@@ -3,7 +3,6 @@ import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
 } from './settings-store';
-import runtimeContext from '../../runtime-context.ts';
 import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
@@ -23,8 +22,6 @@ import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
-
-const NS = runtimeContext as any;
 
 let currentJob: any = null;
 
@@ -122,26 +119,10 @@ function computeDelta(messages: any[], cursor: any) {
 }
 
 function getBackgroundStorageModule() {
-  const storage = NS.backgroundStorage;
-  if (
-    storage &&
-    typeof storage.getConversationById === 'function' &&
-    typeof storage.getMessagesByConversationId === 'function'
-  ) {
-    return storage;
-  }
   return defaultBackgroundStorage;
 }
 
 function getSettingsStoreModule() {
-  const store = NS.obsidianSettingsStore;
-  if (
-    store &&
-    typeof store.getConnectionConfig === 'function' &&
-    typeof store.getPathConfig === 'function'
-  ) {
-    return store;
-  }
   return {
     getConnectionConfig: getObsidianConnectionConfig,
     getPathConfig: getObsidianPathConfig,
@@ -149,8 +130,6 @@ function getSettingsStoreModule() {
 }
 
 function getLocalRestClientModule() {
-  const clientMod = NS.obsidianLocalRestClient;
-  if (clientMod && typeof clientMod.createClient === 'function') return clientMod;
   return {
     createClient: createDefaultObsidianClient,
     NOTE_JSON_ACCEPT,
@@ -158,22 +137,12 @@ function getLocalRestClientModule() {
 }
 
 function getNotePathModule() {
-  const notePathMod = NS.obsidianNotePath;
-  if (notePathMod && typeof notePathMod.buildStableNotePath === 'function') return notePathMod;
   return {
     buildStableNotePath: buildDefaultStableNotePath,
   };
 }
 
 function getSyncMetadataModule() {
-  const metaMod = NS.obsidianSyncMetadata;
-  if (
-    metaMod &&
-    typeof metaMod.readSyncnosObject === 'function' &&
-    typeof metaMod.buildSyncnosObject === 'function'
-  ) {
-    return metaMod;
-  }
   return {
     readSyncnosObject: readDefaultSyncnosObject,
     buildSyncnosObject: buildDefaultSyncnosObject,
@@ -181,16 +150,6 @@ function getSyncMetadataModule() {
 }
 
 function getMarkdownWriterModule() {
-  const writer = NS.obsidianMarkdownWriter;
-  if (
-    writer &&
-    typeof writer.buildFullNoteMarkdown === 'function' &&
-    typeof writer.buildIncrementalAppendMarkdown === 'function' &&
-    typeof writer.appendUnderMessagesHeading === 'function' &&
-    typeof writer.replaceSyncnosFrontmatter === 'function'
-  ) {
-    return writer;
-  }
   return {
     buildFullNoteMarkdown: buildDefaultFullNoteMarkdown,
     buildIncrementalAppendMarkdown: buildDefaultIncrementalAppendMarkdown,
@@ -226,9 +185,9 @@ async function decideSyncModeForConversation({
   conversationId,
   forceFull,
 }: {
-  conversationId?: number;
+  conversationId: number;
   forceFull?: boolean;
-} = {}) {
+}) {
   const storage = getBackgroundStorageModule();
   if (
     !storage ||
@@ -273,7 +232,7 @@ async function decideSyncModeForConversation({
   const pathConfig = store && typeof store.getPathConfig === 'function' ? await store.getPathConfig() : null;
   const folderByKindId = pathConfig
     ? { chat: safeString(pathConfig.chatFolder), article: safeString(pathConfig.articleFolder) }
-    : null;
+    : undefined;
   const desiredFilePath = notePathMod.buildStableNotePath(convo, { folderByKindId });
   const desiredFolder = (() => {
     const p = safeString(desiredFilePath);
@@ -415,17 +374,18 @@ async function decideSyncModeForConversation({
   const frontmatter = note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
 
   const parsed = metaMod.readSyncnosObject(frontmatter);
-  if (!parsed.ok) {
+  const parsedData = parsed && parsed.ok && parsed.data ? parsed.data : null;
+  if (!parsedData) {
     return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
   }
   if (
-    parsed.data.source !== safeString(convo.source) ||
-    parsed.data.conversationKey !== safeString(convo.conversationKey)
+    safeString(parsedData.source) !== safeString(convo.source) ||
+    safeString(parsedData.conversationKey) !== safeString(convo.conversationKey)
   ) {
     return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
   }
 
-  const delta = computeDelta(messages, parsed.data);
+  const delta = computeDelta(messages, parsedData);
   if (!delta.ok) {
     return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
   }
@@ -470,7 +430,7 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
 
   const clientMod = getLocalRestClientModule();
   const client = clientMod.createClient(conn);
-  if (!client || client.ok === false) {
+  if (!client || client.ok === false || typeof (client as any).getServerStatus !== 'function') {
     return {
       ok: false,
       error: client && client.error ? client.error : { code: 'invalid_client', message: 'invalid client' },
@@ -478,7 +438,7 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
     };
   }
 
-  const res = await client.getServerStatus();
+  const res = await (client as any).getServerStatus();
   if (!res || !res.ok) {
     return {
       ok: false,
@@ -740,8 +700,6 @@ async function syncConversations({
 }
 
 const api = { testConnection, getSyncStatus, syncConversations };
-
-NS.obsidianSyncOrchestrator = api;
 
 export { testConnection, getSyncStatus, syncConversations };
 export default api;

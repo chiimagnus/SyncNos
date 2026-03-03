@@ -12,10 +12,10 @@ import notionApi from '../sync/notion/notion-api.ts';
 import notionFilesApi from '../sync/notion/notion-files-api.ts';
 
 import {
-  getObsidianSyncStatus,
-  obsidianSyncConversations,
-  testObsidianConnection,
-} from '../sync/obsidian/orchestrator.ts';
+  getSyncStatus as getObsidianSyncStatus,
+  syncConversations as obsidianSyncConversations,
+  testConnection as testObsidianConnection,
+} from '../sync/obsidian/obsidian-sync-orchestrator.ts';
 
 import { conversationKinds } from '../protocols/conversation-kinds.ts';
 
@@ -63,7 +63,7 @@ export function createBackgroundServices(): BackgroundServices {
     notionSyncOrchestrator,
     obsidianSyncOrchestrator: {
       syncConversations: obsidianSyncConversations,
-      getSyncStatus: getObsidianSyncStatus,
+      getSyncStatus: async (input: { instanceId: string }) => getObsidianSyncStatus(input as any),
       testConnection: testObsidianConnection,
     },
   };

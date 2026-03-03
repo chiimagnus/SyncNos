@@ -4,7 +4,6 @@ import {
   stableConversationHash16,
   stableConversationId10,
 } from '../../conversations/file-naming';
-import runtimeContext from '../../runtime-context.ts';
 
 const DEFAULT_OBSIDIAN_FOLDER = 'SyncNos-AIChats';
 
@@ -24,8 +23,6 @@ function normalizeFolderPath(input: unknown) {
 }
 
 function getConversationKinds() {
-  const injected = (runtimeContext as any).conversationKinds;
-  if (injected && typeof injected.pick === 'function') return injected;
   if (builtInConversationKinds && typeof builtInConversationKinds.pick === 'function') {
     return builtInConversationKinds;
   }
@@ -87,8 +84,6 @@ const api = {
   stableConversationHash16,
   stableConversationId10,
 };
-
-(runtimeContext as any).obsidianNotePath = api;
 
 export {
   DEFAULT_OBSIDIAN_FOLDER,

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createTestBackgroundRouter } from "./background-router-testkit";
+import { registerSettingsHandlers } from "../../src/settings/background-handlers";
+import { registerSyncHandlers } from "../../src/sync/background-handlers";
+import { createBackgroundRouter } from "../../src/platform/messaging/background-router";
 
 describe("background-router obsidian sync routes", () => {
   it("delegates settings get/save and orchestrator actions", async () => {
@@ -10,24 +12,6 @@ describe("background-router obsidian sync routes", () => {
     };
 
     const store: Record<string, unknown> = {};
-    // @ts-expect-error test global
-    globalThis.WebClipper = {
-      backgroundStorage: {},
-      obsidianSyncOrchestrator: {
-        async testConnection({ instanceId }: any) {
-          calls.testConnection += 1;
-          return { ok: true, instanceId };
-        },
-        async getSyncStatus({ instanceId }: any) {
-          calls.getSyncStatus += 1;
-          return { job: null, instanceId };
-        },
-        async syncConversations(payload: any) {
-          calls.syncConversations = payload;
-          return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
-        }
-      }
-    };
 
     // @ts-expect-error test global
     globalThis.chrome = {
@@ -48,7 +32,42 @@ describe("background-router obsidian sync routes", () => {
       }
     };
 
-    const router = createTestBackgroundRouter();
+    const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const router = createBackgroundRouter({
+      fallback: (msg: any) => ({
+        ok: false,
+        data: null,
+        error: { message: `unknown message type: ${msg?.type}`, extra: null },
+      }),
+    });
+
+    registerSettingsHandlers(router as any, {
+      getInstanceId: () => instanceId,
+      testObsidianConnection: async ({ instanceId }: any) => {
+        calls.testConnection += 1;
+        return { ok: true, instanceId };
+      },
+      notionSyncJobStore: { NOTION_SYNC_JOB_KEY: 'notion_sync_job_v1' },
+      conversationKinds: null,
+      backgroundInpageWebVisibility: null,
+    });
+    registerSyncHandlers(router as any, {
+      getInstanceId: () => instanceId,
+      notionSyncOrchestrator: {
+        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+        getSyncJobStatus: async () => ({ job: null }),
+      },
+      obsidianSyncOrchestrator: {
+        async getSyncStatus({ instanceId }: any) {
+          calls.getSyncStatus += 1;
+          return { job: null, instanceId };
+        },
+        async syncConversations(payload: any) {
+          calls.syncConversations = payload;
+          return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
+        },
+      },
+    });
 
     const getRes = await router.__handleMessageForTests({ type: "obsidianGetSettings" });
     expect(getRes.ok).toBe(true);
