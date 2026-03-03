@@ -14,7 +14,7 @@ describe("obsidian-note-path", () => {
     const path2 = mod.buildStableNotePath(convo);
     expect(path1).toBe(path2);
     expect(path1).toContain("SyncNos-WebArticles/");
-    expect(path1).toMatch(/goodlinks-[0-9a-f]{16}\.md$/);
+    expect(path1).toMatch(/goodlinks-Untitled-[0-9a-f]{10}\.md$/);
   });
 
   it("allows per-kind folder override (e.g. user-configured paths)", async () => {
@@ -23,6 +23,6 @@ describe("obsidian-note-path", () => {
     const convo = { sourceType: "article", source: "goodlinks", conversationKey: "abc" };
     const p = mod.buildStableNotePath(convo, { folderByKindId: { article: "My/Custom Folder" } });
     expect(p).toContain("My/Custom Folder/");
-    expect(p).toMatch(/goodlinks-[0-9a-f]{16}\.md$/);
+    expect(p).toMatch(/goodlinks-Untitled-[0-9a-f]{10}\.md$/);
   });
 });

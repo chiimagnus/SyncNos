@@ -1,4 +1,9 @@
 import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
+import {
+  buildConversationBasename,
+  stableConversationHash16,
+  stableConversationId10,
+} from '../../domains/conversations/file-naming';
 import runtimeContext from '../../runtime-context.ts';
 
 const DEFAULT_OBSIDIAN_FOLDER = 'SyncNos-AIChats';
@@ -57,23 +62,18 @@ function folderForConversation(
   return fallback || DEFAULT_OBSIDIAN_FOLDER;
 }
 
-function fnv1a64Hex(input: unknown) {
-  const value = safeString(input);
-  let hash = 0xcbf29ce484222325n;
-  const prime = 0x100000001b3n;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= BigInt(value.charCodeAt(i));
-    hash = (hash * prime) & 0xffffffffffffffffn;
-  }
-  return hash.toString(16).padStart(16, '0');
-}
-
 function buildStableNotePath(conversation: any, opts?: { folderByKindId?: Record<string, unknown>; defaultFolder?: string }) {
   const c = conversation || {};
-  const source = safeString(c.source) || 'unknown';
-  const conversationKey = safeString(c.conversationKey) || 'unknown';
   const folder = folderForConversation(c, opts || {});
-  const id = fnv1a64Hex(`${source}:${conversationKey}`);
+  const filename = `${buildConversationBasename(c)}.md`;
+  return folder ? `${folder}/${filename}` : filename;
+}
+
+function buildLegacyHashNotePath(conversation: any, opts?: { folderByKindId?: Record<string, unknown>; defaultFolder?: string }) {
+  const c = conversation || {};
+  const source = safeString(c.source) || 'unknown';
+  const folder = folderForConversation(c, opts || {});
+  const id = stableConversationHash16(c);
   const filename = `${source}-${id}.md`;
   return folder ? `${folder}/${filename}` : filename;
 }
@@ -81,9 +81,11 @@ function buildStableNotePath(conversation: any, opts?: { folderByKindId?: Record
 const api = {
   DEFAULT_OBSIDIAN_FOLDER,
   folderForConversation,
-  fnv1a64Hex,
   normalizeFolderPath,
   buildStableNotePath,
+  buildLegacyHashNotePath,
+  stableConversationHash16,
+  stableConversationId10,
 };
 
 (runtimeContext as any).obsidianNotePath = api;
@@ -91,8 +93,10 @@ const api = {
 export {
   DEFAULT_OBSIDIAN_FOLDER,
   folderForConversation,
-  fnv1a64Hex,
   normalizeFolderPath,
   buildStableNotePath,
+  buildLegacyHashNotePath,
+  stableConversationHash16,
+  stableConversationId10,
 };
 export default api;

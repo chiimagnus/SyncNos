@@ -16,6 +16,10 @@ import {
 } from './obsidian-markdown-writer.ts';
 import { buildStableNotePath as buildDefaultStableNotePath } from './obsidian-note-path.ts';
 import {
+  stableConversationHash16,
+  stableConversationId10 as stableConversationId10Fallback,
+} from '../../domains/conversations/file-naming';
+import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
@@ -270,7 +274,25 @@ async function decideSyncModeForConversation({
   const folderByKindId = pathConfig
     ? { chat: safeString(pathConfig.chatFolder), article: safeString(pathConfig.articleFolder) }
     : null;
-  const filePath = notePathMod.buildStableNotePath(convo, { folderByKindId });
+  const desiredFilePath = notePathMod.buildStableNotePath(convo, { folderByKindId });
+  const desiredFolder = (() => {
+    const p = safeString(desiredFilePath);
+    const idx = p.lastIndexOf('/');
+    return idx > 0 ? p.slice(0, idx) : '';
+  })();
+  const legacyHashFilePath =
+    notePathMod && typeof (notePathMod as any).buildLegacyHashNotePath === 'function'
+      ? (notePathMod as any).buildLegacyHashNotePath(convo, { folderByKindId })
+      : (() => {
+          const source = safeString(convo && (convo as any).source) || 'unknown';
+          const id = stableConversationHash16(convo);
+          const filename = `${source}-${id}.md`;
+          return desiredFolder ? `${desiredFolder}/${filename}` : filename;
+        })();
+  const stableId10 =
+    notePathMod && typeof (notePathMod as any).stableConversationId10 === 'function'
+      ? safeString((notePathMod as any).stableConversationId10(convo))
+      : stableConversationId10Fallback(convo);
 
   const clientRes: any = await buildClient();
   if (!clientRes.ok) {
@@ -287,18 +309,67 @@ async function decideSyncModeForConversation({
     };
   }
   const client = clientRes.client;
+  const accept = clientRes.noteJsonAccept || client.NOTE_JSON_ACCEPT || NOTE_JSON_ACCEPT;
 
-  if (forceFull) {
-    return { isFinal: false, conversationId, convo, filePath, messages, mode: 'full_rebuild_forced' };
+  const metaMod = getSyncMetadataModule();
+
+  async function tryGetNote(path: string) {
+    const p = safeString(path);
+    if (!p) return null;
+    const r = await client.getVaultFile(p, { accept });
+    if (r && r.ok) return r;
+    if (r && r.status === 404) return null;
+    throw new Error(r && r.error && r.error.message ? r.error.message : 'remote error');
   }
 
-  const remote = await client.getVaultFile(filePath, {
-    accept: clientRes.noteJsonAccept || client.NOTE_JSON_ACCEPT || NOTE_JSON_ACCEPT,
-  });
-  if (!remote.ok) {
-    if (remote.status === 404) {
-      return { isFinal: false, conversationId, convo, filePath, messages, mode: 'full_rebuild' };
+  let existingRemote: any = null;
+  let existingPath = '';
+  let deleteAfterFilePath = '';
+
+  try {
+    existingRemote = await tryGetNote(desiredFilePath);
+    existingPath = existingRemote ? desiredFilePath : '';
+
+    if (!existingRemote && legacyHashFilePath && legacyHashFilePath !== desiredFilePath) {
+      existingRemote = await tryGetNote(legacyHashFilePath);
+      if (existingRemote) {
+        existingPath = legacyHashFilePath;
+      }
     }
+
+    if (!existingRemote && desiredFolder && stableId10 && typeof client.listVaultDir === 'function') {
+      const listRes = await client.listVaultDir(desiredFolder);
+      const raw = listRes && listRes.ok && listRes.data && typeof listRes.data === 'object' ? listRes.data : null;
+      const files = raw && Array.isArray((raw as any).files) ? (raw as any).files : [];
+      const suffix = `-${stableId10}.md`.toLowerCase();
+      const candidates = files
+        .map((x: any) => safeString(x))
+        .filter((x: string) => !!x && !x.endsWith('/') && x.toLowerCase().endsWith(suffix));
+
+      for (const entry of candidates) {
+        const fullPath = entry.includes('/') ? entry : desiredFolder ? `${desiredFolder}/${entry}` : entry;
+        if (!fullPath || fullPath === desiredFilePath) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const r = await tryGetNote(fullPath);
+        if (!r) continue;
+        const note = r.data && typeof r.data === 'object' ? r.data : null;
+        const frontmatter =
+          note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
+        const parsed = metaMod.readSyncnosObject(frontmatter);
+        if (
+          parsed &&
+          parsed.ok &&
+          parsed.data &&
+          parsed.data.source === safeString(convo.source) &&
+          parsed.data.conversationKey === safeString(convo.conversationKey)
+        ) {
+          existingRemote = r;
+          existingPath = fullPath;
+          break;
+        }
+      }
+    }
+  } catch (e: any) {
     return {
       isFinal: true,
       row: buildPerConversationResult({
@@ -306,30 +377,57 @@ async function decideSyncModeForConversation({
         ok: false,
         mode: 'failed',
         appended: 0,
-        error: remote.error && remote.error.message ? remote.error.message : 'remote error',
+        error: e?.message ? String(e.message) : String(e || 'remote error'),
         at: Date.now(),
       }),
     };
   }
 
-  const note = remote.data && typeof remote.data === 'object' ? remote.data : null;
+  if (!existingRemote) {
+    return {
+      isFinal: false,
+      conversationId,
+      convo,
+      filePath: desiredFilePath,
+      messages,
+      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild',
+    };
+  }
+
+  if (existingPath && existingPath !== desiredFilePath) {
+    deleteAfterFilePath = existingPath;
+    return {
+      isFinal: false,
+      conversationId,
+      convo,
+      filePath: desiredFilePath,
+      deleteAfterFilePath,
+      messages,
+      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
+    };
+  }
+
+  if (forceFull) {
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild_forced' };
+  }
+
+  const note = existingRemote.data && typeof existingRemote.data === 'object' ? existingRemote.data : null;
   const frontmatter = note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
 
-  const metaMod = getSyncMetadataModule();
   const parsed = metaMod.readSyncnosObject(frontmatter);
   if (!parsed.ok) {
-    return { isFinal: false, conversationId, convo, filePath, messages, mode: 'full_rebuild' };
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
   }
   if (
     parsed.data.source !== safeString(convo.source) ||
     parsed.data.conversationKey !== safeString(convo.conversationKey)
   ) {
-    return { isFinal: false, conversationId, convo, filePath, messages, mode: 'full_rebuild' };
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
   }
 
   const delta = computeDelta(messages, parsed.data);
   if (!delta.ok) {
-    return { isFinal: false, conversationId, convo, filePath, messages, mode: 'full_rebuild' };
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
   }
   const newMessages = Array.isArray(delta.newMessages) ? delta.newMessages : [];
   if (!newMessages.length) {
@@ -351,7 +449,7 @@ async function decideSyncModeForConversation({
     isFinal: false,
     conversationId,
     convo,
-    filePath,
+    filePath: desiredFilePath,
     messages,
     mode: 'incremental_append',
     newMessages,
@@ -445,7 +543,11 @@ async function syncConversations({
             error: clientRes.error && clientRes.error.message ? clientRes.error.message : 'client error',
             at: Date.now(),
           });
-        } else if (decision.mode === 'full_rebuild' || decision.mode === 'full_rebuild_forced') {
+        } else if (
+          decision.mode === 'full_rebuild' ||
+          decision.mode === 'full_rebuild_forced' ||
+          decision.mode === 'full_rebuild_rename'
+        ) {
           const syncnosObject = metaMod.buildSyncnosObject({
             conversation: decision.convo,
             cursor: pickLocalCursor(decision.messages),
@@ -466,14 +568,38 @@ async function syncConversations({
               at: Date.now(),
             });
           } else {
-            row = buildPerConversationResult({
-              conversationId,
-              ok: true,
-              mode: decision.mode,
-              appended: decision.messages.length,
-              error: '',
-              at: Date.now(),
-            });
+            const deleteAfter = decision.deleteAfterFilePath ? safeString(decision.deleteAfterFilePath) : '';
+            if (deleteAfter && deleteAfter !== safeString(decision.filePath) && typeof client.deleteVaultFile === 'function') {
+              const delRes = await client.deleteVaultFile(deleteAfter);
+              if (!delRes || !delRes.ok) {
+                row = buildPerConversationResult({
+                  conversationId,
+                  ok: false,
+                  mode: 'rename_delete_failed',
+                  appended: decision.messages.length,
+                  error: delRes && delRes.error && delRes.error.message ? delRes.error.message : 'delete failed',
+                  at: Date.now(),
+                });
+              } else {
+                row = buildPerConversationResult({
+                  conversationId,
+                  ok: true,
+                  mode: decision.mode,
+                  appended: decision.messages.length,
+                  error: '',
+                  at: Date.now(),
+                });
+              }
+            } else {
+              row = buildPerConversationResult({
+                conversationId,
+                ok: true,
+                mode: decision.mode,
+                appended: decision.messages.length,
+                error: '',
+                at: Date.now(),
+              });
+            }
           }
         } else if (decision.mode === 'incremental_append') {
           const chunk = writer.buildIncrementalAppendMarkdown({ newMessages: decision.newMessages });
