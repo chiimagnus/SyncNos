@@ -139,12 +139,42 @@ function stripThinkingFromNode(node: Element | null): Element | null {
   return cloned;
 }
 
+function stripTurnChromeFromNode(node: Element | null): Element | null {
+  if (!node || typeof (node as any).cloneNode !== 'function') return node;
+  const cloned = (node as any).cloneNode(true) as Element;
+  const selectors = [
+    '.author-label',
+    '.timestamp',
+  ];
+  for (const selector of selectors) {
+    try {
+      const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
+      for (const el of list) {
+        try {
+          (el as any).remove?.();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    } catch (_e) {
+      // ignore
+    }
+  }
+  return cloned;
+}
+
+function cleanTurnContentNode(node: Element | null): Element | null {
+  const noThinking = stripThinkingFromNode(node);
+  return stripTurnChromeFromNode(noThinking);
+}
+
 function extractMessageFromTurn(turn: Element, sequence: number): any | null {
   const role = normalizeRoleFromTurn(turn);
   if (!role) return null;
 
   const contentEl = pickTurnContent(turn, role);
   if (!contentEl) return null;
+  const cleanedContent = cleanTurnContentNode(contentEl as any) || contentEl;
 
   const utils = NS.collectorUtils || {};
   const extractImages = typeof utils.extractImageUrlsFromElement === 'function' ? utils.extractImageUrlsFromElement : null;
@@ -152,8 +182,8 @@ function extractMessageFromTurn(turn: Element, sequence: number): any | null {
 
   const updatedAt = Date.now();
   if (role === 'user') {
-    const text = NS.normalize.normalizeText((contentEl as any).innerText || (contentEl as any).textContent || '');
-    const imageUrls = extractImages ? extractImages(contentEl) : [];
+    const text = NS.normalize.normalizeText((cleanedContent as any).innerText || (cleanedContent as any).textContent || '');
+    const imageUrls = extractImages ? extractImages(cleanedContent) : [];
     if (!text && !imageUrls.length) return null;
     const contentText = text || '';
     const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
@@ -167,13 +197,12 @@ function extractMessageFromTurn(turn: Element, sequence: number): any | null {
     };
   }
 
-  const cleaned = stripThinkingFromNode(contentEl as any) || contentEl;
-  const text = extractAssistantText(cleaned);
-  const imageUrls = extractImages ? extractImages(cleaned) : [];
+  const text = extractAssistantText(cleanedContent);
+  const imageUrls = extractImages ? extractImages(cleanedContent) : [];
   if (!text && !imageUrls.length) return null;
 
   const contentText = text || '';
-  const baseMarkdown = extractAssistantMarkdown(cleaned, contentText);
+  const baseMarkdown = extractAssistantMarkdown(cleanedContent, contentText);
   const contentMarkdown = appendImageMd
     ? appendImageMd(baseMarkdown || contentText, imageUrls)
     : baseMarkdown || contentText;
@@ -242,7 +271,7 @@ async function prepareManualCapture(options: any = {}): Promise<any> {
     while ((Date.now() - start) <= perTurnTimeoutMs) {
       const contentEl = pickTurnContent(turn, role);
       if (contentEl) {
-        const checkEl = role === 'assistant' ? (stripThinkingFromNode(contentEl as any) || contentEl) : contentEl;
+        const checkEl = cleanTurnContentNode(contentEl as any) || contentEl;
         const text = String((checkEl as any).textContent || '').replace(/\s+/g, ' ').trim();
         const hasImage = !!(checkEl as any).querySelector?.('img');
         if (text || hasImage) break;
