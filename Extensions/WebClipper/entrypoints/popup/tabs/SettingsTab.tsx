@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '../../../src/domains/backup/export';
+import { exportBackupZipV2 } from '../../../src/sync/backup/export';
 import {
   importBackupLegacyJsonMerge,
   importBackupZipV2Merge,
   type ImportProgress,
   type ImportStats,
-} from '../../../src/domains/backup/import';
-import { extractZipEntries } from '../../../src/domains/backup/zip-utils';
-import { disconnectNotion } from '../../../src/domains/settings/sensitive';
-import { getNotionOAuthDefaults } from '../../../src/integrations/notion/oauth';
+} from '../../../src/sync/backup/import';
+import { extractZipEntries } from '../../../src/sync/backup/zip-utils';
+import { disconnectNotion } from '../../../src/settings/sensitive';
+import { getNotionOAuthDefaults } from '../../../src/sync/notion/auth/oauth';
 import {
   ARTICLE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
@@ -18,7 +18,7 @@ import {
 } from '../../../src/platform/messaging/message-contracts';
 import { send } from '../../../src/platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
-import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../src/domains/sync/repo';
+import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../src/sync/repo';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };

@@ -33,9 +33,9 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
-    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     const res = await orch.testConnection({ instanceId: "x" });
     expect(res.ok).toBe(false);
@@ -46,12 +46,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
-    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -87,12 +87,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
-    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -140,12 +140,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
-    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -188,12 +188,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
-    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -241,13 +241,13 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
-    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const naming = await loadModule("../../src/domains/conversations/file-naming.ts");
-    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+    const naming = await loadModule("../../src/conversations/file-naming.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     const convo = { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "New Title" };
     const stableId10 = naming.stableConversationId10(convo);

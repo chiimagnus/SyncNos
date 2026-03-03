@@ -35,11 +35,11 @@ async function prepareNotionRouter() {
   const nonce = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   await import(
     /* @vite-ignore */
-    `../../src/export/notion/notion-sync-job-store.ts?t=${nonce}`
+    `../../src/sync/notion/notion-sync-job-store.ts?t=${nonce}`
   );
   await import(
     /* @vite-ignore */
-    `../../src/export/notion/notion-sync-orchestrator.ts?t=${nonce}`
+    `../../src/sync/notion/notion-sync-orchestrator.ts?t=${nonce}`
   );
   return createTestBackgroundRouter();
 }

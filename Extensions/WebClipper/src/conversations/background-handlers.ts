@@ -1,4 +1,4 @@
-import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
+import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../platform/messaging/message-contracts';
 import {
   deleteConversationsByIds,
   getConversationDetail,

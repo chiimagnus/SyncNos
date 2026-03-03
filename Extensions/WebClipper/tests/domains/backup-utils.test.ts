@@ -8,9 +8,9 @@ import {
   validateBackupDocument,
   validateBackupManifest,
   validateConversationBundle,
-} from '../../src/domains/backup/backup-utils';
+} from '../../src/sync/backup/backup-utils';
 
-describe('domains/backup backup-utils', () => {
+describe('backup backup-utils', () => {
   it('uniqueConversationKey returns stable source||key', () => {
     expect(uniqueConversationKey({ source: 'chatgpt', conversationKey: 'c1' })).toBe('chatgpt||c1');
     expect(uniqueConversationKey({ source: '', conversationKey: 'c1' })).toBe('');

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 async function loadNotePath() {
-  const mod = await import("../../src/export/obsidian/obsidian-note-path.ts");
+  const mod = await import("../../src/sync/obsidian/obsidian-note-path.ts");
   return mod.default || mod;
 }
 
