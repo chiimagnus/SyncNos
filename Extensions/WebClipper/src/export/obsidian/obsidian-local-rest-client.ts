@@ -205,6 +205,11 @@ function createClient({
     return request('GET', `/vault/${encoded}`, { accept: accept || 'text/markdown' });
   }
 
+  function listVaultDir(pathToDirectory: string) {
+    const encoded = encodeVaultPath(pathToDirectory);
+    return request('GET', `/vault/${encoded}/`, { accept: 'application/json' });
+  }
+
   function putVaultFile(filePath: string, markdown: unknown) {
     const encoded = encodeVaultPath(filePath);
     return request('PUT', `/vault/${encoded}`, {
@@ -212,6 +217,11 @@ function createClient({
       contentType: 'text/markdown',
       accept: 'application/json',
     });
+  }
+
+  function deleteVaultFile(filePath: string) {
+    const encoded = encodeVaultPath(filePath);
+    return request('DELETE', `/vault/${encoded}`, { accept: 'application/json' });
   }
 
   function patchVaultFile(
@@ -266,7 +276,9 @@ function createClient({
     NOTE_JSON_ACCEPT,
     getServerStatus,
     getVaultFile,
+    listVaultDir,
     putVaultFile,
+    deleteVaultFile,
     patchVaultFile,
   };
 }
