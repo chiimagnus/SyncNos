@@ -18,7 +18,11 @@
 - 修改应聚焦在：采集 -> 本地持久化 -> 导出/Obsidian/备份/导入 -> 手动 Notion 同步。
 - 权限保持最小且明确；避免添加 `*://*/*` 或无关的 Chrome API。
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
+- 备份 Zip v2 结构固定为 `manifest.json + sources/conversations.csv + sources/... + config/storage-local.json`。
+- 备份 `chrome.storage.local` 默认采用“全量非敏感键”策略；敏感键（`notion_oauth_token*`、`notion_oauth_client_secret`）必须排除。
+- 备份导入入口统一在 `Settings -> App Settings`（含 Firefox popup）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
+- 对话删除必须显式二次确认，避免误删。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
 - inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。
 - inpage 显示范围开关：`inpage_supported_only`（`chrome.storage.local`）。
@@ -34,6 +38,7 @@
 - **SOLID（适配到本项目的 JS 架构）**
   - **S（单一职责）**：UI（popup）、数据层（IndexedDB/storage）、抓取（collectors）、同步（notion sync）分离；避免“一个模块既抓又存又同步又渲染”。
   - **O（开闭原则）**：新增平台优先通过新增 `collector` + 注册表扩展完成，避免在多处 `switch/if` 扩散。
+    - Google AI Studio 等虚拟列表站点需优先在 collector 层补齐 DOM 兼容，不要把站点特化逻辑散落到 popup/background。
   - **I（接口隔离）**：以最小能力的“contract/shape”交互（例如 collector 只暴露 `matches/capture`），避免把内部实现细节泄露到调用方。
   - **D（依赖倒置）**：业务逻辑依赖抽象（例如 `notionApi.notionFetch` / `tokenStore`），在测试里可替换 mock。
 - **DRY**：重复逻辑抽成共享函数（`popup-core`、`collector-utils`、`notion-api`）；但不要为了抽象而抽象。

@@ -77,11 +77,14 @@ SyncNos has two parts:
 - Export selected conversations as Markdown (single merged file or multi-file zip).
 - Sync selected conversations to Obsidian via `Obsidian Local REST API` (`http://127.0.0.1:27123`).
 - Database backup:
-  - Export `*.zip` (`manifest.json` + `index/conversations.csv` + `sources/...` + `config/storage-local.json`)
+  - Export `*.zip` (`manifest.json` + `sources/conversations.csv` + `sources/...` + `config/storage-local.json`)
   - Import `*.zip` (recommended) and legacy `*.json`
   - Merge by `(source + conversationKey)` to avoid duplicates
-  - Notion token / secret are excluded from backups
+  - Back up all non-sensitive `chrome.storage.local` settings
+  - Sensitive keys are excluded from backups (`notion_oauth_token*`, `notion_oauth_client_secret`)
+  - Backup import entry is in `Settings -> App Settings` (Firefox uses the same route)
 - Manually sync selected conversations to Notion (OAuth).
+- Deleting conversations requires explicit confirmation in popup.
 - Configurable Inpage button visibility:
   - Default: all `http(s)` pages
   - Optional: only supported AI sites + Notion pages
@@ -92,6 +95,7 @@ SyncNos has two parts:
 - If cursor matches, append only new messages; otherwise rebuild page blocks when cursor is missing or content is refreshed.
 - If `contentMarkdown` exists, render as Notion blocks (headings/lists/quotes/code blocks); otherwise fallback to plain text.
 - Notion AI: optionally auto-select preferred model when current mode is **Auto**.
+- Google AI Studio collector handles virtualized chat turns for manual save and filters non-message chunks.
 
 ### Supported Sites
 
