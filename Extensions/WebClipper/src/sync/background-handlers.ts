@@ -6,7 +6,7 @@ import {
 import {
   getObsidianSyncStatus,
   obsidianSyncConversations,
-} from '../integrations/obsidian/sync/orchestrator';
+} from './obsidian/orchestrator';
 import runtimeContext from '../runtime-context.ts';
 
 type AnyRouter = {

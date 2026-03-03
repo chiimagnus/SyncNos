@@ -13,7 +13,7 @@ import {
   OBSIDIAN_DEFAULTS,
   OBSIDIAN_STORAGE_KEYS,
   saveObsidianSettings,
-} from '../integrations/obsidian/settings-store';
+} from '../sync/obsidian/settings-store';
 import runtimeContext from '../runtime-context.ts';
 
 const namespace: any = runtimeContext;
