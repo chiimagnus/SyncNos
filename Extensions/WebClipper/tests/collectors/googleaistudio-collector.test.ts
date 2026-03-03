@@ -59,6 +59,11 @@ describe('googleaistudio-collector', () => {
           <div class="chat-turn-container render model">
             <div class="virtual-scroll-container model-prompt-container" data-turn-role="Model">
               <div class="turn-content">
+                <ms-thought-chunk>
+                  <div class="thought-panel">
+                    <p>SECRET_THOUGHT_SHOULD_NOT_EXPORT</p>
+                  </div>
+                </ms-thought-chunk>
                 <p><strong>Bold</strong> and <a href="https://example.com">link</a>.</p>
                 <pre><code class="language-swift">print("hi")</code></pre>
               </div>
@@ -85,6 +90,8 @@ describe('googleaistudio-collector', () => {
     expect(snap.messages.length).toBe(2);
     const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
+    expect(assistant.contentText).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
+    expect(assistant.contentMarkdown).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
     expect(assistant.contentMarkdown).toContain('**Bold**');
     expect(assistant.contentMarkdown).toContain('[link](https://example.com)');
     expect(assistant.contentMarkdown).toContain('```swift');
