@@ -1,7 +1,6 @@
-import { storageGet } from '../../platform/storage/local';
+import { storageGetAll } from '../../platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
-  STORAGE_ALLOWLIST,
   filterStorageForBackup,
   uniqueConversationKey,
 } from './backup-utils';
@@ -75,7 +74,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const syncMappings = (await reqToPromise(stores.sync_mappings.getAll() as any)) as AnyRecord[];
   await txDone(t);
 
-  const rawStorage = await storageGet(STORAGE_ALLOWLIST as any);
+  const rawStorage = await storageGetAll();
   const storageLocal = filterStorageForBackup(rawStorage);
 
   const exportedAt = new Date().toISOString();
@@ -195,7 +194,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
           csvCell(msgs.length),
           csvCell(notionPageId),
           csvCell(hasNotionPageId),
-          csvCell(entryPath),
+          csvCell(entryPath.replace(/^sources\//, '')),
         ].join(','),
       );
     }
@@ -216,7 +215,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     lastModified: exportedAt,
   });
   files.push({
-    name: 'index/conversations.csv',
+    name: 'sources/conversations.csv',
     data: indexLines.join('\n'),
     lastModified: exportedAt,
   });
@@ -231,7 +230,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
       sync_mappings: allMappings.length,
     },
     config: { storageLocalPath: 'config/storage-local.json' },
-    index: { conversationsCsvPath: 'index/conversations.csv' },
+    index: { conversationsCsvPath: 'sources/conversations.csv' },
     sources: manifestSources,
   };
   files.unshift({

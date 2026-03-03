@@ -16,9 +16,10 @@ describe('domains/backup backup-utils', () => {
     expect(uniqueConversationKey({ source: '', conversationKey: 'c1' })).toBe('');
   });
 
-  it('filterStorageForBackup keeps allowlist only', () => {
+  it('filterStorageForBackup keeps all non-sensitive settings', () => {
     const filtered = filterStorageForBackup({
       notion_oauth_client_id: 'abc',
+      notion_oauth_client_secret: 'secret',
       notion_parent_page_id: 'p1',
       notion_db_id_syncnos_ai_chats: 'db1',
       notion_db_id_syncnos_web_articles: 'db2',
@@ -26,6 +27,8 @@ describe('domains/backup backup-utils', () => {
       popup_source_filter_key: 'all',
       notion_ai_preferred_model_index: 3,
       notion_oauth_token_v1: { accessToken: 'secret' },
+      obsidian_api_base_url: 'http://127.0.0.1:27123',
+      obsidian_api_key: 'obsidian-key',
     });
     expect(filtered).toEqual({
       notion_oauth_client_id: 'abc',
@@ -35,6 +38,8 @@ describe('domains/backup backup-utils', () => {
       popup_active_tab: 'settings',
       popup_source_filter_key: 'all',
       notion_ai_preferred_model_index: 3,
+      obsidian_api_base_url: 'http://127.0.0.1:27123',
+      obsidian_api_key: 'obsidian-key',
     });
   });
 
@@ -66,7 +71,7 @@ describe('domains/backup backup-utils', () => {
       db: { name: 'webclipper', version: 3 },
       counts: { conversations: 1, messages: 2, sync_mappings: 0 },
       config: { storageLocalPath: 'config/storage-local.json' },
-      index: { conversationsCsvPath: 'index/conversations.csv' },
+      index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [{ source: 'chatgpt', conversationCount: 1, files: ['sources/chatgpt/c1.json'] }],
     });
     expect(res.ok).toBe(true);
@@ -79,7 +84,7 @@ describe('domains/backup backup-utils', () => {
       db: { name: 'webclipper', version: 3 },
       counts: { conversations: 1, messages: 0, sync_mappings: 0 },
       config: { storageLocalPath: '../config/storage-local.json' },
-      index: { conversationsCsvPath: 'index/conversations.csv' },
+      index: { conversationsCsvPath: 'sources/conversations.csv' },
       sources: [],
     });
     expect(res.ok).toBe(false);
@@ -168,4 +173,3 @@ describe('domains/backup backup-utils', () => {
     expect(merged2.sequence).toBe(2);
   });
 });
-

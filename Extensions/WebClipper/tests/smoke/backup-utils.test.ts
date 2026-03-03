@@ -2,16 +2,18 @@ import { describe, expect, it } from "vitest";
 import * as backupUtils from "../../src/storage/backup-utils.ts";
 
 describe("backup-utils", () => {
-  it("filterStorageForBackup keeps allowlist only", () => {
+  it("filterStorageForBackup keeps all non-sensitive settings", () => {
     const filtered = backupUtils.filterStorageForBackup({
       notion_oauth_client_id: "abc",
+      notion_oauth_client_secret: "secret",
       notion_parent_page_id: "p1",
       notion_db_id_syncnos_ai_chats: "db1",
       notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings",
       popup_source_filter_key: "all",
       notion_ai_preferred_model_index: 3,
-      notion_oauth_token_v1: { accessToken: "secret" }
+      notion_oauth_token_v1: { accessToken: "secret" },
+      obsidian_api_key: "obsidian-key"
     });
     expect(filtered).toEqual({
       notion_oauth_client_id: "abc",
@@ -20,7 +22,8 @@ describe("backup-utils", () => {
       notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings",
       popup_source_filter_key: "all",
-      notion_ai_preferred_model_index: 3
+      notion_ai_preferred_model_index: 3,
+      obsidian_api_key: "obsidian-key"
     });
   });
 
@@ -52,7 +55,7 @@ describe("backup-utils", () => {
       db: { name: "webclipper", version: 3 },
       counts: { conversations: 1, messages: 2, sync_mappings: 0 },
       config: { storageLocalPath: "config/storage-local.json" },
-      index: { conversationsCsvPath: "index/conversations.csv" },
+      index: { conversationsCsvPath: "sources/conversations.csv" },
       sources: [
         { source: "chatgpt", conversationCount: 1, files: ["sources/chatgpt/c1.json"] }
       ]
@@ -67,7 +70,7 @@ describe("backup-utils", () => {
       db: { name: "webclipper", version: 3 },
       counts: { conversations: 1, messages: 0, sync_mappings: 0 },
       config: { storageLocalPath: "../config/storage-local.json" },
-      index: { conversationsCsvPath: "index/conversations.csv" },
+      index: { conversationsCsvPath: "sources/conversations.csv" },
       sources: []
     });
     expect(res.ok).toBe(false);
