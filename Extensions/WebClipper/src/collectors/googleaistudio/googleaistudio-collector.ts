@@ -2,6 +2,9 @@ import collectorContext from '../collector-context.ts';
 
 const NS: any = collectorContext as any;
 
+let manualTurnCache: Map<string, any> | null = null;
+let manualCacheConversationKey: string = '';
+
 function matches(loc: any): any {
   const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
   return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
@@ -33,6 +36,10 @@ function inEditMode(root: any): any {
   return NS.collectorUtils.inEditMode(root);
 }
 
+function sleep(ms: any): any {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
 function normalizeRoleFromTurn(turn: Element): 'user' | 'assistant' | null {
   const container = turn.querySelector('.chat-turn-container');
   if (container && (container as any).classList) {
@@ -53,6 +60,14 @@ function pickTurnContent(turn: Element, role: 'user' | 'assistant'): Element | n
   if (scoped) return scoped as any;
   const anyContent = turn.querySelector('.turn-content');
   return (anyContent as any) || null;
+}
+
+function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
+  const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
+  if (id) return `${id}:${role}`;
+  return NS.normalize && typeof NS.normalize.makeFallbackMessageKey === 'function'
+    ? NS.normalize.makeFallbackMessageKey({ role, contentText, sequence })
+    : String(sequence);
 }
 
 function normalizeTitle(value: any): any {
@@ -124,6 +139,54 @@ function stripThinkingFromNode(node: Element | null): Element | null {
   return cloned;
 }
 
+function extractMessageFromTurn(turn: Element, sequence: number): any | null {
+  const role = normalizeRoleFromTurn(turn);
+  if (!role) return null;
+
+  const contentEl = pickTurnContent(turn, role);
+  if (!contentEl) return null;
+
+  const utils = NS.collectorUtils || {};
+  const extractImages = typeof utils.extractImageUrlsFromElement === 'function' ? utils.extractImageUrlsFromElement : null;
+  const appendImageMd = typeof utils.appendImageMarkdown === 'function' ? utils.appendImageMarkdown : null;
+
+  const updatedAt = Date.now();
+  if (role === 'user') {
+    const text = NS.normalize.normalizeText((contentEl as any).innerText || (contentEl as any).textContent || '');
+    const imageUrls = extractImages ? extractImages(contentEl) : [];
+    if (!text && !imageUrls.length) return null;
+    const contentText = text || '';
+    const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+    return {
+      messageKey: messageKeyFromTurn(turn, 'user', contentText, sequence),
+      role: 'user',
+      contentText,
+      contentMarkdown,
+      sequence,
+      updatedAt,
+    };
+  }
+
+  const cleaned = stripThinkingFromNode(contentEl as any) || contentEl;
+  const text = extractAssistantText(cleaned);
+  const imageUrls = extractImages ? extractImages(cleaned) : [];
+  if (!text && !imageUrls.length) return null;
+
+  const contentText = text || '';
+  const baseMarkdown = extractAssistantMarkdown(cleaned, contentText);
+  const contentMarkdown = appendImageMd
+    ? appendImageMd(baseMarkdown || contentText, imageUrls)
+    : baseMarkdown || contentText;
+  return {
+    messageKey: messageKeyFromTurn(turn, 'assistant', contentText, sequence),
+    role: 'assistant',
+    contentText,
+    contentMarkdown,
+    sequence,
+    updatedAt,
+  };
+}
+
 function collectMessages(): any {
   const root = getConversationRoot();
   if (!root) return [];
@@ -133,63 +196,99 @@ function collectMessages(): any {
   if (!turns.length) return [];
 
   const out: any[] = [];
-  const utils = NS.collectorUtils || {};
-  const extractImages = typeof utils.extractImageUrlsFromElement === 'function' ? utils.extractImageUrlsFromElement : null;
-  const appendImageMd = typeof utils.appendImageMarkdown === 'function' ? utils.appendImageMarkdown : null;
   let seq = 0;
   for (const turn of turns) {
-    const role = normalizeRoleFromTurn(turn);
-    if (!role) continue;
-
-    const contentEl = pickTurnContent(turn, role);
-    if (!contentEl) continue;
-
-    if (role === 'user') {
-      const text = NS.normalize.normalizeText((contentEl as any).innerText || (contentEl as any).textContent || '');
-      const imageUrls = extractImages ? extractImages(contentEl) : [];
-      if (text || imageUrls.length) {
-        const contentText = text || '';
-        const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
-        out.push({
-          messageKey: NS.normalize.makeFallbackMessageKey({ role: 'user', contentText, sequence: seq }),
-          role: 'user',
-          contentText,
-          contentMarkdown,
-          sequence: seq,
-          updatedAt: Date.now(),
-        });
-        seq += 1;
-      }
-    }
-
-    if (role === 'assistant') {
-      const cleaned = stripThinkingFromNode(contentEl as any) || contentEl;
-      const text = extractAssistantText(cleaned);
-      const imageUrls = extractImages ? extractImages(cleaned) : [];
-      if (text || imageUrls.length) {
-        const contentText = text || '';
-        const baseMarkdown = extractAssistantMarkdown(cleaned, contentText);
-        const contentMarkdown = appendImageMd
-          ? appendImageMd(baseMarkdown || contentText, imageUrls)
-          : baseMarkdown || contentText;
-        out.push({
-          messageKey: NS.normalize.makeFallbackMessageKey({ role: 'assistant', contentText, sequence: seq }),
-          role: 'assistant',
-          contentText,
-          contentMarkdown,
-          sequence: seq,
-          updatedAt: Date.now(),
-        });
-        seq += 1;
-      }
-    }
+    const msg = extractMessageFromTurn(turn, seq);
+    if (!msg) continue;
+    out.push(msg);
+    seq += 1;
   }
   return out;
 }
 
-function capture(): any {
+async function prepareManualCapture(options: any = {}): Promise<any> {
+  if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return false;
+
+  const root = getConversationRoot();
+  if (!root) return false;
+
+  const turns: Element[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any;
+  if (!turns.length) return false;
+
+  const maxTurns = Math.max(1, Number(options.maxTurns) || 240);
+  const settleMs = Math.max(0, Number(options.settleMs) || 80);
+  const perTurnTimeoutMs = Math.max(120, Number(options.perTurnTimeoutMs) || 900);
+  const pollMs = Math.max(30, Number(options.pollMs) || 80);
+
+  const conversationKey = String(findConversationKey() || '').trim();
+  manualCacheConversationKey = conversationKey;
+  manualTurnCache = new Map<string, any>();
+
+  const bottomTurn = turns[turns.length - 1] || null;
+
+  const total = Math.min(maxTurns, turns.length);
+  for (let i = 0; i < total; i += 1) {
+    const turn = turns[i];
+    const role = normalizeRoleFromTurn(turn);
+    if (!role) continue;
+
+    try {
+      (turn as any).scrollIntoView?.({ block: 'center' });
+    } catch (_e) {
+      // ignore
+    }
+
+    const start = Date.now();
+    while ((Date.now() - start) <= perTurnTimeoutMs) {
+      const contentEl = pickTurnContent(turn, role);
+      if (contentEl) {
+        const checkEl = role === 'assistant' ? (stripThinkingFromNode(contentEl as any) || contentEl) : contentEl;
+        const text = String((checkEl as any).textContent || '').replace(/\s+/g, ' ').trim();
+        const hasImage = !!(checkEl as any).querySelector?.('img');
+        if (text || hasImage) break;
+      }
+      await sleep(pollMs);
+    }
+
+    if (settleMs) await sleep(settleMs);
+
+    const msg = extractMessageFromTurn(turn, 0);
+    if (!msg) continue;
+    const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
+    if (turnId) manualTurnCache.set(turnId, msg);
+  }
+
+  try {
+    (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });
+  } catch (_e) {
+    // ignore
+  }
+
+  return true;
+}
+
+function capture(options: any = {}): any {
   if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
-  const messages = collectMessages();
+  const manual = options && options.manual === true;
+  let messages: any[] = [];
+
+  const currentConversationKey = String(findConversationKey() || '').trim();
+  if (manual && manualTurnCache && manualCacheConversationKey && manualCacheConversationKey === currentConversationKey) {
+    const root = getConversationRoot();
+    const turns: Element[] = root ? (Array.from(root.querySelectorAll('ms-chat-turn')) as any) : [];
+    for (const turn of turns) {
+      const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
+      if (!turnId) continue;
+      const hit = manualTurnCache.get(turnId);
+      if (hit) messages.push(hit);
+    }
+    messages = messages.map((m, idx) => ({ ...m, sequence: idx, updatedAt: Date.now() }));
+    manualTurnCache = null;
+    manualCacheConversationKey = '';
+  } else {
+    messages = collectMessages();
+  }
+
   if (!messages.length) return null;
   return {
     conversation: {
@@ -208,6 +307,7 @@ function capture(): any {
 const api = {
   capture,
   getRoot: getConversationRoot,
+  prepareManualCapture,
   __test: {
     collectMessages,
     extractAssistantMarkdown,
