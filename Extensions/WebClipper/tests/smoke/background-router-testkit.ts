@@ -1,4 +1,4 @@
-import { registerConversationHandlers } from '../../src/domains/conversations/background-handlers';
+import { registerConversationHandlers } from '../../src/conversations/background-handlers';
 import { registerSettingsHandlers } from '../../src/domains/settings/background-handlers';
 import { registerSyncHandlers } from '../../src/domains/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/integrations/web-article/background-handlers';

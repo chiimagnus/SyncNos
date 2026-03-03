@@ -1,10 +1,10 @@
 import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createZipBlob } from '../../../src/domains/backup/zip-utils';
-import { buildConversationBasename } from '../../../src/domains/conversations/file-naming';
-import { formatConversationMarkdown } from '../../../src/domains/conversations/markdown';
-import type { Conversation, ConversationDetail } from '../../../src/domains/conversations/models';
-import { deleteConversations, getConversationDetail, listConversations } from '../../../src/domains/conversations/repo';
+import { buildConversationBasename } from '../../../src/conversations/file-naming';
+import { formatConversationMarkdown } from '../../../src/conversations/markdown';
+import type { Conversation, ConversationDetail } from '../../../src/conversations/models';
+import { deleteConversations, getConversationDetail, listConversations } from '../../../src/conversations/repo';
 import { syncNotionConversations, syncObsidianConversations } from '../../../src/domains/sync/repo';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 

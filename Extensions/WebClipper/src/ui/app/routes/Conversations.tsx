@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Conversation, ConversationDetail } from '../../../domains/conversations/models';
+import type { Conversation, ConversationDetail } from '../../../conversations/models';
 import { createZipBlob } from '../../../domains/backup/zip-utils';
-import { buildConversationBasename } from '../../../domains/conversations/file-naming';
-import { formatConversationMarkdown } from '../../../domains/conversations/markdown';
-import { deleteConversations, getConversationDetail, listConversations } from '../../../domains/conversations/repo';
+import { buildConversationBasename } from '../../../conversations/file-naming';
+import { formatConversationMarkdown } from '../../../conversations/markdown';
+import { deleteConversations, getConversationDetail, listConversations } from '../../../conversations/repo';
 import { syncNotionConversations, syncObsidianConversations } from '../../../domains/sync/repo';
 
 function formatTime(ts?: number) {
