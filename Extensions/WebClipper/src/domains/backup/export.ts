@@ -5,6 +5,7 @@ import {
   filterStorageForBackup,
   uniqueConversationKey,
 } from './backup-utils';
+import { buildConversationBasename } from '../conversations/file-naming';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
 import runtimeContext from '../../runtime-context.ts';
@@ -145,7 +146,8 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
       const conversationKey = c && c.conversationKey ? String(c.conversationKey) : '';
       if (!conversationKey) continue;
 
-      const safeKeyBase = sanitizeZipPathPart(conversationKey, 'conversation');
+      const basename = buildConversationBasename(c);
+      const safeKeyBase = sanitizeZipPathPart(basename, 'conversation').slice(0, 140);
       let safeKey = safeKeyBase;
       let suffix = 2;
       let entryPath = `sources/${safeSource}/${safeKey}.json`;
