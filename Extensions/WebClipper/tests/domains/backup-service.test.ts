@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
-import { exportBackupZipV2 } from '../../src/backup/export';
-import { importBackupLegacyJsonMerge } from '../../src/backup/import';
-import { extractZipEntries } from '../../src/backup/zip-utils';
-import { __closeDbForTests } from '../../src/backup/idb';
+import { exportBackupZipV2 } from '../../src/sync/backup/export';
+import { importBackupLegacyJsonMerge } from '../../src/sync/backup/import';
+import { extractZipEntries } from '../../src/sync/backup/zip-utils';
+import { __closeDbForTests } from '../../src/sync/backup/idb';
 import { openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {

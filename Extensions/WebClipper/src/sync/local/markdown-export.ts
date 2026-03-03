@@ -1,4 +1,4 @@
-import { createZipBlob } from '../../backup/zip-utils';
+import { createZipBlob } from '../backup/zip-utils';
 import { buildConversationBasename } from '../../conversations/file-naming';
 import { formatConversationMarkdown } from '../../conversations/markdown';
 import type { Conversation } from '../../conversations/models';
@@ -41,4 +41,3 @@ export async function buildConversationsMarkdownZipExport({
   const zipBlob = await createZipBlob(files);
   return { zipBlob, filename: `webclipper-export-${stamp}.zip` };
 }
-
