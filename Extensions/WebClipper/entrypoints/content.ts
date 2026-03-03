@@ -1,21 +1,18 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
-import '../src/shared/normalize.ts';
-import '../src/conversations/incremental-updater.ts';
-import '../src/collectors/bootstrap.ts';
-import '../src/collectors/runtime-observer.ts';
-import '../src/collectors/sites-bootstrap';
-import '../src/collectors/web/web-entry.ts';
-import '../src/integrations/notionai-model-picker.ts';
-import '../src/ui/inpage/inpage-tip.ts';
-import '../src/ui/inpage/inpage-button.ts';
-
 import { createContentController } from '../src/bootstrap/content-controller.ts';
 import { startContentBootstrap } from '../src/bootstrap/content.ts';
-import { createRuntimeClient } from '../src/platform/runtime/client';
-import runtimeContext from '../src/runtime-context.ts';
-import collectorContext from '../src/collectors/collector-context.ts';
+import { createCollectorEnv } from '../src/collectors/collector-env.ts';
+import { registerAllCollectors } from '../src/collectors/register-all.ts';
+import { createCollectorsRegistry } from '../src/collectors/registry.ts';
+import runtimeObserverApi from '../src/collectors/runtime-observer.ts';
+import incrementalUpdaterApi from '../src/conversations/incremental-updater.ts';
+import notionAiModelPickerApi from '../src/integrations/notionai-model-picker.ts';
+import normalizeApi from '../src/shared/normalize.ts';
+import inpageButtonApi from '../src/ui/inpage/inpage-button.ts';
+import inpageTipApi from '../src/ui/inpage/inpage-tip.ts';
+import { createRuntimeClient } from '../src/platform/runtime/client.ts';
 
 export default defineContentScript({
   // P1-05: align with current `manifest.json` content_scripts matches.
@@ -39,24 +36,23 @@ export default defineContentScript({
     'https://*.notion.so/*',
   ],
   main() {
-    const runtimeNS: any = runtimeContext;
-    const collectorsNS: any = collectorContext;
-    runtimeContext.runtimeClient = { createRuntimeClient };
-
     const runtime = createRuntimeClient();
+    const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
+    const collectorsRegistry = createCollectorsRegistry();
+    registerAllCollectors(collectorsRegistry, env);
+    const controller = createContentController({
+      runtime,
+      collectorsRegistry,
+      inpageButton: inpageButtonApi,
+      inpageTip: inpageTipApi,
+      runtimeObserver: runtimeObserverApi,
+      incrementalUpdater: incrementalUpdaterApi,
+      notionAiModelPicker: notionAiModelPickerApi,
+    });
     startContentBootstrap({
       runtime,
-      inpageButton: runtimeNS.inpageButton || null,
-      createController: () =>
-        createContentController({
-          runtime,
-          collectorsRegistry: collectorsNS.collectorsRegistry || null,
-          inpageButton: runtimeNS.inpageButton || null,
-          inpageTip: runtimeNS.inpageTip || null,
-          runtimeObserver: runtimeNS.runtimeObserver || null,
-          incrementalUpdater: runtimeNS.incrementalUpdater || null,
-          notionAiModelPicker: runtimeNS.notionAiModelPicker || null,
-        }),
+      inpageButton: inpageButtonApi,
+      createController: () => controller,
     });
   },
 });

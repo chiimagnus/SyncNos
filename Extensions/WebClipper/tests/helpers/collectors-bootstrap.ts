@@ -1,11 +1,8 @@
 export async function ensureCollectorUtils() {
-  const [collectorUtilsModule, collectorContextModule] = await Promise.all([
+  const [collectorUtilsModule] = await Promise.all([
     import('../../src/collectors/collector-utils.ts'),
-    import('../../src/collectors/collector-context.ts'),
   ]);
   const collectorUtils = collectorUtilsModule.default || collectorUtilsModule;
-  const collectorContext = collectorContextModule.default as any;
-  collectorContext.collectorUtils = collectorUtils;
   if (!globalThis.WebClipper || typeof globalThis.WebClipper !== 'object') {
     globalThis.WebClipper = {};
   }
@@ -14,16 +11,12 @@ export async function ensureCollectorUtils() {
 }
 
 export async function ensureCollectorContractAndRegistry() {
-  const [collectorContractModule, collectorRegistryModule, collectorContextModule] = await Promise.all([
+  const [collectorContractModule, collectorRegistryModule] = await Promise.all([
     import('../../src/collectors/collector-contract.ts'),
     import('../../src/collectors/registry.ts'),
-    import('../../src/collectors/collector-context.ts'),
   ]);
-  const collectorContext = collectorContextModule.default as any;
   const collectorContract = { assertCollectorDef: collectorContractModule.assertCollectorDef };
-  collectorContext.collectorContract = collectorContract;
   const collectorsRegistry = collectorRegistryModule.createCollectorsRegistry();
-  collectorContext.collectorsRegistry = collectorsRegistry;
 
   if (!globalThis.WebClipper || typeof globalThis.WebClipper !== 'object') {
     globalThis.WebClipper = {};
