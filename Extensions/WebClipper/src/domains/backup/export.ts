@@ -194,7 +194,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
           csvCell(msgs.length),
           csvCell(notionPageId),
           csvCell(hasNotionPageId),
-          csvCell(entryPath),
+          csvCell(entryPath.replace(/^sources\//, '')),
         ].join(','),
       );
     }
