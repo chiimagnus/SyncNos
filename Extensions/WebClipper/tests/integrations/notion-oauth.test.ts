@@ -5,7 +5,7 @@ import {
   getNotionOAuthDefaults,
   handleNotionOAuthCallbackNavigation,
   setupNotionOAuthNavigationListener,
-} from '../../src/integrations/notion/oauth';
+} from '../../src/sync/notion/auth/oauth';
 
 function mockChromeStorage(initial: Record<string, unknown> = {}) {
   const store: Record<string, unknown> = { ...initial };

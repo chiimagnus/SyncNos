@@ -9,7 +9,7 @@ import {
 } from '../../../backup/import';
 import { extractZipEntries } from '../../../backup/zip-utils';
 import { disconnectNotion } from '../../../settings/sensitive';
-import { getNotionOAuthDefaults } from '../../../integrations/notion/oauth';
+import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
 import {
   ARTICLE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,

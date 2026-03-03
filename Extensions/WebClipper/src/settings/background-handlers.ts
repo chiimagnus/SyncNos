@@ -1,6 +1,6 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
 import { storageRemove } from '../platform/storage/local';
-import { clearNotionOAuthToken, getNotionOAuthToken } from '../integrations/notion/token-store';
+import { clearNotionOAuthToken, getNotionOAuthToken } from '../sync/notion/auth/token-store';
 import { getObsidianSettings, saveObsidianSettings } from '../integrations/obsidian/settings-store';
 import { testObsidianConnection } from '../integrations/obsidian/sync/orchestrator';
 import { conversationKinds } from '../protocols/conversation-kinds.ts';

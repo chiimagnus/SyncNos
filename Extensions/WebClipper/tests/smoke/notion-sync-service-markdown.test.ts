@@ -6,11 +6,11 @@ async function loadFresh(rel: string) {
 }
 
 async function loadNotionAi() {
-  return loadFresh("../../src/export/notion/notion-ai.ts");
+  return loadFresh("../../src/sync/notion/notion-ai.ts");
 }
 
 async function loadNotionSyncService() {
-  return loadFresh("../../src/export/notion/notion-sync-service.ts");
+  return loadFresh("../../src/sync/notion/notion-sync-service.ts");
 }
 
 describe("notion-sync-service markdown", () => {

@@ -6,11 +6,11 @@ async function loadFresh(rel: string) {
 }
 
 async function loadNotionApi() {
-  return loadFresh("../../src/export/notion/notion-api.ts");
+  return loadFresh("../../src/sync/notion/notion-api.ts");
 }
 
 async function loadNotionFilesApi() {
-  return loadFresh("../../src/export/notion/notion-files-api.ts");
+  return loadFresh("../../src/sync/notion/notion-files-api.ts");
 }
 
 describe("notion-files-api", () => {

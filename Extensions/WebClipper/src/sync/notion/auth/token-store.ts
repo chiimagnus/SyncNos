@@ -1,4 +1,4 @@
-import { storageGet, storageRemove, storageSet } from '../../platform/storage/local';
+import { storageGet, storageRemove, storageSet } from '../../../platform/storage/local';
 
 export const NOTION_OAUTH_TOKEN_KEY = 'notion_oauth_token_v1';
 
@@ -21,4 +21,3 @@ export async function setNotionOAuthToken(token: NotionOAuthTokenV1 | null): Pro
 export async function clearNotionOAuthToken(): Promise<void> {
   await storageRemove([NOTION_OAUTH_TOKEN_KEY]);
 }
-

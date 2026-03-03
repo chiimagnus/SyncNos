@@ -7,7 +7,7 @@ import { registerWebArticleHandlers } from '../src/collectors/web/article-fetch-
 import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
-} from '../src/integrations/notion/oauth';
+} from '../src/sync/notion/auth/oauth';
 import runtimeContext from '../src/runtime-context.ts';
 
 export default defineBackground(() => {
