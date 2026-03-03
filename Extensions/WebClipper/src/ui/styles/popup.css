@@ -1255,6 +1255,47 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: rgba(10, 10, 10, 0.32);
+  backdrop-filter: blur(4px);
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 360px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+
+.modalTitle {
+  font-weight: 860;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.modalBody {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modalActions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
