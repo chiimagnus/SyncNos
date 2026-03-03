@@ -20,6 +20,8 @@ const SUPPORTED_HOST_SUFFIXES = Object.freeze([
   'www.chatgpt.com',
   'claude.ai',
   'gemini.google.com',
+  'aistudio.google.com',
+  'makersuite.google.com',
   'chat.deepseek.com',
   'chat.z.ai',
   'kimi.moonshot.cn',

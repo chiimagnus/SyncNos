@@ -3,6 +3,7 @@ import './claude/claude-entry';
 import './deepseek/deepseek-entry';
 import './doubao/doubao-entry';
 import './gemini/gemini-entry';
+import './googleaistudio/googleaistudio-entry';
 import './kimi/kimi-entry';
 import './notionai/notionai-entry';
 import './poe/poe-entry';

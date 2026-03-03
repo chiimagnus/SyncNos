@@ -7,6 +7,7 @@ function createHarness(options?: {
   sendImpl?: (type: string, payload?: any) => Promise<any>;
   captureImpl?: (args?: any) => any;
   incrementalImpl?: (snapshot: any) => any;
+  collectorId?: string;
 }) {
   let tickRef: TickFn = null;
   let buttonConfig: any = null;
@@ -34,7 +35,7 @@ function createHarness(options?: {
   const controller = createContentController({
     runtime,
     collectorsRegistry: {
-      pickActive: () => ({ id: "gemini", collector }),
+      pickActive: () => ({ id: options?.collectorId || "gemini", collector }),
       list: () => []
     },
     inpageTip: {
@@ -191,6 +192,30 @@ describe("content-controller inpage combo", () => {
     expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
     expect(harness.tipCalls.some((c) => String(c.text) === "Saved")).toBe(true);
+  });
+
+  it("disables auto-save for googleaistudio to avoid virtualized truncation", async () => {
+    const snapshot = {
+      conversation: { source: "googleaistudio", conversationKey: "auto-ai-studio-1" },
+      messages: [{ messageKey: "m1", sequence: 1, role: "user", contentText: "hello" }]
+    };
+
+    const harness = createHarness({
+      collectorId: "googleaistudio",
+      captureImpl: () => snapshot,
+      incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
+      sendImpl: async (type: string) => {
+        if (type === "upsertConversation") return { ok: true, data: { id: 22 } };
+        if (type === "syncConversationMessages") return { ok: true, data: { inserted: 1 } };
+        return { ok: true, data: {} };
+      }
+    });
+
+    await harness.runTick();
+
+    expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(false);
+    expect(harness.tipCalls.some((c) => String(c.text) === "Saved")).toBe(false);
   });
 
   it("ignores repeated manual clicks while a save is still in progress", async () => {
