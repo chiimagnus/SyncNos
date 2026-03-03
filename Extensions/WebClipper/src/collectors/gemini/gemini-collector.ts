@@ -1,15 +1,22 @@
-import collectorContext from '../collector-context.ts';
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import {
+  appendImageMarkdown,
+  conversationKeyFromLocation,
+  extractImageUrlsFromElement,
+  inEditMode as inEditModeUtil,
+} from '../collector-utils.ts';
+import geminiMarkdown from './gemini-markdown.ts';
 
-const NS: any = collectorContext as any;
-
+export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {
-    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)gemini\.google\.com$/.test(hostname);
   }
 
   function isValidConversationUrl(): any {
     try {
-      const p = location.pathname || "";
+      const p = env.location.pathname || "";
       if (p === "/app") return false;
       if (/^\/gem\/[^/]+$/.test(p)) return false;
       return /^\/app\/[^/]+$/.test(p) || /^\/gem\/[^/]+\/[^/]+$/.test(p) || /\/app\/[^/]+$/.test(p) || /\/gem\/[^/]+\/[^/]+$/.test(p);
@@ -19,27 +26,20 @@ const NS: any = collectorContext as any;
   }
 
   function findConversationKey(): any {
-    return NS.collectorUtils.conversationKeyFromLocation(location);
-  }
-
-  function geminiMarkdown(): any {
-    return NS.geminiMarkdown || {};
+    return conversationKeyFromLocation(env.location);
   }
 
   function getConversationRoot(): any {
-    return document.querySelector("#chat-history") || document.querySelector("main") || document.body;
+    return env.document.querySelector("#chat-history") || env.document.querySelector("main") || env.document.body;
   }
 
   function inEditMode(root: any): any {
-    return NS.collectorUtils.inEditMode(root);
+    return inEditModeUtil(root);
   }
 
   function normalizeTitle(value: any): any {
     const text = value == null ? "" : String(value);
-    if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
-      return NS.normalize.normalizeText(text);
-    }
-    return text.replace(/\s+/g, " ").trim();
+    return env.normalize.normalizeText(text);
   }
 
   function extractConversationTitle(): any {
@@ -49,32 +49,30 @@ const NS: any = collectorContext as any;
       ".conversation-title-container .conversation-title-column"
     ];
     for (const selector of selectors) {
-      const el = document.querySelector(selector);
+      const el = env.document.querySelector(selector);
       if (!el) continue;
       const title = normalizeTitle((el as any).textContent || (el as any).innerText || "");
       if (title) return title;
     }
-    const pageTitle = normalizeTitle(document.title || "");
+    const pageTitle = normalizeTitle(env.document.title || "");
     return pageTitle || "Gemini";
   }
 
   function extractAssistantMarkdown(node: any, fallbackText: any): any {
-    const md = geminiMarkdown();
-    if (typeof md.extractAssistantMarkdown === "function") {
-      const markdown = md.extractAssistantMarkdown(node);
+    if (typeof geminiMarkdown.extractAssistantMarkdown === "function") {
+      const markdown = geminiMarkdown.extractAssistantMarkdown(node);
       if (markdown) return markdown;
     }
     return fallbackText || "";
   }
 
   function extractAssistantText(node: any): any {
-    const md = geminiMarkdown();
-    if (typeof md.extractAssistantText === "function") {
-      const text = md.extractAssistantText(node);
+    if (typeof geminiMarkdown.extractAssistantText === "function") {
+      const text = geminiMarkdown.extractAssistantText(node);
       if (text) return text;
     }
     const raw = node ? (node.innerText || node.textContent || "") : "";
-    return NS.normalize.normalizeText(raw);
+    return env.normalize.normalizeText(raw);
   }
 
   function collectMessages(): any {
@@ -86,20 +84,17 @@ const NS: any = collectorContext as any;
     if (!blocks.length) return [];
 
     const out: any[] = [];
-    const utils = NS.collectorUtils || {};
-    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
-    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const b of blocks) {
       const user = b.querySelector("user-query .query-text") || b.querySelector("[data-test-id='user-message']") || null;
       if (user) {
-        const text = NS.normalize.normalizeText(user.innerText || user.textContent || "");
-        const imageUrls = extractImages ? extractImages(user) : [];
+        const text = env.normalize.normalizeText(user.innerText || user.textContent || "");
+        const imageUrls = extractImageUrlsFromElement(user);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+          const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
             role: "user",
             contentText,
             contentMarkdown,
@@ -113,13 +108,13 @@ const NS: any = collectorContext as any;
       const model = b.querySelector("model-response") || b.querySelector("model-response .model-response-text") || null;
       if (model) {
         const text = extractAssistantText(model);
-        const imageUrls = extractImages ? extractImages(model) : [];
+        const imageUrls = extractImageUrlsFromElement(model);
         if (text || imageUrls.length) {
           const contentText = text || "";
           const baseMarkdown = extractAssistantMarkdown(model, contentText);
-          const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown || contentText, imageUrls) : (baseMarkdown || contentText);
+          const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls);
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
             contentText,
             contentMarkdown,
@@ -134,7 +129,7 @@ const NS: any = collectorContext as any;
   }
 
   function capture(): any {
-    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
     return {
@@ -143,7 +138,7 @@ const NS: any = collectorContext as any;
         source: "gemini",
         conversationKey: findConversationKey(),
         title: extractConversationTitle(),
-        url: location.href,
+        url: env.location.href,
         warningFlags: [],
         lastCapturedAt: Date.now()
       },
@@ -151,7 +146,7 @@ const NS: any = collectorContext as any;
     };
   }
 
-  const api = {
+  const collector = {
     capture,
     getRoot: getConversationRoot,
     __test: {
@@ -160,8 +155,6 @@ const NS: any = collectorContext as any;
       extractAssistantText
     }
   };
-  NS.collectors = NS.collectors || {};
-  NS.collectors.gemini = api;
-  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "gemini", matches, collector: api });
-  }
+
+  return { id: "gemini", matches, collector };
+}

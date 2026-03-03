@@ -1,30 +1,36 @@
-import collectorContext from '../collector-context.ts';
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import {
+  appendImageMarkdown,
+  conversationKeyFromLocation,
+  extractImageUrlsFromElement,
+  inEditMode as inEditModeUtil,
+} from '../collector-utils.ts';
 
-const NS: any = collectorContext as any;
-
+export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {
-    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)claude\.ai$/.test(hostname);
   }
 
   function isValidConversationUrl(): any {
     try {
-      return /^\/chat\/.+/.test(location.pathname);
+      return /^\/chat\/.+/.test(env.location.pathname);
     } catch (_e) {
       return false;
     }
   }
 
   function findConversationKey(): any {
-    return NS.collectorUtils.conversationKeyFromLocation(location);
+    return conversationKeyFromLocation(env.location);
   }
 
   function getConversationRoot(): any {
-    return document.querySelector("main") || document.querySelector("[role='main']") || document.body;
+    return env.document.querySelector("main") || env.document.querySelector("[role='main']") || env.document.body;
   }
 
   function inEditMode(root: any): any {
-    return NS.collectorUtils.inEditMode(root);
+    return inEditModeUtil(root);
   }
 
   function isThinkingBlock(el: any): any {
@@ -41,14 +47,14 @@ const NS: any = collectorContext as any;
     const parts: any[] = [];
     const children: any[] = Array.from(container.children || []) as any[];
     if (!children.length) {
-      return NS.normalize.normalizeText(container.innerText || container.textContent || "");
+      return env.normalize.normalizeText(container.innerText || container.textContent || "");
     }
     for (const child of children) {
       if (isThinkingBlock(child)) continue;
-      const t = NS.normalize.normalizeText(child.innerText || child.textContent || "");
+      const t = env.normalize.normalizeText(child.innerText || child.textContent || "");
       if (t) parts.push(t);
     }
-    return NS.normalize.normalizeText(parts.join("\n\n"));
+    return env.normalize.normalizeText(parts.join("\n\n"));
   }
 
   function collectMessages(): any {
@@ -60,20 +66,17 @@ const NS: any = collectorContext as any;
     if (!containers.length) return [];
 
     const out: any[] = [];
-    const utils = NS.collectorUtils || {};
-    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
-    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const c of containers) {
       const user = c.querySelector("[data-testid='user-message']");
       if (user) {
-        const text = NS.normalize.normalizeText(user.innerText || user.textContent || "");
-        const imageUrls = extractImages ? extractImages(user) : [];
+        const text = env.normalize.normalizeText(user.innerText || user.textContent || "");
+        const imageUrls = extractImageUrlsFromElement(user);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+          const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
             role: "user",
             contentText,
             contentMarkdown,
@@ -87,12 +90,12 @@ const NS: any = collectorContext as any;
       const ai = c.querySelector(".font-claude-response") || c.querySelector("[data-testid='assistant-message']") || null;
       if (ai) {
         const text = extractOnlyFormalResponse(ai);
-        const imageUrls = extractImages ? extractImages(ai) : [];
+        const imageUrls = extractImageUrlsFromElement(ai);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+          const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
             contentText,
             contentMarkdown,
@@ -107,7 +110,7 @@ const NS: any = collectorContext as any;
   }
 
   function capture(): any {
-    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
     return {
@@ -115,8 +118,8 @@ const NS: any = collectorContext as any;
         sourceType: "chat",
         source: "claude",
         conversationKey: findConversationKey(),
-        title: document.title || "Claude",
-        url: location.href,
+        title: env.document.title || "Claude",
+        url: env.location.href,
         warningFlags: [],
         lastCapturedAt: Date.now()
       },
@@ -124,9 +127,6 @@ const NS: any = collectorContext as any;
     };
   }
 
-  const api = { capture, getRoot: getConversationRoot };
-  NS.collectors = NS.collectors || {};
-  NS.collectors.claude = api;
-  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "claude", matches, collector: api });
-  }
+  const collector = { capture, getRoot: getConversationRoot };
+  return { id: "claude", matches, collector };
+}
