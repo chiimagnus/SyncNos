@@ -1,5 +1,3 @@
-import runtimeContext from '../runtime-context.ts';
-
 const STORAGE_KEY = 'inpage_supported_only';
 const DYNAMIC_SCRIPT_ID = 'webclipper_inpage_web_dynamic_v1';
 const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';
@@ -329,7 +327,5 @@ const backgroundInpageWebVisibilityApi = {
   applyVisibilitySetting,
   start,
 };
-
-runtimeContext.backgroundInpageWebVisibility = backgroundInpageWebVisibilityApi;
 
 export default backgroundInpageWebVisibilityApi;

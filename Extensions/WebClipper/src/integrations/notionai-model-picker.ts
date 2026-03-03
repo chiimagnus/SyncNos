@@ -1,7 +1,4 @@
 // @ts-nocheck
-import runtimeContext from '../runtime-context.ts';
-
-const NS = runtimeContext as any;
 
   const STORAGE_KEY = "notion_ai_preferred_model_index";
   // 1-based: menu order includes "自动" at #1.
@@ -266,7 +263,6 @@ const NS = runtimeContext as any;
     }
   }
 
-NS.notionAiModelPicker = { maybeApply, STORAGE_KEY, DEFAULT_INDEX_1_BASED };
-
 export { maybeApply, STORAGE_KEY, DEFAULT_INDEX_1_BASED };
-export default NS.notionAiModelPicker;
+const notionAiModelPicker = { maybeApply, STORAGE_KEY, DEFAULT_INDEX_1_BASED };
+export default notionAiModelPicker;
