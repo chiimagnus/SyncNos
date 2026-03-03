@@ -2,9 +2,6 @@
 import { buildAiOptions as buildDefaultAiOptions } from './notion-ai.ts';
 import { notionFetch as defaultNotionFetch } from './notion-api.ts';
 import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
 
   const DEFAULT_DB_TITLE = "SyncNos-AI Chats";
   const DEFAULT_DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";
@@ -27,19 +24,14 @@ const NS = runtimeContext as any;
   }
 
   function getConversationKinds() {
-    const injected = NS.conversationKinds;
-    if (injected && typeof injected.list === 'function') return injected;
     return builtInConversationKinds;
   }
 
   function getNotionFetch() {
-    if (NS.notionApi && typeof NS.notionApi.notionFetch === 'function') return NS.notionApi.notionFetch;
     return defaultNotionFetch;
   }
 
   function buildAiOptions() {
-    const api = NS.notionAi;
-    if (api && typeof api.buildAiOptions === "function") return api.buildAiOptions();
     return buildDefaultAiOptions();
   }
 
@@ -185,9 +177,6 @@ const api = {
   DEFAULT_DB_TITLE,
   DEFAULT_DB_STORAGE_KEY,
 };
-if (!NS.notionDbManager || typeof NS.notionDbManager.ensureDatabase !== 'function') {
-  NS.notionDbManager = api;
-}
 
 export {
   ensureDatabase,
