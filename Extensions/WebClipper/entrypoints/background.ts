@@ -8,11 +8,10 @@ import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
 } from '../src/sync/notion/auth/oauth';
-import runtimeContext from '../src/runtime-context.ts';
 import { getBackgroundInstanceId } from '../src/bootstrap/background-instance.ts';
 
 export default defineBackground(() => {
-  startBackgroundBootstrap();
+  const services = startBackgroundBootstrap();
 
   const router = createBackgroundRouter({
     fallback: (msg) => ({
@@ -44,7 +43,7 @@ export default defineBackground(() => {
 
   try {
     const id = getBackgroundInstanceId();
-    runtimeContext.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
+    services?.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
   } catch (_e) {
     // ignore
   }
