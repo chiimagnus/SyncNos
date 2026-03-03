@@ -14,13 +14,14 @@ function formatIso(ts?: number) {
   }
 }
 
-export function sanitizeFilenamePart(value: unknown, fallback: string) {
+export function sanitizeFilenamePart(value: unknown, fallback: string, maxLen: number = 80) {
   const raw = String(value ?? '').trim();
   const cleaned = raw
     .replace(/[\\/:*?"<>|]/g, '_')
     .replace(/\s+/g, ' ')
     .trim();
-  return cleaned.slice(0, 80) || fallback;
+  const limit = Number.isFinite(Number(maxLen)) ? Math.max(1, Math.floor(Number(maxLen))) : 80;
+  return cleaned.slice(0, limit) || fallback;
 }
 
 function formatArticleMarkdown(conversation: Conversation, messages: ConversationMessage[]) {
@@ -68,4 +69,3 @@ export function formatConversationMarkdown(conversation: Conversation, messages:
   if (sourceType === 'article') return formatArticleMarkdown(conversation, messages);
   return formatChatMarkdown(conversation, messages);
 }
-
