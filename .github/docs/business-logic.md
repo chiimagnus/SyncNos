@@ -93,8 +93,8 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 - 用户价值：即使不连接 Notion，也能把对话以可迁移的形式带走，或快速沉淀到 Obsidian，并可在不同设备/浏览器之间恢复
 - 触发方式：用户在扩展弹窗中选择导出、添加到 Obsidian，或备份导出/导入
 - 输入：选中的会话；备份文件（导入）
-- 输出：导出文件（Markdown）、通过 Obsidian Local REST API 写入/更新后的 vault 笔记、备份文件（Zip v2，含 manifest/index/sources/config）、合并导入后的本地数据（支持 Zip v2 与 legacy JSON）
-- 关键边界与失败方式：备份导入为合并模式（不清空现有数据）；备份不应包含 Notion token；当 Obsidian Local REST API 不可达（未运行/端口不可用/API Key 无效）时应明确提示失败
+- 输出：导出文件（Markdown）、通过 Obsidian Local REST API 写入/更新后的 vault 笔记、备份文件（Zip v2，结构为 `manifest.json + sources/conversations.csv + sources/... + config/storage-local.json`）、合并导入后的本地数据（支持 Zip v2 与 legacy JSON）
+- 关键边界与失败方式：备份导入为合并模式（不清空现有数据）；备份覆盖所有非敏感设置但排除 `notion_oauth_token*` 与 `notion_oauth_client_secret`；当 Obsidian Local REST API 不可达（未运行/端口不可用/API Key 无效）时应明确提示失败
 
 ### 2.9 隐私与本地存储
 
@@ -127,9 +127,10 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
    - inpage 按钮默认在所有 `http(s)` 页面可见；用户可在 Settings 开启“仅在支持站点显示 Inpage 按钮”
    - 或用户在设置页点击 “Fetch Current Page”，将当前网页文章抓取为 `sourceType=article` 的会话并入库
 2. 用户在扩展弹窗中选择会话，执行：
+   - 删除会话（需二次确认弹窗），或
    - 导出（Markdown），或
    - 同步到 Obsidian（通过 Obsidian Local REST API 写入/更新 vault 文件，按 kind 分目录落入 `SyncNos-AIChats` / `SyncNos-WebArticles`，且目录可配置），或
-   - 数据库备份导出/导入（合并导入），或
+   - 数据库备份导出/导入（合并导入；导入入口位于 `Settings -> App Settings`，Firefox 同路径），或
    - 连接 Notion 并选择 Parent Page，同步到对应 kind 的数据库（`SyncNos-AI Chats` / `SyncNos-Web Articles`）
 3. 重复同步策略：
    - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
@@ -174,7 +175,7 @@ flowchart TD
   - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
   - article：当文章被重新 fetch 且内容更新时覆盖式重建子块
 - WebClipper Obsidian 约束：通过 Obsidian Local REST API（localhost HTTP）写入/更新 vault 文件；若 Obsidian 未运行或端口不可用，扩展应返回可理解的失败提示
-- WebClipper 备份约束：备份导出仅 Zip v2；导入为合并模式（Zip v2 + legacy JSON）；备份文件不应包含 Notion token 等敏感凭据
+- WebClipper 备份约束：备份导出仅 Zip v2（`manifest.json + sources/conversations.csv + sources/... + config/storage-local.json`）；导入为合并模式（Zip v2 + legacy JSON）；备份文件不应包含 Notion token/secret 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
 - WebClipper inpage 显示范围约束：配置项 `inpage_supported_only=false` 时全站显示；为 `true` 时仅支持站点显示；该配置不影响 popup 手动抓取当前页
 - WebClipper Markdown 渲染约束：`contentMarkdown` 可用时按 Markdown 结构写入 Notion blocks；不可用时回退纯文本，避免同步中断
