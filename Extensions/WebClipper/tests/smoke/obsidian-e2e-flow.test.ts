@@ -1,4 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const backgroundStorageMocks = vi.hoisted(() => ({
+  getConversationById: vi.fn(),
+  getMessagesByConversationId: vi.fn(),
+}));
+
+vi.mock("../../src/conversations/background-storage", () => ({
+  backgroundStorage: {
+    getConversationById: backgroundStorageMocks.getConversationById,
+    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
+  },
+}));
 
 async function load(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -30,8 +42,6 @@ function setupChromeStorage() {
 
 describe("obsidian local rest api sync e2e flow (mock)", () => {
   it("full -> incremental -> delete -> rebuild, and handles auth failure", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
 
     const settingsStore = await load("../../src/sync/obsidian/obsidian-settings-store.ts");
@@ -45,15 +55,14 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     let messages: any[] = [
       { messageKey: "m1", sequence: 1, role: "assistant", contentMarkdown: "a", updatedAt: 1 }
     ];
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
-      async getConversationById() {
-        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
-      },
-      async getMessagesByConversationId() {
-        return messages.slice();
-      }
-    };
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: "chat",
+      source: "chatgpt",
+      conversationKey: "k1",
+      title: "t",
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockImplementation(async () => messages.slice());
 
     await settingsStore.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
 
@@ -152,4 +161,13 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     expect(r5.failCount).toBe(1);
     expect(r5.results[0].mode).toBe("failed");
   });
+});
+
+afterEach(() => {
+  backgroundStorageMocks.getConversationById.mockReset();
+  backgroundStorageMocks.getMessagesByConversationId.mockReset();
+  // @ts-expect-error test cleanup
+  delete globalThis.fetch;
+  // @ts-expect-error test cleanup
+  delete globalThis.chrome;
 });

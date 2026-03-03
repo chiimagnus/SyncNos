@@ -15,9 +15,6 @@ async function loadNotionSyncService() {
 
 describe("notion-sync-service markdown", () => {
   it("parses inline markdown into rich_text", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
@@ -32,9 +29,6 @@ describe("notion-sync-service markdown", () => {
   });
 
   it("converts markdown to notion blocks (basic types)", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
@@ -73,9 +67,6 @@ describe("notion-sync-service markdown", () => {
   });
 
   it("converts image markdown to notion image blocks", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
@@ -93,9 +84,6 @@ describe("notion-sync-service markdown", () => {
   });
 
   it("messagesToBlocks uses markdown when present (notionai)", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
@@ -107,9 +95,6 @@ describe("notion-sync-service markdown", () => {
   });
 
   it("messagesToBlocks uses markdown when present (zai)", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 

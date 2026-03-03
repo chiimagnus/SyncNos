@@ -20,8 +20,6 @@ afterEach(() => {
   storageMocks.upsertConversation.mockReset();
   storageMocks.syncConversationMessages.mockReset();
   // @ts-expect-error test cleanup
-  delete globalThis.WebClipper;
-  // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
 

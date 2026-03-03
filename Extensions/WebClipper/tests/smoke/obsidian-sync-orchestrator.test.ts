@@ -1,4 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const backgroundStorageMocks = vi.hoisted(() => ({
+  getConversationById: vi.fn(),
+  getMessagesByConversationId: vi.fn(),
+}));
+
+vi.mock("../../src/conversations/background-storage", () => ({
+  backgroundStorage: {
+    getConversationById: backgroundStorageMocks.getConversationById,
+    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
+  },
+}));
 
 async function loadModule(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -30,8 +42,6 @@ function setupChromeStorage() {
 
 describe("obsidian-sync-orchestrator", () => {
   it("reports missing_api_key when api key is not configured", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
     await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -43,8 +53,6 @@ describe("obsidian-sync-orchestrator", () => {
   });
 
   it("decides full rebuild when remote note is missing (404)", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
     const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -53,15 +61,16 @@ describe("obsidian-sync-orchestrator", () => {
     await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
     const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
-      async getConversationById() {
-        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
-      },
-      async getMessagesByConversationId() {
-        return [{ messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: Date.now() }];
-      }
-    };
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: "chat",
+      source: "chatgpt",
+      conversationKey: "k1",
+      title: "t",
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: Date.now() },
+    ]);
 
     let call = 0;
     // @ts-expect-error test global
@@ -84,8 +93,6 @@ describe("obsidian-sync-orchestrator", () => {
   });
 
   it("decides incremental append when remote has cursor and there are new messages", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
     const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -94,18 +101,17 @@ describe("obsidian-sync-orchestrator", () => {
     await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
     const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
-      async getConversationById() {
-        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
-      },
-      async getMessagesByConversationId() {
-        return [
-          { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
-          { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 }
-        ];
-      }
-    };
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: "chat",
+      source: "chatgpt",
+      conversationKey: "k1",
+      title: "t",
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+      { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
+    ]);
 
     const calls: any[] = [];
     // @ts-expect-error test global
@@ -137,8 +143,6 @@ describe("obsidian-sync-orchestrator", () => {
   });
 
   it("falls back to full rebuild when cursor updatedAt mismatches local history", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
     const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -147,18 +151,17 @@ describe("obsidian-sync-orchestrator", () => {
     await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
     const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
-      async getConversationById() {
-        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
-      },
-      async getMessagesByConversationId() {
-        return [
-          { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
-          { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 }
-        ];
-      }
-    };
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: "chat",
+      source: "chatgpt",
+      conversationKey: "k1",
+      title: "t",
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+      { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
+    ]);
 
     // GET returns cursor with mismatched updatedAt -> should rebuild (PUT)
     // @ts-expect-error test global
@@ -185,8 +188,6 @@ describe("obsidian-sync-orchestrator", () => {
   });
 
   it("falls back to full rebuild when PATCH fails with PatchFailed (non-dedup)", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
     const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -195,18 +196,17 @@ describe("obsidian-sync-orchestrator", () => {
     await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
     const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
-      async getConversationById() {
-        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
-      },
-      async getMessagesByConversationId() {
-        return [
-          { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
-          { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 }
-        ];
-      }
-    };
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType: "chat",
+      source: "chatgpt",
+      conversationKey: "k1",
+      title: "t",
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+      { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
+    ]);
 
     let patchCount = 0;
     // @ts-expect-error test global
@@ -238,8 +238,6 @@ describe("obsidian-sync-orchestrator", () => {
   });
 
   it("renames note when title changes by rebuilding new file and deleting old file", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     setupChromeStorage();
     const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -254,15 +252,10 @@ describe("obsidian-sync-orchestrator", () => {
     const oldFilename = `chatgpt-Old Title-${stableId10}.md`;
     const oldFilenameEncoded = oldFilename.replace(/ /g, "%20");
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
-      async getConversationById() {
-        return convo;
-      },
-      async getMessagesByConversationId() {
-        return [{ messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: 1 }];
-      }
-    };
+    backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: 1 },
+    ]);
 
     const seen: any[] = [];
     // @ts-expect-error test global
@@ -316,4 +309,13 @@ describe("obsidian-sync-orchestrator", () => {
     expect(didPut).toBe(true);
     expect(didDelete).toBe(true);
   });
+});
+
+afterEach(() => {
+  backgroundStorageMocks.getConversationById.mockReset();
+  backgroundStorageMocks.getMessagesByConversationId.mockReset();
+  // @ts-expect-error test cleanup
+  delete globalThis.fetch;
+  // @ts-expect-error test cleanup
+  delete globalThis.chrome;
 });

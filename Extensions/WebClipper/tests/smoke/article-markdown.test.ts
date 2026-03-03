@@ -6,14 +6,10 @@ async function loadArticleMarkdown() {
 }
 
 afterEach(() => {
-  // @ts-expect-error test cleanup
-  delete globalThis.WebClipper;
 });
 
 describe("article-markdown", () => {
   it("prefers contentMarkdown over plain text for article body", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const api = await loadArticleMarkdown();
 
     const markdown = api.formatArticleMarkdown({

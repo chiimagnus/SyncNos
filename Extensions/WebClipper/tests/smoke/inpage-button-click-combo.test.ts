@@ -14,8 +14,6 @@ function setupDom() {
   global.document = dom.window.document;
   // @ts-expect-error test global
   global.localStorage = dom.window.localStorage;
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
 
   return dom;
 }
@@ -38,8 +36,6 @@ describe("inpage-button click combos", () => {
     delete global.document;
     // @ts-expect-error cleanup
     delete global.localStorage;
-    // @ts-expect-error cleanup
-    delete globalThis.WebClipper;
   });
 
   it("fires single-click save only after combo window settles", () => {

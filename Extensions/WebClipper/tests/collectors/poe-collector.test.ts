@@ -1,6 +1,5 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
 async function loadNormalize() {
   const normalizeModule = await import("../../src/shared/normalize.ts");
@@ -9,15 +8,7 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-    globalThis.WebClipper = {};
-  }
-  globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
-}
-
-async function loadCollectorUtils() {
-  return ensureCollectorUtils();
 }
 
 async function loadPoeMarkdown() {
@@ -38,13 +29,6 @@ async function loadPoeCollector() {
     normalize: normalizeApi,
   });
   const collector = poeModule.createPoeCollectorDef(env).collector as any;
-
-  // @ts-expect-error test global
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") globalThis.WebClipper = {};
-  // @ts-expect-error test global
-  globalThis.WebClipper.collectors = globalThis.WebClipper.collectors || {};
-  // @ts-expect-error test global
-  globalThis.WebClipper.collectors.poe = collector;
 
   return collector;
 }
@@ -89,17 +73,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe("你好");
   });
@@ -148,17 +125,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
@@ -235,17 +205,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
@@ -319,17 +282,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.conversation.source).toBe("poe");
     expect(snap.messages.length).toBe(2);
@@ -405,17 +361,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.messageKey)).toEqual(["message-1", "message-2", "message-3", "message-4"]);
     expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
@@ -491,19 +440,12 @@ describe("poe-collector", () => {
       }
     });
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
     await collector.prepareManualCapture({ maxRounds: 10, settleMs: 0, waitForLoadMs: 60, pollMs: 5 });
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.messageKey)).toEqual([
       "message-1",
@@ -549,17 +491,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
@@ -605,17 +540,10 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
     await loadPoeMarkdown();
-    await loadPoeCollector();
+    const collector = await loadPoeCollector();
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].contentText).toContain("@GLM-5 这是什么？");
