@@ -1,21 +1,32 @@
-<img align="right" src="Extensions/WebClipper/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="120" />
+<div align="center"><a name="readme-top"></a>
 
 # SyncNos
 
-English | [中文](README.zh-CN.md)
+A toolkit focused on syncing reading highlights and AI conversations.  
+It consolidates multi-source content to Notion and provides a WebClipper browser extension.
 
+**English** · [中文](README.zh-CN.md)
+
+[![Latest Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Latest%20Version&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
+[![Last Commit](https://img.shields.io/github/last-commit/chiimagnus/SyncNos?logo=git)](https://github.com/chiimagnus/SyncNos/commits/main)
+[![License](https://img.shields.io/github/license/chiimagnus/SyncNos)](LICENSE)
+<br/>
+[![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
+[![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
+[![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
+[![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
 [![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total?label=Release%20Downloads&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
 
-[![Download macOS](https://img.shields.io/badge/Download-macOS%20App%20Store-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/syncnos/id6755133888) 
+</div>
 
-[![Download Chrome](https://img.shields.io/badge/Download-Chrome%20Web%20Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) 
-[![Download Edge](https://img.shields.io/badge/Download-Edge%20Release-0078D7?logo=microsoftedge&logoColor=white)](https://github.com/chiimagnus/SyncNos/releases) 
-[![Download Firefox](https://img.shields.io/badge/Download-Firefox%20AMO-FF7139?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+<img align="right" src="Extensions/WebClipper/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="120" />
 
-This project has two parts:
+## Project Overview
 
-1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
-2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (Markdown), backup/restore the local database (export/import), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**.
+SyncNos has two parts:
+
+- **macOS App**: Sync highlights and notes from Apple Books, GoodLinks, WeRead, Dedao, and chat history (with OCR support) to Notion (macOS 14.0+).
+- **WebClipper Extension**: Capture AI chats from supported sites to local browser storage, then export, backup/restore, and sync to Notion / Obsidian.
 
 ## How It Works
 
@@ -23,65 +34,68 @@ This project has two parts:
 
 ## macOS App
 
-- Supported: **macOS 14.0+**
-- Download (App Store): https://apps.apple.com/app/syncnos/id6755133888
+<details>
+<summary><kbd>Expand</kbd></summary>
 
-### Sync Scope
+| Item | Details |
+| --- | --- |
+| Supported OS | **macOS 14.0+** |
+| Download | [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888) |
 
-#### Sync From
+### Sync From
 
 - Apple Books
 - GoodLinks
-- WeRead (微信读书)
-- Dedao (得到)
+- WeRead
+- Dedao
 - Chat history (beta)
-  - OCR version supported
+  - OCR supported
   - Local storage encryption
 
-#### Sync To
+### Sync To
 
-- Notion (OAuth recommended; API key supported)
+- Notion OAuth
+
+</details>
 
 ## WebClipper (Browser Extension)
 
-This repository includes a standalone MV3 browser extension under `Extensions/WebClipper/`.
+<details>
+<summary><kbd>Expand</kbd></summary>
 
-- Supported browsers: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**
-- Download (Releases): https://github.com/chiimagnus/SyncNos/releases
-- Chrome Web Store: https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
-- Firefox (AMO): https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
+### Download & Install
 
-### What It Does
+| Channel | Download |
+| --- | --- |
+| Chrome [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
+| Edge [![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases) | [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) |
+| Firefox [![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) | [Firefox AMO](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 
-- Captures AI chats from supported sites into local browser storage
-- Exports selected conversations as Markdown (single merged export or multi-file zip export)
-- Syncs selected conversations to Obsidian via `Obsidian Local REST API` (writes/updates vault files over `http://127.0.0.1:27123`)
-- Obsidian note paths:
-  - Default folders by kind:
-    - Chats: `SyncNos-AIChats/`
-    - Web articles: `SyncNos-WebArticles/`
-  - Folders are configurable in popup Settings
-  - Filenames are stable by `(source + conversationKey)` (hash-based), so renaming titles does not break incremental updates
-- Database Backup:
-  - Export: `*.zip` only (`manifest.json` + `index/conversations.csv` + `sources/<source>/<conversationKey>.json` + `config/storage-local.json`)
-  - Import: `*.zip` (recommended) and legacy `*.json`
-  - Merge semantics: import merges by `(source + conversationKey)` and avoids duplicate key items
-  - Security: backup excludes Notion token/secret
-- Manually syncs selected conversations to Notion (OAuth)
-- Inpage button visibility is configurable in popup Settings:
-  - Default: shown on all `http(s)` pages
-  - When `Only show Inpage button on supported sites` is enabled: shown only on supported AI sites + Notion pages
-  - This setting does not disable `Fetch Current Page` in popup Settings
-- Notion sync routes by kind:
-  - Chats: database `SyncNos-AI Chats`
-  - Web articles: database `SyncNos-Web Articles`
-  - Re-sync appends only new messages when cursor matches; if cursor is missing (or an article is re-fetched and updated), it rebuilds page content.
-- When `contentMarkdown` is available, sync renders Markdown into Notion blocks (headings/lists/quotes/code blocks/etc.); otherwise it falls back to plain text.
-- Notion AI: optionally auto-picks a preferred model when the chat is set to **Auto** (configure in popup Settings)
+### Core Capabilities
+
+- Capture AI chats from supported sites into local browser storage.
+- Export selected conversations as Markdown (single merged file or multi-file zip).
+- Sync selected conversations to Obsidian via `Obsidian Local REST API` (`http://127.0.0.1:27123`).
+- Database backup:
+  - Export `*.zip` (`manifest.json` + `index/conversations.csv` + `sources/...` + `config/storage-local.json`)
+  - Import `*.zip` (recommended) and legacy `*.json`
+  - Merge by `(source + conversationKey)` to avoid duplicates
+  - Notion token / secret are excluded from backups
+- Manually sync selected conversations to Notion (OAuth).
+- Configurable Inpage button visibility:
+  - Default: all `http(s)` pages
+  - Optional: only supported AI sites + Notion pages
+  - Does not affect `Fetch Current Page` in Settings
+- Notion sync writes by kind:
+  - Chats: `SyncNos-AI Chats`
+  - Web articles: `SyncNos-Web Articles`
+- If cursor matches, append only new messages; otherwise rebuild page blocks when cursor is missing or content is refreshed.
+- If `contentMarkdown` exists, render as Notion blocks (headings/lists/quotes/code blocks); otherwise fallback to plain text.
+- Notion AI: optionally auto-select preferred model when current mode is **Auto**.
 
 ### Supported Sites
 
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI / z.ai
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI / z.ai / Google AI Studio
 
 ### Development (WXT)
 
@@ -89,17 +103,6 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI 
 - Dev (Chrome MV3): `npm --prefix Extensions/WebClipper run dev`
 - Build (Chrome / Firefox): `npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
 - Test + typecheck: `npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
-- Runtime code in `src + entrypoints` is TS-only; current JS allowlist is only `src/vendor/readability.js` (third-party asset for article extraction).
+- Runtime code in `src + entrypoints` is TS-only; current JS allowlist only keeps `src/vendor/readability.js`.
 
-### Install From Releases
-
-- Go to GitHub Releases and download the attached assets:
-  - `syncnos-webclipper-chrome-v*.zip` (Chrome)
-  - `syncnos-webclipper-edge-v*.zip` (Edge)
-  - `syncnos-webclipper-firefox-v*.xpi` (Firefox, for local testing only)
-- Chrome/Edge: unzip, then load unpacked in `chrome://extensions` / `edge://extensions` (Developer mode).
-- Firefox: install from AMO (recommended). If you need local testing, use `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on…” and select the `.xpi` (or unzip and select `manifest.json`).
-
-## License
-
-This project is licensed under the [AGPL-3.0 License](LICENSE).
+</details>
