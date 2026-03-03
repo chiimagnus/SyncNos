@@ -12,9 +12,6 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
-  const collectorContext = collectorContextModule.default as any;
-  collectorContext.normalize = normalizeApi;
   if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
     globalThis.WebClipper = {};
   }

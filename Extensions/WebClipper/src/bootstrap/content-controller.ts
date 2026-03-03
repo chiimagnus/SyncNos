@@ -14,21 +14,22 @@ type InpageButtonApi = {
     collectorId?: string;
     onClick?: () => void;
     onDoubleClick?: () => void;
-    onCombo?: (payload: { level: number }) => void;
+    onCombo?: (payload: { level: number; count?: number }) => void;
   }) => void;
-  cleanupButtons?: (collectorId?: string) => void;
+  cleanupButtons?: (collectorId: string) => void;
 };
 
 type InpageTipApi = {
-  showSaveTip?: (text: string, options?: { kind?: string }) => void;
+  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'loading' | 'error' }) => void;
 };
 
 type RuntimeObserverApi = {
   createObserver?: (input: {
-    debounceMs: number;
-    getRoot: () => unknown;
-    onTick: () => Promise<void>;
-  }) => { start?: () => void; stop?: () => void };
+    debounceMs?: number;
+    getRoot?: () => Node | null;
+    onTick?: () => void | Promise<void>;
+    leading?: boolean;
+  }) => { start?: () => void; stop?: () => void } | null;
 };
 
 type Deps = {
@@ -83,8 +84,16 @@ export function createContentController(deps: Deps) {
   const incrementalUpdater = deps.incrementalUpdater;
   const notionAiModelPicker = deps.notionAiModelPicker;
 
+  function toTipKind(kind?: unknown): 'default' | 'loading' | 'error' | undefined {
+    const value = String(kind || '').trim().toLowerCase();
+    if (!value) return undefined;
+    if (value === 'ok') return 'default';
+    if (value === 'default' || value === 'loading' || value === 'error') return value;
+    return undefined;
+  }
+
   function showInpageTip(text: string, kind?: string) {
-    inpageTip?.showSaveTip?.(text, { kind });
+    inpageTip?.showSaveTip?.(text, { kind: toTipKind(kind) });
   }
 
   function send(type: string, payload?: Record<string, unknown>) {
@@ -235,14 +244,14 @@ export function createContentController(deps: Deps) {
       if (line) showInpageTip(line);
     };
 
-    function refreshInpageButton() {
-      const collector = getCollector();
-      const inpageCollector = collector || getInpageCollector();
-      inpageButton?.cleanupButtons?.(inpageCollector?.id);
-      inpageButton?.ensureInpageButton?.({
-        collectorId: inpageCollector?.id,
-        onClick: clickSave,
-        onDoubleClick: openPopupPanel,
+  function refreshInpageButton() {
+    const collector = getCollector();
+    const inpageCollector = collector || getInpageCollector();
+    inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
+    inpageButton?.ensureInpageButton?.({
+      collectorId: inpageCollector?.id,
+      onClick: clickSave,
+      onDoubleClick: openPopupPanel,
         onCombo: showComboLine,
       });
       return collector;
