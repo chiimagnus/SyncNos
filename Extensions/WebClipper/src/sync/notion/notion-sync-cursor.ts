@@ -25,10 +25,13 @@ export function computeNewMessages(messages: unknown, cursor: Partial<NotionSync
   if (!list.length) return { ok: true, mode: 'empty', newMessages: [], rebuild: false };
 
   const key = cursor?.lastSyncedMessageKey ? String(cursor.lastSyncedMessageKey) : '';
+  const rawSeq = cursor ? (cursor as any).lastSyncedSequence : null;
   const seq =
-    cursor && Number.isFinite(Number(cursor.lastSyncedSequence))
-      ? Number(cursor.lastSyncedSequence)
-      : null;
+    rawSeq == null
+      ? null
+      : Number.isFinite(Number(rawSeq))
+        ? Number(rawSeq)
+        : null;
 
   if (key) {
     const idx = list.findIndex((m) => m && String((m as any).messageKey || '') === key);
@@ -57,4 +60,3 @@ export function lastMessageCursor(messages: unknown): NotionSyncCursor {
     lastSyncedAt: Date.now(),
   };
 }
-
