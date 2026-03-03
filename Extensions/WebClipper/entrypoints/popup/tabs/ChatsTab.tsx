@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createZipBlob } from '../../../src/domains/backup/zip-utils';
+import { buildConversationBasename } from '../../../src/domains/conversations/file-naming';
 import { formatConversationMarkdown } from '../../../src/domains/conversations/markdown';
 import type { Conversation, ConversationDetail } from '../../../src/domains/conversations/models';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../src/domains/conversations/repo';
@@ -290,15 +291,11 @@ export default function ChatsTab() {
         const text = docs.join('\n---\n\n');
         files.push({ name: `webclipper-export-${stamp}.md`, data: text });
       } else {
-        for (let i = 0; i < selectedConversations.length; i += 1) {
-          const c = selectedConversations[i];
+        for (const c of selectedConversations) {
           // eslint-disable-next-line no-await-in-loop
           const d = await getConversationDetail(Number(c.id));
-          const source = getSourceMeta(c.source).key || 'unknown';
-          const title = String(c.title || 'untitled').replace(/\s+/g, ' ').trim() || 'untitled';
-          const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || 'untitled';
           files.push({
-            name: `webclipper-${source}-${safeTitle}-${i + 1}-${stamp}.md`,
+            name: `${buildConversationBasename(c)}.md`,
             data: formatConversationMarkdown(c, d.messages || []),
           });
         }
