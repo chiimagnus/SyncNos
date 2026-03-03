@@ -2,7 +2,7 @@ import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
 import '../src/shared/normalize.ts';
-import '../src/storage/incremental-updater.ts';
+import '../src/conversations/incremental-updater.ts';
 import '../src/collectors/bootstrap.ts';
 import '../src/collectors/runtime-observer.ts';
 import '../src/collectors/sites-bootstrap';
