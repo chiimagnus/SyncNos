@@ -1,5 +1,3 @@
-import runtimeContext from '../runtime-context.ts';
-
 export function normalizeText(text: unknown): string {
   const value = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = value.split('\n').map((line) => line.trim());
@@ -30,7 +28,5 @@ const normalizeApi = {
   fnv1a32,
   makeFallbackMessageKey,
 };
-
-runtimeContext.normalize = normalizeApi;
 
 export default normalizeApi;

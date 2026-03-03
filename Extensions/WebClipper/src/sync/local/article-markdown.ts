@@ -1,5 +1,3 @@
-import runtimeContext from '../../runtime-context.ts';
-
 function formatArticleMarkdown({
   conversation,
   messages,
@@ -25,7 +23,6 @@ function formatArticleMarkdown({
 }
 
 const api = { formatArticleMarkdown };
-(runtimeContext as any).articleMarkdown = api;
 
 export { formatArticleMarkdown };
 export default api;
