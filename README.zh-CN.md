@@ -77,11 +77,14 @@ SyncNos 由两部分组成：
 - 导出所选对话为 Markdown（单文件合并或多文件 zip 导出）。
 - 通过 `Obsidian Local REST API` 同步到 Obsidian（`http://127.0.0.1:27123`）。
 - 数据库备份：
-  - 导出 `*.zip`（`manifest.json` + `index/conversations.csv` + `sources/...` + `config/storage-local.json`）
+  - 导出 `*.zip`（`manifest.json` + `sources/conversations.csv` + `sources/...` + `config/storage-local.json`）
   - 导入 `*.zip`（推荐）与 legacy `*.json`
   - 按 `(source + conversationKey)` 合并导入，避免重复
-  - 备份不包含 Notion token / secret
+  - 备份所有非敏感 `chrome.storage.local` 配置
+  - 备份会排除敏感键（`notion_oauth_token*`、`notion_oauth_client_secret`）
+  - 备份导入入口在 `Settings -> App Settings`（Firefox 同路径）
 - 手动同步所选对话到 Notion（OAuth）。
+- 删除对话会先弹出确认框，避免误删。
 - Inpage 按钮显示范围可配置：
   - 默认在所有 `http(s)` 页面显示
   - 可切换为仅在支持 AI 站点 + Notion 页面显示
@@ -92,6 +95,7 @@ SyncNos 由两部分组成：
 - cursor 匹配时追加新增消息；cursor 缺失（或文章内容更新）时重建页面子块。
 - 消息存在 `contentMarkdown` 时优先渲染为 Notion blocks（标题/列表/引用/代码块等），否则回退纯文本。
 - Notion AI：可选“自动点选偏好模型”（仅在当前为 **Auto** 时生效）。
+- Google AI Studio 采集器支持虚拟列表对话补抓（手动保存）并过滤非消息片段。
 
 ### 支持站点
 
