@@ -12,14 +12,9 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
 };
 
-function getInstanceId(): string {
-  try {
-    const id = runtimeContext.__backgroundInstanceId;
-    return id ? String(id) : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  } catch (_e) {
-    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  }
-}
+type Deps = {
+  getInstanceId: () => string;
+};
 
 function getNotionDisconnectStorageKeys(): string[] {
   const base = [
@@ -45,7 +40,7 @@ function getNotionDisconnectStorageKeys(): string[] {
   return Array.from(new Set([...base, ...notionDbKeys, ...(syncJobKey ? [syncJobKey] : [])]));
 }
 
-export function registerSettingsHandlers(router: AnyRouter) {
+export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
     const token = await getNotionOAuthToken();
     return router.ok({ connected: !!(token && token.accessToken), token: token || null });
@@ -76,7 +71,7 @@ export function registerSettingsHandlers(router: AnyRouter) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, async () => {
-    const data = await testObsidianConnection({ instanceId: getInstanceId() });
+    const data = await testObsidianConnection({ instanceId: deps.getInstanceId() });
     return router.ok(data);
   });
 
