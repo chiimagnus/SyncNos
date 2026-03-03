@@ -92,7 +92,8 @@ Phase 3（JS→TS）收口状态：
   - chat：`SyncNos-AIChats/`
   - article：`SyncNos-WebArticles/`
 - 目录可配置：popup `Settings -> Obsidian Paths` 可分别设置 Chat 与 Web article 的 vault-relative 文件夹。
-- 文件路径由 `source + conversationKey` 生成稳定 hash（避免标题改名导致找不到旧文件；文件名不依赖标题）。
+- 文件名格式：`<source>-<title>-<stableId10>.md`，其中 `stableId10` 基于 `source + conversationKey` 的稳定 hash（用于唯一性与定位旧文件）。
+- 当 `title` 变化导致文件名变化时：同步会在 Obsidian 侧自动“重命名”（写入新文件并删除旧文件）。
 - 同步策略（平台主导）：
   - Obsidian 端不存在文件：全量重建（PUT）
   - Obsidian 端存在文件且 frontmatter 兼容：增量追加（PATCH 追加到 heading `SyncNos::Messages`），并 PATCH frontmatter 更新游标

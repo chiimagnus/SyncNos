@@ -236,4 +236,84 @@ describe("obsidian-sync-orchestrator", () => {
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe("full_rebuild_fallback");
   });
+
+  it("renames note when title changes by rebuilding new file and deleting old file", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    setupChromeStorage();
+    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
+    const naming = await loadModule("../../src/domains/conversations/file-naming.ts");
+    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+
+    const convo = { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "New Title" };
+    const stableId10 = naming.stableConversationId10(convo);
+    const oldFilename = `chatgpt-Old Title-${stableId10}.md`;
+    const oldFilenameEncoded = oldFilename.replace(/ /g, "%20");
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      async getConversationById() {
+        return convo;
+      },
+      async getMessagesByConversationId() {
+        return [{ messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: 1 }];
+      }
+    };
+
+    const seen: any[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const url = String(_url || "");
+      const method = String(init?.method || "GET").toUpperCase();
+      seen.push({ method, url });
+
+      if (method === "GET" && url.endsWith("/vault/SyncNos-AIChats/")) {
+        return new Response(JSON.stringify({ files: [oldFilename] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+
+      if (method === "GET" && url.includes(`/vault/SyncNos-AIChats/${oldFilenameEncoded}`)) {
+        return new Response(JSON.stringify({
+          frontmatter: {
+            syncnos: {
+              source: "chatgpt",
+              conversationKey: "k1",
+              schemaVersion: 1,
+              lastSyncedSequence: 1,
+              lastSyncedMessageKey: "m1",
+              lastSyncedMessageUpdatedAt: 1
+            }
+          },
+          content: "x"
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+
+      if (method === "GET") {
+        return new Response(JSON.stringify({ errorCode: 40400, message: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
+      }
+
+      if (method === "PUT") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+
+      if (method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+
+      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+    };
+
+    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+    expect(syncRes.results[0].ok).toBe(true);
+    expect(syncRes.results[0].mode).toBe("full_rebuild_rename");
+
+    const didPut = seen.some((c) => c.method === "PUT");
+    const didDelete = seen.some((c) => c.method === "DELETE");
+    expect(didPut).toBe(true);
+    expect(didDelete).toBe(true);
+  });
 });

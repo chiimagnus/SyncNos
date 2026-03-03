@@ -46,6 +46,31 @@ describe("obsidian-local-rest-client", () => {
     expect(headers.get("X-Api-Key")).toBe("Bearer k");
   });
 
+  it("supports listVaultDir and deleteVaultFile routes", async () => {
+    const seen: any[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: any, init: any) => {
+      seen.push({ url, init });
+      return new Response(JSON.stringify({ ok: true, files: [] }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const mod = await loadClient();
+    const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    expect(client.ok).toBe(true);
+
+    // @ts-expect-error narrowed
+    await client.listVaultDir("A Folder");
+    expect(String(seen[0].url)).toContain("/vault/A%20Folder/");
+    expect(String(seen[0].init.method || "")).toBe("GET");
+
+    // @ts-expect-error narrowed
+    await client.deleteVaultFile("A Folder/Note.md");
+    expect(String(seen[1].url)).toContain("/vault/A%20Folder/Note.md");
+    expect(String(seen[1].init.method || "")).toBe("DELETE");
+  });
+
   it("normalizes 401 as auth_error with message", async () => {
     // @ts-expect-error test global
     globalThis.fetch = async () => {
