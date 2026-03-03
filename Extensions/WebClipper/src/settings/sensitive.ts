@@ -1,5 +1,5 @@
-import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
-import { send } from '../../platform/runtime/runtime';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
+import { send } from '../platform/runtime/runtime';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
