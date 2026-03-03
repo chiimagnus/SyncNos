@@ -1,5 +1,6 @@
 :root {
-  color-scheme: light dark;
+  /* Popup UI is currently a light theme; force light form-control rendering in OS dark mode. */
+  color-scheme: light;
 }
 
 body {

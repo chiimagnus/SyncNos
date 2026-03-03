@@ -190,12 +190,16 @@ export default function ChatsTab() {
     const onKey = (e: KeyboardEvent) => {
       if (!preview) return;
       if (e.key === 'Escape') {
+        // Prevent browser default from closing the whole popup.
+        e.preventDefault();
+        e.stopPropagation();
         setPreview(null);
         setPreviewDetail(null);
       }
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    // Use capture so we intercept Escape before the extension popup closes.
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
   }, [preview]);
 
   useEffect(() => {

@@ -56,6 +56,7 @@ Then in the SyncNos WebClipper popup:
 Notes:
 
 - The `API Key` field is auto-saved on `blur` or when you press `Enter`.
+- WebClipper writes notes with `<source>-<title>-<stableId10>.md`; when title changes, it auto-renames by writing the new file and removing the old one.
 
 ## Troubleshooting
 
@@ -75,4 +76,3 @@ Usually the API key is missing or incorrect:
 - Copy the API key again from Obsidian
 - Ensure there are no leading/trailing spaces or newlines
 - Keep `Auth Header` as `Authorization`
-
