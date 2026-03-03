@@ -40,11 +40,11 @@ export type NotionDbManager = {
 export type NotionSyncService = {
   getPage?: (accessToken: string, pageId: string) => Promise<any>;
   createPageInDatabase: (accessToken: string, input: any) => Promise<any>;
-  updatePageProperties?: (accessToken: string, pageId: string, props: any) => Promise<any>;
+  updatePageProperties?: (accessToken: string, input: any) => Promise<any>;
   clearPageChildren?: (accessToken: string, pageId: string) => Promise<any>;
   appendChildren: (accessToken: string, pageId: string, blocks: any[]) => Promise<any>;
   messagesToBlocks: (messages: any[], input?: any) => any[];
-  isPageUsableForDatabase?: (page: any) => boolean;
+  isPageUsableForDatabase?: (page: any, databaseId?: string) => boolean;
   pageBelongsToDatabase?: (page: any, databaseId: string) => boolean;
   hasExternalImageBlocks?: (blocks: any[]) => boolean;
   upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[]) => Promise<any[]>;
@@ -63,4 +63,3 @@ export type NotionServices = {
   syncService: NotionSyncService;
   jobStore: NotionJobStore;
 };
-

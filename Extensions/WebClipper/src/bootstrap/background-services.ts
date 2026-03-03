@@ -3,10 +3,13 @@ import backgroundInpageWebVisibility from './background-inpage-web-visibility.ts
 import articleFetchService from '../collectors/web/article-fetch-service.ts';
 
 import notionSyncJobStore from '../sync/notion/notion-sync-job-store.ts';
-import {
-  getSyncJobStatus as getNotionSyncJobStatus,
-  syncConversations as syncNotionConversations,
-} from '../sync/notion/notion-sync-orchestrator.ts';
+import { createNotionSyncOrchestrator } from '../sync/notion/notion-sync-orchestrator.ts';
+import { getNotionOAuthToken } from '../sync/notion/auth/token-store';
+import { backgroundStorage as notionBackgroundStorage } from '../conversations/background-storage';
+import notionDbManager from '../sync/notion/notion-db-manager.ts';
+import notionSyncService from '../sync/notion/notion-sync-service.ts';
+import notionApi from '../sync/notion/notion-api.ts';
+import notionFilesApi from '../sync/notion/notion-files-api.ts';
 
 import {
   getObsidianSyncStatus,
@@ -41,16 +44,23 @@ export type BackgroundServices = {
 };
 
 export function createBackgroundServices(): BackgroundServices {
+  const notionSyncOrchestrator = createNotionSyncOrchestrator({
+    tokenStore: { getToken: getNotionOAuthToken },
+    storage: notionBackgroundStorage,
+    conversationKinds,
+    notionApi,
+    notionFilesApi,
+    dbManager: notionDbManager,
+    syncService: notionSyncService,
+    jobStore: notionSyncJobStore,
+  });
+
   return {
     backgroundInpageWebVisibility,
     articleFetchService,
     conversationKinds,
     notionSyncJobStore,
-    notionSyncOrchestrator: {
-      syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) =>
-        syncNotionConversations({ conversationIds: input.conversationIds, instanceId: input.instanceId } as any),
-      getSyncJobStatus: getNotionSyncJobStatus,
-    },
+    notionSyncOrchestrator,
     obsidianSyncOrchestrator: {
       syncConversations: obsidianSyncConversations,
       getSyncStatus: getObsidianSyncStatus,
