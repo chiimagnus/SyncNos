@@ -1,34 +1,27 @@
-import { conversationKinds } from '../../protocols/conversation-kinds.ts';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
 export const BACKUP_ZIP_SCHEMA_VERSION = 2;
 
-const STORAGE_ALLOWLIST_BASE = Object.freeze([
-  'notion_oauth_client_id',
-  'notion_parent_page_id',
-  'popup_active_tab',
-  'popup_source_filter_key',
-  'notion_ai_preferred_model_index',
+// Legacy export: previously we only backed up an allowlist of keys.
+// Now we back up all chrome.storage.local keys except a small sensitive denylist.
+export const STORAGE_ALLOWLIST = Object.freeze([] as string[]);
+
+const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
+  // Never export tokens (explicit product constraint).
+  'notion_oauth_token_v1',
+  // Not used by default (ensureDefaultNotionOAuthClientId removes it), but keep it out of backups.
+  'notion_oauth_client_secret',
 ]);
 
-function getNotionDbStorageKeys(): string[] {
-  try {
-    const keys = conversationKinds.getNotionStorageKeys();
-    if (Array.isArray(keys) && keys.length) {
-      return keys.map((k) => String(k || '').trim()).filter(Boolean);
-    }
-  } catch (_e) {
-    // ignore
-  }
-
-  // Fallback (load-order safety).
-  return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
+function shouldIncludeStorageKeyInBackup(key: string): boolean {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  if (STORAGE_BACKUP_DENYLIST_EXACT.has(k)) return false;
+  // Forward-compat: if token key changes versions, keep excluding it.
+  if (k.startsWith('notion_oauth_token')) return false;
+  return true;
 }
-
-export const STORAGE_ALLOWLIST = Object.freeze(
-  Array.from(new Set([...STORAGE_ALLOWLIST_BASE, ...getNotionDbStorageKeys()])),
-);
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
@@ -166,8 +159,9 @@ export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: Unknow
 export function filterStorageForBackup(storageLocal: unknown): Record<string, unknown> {
   const input = storageLocal && typeof storageLocal === 'object' ? (storageLocal as any) : {};
   const out: Record<string, unknown> = {};
-  for (const key of STORAGE_ALLOWLIST) {
-    if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
+  for (const [key, value] of Object.entries(input)) {
+    if (!shouldIncludeStorageKeyInBackup(key)) continue;
+    out[key] = value;
   }
   return out;
 }

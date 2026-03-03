@@ -24,13 +24,18 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
   const store: Record<string, unknown> = { ...initial };
   const setPayloads: Record<string, unknown>[] = [];
 
-  return {
-    runtime: { lastError: null as any },
-    storage: {
-      local: {
-        get(keys: string[], cb: (res: Record<string, unknown>) => void) {
+    return {
+      runtime: { lastError: null as any },
+      storage: {
+        local: {
+        get(keys: any, cb: (res: Record<string, unknown>) => void) {
+          if (keys == null) {
+            cb({ ...store });
+            return;
+          }
+          const list = Array.isArray(keys) ? keys : [];
           const out: Record<string, unknown> = {};
-          for (const k of keys) out[k] = Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null;
+          for (const k of list) out[k] = Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null;
           cb(out);
         },
         set(payload: Record<string, unknown>, cb: () => void) {

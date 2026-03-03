@@ -15,7 +15,7 @@ describe("backup zip v2 schema", () => {
       db: { name: "webclipper", version: 3 },
       counts: { conversations: 1, messages: 1, sync_mappings: 0 },
       config: { storageLocalPath: "config/storage-local.json" },
-      index: { conversationsCsvPath: "index/conversations.csv" }
+      index: { conversationsCsvPath: "sources/conversations.csv" }
     };
 
     expect(backupUtils.validateBackupManifest({ ...base, backupSchemaVersion: 999, sources: [] }).ok).toBe(false);
@@ -35,7 +35,7 @@ describe("backup zip v2 schema", () => {
       db: { name: "webclipper", version: 3 },
       counts: { conversations: 1, messages: 0, sync_mappings: 0 },
       config: { storageLocalPath: "config/storage-local.json" },
-      index: { conversationsCsvPath: "index/conversations.csv" },
+      index: { conversationsCsvPath: "sources/conversations.csv" },
       sources: [{ source: "chatgpt", conversationCount: 1, files: ["../sources/chatgpt/a.json"] }]
     });
     expect(res.ok).toBe(false);
