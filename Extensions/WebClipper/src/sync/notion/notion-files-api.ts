@@ -1,8 +1,5 @@
 // @ts-nocheck
 import { notionFetch as defaultNotionFetch } from './notion-api.ts';
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
 
   const FILE_UPLOAD_VERSION = "2025-09-03";
   const DEFAULT_POLL_INTERVAL_MS = 800;
@@ -60,13 +57,7 @@ const NS = runtimeContext as any;
     return String(value);
   }
 
-  function getNotionFetch() {
-    if (NS.notionApi && typeof NS.notionApi.notionFetch === 'function') return NS.notionApi.notionFetch;
-    return defaultNotionFetch;
-  }
-
   async function createExternalURLUpload({ accessToken, url, filename, contentType }) {
-    const notionFetch = getNotionFetch();
     const target = String(url || "").trim();
     if (!isHttpUrl(target)) throw new Error("invalid external image url");
     const body = {
@@ -76,7 +67,7 @@ const NS = runtimeContext as any;
     };
     const ct = String(contentType || "").trim();
     if (ct) body.content_type = ct;
-    return notionFetch({
+    return defaultNotionFetch({
       accessToken,
       method: "POST",
       path: "/v1/file_uploads",
@@ -86,7 +77,6 @@ const NS = runtimeContext as any;
   }
 
   async function createFileUpload({ accessToken, filename, contentType, contentLength }) {
-    const notionFetch = getNotionFetch();
     const name = sanitizeFilename(filename || "");
     const ct = String(contentType || "").trim() || "application/octet-stream";
     const body = {
@@ -94,7 +84,7 @@ const NS = runtimeContext as any;
       filename: name,
       content_type: ct
     };
-    return notionFetch({
+    return defaultNotionFetch({
       accessToken,
       method: "POST",
       path: "/v1/file_uploads",
@@ -130,10 +120,9 @@ const NS = runtimeContext as any;
   }
 
   async function retrieveUpload({ accessToken, id }) {
-    const notionFetch = getNotionFetch();
     const uploadId = String(id || "").trim();
     if (!uploadId) throw new Error("missing upload id");
-    return notionFetch({
+    return defaultNotionFetch({
       accessToken,
       method: "GET",
       path: `/v1/file_uploads/${encodeURIComponent(uploadId)}`,
@@ -177,10 +166,6 @@ const api = {
   retrieveUpload,
   waitUntilUploaded,
 };
-
-if (!NS.notionFilesApi || typeof NS.notionFilesApi.createExternalURLUpload !== 'function') {
-  NS.notionFilesApi = api;
-}
 
 export {
   FILE_UPLOAD_VERSION,

@@ -1,7 +1,4 @@
 // @ts-nocheck
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
 
   const NOTION_VERSION = "2022-06-28";
 
@@ -108,9 +105,6 @@ const NS = runtimeContext as any;
   }
 
 const api = { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
-if (!NS.notionApi || typeof NS.notionApi.notionFetch !== 'function') {
-  NS.notionApi = api;
-}
 
 export { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
 export default api;
