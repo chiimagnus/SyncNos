@@ -960,12 +960,6 @@ export default function SettingsTab() {
           </div>
         ) : null}
 
-        <div className="settingsRow settingsRow--compact" aria-label="Database import note">
-          <div className="settingsLabel settingsLabel--inline">Note</div>
-          <div className="sub">
-            Import merges by (source + conversationKey). Notion token is not included. Backup file: .zip (recommended) / .json (legacy). Firefox kernel imports open App Settings.
-          </div>
-        </div>
       </section>
 
       <section className="toolbar settingsPanel" id="notionAiCard" aria-label="Notion AI settings">
