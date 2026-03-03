@@ -41,6 +41,28 @@ export async function storageGet(keys: string[]): Promise<Record<string, unknown
   throw toError('storage.local.get unavailable');
 }
 
+export async function storageGetAll(): Promise<Record<string, unknown>> {
+  const { chrome, browser } = getApis();
+
+  if (chrome?.storage?.local?.get) {
+    return await new Promise((resolve, reject) => {
+      chrome.storage.local.get(null as any, (res: Record<string, unknown>) => {
+        if (chrome?.runtime?.lastError) {
+          reject(toError(runtimeLastErrorMessage('storage.get failed')));
+          return;
+        }
+        resolve(res ?? {});
+      });
+    });
+  }
+
+  if (browser?.storage?.local?.get) {
+    return (await browser.storage.local.get(null as any)) as Record<string, unknown>;
+  }
+
+  throw toError('storage.local.get unavailable');
+}
+
 export async function storageSet(items: Record<string, unknown>): Promise<void> {
   const { chrome, browser } = getApis();
   const payload = (items ?? {}) as Record<string, unknown>;
@@ -90,4 +112,3 @@ export async function storageRemove(keys: string[]): Promise<void> {
 
   throw toError('storage.local.remove unavailable');
 }
-

@@ -1,7 +1,6 @@
-import { storageGet } from '../../platform/storage/local';
+import { storageGetAll } from '../../platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
-  STORAGE_ALLOWLIST,
   filterStorageForBackup,
   uniqueConversationKey,
 } from './backup-utils';
@@ -75,7 +74,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const syncMappings = (await reqToPromise(stores.sync_mappings.getAll() as any)) as AnyRecord[];
   await txDone(t);
 
-  const rawStorage = await storageGet(STORAGE_ALLOWLIST as any);
+  const rawStorage = await storageGetAll();
   const storageLocal = filterStorageForBackup(rawStorage);
 
   const exportedAt = new Date().toISOString();
