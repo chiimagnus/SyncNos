@@ -5,7 +5,7 @@ const articleFetchMocks = vi.hoisted(() => ({
   fetchActiveTabArticle: vi.fn(),
 }));
 
-vi.mock("../../src/integrations/web-article/article-fetch", () => ({
+vi.mock("../../src/collectors/web/article-fetch", () => ({
   fetchActiveTabArticle: articleFetchMocks.fetchActiveTabArticle,
 }));
 
