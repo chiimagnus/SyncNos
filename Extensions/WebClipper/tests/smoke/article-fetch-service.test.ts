@@ -5,7 +5,7 @@ const storageMocks = {
   syncConversationMessages: vi.fn(),
 };
 
-vi.mock("../../src/domains/conversations/storage", () => ({
+vi.mock("../../src/conversations/storage", () => ({
   upsertConversation: storageMocks.upsertConversation,
   syncConversationMessages: storageMocks.syncConversationMessages,
 }));

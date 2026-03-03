@@ -1,4 +1,4 @@
-import { backgroundStorage } from '../domains/conversations/background-storage';
+import { backgroundStorage } from '../conversations/background-storage';
 import {
   clearNotionOAuthToken,
   getNotionOAuthToken,

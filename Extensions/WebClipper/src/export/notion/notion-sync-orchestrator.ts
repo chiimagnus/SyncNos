@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { backgroundStorage as defaultBackgroundStorage } from '../../domains/conversations/background-storage';
+import { backgroundStorage as defaultBackgroundStorage } from '../../conversations/background-storage';
 import { getNotionOAuthToken } from '../../integrations/notion/token-store';
 import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
 import runtimeContext from '../../runtime-context.ts';

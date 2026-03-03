@@ -7,7 +7,7 @@
 
 import type { Conversation, ConversationDetail, ConversationMessage } from './models';
 import * as idb from './storage-idb';
-import runtimeContext from '../../runtime-context.ts';
+import runtimeContext from '../runtime-context.ts';
 
 type LegacyStorage = {
   upsertConversation: (payload: any) => Promise<any>;

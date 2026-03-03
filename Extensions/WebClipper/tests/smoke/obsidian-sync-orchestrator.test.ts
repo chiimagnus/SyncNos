@@ -246,7 +246,7 @@ describe("obsidian-sync-orchestrator", () => {
     await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
     await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const naming = await loadModule("../../src/domains/conversations/file-naming.ts");
+    const naming = await loadModule("../../src/conversations/file-naming.ts");
     const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     const convo = { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "New Title" };
