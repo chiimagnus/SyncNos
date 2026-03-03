@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Conversation, ConversationDetail } from '../../../domains/conversations/models';
 import { createZipBlob } from '../../../domains/backup/zip-utils';
-import { formatConversationMarkdown, sanitizeFilenamePart } from '../../../domains/conversations/markdown';
+import { buildConversationBasename } from '../../../domains/conversations/file-naming';
+import { formatConversationMarkdown } from '../../../domains/conversations/markdown';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../domains/conversations/repo';
 import { syncNotionConversations, syncObsidianConversations } from '../../../domains/sync/repo';
 
@@ -129,14 +130,11 @@ export default function Conversations() {
         const text = docs.join('\n---\n\n');
         files.push({ name: `webclipper-export-${stamp}.md`, data: text });
       } else {
-        for (let i = 0; i < selectedConversations.length; i += 1) {
-          const c = selectedConversations[i];
+        for (const c of selectedConversations) {
           // eslint-disable-next-line no-await-in-loop
           const d = await getConversationDetail(Number(c.id));
-          const source = sanitizeFilenamePart(c.source || 'unknown', 'unknown');
-          const title = sanitizeFilenamePart(c.title || 'untitled', 'untitled');
           files.push({
-            name: `webclipper-${source}-${title}-${i + 1}-${stamp}.md`,
+            name: `${buildConversationBasename(c)}.md`,
             data: formatConversationMarkdown(c, d.messages || []),
           });
         }
