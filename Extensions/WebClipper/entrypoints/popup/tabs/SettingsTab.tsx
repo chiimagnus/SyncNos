@@ -647,6 +647,86 @@ export default function SettingsTab() {
         </section>
       ) : null}
 
+      <section className="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
+        <div className="settingsRow settingsRow--header" aria-label="Database backup header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Database Backup</span>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Database import controls">
+          <div className="settingsControl settingsControl--grow">
+            <button id="btnDatabaseExport" className="btn" type="button" onClick={() => handleBackupExport().catch(() => {})} disabled={busy}>
+              Export
+            </button>
+            <button
+              id="btnDatabaseImport"
+              className="btn"
+              type="button"
+              onClick={() => handleBackupImportClick().catch(() => {})}
+              disabled={busy}
+            >
+              {useAppImport ? 'Import in App' : 'Import'}
+            </button>
+            <input
+              ref={fileInputRef}
+              id="databaseImportFile"
+              className="fileInputHidden"
+              type="file"
+              accept=".zip,application/zip,.json,application/json"
+              onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                void importFromFile(f);
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Database backup status">
+          <div className="settingsLabel settingsLabel--inline">Status</div>
+          <div className="sub">
+            export: {exportStatus} · import: {importStatus}
+          </div>
+        </div>
+
+        {importStats ? (
+          <div className="settingsRow settingsRow--compact" aria-label="Database backup import stats">
+            <div className="settingsLabel settingsLabel--inline">Stats</div>
+            <div className="sub">{renderStats(importStats)}</div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="toolbar settingsPanel" id="articleFetchCard" aria-label="Article fetch">
+        <div className="settingsRow settingsRow--header" aria-label="Article fetch header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Article Fetch</span>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Fetch current page article">
+          <div className="settingsControl settingsControl--grow">
+            <button id="btnFetchCurrentArticle" className="btn" type="button" onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy}>
+              Fetch Current Page
+            </button>
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Article fetch status">
+          <div className="settingsLabel settingsLabel--inline">Status</div>
+          <div id="articleFetchStatus" className={['sub', articleFetchStatusClass].filter(Boolean).join(' ')}>
+            {articleFetchStatus}
+          </div>
+        </div>
+      </section>
+
       <section className="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
         <div className="settingsRow settingsRow--header" id="notionBar">
           <img className="notionLogo" src={browser.runtime.getURL('icons/notion.svg' as any)} alt="" aria-hidden="true" />
@@ -698,29 +778,44 @@ export default function SettingsTab() {
         </div>
       </section>
 
-      <section className="toolbar settingsPanel" id="articleFetchCard" aria-label="Article fetch">
-        <div className="settingsRow settingsRow--header" aria-label="Article fetch header">
+      <section className="toolbar settingsPanel" id="notionAiCard" aria-label="Notion AI settings">
+        <div className="settingsRow settingsRow--header" aria-label="Notion AI header">
           <div className="notionHeaderText">
-            <span className="notionHeaderTitle">Article Fetch</span>
+            <span className="notionHeaderTitle">Notion AI</span>
           </div>
           <div className="spacer" />
         </div>
 
         <div className="settingsDivider" role="presentation" />
 
-        <div className="settingsRow settingsRow--compact" aria-label="Fetch current page article">
+        <div className="settingsRow settingsRow--compact" aria-label="Preferred model index">
+          <div className="settingsLabel settingsLabel--inline">Model Index</div>
           <div className="settingsControl settingsControl--grow">
-            <button id="btnFetchCurrentArticle" className="btn" type="button" onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy}>
-              Fetch Current Page
+            <input
+              id="notionAiModelIndex"
+              className="input"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              placeholder="3"
+              aria-label="Notion AI preferred model index"
+              value={notionAiModelIndex}
+              disabled={busy}
+              onChange={(e) => setNotionAiModelIndex(e.target.value)}
+            />
+            <button id="btnNotionAiModelSave" className="btn" type="button" onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy}>
+              Save
+            </button>
+            <button id="btnNotionAiModelReset" className="btn" type="button" title="Reset to default" onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy}>
+              Reset
             </button>
           </div>
         </div>
 
-        <div className="settingsRow settingsRow--compact" aria-label="Article fetch status">
-          <div className="settingsLabel settingsLabel--inline">Status</div>
-          <div id="articleFetchStatus" className={['sub', articleFetchStatusClass].filter(Boolean).join(' ')}>
-            {articleFetchStatus}
-          </div>
+        <div className="settingsRow settingsRow--compact" aria-label="Notion AI model note">
+          <div className="settingsLabel settingsLabel--inline">Note</div>
+          <div className="sub">Applies only when Notion AI model is set to Auto. Menu order may change in Notion.</div>
         </div>
       </section>
 
@@ -904,102 +999,6 @@ export default function SettingsTab() {
         <div className="settingsRow settingsRow--compact" aria-label="Obsidian paths note">
           <div className="settingsLabel settingsLabel--inline">Note</div>
           <div className="sub">Vault-relative folder paths. Nested folders supported. Empty uses defaults.</div>
-        </div>
-      </section>
-
-      <section className="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
-        <div className="settingsRow settingsRow--header" aria-label="Database backup header">
-          <div className="notionHeaderText">
-            <span className="notionHeaderTitle">Database Backup</span>
-          </div>
-          <div className="spacer" />
-        </div>
-
-        <div className="settingsDivider" role="presentation" />
-
-        <div className="settingsRow settingsRow--compact" aria-label="Database import controls">
-          <div className="settingsControl settingsControl--grow">
-            <button id="btnDatabaseExport" className="btn" type="button" onClick={() => handleBackupExport().catch(() => {})} disabled={busy}>
-              Export
-            </button>
-            <button
-              id="btnDatabaseImport"
-              className="btn"
-              type="button"
-              onClick={() => handleBackupImportClick().catch(() => {})}
-              disabled={busy}
-            >
-              {useAppImport ? 'Import in App' : 'Import'}
-            </button>
-            <input
-              ref={fileInputRef}
-              id="databaseImportFile"
-              className="fileInputHidden"
-              type="file"
-              accept=".zip,application/zip,.json,application/json"
-              onChange={(e) => {
-                const f = e.target.files && e.target.files[0];
-                if (!f) return;
-                void importFromFile(f);
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="settingsRow settingsRow--compact" aria-label="Database backup status">
-          <div className="settingsLabel settingsLabel--inline">Status</div>
-          <div className="sub">
-            export: {exportStatus} · import: {importStatus}
-          </div>
-        </div>
-
-        {importStats ? (
-          <div className="settingsRow settingsRow--compact" aria-label="Database backup import stats">
-            <div className="settingsLabel settingsLabel--inline">Stats</div>
-            <div className="sub">{renderStats(importStats)}</div>
-          </div>
-        ) : null}
-
-      </section>
-
-      <section className="toolbar settingsPanel" id="notionAiCard" aria-label="Notion AI settings">
-        <div className="settingsRow settingsRow--header" aria-label="Notion AI header">
-          <div className="notionHeaderText">
-            <span className="notionHeaderTitle">Notion AI</span>
-          </div>
-          <div className="spacer" />
-        </div>
-
-        <div className="settingsDivider" role="presentation" />
-
-        <div className="settingsRow settingsRow--compact" aria-label="Preferred model index">
-          <div className="settingsLabel settingsLabel--inline">Model Index</div>
-          <div className="settingsControl settingsControl--grow">
-            <input
-              id="notionAiModelIndex"
-              className="input"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              placeholder="3"
-              aria-label="Notion AI preferred model index"
-              value={notionAiModelIndex}
-              disabled={busy}
-              onChange={(e) => setNotionAiModelIndex(e.target.value)}
-            />
-            <button id="btnNotionAiModelSave" className="btn" type="button" onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy}>
-              Save
-            </button>
-            <button id="btnNotionAiModelReset" className="btn" type="button" title="Reset to default" onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy}>
-              Reset
-            </button>
-          </div>
-        </div>
-
-        <div className="settingsRow settingsRow--compact" aria-label="Notion AI model note">
-          <div className="settingsLabel settingsLabel--inline">Note</div>
-          <div className="sub">Applies only when Notion AI model is set to Auto. Menu order may change in Notion.</div>
         </div>
       </section>
 
