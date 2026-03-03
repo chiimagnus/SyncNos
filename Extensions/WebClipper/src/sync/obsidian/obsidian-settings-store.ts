@@ -1,4 +1,3 @@
-import runtimeContext from '../../runtime-context.ts';
 import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
@@ -16,8 +15,6 @@ const api = {
   getPathConfig: getObsidianPathConfig,
   saveSettings: saveObsidianSettings,
 };
-
-(runtimeContext as any).obsidianSettingsStore = api;
 
 export {
   OBSIDIAN_STORAGE_KEYS as STORAGE_KEYS,

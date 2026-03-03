@@ -10,10 +10,10 @@ import {
   syncConversations as syncNotionConversations,
 } from '../../src/sync/notion/notion-sync-orchestrator.ts';
 import {
-  getObsidianSyncStatus,
-  obsidianSyncConversations,
-  testObsidianConnection,
-} from '../../src/sync/obsidian/orchestrator.ts';
+  getSyncStatus as getObsidianSyncStatus,
+  syncConversations as obsidianSyncConversations,
+  testConnection as testObsidianConnection,
+} from '../../src/sync/obsidian/obsidian-sync-orchestrator.ts';
 import backgroundInpageWebVisibility from '../../src/bootstrap/background-inpage-web-visibility.ts';
 
 export function createTestBackgroundRouter() {
