@@ -23,7 +23,7 @@
 
 **Acceptance（验收）:**
 - `Extensions/WebClipper/src/runtime-context.ts`、`Extensions/WebClipper/src/export/bootstrap.ts` 被删除，且运行/测试不再依赖它们。
-- `rg -n "runtimeContext\\b|globalThis\\.WebClipper|\\bWebClipper\\b" Extensions/WebClipper/{src,entrypoints,tests}`：在运行时代码与测试中无匹配（允许文档中出现 “WebClipper” 字样，但不能再出现代码注入/读取）。
+- `rg -n "runtimeContext\\b|globalThis\\.WebClipper" Extensions/WebClipper/{src,entrypoints,tests}`：在运行时代码与测试中无匹配（允许字符串/文案中出现 “WebClipper”，但不能再出现兼容层代码注入/读取）。
 - 通过：`npm --prefix Extensions/WebClipper run test`
 - 通过：`npm --prefix Extensions/WebClipper run compile`
 - 冒烟（手动）：`npm --prefix Extensions/WebClipper run dev` 后，inpage 按钮能在支持站点出现、能保存对话/网页文章、popup 能正常打开。
@@ -36,13 +36,14 @@
 
 **Files:**
 - Modify: `Extensions/WebClipper/package.json`（可选：增加 `check:no-compat` 脚本）
-- (可选) Create: `Extensions/WebClipper/scripts/check-no-compat.mjs`
+- (可选) Create: `Extensions/WebClipper/scripts/check-no-compat.mjs`（需先创建目录）
 
 **Step 1: 实现**
 - 增加一个可重复执行的检查入口（建议脚本化），用于阻止 `runtimeContext`/`globalThis.WebClipper` 回归。
 - 推荐检查模式：
-  - `rg -n "runtimeContext\\b|globalThis\\.WebClipper" src entrypoints tests`
+  - `rg -n "runtimeContext\\b|globalThis\\.WebClipper" Extensions/WebClipper/src Extensions/WebClipper/entrypoints Extensions/WebClipper/tests`
   - 失败则退出非 0。
+  - （如果走脚本文件）前置：`mkdir -p Extensions/WebClipper/scripts`
 
 **Step 2: 验证**
 - Run: `node Extensions/WebClipper/scripts/check-no-compat.mjs`（如果实现了脚本）
@@ -53,29 +54,21 @@
 
 ---
 
-### Task 2: Content 入口改为“显式 deps + collectors 工厂化”
+### Task 2: 定义 CollectorEnv + 工厂化目标形态（不立即切换 content 入口）
 
 **Files:**
-- Modify: `Extensions/WebClipper/entrypoints/content.ts`
-- Modify: `Extensions/WebClipper/src/bootstrap/content-controller.ts`（如需调整 deps 类型与调用方式）
 - Create: `Extensions/WebClipper/src/collectors/collector-env.ts`
 - Create: `Extensions/WebClipper/src/collectors/register-all.ts`
 - Modify: `Extensions/WebClipper/src/collectors/registry.ts`（如需扩展类型：支持 `{ id, matches, inpageMatches, collector }`）
 
 **Step 1: 实现**
-- 在 `entrypoints/content.ts` 中移除：
-  - `import runtimeContext from '../src/runtime-context.ts'`
-  - 对 `runtimeContext.*` / `collectorContext.*` 的读取
 - 新增 `createCollectorEnv()`（`src/collectors/collector-env.ts`）：
   - 输入：`{ window, document, location, normalize }`（最小集）
   - 输出：collector 工厂需要的 `env`
 - 新增 `registerAllCollectors(registry, env)`（`src/collectors/register-all.ts`）：
   - 负责：对每个站点调用 `registry.register({ id, matches, inpageMatches?, collector: createXCollector(env) })`
-- `entrypoints/content.ts` 里显式组装：
-  - `const env = createCollectorEnv({ ... })`
-  - `const registry = createCollectorsRegistry()`
-  - `registerAllCollectors(registry, env)`
-  - 传入 `createContentController({ collectorsRegistry: registry, ... })`
+- **重要（避免中途不可用）**：在“所有站点 collectors 都完成工厂化”之前，不要切换 `entrypoints/content.ts` 到 `registerAllCollectors(...)`，否则会丢失未迁移站点。
+- 本 Task 目标是把“最终形态”的接口与注册点先落下来，供后续站点迁移与测试使用。
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run compile`
@@ -86,33 +79,72 @@
 
 ---
 
-### Task 3: 逐站点把 collector 改为 `createXCollector(env)`（第一批：normalize 依赖）
+### Task 3: 逐站点把 collector 改为 `createXCollector(env)`（工厂化迁移：含 markdown/collectorUtils/注册）
 
 **Files:**
-- Modify: `Extensions/WebClipper/src/collectors/*/*-collector.ts`（选 2–3 个站点先打通，比如 chatgpt/claude/gemini）
-- Modify: `Extensions/WebClipper/src/collectors/*/*-entry.ts`（预计删除，或改为纯 re-export）
-- Modify: `Extensions/WebClipper/src/collectors/sites-bootstrap.ts`（预计删除）
-- Modify: `Extensions/WebClipper/src/collectors/collector-context.ts`（预计删除）
-- Modify: `Extensions/WebClipper/src/collectors/bootstrap.ts`（预计删除）
+- Modify: `Extensions/WebClipper/src/collectors/*/*-collector.ts`（分批迁移所有站点）
+- Modify: `Extensions/WebClipper/src/collectors/*/*-markdown.ts`（如该站点存在 markdown 辅助，需同步纯化）
+- Modify: `Extensions/WebClipper/src/collectors/register-all.ts`（随着站点迁移逐步补齐注册）
 
 **Step 1: 实现**
-- 将第一批站点 collector 从：
-  - `import collectorContext ...; const NS = collectorContext as any; NS.normalize...`
-  改为：
-  - `export function createChatgptCollector(env) { ... }`
-  - normalize/hashing 通过 `env.normalize` 传入（或 env 里直接有 `normalizeText/fnv1a32`）
-- 同步删除已不再需要的：
-  - `src/collectors/collector-context.ts`
-  - `src/collectors/bootstrap.ts`
-  - `src/collectors/sites-bootstrap.ts`（以及各 `*-entry.ts` side-effect import 链）
+- 每个站点的迁移 checklist（必须全部处理，不止 normalize）：
+  - `NS.normalize.*` -> `env.normalize.*`（或显式 import）
+  - `NS.*Markdown`（例如 ChatGPT）-> 显式 import 对应模块的纯导出（必要时把 markdown 模块也工厂化/纯化）
+  - `NS.collectorUtils.*` -> 显式 import（或注入到 env）
+  - 删除 `NS.collectorsRegistry.register(...)` 的“模块加载自注册”；改为导出 `create<Site>CollectorDef(env): CollectorDefinition`
+  - `register-all.ts` 负责统一注册所有站点 def
+- **删除旧 side-effect 链（collector-context/bootstrap/sites-bootstrap/*-entry.ts）必须后置**：
+  - 前置条件：所有站点 collector 已提供 `create<Site>CollectorDef(env)` 且 `entrypoints/content.ts` 已切到 `registerAllCollectors(...)` 并通过全量测试与手动冒烟。
 
 **Step 2: 验证**
-- Run: `npm --prefix Extensions/WebClipper run test -- collectors/chatgpt-collector.test.ts`
+- Run: `npm --prefix Extensions/WebClipper run test -- collectors/chatgpt-collector.test.ts`（迁移到哪个站点，就跑哪个站点的测试）
 - Run: `npm --prefix Extensions/WebClipper run compile`
 - Expected: 第一批站点测试 PASS；编译 PASS。
 
 **Step 3: 提交（建议）**
 - Commit: `refactor: task3 - factoryize first collectors batch`
+
+---
+
+### Task 3B: 切换 content 入口到 `registerAllCollectors(...)` 并删除 collectors side-effect 注册链（收口）
+
+**前置条件（硬门槛）**
+- `register-all.ts` 已覆盖所有站点 collectors（包含 web / googleaistudio / notionai 等）。
+- `npm --prefix Extensions/WebClipper run test -- collectors` 全绿。
+
+**Files:**
+- Modify: `Extensions/WebClipper/entrypoints/content.ts`
+- Modify: `Extensions/WebClipper/src/bootstrap/content-controller.ts`（如需调整 deps 类型）
+- Delete: `Extensions/WebClipper/src/collectors/collector-context.ts`
+- Delete: `Extensions/WebClipper/src/collectors/bootstrap.ts`
+- Delete: `Extensions/WebClipper/src/collectors/sites-bootstrap.ts`
+- Delete (按实际存在): `Extensions/WebClipper/src/collectors/*/*-entry.ts`
+
+**Step 1: 实现**
+- `entrypoints/content.ts` 改为显式组装（不再读写 `runtimeContext` / `collectorContext`）：
+  - `const runtime = createRuntimeClient()`
+  - `const env = createCollectorEnv({ window, document, location, normalize: normalizeApi })`
+  - `const registry = createCollectorsRegistry()`
+  - `registerAllCollectors(registry, env)`
+  - `const controller = createContentController({`
+    - `runtime,`
+    - `collectorsRegistry: registry,`
+    - `inpageButton: inpageButtonApi,`
+    - `inpageTip: inpageTipApi,`
+    - `runtimeObserver: runtimeObserverApi,`
+    - `incrementalUpdater: incrementalUpdaterApi,`
+    - `notionAiModelPicker: notionAiModelPickerApi,`
+  - `})`
+  - 交给 `startContentBootstrap({ runtime, inpageButton: inpageButtonApi, createController: () => controller })`
+- 删除旧的 side-effect 注册链，确保不再有“import 就注册”的隐式行为。
+
+**Step 2: 验证**
+- Run: `npm --prefix Extensions/WebClipper run test -- collectors`
+- Run: `npm --prefix Extensions/WebClipper run compile`
+- Expected: PASS
+
+**Step 3: 提交（建议）**
+- Commit: `refactor: task3B - switch content entry to explicit collectors registry`
 
 ---
 
@@ -184,7 +216,11 @@
 - 把 `registerSyncHandlers(router)` 改为 `registerSyncHandlers(router, deps)`：
   - deps 至少包含：`notionSyncOrchestrator`、`obsidianSyncOrchestrator`、`getInstanceId`
 - 把 `registerSettingsHandlers(router)` 改为 `registerSettingsHandlers(router, deps)`：
-  - deps 至少包含：`notionSyncJobStore`、`backgroundInpageWebVisibility` 等（以实际使用为准）
+  - deps 至少包含（按现有代码路径）：
+    - `testObsidianConnection`（或 `obsidianSyncOrchestrator.testConnection` 等等价能力）
+    - `notionSyncJobStore`（用于 disconnect 时拿到 job key）
+    - `conversationKinds`（用于 disconnect 时计算 Notion DB storage keys）
+    - `backgroundInpageWebVisibility`（用于 `APPLY_INPAGE_VISIBILITY`）
 - `entrypoints/background.ts` 从 `createBackgroundServices()` 拿到 deps 并传入。
 
 **Step 2: 验证**
@@ -226,7 +262,7 @@
 **Files:**
 - Modify: `Extensions/WebClipper/src/sync/notion/notion-api.ts`
 - Modify: `Extensions/WebClipper/src/sync/notion/notion-files-api.ts`
-- Modify: `Extensions/WebClipper/src/sync/notion/auth/token-store.ts`（只要它还被 runtimeContext 兼容层引用即可）
+- Modify: `Extensions/WebClipper/src/sync/notion/auth/token-store.ts`
 
 **Step 1: 实现**
 - 删除这些文件里所有 `import runtimeContext` + `runtimeContext.xxx = ...` 的副作用（如果存在）。
@@ -291,6 +327,31 @@
 
 ---
 
+### Task 10A: 落地“分层单测”（Notion/Obsidian 纯函数与编排测试）
+
+**Files:**
+- Create: `Extensions/WebClipper/src/sync/notion/notion-sync-cursor.ts`（从 orchestrator 抽纯函数：cursor/append/rebuild 判定等）
+- Create: `Extensions/WebClipper/tests/unit/notion-sync-cursor.test.ts`
+- (可选) Create: `Extensions/WebClipper/src/sync/obsidian/obsidian-connection.ts`（若 Task 11 选 B）
+- (可选) Create: `Extensions/WebClipper/tests/unit/obsidian-connection.test.ts`
+
+**Step 1: 实现**
+- 把 Notion orchestrator 内“与 chrome/storage/network 无关”的纯逻辑抽出来（例如 cursor 提取、newMessages 计算、重建判定），让它们：
+  - 输入/输出是普通对象/数组
+  - 不读取 `runtimeContext`、不直接访问 `chrome.*`
+- 为这些纯函数补单测（覆盖：空消息/缺 cursor/cursor missing/append/rebuild）。
+- Obsidian（如果拆出 connection 模块）同理：把“请求构造/错误归类/响应判定”的纯逻辑单测化。
+
+**Step 2: 验证**
+- Run: `npm --prefix Extensions/WebClipper run test -- tests/unit/notion-sync-cursor.test.ts`
+- (可选) Run: `npm --prefix Extensions/WebClipper run test -- tests/unit/obsidian-connection.test.ts`
+- Expected: PASS
+
+**Step 3: 提交（建议）**
+- Commit: `test: task10A - add unit tests for notion/obsidian core logic`
+
+---
+
 ### Task 11: Obsidian 模块去 `runtimeContext`（删除兼容委托层）
 
 **Files:**
@@ -298,11 +359,15 @@
 - Delete (预计): `Extensions/WebClipper/src/sync/obsidian/orchestrator.ts`
 - Modify: `Extensions/WebClipper/src/bootstrap/background-services.ts`
 - Modify: `Extensions/WebClipper/src/sync/background-handlers.ts`
+- Modify: `Extensions/WebClipper/src/settings/background-handlers.ts`
 - Modify: `Extensions/WebClipper/tests/smoke/background-router-obsidian-sync.test.ts`
 
 **Step 1: 实现**
 - 让 Obsidian sync 完全由 `background-services.ts` 注入 deps 构建。
 - 删除 `orchestrator.ts`（如果它仅用于 runtimeContext fallback）。
+- 将 `testObsidianConnection` 的能力迁移到新的落点（建议二选一）：
+  - A) 作为 `obsidian-sync-orchestrator` export（由 services 注入调用）
+  - B) 抽成 `src/sync/obsidian/obsidian-connection.ts`（更纯粹），由 `registerSettingsHandlers` 通过 deps 注入
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run test -- smoke/background-router-obsidian-sync.test.ts`
@@ -321,9 +386,6 @@
 - Modify: `Extensions/WebClipper/src/conversations/incremental-updater.ts`
 - Modify: `Extensions/WebClipper/src/ui/inpage/inpage-button.ts`
 - Modify: `Extensions/WebClipper/src/ui/inpage/inpage-tip.ts`
-- Modify: `Extensions/WebClipper/src/collectors/collector-context.ts`（预计删除）
-- Modify: `Extensions/WebClipper/src/collectors/bootstrap.ts`（预计删除或重写）
-- Modify: `Extensions/WebClipper/src/collectors/*/*-collector.ts`（按站点逐个替换 `NS.normalize`/`collectorContext`）
 - Modify: `Extensions/WebClipper/src/collectors/runtime-observer.ts`
 - Modify: `Extensions/WebClipper/src/sync/local/article-markdown.ts`
 - Modify: `Extensions/WebClipper/src/sync/local/zip-utils.ts`
@@ -331,10 +393,7 @@
 
 **Step 1: 实现**
 - 删除所有 `runtimeContext.xxx = api`。
-- collectors 改造按站点拆分提交（每站点 5–15 分钟一批），统一目标：
-  - 不再存在 `collectorContext` / `NS` / side-effect import 注册
-  - 每站点提供 `createXCollector(env)` 并在 `registerAllCollectors(registry, env)` 注册
-  - 所有依赖（normalize、markdown utils、DOM helper）要么显式 import，要么来自 env
+- 注：站点 collectors 的 `NS/collectorContext` 清理应在 Task 3/3B 完成；Task 12 仅处理“通用模块”与 UI/local/shared 的 runtimeContext 副作用。
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run test -- collectors`
