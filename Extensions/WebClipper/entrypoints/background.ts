@@ -29,8 +29,18 @@ export default defineBackground(() => {
 
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
-  registerSettingsHandlers(router, { getInstanceId: getBackgroundInstanceId });
-  registerSyncHandlers(router, { getInstanceId: getBackgroundInstanceId });
+  registerSettingsHandlers(router, {
+    getInstanceId: getBackgroundInstanceId,
+    testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
+    notionSyncJobStore: services.notionSyncJobStore,
+    conversationKinds: services.conversationKinds,
+    backgroundInpageWebVisibility: services.backgroundInpageWebVisibility,
+  });
+  registerSyncHandlers(router, {
+    getInstanceId: getBackgroundInstanceId,
+    notionSyncOrchestrator: services.notionSyncOrchestrator,
+    obsidianSyncOrchestrator: services.obsidianSyncOrchestrator,
+  });
 
   // Keep legacy "start" side-effects that are not message handlers.
   try {

@@ -90,6 +90,6 @@ describe("content-controller web inpage fetch", () => {
     await cfg.onClick();
 
     expect(harness.sendCalls.some((c) => c.type === "fetchActiveTabArticle")).toBe(true);
-    expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
+    expect(harness.tipCalls.some((c) => c.opts?.kind === "default")).toBe(true);
   });
 });

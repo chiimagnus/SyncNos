@@ -150,7 +150,7 @@ describe("content-controller inpage combo", () => {
 
     expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
-    expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
+    expect(harness.tipCalls.some((c) => c.opts?.kind === "default")).toBe(true);
   });
 
   it("shows error tip when manual capture finds no visible conversation", async () => {

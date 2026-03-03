@@ -1,12 +1,4 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-import {
-  getSyncJobStatus as getNotionSyncStatus,
-  syncConversations as notionSyncConversations,
-} from './notion/notion-sync-orchestrator';
-import {
-  getObsidianSyncStatus,
-  obsidianSyncConversations,
-} from './obsidian/orchestrator';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -16,11 +8,23 @@ type AnyRouter = {
 
 type Deps = {
   getInstanceId: () => string;
+  notionSyncOrchestrator: {
+    syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
+    getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
+  };
+  obsidianSyncOrchestrator: {
+    syncConversations: (input: {
+      conversationIds?: unknown[];
+      forceFullConversationIds?: unknown[];
+      instanceId: string;
+    }) => Promise<unknown>;
+    getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+  };
 };
 
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const data = await notionSyncConversations({
+    const data = await deps.notionSyncOrchestrator.syncConversations({
       conversationIds: msg?.conversationIds,
       instanceId: deps.getInstanceId(),
     });
@@ -28,17 +32,17 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS, async () => {
-    const data = await getNotionSyncStatus({ instanceId: deps.getInstanceId() });
+    const data = await deps.notionSyncOrchestrator.getSyncJobStatus({ instanceId: deps.getInstanceId() });
     return router.ok(data);
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
-    const data = await getObsidianSyncStatus({ instanceId: deps.getInstanceId() });
+    const data = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
     return router.ok(data);
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const data = await obsidianSyncConversations({
+    const data = await deps.obsidianSyncOrchestrator.syncConversations({
       conversationIds: msg?.conversationIds,
       forceFullConversationIds: msg?.forceFullConversationIds,
       instanceId: deps.getInstanceId(),
