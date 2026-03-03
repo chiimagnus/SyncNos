@@ -1,34 +1,25 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import {
-  ensureCollectorContractAndRegistry,
-  ensureCollectorUtils,
-} from "../helpers/collectors-bootstrap";
+import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
+import { createCollectorsRegistry } from "../../src/collectors/registry.ts";
+import { createNotionAiCollectorDef } from "../../src/collectors/notionai/notionai-collector.ts";
+import normalizeApi from "../../src/shared/normalize.ts";
 
-async function loadNormalize() {
-  const normalizeModule = await import("../../src/shared/normalize.ts");
-  const normalizeApi = normalizeModule.default || {
-    normalizeText: normalizeModule.normalizeText,
-    fnv1a32: normalizeModule.fnv1a32,
-    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
-  };
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-    globalThis.WebClipper = {};
-  }
-  globalThis.WebClipper.normalize = normalizeApi;
-  return normalizeApi;
+function setupDom(dom: JSDOM) {
+  // @ts-expect-error test global
+  globalThis.window = dom.window;
+  // @ts-expect-error test global
+  globalThis.document = dom.window.document;
+  // @ts-expect-error test global
+  globalThis.Node = dom.window.Node;
+  // @ts-expect-error test global
+  globalThis.location = dom.window.location;
+  // @ts-expect-error test global
+  globalThis.getComputedStyle = dom.window.getComputedStyle;
 }
 
-async function loadContractAndRegistry() {
-  return ensureCollectorContractAndRegistry();
-}
-
-async function loadNotionAiCollector() {
-  const normalizeApi = await loadNormalize();
-  const envModule = await import("../../src/collectors/collector-env.ts");
-  const notionModule = await import("../../src/collectors/notionai/notionai-collector.ts");
-
-  const env = envModule.createCollectorEnv({
+function createCollectorHarness() {
+  const env = createCollectorEnv({
     // @ts-expect-error test global
     window: globalThis.window,
     // @ts-expect-error test global
@@ -37,57 +28,24 @@ async function loadNotionAiCollector() {
     location: globalThis.location,
     normalize: normalizeApi,
   });
-
-  const def = notionModule.createNotionAiCollectorDef(env);
-  const collector = def.collector as any;
-
-  // @ts-expect-error test global
-  globalThis.WebClipper.collectors = globalThis.WebClipper.collectors || {};
-  // @ts-expect-error test global
-  globalThis.WebClipper.collectors.notionai = collector;
-
-  // @ts-expect-error test global
-  const registry = globalThis.WebClipper?.collectorsRegistry;
-  if (registry && typeof registry.register === "function") registry.register(def);
-
-  return collector;
-}
-
-async function loadNotionAiMarkdown() {
-  return import("../../src/collectors/notionai/notionai-markdown.ts");
-}
-
-async function loadCollectorUtils() {
-  return ensureCollectorUtils();
+  const def = createNotionAiCollectorDef(env);
+  const registry = createCollectorsRegistry();
+  registry.register(def);
+  return { def, collector: def.collector as any, registry };
 }
 
 describe("notionai-collector", () => {
   it("exposes inpageMatches for early UI eligibility", async () => {
 
     const dom = new JSDOM("<body></body>", { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    const collector = await loadNotionAiCollector();
+    setupDom(dom);
+    const { collector, registry } = createCollectorHarness();
 
     expect(typeof collector.__test.inpageMatches).toBe("function");
     expect(collector.__test.inpageMatches({ hostname: "www.notion.so", pathname: "/", href: "https://www.notion.so/" })).toBe(true);
     expect(collector.__test.inpageMatches({ hostname: "example.com", pathname: "/", href: "https://example.com/" })).toBe(false);
 
-    const active = globalThis.WebClipper.collectorsRegistry.pickActive({
+    const active = registry.pickActive({
       hostname: "www.notion.so",
       pathname: "/0123456789abcdef0123456789abcdef",
       href: "https://www.notion.so/0123456789abcdef0123456789abcdef"
@@ -99,25 +57,10 @@ describe("notionai-collector", () => {
 
     const html = `<div data-agent-chat-user-step-id="u1"></div>`;
     const dom = new JSDOM(`<body>${html}</body>`, { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
+    setupDom(dom);
+    const { registry } = createCollectorHarness();
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    await loadNotionAiCollector();
-
-    const active = globalThis.WebClipper.collectorsRegistry.pickActive({
+    const active = registry.pickActive({
       hostname: "www.notion.so",
       pathname: "/0123456789abcdef0123456789abcdef",
       href: "https://www.notion.so/0123456789abcdef0123456789abcdef"
@@ -142,23 +85,8 @@ describe("notionai-collector", () => {
     const dom = new JSDOM(`<body>${html}</body>`, {
       url: `https://www.notion.so/chiimagnus/Some-Page-0123456789abcdef0123456789abcdef?t=${threadId}`
     });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    const collector = await loadNotionAiCollector();
+    setupDom(dom);
+    const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -186,23 +114,8 @@ describe("notionai-collector", () => {
     const keys: string[] = [];
     for (const url of urls) {
       const dom = new JSDOM(`<body>${html}</body>`, { url });
-      // @ts-expect-error test global
-      globalThis.window = dom.window;
-      // @ts-expect-error test global
-      globalThis.document = dom.window.document;
-      // @ts-expect-error test global
-      globalThis.Node = dom.window.Node;
-      // @ts-expect-error test global
-      globalThis.location = dom.window.location;
-
-      // @ts-expect-error test global
-      if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-      await loadNormalize();
-    await loadContractAndRegistry();
-      await loadNotionAiMarkdown();
-      const collector = await loadNotionAiCollector();
+      setupDom(dom);
+      const { collector } = createCollectorHarness();
 
       const snap = collector.capture();
       keys.push(snap.conversation.conversationKey);
@@ -236,24 +149,8 @@ describe("notionai-collector", () => {
     const dom = new JSDOM(`<body>${html}</body>`, {
       url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`
     });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    const collector = await loadNotionAiCollector();
+    setupDom(dom);
+    const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -292,24 +189,8 @@ describe("notionai-collector", () => {
     const dom = new JSDOM(`<body>${html}</body>`, {
       url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`
     });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    const collector = await loadNotionAiCollector();
+    setupDom(dom);
+    const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -350,24 +231,8 @@ describe("notionai-collector", () => {
     const dom = new JSDOM(`<body>${html}</body>`, {
       url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`
     });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    const collector = await loadNotionAiCollector();
+    setupDom(dom);
+    const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -408,24 +273,8 @@ console.log(value);</div>
     const dom = new JSDOM(`<body>${html}</body>`, {
       url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`
     });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadContractAndRegistry();
-    await loadNotionAiMarkdown();
-    const collector = await loadNotionAiCollector();
+    setupDom(dom);
+    const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();

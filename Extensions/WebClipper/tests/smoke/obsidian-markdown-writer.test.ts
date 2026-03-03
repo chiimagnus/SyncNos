@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 async function loadWriter() {
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
   const mod = await import("../../src/sync/obsidian/obsidian-markdown-writer.ts");
   return mod.default || mod;
 }

@@ -69,8 +69,6 @@ function setupDom() {
   global.document = dom.window.document;
   // @ts-expect-error test global
   global.localStorage = dom.window.localStorage;
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
 
   return dom;
 }
@@ -99,8 +97,6 @@ describe("inpage-button ratio position persistence", () => {
     delete global.document;
     // @ts-expect-error cleanup
     delete global.localStorage;
-    // @ts-expect-error cleanup
-    delete globalThis.WebClipper;
   });
 
   it("keeps relative (ratio) position on resize", () => {
