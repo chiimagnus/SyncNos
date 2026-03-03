@@ -1,6 +1,5 @@
-import collectorContext from "../collector-context.ts";
-
-const NS: any = collectorContext as any;
+import type { CollectorDefinition } from "../collector-contract.ts";
+import type { CollectorEnv } from "../collector-env.ts";
 
 function isHttpUrl(href: unknown): boolean {
   const raw = String(href || "").trim();
@@ -14,23 +13,16 @@ function isHttpUrl(href: unknown): boolean {
 }
 
 function matches(loc: { href?: string } | null | undefined): boolean {
-  const href = loc && loc.href ? loc.href : location.href;
+  const href = loc && loc.href ? loc.href : "";
   return isHttpUrl(href);
 }
 
-function capture() {
-  return null;
-}
+export function createWebCollectorDef(env: CollectorEnv): CollectorDefinition {
+  function matchesWithEnv(loc: { href?: string } | null | undefined): boolean {
+    const href = loc && loc.href ? loc.href : env.location.href;
+    return matches({ href });
+  }
 
-const collector = { capture };
-NS.collectors = NS.collectors || {};
-NS.collectors.web = collector;
-
-if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-  NS.collectorsRegistry.register({
-    id: "web",
-    matches,
-    inpageMatches: matches,
-    collector,
-  });
+  const collector = { capture: () => null };
+  return { id: "web", matches: matchesWithEnv, inpageMatches: matchesWithEnv, collector };
 }

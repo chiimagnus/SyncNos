@@ -28,8 +28,28 @@ async function loadPoeMarkdown() {
 }
 
 async function loadPoeCollector() {
-  await import("../../src/collectors/poe/poe-collector.ts");
-  return globalThis.WebClipper?.collectors?.poe;
+  const normalizeApi = await loadNormalize();
+  const envModule = await import("../../src/collectors/collector-env.ts");
+  const poeModule = await import("../../src/collectors/poe/poe-collector.ts");
+  const env = envModule.createCollectorEnv({
+    // @ts-expect-error test global
+    window: globalThis.window,
+    // @ts-expect-error test global
+    document: globalThis.document,
+    // @ts-expect-error test global
+    location: globalThis.location,
+    normalize: normalizeApi,
+  });
+  const collector = poeModule.createPoeCollectorDef(env).collector as any;
+
+  // @ts-expect-error test global
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") globalThis.WebClipper = {};
+  // @ts-expect-error test global
+  globalThis.WebClipper.collectors = globalThis.WebClipper.collectors || {};
+  // @ts-expect-error test global
+  globalThis.WebClipper.collectors.poe = collector;
+
+  return collector;
 }
 
 describe("poe-collector", () => {

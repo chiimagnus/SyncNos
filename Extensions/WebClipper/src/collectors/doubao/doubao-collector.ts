@@ -1,15 +1,22 @@
-import collectorContext from '../collector-context.ts';
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import {
+  appendImageMarkdown,
+  conversationKeyFromLocation,
+  extractImageUrlsFromElement,
+  inEditMode as inEditModeUtil,
+} from '../collector-utils.ts';
+import doubaoMarkdown from './doubao-markdown.ts';
 
-const NS: any = collectorContext as any;
-
+export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {
-    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)doubao\.com$/.test(hostname);
   }
 
   function isValidConversationUrl(): any {
     try {
-      const p = location.pathname || "";
+      const p = env.location.pathname || "";
       if (p === "/chat" || p === "/chat/") return false;
       if (/^\/chat\/local/.test(p)) return false;
       return /^\/chat\/(?!local)[^/]+/.test(p);
@@ -19,19 +26,15 @@ const NS: any = collectorContext as any;
   }
 
   function findConversationKey(): any {
-    return NS.collectorUtils.conversationKeyFromLocation(location);
+    return conversationKeyFromLocation(env.location);
   }
 
   function getConversationRoot(): any {
-    return document.querySelector("[data-testid='message_list']") || document.querySelector("main") || document.body;
+    return env.document.querySelector("[data-testid='message_list']") || env.document.querySelector("main") || env.document.body;
   }
 
   function inEditMode(root: any): any {
-    return NS.collectorUtils.inEditMode(root);
-  }
-
-  function doubaoMarkdown(): any {
-    return NS.doubaoMarkdown || {};
+    return inEditModeUtil(root);
   }
 
   function collectMessages(): any {
@@ -39,26 +42,22 @@ const NS: any = collectorContext as any;
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const containers: any[] = Array.from(document.querySelectorAll("[data-testid='union_message']")) as any[];
+    const containers: any[] = Array.from(env.document.querySelectorAll("[data-testid='union_message']")) as any[];
     if (!containers.length) return [];
 
     const out = [];
-    const utils = NS.collectorUtils || {};
-    const markdown = doubaoMarkdown();
-    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
-    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const c of containers) {
       const sendMessage = c.querySelector("[data-testid='send_message']");
       if (sendMessage) {
         const tEl = sendMessage.querySelector("[data-testid='message_text_content']") || sendMessage;
-        const text = NS.normalize.normalizeText((tEl as any).innerText || tEl.textContent || "");
-        const imageUrls = extractImages ? extractImages(sendMessage) : [];
+        const text = env.normalize.normalizeText((tEl as any).innerText || tEl.textContent || "");
+        const imageUrls = extractImageUrlsFromElement(sendMessage);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+          const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
             role: "user",
             contentText,
             contentMarkdown,
@@ -73,19 +72,19 @@ const NS: any = collectorContext as any;
       if (recv) {
         const all: any[] = Array.from(recv.querySelectorAll("[data-testid='message_text_content']")) as any[];
         const textEl = all.find((el: any) => !el.closest("[data-testid='think_block_collapse']")) || recv;
-        const fallbackText = NS.normalize.normalizeText((textEl as any).innerText || textEl.textContent || "");
-        const text = typeof markdown.extractAssistantText === "function"
-          ? (markdown.extractAssistantText(textEl) || fallbackText)
+        const fallbackText = env.normalize.normalizeText((textEl as any).innerText || textEl.textContent || "");
+        const text = typeof doubaoMarkdown.extractAssistantText === "function"
+          ? (doubaoMarkdown.extractAssistantText(textEl) || fallbackText)
           : fallbackText;
-        const imageUrls = extractImages ? extractImages(recv) : [];
+        const imageUrls = extractImageUrlsFromElement(recv);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const baseMarkdown = typeof markdown.extractAssistantMarkdown === "function"
-            ? (markdown.extractAssistantMarkdown(textEl) || contentText)
+          const baseMarkdown = typeof doubaoMarkdown.extractAssistantMarkdown === "function"
+            ? (doubaoMarkdown.extractAssistantMarkdown(textEl) || contentText)
             : contentText;
-          const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
+          const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
             contentText,
             contentMarkdown,
@@ -100,7 +99,7 @@ const NS: any = collectorContext as any;
   }
 
   function capture(): any {
-    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
     return {
@@ -108,8 +107,8 @@ const NS: any = collectorContext as any;
         sourceType: "chat",
         source: "doubao",
         conversationKey: findConversationKey(),
-        title: document.title || "Doubao",
-        url: location.href,
+        title: env.document.title || "Doubao",
+        url: env.location.href,
         warningFlags: [],
         lastCapturedAt: Date.now()
       },
@@ -117,9 +116,6 @@ const NS: any = collectorContext as any;
     };
   }
 
-  const api = { capture, getRoot: getConversationRoot };
-  NS.collectors = NS.collectors || {};
-  NS.collectors.doubao = api;
-  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "doubao", matches, collector: api });
-  }
+  const collector = { capture, getRoot: getConversationRoot };
+  return { id: "doubao", matches, collector };
+}

@@ -1,7 +1,3 @@
-import collectorContext from '../collector-context.ts';
-
-const NS: any = collectorContext as any;
-
   function texFromKatex(el: any): any {
     if (!el || !el.querySelector) return "";
     const ann = el.querySelector('annotation[encoding="application/x-tex"]');
@@ -52,8 +48,10 @@ const NS: any = collectorContext as any;
 
   function nodeToMarkdown(node: any): any {
     if (!node) return "";
-    if (node.nodeType === Node.TEXT_NODE) return normalizeMarkdownText(node.nodeValue || "");
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
+    const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
+    if (node.nodeType === TEXT_NODE) return normalizeMarkdownText(node.nodeValue || "");
+    if (node.nodeType !== ELEMENT_NODE) return "";
 
     const el = node;
     const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
@@ -414,4 +412,4 @@ const NS: any = collectorContext as any;
     extractAssistantMarkdown
   };
 
-  NS.notionAiMarkdown = api;
+export default api;

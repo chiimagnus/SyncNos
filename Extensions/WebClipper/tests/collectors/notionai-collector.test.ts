@@ -27,18 +27,32 @@ async function loadContractAndRegistry() {
 }
 
 async function loadNotionAiCollector() {
-  await import("../../src/collectors/notionai/notionai-collector.ts");
-  const collector = globalThis.WebClipper?.collectors?.notionai;
+  const normalizeApi = await loadNormalize();
+  const envModule = await import("../../src/collectors/collector-env.ts");
+  const notionModule = await import("../../src/collectors/notionai/notionai-collector.ts");
+
+  const env = envModule.createCollectorEnv({
+    // @ts-expect-error test global
+    window: globalThis.window,
+    // @ts-expect-error test global
+    document: globalThis.document,
+    // @ts-expect-error test global
+    location: globalThis.location,
+    normalize: normalizeApi,
+  });
+
+  const def = notionModule.createNotionAiCollectorDef(env);
+  const collector = def.collector as any;
+
+  // @ts-expect-error test global
+  globalThis.WebClipper.collectors = globalThis.WebClipper.collectors || {};
+  // @ts-expect-error test global
+  globalThis.WebClipper.collectors.notionai = collector;
+
+  // @ts-expect-error test global
   const registry = globalThis.WebClipper?.collectorsRegistry;
-  const matches = collector?.__test?.matches;
-  if (collector && registry && typeof registry.register === "function" && typeof matches === "function") {
-    registry.register({
-      id: "notionai",
-      matches,
-      inpageMatches: collector?.__test?.inpageMatches,
-      collector,
-    });
-  }
+  if (registry && typeof registry.register === "function") registry.register(def);
+
   return collector;
 }
 
