@@ -9,13 +9,10 @@ import {
   setupNotionOAuthNavigationListener,
 } from '../src/sync/notion/auth/oauth';
 import runtimeContext from '../src/runtime-context.ts';
+import { getBackgroundInstanceId } from '../src/bootstrap/background-instance.ts';
 
 export default defineBackground(() => {
   startBackgroundBootstrap();
-
-  if (!runtimeContext.__backgroundInstanceId) {
-    runtimeContext.__backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  }
 
   const router = createBackgroundRouter({
     fallback: (msg) => ({
@@ -27,14 +24,14 @@ export default defineBackground(() => {
 
   // Migration-only utility; routed through platform router (and/or legacy router ping handler).
   router.register('__WXT_PING__', async () => {
-    const instanceId = runtimeContext.__backgroundInstanceId ?? null;
+    const instanceId = getBackgroundInstanceId();
     return router.ok({ pong: true, instanceId });
   });
 
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
-  registerSettingsHandlers(router);
-  registerSyncHandlers(router);
+  registerSettingsHandlers(router, { getInstanceId: getBackgroundInstanceId });
+  registerSyncHandlers(router, { getInstanceId: getBackgroundInstanceId });
 
   // Keep legacy "start" side-effects that are not message handlers.
   try {
@@ -46,12 +43,11 @@ export default defineBackground(() => {
   }
 
   try {
-    const id = runtimeContext.__backgroundInstanceId;
+    const id = getBackgroundInstanceId();
     runtimeContext.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
   } catch (_e) {
     // ignore
   }
 
   router.start();
-  runtimeContext.__backgroundReady = true;
 });
