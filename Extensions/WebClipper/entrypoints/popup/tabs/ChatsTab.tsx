@@ -5,7 +5,7 @@ import { buildConversationBasename } from '../../../src/conversations/file-namin
 import { formatConversationMarkdown } from '../../../src/conversations/markdown';
 import type { Conversation, ConversationDetail } from '../../../src/conversations/models';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../src/conversations/repo';
-import { syncNotionConversations, syncObsidianConversations } from '../../../src/domains/sync/repo';
+import { syncNotionConversations, syncObsidianConversations } from '../../../src/sync/repo';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 
 type SourceMeta = { key: string; label: string };

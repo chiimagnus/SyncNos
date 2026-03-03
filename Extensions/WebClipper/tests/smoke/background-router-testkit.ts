@@ -1,6 +1,6 @@
 import { registerConversationHandlers } from '../../src/conversations/background-handlers';
 import { registerSettingsHandlers } from '../../src/settings/background-handlers';
-import { registerSyncHandlers } from '../../src/domains/sync/background-handlers';
+import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/integrations/web-article/background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 

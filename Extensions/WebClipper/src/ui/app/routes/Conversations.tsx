@@ -4,7 +4,7 @@ import { createZipBlob } from '../../../backup/zip-utils';
 import { buildConversationBasename } from '../../../conversations/file-naming';
 import { formatConversationMarkdown } from '../../../conversations/markdown';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../conversations/repo';
-import { syncNotionConversations, syncObsidianConversations } from '../../../domains/sync/repo';
+import { syncNotionConversations, syncObsidianConversations } from '../../../sync/repo';
 
 function formatTime(ts?: number) {
   if (!ts) return '';

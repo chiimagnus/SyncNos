@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../domains/sync/repo';
+import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../sync/repo';
 
 function formatTime(ts?: number) {
   if (!ts) return '';

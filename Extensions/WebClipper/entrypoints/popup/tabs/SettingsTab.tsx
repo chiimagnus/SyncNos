@@ -18,7 +18,7 @@ import {
 } from '../../../src/platform/messaging/message-contracts';
 import { send } from '../../../src/platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
-import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../src/domains/sync/repo';
+import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../src/sync/repo';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
