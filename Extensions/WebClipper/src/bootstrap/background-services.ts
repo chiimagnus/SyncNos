@@ -16,7 +16,31 @@ import {
 
 import { conversationKinds } from '../protocols/conversation-kinds.ts';
 
-export function createBackgroundServices() {
+export type NotionSyncOrchestrator = {
+  syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
+  getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
+};
+
+export type ObsidianSyncOrchestrator = {
+  syncConversations: (input: {
+    conversationIds?: unknown[];
+    forceFullConversationIds?: unknown[];
+    instanceId: string;
+  }) => Promise<unknown>;
+  getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+  testConnection: (input: { instanceId: string }) => Promise<unknown>;
+};
+
+export type BackgroundServices = {
+  backgroundInpageWebVisibility: typeof backgroundInpageWebVisibility;
+  articleFetchService: typeof articleFetchService;
+  conversationKinds: typeof conversationKinds;
+  notionSyncJobStore: typeof notionSyncJobStore;
+  notionSyncOrchestrator: NotionSyncOrchestrator;
+  obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
+};
+
+export function createBackgroundServices(): BackgroundServices {
   return {
     backgroundInpageWebVisibility,
     articleFetchService,
@@ -34,5 +58,3 @@ export function createBackgroundServices() {
     },
   };
 }
-
-export type BackgroundServices = ReturnType<typeof createBackgroundServices>;
