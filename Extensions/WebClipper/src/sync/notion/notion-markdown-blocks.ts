@@ -1,7 +1,4 @@
 // @ts-nocheck
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
 
   const MAX_TEXT = 1900;
 
@@ -490,9 +487,6 @@ const api = {
   inlineMarkdownToRichText,
   markdownToNotionBlocks,
 };
-if (!NS.notionMarkdownBlocks || typeof NS.notionMarkdownBlocks.markdownToNotionBlocks !== 'function') {
-  NS.notionMarkdownBlocks = api;
-}
 
 export { inlineMarkdownToRichText, markdownToNotionBlocks };
 export default api;

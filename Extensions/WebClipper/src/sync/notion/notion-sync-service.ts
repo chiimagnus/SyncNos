@@ -3,9 +3,6 @@ import { optionNameForSource as defaultOptionNameForSource } from './notion-ai.t
 import { notionFetch as defaultNotionFetch } from './notion-api.ts';
 import notionImageUploadUpgrader from './notion-image-upload-upgrader.ts';
 import notionMarkdownBlocks from './notion-markdown-blocks.ts';
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
 
   const MAX_TEXT = 1900;
   const APPEND_BATCH = 90;
@@ -14,13 +11,10 @@ const NS = runtimeContext as any;
   const CLEAR_DELETE_MAX_ATTEMPTS = 5;
 
   function getNotionFetch() {
-    if (NS.notionApi && typeof NS.notionApi.notionFetch === 'function') return NS.notionApi.notionFetch;
     return defaultNotionFetch;
   }
 
   function aiLabelForSource(source) {
-    const api = NS.notionAi;
-    if (api && typeof api.optionNameForSource === "function") return api.optionNameForSource(source);
     return defaultOptionNameForSource(source);
   }
 
@@ -91,15 +85,6 @@ const NS = runtimeContext as any;
 
   function getMarkdownBlocksApi() {
     if (markdownBlocksApi) return markdownBlocksApi;
-    const globalApi = NS.notionMarkdownBlocks;
-    if (
-      globalApi &&
-      typeof globalApi.inlineMarkdownToRichText === "function" &&
-      typeof globalApi.markdownToNotionBlocks === "function"
-    ) {
-      markdownBlocksApi = globalApi;
-      return markdownBlocksApi;
-    }
     if (
       notionMarkdownBlocks &&
       typeof notionMarkdownBlocks.inlineMarkdownToRichText === 'function' &&
@@ -113,11 +98,6 @@ const NS = runtimeContext as any;
 
   function getImageUploadUpgraderApi() {
     if (imageUploadUpgraderApi) return imageUploadUpgraderApi;
-    const globalApi = NS.notionImageUploadUpgrader;
-    if (globalApi && typeof globalApi.upgradeImageBlocksToFileUploads === "function") {
-      imageUploadUpgraderApi = globalApi;
-      return imageUploadUpgraderApi;
-    }
     if (
       notionImageUploadUpgrader &&
       typeof notionImageUploadUpgrader.upgradeImageBlocksToFileUploads === 'function'
@@ -361,10 +341,6 @@ const api = {
   upgradeImageBlocksToFileUploads,
   aiLabelForSource,
 };
-
-if (!NS.notionSyncService || typeof NS.notionSyncService.messagesToBlocks !== 'function') {
-  NS.notionSyncService = api;
-}
 
 export {
   messagesToBlocks,
