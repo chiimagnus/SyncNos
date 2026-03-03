@@ -38,7 +38,7 @@ export default defineConfig({
     // P1-05: migrate-time behavior. Keep permissions aligned with `manifest.json`;
     // do not "optimize" permissions/hosts during the scaffolding migration.
     name: 'SyncNos-AI+Web Clipper',
-    version: '1.0.0',
+    version: '1.0.1',
     description:
       'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
     permissions: [
