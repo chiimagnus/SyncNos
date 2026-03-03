@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '../../../backup/export';
+import { exportBackupZipV2 } from '../../../sync/backup/export';
 import {
   importBackupLegacyJsonMerge,
   importBackupZipV2Merge,
   type ImportProgress,
   type ImportStats,
-} from '../../../backup/import';
-import { extractZipEntries } from '../../../backup/zip-utils';
+} from '../../../sync/backup/import';
+import { extractZipEntries } from '../../../sync/backup/zip-utils';
 
 function formatProgress(p: ImportProgress) {
   const safeTotal = Math.max(0, Number(p.total) || 0);

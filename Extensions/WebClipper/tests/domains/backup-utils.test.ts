@@ -8,7 +8,7 @@ import {
   validateBackupDocument,
   validateBackupManifest,
   validateConversationBundle,
-} from '../../src/backup/backup-utils';
+} from '../../src/sync/backup/backup-utils';
 
 describe('backup backup-utils', () => {
   it('uniqueConversationKey returns stable source||key', () => {

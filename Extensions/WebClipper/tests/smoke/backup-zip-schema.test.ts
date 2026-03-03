@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import * as backupUtils from "../../src/backup/backup-utils.ts";
+import * as backupUtils from "../../src/sync/backup/backup-utils.ts";
 
 describe("backup zip v2 schema", () => {
   it("validateStorageLocalDocument rejects invalid shapes", () => {

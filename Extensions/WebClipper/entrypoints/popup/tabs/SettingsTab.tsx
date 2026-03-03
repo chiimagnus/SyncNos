@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '../../../src/backup/export';
+import { exportBackupZipV2 } from '../../../src/sync/backup/export';
 import {
   importBackupLegacyJsonMerge,
   importBackupZipV2Merge,
   type ImportProgress,
   type ImportStats,
-} from '../../../src/backup/import';
-import { extractZipEntries } from '../../../src/backup/zip-utils';
+} from '../../../src/sync/backup/import';
+import { extractZipEntries } from '../../../src/sync/backup/zip-utils';
 import { disconnectNotion } from '../../../src/settings/sensitive';
 import { getNotionOAuthDefaults } from '../../../src/sync/notion/auth/oauth';
 import {
