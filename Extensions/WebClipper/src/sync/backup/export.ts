@@ -4,7 +4,7 @@ import {
   filterStorageForBackup,
   uniqueConversationKey,
 } from './backup-utils';
-import { buildConversationBasename } from '../../conversations/file-naming';
+import { buildConversationBasename } from '../../conversations/domain/file-naming';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
 import { DB_NAME, DB_VERSION } from '../../platform/idb/schema.ts';

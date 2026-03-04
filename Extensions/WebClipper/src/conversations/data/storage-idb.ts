@@ -1,5 +1,5 @@
-import type { Conversation, ConversationMessage } from './models';
-import { openDb as openSchemaDb } from '../platform/idb/schema';
+import type { Conversation, ConversationMessage } from '../domain/models';
+import { openDb as openSchemaDb } from '../../platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;

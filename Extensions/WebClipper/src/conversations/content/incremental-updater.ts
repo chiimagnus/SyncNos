@@ -1,4 +1,4 @@
-import normalizeApi from '../shared/normalize.ts';
+import normalizeApi from '../../shared/normalize.ts';
 
 const state = {
   lastConversationKey: '',
