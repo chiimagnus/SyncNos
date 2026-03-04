@@ -3,16 +3,12 @@ import { createTestBackgroundRouter } from "./background-router-testkit";
 
 afterEach(() => {
   // @ts-expect-error test cleanup
-  delete globalThis.WebClipper;
-  // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
 
 describe("background-router open extension popup", () => {
   it("opens popup via chrome.action.openPopup when supported", async () => {
     const calls: string[] = [];
-    // @ts-expect-error test global
-    globalThis.WebClipper = { backgroundStorage: {} };
     // @ts-expect-error test global
     globalThis.chrome = {
       action: {
@@ -33,8 +29,6 @@ describe("background-router open extension popup", () => {
   it("opens popup even when backgroundStorage is unavailable", async () => {
     const calls: string[] = [];
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    // @ts-expect-error test global
     globalThis.chrome = {
       action: {
         openPopup: async () => {
@@ -52,8 +46,6 @@ describe("background-router open extension popup", () => {
 
   it("returns unsupported error when action.openPopup is unavailable", async () => {
     // @ts-expect-error test global
-    globalThis.WebClipper = { backgroundStorage: {} };
-    // @ts-expect-error test global
     globalThis.chrome = {};
 
     const router = createTestBackgroundRouter();
@@ -64,8 +56,6 @@ describe("background-router open extension popup", () => {
   });
 
   it("returns failed error when action.openPopup throws", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = { backgroundStorage: {} };
     // @ts-expect-error test global
     globalThis.chrome = {
       action: {

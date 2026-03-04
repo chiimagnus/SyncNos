@@ -7,15 +7,11 @@ async function loadClient() {
 
 describe("obsidian-local-rest-client", () => {
   it("encodes vault path segments without encoding slashes", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadClient();
     expect(mod.encodeVaultPath("A Folder/My Note.md")).toBe("A%20Folder/My%20Note.md");
   });
 
   it("rejects https base url in this version", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "https://127.0.0.1:27124", apiKey: "k" });
     expect(client.ok).toBe(false);
@@ -30,8 +26,6 @@ describe("obsidian-local-rest-client", () => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
     };
 
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k", authHeaderName: "X-Api-Key" });
     expect(client.ok).toBe(true);
@@ -54,8 +48,6 @@ describe("obsidian-local-rest-client", () => {
       return new Response(JSON.stringify({ ok: true, files: [] }), { status: 200, headers: { "content-type": "application/json" } });
     };
 
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     expect(client.ok).toBe(true);
@@ -76,8 +68,6 @@ describe("obsidian-local-rest-client", () => {
     globalThis.fetch = async () => {
       return new Response(JSON.stringify({ errorCode: 40100, message: "unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
     };
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "bad" });
     expect(client.ok).toBe(true);

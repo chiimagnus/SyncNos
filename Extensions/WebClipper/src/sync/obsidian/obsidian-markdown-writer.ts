@@ -1,5 +1,3 @@
-import runtimeContext from '../../runtime-context.ts';
-
 const MESSAGES_HEADING = 'SyncNos::Messages';
 
 function safeString(v: unknown) {
@@ -154,8 +152,6 @@ const api = {
   appendUnderMessagesHeading,
   replaceSyncnosFrontmatter,
 };
-
-(runtimeContext as any).obsidianMarkdownWriter = api;
 
 export {
   MESSAGES_HEADING,

@@ -1,5 +1,3 @@
-import collectorContext from './collector-context.ts';
-
 type ObserverInput = {
   debounceMs?: number;
   onTick?: () => void;
@@ -92,6 +90,4 @@ export function createObserver(input: ObserverInput): ObserverController {
 }
 
 const runtimeObserverApi = { createObserver };
-(collectorContext as any).runtimeObserver = runtimeObserverApi;
-
 export default runtimeObserverApi;

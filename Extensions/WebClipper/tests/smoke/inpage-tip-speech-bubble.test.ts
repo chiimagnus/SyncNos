@@ -16,8 +16,6 @@ function setupDom() {
   global.HTMLElement = dom.window.HTMLElement;
   // @ts-expect-error test global
   global.Node = dom.window.Node;
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
   Object.defineProperty(dom.window, "innerWidth", { value: 1000, configurable: true, writable: true });
   Object.defineProperty(dom.window, "innerHeight", { value: 800, configurable: true, writable: true });
 
@@ -51,8 +49,6 @@ describe("inpage-tip speech bubble", () => {
     delete global.HTMLElement;
     // @ts-expect-error test global cleanup
     delete global.Node;
-    // @ts-expect-error test global cleanup
-    delete globalThis.WebClipper;
   });
 
   it("creates anchored bubble with kind and inward placement", () => {

@@ -1,8 +1,4 @@
 // @ts-nocheck
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
-
   const AI = Object.freeze({
     chatgpt: { name: "ChatGPT", color: "green" },
     claude: { name: "Claude", color: "purple" },
@@ -32,9 +28,6 @@ const NS = runtimeContext as any;
   }
 
 const api = { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
-if (!NS.notionAi || typeof NS.notionAi.optionNameForSource !== 'function') {
-  NS.notionAi = api;
-}
 
 export { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
 export default api;

@@ -1,5 +1,3 @@
-import runtimeContext from '../../runtime-context.ts';
-
 const SCHEMA_VERSION = 1;
 
 function safeString(v: unknown) {
@@ -70,8 +68,6 @@ const api = {
   readSyncnosObject,
   buildSyncnosObject,
 };
-
-(runtimeContext as any).obsidianSyncMetadata = api;
 
 export { SCHEMA_VERSION, readSyncnosObject, buildSyncnosObject };
 export default api;

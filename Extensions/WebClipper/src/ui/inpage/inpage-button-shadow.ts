@@ -1,6 +1,4 @@
 import inpageCssRaw from '../styles/inpage.css?raw';
-import runtimeContext from '../../runtime-context.ts';
-
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
@@ -455,5 +453,3 @@ export const inpageButtonApi = {
   ensureInpageButton,
   cleanupButtons,
 };
-
-runtimeContext.inpageButton = inpageButtonApi;

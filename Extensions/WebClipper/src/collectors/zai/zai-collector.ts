@@ -1,14 +1,21 @@
-import collectorContext from '../collector-context.ts';
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import {
+  appendImageMarkdown,
+  conversationKeyFromLocation,
+  extractImageUrlsFromElement,
+  inEditMode as inEditModeUtil,
+} from '../collector-utils.ts';
+import zaiMarkdown from './zai-markdown.ts';
 
-const NS: any = collectorContext as any;
-
+export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {
-    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return hostname === "chat.z.ai";
   }
 
   function findConversationIdFromUrl(): any {
-    const m = String(location.pathname || "").match(/^\/c\/([^/?#]+)/);
+    const m = String(env.location.pathname || "").match(/^\/c\/([^/?#]+)/);
     return m && m[1] ? m[1] : "";
   }
 
@@ -21,23 +28,19 @@ const NS: any = collectorContext as any;
   }
 
   function findConversationKey(): any {
-    return findConversationIdFromUrl() || (NS.collectorUtils && NS.collectorUtils.conversationKeyFromLocation
-      ? NS.collectorUtils.conversationKeyFromLocation(location)
-      : "");
+    return findConversationIdFromUrl() || conversationKeyFromLocation(env.location);
   }
 
   function findTitle(): any {
-    return document.title || "z.ai";
+    return env.document.title || "z.ai";
   }
 
   function getConversationRoot(): any {
-    return document.querySelector("main") || document.querySelector("[role='main']") || document.body;
+    return env.document.querySelector("main") || env.document.querySelector("[role='main']") || env.document.body;
   }
 
   function inEditMode(root: any): any {
-    const utils = NS.collectorUtils;
-    if (utils && typeof utils.inEditMode === "function") return utils.inEditMode(root);
-    return false;
+    return inEditModeUtil(root);
   }
 
   function sortByDomOrder(nodes: any): any {
@@ -45,8 +48,10 @@ const NS: any = collectorContext as any;
     sorted.sort((a, b) => {
       if (a === b) return 0;
       const pos = a.compareDocumentPosition(b);
-      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-      if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+      const DOCUMENT_POSITION_FOLLOWING = env.window?.Node?.DOCUMENT_POSITION_FOLLOWING ?? 4;
+      const DOCUMENT_POSITION_PRECEDING = env.window?.Node?.DOCUMENT_POSITION_PRECEDING ?? 2;
+      if (pos & DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (pos & DOCUMENT_POSITION_PRECEDING) return 1;
       return 0;
     });
     return sorted;
@@ -64,13 +69,8 @@ const NS: any = collectorContext as any;
     return !!(wrapper.querySelector && wrapper.querySelector(".chat-assistant"));
   }
 
-  function zaiMarkdown(): any {
-    return NS.zaiMarkdown || {};
-  }
-
   function extractAssistantMarkdown(wrapper: any): any {
-    const md = zaiMarkdown();
-    if (typeof md.extractAssistantMarkdown === "function") return md.extractAssistantMarkdown(wrapper);
+    if (typeof zaiMarkdown.extractAssistantMarkdown === "function") return zaiMarkdown.extractAssistantMarkdown(wrapper);
     return "";
   }
 
@@ -79,20 +79,19 @@ const NS: any = collectorContext as any;
       ? (wrapper.querySelector(".whitespace-pre-wrap") || wrapper)
       : wrapper;
     const text = node && ((node as any).innerText || node.textContent) ? ((node as any).innerText || node.textContent) : "";
-    return NS.normalize.normalizeText(text);
+    return env.normalize.normalizeText(text);
   }
 
   function extractAssistantText(wrapper: any): any {
-    const md = zaiMarkdown();
-    if (typeof md.extractAssistantText === "function") return md.extractAssistantText(wrapper);
+    if (typeof zaiMarkdown.extractAssistantText === "function") return zaiMarkdown.extractAssistantText(wrapper);
     if (!wrapper || !wrapper.querySelector) return "";
     const content = wrapper.querySelector("#response-content-container") || wrapper.querySelector(".chat-assistant") || wrapper;
     const text = content && ((content as any).innerText || content.textContent) ? ((content as any).innerText || content.textContent) : "";
-    return NS.normalize.normalizeText(text);
+    return env.normalize.normalizeText(text);
   }
 
   function getMessageWrappers(root: any): any {
-    const scope = root || document;
+    const scope = root || env.document;
     const candidates: any[] = Array.from(scope.querySelectorAll("div[id^='message-']")) as any[];
     // Keep only wrappers we can classify; avoid catching nested structural nodes if any.
     const filtered = candidates.filter((w: any) => isUserWrapper(w) || isAssistantWrapper(w));
@@ -102,7 +101,7 @@ const NS: any = collectorContext as any;
   function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
     const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
     if (id) return id;
-    return NS.normalize.makeFallbackMessageKey({ role, contentText, sequence });
+    return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
   }
 
   function collectMessages({ allowEditing }: any = {}): any {
@@ -114,9 +113,6 @@ const NS: any = collectorContext as any;
     if (!wrappers.length) return [];
 
     const out = [];
-    const utils = NS.collectorUtils || {};
-    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
-    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const w of wrappers) {
       const role = isUserWrapper(w) ? "user" : (isAssistantWrapper(w) ? "assistant" : "");
@@ -127,12 +123,12 @@ const NS: any = collectorContext as any;
         if (role === "user") return w.querySelector(".whitespace-pre-wrap") || w.querySelector(".chat-user") || w;
         return w.querySelector("#response-content-container") || w.querySelector(".markdown-prose") || w.querySelector(".chat-assistant") || w;
       })();
-      const imageUrls = extractImages ? extractImages(imageScope || w) : [];
+      const imageUrls = extractImageUrlsFromElement(imageScope || w);
       if (!contentText && !imageUrls.length) continue;
       const contentMarkdown = role === "assistant"
         ? (extractAssistantMarkdown(w) || contentText)
         : contentText;
-      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown || contentText || "", imageUrls) : (contentMarkdown || contentText || "");
+      const nextMarkdown = appendImageMarkdown(contentMarkdown || contentText || "", imageUrls);
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
@@ -147,7 +143,7 @@ const NS: any = collectorContext as any;
   }
 
   function capture(options: any): any {
-    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
     return {
@@ -156,7 +152,7 @@ const NS: any = collectorContext as any;
         source: "zai",
         conversationKey: findConversationKey(),
         title: findTitle(),
-        url: location.href,
+        url: env.location.href,
         warningFlags: [],
         lastCapturedAt: Date.now()
       },
@@ -164,19 +160,16 @@ const NS: any = collectorContext as any;
     };
   }
 
-  const api: any = { capture, getRoot: getConversationRoot };
-  const md = zaiMarkdown();
-  api.__test = {
-    removeThinkingNodes: md.removeThinkingNodes,
-    removeNonContentNodes: md.removeNonContentNodes,
-    normalizeMarkdown: md.normalizeMarkdown,
-    htmlToMarkdown: md.htmlToMarkdown,
-    extractTextFromSanitizedClone: md.extractTextFromSanitizedClone,
-    extractAssistantMarkdown: md.extractAssistantMarkdown,
-    extractAssistantText: md.extractAssistantText,
+  const collector: any = { capture, getRoot: getConversationRoot };
+  collector.__test = {
+    removeThinkingNodes: (zaiMarkdown as any).removeThinkingNodes,
+    removeNonContentNodes: (zaiMarkdown as any).removeNonContentNodes,
+    normalizeMarkdown: (zaiMarkdown as any).normalizeMarkdown,
+    htmlToMarkdown: (zaiMarkdown as any).htmlToMarkdown,
+    extractTextFromSanitizedClone: (zaiMarkdown as any).extractTextFromSanitizedClone,
+    extractAssistantMarkdown: (zaiMarkdown as any).extractAssistantMarkdown,
+    extractAssistantText: (zaiMarkdown as any).extractAssistantText,
   };
-  NS.collectors = NS.collectors || {};
-  NS.collectors.zai = api;
-  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "zai", matches, collector: api });
-  }
+
+  return { id: "zai", matches, collector };
+}
