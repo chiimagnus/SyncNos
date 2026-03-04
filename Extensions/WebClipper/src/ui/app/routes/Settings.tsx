@@ -531,6 +531,7 @@ export default function Settings() {
               chatFolder={obsidianChatFolder}
               articleFolder={obsidianArticleFolder}
               statusText={obsidianStatus}
+              obsidianLogoUrl={getURL('icons/obsidian.svg' as any)}
               onChangeApiBaseUrl={setObsidianApiBaseUrl}
               onChangeAuthHeaderName={setObsidianAuthHeaderName}
               onChangeApiKeyDraft={(v) => {
