@@ -68,4 +68,46 @@ export function getURL(path: string): string {
   }
 }
 
+export function getManifest(): any | null {
+  const anyGlobal = globalThis as any;
+  const rt = anyGlobal.browser?.runtime ?? anyGlobal.chrome?.runtime;
+  if (!rt?.getManifest) return null;
+
+  try {
+    return rt.getManifest() as any;
+  } catch (err) {
+    const normalized = toError(err, 'runtime.getManifest failed');
+    if (isInvalidContextError(normalized)) return null;
+    throw normalized;
+  }
+}
+
+export function onInstalled(listener: () => void): void {
+  if (typeof listener !== 'function') return;
+  const anyGlobal = globalThis as any;
+  const browserRuntime = anyGlobal.browser?.runtime;
+  if (browserRuntime?.onInstalled?.addListener) {
+    browserRuntime.onInstalled.addListener(listener);
+    return;
+  }
+  const chromeRuntime = anyGlobal.chrome?.runtime;
+  if (chromeRuntime?.onInstalled?.addListener) {
+    chromeRuntime.onInstalled.addListener(listener);
+  }
+}
+
+export function onStartup(listener: () => void): void {
+  if (typeof listener !== 'function') return;
+  const anyGlobal = globalThis as any;
+  const browserRuntime = anyGlobal.browser?.runtime;
+  if (browserRuntime?.onStartup?.addListener) {
+    browserRuntime.onStartup.addListener(listener);
+    return;
+  }
+  const chromeRuntime = anyGlobal.chrome?.runtime;
+  if (chromeRuntime?.onStartup?.addListener) {
+    chromeRuntime.onStartup.addListener(listener);
+  }
+}
+
 export { INVALIDATED_MESSAGE };

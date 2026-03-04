@@ -6,6 +6,7 @@ import { deleteConversations, getConversationDetail, listConversations } from '.
 import { syncNotionConversations, syncObsidianConversations } from '../../../src/sync/repo';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 import { buildConversationsMarkdownZipExport } from '../../../src/sync/local/markdown-export';
+import { tabsCreate } from '../../../src/platform/webext/tabs';
 
 type SourceMeta = { key: string; label: string };
 
@@ -445,7 +446,7 @@ export default function ChatsTab() {
     const safe = sanitizeHttpUrl(url);
     if (!safe) return;
     try {
-      await browser.tabs.create({ url: safe });
+      await tabsCreate({ url: safe });
     } catch (_e) {
       // ignore
     }

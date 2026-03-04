@@ -11,6 +11,7 @@ import {
 import { getBackgroundInstanceId } from '../src/bootstrap/background-instance.ts';
 import { registerNotionSettingsHandlers } from '../src/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '../src/sync/obsidian/settings-background-handlers';
+import { onInstalled } from '../src/platform/runtime/runtime';
 
 export default defineBackground(() => {
   const services = startBackgroundBootstrap();
@@ -44,7 +45,7 @@ export default defineBackground(() => {
   try {
     ensureDefaultNotionOAuthClientId().catch(() => {});
     setupNotionOAuthNavigationListener();
-    browser.runtime.onInstalled.addListener(() => ensureDefaultNotionOAuthClientId().catch(() => {}));
+    onInstalled(() => ensureDefaultNotionOAuthClientId().catch(() => {}));
   } catch (_e) {
     // ignore
   }

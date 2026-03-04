@@ -1,20 +1,24 @@
+import { getManifest, getURL } from '../../../src/platform/runtime/runtime';
+import { tabsCreate } from '../../../src/platform/webext/tabs';
+
 export default function AboutTab() {
   const version = (() => {
     try {
-      return browser.runtime.getManifest().version || '';
+      const manifest = getManifest();
+      return String(manifest?.version || '');
     } catch (_e) {
       return '';
     }
   })();
 
   const openUrl = async (url: string) => {
-    await browser.tabs.create({ url });
+    await tabsCreate({ url });
   };
 
   return (
     <div className="viewScroll" aria-label="About content">
       <section className="toolbar aboutHero" aria-label="About SyncNos WebClipper">
-        <img className="aboutLogo" src={browser.runtime.getURL('icons/icon-48.png' as any)} alt="" />
+        <img className="aboutLogo" src={getURL('icons/icon-48.png' as any)} alt="" />
         <div className="aboutInfo">
           <div className="aboutName">SyncNos WebClipper</div>
           <div className="sub" id="aboutVersion">
@@ -35,7 +39,7 @@ export default function AboutTab() {
       </section>
 
       <section className="toolbar" aria-label="Author">
-        <img className="aboutAvatar" src={browser.runtime.getURL('icons/author-avatar.png' as any)} alt="Chii Magnus avatar" />
+        <img className="aboutAvatar" src={getURL('icons/author-avatar.png' as any)} alt="Chii Magnus avatar" />
         <div className="aboutAuthor">
           <div className="aboutAuthorName">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
           <div className="sub">Time Machine Creator~</div>
@@ -55,7 +59,7 @@ export default function AboutTab() {
       </section>
 
       <section className="toolbar aboutDonate" aria-label="Donate QR code">
-        <img className="aboutDonateImage" src={browser.runtime.getURL('icons/buymeacoffee1.jpg' as any)} alt="Chii Magnus donate QR code" />
+        <img className="aboutDonateImage" src={getURL('icons/buymeacoffee1.jpg' as any)} alt="Chii Magnus donate QR code" />
       </section>
     </div>
   );

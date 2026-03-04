@@ -1,5 +1,29 @@
 import { webextApis, webextError, webextLastErrorMessage } from './base';
 
+export function scriptingCanInject(): boolean {
+  const { chrome, browser } = webextApis();
+  return Boolean(
+    (browser?.scripting &&
+      typeof browser.scripting.executeScript === 'function' &&
+      typeof browser.scripting.insertCSS === 'function') ||
+      (chrome?.scripting &&
+        typeof chrome.scripting.executeScript === 'function' &&
+        typeof chrome.scripting.insertCSS === 'function'),
+  );
+}
+
+export function scriptingCanDynamicRegister(): boolean {
+  const { chrome, browser } = webextApis();
+  return Boolean(
+    (browser?.scripting &&
+      typeof browser.scripting.registerContentScripts === 'function' &&
+      typeof browser.scripting.unregisterContentScripts === 'function') ||
+      (chrome?.scripting &&
+        typeof chrome.scripting.registerContentScripts === 'function' &&
+        typeof chrome.scripting.unregisterContentScripts === 'function'),
+  );
+}
+
 export async function scriptingExecuteScript(details: any): Promise<any[]> {
   const { chrome, browser } = webextApis();
 

@@ -112,3 +112,25 @@ export async function storageRemove(keys: string[]): Promise<void> {
 
   throw toError('storage.local.remove unavailable');
 }
+
+export function storageOnChanged(listener: (changes: any, areaName: string) => void): () => void {
+  if (typeof listener !== 'function') return () => {};
+
+  const anyGlobal = globalThis as any;
+  const event = anyGlobal.browser?.storage?.onChanged ?? anyGlobal.chrome?.storage?.onChanged;
+  if (!event?.addListener) return () => {};
+
+  try {
+    event.addListener(listener);
+  } catch (_e) {
+    return () => {};
+  }
+
+  return () => {
+    try {
+      event.removeListener?.(listener);
+    } catch (_e) {
+      // ignore
+    }
+  };
+}

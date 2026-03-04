@@ -1,6 +1,13 @@
-import { storageGet } from '../platform/storage/local';
-import { webextApis } from '../platform/webext/base';
-import { scriptingExecuteScript, scriptingInsertCSS, scriptingRegisterContentScripts, scriptingUnregisterContentScripts } from '../platform/webext/scripting';
+import { onInstalled, onStartup, getManifest } from '../platform/runtime/runtime';
+import { storageGet, storageOnChanged } from '../platform/storage/local';
+import {
+  scriptingCanDynamicRegister,
+  scriptingCanInject,
+  scriptingExecuteScript,
+  scriptingInsertCSS,
+  scriptingRegisterContentScripts,
+  scriptingUnregisterContentScripts,
+} from '../platform/webext/scripting';
 import { tabsQuery, tabsSendMessage } from '../platform/webext/tabs';
 
 const STORAGE_KEY = 'inpage_supported_only';
@@ -66,35 +73,6 @@ function parseHttpUrl(raw: unknown) {
   }
 }
 
-function canUseScriptingDynamicRegistration() {
-  const { chrome, browser } = webextApis();
-  return Boolean(
-    (browser?.scripting &&
-      typeof browser.scripting.registerContentScripts === 'function' &&
-      typeof browser.scripting.unregisterContentScripts === 'function') ||
-      (chrome?.scripting &&
-        typeof chrome.scripting.registerContentScripts === 'function' &&
-        typeof chrome.scripting.unregisterContentScripts === 'function'),
-  );
-}
-
-function canUseScriptingInjection() {
-  const { chrome, browser } = webextApis();
-  return Boolean(
-    (browser?.scripting &&
-      typeof browser.scripting.executeScript === 'function' &&
-      typeof browser.scripting.insertCSS === 'function') ||
-      (chrome?.scripting &&
-        typeof chrome.scripting.executeScript === 'function' &&
-        typeof chrome.scripting.insertCSS === 'function'),
-  );
-}
-
-function runtimeLastErrorMessage() {
-  const { chrome } = webextApis();
-  return String(chrome?.runtime?.lastError?.message || '');
-}
-
 function readSetting(): Promise<boolean> {
   return storageGet([STORAGE_KEY])
     .then((res) => (res as any)?.[STORAGE_KEY] === true)
@@ -103,9 +81,7 @@ function readSetting(): Promise<boolean> {
 
 function getContentAssetsFromManifest(): { js: string[]; css: string[] } {
   try {
-    const { chrome, browser } = webextApis();
-    const runtimeApi = browser?.runtime ?? chrome?.runtime;
-    const manifest = runtimeApi && typeof runtimeApi.getManifest === 'function' ? runtimeApi.getManifest() : null;
+    const manifest = getManifest();
     const entries = manifest && Array.isArray(manifest.content_scripts) ? manifest.content_scripts : [];
     const entry = entries && entries[0] ? entries[0] : null;
     const js = entry && Array.isArray(entry.js) ? entry.js.slice() : [];
@@ -148,7 +124,7 @@ function sendTabMessage(tabId: number, message: Record<string, unknown>) {
 
 function injectIntoTab(tabId: number) {
   return new Promise<{ ok: boolean; error?: string | null }>((resolve) => {
-    if (!canUseScriptingInjection()) {
+    if (!scriptingCanInject()) {
       resolve({ ok: false, error: 'scripting injection unavailable' });
       return;
     }
@@ -184,7 +160,7 @@ function injectIntoTab(tabId: number) {
 
 function registerDynamicContentScript() {
   return new Promise<{ ok: boolean; error?: string; existed?: boolean }>((resolve) => {
-    if (!canUseScriptingDynamicRegistration()) {
+    if (!scriptingCanDynamicRegister()) {
       resolve({ ok: false, error: 'dynamic content scripts unavailable' });
       return;
     }
@@ -207,7 +183,7 @@ function registerDynamicContentScript() {
     scriptingRegisterContentScripts([definition])
       .then(() => resolve({ ok: true }))
       .catch((e) => {
-        const message = String((e as any)?.message || e || runtimeLastErrorMessage());
+        const message = String((e as any)?.message || e || '');
         if (/already exists/i.test(message)) return resolve({ ok: true, existed: true, error: message });
         resolve({ ok: false, error: message });
       });
@@ -216,14 +192,14 @@ function registerDynamicContentScript() {
 
 function unregisterDynamicContentScript() {
   return new Promise<{ ok: boolean; error?: string; missing?: boolean }>((resolve) => {
-    if (!canUseScriptingDynamicRegistration()) {
+    if (!scriptingCanDynamicRegister()) {
       resolve({ ok: false, error: 'dynamic content scripts unavailable' });
       return;
     }
     scriptingUnregisterContentScripts({ ids: [DYNAMIC_SCRIPT_ID] })
       .then(() => resolve({ ok: true }))
       .catch((e) => {
-        const message = String((e as any)?.message || e || runtimeLastErrorMessage());
+        const message = String((e as any)?.message || e || '');
         if (/not found|no such|unknown/i.test(message)) return resolve({ ok: true, missing: true, error: message });
         resolve({ ok: false, error: message });
       });
@@ -256,40 +232,23 @@ async function applyVisibilitySetting({ reason }: { reason?: string } = {}) {
 }
 
 function start() {
-  const { chrome } = webextApis();
   try {
-    if (chrome?.runtime?.onInstalled?.addListener) {
-      chrome.runtime.onInstalled.addListener(() => {
-        applyVisibilitySetting({ reason: 'onInstalled' }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore
-  }
+    onInstalled(() => applyVisibilitySetting({ reason: 'onInstalled' }).catch(() => {}));
+  } catch (_e) {}
 
   try {
-    if (chrome?.runtime?.onStartup?.addListener) {
-      chrome.runtime.onStartup.addListener(() => {
-        applyVisibilitySetting({ reason: 'onStartup' }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore
-  }
+    onStartup(() => applyVisibilitySetting({ reason: 'onStartup' }).catch(() => {}));
+  } catch (_e) {}
 
   applyVisibilitySetting({ reason: 'startup' }).catch(() => {});
 
   try {
-    if (chrome?.storage?.onChanged?.addListener) {
-      chrome.storage.onChanged.addListener((changes: any, areaName: string) => {
-        if (areaName !== 'local') return;
-        if (!changes || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-        applyVisibilitySetting({ reason: 'storageChanged' }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore
-  }
+    storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      if (!changes || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+      applyVisibilitySetting({ reason: 'storageChanged' }).catch(() => {});
+    });
+  } catch (_e) {}
 }
 
 const backgroundInpageWebVisibilityApi = {
