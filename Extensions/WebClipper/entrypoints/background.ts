@@ -8,10 +8,15 @@ import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
 } from '../src/sync/notion/auth/oauth';
-import { getBackgroundInstanceId } from '../src/bootstrap/background-instance.ts';
 import { registerNotionSettingsHandlers } from '../src/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '../src/sync/obsidian/settings-background-handlers';
 import { onInstalled } from '../src/platform/runtime/runtime';
+
+let backgroundInstanceId: string | null = null;
+function getBackgroundInstanceId(): string {
+  if (!backgroundInstanceId) backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return backgroundInstanceId;
+}
 
 export default defineBackground(() => {
   const services = createBackgroundServices();
