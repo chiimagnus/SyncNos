@@ -3,24 +3,34 @@ import Conversations from './routes/Conversations';
 import Debug from './routes/Debug';
 import Settings from './routes/Settings';
 
-function Nav() {
-  const linkStyle = ({ isActive }: { isActive: boolean }) => ({
-    textDecoration: 'none',
-    fontWeight: isActive ? 700 : 500,
-    opacity: isActive ? 1 : 0.75,
-  });
+const navItems = [
+  { path: '/', label: 'Conversations' },
+  { path: '/settings', label: 'Settings' },
+  { path: '/debug', label: 'Debug' },
+];
 
+function navLinkClass(isActive: boolean) {
+  const base =
+    'tw-rounded-full tw-border tw-px-3 tw-py-1.5 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200';
+  if (isActive) {
+    return `${base} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
+  }
+  return `${base} tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]`;
+}
+
+function Nav() {
   return (
-    <nav style={{ display: 'flex', gap: 12 }}>
-      <NavLink to="/" style={linkStyle}>
-        Conversations
-      </NavLink>
-      <NavLink to="/settings" style={linkStyle}>
-        Settings
-      </NavLink>
-      <NavLink to="/debug" style={linkStyle}>
-        Debug
-      </NavLink>
+    <nav className="tw-flex tw-flex-wrap tw-items-center tw-gap-2" aria-label="App routes">
+      {navItems.map((item) => (
+        <NavLink
+          key={item.path}
+          to={item.path}
+          className={({ isActive }) => navLinkClass(isActive)}
+          end={item.path === '/'}
+        >
+          {item.label}
+        </NavLink>
+      ))}
     </nav>
   );
 }
@@ -28,28 +38,24 @@ function Nav() {
 export default function AppShell() {
   return (
     <HashRouter>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateRows: 'auto 1fr',
-          minHeight: '100vh',
-        }}
-      >
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            padding: '12px 16px',
-            borderBottom: '1px solid color-mix(in oklab, CanvasText 15%, transparent)',
-          }}
-        >
-          <div style={{ fontWeight: 800 }}>SyncNos WebClipper</div>
+      <div className="tw-grid tw-min-h-screen tw-grid-rows-[auto_1fr]">
+        <header className="tw-sticky tw-top-0 tw-z-20 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-bg-[var(--panel)]/90 tw-px-4 tw-py-3 tw-backdrop-blur-sm md:tw-px-5">
+          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-3">
+            <span
+              className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
+              aria-hidden="true"
+            >
+              SN
+            </span>
+            <div className="tw-min-w-0">
+              <p className="tw-m-0 tw-truncate tw-text-[16px] tw-font-black tw-leading-none tw-text-[var(--text)]">SyncNos WebClipper</p>
+              <p className="tw-mt-1 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">Route App Control Center</p>
+            </div>
+          </div>
           <Nav />
         </header>
 
-        <main style={{ padding: '16px' }}>
+        <main className="tw-mx-auto tw-my-4 tw-w-[calc(100%-20px)] tw-max-w-[1400px] md:tw-my-5 md:tw-w-[calc(100%-32px)]">
           <Routes>
             <Route path="/" element={<Conversations />} />
             <Route path="/settings" element={<Settings />} />

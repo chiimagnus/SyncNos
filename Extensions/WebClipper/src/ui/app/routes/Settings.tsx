@@ -220,12 +220,20 @@ export default function Settings() {
   // Inpage
   const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean | null>(null);
 
+  const cardClassName = 'tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3';
+  const buttonClassName =
+    'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-px-3 tw-text-xs tw-font-bold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)] disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
+  const primaryButtonClassName =
+    'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--text)] tw-bg-[var(--text)] tw-px-3 tw-text-xs tw-font-bold tw-text-white tw-transition-colors tw-duration-200 hover:tw-bg-[#c94f20] disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
+
   const buttonStyle = useMemo(
     () => ({
       padding: '8px 12px',
-      borderRadius: 8,
-      border: '1px solid color-mix(in oklab, CanvasText 15%, transparent)',
-      background: 'color-mix(in oklab, Canvas 85%, CanvasText 2%)',
+      borderRadius: 10,
+      border: '1px solid var(--border-strong)',
+      background: 'var(--btn-bg)',
+      color: 'var(--text)',
+      fontWeight: 700,
       cursor: 'pointer',
     }),
     [],
@@ -233,8 +241,9 @@ export default function Settings() {
 
   const cardStyle = useMemo(
     () => ({
-      border: '1px solid color-mix(in oklab, CanvasText 12%, transparent)',
-      borderRadius: 12,
+      border: '1px solid var(--border)',
+      borderRadius: 16,
+      background: 'rgba(255, 255, 255, 0.8)',
       padding: 12,
     }),
     [],
@@ -635,23 +644,26 @@ export default function Settings() {
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
 
   return (
-    <section style={{ display: 'grid', gap: 16, maxWidth: 980 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <h1 style={{ margin: 0 }}>Settings</h1>
-        <button onClick={() => refresh().catch(() => {})} disabled={busy} type="button">
+    <section className="tw-grid tw-max-w-[980px] tw-gap-4">
+      <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-4">
+        <div>
+          <h1 className="tw-m-0 tw-text-[26px] tw-font-black tw-leading-none tw-tracking-[-0.01em] tw-text-[var(--text)]">Settings</h1>
+          <p className="tw-m-0 tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Sync integrations, backup, and app behavior controls.</p>
+        </div>
+        <button onClick={() => refresh().catch(() => {})} disabled={busy} type="button" className={primaryButtonClassName}>
           {busy ? 'Loading…' : 'Refresh'}
         </button>
       </div>
 
-      {error ? <p style={{ color: 'crimson', margin: 0 }}>{error}</p> : null}
+      {error ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{error}</p> : null}
 
-      <section style={cardStyle as any} aria-label="Notion OAuth">
-        <h2 style={{ margin: 0, fontSize: 16 }}>Notion OAuth</h2>
+      <section style={cardStyle as any} className={cardClassName} aria-label="Notion OAuth">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Notion OAuth</h2>
         <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>status: {notionStatusText}</div>
         <div style={{ marginTop: 6, opacity: 0.85, fontSize: 12 }}>
           clientId: {notionClientId ? notionClientId : '(missing)'}
         </div>
-        <button onClick={() => onNotionConnectOrDisconnect().catch(() => {})} disabled={busy} style={{ marginTop: 10 }} type="button">
+        <button onClick={() => onNotionConnectOrDisconnect().catch(() => {})} disabled={busy} style={{ marginTop: 10 }} type="button" className={buttonClassName}>
           {notionConnected ? 'Disconnect' : pollingNotion ? 'Connecting…' : 'Connect'}
         </button>
 
@@ -663,6 +675,7 @@ export default function Settings() {
               disabled={busy || !notionConnected}
               onChange={(e) => onSaveNotionParentPage(e.target.value).catch(() => {})}
               style={{ width: '100%' }}
+              className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]"
             >
               {notionPageOptions.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
               {notionPageOptions.map((p) => (
@@ -672,7 +685,7 @@ export default function Settings() {
               ))}
             </select>
           </div>
-          <button onClick={() => onLoadNotionPages().catch(() => {})} disabled={busy || !notionConnected || loadingNotionPages} type="button">
+          <button onClick={() => onLoadNotionPages().catch(() => {})} disabled={busy || !notionConnected || loadingNotionPages} type="button" className={buttonClassName}>
             {loadingNotionPages ? 'Loading…' : 'Refresh'}
           </button>
         </div>
@@ -687,39 +700,41 @@ export default function Settings() {
         ) : null}
       </section>
 
-      <section style={cardStyle as any} aria-label="Article Fetch">
-        <h2 style={{ margin: 0, fontSize: 16 }}>Article Fetch</h2>
-        <button onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy} style={{ marginTop: 10 }} type="button">
+      <section style={cardStyle as any} className={cardClassName} aria-label="Article Fetch">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Article Fetch</h2>
+        <button onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy} style={{ marginTop: 10 }} type="button" className={buttonClassName}>
           Fetch Current Page
         </button>
         <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>status: {articleFetchStatus}</div>
       </section>
 
-      <section style={cardStyle as any} aria-label="Obsidian Settings">
-        <h2 style={{ margin: 0, fontSize: 16 }}>Obsidian</h2>
+      <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Settings">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian</h2>
 
         <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
           <label style={{ display: 'grid', gap: 6 }}>
             <div style={{ fontSize: 12, opacity: 0.85 }}>API Base URL</div>
-            <input
-              value={obsidianApiBaseUrl}
-              onChange={(e) => setObsidianApiBaseUrl(e.target.value)}
-              disabled={busy}
-              spellCheck={false}
-            />
-          </label>
+              <input
+                value={obsidianApiBaseUrl}
+                onChange={(e) => setObsidianApiBaseUrl(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)]"
+              />
+            </label>
 
           <label style={{ display: 'grid', gap: 6 }}>
             <div style={{ fontSize: 12, opacity: 0.85 }}>API Key</div>
-            <input
-              value={obsidianApiKeyDraft}
-              onChange={(e) => {
-                setObsidianApiKeyDraft(e.target.value);
-                setObsidianApiKeyChanged(true);
-              }}
-              disabled={busy}
-              placeholder={obsidianApiKeyPresent ? '(configured)' : ''}
-            />
+              <input
+                value={obsidianApiKeyDraft}
+                onChange={(e) => {
+                  setObsidianApiKeyDraft(e.target.value);
+                  setObsidianApiKeyChanged(true);
+                }}
+                disabled={busy}
+                placeholder={obsidianApiKeyPresent ? '(configured)' : ''}
+                className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)]"
+              />
             <div style={{ fontSize: 12, opacity: 0.75 }}>
               status: {obsidianApiKeyPresent ? 'configured' : 'not configured'} (value not displayed)
             </div>
@@ -727,33 +742,46 @@ export default function Settings() {
 
           <label style={{ display: 'grid', gap: 6 }}>
             <div style={{ fontSize: 12, opacity: 0.85 }}>Auth Header</div>
-            <input
-              value={obsidianAuthHeaderName}
-              onChange={(e) => setObsidianAuthHeaderName(e.target.value)}
-              disabled={busy}
-              spellCheck={false}
-            />
-          </label>
+              <input
+                value={obsidianAuthHeaderName}
+                onChange={(e) => setObsidianAuthHeaderName(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)]"
+              />
+            </label>
 
           <div style={{ display: 'grid', gap: 10, gridTemplateColumns: '1fr 1fr' }}>
             <label style={{ display: 'grid', gap: 6 }}>
               <div style={{ fontSize: 12, opacity: 0.85 }}>AI Chats Folder</div>
-              <input value={obsidianChatFolder} onChange={(e) => setObsidianChatFolder(e.target.value)} disabled={busy} spellCheck={false} />
+              <input
+                value={obsidianChatFolder}
+                onChange={(e) => setObsidianChatFolder(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)]"
+              />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
               <div style={{ fontSize: 12, opacity: 0.85 }}>Web Articles Folder</div>
-              <input value={obsidianArticleFolder} onChange={(e) => setObsidianArticleFolder(e.target.value)} disabled={busy} spellCheck={false} />
+              <input
+                value={obsidianArticleFolder}
+                onChange={(e) => setObsidianArticleFolder(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)]"
+              />
             </label>
           </div>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button style={buttonStyle as any} onClick={() => onSaveObsidianSettings().catch(() => {})} disabled={busy}>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={() => onSaveObsidianSettings().catch(() => {})} disabled={busy}>
               Save
             </button>
-            <button style={buttonStyle as any} onClick={() => onTestObsidianConnection().catch(() => {})} disabled={busy}>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={() => onTestObsidianConnection().catch(() => {})} disabled={busy}>
               Test Connection
             </button>
-            <button style={buttonStyle as any} onClick={() => onClearObsidianKey().catch(() => {})} disabled={busy}>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={() => onClearObsidianKey().catch(() => {})} disabled={busy}>
               Clear API key
             </button>
           </div>
@@ -766,14 +794,15 @@ export default function Settings() {
         </div>
       </section>
 
-      <section style={cardStyle as any} aria-label="Database Backup">
-        <h2 style={{ margin: 0, fontSize: 16 }}>Database Backup</h2>
+      <section style={cardStyle as any} className={cardClassName} aria-label="Database Backup">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Database Backup</h2>
 
         <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button style={buttonStyle as any} onClick={() => handleBackupExport().catch(() => {})} disabled={busy}>
+          <button className={buttonClassName} style={buttonStyle as any} onClick={() => handleBackupExport().catch(() => {})} disabled={busy}>
             Export (Zip v2)
           </button>
           <button
+            className={buttonClassName}
             style={buttonStyle as any}
             disabled={busy}
             onClick={() => {
@@ -800,8 +829,8 @@ export default function Settings() {
         <div style={{ marginTop: 10 }}>{renderStats(importStats)}</div>
       </section>
 
-      <section style={cardStyle as any} aria-label="Notion AI">
-        <h2 style={{ margin: 0, fontSize: 16 }}>Notion AI</h2>
+      <section style={cardStyle as any} className={cardClassName} aria-label="Notion AI">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Notion AI</h2>
         <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             value={notionAiModelIndex}
@@ -810,11 +839,12 @@ export default function Settings() {
             inputMode="numeric"
             placeholder="3"
             style={{ width: 120 }}
+            className="tw-min-h-9 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-text-sm tw-text-[var(--text)]"
           />
-          <button style={buttonStyle as any} onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy}>
+          <button className={buttonClassName} style={buttonStyle as any} onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy}>
             Save
           </button>
-          <button style={buttonStyle as any} onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy}>
+          <button className={buttonClassName} style={buttonStyle as any} onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy}>
             Reset
           </button>
         </div>
@@ -823,14 +853,15 @@ export default function Settings() {
         </div>
       </section>
 
-      <section style={cardStyle as any} aria-label="Inpage Button">
-        <h2 style={{ margin: 0, fontSize: 16 }}>Inpage Button</h2>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <section style={cardStyle as any} className={cardClassName} aria-label="Inpage Button">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Inpage Button</h2>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }} className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">
           <input
             type="checkbox"
             checked={!!inpageSupportedOnly}
             disabled={busy || inpageSupportedOnly == null}
             onChange={(e) => onToggleInpageSupportedOnly(!!e.target.checked).catch(() => {})}
+            className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
           />
           仅在支持站点显示 Inpage 按钮
         </label>
