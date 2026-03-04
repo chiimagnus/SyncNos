@@ -8,8 +8,8 @@ import { ConversationsProvider } from './conversations/conversations-context';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_KEY = 'webclipper_app_sidebar_width';
-const SIDEBAR_WIDTH_DEFAULT = 320;
-const SIDEBAR_WIDTH_MIN = 260;
+const SIDEBAR_WIDTH_DEFAULT = 350;
+const SIDEBAR_WIDTH_MIN = 350;
 const SIDEBAR_WIDTH_MAX = 520;
 
 function CollapseIcon() {
