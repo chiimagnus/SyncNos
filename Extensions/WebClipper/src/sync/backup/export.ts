@@ -1,7 +1,8 @@
-import { storageGetAll } from '../../platform/storage/local';
+import { storageGetAll, storageSet } from '../../platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
   filterStorageForBackup,
+  LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
   uniqueConversationKey,
 } from './backup-utils';
 import { buildConversationBasename } from '../../conversations/domain/file-naming';
@@ -77,7 +78,8 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const rawStorage = await storageGetAll();
   const storageLocal = filterStorageForBackup(rawStorage);
 
-  const exportedAt = new Date().toISOString();
+  const exportedAtMs = Date.now();
+  const exportedAt = new Date(exportedAtMs).toISOString();
 
   const allConversations = Array.isArray(conversations) ? conversations : [];
   const allMessages = Array.isArray(messages) ? messages : [];
@@ -240,6 +242,12 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `webclipper-db-backup-${stamp}.zip`;
   const blob = await createZipBlob(files);
+
+  try {
+    await storageSet({ [LAST_BACKUP_EXPORT_AT_STORAGE_KEY]: exportedAtMs });
+  } catch (_e) {
+    // non-fatal
+  }
 
   return {
     filename,

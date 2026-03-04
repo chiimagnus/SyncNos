@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { exportBackupZipV2 } from '../../../src/sync/backup/export';
+import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '../../../src/sync/backup/backup-utils';
 import {
   importBackupLegacyJsonMerge,
   importBackupZipV2Merge,
@@ -227,6 +228,7 @@ export default function SettingsTab() {
   const [exportStatus, setExportStatus] = useState<string>('Idle');
   const [importStatus, setImportStatus] = useState<string>('Ready');
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
+  const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Notion AI
@@ -250,6 +252,7 @@ export default function SettingsTab() {
           'notion_parent_page_title',
           'notion_ai_preferred_model_index',
           'inpage_supported_only',
+          LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
         getNotionSyncJobStatus().catch(() => ({ job: null } as any)),
@@ -267,6 +270,7 @@ export default function SettingsTab() {
       setNotionParentPageTitle(String(local?.notion_parent_page_title || '').trim());
       setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || '').trim());
       setInpageSupportedOnly(local?.inpage_supported_only == null ? null : !!local.inpage_supported_only);
+      setLastBackupExportAt(Number((local as any)?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY]) || 0);
 
       const obsidian = unwrap(obsidianRes);
       setObsidianApiBaseUrl(String(obsidian?.apiBaseUrl || ''));
@@ -568,6 +572,7 @@ export default function SettingsTab() {
       a.download = res.filename;
       a.click();
       setExportStatus(`Exported (${res.counts.conversations} convos, ${res.counts.messages} msgs)`);
+      setLastBackupExportAt(Date.parse(res.exportedAt) || Date.now());
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
       const msg = (e as any)?.message ? String((e as any).message) : String(e || 'export failed');
@@ -692,6 +697,11 @@ export default function SettingsTab() {
           <div className="sub">
             export: {exportStatus} · import: {importStatus}
           </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Database backup last export">
+          <div className="settingsLabel settingsLabel--inline">Last export</div>
+          <div className="sub">{lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
         </div>
 
         {importStats ? (
