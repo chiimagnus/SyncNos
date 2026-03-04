@@ -408,12 +408,10 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                 ))}
               </select>
 
-              <div className="tw-flex-1" aria-hidden="true" />
-
               <div
                 id="chatActionButtons"
                 className={[
-                  'tw-inline-flex tw-items-center tw-gap-1.5 tw-overflow-hidden',
+                  ['tw-inline-flex tw-items-center tw-gap-1.5', hasSelection ? 'tw-overflow-visible' : 'tw-overflow-hidden'].join(' '),
                   'tw-transition-[max-width,opacity,transform] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
                   hasSelection
                     ? 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-pointer-events-auto'
@@ -491,6 +489,8 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                   {syncingNotion ? 'Notion...' : 'Notion'}
                 </button>
               </div>
+
+              <div className="tw-flex-1 tw-min-w-0" aria-hidden="true" />
 
               <div
                 id="stats"
