@@ -15,10 +15,11 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@types/react": "^19.2.13",
-    "@types/react-dom": "^19.2.3",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.10.0",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^2.1.9",
     "@wxt-dev/module-react": "^1.1.5",
     "autoprefixer": "^10.4.21",
     "fake-indexeddb": "^6.2.2",
