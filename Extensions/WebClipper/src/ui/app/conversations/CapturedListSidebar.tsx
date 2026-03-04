@@ -5,6 +5,7 @@ import type { Conversation } from '../../../conversations/domain/models';
 import { formatConversationMarkdown } from '../../../conversations/domain/markdown';
 import { getConversationDetail } from '../../../conversations/client/repo';
 import { tabsCreate } from '../../../platform/webext/tabs';
+import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
 
 import { useConversationsApp } from './conversations-context';
 
@@ -106,6 +107,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
   } = useConversationsApp();
 
   const navigate = useNavigate();
+  const logoUrl = runtimeGetURL('icons/icon-48.png');
 
   const [filterKey, setFilterKey] = useState<string>('all');
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -259,16 +261,21 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col tw-gap-2">
       <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
         <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-          <span
-            className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
-            aria-hidden="true"
-          >
-            SN
-          </span>
-          <div className="tw-min-w-0">
-            <p className="tw-m-0 tw-truncate tw-text-[13px] tw-font-black tw-leading-none tw-text-[var(--text)]">Captured List</p>
-            <p className="tw-mt-1 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{selectedIds.length}/{items.length} selected</p>
-          </div>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="SyncNos"
+              className="tw-size-8 tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-p-1 tw-object-contain"
+              draggable={false}
+            />
+          ) : (
+            <span
+              className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
+              aria-hidden="true"
+            >
+              SN
+            </span>
+          )}
         </div>
 
         <button
