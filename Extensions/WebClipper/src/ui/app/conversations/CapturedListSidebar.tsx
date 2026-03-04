@@ -412,7 +412,11 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                 id="sourceFilterSelect"
                 value={filterKey}
                 onChange={(e) => onSetFilterKey(e.target.value)}
-                className={['tw-min-h-11 tw-max-w-[150px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2.5 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]', hasSelection ? 'tw-hidden' : ''].join(' ')}
+                className={[
+                  'tw-min-h-[34px] tw-max-w-[150px] tw-rounded-[11px] tw-border tw-border-[var(--border)] tw-bg-[#fff9f6] tw-px-2.5 tw-py-1 tw-text-[12px] tw-font-semibold tw-text-[var(--text)]',
+                  'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+                  hasSelection ? 'tw-hidden' : '',
+                ].join(' ')}
                 aria-label="Source filter"
               >
                 {sourceOptions.map((opt) => (
