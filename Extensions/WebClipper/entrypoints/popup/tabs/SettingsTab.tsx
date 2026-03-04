@@ -235,7 +235,7 @@ export default function SettingsTab() {
   const [notionAiModelIndex, setNotionAiModelIndex] = useState<string>('');
 
   // Inpage
-  const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean | null>(null);
+  const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean>(false);
   const useAppImport = useMemo(() => isFirefoxFamilyBrowser(), []);
 
   const refresh = async () => {
@@ -269,7 +269,7 @@ export default function SettingsTab() {
       setNotionParentPageId(String(local?.notion_parent_page_id || '').trim());
       setNotionParentPageTitle(String(local?.notion_parent_page_title || '').trim());
       setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || '').trim());
-      setInpageSupportedOnly(local?.inpage_supported_only == null ? null : !!local.inpage_supported_only);
+      setInpageSupportedOnly(!!local?.inpage_supported_only);
       setLastBackupExportAt(Number((local as any)?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY]) || 0);
 
       const obsidian = unwrap(obsidianRes);
@@ -1025,13 +1025,13 @@ export default function SettingsTab() {
         <div className="settingsRow settingsRow--compact" aria-label="Inpage button supported sites toggle">
           <div className="settingsControl settingsControl--grow">
             <label className="checkbox" htmlFor="inpageSupportedOnlyToggle">
-              <input
-                id="inpageSupportedOnlyToggle"
-                type="checkbox"
-                checked={!!inpageSupportedOnly}
-                disabled={busy || inpageSupportedOnly == null}
-                onChange={(e) => onToggleInpageSupportedOnly(e.target.checked).catch(() => {})}
-              />
+                <input
+                  id="inpageSupportedOnlyToggle"
+                  type="checkbox"
+                  checked={inpageSupportedOnly}
+                  disabled={busy}
+                  onChange={(e) => onToggleInpageSupportedOnly(e.target.checked).catch(() => {})}
+                />
               <span>仅在支持站点显示 Inpage 按钮</span>
             </label>
           </div>
