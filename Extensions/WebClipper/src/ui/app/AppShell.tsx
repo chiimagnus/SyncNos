@@ -227,8 +227,8 @@ export default function AppShell() {
                   </svg>
                 </button>
 
-                <div className="tw-h-full tw-overflow-hidden tw-p-4">
-                  <div className="tw-h-full tw-overflow-y-auto tw-overflow-x-hidden tw-pr-1">
+                <div className="tw-h-full tw-overflow-hidden">
+                  <div className="tw-h-full tw-overflow-y-auto tw-overflow-x-hidden tw-p-4">
                     <Settings />
                   </div>
                 </div>
