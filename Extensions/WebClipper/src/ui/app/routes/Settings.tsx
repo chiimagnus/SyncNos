@@ -92,9 +92,10 @@ export default function Settings() {
   const [obsidianApiKeyDraft, setObsidianApiKeyDraft] = useState<string>('');
   const [obsidianApiKeyChanged, setObsidianApiKeyChanged] = useState(false);
   const [obsidianApiKeyPresent, setObsidianApiKeyPresent] = useState<boolean>(false);
+  const [obsidianApiKeyMasked, setObsidianApiKeyMasked] = useState<string>('');
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
-  const [obsidianTestResult, setObsidianTestResult] = useState<string>('');
+  const [obsidianStatus, setObsidianStatus] = useState<string>('Idle');
   const [obsidianJob, setObsidianJob] = useState<any>(null);
 
   // Backup
@@ -150,6 +151,7 @@ export default function Settings() {
       setObsidianApiBaseUrl(String(obsidian?.apiBaseUrl || ''));
       setObsidianAuthHeaderName(String(obsidian?.authHeaderName || ''));
       setObsidianApiKeyPresent(!!obsidian?.apiKeyPresent);
+      setObsidianApiKeyMasked(String(obsidian?.apiKeyMasked || ''));
       setObsidianChatFolder(String(obsidian?.chatFolder || ''));
       setObsidianArticleFolder(String(obsidian?.articleFolder || ''));
       setNotionJob(nJob?.job ?? null);
@@ -303,9 +305,11 @@ export default function Settings() {
     }
   };
 
-  const onSaveObsidianSettings = async () => {
+  const onSaveObsidianSettings = async ({ includeApiKey }: { includeApiKey?: boolean } = {}) => {
+    if (busy) return;
     setBusy(true);
     setError(null);
+    setObsidianStatus('Saving…');
     try {
       const payload: any = {
         apiBaseUrl: obsidianApiBaseUrl,
@@ -313,34 +317,21 @@ export default function Settings() {
         chatFolder: obsidianChatFolder,
         articleFolder: obsidianArticleFolder,
       };
-      if (obsidianApiKeyChanged) payload.apiKey = obsidianApiKeyDraft;
+      if (includeApiKey === true && String(obsidianApiKeyDraft || '').trim()) payload.apiKey = obsidianApiKeyDraft;
       const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, payload);
       const data = unwrap(res);
       setObsidianApiBaseUrl(String(data?.apiBaseUrl || ''));
       setObsidianAuthHeaderName(String(data?.authHeaderName || ''));
       setObsidianApiKeyPresent(!!data?.apiKeyPresent);
+      setObsidianApiKeyMasked(String(data?.apiKeyMasked || ''));
       setObsidianChatFolder(String(data?.chatFolder || ''));
       setObsidianArticleFolder(String(data?.articleFolder || ''));
       setObsidianApiKeyDraft('');
       setObsidianApiKeyChanged(false);
+      setObsidianStatus('Saved');
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onClearObsidianKey = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, { apiKey: '' });
-      const data = unwrap(res);
-      setObsidianApiKeyPresent(!!data?.apiKeyPresent);
-      setObsidianApiKeyDraft('');
-      setObsidianApiKeyChanged(false);
-    } catch (e) {
-      setError((e as any)?.message ?? String(e ?? 'failed'));
+      setObsidianStatus('Error');
     } finally {
       setBusy(false);
     }
@@ -349,16 +340,16 @@ export default function Settings() {
   const onTestObsidianConnection = async () => {
     setBusy(true);
     setError(null);
-    setObsidianTestResult('Testing…');
+    setObsidianStatus('Testing…');
     try {
       const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, {});
       const data = unwrap(res);
       const ok = data && data.ok === true;
       const message = data && data.message ? String(data.message) : '';
-      setObsidianTestResult(ok ? `OK ✓ ${message}`.trim() : `Error: ${message || 'failed'}`);
+      setObsidianStatus(ok ? `OK ✓ ${message}`.trim() : `Error: ${message || 'failed'}`);
     } catch (e) {
       const msg = (e as any)?.message ?? String(e ?? 'failed');
-      setObsidianTestResult(`Error: ${msg}`);
+      setObsidianStatus(`Error: ${msg}`);
       setError(msg);
     } finally {
       setBusy(false);
@@ -544,10 +535,10 @@ export default function Settings() {
               authHeaderName={obsidianAuthHeaderName}
               apiKeyDraft={obsidianApiKeyDraft}
               apiKeyPresent={obsidianApiKeyPresent}
+              apiKeyMasked={obsidianApiKeyMasked}
               chatFolder={obsidianChatFolder}
               articleFolder={obsidianArticleFolder}
-              testResult={obsidianTestResult}
-              job={obsidianJob}
+              statusText={obsidianStatus}
               onChangeApiBaseUrl={setObsidianApiBaseUrl}
               onChangeAuthHeaderName={setObsidianAuthHeaderName}
               onChangeApiKeyDraft={(v) => {
@@ -557,8 +548,11 @@ export default function Settings() {
               onChangeChatFolder={setObsidianChatFolder}
               onChangeArticleFolder={setObsidianArticleFolder}
               onSave={() => onSaveObsidianSettings().catch(() => {})}
+              onSaveApiKey={() => onSaveObsidianSettings({ includeApiKey: true }).catch(() => {})}
               onTest={() => onTestObsidianConnection().catch(() => {})}
-              onClearKey={() => onClearObsidianKey().catch(() => {})}
+              onOpenSetupGuide={() =>
+                openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md')
+              }
             />
           ) : null}
 

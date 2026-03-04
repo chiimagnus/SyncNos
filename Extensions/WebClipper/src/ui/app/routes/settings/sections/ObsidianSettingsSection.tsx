@@ -1,4 +1,5 @@
-import { formatTime } from '../utils';
+import type { KeyboardEvent } from 'react';
+
 import { buttonClassName, buttonStyle, cardClassName, cardStyle, textInputClassName } from '../ui';
 
 export function ObsidianSettingsSection(props: {
@@ -7,18 +8,19 @@ export function ObsidianSettingsSection(props: {
   authHeaderName: string;
   apiKeyDraft: string;
   apiKeyPresent: boolean;
+  apiKeyMasked: string;
   chatFolder: string;
   articleFolder: string;
-  testResult: string;
-  job: any;
+  statusText: string;
   onChangeApiBaseUrl: (v: string) => void;
   onChangeAuthHeaderName: (v: string) => void;
   onChangeApiKeyDraft: (v: string) => void;
   onChangeChatFolder: (v: string) => void;
   onChangeArticleFolder: (v: string) => void;
   onSave: () => void;
+  onSaveApiKey: () => void;
   onTest: () => void;
-  onClearKey: () => void;
+  onOpenSetupGuide: () => void;
 }) {
   const {
     busy,
@@ -26,118 +28,161 @@ export function ObsidianSettingsSection(props: {
     authHeaderName,
     apiKeyDraft,
     apiKeyPresent,
+    apiKeyMasked,
     chatFolder,
     articleFolder,
-    testResult,
-    job,
+    statusText,
     onChangeApiBaseUrl,
     onChangeAuthHeaderName,
     onChangeApiKeyDraft,
     onChangeChatFolder,
     onChangeArticleFolder,
     onSave,
+    onSaveApiKey,
     onTest,
-    onClearKey,
+    onOpenSetupGuide,
   } = props;
+
+  const onEnterToSave = (e: KeyboardEvent<HTMLInputElement>, mode: 'default' | 'apiKey' = 'default') => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (mode === 'apiKey') {
+      if (!String(apiKeyDraft || '').trim()) return;
+      onSaveApiKey();
+      return;
+    }
+    onSave();
+  };
 
   return (
     <>
       <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Local REST API">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Local REST API</h2>
 
-        <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>Base URL</div>
+        <div className="tw-mt-3 tw-grid tw-gap-2">
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Base URL</div>
             <input
               value={apiBaseUrl}
               onChange={(e) => onChangeApiBaseUrl(e.target.value)}
+              onBlur={onSave}
+              onKeyDown={(e) => onEnterToSave(e)}
               disabled={busy}
               spellCheck={false}
               placeholder="http://127.0.0.1:27123"
               className={textInputClassName}
+              aria-label="Obsidian API base url"
             />
-          </label>
+          </div>
 
-          <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>API Key</div>
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">API Key</div>
             <input
               value={apiKeyDraft}
               onChange={(e) => onChangeApiKeyDraft(e.target.value)}
+              onBlur={() => {
+                if (!String(apiKeyDraft || '').trim()) return;
+                onSaveApiKey();
+              }}
+              onKeyDown={(e) => onEnterToSave(e, 'apiKey')}
               disabled={busy}
-              placeholder={apiKeyPresent ? '(configured)' : ''}
+              placeholder={apiKeyPresent ? apiKeyMasked : ''}
               className={textInputClassName}
+              aria-label="Obsidian API key"
             />
-            <div style={{ fontSize: 12, opacity: 0.75 }}>status: {apiKeyPresent ? 'configured' : 'not configured'} (value not displayed)</div>
-          </label>
+          </div>
 
-          <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>Auth Header</div>
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Auth Header</div>
             <input
               value={authHeaderName}
               onChange={(e) => onChangeAuthHeaderName(e.target.value)}
+              onBlur={onSave}
+              onKeyDown={(e) => onEnterToSave(e)}
               disabled={busy}
               spellCheck={false}
               placeholder="Authorization"
               className={textInputClassName}
+              aria-label="Obsidian auth header name"
             />
-          </label>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className={buttonClassName} style={buttonStyle as any} onClick={onSave} disabled={busy}>
-              Save
-            </button>
-            <button className={buttonClassName} style={buttonStyle as any} onClick={onTest} disabled={busy}>
-              Test Connection
-            </button>
-            <button className={buttonClassName} style={buttonStyle as any} onClick={onClearKey} disabled={busy}>
-              Clear API key
-            </button>
           </div>
 
-          {testResult ? <div style={{ opacity: 0.85, fontSize: 12 }}>test: {testResult}</div> : null}
-
-          <div style={{ opacity: 0.85, fontSize: 12 }}>
-            sync status: {String(job?.status ?? 'idle')} · started: {formatTime(job?.startedAt)}
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]"> </div>
+            <div className="tw-flex tw-items-center tw-gap-2">
+              <button className={buttonClassName} style={buttonStyle as any} onClick={onTest} disabled={busy} type="button">
+                Test
+              </button>
+            </div>
           </div>
+
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Status</div>
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{statusText}</div>
+          </div>
+
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Note</div>
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+              Install and configure Obsidian Local REST API first.{' '}
+              <a
+                className="tw-underline hover:tw-opacity-80"
+                href="https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onOpenSetupGuide();
+                }}
+              >
+                Open Setup Guide
+              </a>
+            </div>
+          </div>
+
         </div>
       </section>
 
       <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Paths">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Paths</h2>
 
-        <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
-          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: '1fr 1fr' }}>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 12, opacity: 0.85 }}>AI Chats Folder</div>
-              <input
-                value={chatFolder}
-                onChange={(e) => onChangeChatFolder(e.target.value)}
-                disabled={busy}
-                spellCheck={false}
-                placeholder="SyncNos-AIChats"
-                className={textInputClassName}
-              />
-            </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 12, opacity: 0.85 }}>Web Clipper Folder</div>
-              <input
-                value={articleFolder}
-                onChange={(e) => onChangeArticleFolder(e.target.value)}
-                disabled={busy}
-                spellCheck={false}
-                placeholder="SyncNos-WebArticles"
-                className={textInputClassName}
-              />
-            </label>
+        <div className="tw-mt-3 tw-grid tw-gap-2">
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">AI Chats Folder</div>
+            <input
+              value={chatFolder}
+              onChange={(e) => onChangeChatFolder(e.target.value)}
+              onBlur={onSave}
+              onKeyDown={(e) => onEnterToSave(e)}
+              disabled={busy}
+              spellCheck={false}
+              placeholder="SyncNos-AIChats"
+              className={textInputClassName}
+              aria-label="Obsidian AI chats folder"
+            />
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className={buttonClassName} style={buttonStyle as any} onClick={onSave} disabled={busy}>
-              Save
-            </button>
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Web Clipper Folder</div>
+            <input
+              value={articleFolder}
+              onChange={(e) => onChangeArticleFolder(e.target.value)}
+              onBlur={onSave}
+              onKeyDown={(e) => onEnterToSave(e)}
+              disabled={busy}
+              spellCheck={false}
+              placeholder="SyncNos-WebArticles"
+              className={textInputClassName}
+              aria-label="Obsidian web clipper folder"
+            />
           </div>
 
-          <div style={{ opacity: 0.85, fontSize: 12 }}>Vault-relative folder paths. Nested folders supported. Empty uses defaults.</div>
+          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3">
+            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Note</div>
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+              Vault-relative folder paths. Nested folders supported. Empty uses defaults.
+            </div>
+          </div>
         </div>
       </section>
     </>
