@@ -13,7 +13,7 @@ type StartContentBootstrapInput = {
   inpageButton?: { initRuntime?: (runtime: { getURL?: (path: string) => string } | null) => void };
 };
 
-const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';
+const STORAGE_KEY = 'inpage_supported_only';
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
   'chat.openai.com',
@@ -75,37 +75,44 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
     }
   }
 
-  startController();
+  const supportedHost = isSupportedHost(location?.hostname || '');
 
-  const runtimeApi = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
-  try {
-    runtimeApi?.onMessage?.addListener?.((msg: any, _sender: any, sendResponse: any) => {
-      if (!msg || msg.type !== WEB_INPAGE_VISIBILITY_MESSAGE) return;
+  const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
 
-      if (isSupportedHost(location?.hostname || '')) {
-        try {
-          sendResponse?.({ ok: true, ignored: true });
-        } catch (_e) {
-          // ignore
-        }
-        return;
-      }
-
-      const enabled = msg.enabled === true;
-      if (enabled) {
-        if (!active) startController();
-      } else if (active) {
-        stopController();
-      }
-
+  function readSupportedOnly(): Promise<boolean> {
+    return new Promise((resolve) => {
       try {
-        sendResponse?.({ ok: true, enabled });
+        const local = storageApi?.local;
+        if (!local?.get) return resolve(false);
+        local.get([STORAGE_KEY], (res: any) => resolve(res?.[STORAGE_KEY] === true));
       } catch (_e) {
-        // ignore
+        resolve(false);
       }
     });
-  } catch (_e) {
-    // ignore
+  }
+
+  function applySupportedOnly(supportedOnly: boolean) {
+    // supported sites always on (the setting means "supported sites only").
+    if (supportedHost) {
+      if (!active) startController();
+      return;
+    }
+
+    if (supportedOnly) {
+      if (active) stopController();
+      return;
+    }
+
+    if (!active) startController();
+  }
+
+  // Initial start decision.
+  if (supportedHost) {
+    startController();
+  } else {
+    readSupportedOnly()
+      .then((supportedOnly) => applySupportedOnly(supportedOnly))
+      .catch(() => applySupportedOnly(false));
   }
 
   return {

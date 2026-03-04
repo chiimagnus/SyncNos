@@ -27,7 +27,6 @@ export const ARTICLE_MESSAGE_TYPES = {
 
 export const UI_MESSAGE_TYPES = {
   OPEN_EXTENSION_POPUP: 'openExtensionPopup',
-  APPLY_INPAGE_VISIBILITY: 'applyInpageVisibility',
 } as const;
 
 export const UI_EVENT_TYPES = {
@@ -62,4 +61,3 @@ export type MessageType =
   | ObsidianMessageType
   | ArticleMessageType
   | UiMessageType;
-

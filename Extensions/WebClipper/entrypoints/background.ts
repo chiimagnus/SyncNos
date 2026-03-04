@@ -1,4 +1,4 @@
-import { startBackgroundBootstrap } from '../src/bootstrap/background.ts';
+import { createBackgroundServices } from '../src/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '../src/conversations/background/handlers';
 import { registerSyncHandlers } from '../src/sync/background-handlers';
 import { createBackgroundRouter } from '../src/platform/messaging/background-router';
@@ -8,13 +8,18 @@ import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
 } from '../src/sync/notion/auth/oauth';
-import { getBackgroundInstanceId } from '../src/bootstrap/background-instance.ts';
 import { registerNotionSettingsHandlers } from '../src/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '../src/sync/obsidian/settings-background-handlers';
 import { onInstalled } from '../src/platform/runtime/runtime';
 
+let backgroundInstanceId: string | null = null;
+function getBackgroundInstanceId(): string {
+  if (!backgroundInstanceId) backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return backgroundInstanceId;
+}
+
 export default defineBackground(() => {
-  const services = startBackgroundBootstrap();
+  const services = createBackgroundServices();
 
   const router = createBackgroundRouter({
     fallback: (msg) => ({
@@ -34,7 +39,7 @@ export default defineBackground(() => {
     getInstanceId: getBackgroundInstanceId,
     testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
   });
-  registerUiMessageHandlers(router, { backgroundInpageWebVisibility: services.backgroundInpageWebVisibility });
+  registerUiMessageHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,
