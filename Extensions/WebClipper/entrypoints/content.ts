@@ -15,26 +15,9 @@ import inpageTipApi from '../src/ui/inpage/inpage-tip.ts';
 import { createRuntimeClient } from '../src/platform/runtime/client.ts';
 
 export default defineContentScript({
-  // P1-05: align with current `manifest.json` content_scripts matches.
-  // Note: host_permissions still includes `http(s)://*/*` for on-demand scripting injects.
-  matches: [
-    'https://chat.openai.com/*',
-    'https://chatgpt.com/*',
-    'https://www.chatgpt.com/*',
-    'https://claude.ai/*',
-    'https://gemini.google.com/*',
-    'https://aistudio.google.com/*',
-    'https://makersuite.google.com/*',
-    'https://chat.deepseek.com/*',
-    'https://chat.z.ai/*',
-    'https://kimi.moonshot.cn/*',
-    'https://kimi.com/*',
-    'https://*.kimi.com/*',
-    'https://www.doubao.com/*',
-    'https://yuanbao.tencent.com/*',
-    'https://poe.com/*',
-    'https://*.notion.so/*',
-  ],
+  // Inpage visibility is controlled at runtime by `inpage_supported_only`.
+  // This avoids browser-specific dynamic content-script registration support gaps.
+  matches: ['http://*/*', 'https://*/*'],
   main() {
     const runtime = createRuntimeClient();
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
