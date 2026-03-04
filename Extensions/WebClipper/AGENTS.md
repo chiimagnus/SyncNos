@@ -69,11 +69,13 @@
 - **WXT Content 入口**：`entrypoints/content.ts`
 - **WXT Popup 入口**：`entrypoints/popup/*`
 - **WXT App 入口**：`entrypoints/app/*`
-- **消息协议（前后端共享）**：`src/platform/messaging/message-contracts.ts`（兼容导出：`src/protocols/message-contracts.ts`）
+- **消息协议（前后端共享）**：`src/platform/messaging/message-contracts.ts`
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
 - **兼容层已移除**：`src/runtime-context.ts` + `src/export/bootstrap.ts` 已删除；禁止依赖 `globalThis.WebClipper` 的隐式注入。
 - **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/bootstrap/background-services.ts` + `src/platform/messaging/background-router.ts`
   - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
+- **本地内容库（conversations/messages）**：`src/conversations/`
+  - 按职责拆分：`domain/`（类型/纯函数）+ `data/`（IndexedDB）+ `background/`（handlers/storage）+ `client/`（UI 调用）+ `content/`（增量 diff）
 - **Notion 同步模块**：`src/sync/notion/`
   - 编排入口：`src/sync/notion/notion-sync-orchestrator.ts`（由 `src/sync/background-handlers.ts` 路由触发）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
@@ -90,7 +92,7 @@
 
 Phase 3（JS→TS）收口状态：
 - `src + entrypoints` 运行时代码已收敛为 TS 主实现。
-- runtime JS allowlist 仅保留第三方脚本资产：`src/vendor/readability.js`。
+- runtime JS allowlist 仅保留第三方脚本资产：`public/src/vendor/readability.js`（产物路径仍为 `src/vendor/readability.js`）。
 
 ### Obsidian 约束
 

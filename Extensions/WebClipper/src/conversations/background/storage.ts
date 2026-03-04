@@ -9,7 +9,7 @@ import {
   setSyncCursor,
   syncConversationMessages,
   upsertConversation,
-} from './storage-idb';
+} from '../data/storage-idb';
 
 export const backgroundStorage = {
   upsertConversation,

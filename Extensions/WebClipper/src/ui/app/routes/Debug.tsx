@@ -2,15 +2,6 @@ import { send } from '../../../platform/runtime/runtime';
 import { CORE_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
 
 export default function Debug() {
-  const ping = async () => {
-    try {
-      const res = await send('__WXT_PING__');
-      alert(JSON.stringify(res));
-    } catch (e) {
-      alert(String(e));
-    }
-  };
-
   const seedConversation = async () => {
     try {
       const now = Date.now();
@@ -66,9 +57,6 @@ export default function Debug() {
     <section>
       <h1 style={{ margin: 0 }}>Debug</h1>
       <p style={{ opacity: 0.75 }}>Temporary tools for migration verification.</p>
-      <button onClick={ping} style={{ marginTop: 8 }} type="button">
-        Ping background
-      </button>
       <button onClick={seedConversation} style={{ marginLeft: 8, marginTop: 8 }} type="button">
         Seed sample conversation
       </button>

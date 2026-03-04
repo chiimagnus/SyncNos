@@ -1,4 +1,4 @@
-import { registerConversationHandlers } from '../../src/conversations/background-handlers';
+import { registerConversationHandlers } from '../../src/conversations/background/handlers';
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
@@ -27,10 +27,6 @@ export function createTestBackgroundRouter() {
       data: null,
       error: { message: `unknown message type: ${msg?.type}`, extra: null },
     }),
-  });
-
-  router.register('__WXT_PING__', async () => {
-    return router.ok({ pong: true, instanceId });
   });
 
   registerConversationHandlers(router);

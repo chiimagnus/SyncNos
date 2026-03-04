@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { storageGet } from '../platform/storage/local';
 
   const STORAGE_KEY = "notion_ai_preferred_model_index";
   // 1-based: menu order includes "自动" at #1.
@@ -156,20 +157,6 @@
     return null;
   }
 
-  function getFromStorage(keys) {
-    const api = globalThis.chrome && chrome.storage && chrome.storage.local && chrome.storage.local.get
-      ? chrome.storage.local
-      : null;
-    if (!api) return Promise.resolve({});
-    return new Promise((resolve) => {
-      try {
-        api.get(keys, (res) => resolve(res || {}));
-      } catch (_e) {
-        resolve({});
-      }
-    });
-  }
-
   async function loadPreferredIndex1Based() {
     const t = now();
     if (cachedIndex1Based !== null && t - cachedIndexAt < STORAGE_CACHE_TTL_MS) {
@@ -178,7 +165,7 @@
     if (indexReadPromise) return indexReadPromise;
 
     indexReadPromise = (async () => {
-      const res = await getFromStorage([STORAGE_KEY]);
+      const res = await storageGet([STORAGE_KEY]).catch(() => ({}));
       const raw = res ? res[STORAGE_KEY] : null;
       const n = Number(raw);
       const idx = Number.isFinite(n) && n >= 1 ? Math.floor(n) : DEFAULT_INDEX_1_BASED;

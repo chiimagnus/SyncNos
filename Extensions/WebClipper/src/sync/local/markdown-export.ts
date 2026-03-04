@@ -1,8 +1,8 @@
 import { createZipBlob } from '../backup/zip-utils';
-import { buildConversationBasename } from '../../conversations/file-naming';
-import { formatConversationMarkdown } from '../../conversations/markdown';
-import type { Conversation } from '../../conversations/models';
-import { getConversationDetail } from '../../conversations/repo';
+import { buildConversationBasename } from '../../conversations/domain/file-naming';
+import { formatConversationMarkdown } from '../../conversations/domain/markdown';
+import type { Conversation } from '../../conversations/domain/models';
+import { getConversationDetail } from '../../conversations/client/repo';
 
 export async function buildConversationsMarkdownZipExport({
   conversations,

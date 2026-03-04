@@ -16,9 +16,10 @@ import {
   OBSIDIAN_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
 } from '../../../src/platform/messaging/message-contracts';
-import { send } from '../../../src/platform/runtime/runtime';
+import { getURL, send } from '../../../src/platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../src/sync/repo';
+import { tabsCreate } from '../../../src/platform/webext/tabs';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
@@ -185,8 +186,8 @@ function isFirefoxFamilyBrowser() {
 }
 
 async function openExtensionAppSettings() {
-  const url = browser.runtime.getURL('/app.html#/settings');
-  await browser.tabs.create({ url });
+  const url = getURL('/app.html#/settings');
+  await tabsCreate({ url });
 }
 
 export default function SettingsTab() {
@@ -729,7 +730,7 @@ export default function SettingsTab() {
 
       <section className="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
         <div className="settingsRow settingsRow--header" id="notionBar">
-          <img className="notionLogo" src={browser.runtime.getURL('icons/notion.svg' as any)} alt="" aria-hidden="true" />
+          <img className="notionLogo" src={getURL('icons/notion.svg' as any)} alt="" aria-hidden="true" />
           <div className="notionHeaderText" aria-label="Notion OAuth status">
             <span className="notionHeaderTitle">Notion OAuth</span>
             <span className="notionHeaderSep" aria-hidden="true">

@@ -1,11 +1,12 @@
 import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Conversation, ConversationDetail } from '../../../src/conversations/models';
-import { formatConversationMarkdown } from '../../../src/conversations/markdown';
-import { deleteConversations, getConversationDetail, listConversations } from '../../../src/conversations/repo';
+import type { Conversation, ConversationDetail } from '../../../src/conversations/domain/models';
+import { formatConversationMarkdown } from '../../../src/conversations/domain/markdown';
+import { deleteConversations, getConversationDetail, listConversations } from '../../../src/conversations/client/repo';
 import { syncNotionConversations, syncObsidianConversations } from '../../../src/sync/repo';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 import { buildConversationsMarkdownZipExport } from '../../../src/sync/local/markdown-export';
+import { tabsCreate } from '../../../src/platform/webext/tabs';
 
 type SourceMeta = { key: string; label: string };
 
@@ -445,7 +446,7 @@ export default function ChatsTab() {
     const safe = sanitizeHttpUrl(url);
     if (!safe) return;
     try {
-      await browser.tabs.create({ url: safe });
+      await tabsCreate({ url: safe });
     } catch (_e) {
       // ignore
     }
