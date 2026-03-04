@@ -182,38 +182,58 @@ export default function Conversations() {
     }
   };
 
+  const baseButtonClass =
+    'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
+  const neutralButtonClass = `${baseButtonClass} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)] hover:tw-bg-[var(--btn-bg-hover)]`;
+  const primaryButtonClass = `${baseButtonClass} tw-border-[var(--text)] tw-bg-[var(--text)] tw-text-white hover:tw-bg-[#c94f20]`;
+  const dangerButtonClass = `${baseButtonClass} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
+
   return (
-    <section style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <h1 style={{ margin: 0 }}>Conversations</h1>
-          <button onClick={refresh} disabled={loadingList} type="button">
-            {loadingList ? 'Loading…' : 'Refresh'}
-          </button>
+    <section className="tw-grid tw-gap-4">
+      <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-4">
+        <div className="tw-min-w-0">
+          <h1 className="tw-m-0 tw-text-[26px] tw-font-black tw-leading-none tw-tracking-[-0.01em] tw-text-[var(--text)]">Conversations</h1>
+          <p className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            Review captured chats, batch actions, and message-level details.
+          </p>
         </div>
+        <button onClick={refresh} disabled={loadingList} type="button" className={primaryButtonClass}>
+          {loadingList ? 'Loading…' : 'Refresh'}
+        </button>
+      </header>
 
-        {listError ? (
-          <p style={{ color: 'crimson' }}>{listError}</p>
-        ) : null}
+      {listError ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
 
-        <div
-          style={{
-            marginTop: 12,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.9 }}>
-            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-            Select all
-          </label>
-          <div style={{ display: 'flex', gap: 8 }}>
+      <section className="tw-grid tw-gap-3 lg:tw-grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Conversation list">
+          <div className="tw-flex tw-items-end tw-justify-between tw-gap-2">
+            <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Captured List</h2>
+            <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+              {selectedIds.length}/{items.length} selected
+            </span>
+          </div>
+
+          <div className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-3">
+            <label className="tw-inline-flex tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+              />
+              Select all
+            </label>
+            <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+              {loadingList ? 'Refreshing list...' : 'Ready'}
+            </span>
+          </div>
+
+          <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
             <button
               onClick={() => onSyncObsidian().catch(() => {})}
               disabled={!selectedIds.length || syncingObsidian}
               type="button"
+              className={neutralButtonClass}
             >
               {syncingObsidian ? 'Syncing…' : 'Obsidian'}
             </button>
@@ -221,6 +241,7 @@ export default function Conversations() {
               onClick={() => onSyncNotion().catch(() => {})}
               disabled={!selectedIds.length || syncingNotion}
               type="button"
+              className={neutralButtonClass}
             >
               {syncingNotion ? 'Syncing…' : 'Notion'}
             </button>
@@ -228,103 +249,99 @@ export default function Conversations() {
               onClick={() => exportSelectedMarkdown({ mergeSingle: true }).catch(() => {})}
               disabled={!selectedIds.length || exporting}
               type="button"
+              className={neutralButtonClass}
             >
-              Export (single)
+              Export 1 file
             </button>
             <button
               onClick={() => exportSelectedMarkdown({ mergeSingle: false }).catch(() => {})}
               disabled={!selectedIds.length || exporting}
               type="button"
+              className={neutralButtonClass}
             >
-              Export (multi)
+              Export multi
             </button>
-            <button onClick={() => onDeleteSelected().catch(() => {})} disabled={!selectedIds.length || loadingList} type="button">
+            <button
+              onClick={() => onDeleteSelected().catch(() => {})}
+              disabled={!selectedIds.length || loadingList}
+              type="button"
+              className={dangerButtonClass}
+            >
               Delete
             </button>
           </div>
-        </div>
 
-        <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
-          {items.length ? null : (
-            <div style={{ opacity: 0.7 }}>No conversations yet.</div>
+          <div className="route-scroll tw-mt-3 tw-grid tw-max-h-[42vh] tw-gap-2 tw-overflow-auto tw-pr-1 lg:tw-max-h-[calc(100vh-290px)]">
+            {items.length ? null : <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No conversations yet.</div>}
+
+            {items.map((c) => {
+              const id = Number(c.id);
+              const active = Number(c.id) === Number(activeId);
+              const title = c.title && String(c.title).trim() ? String(c.title).trim() : '(Untitled)';
+              return (
+                <button
+                  key={String(c.id)}
+                  onClick={() => setActiveId(id)}
+                  type="button"
+                  className={`tw-w-full tw-rounded-xl tw-border tw-p-2.5 tw-text-left tw-transition-colors tw-duration-200 ${
+                    active
+                      ? 'tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)]'
+                      : 'tw-border-[var(--border)] tw-bg-white hover:tw-border-[var(--border-strong)] hover:tw-bg-[var(--panel)]'
+                  }`}
+                >
+                  <div className="tw-flex tw-items-center tw-gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedIdSet.has(id)}
+                      onChange={() => toggleSelected(id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+                    />
+                    <div className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text)]">{title}</div>
+                  </div>
+                  <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                    {c.source} · {formatTime(c.lastCapturedAt)}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <section className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-4" aria-label="Conversation detail">
+          <div className="tw-flex tw-flex-wrap tw-items-end tw-justify-between tw-gap-2">
+            <h2 className="tw-m-0 tw-max-w-[80%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
+              {selected ? selected.title || '(Untitled)' : 'Detail'}
+            </h2>
+            <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+              {selected ? `${selected.source} · ${selected.conversationKey}` : null}
+            </div>
+          </div>
+
+          {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Loading…</p> : null}
+          {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
+
+          {detail?.messages?.length ? (
+            <div className="tw-mt-3 tw-grid tw-gap-2.5">
+              {detail.messages.map((m) => (
+                <article key={String(m.id)} className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/55 tw-p-3">
+                  <header className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+                    <div className="tw-font-mono tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em] tw-text-[var(--text)]">{m.role}</div>
+                    <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{formatTime(m.updatedAt)}</div>
+                  </header>
+                  <pre className="tw-m-0 tw-mt-2 tw-whitespace-pre-wrap tw-font-mono tw-text-[12px] tw-leading-5 tw-text-[var(--muted)]">
+                    {m.contentMarkdown || m.contentText || ''}
+                  </pre>
+                </article>
+              ))}
+            </div>
+          ) : activeId ? (
+            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No messages.</p>
+          ) : (
+            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Select a conversation.</p>
           )}
-
-          {items.map((c) => {
-            const id = Number(c.id);
-            const active = Number(c.id) === Number(activeId);
-            const title = (c.title && String(c.title).trim()) ? String(c.title).trim() : '(Untitled)';
-            return (
-              <button
-                key={String(c.id)}
-                onClick={() => setActiveId(id)}
-                type="button"
-                style={{
-                  textAlign: 'left',
-                  padding: '10px 10px',
-                  borderRadius: 10,
-                  border: '1px solid color-mix(in oklab, CanvasText 15%, transparent)',
-                  background: active
-                    ? 'color-mix(in oklab, CanvasText 10%, Canvas)'
-                    : 'transparent',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIdSet.has(id)}
-                    onChange={() => toggleSelected(id)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div style={{ fontWeight: 650, flex: 1 }}>{title}</div>
-                </div>
-                <div style={{ opacity: 0.7, fontSize: 12, marginTop: 4 }}>
-                  {c.source} · {formatTime(c.lastCapturedAt)}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <h2 style={{ margin: 0 }}>{selected ? (selected.title || '(Untitled)') : 'Detail'}</h2>
-          <div style={{ opacity: 0.7, fontSize: 12 }}>
-            {selected ? `${selected.source} · ${selected.conversationKey}` : null}
-          </div>
-        </div>
-
-        {loadingDetail ? <p style={{ opacity: 0.7 }}>Loading…</p> : null}
-        {detailError ? <p style={{ color: 'crimson' }}>{detailError}</p> : null}
-
-        {detail?.messages?.length ? (
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-            {detail.messages.map((m) => (
-              <article
-                key={String(m.id)}
-                style={{
-                  border: '1px solid color-mix(in oklab, CanvasText 12%, transparent)',
-                  borderRadius: 12,
-                  padding: 12,
-                }}
-              >
-                <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ fontWeight: 700 }}>{m.role}</div>
-                  <div style={{ opacity: 0.6, fontSize: 12 }}>{formatTime(m.updatedAt)}</div>
-                </header>
-                <pre style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
-                  {m.contentMarkdown || m.contentText || ''}
-                </pre>
-              </article>
-            ))}
-          </div>
-        ) : activeId ? (
-          <p style={{ opacity: 0.7, marginTop: 12 }}>No messages.</p>
-        ) : (
-          <p style={{ opacity: 0.7, marginTop: 12 }}>Select a conversation.</p>
-        )}
-      </div>
+        </section>
+      </section>
     </section>
   );
 }
