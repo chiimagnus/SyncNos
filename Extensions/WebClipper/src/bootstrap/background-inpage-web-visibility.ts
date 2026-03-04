@@ -1,37 +1,9 @@
-import { onInstalled, onStartup, getManifest } from '../platform/runtime/runtime';
+import { onInstalled, onStartup } from '../platform/runtime/runtime';
 import { storageGet, storageOnChanged } from '../platform/storage/local';
-import {
-  scriptingCanDynamicRegister,
-  scriptingCanInject,
-  scriptingExecuteScript,
-  scriptingInsertCSS,
-  scriptingRegisterContentScripts,
-  scriptingUnregisterContentScripts,
-} from '../platform/webext/scripting';
 import { tabsQuery, tabsSendMessage } from '../platform/webext/tabs';
 
 const STORAGE_KEY = 'inpage_supported_only';
-const DYNAMIC_SCRIPT_ID = 'webclipper_inpage_web_dynamic_v1';
 const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';
-
-const SUPPORTED_EXCLUDE_MATCHES = Object.freeze([
-  'https://chat.openai.com/*',
-  'https://chatgpt.com/*',
-  'https://www.chatgpt.com/*',
-  'https://claude.ai/*',
-  'https://gemini.google.com/*',
-  'https://aistudio.google.com/*',
-  'https://makersuite.google.com/*',
-  'https://chat.deepseek.com/*',
-  'https://chat.z.ai/*',
-  'https://kimi.moonshot.cn/*',
-  'https://kimi.com/*',
-  'https://*.kimi.com/*',
-  'https://www.doubao.com/*',
-  'https://yuanbao.tencent.com/*',
-  'https://poe.com/*',
-  'https://*.notion.so/*',
-]);
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
   'chat.openai.com',
@@ -79,19 +51,6 @@ function readSetting(): Promise<boolean> {
     .catch(() => false);
 }
 
-function getContentAssetsFromManifest(): { js: string[]; css: string[] } {
-  try {
-    const manifest = getManifest();
-    const entries = manifest && Array.isArray(manifest.content_scripts) ? manifest.content_scripts : [];
-    const entry = entries && entries[0] ? entries[0] : null;
-    const js = entry && Array.isArray(entry.js) ? entry.js.slice() : [];
-    const css = entry && Array.isArray(entry.css) ? entry.css.slice() : [];
-    return { js, css };
-  } catch (_e) {
-    return { js: [], css: [] };
-  }
-}
-
 function getAllTabs() {
   return new Promise<any[]>((resolve) => {
     tabsQuery({})
@@ -122,110 +81,12 @@ function sendTabMessage(tabId: number, message: Record<string, unknown>) {
   });
 }
 
-function injectIntoTab(tabId: number) {
-  return new Promise<{ ok: boolean; error?: string | null }>((resolve) => {
-    if (!scriptingCanInject()) {
-      resolve({ ok: false, error: 'scripting injection unavailable' });
-      return;
-    }
-    const { js, css } = getContentAssetsFromManifest();
-    if (!js.length) {
-      resolve({ ok: false, error: 'content assets missing' });
-      return;
-    }
-
-    const target = { tabId, allFrames: false };
-    const tasks: Array<Promise<{ ok: boolean; error: string | null }>> = [];
-
-    if (css.length) {
-      tasks.push(
-        scriptingInsertCSS({ target, files: css })
-          .then(() => ({ ok: true, error: null }))
-          .catch((e) => ({ ok: false, error: String((e as any)?.message || e) })),
-      );
-    }
-
-    tasks.push(
-      scriptingExecuteScript({ target, files: js })
-        .then(() => ({ ok: true, error: null }))
-        .catch((e) => ({ ok: false, error: String((e as any)?.message || e) })),
-    );
-
-    Promise.all(tasks).then((results) => {
-      const firstError = results.find((item) => !item.ok);
-      resolve(firstError ? { ok: false, error: firstError.error } : { ok: true });
-    });
-  });
-}
-
-function registerDynamicContentScript() {
-  return new Promise<{ ok: boolean; error?: string; existed?: boolean }>((resolve) => {
-    if (!scriptingCanDynamicRegister()) {
-      resolve({ ok: false, error: 'dynamic content scripts unavailable' });
-      return;
-    }
-    const { js, css } = getContentAssetsFromManifest();
-    if (!js.length) {
-      resolve({ ok: false, error: 'content assets missing' });
-      return;
-    }
-
-    const definition = {
-      id: DYNAMIC_SCRIPT_ID,
-      matches: ['http://*/*', 'https://*/*'],
-      excludeMatches: SUPPORTED_EXCLUDE_MATCHES.slice(),
-      js,
-      css,
-      runAt: 'document_idle',
-      allFrames: false,
-    };
-
-    scriptingRegisterContentScripts([definition])
-      .then(() => resolve({ ok: true }))
-      .catch((e) => {
-        const message = String((e as any)?.message || e || '');
-        if (/already exists/i.test(message)) return resolve({ ok: true, existed: true, error: message });
-        resolve({ ok: false, error: message });
-      });
-  });
-}
-
-function unregisterDynamicContentScript() {
-  return new Promise<{ ok: boolean; error?: string; missing?: boolean }>((resolve) => {
-    if (!scriptingCanDynamicRegister()) {
-      resolve({ ok: false, error: 'dynamic content scripts unavailable' });
-      return;
-    }
-    scriptingUnregisterContentScripts({ ids: [DYNAMIC_SCRIPT_ID] })
-      .then(() => resolve({ ok: true }))
-      .catch((e) => {
-        const message = String((e as any)?.message || e || '');
-        if (/not found|no such|unknown/i.test(message)) return resolve({ ok: true, missing: true, error: message });
-        resolve({ ok: false, error: message });
-      });
-  });
-}
-
 async function applyVisibilitySetting({ reason }: { reason?: string } = {}) {
   const supportedOnly = await readSetting();
 
-  if (supportedOnly) {
-    await unregisterDynamicContentScript();
-    const tabs = eligibleGenericTabs(await getAllTabs());
-    for (const tab of tabs) {
-      await sendTabMessage(tab.id, { type: WEB_INPAGE_VISIBILITY_MESSAGE, enabled: false });
-    }
-    return { ok: true, supportedOnly, reason: reason || 'apply' };
-  }
-
-  await registerDynamicContentScript();
-
   const tabs = eligibleGenericTabs(await getAllTabs());
   for (const tab of tabs) {
-    const response = await sendTabMessage(tab.id, { type: WEB_INPAGE_VISIBILITY_MESSAGE, enabled: true });
-    if (!response.ok) {
-      await injectIntoTab(tab.id);
-    }
+    await sendTabMessage(tab.id, { type: WEB_INPAGE_VISIBILITY_MESSAGE, enabled: supportedOnly ? false : true });
   }
 
   return { ok: true, supportedOnly, reason: reason || 'apply' };
