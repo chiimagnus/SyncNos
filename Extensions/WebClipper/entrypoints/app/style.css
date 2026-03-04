@@ -1,14 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --theme: #ffc6ad;
+  --text: #d95926;
+  --muted: #b85e3a;
+  /* Keep semantic tokens aligned with popup.css expectations. */
+  --wc-ok: #1f9d55;
+  --wc-ok-bg: rgba(31, 157, 85, 0.14);
+  --wc-ok-border: rgba(31, 157, 85, 0.38);
+  --bg: #fff7f3;
+  --panel: #fff1ea;
+  --panel-strong: #ffe7dc;
+  --border: #f4b89e;
+  --border-strong: #e8916f;
+  --btn-bg: #ffe6da;
+  --btn-bg-hover: #ffd8c4;
+  --danger: #c7372f;
+  --danger-bg: #ffe5e1;
+  --warn-bg: #fff0e8;
+  --shadow: 0 8px 18px rgba(217, 89, 38, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
-    'Apple Color Emoji', 'Segoe UI Emoji';
+  min-width: 320px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% -12%, rgba(244, 184, 158, 0.4), transparent 40%),
+    radial-gradient(circle at -10% 6%, rgba(255, 198, 173, 0.5), transparent 36%),
+    linear-gradient(180deg, #fffaf8, var(--bg));
+  color: var(--text);
+  font: 14px/1.5 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
 }
 
 a {
   color: inherit;
 }
 
+.route-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217, 89, 38, 0.45) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
