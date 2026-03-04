@@ -1,7 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import type { Conversation, ConversationDetail } from '../../../conversations/domain/models';
-import { getConversationDetail, listConversations } from '../../../conversations/client/repo';
+import { buildConversationBasename } from '../../../conversations/domain/file-naming';
+import { formatConversationMarkdown } from '../../../conversations/domain/markdown';
+import { createZipBlob } from '../../../sync/backup/zip-utils';
+import { deleteConversations, getConversationDetail, listConversations } from '../../../conversations/client/repo';
+import { syncNotionConversations, syncObsidianConversations } from '../../../sync/repo';
 
 type ConversationsAppState = {
   loadingList: boolean;
@@ -17,12 +21,22 @@ type ConversationsAppState = {
 
   selectedConversation: Conversation | null;
 
+  exporting: boolean;
+  syncingNotion: boolean;
+  syncingObsidian: boolean;
+  deleting: boolean;
+
   refreshList: () => Promise<void>;
   refreshActiveDetail: () => Promise<void>;
   setActiveId: (id: number | null) => void;
   toggleSelected: (id: number) => void;
   toggleAll: () => void;
   clearSelected: () => void;
+
+  exportSelectedMarkdown: (opts: { mergeSingle: boolean }) => Promise<void>;
+  syncSelectedNotion: () => Promise<void>;
+  syncSelectedObsidian: () => Promise<void>;
+  deleteSelected: () => Promise<void>;
 };
 
 const ConversationsContext = createContext<ConversationsAppState | null>(null);
@@ -42,6 +56,11 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
+
+  const [exporting, setExporting] = useState(false);
+  const [syncingNotion, setSyncingNotion] = useState(false);
+  const [syncingObsidian, setSyncingObsidian] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedConversation = useMemo(
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
@@ -113,6 +132,99 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const clearSelected = useCallback(() => setSelectedIds([]), []);
 
+  const exportSelectedMarkdown = useCallback(
+    async ({ mergeSingle }: { mergeSingle: boolean }) => {
+      const ids = selectedIds.slice();
+      if (!ids.length) return;
+
+      setExporting(true);
+      try {
+        const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
+        if (!selectedConversations.length) return;
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const files: Array<{ name: string; data: string }> = [];
+
+        if (mergeSingle) {
+          const docs: string[] = [];
+          for (const c of selectedConversations) {
+            // eslint-disable-next-line no-await-in-loop
+            const d = await getConversationDetail(Number(c.id));
+            docs.push(formatConversationMarkdown(c, d.messages || []));
+          }
+          files.push({ name: `webclipper-export-${stamp}.md`, data: docs.join('\n---\n\n') });
+        } else {
+          for (const c of selectedConversations) {
+            // eslint-disable-next-line no-await-in-loop
+            const d = await getConversationDetail(Number(c.id));
+            files.push({
+              name: `${buildConversationBasename(c)}.md`,
+              data: formatConversationMarkdown(c, d.messages || []),
+            });
+          }
+        }
+
+        const zipBlob = await createZipBlob(files);
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `webclipper-export-${stamp}.zip`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } catch (e) {
+        alert((e as any)?.message ?? String(e ?? 'export failed'));
+      } finally {
+        setExporting(false);
+      }
+    },
+    [items, selectedIds],
+  );
+
+  const syncSelectedNotion = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    setSyncingNotion(true);
+    try {
+      await syncNotionConversations(ids);
+    } catch (e) {
+      alert((e as any)?.message ?? String(e ?? 'notion sync failed'));
+    } finally {
+      setSyncingNotion(false);
+    }
+  }, [selectedIds]);
+
+  const syncSelectedObsidian = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    setSyncingObsidian(true);
+    try {
+      await syncObsidianConversations(ids);
+    } catch (e) {
+      alert((e as any)?.message ?? String(e ?? 'obsidian sync failed'));
+    } finally {
+      setSyncingObsidian(false);
+    }
+  }, [selectedIds]);
+
+  const deleteSelected = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    const ok = confirm(`Delete ${ids.length} conversation(s)? This cannot be undone.`);
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      await deleteConversations(ids);
+      setSelectedIds([]);
+      await refreshList();
+      await refreshActiveDetail();
+    } catch (e) {
+      alert((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setDeleting(false);
+    }
+  }, [refreshActiveDetail, refreshList, selectedIds]);
+
   const value: ConversationsAppState = {
     loadingList,
     listError,
@@ -123,12 +235,20 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     detailError,
     detail,
     selectedConversation,
+    exporting,
+    syncingNotion,
+    syncingObsidian,
+    deleting,
     refreshList,
     refreshActiveDetail,
     setActiveId,
     toggleSelected,
     toggleAll,
     clearSelected,
+    exportSelectedMarkdown,
+    syncSelectedNotion,
+    syncSelectedObsidian,
+    deleteSelected,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;
@@ -139,4 +259,3 @@ export function useConversationsApp() {
   if (!ctx) throw new Error('useConversationsApp must be used within ConversationsProvider');
   return ctx;
 }
-
