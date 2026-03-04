@@ -369,8 +369,8 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
       </div>
 
       <div className="tw-mt-2 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-p-3">
-        <div className={['tw-flex tw-items-center tw-gap-2', hasSelection ? 'tw-opacity-100' : 'tw-opacity-100'].join(' ')}>
-          <label className="tw-inline-flex tw-items-center tw-justify-center" aria-label="Select all">
+        <div className={['tw-flex tw-min-h-11 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
+          <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label="Select all">
             <input
               ref={selectAllRef}
               id="chkSelectAll"
@@ -384,10 +384,10 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
           </label>
 
           <select
+            id="sourceFilterSelect"
             value={filterKey}
             onChange={(e) => onSetFilterKey(e.target.value)}
-            disabled={hasSelection}
-            className="tw-min-h-9 tw-max-w-[180px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)] disabled:tw-cursor-not-allowed disabled:tw-opacity-60"
+            className={['tw-min-h-11 tw-max-w-[150px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2.5 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]', hasSelection ? 'tw-hidden' : ''].join(' ')}
             aria-label="Source filter"
           >
             {sourceOptions.map((opt) => (
@@ -397,7 +397,18 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             ))}
           </select>
 
-          <div className="tw-ml-auto tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-2">
+          <div className="tw-flex-1" aria-hidden="true" />
+
+          <div
+            id="chatActionButtons"
+            className={[
+              'tw-inline-flex tw-items-center tw-gap-1.5 tw-overflow-hidden',
+              'tw-transition-[max-width,opacity,transform] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
+              hasSelection
+                ? 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-pointer-events-auto'
+                : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
+            ].join(' ')}
+          >
             <button
               id="btnDelete"
               type="button"
@@ -433,7 +444,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                 role="menu"
                 aria-label="Export options"
                 hidden={!exportOpen}
-                className="tw-absolute tw-right-0 tw-top-[calc(100%+8px)] tw-z-20 tw-min-w-[190px] tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white tw-shadow-[var(--shadow)]"
+                className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-20 tw-min-w-[190px] tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white tw-shadow-[var(--shadow)]"
               >
                 <button
                   id="menuExportSingleMarkdown"
@@ -469,14 +480,21 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               {syncingNotion ? 'Notion...' : 'Notion'}
             </button>
           </div>
-        </div>
 
-        <div className="tw-mt-2 tw-flex tw-items-center tw-justify-center tw-gap-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-          <span className="tw-text-[var(--muted)]">Today:</span>
-          <span className="tw-font-extrabold tw-text-[var(--text)]">{String(todayCount)}</span>
-          <span className="tw-opacity-70">·</span>
-          <span className="tw-text-[var(--muted)]">Total:</span>
-          <span className="tw-font-extrabold tw-text-[var(--text)]">{String(filteredItems.length)}</span>
+          <div
+            id="stats"
+            className={[
+              'tw-flex tw-flex-none tw-items-end tw-gap-1 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--muted)]',
+              'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
+              hasSelection ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none' : 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-2 tw-py-[3px]',
+            ].join(' ')}
+          >
+            <span className="tw-text-[var(--muted)]">Today:</span>
+            <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--wc-ok)]">{String(todayCount)}</span>
+            <span className="tw-text-[rgba(184,94,58,0.7)]">·</span>
+            <span className="tw-text-[var(--muted)]">Total:</span>
+            <span className="tw-text-[30px] tw-font-extrabold tw-text-[#2563eb]">{String(filteredItems.length)}</span>
+          </div>
         </div>
 
         <div className="tw-mt-3">
