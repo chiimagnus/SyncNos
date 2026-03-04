@@ -8,9 +8,8 @@ import { extractZipEntries } from '../../../sync/backup/zip-utils';
 import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
-import { send } from '../../../platform/runtime/runtime';
+import { getURL, send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
-import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../sync/repo';
 
 import { SettingsSidebarNav } from './settings/SettingsSidebarNav';
 import type { SettingsSectionKey } from './settings/types';
@@ -83,7 +82,6 @@ export default function Settings() {
   const [notionPages, setNotionPages] = useState<NotionPageOption[]>([]);
   const [loadingNotionPages, setLoadingNotionPages] = useState(false);
   const [pollingNotion, setPollingNotion] = useState(false);
-  const [notionJob, setNotionJob] = useState<any>(null);
   const notionPagesAutoLoadRef = useRef(false);
 
   // Obsidian
@@ -96,7 +94,6 @@ export default function Settings() {
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
   const [obsidianStatus, setObsidianStatus] = useState<string>('Idle');
-  const [obsidianJob, setObsidianJob] = useState<any>(null);
 
   // Backup
   const [exportStatus, setExportStatus] = useState<string>('Idle');
@@ -117,7 +114,7 @@ export default function Settings() {
     setBusy(true);
     setError(null);
     try {
-      const [notionRes, local, obsidianRes, nJob, oJob] = await Promise.all([
+      const [notionRes, local, obsidianRes] = await Promise.all([
         send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
         storageGet([
           'notion_oauth_client_id',
@@ -130,8 +127,6 @@ export default function Settings() {
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
-        getNotionSyncJobStatus().catch(() => ({ job: null } as any)),
-        getObsidianSyncStatus().catch(() => ({ job: null } as any)),
       ]);
 
       const notion = unwrap(notionRes);
@@ -154,8 +149,6 @@ export default function Settings() {
       setObsidianApiKeyMasked(String(obsidian?.apiKeyMasked || ''));
       setObsidianChatFolder(String(obsidian?.chatFolder || ''));
       setObsidianArticleFolder(String(obsidian?.articleFolder || ''));
-      setNotionJob(nJob?.job ?? null);
-      setObsidianJob(oJob?.job ?? null);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {
@@ -472,9 +465,9 @@ export default function Settings() {
     if (notionConnected == null) return 'unknown';
     if (notionConnected) {
       const w = String(notionWorkspaceName || '').trim();
-      return w ? `Connected ✓ (${w})` : 'Connected ✓';
+      return w ? `Connected ✅ (${w})` : 'Connected ✅';
     }
-    if (notionLastError) return `Error: ${notionLastError}`;
+    if (notionLastError) return 'Error';
     if (notionPendingState) return 'Waiting…';
     return 'Not connected';
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
@@ -504,13 +497,12 @@ export default function Settings() {
               <NotionOAuthSection
                 busy={busy}
                 notionStatusText={notionStatusText}
-                notionClientId={notionClientId}
                 notionConnected={!!notionConnected}
                 pollingNotion={pollingNotion}
                 loadingNotionPages={loadingNotionPages}
                 notionParentPageId={notionParentPageId}
                 notionPageOptions={notionPageOptions}
-                notionJob={notionJob}
+                notionLogoUrl={getURL('icons/notion.svg' as any)}
                 onConnectOrDisconnect={() => onNotionConnectOrDisconnect().catch(() => {})}
                 onSaveNotionParentPage={(id) => onSaveNotionParentPage(id).catch(() => {})}
                 onLoadNotionPages={() => onLoadNotionPages().catch(() => {})}
