@@ -3,7 +3,7 @@ import {
   buildConversationBasename,
   stableConversationHash16,
   stableConversationId10,
-} from '../../conversations/file-naming';
+} from '../../conversations/domain/file-naming';
 
 const DEFAULT_OBSIDIAN_FOLDER = 'SyncNos-AIChats';
 

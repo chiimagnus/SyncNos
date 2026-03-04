@@ -1,3 +1,15 @@
+import { onInstalled, onStartup, getManifest } from '../platform/runtime/runtime';
+import { storageGet, storageOnChanged } from '../platform/storage/local';
+import {
+  scriptingCanDynamicRegister,
+  scriptingCanInject,
+  scriptingExecuteScript,
+  scriptingInsertCSS,
+  scriptingRegisterContentScripts,
+  scriptingUnregisterContentScripts,
+} from '../platform/webext/scripting';
+import { tabsQuery, tabsSendMessage } from '../platform/webext/tabs';
+
 const STORAGE_KEY = 'inpage_supported_only';
 const DYNAMIC_SCRIPT_ID = 'webclipper_inpage_web_dynamic_v1';
 const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';
@@ -39,10 +51,6 @@ const SUPPORTED_HOST_SUFFIXES = Object.freeze([
   'notion.so',
 ]);
 
-function getChrome() {
-  return (globalThis as any).chrome;
-}
-
 function isSupportedHost(hostname: unknown) {
   const host = String(hostname || '').toLowerCase();
   if (!host) return false;
@@ -65,55 +73,15 @@ function parseHttpUrl(raw: unknown) {
   }
 }
 
-function canUseScriptingDynamicRegistration() {
-  const chrome = getChrome();
-  return Boolean(
-    chrome &&
-      chrome.scripting &&
-      typeof chrome.scripting.registerContentScripts === 'function' &&
-      typeof chrome.scripting.unregisterContentScripts === 'function',
-  );
-}
-
-function canUseScriptingInjection() {
-  const chrome = getChrome();
-  return Boolean(
-    chrome &&
-      chrome.scripting &&
-      typeof chrome.scripting.executeScript === 'function' &&
-      typeof chrome.scripting.insertCSS === 'function',
-  );
-}
-
-function runtimeLastErrorMessage() {
-  const chrome = getChrome();
-  return String(chrome?.runtime?.lastError?.message || '');
-}
-
 function readSetting(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const chrome = getChrome();
-      if (!chrome?.storage?.local?.get) {
-        resolve(false);
-        return;
-      }
-      chrome.storage.local.get([STORAGE_KEY], (res: any) => {
-        resolve(res && res[STORAGE_KEY] === true);
-      });
-    } catch (_e) {
-      resolve(false);
-    }
-  });
+  return storageGet([STORAGE_KEY])
+    .then((res) => (res as any)?.[STORAGE_KEY] === true)
+    .catch(() => false);
 }
 
 function getContentAssetsFromManifest(): { js: string[]; css: string[] } {
   try {
-    const chrome = getChrome();
-    const manifest =
-      chrome && chrome.runtime && typeof chrome.runtime.getManifest === 'function'
-        ? chrome.runtime.getManifest()
-        : null;
+    const manifest = getManifest();
     const entries = manifest && Array.isArray(manifest.content_scripts) ? manifest.content_scripts : [];
     const entry = entries && entries[0] ? entries[0] : null;
     const js = entry && Array.isArray(entry.js) ? entry.js.slice() : [];
@@ -126,13 +94,9 @@ function getContentAssetsFromManifest(): { js: string[]; css: string[] } {
 
 function getAllTabs() {
   return new Promise<any[]>((resolve) => {
-    try {
-      const chrome = getChrome();
-      if (!chrome?.tabs?.query) return resolve([]);
-      chrome.tabs.query({}, (tabs: any[]) => resolve(Array.isArray(tabs) ? tabs : []));
-    } catch (_e) {
-      resolve([]);
-    }
+    tabsQuery({})
+      .then((tabs) => resolve(Array.isArray(tabs) ? tabs : []))
+      .catch(() => resolve([]));
   });
 }
 
@@ -152,27 +116,15 @@ function eligibleGenericTabs(tabs: any[]): Array<{ id: number; url: string }> {
 
 function sendTabMessage(tabId: number, message: Record<string, unknown>) {
   return new Promise<{ ok: boolean; error?: string; response?: unknown }>((resolve) => {
-    try {
-      const chrome = getChrome();
-      if (!chrome?.tabs?.sendMessage) return resolve({ ok: false });
-      chrome.tabs.sendMessage(tabId, message, (res: any) => {
-        const errorMessage = runtimeLastErrorMessage();
-        if (errorMessage) return resolve({ ok: false, error: errorMessage, response: res || null });
-        resolve({ ok: true, response: res || null });
-      });
-    } catch (error) {
-      resolve({
-        ok: false,
-        error: String((error as any)?.message || error),
-      });
-    }
+    tabsSendMessage(tabId, message)
+      .then((response) => resolve({ ok: true, response }))
+      .catch((error) => resolve({ ok: false, error: String((error as any)?.message || error), response: null }));
   });
 }
 
 function injectIntoTab(tabId: number) {
   return new Promise<{ ok: boolean; error?: string | null }>((resolve) => {
-    const chrome = getChrome();
-    if (!canUseScriptingInjection()) {
+    if (!scriptingCanInject()) {
       resolve({ ok: false, error: 'scripting injection unavailable' });
       return;
     }
@@ -187,22 +139,16 @@ function injectIntoTab(tabId: number) {
 
     if (css.length) {
       tasks.push(
-        new Promise((taskResolve) => {
-          chrome.scripting.insertCSS({ target, files: css }, () => {
-            const errorMessage = runtimeLastErrorMessage();
-            taskResolve({ ok: !errorMessage, error: errorMessage || null });
-          });
-        }),
+        scriptingInsertCSS({ target, files: css })
+          .then(() => ({ ok: true, error: null }))
+          .catch((e) => ({ ok: false, error: String((e as any)?.message || e) })),
       );
     }
 
     tasks.push(
-      new Promise((taskResolve) => {
-        chrome.scripting.executeScript({ target, files: js }, () => {
-          const errorMessage = runtimeLastErrorMessage();
-          taskResolve({ ok: !errorMessage, error: errorMessage || null });
-        });
-      }),
+      scriptingExecuteScript({ target, files: js })
+        .then(() => ({ ok: true, error: null }))
+        .catch((e) => ({ ok: false, error: String((e as any)?.message || e) })),
     );
 
     Promise.all(tasks).then((results) => {
@@ -214,8 +160,7 @@ function injectIntoTab(tabId: number) {
 
 function registerDynamicContentScript() {
   return new Promise<{ ok: boolean; error?: string; existed?: boolean }>((resolve) => {
-    const chrome = getChrome();
-    if (!canUseScriptingDynamicRegistration()) {
+    if (!scriptingCanDynamicRegister()) {
       resolve({ ok: false, error: 'dynamic content scripts unavailable' });
       return;
     }
@@ -235,28 +180,29 @@ function registerDynamicContentScript() {
       allFrames: false,
     };
 
-    chrome.scripting.registerContentScripts([definition], () => {
-      const errorMessage = runtimeLastErrorMessage();
-      if (!errorMessage) return resolve({ ok: true });
-      if (/already exists/i.test(errorMessage)) return resolve({ ok: true, existed: true });
-      resolve({ ok: false, error: errorMessage });
-    });
+    scriptingRegisterContentScripts([definition])
+      .then(() => resolve({ ok: true }))
+      .catch((e) => {
+        const message = String((e as any)?.message || e || '');
+        if (/already exists/i.test(message)) return resolve({ ok: true, existed: true, error: message });
+        resolve({ ok: false, error: message });
+      });
   });
 }
 
 function unregisterDynamicContentScript() {
   return new Promise<{ ok: boolean; error?: string; missing?: boolean }>((resolve) => {
-    const chrome = getChrome();
-    if (!canUseScriptingDynamicRegistration()) {
+    if (!scriptingCanDynamicRegister()) {
       resolve({ ok: false, error: 'dynamic content scripts unavailable' });
       return;
     }
-    chrome.scripting.unregisterContentScripts({ ids: [DYNAMIC_SCRIPT_ID] }, () => {
-      const errorMessage = runtimeLastErrorMessage();
-      if (!errorMessage) return resolve({ ok: true });
-      if (/not found|no such|unknown/i.test(errorMessage)) return resolve({ ok: true, missing: true });
-      resolve({ ok: false, error: errorMessage });
-    });
+    scriptingUnregisterContentScripts({ ids: [DYNAMIC_SCRIPT_ID] })
+      .then(() => resolve({ ok: true }))
+      .catch((e) => {
+        const message = String((e as any)?.message || e || '');
+        if (/not found|no such|unknown/i.test(message)) return resolve({ ok: true, missing: true, error: message });
+        resolve({ ok: false, error: message });
+      });
   });
 }
 
@@ -286,40 +232,23 @@ async function applyVisibilitySetting({ reason }: { reason?: string } = {}) {
 }
 
 function start() {
-  const chrome = getChrome();
   try {
-    if (chrome?.runtime?.onInstalled?.addListener) {
-      chrome.runtime.onInstalled.addListener(() => {
-        applyVisibilitySetting({ reason: 'onInstalled' }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore
-  }
+    onInstalled(() => applyVisibilitySetting({ reason: 'onInstalled' }).catch(() => {}));
+  } catch (_e) {}
 
   try {
-    if (chrome?.runtime?.onStartup?.addListener) {
-      chrome.runtime.onStartup.addListener(() => {
-        applyVisibilitySetting({ reason: 'onStartup' }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore
-  }
+    onStartup(() => applyVisibilitySetting({ reason: 'onStartup' }).catch(() => {}));
+  } catch (_e) {}
 
   applyVisibilitySetting({ reason: 'startup' }).catch(() => {});
 
   try {
-    if (chrome?.storage?.onChanged?.addListener) {
-      chrome.storage.onChanged.addListener((changes: any, areaName: string) => {
-        if (areaName !== 'local') return;
-        if (!changes || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-        applyVisibilitySetting({ reason: 'storageChanged' }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore
-  }
+    storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      if (!changes || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+      applyVisibilitySetting({ reason: 'storageChanged' }).catch(() => {});
+    });
+  } catch (_e) {}
 }
 
 const backgroundInpageWebVisibilityApi = {

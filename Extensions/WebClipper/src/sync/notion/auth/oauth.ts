@@ -1,5 +1,7 @@
 import { storageGet, storageRemove, storageSet } from '../../../platform/storage/local';
 import { setNotionOAuthToken, type NotionOAuthTokenV1 } from './token-store';
+import { tabsRemove } from '../../../platform/webext/tabs';
+import { webNavigationOnCommittedAddListener } from '../../../platform/webext/web-navigation';
 
 const DEFAULT_NOTION_OAUTH_CLIENT_ID = '2a8d872b-594c-8060-9a2b-00377c27ec32';
 
@@ -28,14 +30,6 @@ export function getNotionOAuthDefaults(): NotionOAuthDefaults {
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
-}
-
-function getApis() {
-  const anyGlobal = globalThis as any;
-  return {
-    chrome: anyGlobal.chrome,
-    browser: anyGlobal.browser,
-  };
 }
 
 function sleep(ms: number) {
@@ -113,19 +107,10 @@ function parseQueryFromUrl(url: string) {
 }
 
 async function removeTab(tabId: number) {
-  const { chrome, browser } = getApis();
-  const id = Number(tabId);
-  if (!Number.isFinite(id) || id < 0) return;
-
-  if (chrome?.tabs?.remove) {
-    await new Promise<void>((resolve) => {
-      chrome.tabs.remove(id, () => resolve());
-    });
-    return;
-  }
-
-  if (browser?.tabs?.remove) {
-    await browser.tabs.remove(id);
+  try {
+    await tabsRemove(Number(tabId));
+  } catch (_e) {
+    // ignore
   }
 }
 
@@ -188,27 +173,10 @@ export async function handleNotionOAuthCallbackNavigation(
 }
 
 export function setupNotionOAuthNavigationListener(): void {
-  const { chrome, browser } = getApis();
-  try {
-    if (chrome?.webNavigation?.onCommitted?.addListener) {
-      chrome.webNavigation.onCommitted.addListener((details: any) => {
-        handleNotionOAuthCallbackNavigation({
-          url: String(details?.url || ''),
-          tabId: Number(details?.tabId),
-        }).catch(() => {});
-      });
-      return;
-    }
-
-    if (browser?.webNavigation?.onCommitted?.addListener) {
-      browser.webNavigation.onCommitted.addListener((details: any) => {
-        handleNotionOAuthCallbackNavigation({
-          url: String(details?.url || ''),
-          tabId: Number(details?.tabId),
-        }).catch(() => {});
-      });
-    }
-  } catch (_e) {
-    // ignore: best-effort (some browsers/polyfills may throw on listener registration)
-  }
+  webNavigationOnCommittedAddListener((details: any) => {
+    handleNotionOAuthCallbackNavigation({
+      url: String(details?.url || ''),
+      tabId: Number(details?.tabId),
+    }).catch(() => {});
+  });
 }

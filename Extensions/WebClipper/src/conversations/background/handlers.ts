@@ -1,13 +1,13 @@
-import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../platform/messaging/message-contracts';
+import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
 import {
   deleteConversationsByIds,
   getConversationDetail,
   listConversations,
-} from './storage';
+} from '../data/storage';
 import {
   writeConversationMessagesSnapshot,
   writeConversationSnapshot,
-} from './write';
+} from '../data/write';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

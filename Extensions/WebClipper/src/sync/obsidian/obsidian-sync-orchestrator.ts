@@ -1,4 +1,4 @@
-import { backgroundStorage as defaultBackgroundStorage } from '../../conversations/background-storage';
+import { backgroundStorage as defaultBackgroundStorage } from '../../conversations/background/storage';
 import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
@@ -17,7 +17,7 @@ import { buildStableNotePath as buildDefaultStableNotePath } from './obsidian-no
 import {
   stableConversationHash16,
   stableConversationId10 as stableConversationId10Fallback,
-} from '../../conversations/file-naming';
+} from '../../conversations/domain/file-naming';
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,

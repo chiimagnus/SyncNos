@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as normalize from "../../src/shared/normalize.ts";
-import * as incrementalUpdater from "../../src/conversations/incremental-updater.ts";
+import * as incrementalUpdater from "../../src/conversations/content/incremental-updater.ts";
 
 describe("smoke", () => {
   it("normalizeText trims and normalizes newlines", () => {
