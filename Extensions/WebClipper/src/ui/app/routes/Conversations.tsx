@@ -1,9 +1,4 @@
-import { useMemo, useState } from 'react';
-import { createZipBlob } from '../../../sync/backup/zip-utils';
-import { buildConversationBasename } from '../../../conversations/domain/file-naming';
-import { formatConversationMarkdown } from '../../../conversations/domain/markdown';
-import { deleteConversations, getConversationDetail } from '../../../conversations/client/repo';
-import { syncNotionConversations, syncObsidianConversations } from '../../../sync/repo';
+import { useMemo } from 'react';
 import { useConversationsApp } from '../conversations/conversations-context';
 
 function formatTime(ts?: number) {
@@ -17,7 +12,6 @@ function formatTime(ts?: number) {
 
 export default function Conversations() {
   const {
-    items,
     activeId,
     selectedIds,
     loadingList,
@@ -28,111 +22,11 @@ export default function Conversations() {
     detail,
     refreshList,
     refreshActiveDetail,
-    clearSelected,
   } = useConversationsApp();
-
-  const [exporting, setExporting] = useState(false);
-  const [syncingNotion, setSyncingNotion] = useState(false);
-  const [syncingObsidian, setSyncingObsidian] = useState(false);
-
-  const onDeleteSelected = async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    const ok = confirm(`Delete ${ids.length} conversation(s)? This cannot be undone.`);
-    if (!ok) return;
-
-    // keep UI responsive; list refresh happens after delete
-    try {
-      await deleteConversations(ids);
-      clearSelected();
-      if (activeId != null && ids.includes(Number(activeId))) {
-        // Let provider pick the next active conversation on refresh.
-      }
-      await refreshList();
-      await refreshActiveDetail();
-    } catch (e) {
-      // Provider owns the primary list error surface; show a best-effort alert here.
-      alert((e as any)?.message ?? String(e ?? 'failed'));
-    }
-  };
-
-  const exportSelectedMarkdown = async ({ mergeSingle }: { mergeSingle: boolean }) => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-
-    setExporting(true);
-    try {
-      const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
-      if (!selectedConversations.length) return;
-
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const files: Array<{ name: string; data: string }> = [];
-
-      if (mergeSingle) {
-        const docs: string[] = [];
-        for (const c of selectedConversations) {
-          // eslint-disable-next-line no-await-in-loop
-          const d = await getConversationDetail(Number(c.id));
-          docs.push(formatConversationMarkdown(c, d.messages || []));
-        }
-        const text = docs.join('\n---\n\n');
-        files.push({ name: `webclipper-export-${stamp}.md`, data: text });
-      } else {
-        for (const c of selectedConversations) {
-          // eslint-disable-next-line no-await-in-loop
-          const d = await getConversationDetail(Number(c.id));
-          files.push({
-            name: `${buildConversationBasename(c)}.md`,
-            data: formatConversationMarkdown(c, d.messages || []),
-          });
-        }
-      }
-
-      const zipBlob = await createZipBlob(files);
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `webclipper-export-${stamp}.zip`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e) {
-      alert((e as any)?.message ?? String(e ?? 'export failed'));
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const onSyncNotion = async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    setSyncingNotion(true);
-    try {
-      await syncNotionConversations(ids);
-    } catch (e) {
-      alert((e as any)?.message ?? String(e ?? 'notion sync failed'));
-    } finally {
-      setSyncingNotion(false);
-    }
-  };
-
-  const onSyncObsidian = async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    setSyncingObsidian(true);
-    try {
-      await syncObsidianConversations(ids);
-    } catch (e) {
-      alert((e as any)?.message ?? String(e ?? 'obsidian sync failed'));
-    } finally {
-      setSyncingObsidian(false);
-    }
-  };
 
   const baseButtonClass =
     'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
-  const neutralButtonClass = `${baseButtonClass} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)] hover:tw-bg-[var(--btn-bg-hover)]`;
   const primaryButtonClass = `${baseButtonClass} tw-border-[var(--text)] tw-bg-[var(--text)] tw-text-white hover:tw-bg-[#c94f20]`;
-  const dangerButtonClass = `${baseButtonClass} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
 
   return (
     <section className="tw-h-full tw-min-h-0">
@@ -160,49 +54,9 @@ export default function Conversations() {
               onClick={() => refreshActiveDetail().catch(() => {})}
               disabled={!activeId || loadingDetail}
               type="button"
-              className={neutralButtonClass}
+              className={primaryButtonClass}
             >
               {loadingDetail ? 'Loading…' : 'Reload Detail'}
-            </button>
-            <button
-              onClick={() => onSyncObsidian().catch(() => {})}
-              disabled={!selectedIds.length || syncingObsidian}
-              type="button"
-              className={neutralButtonClass}
-            >
-              {syncingObsidian ? 'Syncing…' : 'Obsidian'}
-            </button>
-            <button
-              onClick={() => onSyncNotion().catch(() => {})}
-              disabled={!selectedIds.length || syncingNotion}
-              type="button"
-              className={neutralButtonClass}
-            >
-              {syncingNotion ? 'Syncing…' : 'Notion'}
-            </button>
-            <button
-              onClick={() => exportSelectedMarkdown({ mergeSingle: true }).catch(() => {})}
-              disabled={!selectedIds.length || exporting}
-              type="button"
-              className={neutralButtonClass}
-            >
-              Export 1 file
-            </button>
-            <button
-              onClick={() => exportSelectedMarkdown({ mergeSingle: false }).catch(() => {})}
-              disabled={!selectedIds.length || exporting}
-              type="button"
-              className={neutralButtonClass}
-            >
-              Export multi
-            </button>
-            <button
-              onClick={() => onDeleteSelected().catch(() => {})}
-              disabled={!selectedIds.length || loadingList}
-              type="button"
-              className={dangerButtonClass}
-            >
-              Delete
             </button>
           </div>
         </header>
