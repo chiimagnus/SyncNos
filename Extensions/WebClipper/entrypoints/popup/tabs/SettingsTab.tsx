@@ -516,8 +516,6 @@ export default function SettingsTab() {
     try {
       await storageSet({ inpage_supported_only: !!next });
       setInpageSupportedOnly(!!next);
-      const res = await send<ApiResponse<any>>(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, {});
-      unwrap(res);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {

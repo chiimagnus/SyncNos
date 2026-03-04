@@ -24,14 +24,4 @@ export function registerUiMessageHandlers(router: AnyRouter, deps: Deps) {
       return router.err(message, { code: 'OPEN_POPUP_FAILED' });
     }
   });
-
-  router.register(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, async () => {
-    const api = deps.backgroundInpageWebVisibility;
-    if (!api || typeof api.applyVisibilitySetting !== 'function') {
-      return router.err('inpage web visibility manager missing', { code: 'INPAGE_VISIBILITY_UNAVAILABLE' });
-    }
-    const data = await api.applyVisibilitySetting({ reason: 'app' });
-    return router.ok(data);
-  });
 }
-
