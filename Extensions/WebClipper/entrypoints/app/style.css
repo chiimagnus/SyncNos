@@ -7,6 +7,10 @@
   --theme: #ffc6ad;
   --text: #d95926;
   --muted: #b85e3a;
+  /* Keep semantic tokens aligned with popup.css expectations. */
+  --wc-ok: #1f9d55;
+  --wc-ok-bg: rgba(31, 157, 85, 0.14);
+  --wc-ok-border: rgba(31, 157, 85, 0.38);
   --bg: #fff7f3;
   --panel: #fff1ea;
   --panel-strong: #ffe7dc;
