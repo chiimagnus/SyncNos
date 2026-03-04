@@ -2,6 +2,7 @@ type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
 export const BACKUP_ZIP_SCHEMA_VERSION = 2;
+export const LAST_BACKUP_EXPORT_AT_STORAGE_KEY = 'last_backup_export_at';
 
 // Legacy export: previously we only backed up an allowlist of keys.
 // Now we back up all chrome.storage.local keys except a small sensitive denylist.

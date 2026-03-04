@@ -71,6 +71,8 @@
 - **WXT App 入口**：`entrypoints/app/*`
 - **消息协议（前后端共享）**：`src/platform/messaging/message-contracts.ts`
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
+- **WebExtensions API 封装层**：`src/platform/webext/`
+  - `tabs.ts` / `scripting.ts` / `web-navigation.ts` 统一封装 `chrome.*` 与 `browser.*` 差异；业务模块优先调用封装函数，避免散落全局 API 访问。
 - **兼容层已移除**：`src/runtime-context.ts` + `src/export/bootstrap.ts` 已删除；禁止依赖 `globalThis.WebClipper` 的隐式注入。
 - **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/bootstrap/background-services.ts` + `src/platform/messaging/background-router.ts`
   - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
@@ -83,7 +85,7 @@
   - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
   - background：`src/sync/obsidian/obsidian-sync-orchestrator.ts`。
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch.ts` + `src/collectors/web/article-fetch-background-handlers.ts`
-  - background 侧通过 `chrome.scripting.executeScript` 注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
+  - background 侧通过 `scriptingExecuteScript`（`src/platform/webext/scripting.ts`）注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.ts`
   - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
   - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：

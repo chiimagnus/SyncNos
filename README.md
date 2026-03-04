@@ -19,7 +19,7 @@ It consolidates multi-source content to Notion and provides a WebClipper browser
 
 </div>
 
-<img align="right" src="Extensions/WebClipper/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="120" />
+<img align="right" src="Extensions/WebClipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="120" />
 
 ## Project Overview
 
@@ -107,6 +107,6 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI 
 - Dev (Chrome MV3): `npm --prefix Extensions/WebClipper run dev`
 - Build (Chrome / Firefox): `npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
 - Test + typecheck: `npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
-- Runtime code in `src + entrypoints` is TS-only; current JS allowlist only keeps `src/vendor/readability.js`.
+- Runtime code in `src + entrypoints` is TS-only; current JS allowlist only keeps `public/src/vendor/readability.js` (built asset path remains `src/vendor/readability.js`).
 
 </details>
