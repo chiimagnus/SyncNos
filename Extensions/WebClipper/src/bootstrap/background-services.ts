@@ -1,5 +1,3 @@
-import backgroundInpageWebVisibility from './background-inpage-web-visibility.ts';
-
 import articleFetchService from '../collectors/web/article-fetch-service.ts';
 
 import notionSyncJobStore from '../sync/notion/notion-sync-job-store.ts';
@@ -35,7 +33,6 @@ export type ObsidianSyncOrchestrator = {
 };
 
 export type BackgroundServices = {
-  backgroundInpageWebVisibility: typeof backgroundInpageWebVisibility;
   articleFetchService: typeof articleFetchService;
   conversationKinds: typeof conversationKinds;
   notionSyncJobStore: typeof notionSyncJobStore;
@@ -56,7 +53,6 @@ export function createBackgroundServices(): BackgroundServices {
   });
 
   return {
-    backgroundInpageWebVisibility,
     articleFetchService,
     conversationKinds,
     notionSyncJobStore,

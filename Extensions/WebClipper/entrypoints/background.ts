@@ -34,7 +34,7 @@ export default defineBackground(() => {
     getInstanceId: getBackgroundInstanceId,
     testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
   });
-  registerUiMessageHandlers(router, { backgroundInpageWebVisibility: services.backgroundInpageWebVisibility });
+  registerUiMessageHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,

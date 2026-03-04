@@ -6,11 +6,7 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
 };
 
-type Deps = {
-  backgroundInpageWebVisibility: { applyVisibilitySetting?: (input: { reason: string }) => Promise<unknown> } | null;
-};
-
-export function registerUiMessageHandlers(router: AnyRouter, deps: Deps) {
+export function registerUiMessageHandlers(router: AnyRouter) {
   router.register(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP, async () => {
     const actionApi = (globalThis as any).chrome?.action ?? (globalThis as any).browser?.action;
     if (!actionApi || typeof actionApi.openPopup !== 'function') {
