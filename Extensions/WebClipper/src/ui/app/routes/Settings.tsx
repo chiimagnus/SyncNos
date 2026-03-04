@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { exportBackupZipV2 } from '../../../sync/backup/export';
+import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '../../../sync/backup/backup-utils';
 import {
   importBackupLegacyJsonMerge,
   importBackupZipV2Merge,
@@ -210,6 +211,7 @@ export default function Settings() {
   const [exportStatus, setExportStatus] = useState<string>('Idle');
   const [importStatus, setImportStatus] = useState<string>('Ready');
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
+  const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Notion AI
@@ -252,6 +254,7 @@ export default function Settings() {
           'notion_parent_page_title',
           'notion_ai_preferred_model_index',
           'inpage_supported_only',
+          LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
         getNotionSyncJobStatus().catch(() => ({ job: null } as any)),
@@ -269,6 +272,7 @@ export default function Settings() {
       setNotionParentPageTitle(String(local?.notion_parent_page_title || '').trim());
       setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || '').trim());
       setInpageSupportedOnly(local?.inpage_supported_only == null ? null : !!local.inpage_supported_only);
+      setLastBackupExportAt(Number((local as any)?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY]) || 0);
 
       const obsidian = unwrap(obsidianRes);
       setObsidianApiBaseUrl(String(obsidian?.apiBaseUrl || ''));
@@ -569,6 +573,7 @@ export default function Settings() {
       a.download = res.filename;
       a.click();
       setExportStatus(`Exported (${res.counts.conversations} convos, ${res.counts.messages} msgs)`);
+      setLastBackupExportAt(Date.parse(res.exportedAt) || Date.now());
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
       const msg = (e as any)?.message ? String((e as any).message) : String(e || 'export failed');
@@ -790,6 +795,7 @@ export default function Settings() {
           />
         </div>
         <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>export: {exportStatus}</div>
+        <div style={{ marginTop: 6, opacity: 0.85, fontSize: 12 }}>last export: {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
         <div style={{ marginTop: 6, opacity: 0.85, fontSize: 12 }}>import: {importStatus}</div>
         <div style={{ marginTop: 10 }}>{renderStats(importStats)}</div>
       </section>
