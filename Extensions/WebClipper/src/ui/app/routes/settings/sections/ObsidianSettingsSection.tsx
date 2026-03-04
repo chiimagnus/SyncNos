@@ -12,6 +12,7 @@ export function ObsidianSettingsSection(props: {
   chatFolder: string;
   articleFolder: string;
   statusText: string;
+  obsidianLogoUrl: string;
   onChangeApiBaseUrl: (v: string) => void;
   onChangeAuthHeaderName: (v: string) => void;
   onChangeApiKeyDraft: (v: string) => void;
@@ -32,6 +33,7 @@ export function ObsidianSettingsSection(props: {
     chatFolder,
     articleFolder,
     statusText,
+    obsidianLogoUrl,
     onChangeApiBaseUrl,
     onChangeAuthHeaderName,
     onChangeApiKeyDraft,
@@ -57,7 +59,10 @@ export function ObsidianSettingsSection(props: {
   return (
     <>
       <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Local REST API">
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Local REST API</h2>
+        <div className="tw-flex tw-items-center tw-gap-2">
+          <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
+          <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Local REST API</h2>
+        </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
           <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">

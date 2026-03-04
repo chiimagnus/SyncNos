@@ -832,6 +832,7 @@ export default function SettingsTab() {
 
       <section className="toolbar settingsPanel" id="obsidianSyncCard" aria-label="Obsidian Local REST API">
         <div className="settingsRow settingsRow--header" aria-label="Obsidian sync header">
+          <img className="obsidianLogo" src={getURL('icons/obsidian.svg' as any)} alt="" aria-hidden="true" />
           <div className="notionHeaderText">
             <span className="notionHeaderTitle">Obsidian Local REST API</span>
           </div>

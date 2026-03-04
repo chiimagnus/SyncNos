@@ -90,6 +90,13 @@ body {
   filter: grayscale(1) contrast(1.1);
 }
 
+#obsidianSyncCard .obsidianLogo,
+#obsidianPathsCard .obsidianLogo {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 .settingsRow--header {
   padding-top: 10px;
   padding-bottom: 8px;
