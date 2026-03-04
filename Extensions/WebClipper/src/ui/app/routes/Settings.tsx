@@ -7,7 +7,7 @@ import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgres
 import { extractZipEntries } from '../../../sync/backup/zip-utils';
 import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
-import { ARTICLE_MESSAGE_TYPES, NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
 import { send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
 import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../sync/repo';
@@ -15,7 +15,6 @@ import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../sync/rep
 import { SettingsHeader } from './settings/SettingsHeader';
 import { SettingsSidebarNav } from './settings/SettingsSidebarNav';
 import type { SettingsSectionKey } from './settings/types';
-import { ArticleFetchSection } from './settings/sections/ArticleFetchSection';
 import { BackupSection } from './settings/sections/BackupSection';
 import { InpageSection } from './settings/sections/InpageSection';
 import { NotionAISection } from './settings/sections/NotionAISection';
@@ -48,8 +47,13 @@ export default function Settings() {
       return { section: 'notion', focus: rawFocus || 'notion-ai' };
     }
 
+    // Article Fetch is popup-only; keep older deep links stable by redirecting to Notion.
+    if (rawSection === 'article') {
+      return { section: 'notion', focus: rawFocus };
+    }
+
     const section: SettingsSectionKey =
-      rawSection === 'article' || rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'inpage'
+      rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'inpage'
         ? (rawSection as SettingsSectionKey)
         : 'notion';
     const focus = rawFocus;
@@ -93,9 +97,6 @@ export default function Settings() {
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
   const [obsidianTestResult, setObsidianTestResult] = useState<string>('');
   const [obsidianJob, setObsidianJob] = useState<any>(null);
-
-  // Article fetch
-  const [articleFetchStatus, setArticleFetchStatus] = useState<string>('Idle');
 
   // Backup
   const [exportStatus, setExportStatus] = useState<string>('Idle');
@@ -298,24 +299,6 @@ export default function Settings() {
       await storageSet(payload);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onFetchCurrentPage = async () => {
-    setBusy(true);
-    setError(null);
-    setArticleFetchStatus('Fetching…');
-    try {
-      const res = await send<ApiResponse<any>>(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, {});
-      const data = unwrap(res);
-      const conversationId = Number(data?.conversationId) || 0;
-      setArticleFetchStatus(conversationId ? `Saved ✓ (conversationId=${conversationId})` : 'Done ✓');
-    } catch (e) {
-      const msg = (e as any)?.message ?? String(e ?? 'fetch failed');
-      setArticleFetchStatus(`Error: ${msg}`);
-      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -554,8 +537,6 @@ export default function Settings() {
               </div>
             </>
           ) : null}
-
-          {activeSection === 'article' ? <ArticleFetchSection busy={busy} statusText={articleFetchStatus} onFetchCurrentPage={() => onFetchCurrentPage().catch(() => {})} /> : null}
 
           {activeSection === 'obsidian' ? (
             <ObsidianSettingsSection
