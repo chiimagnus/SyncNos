@@ -1,14 +1,16 @@
 import { startBackgroundBootstrap } from '../src/bootstrap/background.ts';
 import { registerConversationHandlers } from '../src/conversations/background-handlers';
-import { registerSettingsHandlers } from '../src/settings/background-handlers';
 import { registerSyncHandlers } from '../src/sync/background-handlers';
 import { createBackgroundRouter } from '../src/platform/messaging/background-router';
 import { registerWebArticleHandlers } from '../src/collectors/web/article-fetch-background-handlers';
+import { registerUiMessageHandlers } from '../src/platform/messaging/ui-background-handlers';
 import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
 } from '../src/sync/notion/auth/oauth';
 import { getBackgroundInstanceId } from '../src/bootstrap/background-instance.ts';
+import { registerNotionSettingsHandlers } from '../src/sync/notion/settings-background-handlers';
+import { registerObsidianSettingsHandlers } from '../src/sync/obsidian/settings-background-handlers';
 
 export default defineBackground(() => {
   const services = startBackgroundBootstrap();
@@ -29,13 +31,15 @@ export default defineBackground(() => {
 
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
-  registerSettingsHandlers(router, {
-    getInstanceId: getBackgroundInstanceId,
-    testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
+  registerNotionSettingsHandlers(router, {
     notionSyncJobStore: services.notionSyncJobStore,
     conversationKinds: services.conversationKinds,
-    backgroundInpageWebVisibility: services.backgroundInpageWebVisibility,
   });
+  registerObsidianSettingsHandlers(router, {
+    getInstanceId: getBackgroundInstanceId,
+    testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
+  });
+  registerUiMessageHandlers(router, { backgroundInpageWebVisibility: services.backgroundInpageWebVisibility });
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,

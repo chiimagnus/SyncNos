@@ -1,19 +1,21 @@
 import { registerConversationHandlers } from '../../src/conversations/background-handlers';
-import { registerSettingsHandlers } from '../../src/settings/background-handlers';
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
+import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
 import notionSyncJobStore from '../../src/sync/notion/notion-sync-job-store.ts';
 import {
   getSyncJobStatus as getNotionSyncJobStatus,
   syncConversations as syncNotionConversations,
 } from '../../src/sync/notion/notion-sync-orchestrator.ts';
+import { registerNotionSettingsHandlers } from '../../src/sync/notion/settings-background-handlers';
 import {
   getSyncStatus as getObsidianSyncStatus,
   syncConversations as obsidianSyncConversations,
   testConnection as testObsidianConnection,
 } from '../../src/sync/obsidian/obsidian-sync-orchestrator.ts';
+import { registerObsidianSettingsHandlers } from '../../src/sync/obsidian/settings-background-handlers';
 import backgroundInpageWebVisibility from '../../src/bootstrap/background-inpage-web-visibility.ts';
 
 export function createTestBackgroundRouter() {
@@ -33,13 +35,9 @@ export function createTestBackgroundRouter() {
 
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
-  registerSettingsHandlers(router, {
-    getInstanceId: () => instanceId,
-    testObsidianConnection,
-    notionSyncJobStore,
-    conversationKinds,
-    backgroundInpageWebVisibility,
-  });
+  registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
+  registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
+  registerUiMessageHandlers(router, { backgroundInpageWebVisibility });
   registerSyncHandlers(router, {
     getInstanceId: () => instanceId,
     notionSyncOrchestrator: {

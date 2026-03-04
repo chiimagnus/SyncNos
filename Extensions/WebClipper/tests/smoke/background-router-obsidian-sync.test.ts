@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerSettingsHandlers } from "../../src/settings/background-handlers";
+import { registerObsidianSettingsHandlers } from "../../src/sync/obsidian/settings-background-handlers";
 import { registerSyncHandlers } from "../../src/sync/background-handlers";
 import { createBackgroundRouter } from "../../src/platform/messaging/background-router";
 
@@ -41,15 +41,12 @@ describe("background-router obsidian sync routes", () => {
       }),
     });
 
-    registerSettingsHandlers(router as any, {
+    registerObsidianSettingsHandlers(router as any, {
       getInstanceId: () => instanceId,
       testObsidianConnection: async ({ instanceId }: any) => {
         calls.testConnection += 1;
         return { ok: true, instanceId };
       },
-      notionSyncJobStore: { NOTION_SYNC_JOB_KEY: 'notion_sync_job_v1' },
-      conversationKinds: null,
-      backgroundInpageWebVisibility: null,
     });
     registerSyncHandlers(router as any, {
       getInstanceId: () => instanceId,
