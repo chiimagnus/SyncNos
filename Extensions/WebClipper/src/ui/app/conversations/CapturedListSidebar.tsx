@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 
 import type { Conversation } from '../../../conversations/domain/models';
@@ -108,6 +108,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
   } = useConversationsApp();
 
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const logoUrl = runtimeGetURL('icons/icon-48.png');
 
   const [filterKey, setFilterKey] = useState<string>('all');
@@ -282,7 +283,14 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             </div>
 
             <div className="tw-flex tw-items-center tw-gap-2">
-              <NavLink to="/settings" className={({ isActive }) => settingsClass(isActive)}>
+              <NavLink
+                to="/settings"
+                state={{
+                  backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+                  from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
+                }}
+                className={({ isActive }) => settingsClass(isActive)}
+              >
                 <span className="tw-sr-only">Settings</span>
                 <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
               </NavLink>

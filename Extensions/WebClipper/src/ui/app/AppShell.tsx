@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Conversations from './routes/Conversations';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
@@ -124,50 +124,126 @@ export default function AppShell() {
     window.addEventListener('pointercancel', onUp, true);
   };
 
+  function AppShellFrame() {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const showSettingsSheet = location.pathname === '/settings';
+    const state: any = (location as any)?.state ?? {};
+    const backgroundLocation = state?.backgroundLocation ?? null;
+
+    const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
+
+    const closeSettings = () => {
+      const from = String(state?.from || '').trim();
+      if (from) navigate(from, { replace: true });
+      else navigate('/', { replace: true });
+    };
+
+    useEffect(() => {
+      if (!showSettingsSheet) return;
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          closeSettings();
+        }
+      };
+      document.addEventListener('keydown', onKey, true);
+      return () => document.removeEventListener('keydown', onKey, true);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showSettingsSheet]);
+
+    return (
+      <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
+        {sidebarCollapsed ? null : (
+          <aside
+            className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-0 tw-backdrop-blur-sm"
+            style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
+          >
+            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
+
+            <div
+              role="separator"
+              aria-label="Resize sidebar"
+              onPointerDown={onResizePointerDown}
+              className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-2 tw-cursor-col-resize tw-touch-none"
+            >
+              <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border-strong)]/40 tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
+            </div>
+          </aside>
+        )}
+
+        <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setCollapsed(false)}
+              className="tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-shadow-[var(--shadow)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+              aria-label="Expand sidebar"
+            >
+              <ExpandIcon />
+            </button>
+          ) : null}
+
+          <div
+            className={[
+              'route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4',
+              showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
+            ].join(' ')}
+            aria-hidden={showSettingsSheet}
+          >
+            <Routes location={routesLocation}>
+              <Route path="/" element={<Conversations />} />
+              <Route path="/settings" element={<Navigate to="/" replace />} />
+              <Route path="/sync" element={<Navigate to="/settings" replace />} />
+              <Route path="/backup" element={<Navigate to="/settings" replace />} />
+            </Routes>
+          </div>
+
+          {showSettingsSheet ? (
+            <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label="Settings">
+              <div
+                className="tw-absolute tw-inset-0 tw-bg-transparent"
+                role="presentation"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  closeSettings();
+                }}
+              />
+              <div
+                className="tw-relative tw-z-10 tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1080px,calc(100vw-40px))] tw-overflow-hidden tw-rounded-3xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg)]/90 tw-shadow-[0_20px_60px_rgba(0,0,0,0.18)] tw-backdrop-blur-lg"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={closeSettings}
+                  className="tw-absolute tw-right-3 tw-top-3 tw-z-20 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                  aria-label="Close settings"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </button>
+
+                <div className="tw-h-full tw-overflow-hidden tw-p-4">
+                  <div className="tw-h-full tw-overflow-y-auto tw-overflow-x-hidden tw-pr-1">
+                    <Settings />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <HashRouter>
       <ConversationsProvider>
-        <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
-          {sidebarCollapsed ? null : (
-            <aside
-              className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-0 tw-backdrop-blur-sm"
-              style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
-            >
-              <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-
-              <div
-                role="separator"
-                aria-label="Resize sidebar"
-                onPointerDown={onResizePointerDown}
-                className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-2 tw-cursor-col-resize tw-touch-none"
-              >
-                <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border-strong)]/40 tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
-              </div>
-            </aside>
-          )}
-
-          <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
-            {sidebarCollapsed ? (
-              <button
-                type="button"
-                onClick={() => setCollapsed(false)}
-                className="tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-shadow-[var(--shadow)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-                aria-label="Expand sidebar"
-              >
-                <ExpandIcon />
-              </button>
-            ) : null}
-
-            <div className="route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4">
-              <Routes>
-                <Route path="/" element={<Conversations />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/sync" element={<Navigate to="/settings" replace />} />
-                <Route path="/backup" element={<Navigate to="/settings" replace />} />
-              </Routes>
-            </div>
-          </main>
-        </div>
+        <AppShellFrame />
       </ConversationsProvider>
     </HashRouter>
   );
