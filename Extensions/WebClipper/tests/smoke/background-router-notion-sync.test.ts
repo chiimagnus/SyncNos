@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
-import { registerSettingsHandlers } from '../../src/settings/background-handlers';
+import { registerNotionSettingsHandlers } from '../../src/sync/notion/settings-background-handlers';
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { createNotionSyncOrchestrator } from '../../src/sync/notion/notion-sync-orchestrator.ts';
 import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
@@ -78,12 +78,9 @@ function createRouter({
     notionFilesApi: {},
   });
 
-  registerSettingsHandlers(router as any, {
-    getInstanceId: () => instanceId,
-    testObsidianConnection: async () => ({ ok: true }),
+  registerNotionSettingsHandlers(router as any, {
     notionSyncJobStore: notionServices.jobStore,
     conversationKinds,
-    backgroundInpageWebVisibility: null,
   });
 
   registerSyncHandlers(router as any, {
@@ -433,4 +430,3 @@ describe('background-router notion sync', () => {
     expect(clearCacheCalls).toBe(1);
   });
 });
-

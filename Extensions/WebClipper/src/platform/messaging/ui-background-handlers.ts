@@ -1,6 +1,4 @@
-import { UI_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-import { registerNotionSettingsHandlers } from '../sync/notion/settings-background-handlers';
-import { registerObsidianSettingsHandlers } from '../sync/obsidian/settings-background-handlers';
+import { UI_MESSAGE_TYPES } from './message-contracts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -9,23 +7,10 @@ type AnyRouter = {
 };
 
 type Deps = {
-  getInstanceId: () => string;
-  testObsidianConnection: (input: { instanceId: string }) => Promise<unknown>;
-  notionSyncJobStore: { NOTION_SYNC_JOB_KEY?: unknown } | null;
-  conversationKinds: { getNotionStorageKeys?: () => unknown[] } | null;
   backgroundInpageWebVisibility: { applyVisibilitySetting?: (input: { reason: string }) => Promise<unknown> } | null;
 };
 
-export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
-  registerNotionSettingsHandlers(router, {
-    notionSyncJobStore: deps.notionSyncJobStore,
-    conversationKinds: deps.conversationKinds,
-  });
-  registerObsidianSettingsHandlers(router, {
-    getInstanceId: deps.getInstanceId,
-    testObsidianConnection: deps.testObsidianConnection,
-  });
-
+export function registerUiMessageHandlers(router: AnyRouter, deps: Deps) {
   router.register(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP, async () => {
     const actionApi = (globalThis as any).chrome?.action ?? (globalThis as any).browser?.action;
     if (!actionApi || typeof actionApi.openPopup !== 'function') {
@@ -49,3 +34,4 @@ export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
     return router.ok(data);
   });
 }
+
