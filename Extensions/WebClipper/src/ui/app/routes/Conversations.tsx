@@ -189,7 +189,7 @@ export default function Conversations() {
   const dangerButtonClass = `${baseButtonClass} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
 
   return (
-    <section className="tw-grid tw-min-h-0 tw-gap-3 lg:tw-h-full lg:tw-grid-cols-[340px_minmax(0,1fr)]">
+    <section className="tw-grid tw-h-full tw-min-h-0 tw-gap-3 lg:tw-grid-cols-[340px_minmax(0,1fr)]">
       <aside className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation list">
         <div className="tw-flex tw-items-end tw-justify-between tw-gap-2">
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Captured List</h2>
