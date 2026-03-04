@@ -68,7 +68,7 @@ export default function AppShell() {
               </button>
             ) : null}
 
-            <div className="tw-h-full tw-min-h-0 tw-overflow-hidden tw-p-3 md:tw-p-4">
+            <div className="route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4">
               <Routes>
                 <Route path="/" element={<Conversations />} />
                 <Route path="/settings" element={<Settings />} />

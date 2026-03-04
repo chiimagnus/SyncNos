@@ -29,8 +29,8 @@ export default function Conversations() {
   const primaryButtonClass = `${baseButtonClass} tw-border-[var(--text)] tw-bg-[var(--text)] tw-text-white hover:tw-bg-[#c94f20]`;
 
   return (
-    <section className="tw-h-full tw-min-h-0">
-      <section className="tw-flex tw-h-full tw-min-h-0 tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Conversation detail">
+    <section>
+      <section className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Conversation detail">
         <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
           <div className="tw-min-w-0">
             <h2 className="tw-m-0 tw-max-w-[85%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
@@ -66,7 +66,7 @@ export default function Conversations() {
         {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
 
         {detail?.messages?.length ? (
-          <div className="route-scroll tw-mt-3 tw-grid tw-gap-2.5 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-overflow-auto lg:tw-pr-1">
+          <div className="tw-mt-3 tw-grid tw-gap-2.5">
             {detail.messages.map((m) => (
               <article key={String(m.id)} className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/55 tw-p-3">
                 <header className="tw-flex tw-items-center tw-justify-between tw-gap-2">

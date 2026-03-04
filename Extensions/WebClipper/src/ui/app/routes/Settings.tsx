@@ -644,7 +644,7 @@ export default function Settings() {
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
 
   return (
-    <section className="route-scroll tw-mx-auto tw-grid tw-h-full tw-w-full tw-max-w-[980px] tw-gap-4 tw-overflow-y-auto tw-pr-1">
+    <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
       <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-4">
         <div>
           <h1 className="tw-m-0 tw-text-[26px] tw-font-black tw-leading-none tw-tracking-[-0.01em] tw-text-[var(--text)]">Settings</h1>
