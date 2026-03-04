@@ -1,7 +1,6 @@
-import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-import { storageRemove } from '../platform/storage/local';
-import { clearNotionOAuthToken, getNotionOAuthToken } from '../sync/notion/auth/token-store';
+import { OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
 import { getObsidianSettings, saveObsidianSettings } from '../sync/obsidian/settings-store';
+import { registerNotionSettingsHandlers } from '../sync/notion/settings-background-handlers';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -17,40 +16,10 @@ type Deps = {
   backgroundInpageWebVisibility: { applyVisibilitySetting?: (input: { reason: string }) => Promise<unknown> } | null;
 };
 
-function getNotionDisconnectStorageKeys(deps: Deps): string[] {
-  const base = [
-    'notion_parent_page_id',
-    'notion_parent_page_title',
-    'notion_oauth_pending_state',
-    'notion_oauth_last_error',
-  ];
-
-  const notionDbKeys = (() => {
-    try {
-      const keys = deps.conversationKinds?.getNotionStorageKeys?.();
-      if (Array.isArray(keys) && keys.length) return keys.map((k: any) => String(k || '').trim()).filter(Boolean);
-    } catch (_e) {
-      // ignore
-    }
-    return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
-  })();
-
-  const syncJobKey = deps.notionSyncJobStore?.NOTION_SYNC_JOB_KEY ? String(deps.notionSyncJobStore.NOTION_SYNC_JOB_KEY).trim() : '';
-
-  return Array.from(new Set([...base, ...notionDbKeys, ...(syncJobKey ? [syncJobKey] : [])]));
-}
-
 export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
-  router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
-    const token = await getNotionOAuthToken();
-    return router.ok({ connected: !!(token && token.accessToken), token: token || null });
-  });
-
-  router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
-    await clearNotionOAuthToken();
-    const clearedKeys = getNotionDisconnectStorageKeys(deps);
-    await storageRemove(clearedKeys);
-    return router.ok({ disconnected: true, clearedKeys });
+  registerNotionSettingsHandlers(router, {
+    notionSyncJobStore: deps.notionSyncJobStore,
+    conversationKinds: deps.conversationKinds,
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, async () => {
