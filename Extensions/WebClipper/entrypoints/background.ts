@@ -1,4 +1,4 @@
-import { startBackgroundBootstrap } from '../src/bootstrap/background.ts';
+import { createBackgroundServices } from '../src/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '../src/conversations/background/handlers';
 import { registerSyncHandlers } from '../src/sync/background-handlers';
 import { createBackgroundRouter } from '../src/platform/messaging/background-router';
@@ -14,7 +14,7 @@ import { registerObsidianSettingsHandlers } from '../src/sync/obsidian/settings-
 import { onInstalled } from '../src/platform/runtime/runtime';
 
 export default defineBackground(() => {
-  const services = startBackgroundBootstrap();
+  const services = createBackgroundServices();
 
   const router = createBackgroundRouter({
     fallback: (msg) => ({
