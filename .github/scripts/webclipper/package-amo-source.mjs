@@ -69,7 +69,7 @@ const requiredItems = [
   "postcss.config.cjs",
   "tailwind.config.cjs",
   "entrypoints",
-  "icons",
+  "public",
   "src",
   "package.json",
   "package-lock.json",
