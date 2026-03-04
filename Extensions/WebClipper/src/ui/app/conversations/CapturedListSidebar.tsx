@@ -258,47 +258,50 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
   const dangerButton = `${actionButtonBase} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
 
   return (
-    <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col tw-gap-2">
-      <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-        <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="SyncNos"
-              className="tw-size-8 tw-rounded-xl tw-object-contain"
-              draggable={false}
-            />
-          ) : (
-            <span
-              className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
-              aria-hidden="true"
+    <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
+      <div className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden">
+        <div className="tw-sticky tw-top-0 tw-z-20 tw-border-b tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="SyncNos"
+                  className="tw-size-8 tw-rounded-xl tw-object-contain"
+                  draggable={false}
+                />
+              ) : (
+                <span
+                  className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
+                  aria-hidden="true"
+                >
+                  SN
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+              aria-label="Collapse sidebar"
             >
-              SN
-            </span>
-          )}
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onCollapse}
-          className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-          aria-label="Collapse sidebar"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
+        <div className="tw-grid tw-gap-2 tw-px-3 tw-py-3">
+          {filteredItems.length ? null : (
+            <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+              No conversations yet.
+            </div>
+          )}
 
-      <div className="route-scroll tw-mt-2 tw-grid tw-min-h-0 tw-flex-1 tw-gap-2 tw-overflow-auto tw-pr-1">
-        {filteredItems.length ? null : (
-          <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-            No conversations yet.
-          </div>
-        )}
-
-        {filteredItems.map((conversation) => {
+          {filteredItems.map((conversation) => {
           const id = Number((conversation as any).id);
           const checked = selectedIds.includes(id);
           const { key: sourceKey, label: sourceLabel } = getSourceMeta((conversation as any).source);
@@ -373,141 +376,144 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             </div>
           );
         })}
-      </div>
+        </div>
 
-      <div className="tw-mt-2 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-p-3">
-        <div className={['tw-flex tw-min-h-11 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
-          <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label="Select all">
-            <input
-              ref={selectAllRef}
-              id="chkSelectAll"
-              type="checkbox"
-              aria-label="Select all"
-              checked={allSelected}
-              onChange={() => toggleAll(visibleIds)}
-              className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
-            />
-            <span className="tw-sr-only">Select all</span>
-          </label>
+        <div className="tw-sticky tw-bottom-0 tw-z-20 tw-border-t tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
+          <div className="tw-px-3 tw-py-3">
+            <div className={['tw-flex tw-min-h-11 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
+              <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label="Select all">
+                <input
+                  ref={selectAllRef}
+                  id="chkSelectAll"
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={allSelected}
+                  onChange={() => toggleAll(visibleIds)}
+                  className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+                />
+                <span className="tw-sr-only">Select all</span>
+              </label>
 
-          <select
-            id="sourceFilterSelect"
-            value={filterKey}
-            onChange={(e) => onSetFilterKey(e.target.value)}
-            className={['tw-min-h-11 tw-max-w-[150px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2.5 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]', hasSelection ? 'tw-hidden' : ''].join(' ')}
-            aria-label="Source filter"
-          >
-            {sourceOptions.map((opt) => (
-              <option key={opt.key} value={opt.key}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
-          <div className="tw-flex-1" aria-hidden="true" />
-
-          <div
-            id="chatActionButtons"
-            className={[
-              'tw-inline-flex tw-items-center tw-gap-1.5 tw-overflow-hidden',
-              'tw-transition-[max-width,opacity,transform] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
-              hasSelection
-                ? 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-pointer-events-auto'
-                : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
-            ].join(' ')}
-          >
-            <button
-              id="btnDelete"
-              type="button"
-              className={dangerButton}
-              title="Delete selected"
-              onClick={() => deleteSelected().catch(() => {})}
-              disabled={!hasSelection || busy}
-            >
-              Delete
-            </button>
-
-            <div ref={exportWrapRef} className="tw-relative">
-              <button
-                id="btnExport"
-                type="button"
-                className={actionButton}
-                aria-haspopup="menu"
-                aria-expanded={exportOpen}
-                onClick={() => {
-                  if (!hasSelection || busy) return;
-                  setExportOpen((v) => !v);
-                }}
-                disabled={!hasSelection || exporting || busy}
+              <select
+                id="sourceFilterSelect"
+                value={filterKey}
+                onChange={(e) => onSetFilterKey(e.target.value)}
+                className={['tw-min-h-11 tw-max-w-[150px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2.5 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]', hasSelection ? 'tw-hidden' : ''].join(' ')}
+                aria-label="Source filter"
               >
-                <span className="tw-leading-none">Export</span>
-                <span className="tw-ml-1 tw-text-[12px] tw-font-black" aria-hidden="true">
-                  ▾
-                </span>
-              </button>
+                {sourceOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+
+              <div className="tw-flex-1" aria-hidden="true" />
 
               <div
-                id="exportMenu"
-                role="menu"
-                aria-label="Export options"
-                hidden={!exportOpen}
-                className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-20 tw-min-w-[190px] tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white tw-shadow-[var(--shadow)]"
+                id="chatActionButtons"
+                className={[
+                  'tw-inline-flex tw-items-center tw-gap-1.5 tw-overflow-hidden',
+                  'tw-transition-[max-width,opacity,transform] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
+                  hasSelection
+                    ? 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-pointer-events-auto'
+                    : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
+                ].join(' ')}
               >
                 <button
-                  id="menuExportSingleMarkdown"
-                  className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                  id="btnDelete"
                   type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setExportOpen(false);
-                    void exportSelectedMarkdown({ mergeSingle: true });
-                  }}
+                  className={dangerButton}
+                  title="Delete selected"
+                  onClick={() => deleteSelected().catch(() => {})}
+                  disabled={!hasSelection || busy}
                 >
-                  Single Markdown
+                  Delete
                 </button>
-                <button
-                  id="menuExportMultiMarkdown"
-                  className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setExportOpen(false);
-                    void exportSelectedMarkdown({ mergeSingle: false });
-                  }}
-                >
-                  Multi Markdown
+
+                <div ref={exportWrapRef} className="tw-relative">
+                  <button
+                    id="btnExport"
+                    type="button"
+                    className={actionButton}
+                    aria-haspopup="menu"
+                    aria-expanded={exportOpen}
+                    onClick={() => {
+                      if (!hasSelection || busy) return;
+                      setExportOpen((v) => !v);
+                    }}
+                    disabled={!hasSelection || exporting || busy}
+                  >
+                    <span className="tw-leading-none">Export</span>
+                    <span className="tw-ml-1 tw-text-[12px] tw-font-black" aria-hidden="true">
+                      ▾
+                    </span>
+                  </button>
+
+                  <div
+                    id="exportMenu"
+                    role="menu"
+                    aria-label="Export options"
+                    hidden={!exportOpen}
+                    className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-20 tw-min-w-[190px] tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white tw-shadow-[var(--shadow)]"
+                  >
+                    <button
+                      id="menuExportSingleMarkdown"
+                      className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setExportOpen(false);
+                        void exportSelectedMarkdown({ mergeSingle: true });
+                      }}
+                    >
+                      Single Markdown
+                    </button>
+                    <button
+                      id="menuExportMultiMarkdown"
+                      className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setExportOpen(false);
+                        void exportSelectedMarkdown({ mergeSingle: false });
+                      }}
+                    >
+                      Multi Markdown
+                    </button>
+                  </div>
+                </div>
+
+                <button type="button" className={actionButton} onClick={() => syncSelectedObsidian().catch(() => {})} disabled={!hasSelection || busy}>
+                  {syncingObsidian ? 'Obsidian...' : 'Obsidian'}
                 </button>
+                <button type="button" className={actionButton} onClick={() => syncSelectedNotion().catch(() => {})} disabled={!hasSelection || busy}>
+                  {syncingNotion ? 'Notion...' : 'Notion'}
+                </button>
+              </div>
+
+              <div
+                id="stats"
+                className={[
+                  'tw-flex tw-flex-none tw-items-end tw-gap-1 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--muted)]',
+                  'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
+                  hasSelection ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none' : 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-2 tw-py-[3px]',
+                ].join(' ')}
+              >
+                <span className="tw-text-[var(--muted)]">Today:</span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--wc-ok)]">{String(todayCount)}</span>
+                <span className="tw-text-[rgba(184,94,58,0.7)]">·</span>
+                <span className="tw-text-[var(--muted)]">Total:</span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#2563eb]">{String(filteredItems.length)}</span>
               </div>
             </div>
 
-            <button type="button" className={actionButton} onClick={() => syncSelectedObsidian().catch(() => {})} disabled={!hasSelection || busy}>
-              {syncingObsidian ? 'Obsidian...' : 'Obsidian'}
-            </button>
-            <button type="button" className={actionButton} onClick={() => syncSelectedNotion().catch(() => {})} disabled={!hasSelection || busy}>
-              {syncingNotion ? 'Notion...' : 'Notion'}
-            </button>
+            <div className="tw-mt-3">
+              <NavLink to="/settings" className={({ isActive }) => settingsClass(isActive)}>
+                Settings
+              </NavLink>
+            </div>
           </div>
-
-          <div
-            id="stats"
-            className={[
-              'tw-flex tw-flex-none tw-items-end tw-gap-1 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--muted)]',
-              'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
-              hasSelection ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none' : 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-2 tw-py-[3px]',
-            ].join(' ')}
-          >
-            <span className="tw-text-[var(--muted)]">Today:</span>
-            <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--wc-ok)]">{String(todayCount)}</span>
-            <span className="tw-text-[rgba(184,94,58,0.7)]">·</span>
-            <span className="tw-text-[var(--muted)]">Total:</span>
-            <span className="tw-text-[30px] tw-font-extrabold tw-text-[#2563eb]">{String(filteredItems.length)}</span>
-          </div>
-        </div>
-
-        <div className="tw-mt-3">
-          <NavLink to="/settings" className={({ isActive }) => settingsClass(isActive)}>
-            Settings
-          </NavLink>
         </div>
       </div>
     </div>
