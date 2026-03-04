@@ -48,3 +48,24 @@ export async function tabsGet(tabId: number): Promise<AnyTab | null> {
   throw webextError('tabs.get unavailable');
 }
 
+export async function tabsSendMessage(tabId: number, message: Record<string, unknown>): Promise<unknown> {
+  const { chrome, browser } = webextApis();
+
+  if (browser?.tabs?.sendMessage) {
+    return await Promise.resolve(browser.tabs.sendMessage(tabId, message));
+  }
+
+  if (chrome?.tabs?.sendMessage) {
+    return await new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, message, (res: any) => {
+        if (chrome?.runtime?.lastError) {
+          reject(webextError(webextLastErrorMessage('tabs.sendMessage failed')));
+          return;
+        }
+        resolve(res ?? null);
+      });
+    });
+  }
+
+  throw webextError('tabs.sendMessage unavailable');
+}
