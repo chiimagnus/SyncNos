@@ -55,7 +55,7 @@ export default function AppShell() {
           <Nav />
         </header>
 
-        <main className="tw-mx-auto tw-my-4 tw-w-[calc(100%-20px)] tw-max-w-[1400px] md:tw-my-5 md:tw-w-[calc(100%-32px)]">
+        <main className="tw-mx-auto tw-my-4 tw-min-h-0 tw-w-[calc(100%-20px)] tw-max-w-[1400px] md:tw-my-5 md:tw-w-[calc(100%-32px)]">
           <Routes>
             <Route path="/" element={<Conversations />} />
             <Route path="/settings" element={<Settings />} />

@@ -189,7 +189,7 @@ export default function Conversations() {
   const dangerButtonClass = `${baseButtonClass} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
 
   return (
-    <section className="tw-grid tw-gap-4">
+    <section className="tw-flex tw-flex-col tw-gap-4 lg:tw-h-[calc(100dvh-160px)]">
       <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-4">
         <div className="tw-min-w-0">
           <h1 className="tw-m-0 tw-text-[26px] tw-font-black tw-leading-none tw-tracking-[-0.01em] tw-text-[var(--text)]">Conversations</h1>
@@ -204,8 +204,8 @@ export default function Conversations() {
 
       {listError ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
 
-      <section className="tw-grid tw-gap-3 lg:tw-grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Conversation list">
+      <section className="tw-grid tw-gap-3 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation list">
           <div className="tw-flex tw-items-end tw-justify-between tw-gap-2">
             <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Captured List</h2>
             <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
@@ -271,7 +271,7 @@ export default function Conversations() {
             </button>
           </div>
 
-          <div className="route-scroll tw-mt-3 tw-grid tw-max-h-[42vh] tw-gap-2 tw-overflow-auto tw-pr-1 lg:tw-max-h-[calc(100vh-290px)]">
+          <div className="route-scroll tw-mt-3 tw-grid tw-max-h-[42vh] tw-gap-2 tw-overflow-auto tw-pr-1 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-max-h-none">
             {items.length ? null : <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No conversations yet.</div>}
 
             {items.map((c) => {
@@ -308,7 +308,7 @@ export default function Conversations() {
           </div>
         </aside>
 
-        <section className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-4" aria-label="Conversation detail">
+        <section className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-4 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation detail">
           <div className="tw-flex tw-flex-wrap tw-items-end tw-justify-between tw-gap-2">
             <h2 className="tw-m-0 tw-max-w-[80%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
               {selected ? selected.title || '(Untitled)' : 'Detail'}
@@ -322,7 +322,7 @@ export default function Conversations() {
           {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
 
           {detail?.messages?.length ? (
-            <div className="tw-mt-3 tw-grid tw-gap-2.5">
+            <div className="route-scroll tw-mt-3 tw-grid tw-gap-2.5 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-overflow-auto lg:tw-pr-1">
               {detail.messages.map((m) => (
                 <article key={String(m.id)} className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/55 tw-p-3">
                   <header className="tw-flex tw-items-center tw-justify-between tw-gap-2">
