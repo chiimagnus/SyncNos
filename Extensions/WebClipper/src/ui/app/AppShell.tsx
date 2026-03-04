@@ -228,9 +228,7 @@ export default function AppShell() {
                 </button>
 
                 <div className="tw-h-full tw-overflow-hidden">
-                  <div className="tw-h-full tw-overflow-y-auto tw-overflow-x-hidden tw-p-4">
-                    <Settings />
-                  </div>
+                  <Settings />
                 </div>
               </div>
             </div>

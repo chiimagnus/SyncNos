@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { exportBackupZipV2 } from '../../../sync/backup/export';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '../../../sync/backup/backup-utils';
@@ -176,8 +177,40 @@ function renderStats(stats: ImportStats | null) {
 }
 
 export default function Settings() {
+  const routerLocation = useLocation();
+  const navigate = useNavigate();
+
+  const notionRef = useRef<HTMLDivElement | null>(null);
+  const articleRef = useRef<HTMLDivElement | null>(null);
+  const obsidianRef = useRef<HTMLDivElement | null>(null);
+  const backupRef = useRef<HTMLDivElement | null>(null);
+  const backupImportRef = useRef<HTMLDivElement | null>(null);
+  const notionAiRef = useRef<HTMLDivElement | null>(null);
+  const inpageRef = useRef<HTMLDivElement | null>(null);
+
+  type SettingsSectionKey = 'notion' | 'article' | 'obsidian' | 'backup' | 'notion-ai' | 'inpage';
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const activeSection = useMemo<SettingsSectionKey>(() => {
+    const params = new URLSearchParams(routerLocation.search || '');
+    const raw = String(params.get('section') || '').trim().toLowerCase();
+    if (raw === 'article' || raw === 'obsidian' || raw === 'backup' || raw === 'notion-ai' || raw === 'inpage') return raw;
+    return 'notion';
+  }, [routerLocation.search]);
+
+  const focusKey = useMemo(() => {
+    const params = new URLSearchParams(routerLocation.search || '');
+    return String(params.get('focus') || '').trim().toLowerCase();
+  }, [routerLocation.search]);
+
+  const setActiveSection = (key: SettingsSectionKey) => {
+    const params = new URLSearchParams(routerLocation.search || '');
+    params.set('section', key);
+    params.delete('focus');
+    navigate({ pathname: routerLocation.pathname, search: `?${params.toString()}` }, { replace: true, state: routerLocation.state });
+  };
 
   // Notion
   const [notionConnected, setNotionConnected] = useState<boolean | null>(null);
@@ -643,8 +676,64 @@ export default function Settings() {
     return 'Not connected';
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
 
+  useEffect(() => {
+    const refByKey: Record<SettingsSectionKey, React.RefObject<HTMLDivElement | null>> = {
+      notion: notionRef,
+      article: articleRef,
+      obsidian: obsidianRef,
+      backup: backupRef,
+      'notion-ai': notionAiRef,
+      inpage: inpageRef,
+    };
+
+    const target = refByKey[activeSection]?.current || null;
+    if (target) target.scrollIntoView({ block: 'start' });
+
+    if (focusKey === 'import') {
+      backupImportRef.current?.scrollIntoView({ block: 'start' });
+    }
+  }, [activeSection, focusKey]);
+
   return (
-    <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
+    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0">
+      <aside className="tw-w-[220px] tw-shrink-0 tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/40">
+        <div className="tw-p-4">
+          <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">Settings</div>
+          <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">Integrations, backup, and app behavior.</div>
+        </div>
+
+        <nav className="tw-px-2 tw-pb-4" aria-label="Settings sections">
+          {([
+            { key: 'notion', label: 'Notion' },
+            { key: 'article', label: 'Article' },
+            { key: 'obsidian', label: 'Obsidian' },
+            { key: 'backup', label: 'Backup' },
+            { key: 'notion-ai', label: 'Notion AI' },
+            { key: 'inpage', label: 'Inpage' },
+          ] as Array<{ key: SettingsSectionKey; label: string }>).map((s) => {
+            const active = activeSection === s.key;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setActiveSection(s.key)}
+                className={[
+                  'tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-2 tw-rounded-xl tw-border tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200',
+                  active
+                    ? 'tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)]'
+                    : 'tw-border-transparent tw-bg-transparent tw-text-[var(--muted)] hover:tw-border-[var(--border)] hover:tw-bg-white/40 hover:tw-text-[var(--text)]',
+                ].join(' ')}
+                aria-current={active ? 'page' : undefined}
+              >
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-p-4">
+        <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
       <div className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-4">
         <div>
           <h1 className="tw-m-0 tw-text-[26px] tw-font-black tw-leading-none tw-tracking-[-0.01em] tw-text-[var(--text)]">Settings</h1>
@@ -657,6 +746,7 @@ export default function Settings() {
 
       {error ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{error}</p> : null}
 
+      <div ref={notionRef} id="settings-notion">
       <section style={cardStyle as any} className={cardClassName} aria-label="Notion OAuth">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Notion OAuth</h2>
         <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>status: {notionStatusText}</div>
@@ -699,7 +789,9 @@ export default function Settings() {
           </pre>
         ) : null}
       </section>
+      </div>
 
+      <div ref={articleRef} id="settings-article">
       <section style={cardStyle as any} className={cardClassName} aria-label="Article Fetch">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Article Fetch</h2>
         <button onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy} style={{ marginTop: 10 }} type="button" className={buttonClassName}>
@@ -707,7 +799,9 @@ export default function Settings() {
         </button>
         <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>status: {articleFetchStatus}</div>
       </section>
+      </div>
 
+      <div ref={obsidianRef} id="settings-obsidian">
       <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Settings">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian</h2>
 
@@ -793,11 +887,13 @@ export default function Settings() {
           </div>
         </div>
       </section>
+      </div>
 
+      <div ref={backupRef} id="settings-backup">
       <section style={cardStyle as any} className={cardClassName} aria-label="Database Backup">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Database Backup</h2>
 
-        <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div ref={backupImportRef} id="settings-backup-import" style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className={buttonClassName} style={buttonStyle as any} onClick={() => handleBackupExport().catch(() => {})} disabled={busy}>
             Export (Zip v2)
           </button>
@@ -828,7 +924,9 @@ export default function Settings() {
         <div style={{ marginTop: 6, opacity: 0.85, fontSize: 12 }}>import: {importStatus}</div>
         <div style={{ marginTop: 10 }}>{renderStats(importStats)}</div>
       </section>
+      </div>
 
+      <div ref={notionAiRef} id="settings-notion-ai">
       <section style={cardStyle as any} className={cardClassName} aria-label="Notion AI">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Notion AI</h2>
         <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -852,7 +950,9 @@ export default function Settings() {
           Applies only when Notion AI model is set to Auto. Menu order may change in Notion.
         </div>
       </section>
+      </div>
 
+      <div ref={inpageRef} id="settings-inpage">
       <section style={cardStyle as any} className={cardClassName} aria-label="Inpage Button">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Inpage Button</h2>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }} className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">
@@ -867,6 +967,9 @@ export default function Settings() {
         </label>
         <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>Applies immediately to existing tabs.</div>
       </section>
-    </section>
+      </div>
+        </section>
+      </div>
+    </div>
   );
 }
