@@ -443,7 +443,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                     disabled={!hasSelection || exporting || busy}
                   >
                     <span className="tw-leading-none">Export</span>
-                    <span className="tw-ml-1 tw-text-[12px] tw-font-black" aria-hidden="true">
+                    <span className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]" aria-hidden="true">
                       ▾
                     </span>
                   </button>
@@ -453,11 +453,11 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                     role="menu"
                     aria-label="Export options"
                     hidden={!exportOpen}
-                    className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-20 tw-min-w-[190px] tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white tw-shadow-[var(--shadow)]"
+                    className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[150px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-1.5 tw-shadow-[var(--shadow)]"
                   >
                     <button
                       id="menuExportSingleMarkdown"
-                      className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                      className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)]"
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -469,7 +469,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                     </button>
                     <button
                       id="menuExportMultiMarkdown"
-                      className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                      className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)]"
                       type="button"
                       role="menuitem"
                       onClick={() => {
