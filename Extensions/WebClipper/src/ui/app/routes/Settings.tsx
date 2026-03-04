@@ -12,7 +12,6 @@ import { send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
 import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../sync/repo';
 
-import { SettingsHeader } from './settings/SettingsHeader';
 import { SettingsSidebarNav } from './settings/SettingsSidebarNav';
 import type { SettingsSectionKey } from './settings/types';
 import { BackupSection } from './settings/sections/BackupSection';
@@ -507,7 +506,7 @@ export default function Settings() {
 
       <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-p-4">
         <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
-          <SettingsHeader busy={busy} error={error} onRefresh={() => refresh().catch(() => {})} />
+          {error ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{error}</p> : null}
 
           {activeSection === 'notion' ? (
             <>
