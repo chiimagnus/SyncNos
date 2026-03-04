@@ -2,6 +2,29 @@ import { webextApis, webextError, webextLastErrorMessage } from './base';
 
 type AnyTab = { id?: number; url?: string; title?: string };
 
+export async function tabsCreate(createProperties: any): Promise<AnyTab | null> {
+  const { chrome, browser } = webextApis();
+
+  if (browser?.tabs?.create) {
+    const tab = await Promise.resolve(browser.tabs.create(createProperties));
+    return (tab as any) || null;
+  }
+
+  if (chrome?.tabs?.create) {
+    return await new Promise((resolve, reject) => {
+      chrome.tabs.create(createProperties, (tab: AnyTab) => {
+        if (chrome?.runtime?.lastError) {
+          reject(webextError(webextLastErrorMessage('tabs.create failed')));
+          return;
+        }
+        resolve(tab || null);
+      });
+    });
+  }
+
+  throw webextError('tabs.create unavailable');
+}
+
 export async function tabsQuery(queryInfo: any): Promise<AnyTab[]> {
   const { chrome, browser } = webextApis();
 

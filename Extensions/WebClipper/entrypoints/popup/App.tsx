@@ -9,6 +9,8 @@ import AboutTab from './tabs/AboutTab';
 import ChatsTab from './tabs/ChatsTab';
 import SettingsTab from './tabs/SettingsTab';
 import { storageGet, storageSet } from '../../src/platform/storage/local';
+import { getURL } from '../../src/platform/runtime/runtime';
+import { tabsCreate } from '../../src/platform/webext/tabs';
 
 export default function App() {
   const [tab, setTab] = useState<'chats' | 'settings' | 'about'>('chats');
@@ -27,8 +29,8 @@ export default function App() {
   }, [tab]);
 
   const onOpenApp = async () => {
-    const url = browser.runtime.getURL('/app.html#/');
-    await browser.tabs.create({ url });
+    const url = getURL('/app.html#/');
+    await tabsCreate({ url });
     window.close();
   };
 
@@ -47,7 +49,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="title">
-          <img className="appLogo" src={browser.runtime.getURL('icons/icon-48.png' as any)} alt="" />
+          <img className="appLogo" src={getURL('icons/icon-48.png' as any)} alt="" />
           <span>SyncNos</span>
           <button className="sourceOpen" type="button" title="Open App" onClick={() => onOpenApp().catch(() => {})}>
             ↗
