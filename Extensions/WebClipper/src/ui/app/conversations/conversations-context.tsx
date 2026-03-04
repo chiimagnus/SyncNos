@@ -30,7 +30,7 @@ type ConversationsAppState = {
   refreshActiveDetail: () => Promise<void>;
   setActiveId: (id: number | null) => void;
   toggleSelected: (id: number) => void;
-  toggleAll: () => void;
+  toggleAll: (scopeIds?: number[]) => void;
   clearSelected: () => void;
 
   exportSelectedMarkdown: (opts: { mergeSingle: boolean }) => Promise<void>;
@@ -123,12 +123,23 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     setSelectedIds((prev) => (prev.includes(safeId) ? prev.filter((x) => x !== safeId) : [...prev, safeId]));
   }, []);
 
-  const toggleAll = useCallback(() => {
-    const allIds = items.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0);
-    const allSelected = !!allIds.length && selectedIds.length === allIds.length;
-    if (allSelected) setSelectedIds([]);
-    else setSelectedIds(allIds);
-  }, [items, selectedIds.length]);
+  const toggleAll = useCallback(
+    (scopeIds?: number[]) => {
+      const allIds = (scopeIds?.length ? scopeIds : items.map((x) => Number(x.id)))
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x) && x > 0);
+      const idSet = new Set(allIds);
+      const selectedInScope = selectedIds.filter((id) => idSet.has(Number(id)));
+      const allSelected = !!allIds.length && selectedInScope.length === allIds.length;
+      if (allSelected) setSelectedIds((prev) => prev.filter((id) => !idSet.has(Number(id))));
+      else {
+        const next = new Set(selectedIds);
+        for (const id of allIds) next.add(Number(id));
+        setSelectedIds(Array.from(next));
+      }
+    },
+    [items, selectedIds],
+  );
 
   const clearSelected = useCallback(() => setSelectedIds([]), []);
 
