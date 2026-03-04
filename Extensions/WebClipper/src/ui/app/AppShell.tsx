@@ -1,64 +1,174 @@
-import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Conversations from './routes/Conversations';
-import Debug from './routes/Debug';
 import Settings from './routes/Settings';
+import { CapturedListSidebar } from './conversations/CapturedListSidebar';
+import { ConversationsProvider } from './conversations/conversations-context';
 
-function Nav() {
-  const linkStyle = ({ isActive }: { isActive: boolean }) => ({
-    textDecoration: 'none',
-    fontWeight: isActive ? 700 : 500,
-    opacity: isActive ? 1 : 0.75,
-  });
+const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
+const SIDEBAR_WIDTH_KEY = 'webclipper_app_sidebar_width';
+const SIDEBAR_WIDTH_DEFAULT = 350;
+const SIDEBAR_WIDTH_MIN = 350;
+const SIDEBAR_WIDTH_MAX = 520;
 
+function CollapseIcon() {
   return (
-    <nav style={{ display: 'flex', gap: 12 }}>
-      <NavLink to="/" style={linkStyle}>
-        Conversations
-      </NavLink>
-      <NavLink to="/settings" style={linkStyle}>
-        Settings
-      </NavLink>
-      <NavLink to="/debug" style={linkStyle}>
-        Debug
-      </NavLink>
-    </nav>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ExpandIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M9.75 3.25L13 6.5L9.75 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12.8 6.5H3.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
 
 export default function AppShell() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_WIDTH_DEFAULT);
+  const sidebarWidthRef = useRef<number>(SIDEBAR_WIDTH_DEFAULT);
+  const resizingRef = useRef(false);
+  const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
+
+  useEffect(() => {
+    sidebarWidthRef.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      if (v === '1') setSidebarCollapsed(true);
+    } catch (_e) {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+      if (Number.isFinite(raw) && raw >= SIDEBAR_WIDTH_MIN && raw <= SIDEBAR_WIDTH_MAX) setSidebarWidth(raw);
+    } catch (_e) {
+      // ignore
+    }
+  }, []);
+
+  const setCollapsed = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  const clampSidebarWidth = (next: number) => {
+    const maxByViewport = typeof window !== 'undefined' && window.innerWidth ? Math.max(SIDEBAR_WIDTH_MIN, window.innerWidth - 320) : SIDEBAR_WIDTH_MAX;
+    const max = Math.min(SIDEBAR_WIDTH_MAX, maxByViewport);
+    return Math.max(SIDEBAR_WIDTH_MIN, Math.min(max, Math.round(next)));
+  };
+
+  const persistSidebarWidth = (next: number) => {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next));
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  const onResizePointerDown = (e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    if (sidebarCollapsed) return;
+    resizingRef.current = true;
+    resizeStartRef.current = { x: e.clientX, width: sidebarWidth };
+
+    try {
+      (e.currentTarget as any)?.setPointerCapture?.(e.pointerId);
+    } catch (_e) {
+      // ignore
+    }
+
+    const prevCursor = document.body.style.cursor;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev: PointerEvent) => {
+      if (!resizingRef.current) return;
+      const start = resizeStartRef.current;
+      if (!start) return;
+      const dx = ev.clientX - start.x;
+      setSidebarWidth(clampSidebarWidth(start.width + dx));
+    };
+
+    const onUp = () => {
+      if (!resizingRef.current) return;
+      resizingRef.current = false;
+      resizeStartRef.current = null;
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevUserSelect;
+      persistSidebarWidth(clampSidebarWidth(sidebarWidthRef.current));
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+    };
+
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+  };
+
   return (
     <HashRouter>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateRows: 'auto 1fr',
-          minHeight: '100vh',
-        }}
-      >
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            padding: '12px 16px',
-            borderBottom: '1px solid color-mix(in oklab, CanvasText 15%, transparent)',
-          }}
-        >
-          <div style={{ fontWeight: 800 }}>SyncNos WebClipper</div>
-          <Nav />
-        </header>
+      <ConversationsProvider>
+        <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
+          {sidebarCollapsed ? null : (
+            <aside
+              className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-0 tw-backdrop-blur-sm"
+              style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
+            >
+              <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
 
-        <main style={{ padding: '16px' }}>
-          <Routes>
-            <Route path="/" element={<Conversations />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/sync" element={<Navigate to="/settings" replace />} />
-            <Route path="/backup" element={<Navigate to="/settings" replace />} />
-            <Route path="/debug" element={<Debug />} />
-          </Routes>
-        </main>
-      </div>
+              <div
+                role="separator"
+                aria-label="Resize sidebar"
+                onPointerDown={onResizePointerDown}
+                className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-2 tw-cursor-col-resize tw-touch-none"
+              >
+                <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border-strong)]/40 tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
+              </div>
+            </aside>
+          )}
+
+          <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
+            {sidebarCollapsed ? (
+              <button
+                type="button"
+                onClick={() => setCollapsed(false)}
+                className="tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-shadow-[var(--shadow)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                aria-label="Expand sidebar"
+              >
+                <ExpandIcon />
+              </button>
+            ) : null}
+
+            <div className="route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4">
+              <Routes>
+                <Route path="/" element={<Conversations />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/sync" element={<Navigate to="/settings" replace />} />
+                <Route path="/backup" element={<Navigate to="/settings" replace />} />
+              </Routes>
+            </div>
+          </main>
+        </div>
+      </ConversationsProvider>
     </HashRouter>
   );
 }
