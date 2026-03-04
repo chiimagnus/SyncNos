@@ -19,6 +19,10 @@ function formatTime(ts?: number) {
   }
 }
 
+function isSameLocalDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 function hasWarningFlags(conversation: Conversation) {
   return Array.isArray((conversation as any).warningFlags) && ((conversation as any).warningFlags as any[]).length > 0;
 }
@@ -105,6 +109,8 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   const [filterKey, setFilterKey] = useState<string>('all');
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportWrapRef = useRef<HTMLDivElement | null>(null);
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
@@ -135,6 +141,19 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
     return items.filter((c) => getSourceMeta((c as any).source).key === key);
   }, [filterKey, items]);
 
+  const todayCount = useMemo(() => {
+    const now = new Date();
+    return filteredItems.filter((c) => {
+      const ts = Number((c as any).lastCapturedAt) || 0;
+      if (!ts) return false;
+      try {
+        return isSameLocalDay(new Date(ts), now);
+      } catch {
+        return false;
+      }
+    }).length;
+  }, [filteredItems]);
+
   const visibleIds = useMemo(
     () => filteredItems.map((c) => Number((c as any).id)).filter((x) => Number.isFinite(x) && x > 0),
     [filteredItems],
@@ -156,7 +175,6 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   const hasSelection = selectedIds.length > 0;
   const busy = exporting || syncingNotion || syncingObsidian || deleting;
-  const pct = total ? Math.floor((selectedCount / total) * 100) : 0;
 
   useEffect(() => {
     return () => {
@@ -165,10 +183,22 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
     };
   }, []);
 
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!exportOpen) return;
+      const wrap = exportWrapRef.current;
+      const target = e.target as any;
+      if (!wrap || !target || !wrap.contains(target)) setExportOpen(false);
+    };
+    document.addEventListener('click', onDocClick, true);
+    return () => document.removeEventListener('click', onDocClick, true);
+  }, [exportOpen]);
+
   const onSetFilterKey = (key: string) => {
     const next = String(key || 'all').trim().toLowerCase() || 'all';
     setFilterKey(next);
     clearSelected();
+    setExportOpen(false);
     try {
       localStorage.setItem('webclipper_app_source_filter_key', next);
     } catch (_e) {
@@ -339,50 +369,25 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
       </div>
 
       <div className="tw-mt-2 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-p-3">
-        {hasSelection ? (
-          <div className="tw-grid tw-gap-2">
-            <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-              <div className="tw-text-xs tw-font-extrabold tw-text-[var(--text)]">{selectedIds.length} selected</div>
-              <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{busy ? 'Working…' : 'Actions'}</div>
-            </div>
-            <div className="tw-flex tw-flex-wrap tw-gap-2">
-              <button type="button" className={dangerButton} onClick={() => deleteSelected().catch(() => {})} disabled={busy}>
-                {deleting ? 'Deleting…' : 'Delete'}
-              </button>
-              <button type="button" className={actionButton} onClick={() => exportSelectedMarkdown({ mergeSingle: true }).catch(() => {})} disabled={busy}>
-                {exporting ? 'Exporting…' : 'Export'}
-              </button>
-              <button type="button" className={actionButton} onClick={() => syncSelectedObsidian().catch(() => {})} disabled={busy}>
-                {syncingObsidian ? 'Syncing…' : 'Obsidian'}
-              </button>
-              <button type="button" className={actionButton} onClick={() => syncSelectedNotion().catch(() => {})} disabled={busy}>
-                {syncingNotion ? 'Syncing…' : 'Notion'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="tw-grid tw-gap-2">
-            <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-              <label className="tw-inline-flex tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-                <input ref={selectAllRef} type="checkbox" checked={allSelected} onChange={() => toggleAll(visibleIds)} className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]" />
-                Select all
-              </label>
-              <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{selectedCount}/{total} selected</div>
-            </div>
-            <div className="tw-h-2 tw-overflow-hidden tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/70">
-              <div className="tw-h-full tw-bg-[var(--border-strong)]" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} aria-hidden="true" />
-            </div>
-          </div>
-        )}
+        <div className={['tw-flex tw-items-center tw-gap-2', hasSelection ? 'tw-opacity-100' : 'tw-opacity-100'].join(' ')}>
+          <label className="tw-inline-flex tw-items-center tw-justify-center" aria-label="Select all">
+            <input
+              ref={selectAllRef}
+              id="chkSelectAll"
+              type="checkbox"
+              aria-label="Select all"
+              checked={allSelected}
+              onChange={() => toggleAll(visibleIds)}
+              className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+            />
+            <span className="tw-sr-only">Select all</span>
+          </label>
 
-        <div className="tw-my-3 tw-h-px tw-w-full tw-bg-[var(--border)]/70" aria-hidden="true" />
-
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-          <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{loadingList ? 'Refreshing...' : 'Ready'}</span>
           <select
             value={filterKey}
             onChange={(e) => onSetFilterKey(e.target.value)}
-            className="tw-min-h-8 tw-max-w-[180px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]"
+            disabled={hasSelection}
+            className="tw-min-h-9 tw-max-w-[180px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)] disabled:tw-cursor-not-allowed disabled:tw-opacity-60"
             aria-label="Source filter"
           >
             {sourceOptions.map((opt) => (
@@ -391,6 +396,87 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               </option>
             ))}
           </select>
+
+          <div className="tw-ml-auto tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-2">
+            <button
+              id="btnDelete"
+              type="button"
+              className={dangerButton}
+              title="Delete selected"
+              onClick={() => deleteSelected().catch(() => {})}
+              disabled={!hasSelection || busy}
+            >
+              Delete
+            </button>
+
+            <div ref={exportWrapRef} className="tw-relative">
+              <button
+                id="btnExport"
+                type="button"
+                className={actionButton}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+                onClick={() => {
+                  if (!hasSelection || busy) return;
+                  setExportOpen((v) => !v);
+                }}
+                disabled={!hasSelection || exporting || busy}
+              >
+                <span className="tw-leading-none">Export</span>
+                <span className="tw-ml-1 tw-text-[12px] tw-font-black" aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+
+              <div
+                id="exportMenu"
+                role="menu"
+                aria-label="Export options"
+                hidden={!exportOpen}
+                className="tw-absolute tw-right-0 tw-top-[calc(100%+8px)] tw-z-20 tw-min-w-[190px] tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white tw-shadow-[var(--shadow)]"
+              >
+                <button
+                  id="menuExportSingleMarkdown"
+                  className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setExportOpen(false);
+                    void exportSelectedMarkdown({ mergeSingle: true });
+                  }}
+                >
+                  Single Markdown
+                </button>
+                <button
+                  id="menuExportMultiMarkdown"
+                  className="tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-3 tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-font-extrabold tw-text-[var(--text)] hover:tw-bg-[var(--panel)]/70"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setExportOpen(false);
+                    void exportSelectedMarkdown({ mergeSingle: false });
+                  }}
+                >
+                  Multi Markdown
+                </button>
+              </div>
+            </div>
+
+            <button type="button" className={actionButton} onClick={() => syncSelectedObsidian().catch(() => {})} disabled={!hasSelection || busy}>
+              {syncingObsidian ? 'Obsidian...' : 'Obsidian'}
+            </button>
+            <button type="button" className={actionButton} onClick={() => syncSelectedNotion().catch(() => {})} disabled={!hasSelection || busy}>
+              {syncingNotion ? 'Notion...' : 'Notion'}
+            </button>
+          </div>
+        </div>
+
+        <div className="tw-mt-2 tw-flex tw-items-center tw-justify-center tw-gap-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+          <span className="tw-text-[var(--muted)]">Today:</span>
+          <span className="tw-font-extrabold tw-text-[var(--text)]">{String(todayCount)}</span>
+          <span className="tw-opacity-70">·</span>
+          <span className="tw-text-[var(--muted)]">Total:</span>
+          <span className="tw-font-extrabold tw-text-[var(--text)]">{String(filteredItems.length)}</span>
         </div>
 
         <div className="tw-mt-3">
