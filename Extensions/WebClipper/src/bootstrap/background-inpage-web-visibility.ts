@@ -1,3 +1,5 @@
+import { storageGet } from '../platform/storage/local';
+
 const STORAGE_KEY = 'inpage_supported_only';
 const DYNAMIC_SCRIPT_ID = 'webclipper_inpage_web_dynamic_v1';
 const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';
@@ -91,20 +93,9 @@ function runtimeLastErrorMessage() {
 }
 
 function readSetting(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const chrome = getChrome();
-      if (!chrome?.storage?.local?.get) {
-        resolve(false);
-        return;
-      }
-      chrome.storage.local.get([STORAGE_KEY], (res: any) => {
-        resolve(res && res[STORAGE_KEY] === true);
-      });
-    } catch (_e) {
-      resolve(false);
-    }
-  });
+  return storageGet([STORAGE_KEY])
+    .then((res) => (res as any)?.[STORAGE_KEY] === true)
+    .catch(() => false);
 }
 
 function getContentAssetsFromManifest(): { js: string[]; css: string[] } {

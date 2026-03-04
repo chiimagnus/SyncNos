@@ -2,25 +2,27 @@
 import { buildAiOptions as buildDefaultAiOptions } from './notion-ai.ts';
 import { notionFetch as defaultNotionFetch } from './notion-api.ts';
 import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
+import { storageGet, storageRemove, storageSet } from '../../platform/storage/local';
 
   const DEFAULT_DB_TITLE = "SyncNos-AI Chats";
   const DEFAULT_DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";
 
-  function getCachedDatabaseId(storageKey) {
+  async function getCachedDatabaseId(storageKey) {
     const key = String(storageKey || "").trim() || DEFAULT_DB_STORAGE_KEY;
-    return new Promise((resolve) => {
-      chrome.storage.local.get([key], (res) => resolve((res && res[key]) || ""));
-    });
+    const res = await storageGet([key]);
+    return String((res && (res as any)[key]) || '');
   }
 
-  function setCachedDatabaseId(storageKey, databaseId) {
+  async function setCachedDatabaseId(storageKey, databaseId) {
     const key = String(storageKey || "").trim() || DEFAULT_DB_STORAGE_KEY;
-    return new Promise((resolve) => chrome.storage.local.set({ [key]: databaseId || "" }, () => resolve(true)));
+    await storageSet({ [key]: databaseId || "" });
+    return true;
   }
 
-  function clearCachedDatabaseId(storageKey) {
+  async function clearCachedDatabaseId(storageKey) {
     const key = String(storageKey || "").trim() || DEFAULT_DB_STORAGE_KEY;
-    return new Promise((resolve) => chrome.storage.local.remove([key], () => resolve(true)));
+    await storageRemove([key]);
+    return true;
   }
 
   function getConversationKinds() {

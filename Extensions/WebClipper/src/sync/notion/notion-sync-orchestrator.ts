@@ -9,6 +9,7 @@ import notionSyncServiceDefault from './notion-sync-service.ts';
 import notionApiDefault from './notion-api.ts';
 import notionFilesApiDefault from './notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
+import { storageGet, storageRemove } from '../../platform/storage/local';
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
@@ -61,17 +62,8 @@ import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-s
   }
 
   async function getNotionParentPageId() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
-    });
-  }
-
-  function storageRemove(keys) {
-    return new Promise((resolve) => {
-      if (!Array.isArray(keys) || !keys.length) return resolve(false);
-      if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.remove !== "function") return resolve(false);
-      chrome.storage.local.remove(keys, () => resolve(true));
-    });
+    const res = await storageGet(['notion_parent_page_id']);
+    return String((res as any)?.notion_parent_page_id || '');
   }
 
   async function clearCachedDatabaseId(notionDbManager, storageKey) {
@@ -84,7 +76,12 @@ import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-s
       ? String(notionDbManager.DEFAULT_DB_STORAGE_KEY).trim()
       : "notion_db_id_syncnos_ai_chats";
     const key = explicit || fallback;
-    return storageRemove([key]);
+    try {
+      await storageRemove([key]);
+      return true;
+    } catch (_e) {
+      return false;
+    }
   }
 
 export function createNotionSyncOrchestrator(services: NotionServices) {
