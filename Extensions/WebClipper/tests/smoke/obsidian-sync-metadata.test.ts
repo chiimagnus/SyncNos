@@ -7,16 +7,12 @@ async function loadMetadata() {
 
 describe("obsidian-sync-metadata", () => {
   it("reads missing or mismatched schema as non-ok", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadMetadata();
     expect(mod.readSyncnosObject(null).ok).toBe(false);
     expect(mod.readSyncnosObject({ syncnos: { schemaVersion: 2 } }).ok).toBe(false);
   });
 
   it("builds and reads syncnos object", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
     const mod = await loadMetadata();
     const syncnos = mod.buildSyncnosObject({
       conversation: { source: "x", conversationKey: "y" },

@@ -1,8 +1,4 @@
 // @ts-nocheck
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
-
   const NOTION_SYNC_JOB_KEY = "notion_sync_job_v1";
   const DEFAULT_STALE_MS = 20 * 60 * 1000;
 
@@ -69,9 +65,6 @@ const api = {
   isRunningJob,
   abortRunningJobIfFromOtherInstance,
 };
-if (!NS.notionSyncJobStore || typeof NS.notionSyncJobStore.getJob !== 'function') {
-  NS.notionSyncJobStore = api;
-}
 
 export {
   NOTION_SYNC_JOB_KEY,

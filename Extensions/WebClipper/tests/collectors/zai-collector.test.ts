@@ -1,30 +1,33 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
+import { createZaiCollectorDef } from "../../src/collectors/zai/zai-collector.ts";
+import normalizeApi from "../../src/shared/normalize.ts";
 
-async function loadNormalize() {
-  const normalizeModule = await import("../../src/shared/normalize.ts");
-  const normalizeApi = normalizeModule.default || {
-    normalizeText: normalizeModule.normalizeText,
-    fnv1a32: normalizeModule.fnv1a32,
-    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
-  };
-  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
-  const collectorContext = collectorContextModule.default as any;
-  collectorContext.normalize = normalizeApi;
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-    globalThis.WebClipper = {};
-  }
-  globalThis.WebClipper.normalize = normalizeApi;
-  return normalizeApi;
+function setupDom(dom: JSDOM) {
+  // @ts-expect-error test global
+  globalThis.window = dom.window;
+  // @ts-expect-error test global
+  globalThis.document = dom.window.document;
+  // @ts-expect-error test global
+  globalThis.Node = dom.window.Node;
+  // @ts-expect-error test global
+  globalThis.location = dom.window.location;
+  // @ts-expect-error test global
+  globalThis.getComputedStyle = dom.window.getComputedStyle;
 }
 
-async function loadZaiCollector() {
-  await import("../../src/collectors/zai/zai-collector.ts");
-  return globalThis.WebClipper?.collectors?.zai;
-}
-
-async function loadZaiMarkdown() {
-  return import("../../src/collectors/zai/zai-markdown.ts");
+function createCollector() {
+  const env = createCollectorEnv({
+    // @ts-expect-error test global
+    window: globalThis.window,
+    // @ts-expect-error test global
+    document: globalThis.document,
+    // @ts-expect-error test global
+    location: globalThis.location,
+    normalize: normalizeApi,
+  });
+  return createZaiCollectorDef(env).collector as any;
 }
 
 describe("zai-collector", () => {
@@ -51,22 +54,8 @@ describe("zai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv1" });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadZaiMarkdown();
-    const collector = await loadZaiCollector();
+    setupDom(dom);
+    const collector = createCollector();
 
     const wrapper = dom.window.document.querySelector("#message-1");
     const text = collector.__test.extractAssistantText(wrapper);
@@ -95,22 +84,8 @@ describe("zai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv3" });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadZaiMarkdown();
-    const collector = await loadZaiCollector();
+    setupDom(dom);
+    const collector = createCollector();
 
     const wrapper = dom.window.document.querySelector("#message-3");
     const md = collector.__test.extractAssistantMarkdown(wrapper);
@@ -150,22 +125,8 @@ describe("zai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv2" });
-    // @ts-expect-error test global
-    globalThis.window = dom.window;
-    // @ts-expect-error test global
-    globalThis.document = dom.window.document;
-    // @ts-expect-error test global
-    globalThis.Node = dom.window.Node;
-    // @ts-expect-error test global
-    globalThis.location = dom.window.location;
-
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadZaiMarkdown();
-    const collector = await loadZaiCollector();
+    setupDom(dom);
+    const collector = createCollector();
 
     const wrapper = dom.window.document.querySelector("#message-2");
     const text = collector.__test.extractAssistantText(wrapper);

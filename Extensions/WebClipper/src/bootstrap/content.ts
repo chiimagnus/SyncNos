@@ -1,5 +1,6 @@
 type RuntimeClient = {
   onInvalidated?: (listener: (error: Error) => void) => () => void;
+  getURL?: (path: string) => string;
 };
 
 type ControllerFactory = {
@@ -9,7 +10,7 @@ type ControllerFactory = {
 type StartContentBootstrapInput = {
   runtime: RuntimeClient | null;
   createController: () => ControllerFactory;
-  inpageButton?: { initRuntime?: (runtime: RuntimeClient | null) => void };
+  inpageButton?: { initRuntime?: (runtime: { getURL?: (path: string) => string } | null) => void };
 };
 
 const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';

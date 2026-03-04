@@ -1,6 +1,12 @@
-import collectorContext from '../collector-context.ts';
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import { appendImageMarkdown, conversationKeyFromLocation, extractImageUrlsFromElement } from '../collector-utils.ts';
+import notionAiMarkdown from './notionai-markdown.ts';
 
-const NS: any = collectorContext as any;
+export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefinition {
+  const window = env.window;
+  const document = env.document;
+  const location = env.location;
 
   function findChatThreadIdFromHref(href: any): any {
     try {
@@ -315,9 +321,10 @@ const NS: any = collectorContext as any;
       if (!isChild) finalNodes.push(node);
     }
 
+    const DOCUMENT_POSITION_FOLLOWING = window?.Node?.DOCUMENT_POSITION_FOLLOWING ?? 4;
     finalNodes.sort((a, b) => {
       if (a === b) return 0;
-      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      return a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     });
     return finalNodes;
   }
@@ -345,23 +352,23 @@ const NS: any = collectorContext as any;
       wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
       wrapper.querySelector("[data-content-editable-leaf='true']");
     const raw = leaf ? ((leaf as any).innerText || leaf.textContent || "") : ((wrapper as any).innerText || wrapper.textContent || "");
-    return NS.normalize.normalizeText(raw);
+    return env.normalize.normalizeText(raw);
   }
 
   function extractAssistantText(wrapper: any): any {
     const blocks: any[] = Array.from(wrapper.querySelectorAll("div[data-block-id]")) as any[];
     if (!blocks.length) {
       const raw = (wrapper as any).innerText || wrapper.textContent || "";
-      return NS.normalize.normalizeText(raw);
+      return env.normalize.normalizeText(raw);
     }
     const topBlocks = blocks.filter((b: any) => isTopLevelBlock(b, wrapper));
     const parts: any[] = [];
     for (const b of topBlocks) {
       const raw = (b as any).innerText || b.textContent || "";
-      const t = NS.normalize.normalizeText(raw);
+      const t = env.normalize.normalizeText(raw);
       if (t) parts.push(t);
     }
-    return NS.normalize.normalizeText(parts.join("\n"));
+    return env.normalize.normalizeText(parts.join("\n"));
   }
 
   function findPageIdFromUrl(): any {
@@ -405,15 +412,11 @@ const NS: any = collectorContext as any;
 
     const messages: any[] = [];
     const warningFlags: any[] = [];
-    const utils = NS.collectorUtils || {};
-    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
-    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
     function mergeImageUrls(nodes: any): any {
-      if (!extractImages) return [];
       const set = new Set();
       for (const n of nodes || []) {
-        const urls = extractImages(n);
+        const urls = extractImageUrlsFromElement(n);
         for (const u of urls || []) set.add(u);
       }
       return Array.from(set);
@@ -481,17 +484,17 @@ const NS: any = collectorContext as any;
         return merged.filter(isThreadAttachmentImageUrl);
       })();
       if (!contentText && !imageUrls.length) continue;
-      const markdown = NS.notionAiMarkdown || {};
+      const markdown: any = notionAiMarkdown as any;
       const contentMarkdown = role === "user"
         ? ((typeof markdown.extractUserMarkdown === "function" ? markdown.extractUserMarkdown(w) : "") || contentText)
         : ((typeof markdown.extractAssistantMarkdown === "function" ? markdown.extractAssistantMarkdown(w) : "") || contentText);
-      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown || contentText || "", imageUrls) : (contentMarkdown || contentText || "");
+      const nextMarkdown = appendImageMarkdown(contentMarkdown || contentText || "", imageUrls);
       const userStepId = role === "user" ? w.getAttribute("data-agent-chat-user-step-id") : "";
       const firstBlockId = role === "assistant" ? (w.querySelector("div[data-block-id]") || {}).getAttribute?.("data-block-id") : "";
       const stableId = userStepId || firstBlockId || "";
       const messageKey = stableId
         ? `${role}_${stableId}`
-        : NS.normalize.makeFallbackMessageKey({ role, contentText: contentText || "", sequence: i });
+        : env.normalize.makeFallbackMessageKey({ role, contentText: contentText || "", sequence: i });
       messages.push({
         messageKey,
         role,
@@ -507,7 +510,7 @@ const NS: any = collectorContext as any;
     const threadId = findChatThreadIdFromHref(location.href);
     const pageId = findPageIdFromUrl();
     const firstUser = messages.find((m: any) => m.role === "user");
-    const firstUserSig = firstUser ? NS.normalize.fnv1a32(firstUser.contentText) : NS.normalize.fnv1a32(String(Date.now()));
+    const firstUserSig = firstUser ? env.normalize.fnv1a32(firstUser.contentText) : env.normalize.fnv1a32(String(Date.now()));
     const conversationKey = threadId
       ? `notionai_t_${threadId}`
       : `notionai_${pageId || location.pathname}_${firstUserSig}`;
@@ -528,8 +531,7 @@ const NS: any = collectorContext as any;
     };
   }
 
-  NS.collectors = NS.collectors || {};
-  NS.collectors.notionai = {
+  const collector: any = {
     capture,
     getRoot: () => pickBestRoot(findCandidateRoots()).root,
     __test: {
@@ -538,6 +540,5 @@ const NS: any = collectorContext as any;
     },
   };
 
-  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "notionai", matches, inpageMatches, collector: NS.collectors.notionai });
-  }
+  return { id: "notionai", matches, inpageMatches, collector };
+}

@@ -2,8 +2,6 @@ import { deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
 async function loadZipUtils() {
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
   const mod = await import("../../src/sync/local/zip-utils.ts");
   return mod.default || mod;
 }

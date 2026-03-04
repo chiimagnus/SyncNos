@@ -1,6 +1,4 @@
 import inpageCssRaw from '../styles/inpage.css?raw';
-import runtimeContext from '../../runtime-context.ts';
-
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const VISIBLE_MS = 1800;
@@ -262,5 +260,3 @@ function showSaveTip(text: unknown, options?: { kind?: TipKind }) {
 }
 
 export const inpageTipApi = { showSaveTip };
-
-runtimeContext.inpageTip = inpageTipApi;

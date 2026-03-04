@@ -1,5 +1,3 @@
-import runtimeContext from '../../runtime-context.ts';
-
 const NOTE_JSON_ACCEPT = 'application/vnd.olrapi.note+json';
 
 function safeString(value: unknown) {
@@ -288,8 +286,6 @@ const api = {
   encodeVaultPath,
   createClient,
 };
-
-(runtimeContext as any).obsidianLocalRestClient = api;
 
 export { NOTE_JSON_ACCEPT, encodeVaultPath, createClient };
 export default api;

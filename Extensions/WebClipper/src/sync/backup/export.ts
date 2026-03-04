@@ -7,7 +7,7 @@ import {
 import { buildConversationBasename } from '../../conversations/file-naming';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
-import runtimeContext from '../../runtime-context.ts';
+import { DB_NAME, DB_VERSION } from '../../platform/idb/schema.ts';
 
 type AnyRecord = Record<string, any>;
 
@@ -206,8 +206,6 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     });
   }
 
-  const schema = runtimeContext.storageSchema || {};
-
   const storageDoc = { schemaVersion: 1, storageLocal };
   files.push({
     name: 'config/storage-local.json',
@@ -223,7 +221,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const manifest = {
     backupSchemaVersion: BACKUP_ZIP_SCHEMA_VERSION,
     exportedAt,
-    db: { name: schema.DB_NAME || 'webclipper', version: schema.DB_VERSION || 3 },
+    db: { name: DB_NAME, version: DB_VERSION },
     counts: {
       conversations: allConversations.length,
       messages: allMessages.length,

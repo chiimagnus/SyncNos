@@ -13,8 +13,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   articleFetchMocks.fetchActiveTabArticle.mockReset();
   // @ts-expect-error test cleanup
-  delete globalThis.WebClipper;
-  // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
 
@@ -24,8 +22,6 @@ describe("background-router article fetch", () => {
       conversationId: 7,
       tabId: 42,
     });
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
 
     const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle", tabId: 42 });
@@ -38,8 +34,6 @@ describe("background-router article fetch", () => {
 
   it("returns integration errors as router errors", async () => {
     articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error("extract failed"));
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
 
     const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle" });
@@ -52,8 +46,6 @@ describe("background-router article fetch", () => {
     articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({
       conversationId: 123,
     });
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
 
     const router = createTestBackgroundRouter();
     const broadcast = vi.fn();

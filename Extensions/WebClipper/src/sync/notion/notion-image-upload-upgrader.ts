@@ -1,12 +1,5 @@
 // @ts-nocheck
 import notionFilesApi from './notion-files-api.ts';
-import runtimeContext from '../../runtime-context.ts';
-
-const NS = runtimeContext as any;
-
-function getNS() {
-  return NS;
-}
 
   const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
@@ -34,8 +27,6 @@ function getNS() {
   }
 
 function getNotionFilesApi() {
-  const injected = getNS().notionFilesApi;
-  if (injected) return injected;
   return notionFilesApi;
 }
 
@@ -194,13 +185,6 @@ function guessFilenameFromUrl(url) {
 const api = {
   upgradeImageBlocksToFileUploads,
 };
-
-if (
-  !getNS().notionImageUploadUpgrader ||
-  typeof getNS().notionImageUploadUpgrader.upgradeImageBlocksToFileUploads !== 'function'
-) {
-  getNS().notionImageUploadUpgrader = api;
-}
 
 export { upgradeImageBlocksToFileUploads };
 export default api;
