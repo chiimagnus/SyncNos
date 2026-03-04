@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 import type { Conversation } from '../../../conversations/domain/models';
 import { formatConversationMarkdown } from '../../../conversations/domain/markdown';
@@ -81,7 +82,7 @@ async function copyTextToClipboard(text: string) {
 
 function settingsClass(isActive: boolean) {
   const base =
-    'tw-flex tw-w-full tw-items-center tw-justify-between tw-gap-2 tw-rounded-xl tw-border tw-px-3 tw-py-2 tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200';
+    'tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-transition-colors tw-duration-200';
   if (isActive) return `${base} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
   return `${base} tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]`;
 }
@@ -280,17 +281,24 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={onCollapse}
-              className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-              aria-label="Collapse sidebar"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
+            <div className="tw-flex tw-items-center tw-gap-2">
+              <NavLink to="/settings" className={({ isActive }) => settingsClass(isActive)}>
+                <span className="tw-sr-only">Settings</span>
+                <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
+              </NavLink>
+
+              <button
+                type="button"
+                onClick={onCollapse}
+                className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                aria-label="Collapse sidebar"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -508,11 +516,6 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               </div>
             </div>
 
-            <div className="tw-mt-3">
-              <NavLink to="/settings" className={({ isActive }) => settingsClass(isActive)}>
-                Settings
-              </NavLink>
-            </div>
           </div>
         </div>
       </div>
