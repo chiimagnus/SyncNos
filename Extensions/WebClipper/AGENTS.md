@@ -74,6 +74,8 @@
 - **兼容层已移除**：`src/runtime-context.ts` + `src/export/bootstrap.ts` 已删除；禁止依赖 `globalThis.WebClipper` 的隐式注入。
 - **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/bootstrap/background-services.ts` + `src/platform/messaging/background-router.ts`
   - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
+- **本地内容库（conversations/messages）**：`src/conversations/`
+  - 按职责拆分：`domain/`（类型/纯函数）+ `data/`（IndexedDB）+ `background/`（handlers/storage）+ `client/`（UI 调用）+ `content/`（增量 diff）
 - **Notion 同步模块**：`src/sync/notion/`
   - 编排入口：`src/sync/notion/notion-sync-orchestrator.ts`（由 `src/sync/background-handlers.ts` 路由触发）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
