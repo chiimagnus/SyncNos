@@ -69,3 +69,29 @@ export async function tabsSendMessage(tabId: number, message: Record<string, unk
 
   throw webextError('tabs.sendMessage unavailable');
 }
+
+export async function tabsRemove(tabId: number): Promise<void> {
+  const { chrome, browser } = webextApis();
+  const id = Number(tabId);
+  if (!Number.isFinite(id) || id < 0) return;
+
+  if (browser?.tabs?.remove) {
+    await Promise.resolve(browser.tabs.remove(id));
+    return;
+  }
+
+  if (chrome?.tabs?.remove) {
+    await new Promise<void>((resolve, reject) => {
+      chrome.tabs.remove(id, () => {
+        if (chrome?.runtime?.lastError) {
+          reject(webextError(webextLastErrorMessage('tabs.remove failed')));
+          return;
+        }
+        resolve();
+      });
+    });
+    return;
+  }
+
+  throw webextError('tabs.remove unavailable');
+}
