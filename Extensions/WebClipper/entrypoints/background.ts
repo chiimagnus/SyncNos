@@ -23,12 +23,6 @@ export default defineBackground(() => {
     }),
   });
 
-  // Migration-only utility; routed through platform router (and/or legacy router ping handler).
-  router.register('__WXT_PING__', async () => {
-    const instanceId = getBackgroundInstanceId();
-    return router.ok({ pong: true, instanceId });
-  });
-
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
   registerNotionSettingsHandlers(router, {

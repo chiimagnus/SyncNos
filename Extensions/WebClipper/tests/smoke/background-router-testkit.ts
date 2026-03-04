@@ -29,10 +29,6 @@ export function createTestBackgroundRouter() {
     }),
   });
 
-  router.register('__WXT_PING__', async () => {
-    return router.ok({ pong: true, instanceId });
-  });
-
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
   registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
