@@ -265,12 +265,12 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             <img
               src={logoUrl}
               alt="SyncNos"
-              className="tw-size-8 tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-p-1 tw-object-contain"
+              className="tw-size-8 tw-rounded-xl tw-object-contain"
               draggable={false}
             />
           ) : (
             <span
-              className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
+              className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
               aria-hidden="true"
             >
               SN
