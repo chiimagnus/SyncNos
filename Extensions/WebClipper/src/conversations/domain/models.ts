@@ -28,4 +28,3 @@ export type ConversationDetail = {
   conversationId: number;
   messages: ConversationMessage[];
 };
-

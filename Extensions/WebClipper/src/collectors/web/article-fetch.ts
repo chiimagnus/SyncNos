@@ -1,4 +1,4 @@
-import { syncConversationMessages, upsertConversation } from '../../conversations/storage';
+import { syncConversationMessages, upsertConversation } from '../../conversations/data/storage';
 
 type AnyTab = { id?: number; url?: string; title?: string };
 

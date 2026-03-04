@@ -5,7 +5,7 @@ import articleFetchService from '../collectors/web/article-fetch-service.ts';
 import notionSyncJobStore from '../sync/notion/notion-sync-job-store.ts';
 import { createNotionSyncOrchestrator } from '../sync/notion/notion-sync-orchestrator.ts';
 import { getNotionOAuthToken } from '../sync/notion/auth/token-store';
-import { backgroundStorage as notionBackgroundStorage } from '../conversations/background-storage';
+import { backgroundStorage as notionBackgroundStorage } from '../conversations/background/storage';
 import notionDbManager from '../sync/notion/notion-db-manager.ts';
 import notionSyncService from '../sync/notion/notion-sync-service.ts';
 import notionApi from '../sync/notion/notion-api.ts';

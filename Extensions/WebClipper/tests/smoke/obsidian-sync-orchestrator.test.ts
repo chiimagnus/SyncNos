@@ -5,7 +5,7 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   getMessagesByConversationId: vi.fn(),
 }));
 
-vi.mock("../../src/conversations/background-storage", () => ({
+vi.mock("../../src/conversations/background/storage", () => ({
   backgroundStorage: {
     getConversationById: backgroundStorageMocks.getConversationById,
     getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
@@ -244,7 +244,7 @@ describe("obsidian-sync-orchestrator", () => {
     await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
     await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
-    const naming = await loadModule("../../src/conversations/file-naming.ts");
+    const naming = await loadModule("../../src/conversations/domain/file-naming.ts");
     const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     const convo = { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "New Title" };

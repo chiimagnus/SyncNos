@@ -1,4 +1,4 @@
-import type { Conversation } from './models';
+import type { Conversation } from '../domain/models';
 import { syncConversationMessages, upsertConversation } from './storage';
 
 export async function writeConversationSnapshot(payload: any): Promise<Conversation> {
@@ -11,4 +11,3 @@ export async function writeConversationMessagesSnapshot(
 ): Promise<{ upserted: number; deleted: number }> {
   return syncConversationMessages(conversationId, messages);
 }
-

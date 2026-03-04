@@ -7,7 +7,7 @@ import { createCollectorEnv } from '../src/collectors/collector-env.ts';
 import { registerAllCollectors } from '../src/collectors/register-all.ts';
 import { createCollectorsRegistry } from '../src/collectors/registry.ts';
 import runtimeObserverApi from '../src/collectors/runtime-observer.ts';
-import incrementalUpdaterApi from '../src/conversations/incremental-updater.ts';
+import incrementalUpdaterApi from '../src/conversations/content/incremental-updater.ts';
 import notionAiModelPickerApi from '../src/integrations/notionai-model-picker.ts';
 import normalizeApi from '../src/shared/normalize.ts';
 import inpageButtonApi from '../src/ui/inpage/inpage-button.ts';
