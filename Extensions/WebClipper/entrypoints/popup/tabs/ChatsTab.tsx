@@ -1,4 +1,3 @@
-import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Conversation, ConversationDetail } from '../../../src/conversations/domain/models';
 import { formatConversationMarkdown } from '../../../src/conversations/domain/markdown';
@@ -7,6 +6,7 @@ import { syncNotionConversations, syncObsidianConversations } from '../../../src
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 import { buildConversationsMarkdownZipExport } from '../../../src/sync/local/markdown-export';
 import { tabsCreate } from '../../../src/platform/webext/tabs';
+import { createMarkdownRenderer } from '../../../src/ui/shared/markdown';
 
 type SourceMeta = { key: string; label: string };
 
@@ -111,18 +111,7 @@ export default function ChatsTab() {
   const copiedTimerRef = useRef<number | null>(null);
 
   const md = useMemo(() => {
-    const inst = new MarkdownIt({
-      html: false,
-      breaks: true,
-      linkify: true,
-      typographer: false,
-    });
-    try {
-      inst.enable(['table']);
-    } catch (_e) {
-      // ignore
-    }
-    return inst;
+    return createMarkdownRenderer();
   }, []);
 
   const [preview, setPreview] = useState<PreviewState>(null);
