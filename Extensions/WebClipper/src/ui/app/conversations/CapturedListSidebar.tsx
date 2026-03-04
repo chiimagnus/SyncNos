@@ -254,22 +254,6 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
         </button>
       </div>
 
-      <div className="tw-mt-1 tw-flex tw-items-center tw-justify-between tw-gap-3">
-        <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{loadingList ? 'Refreshing...' : 'Ready'}</span>
-        <select
-          value={filterKey}
-          onChange={(e) => onSetFilterKey(e.target.value)}
-          className="tw-min-h-8 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]"
-          aria-label="Source filter"
-        >
-          {sourceOptions.map((opt) => (
-            <option key={opt.key} value={opt.key}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="route-scroll tw-mt-2 tw-grid tw-min-h-0 tw-flex-1 tw-gap-2 tw-overflow-auto tw-pr-1">
         {filteredItems.length ? null : (
           <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
@@ -390,6 +374,24 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             </div>
           </div>
         )}
+
+        <div className="tw-my-3 tw-h-px tw-w-full tw-bg-[var(--border)]/70" aria-hidden="true" />
+
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{loadingList ? 'Refreshing...' : 'Ready'}</span>
+          <select
+            value={filterKey}
+            onChange={(e) => onSetFilterKey(e.target.value)}
+            className="tw-min-h-8 tw-max-w-[180px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]"
+            aria-label="Source filter"
+          >
+            {sourceOptions.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="tw-mt-3">
           <NavLink to="/settings" className={({ isActive }) => settingsClass(isActive)}>
