@@ -41,74 +41,105 @@ export function ObsidianSettingsSection(props: {
   } = props;
 
   return (
-    <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Settings">
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian</h2>
+    <>
+      <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Local REST API">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Local REST API</h2>
 
-      <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
-        <label style={{ display: 'grid', gap: 6 }}>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>API Base URL</div>
-          <input value={apiBaseUrl} onChange={(e) => onChangeApiBaseUrl(e.target.value)} disabled={busy} spellCheck={false} className={textInputClassName} />
-        </label>
-
-        <label style={{ display: 'grid', gap: 6 }}>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>API Key</div>
-          <input
-            value={apiKeyDraft}
-            onChange={(e) => onChangeApiKeyDraft(e.target.value)}
-            disabled={busy}
-            placeholder={apiKeyPresent ? '(configured)' : ''}
-            className={textInputClassName}
-          />
-          <div style={{ fontSize: 12, opacity: 0.75 }}>status: {apiKeyPresent ? 'configured' : 'not configured'} (value not displayed)</div>
-        </label>
-
-        <label style={{ display: 'grid', gap: 6 }}>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>Auth Header</div>
-          <input
-            value={authHeaderName}
-            onChange={(e) => onChangeAuthHeaderName(e.target.value)}
-            disabled={busy}
-            spellCheck={false}
-            className={textInputClassName}
-          />
-        </label>
-
-        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: '1fr 1fr' }}>
+        <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
           <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>AI Chats Folder</div>
-            <input value={chatFolder} onChange={(e) => onChangeChatFolder(e.target.value)} disabled={busy} spellCheck={false} className={textInputClassName} />
-          </label>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>Web Articles Folder</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>Base URL</div>
             <input
-              value={articleFolder}
-              onChange={(e) => onChangeArticleFolder(e.target.value)}
+              value={apiBaseUrl}
+              onChange={(e) => onChangeApiBaseUrl(e.target.value)}
               disabled={busy}
               spellCheck={false}
+              placeholder="http://127.0.0.1:27123"
               className={textInputClassName}
             />
           </label>
-        </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className={buttonClassName} style={buttonStyle as any} onClick={onSave} disabled={busy}>
-            Save
-          </button>
-          <button className={buttonClassName} style={buttonStyle as any} onClick={onTest} disabled={busy}>
-            Test Connection
-          </button>
-          <button className={buttonClassName} style={buttonStyle as any} onClick={onClearKey} disabled={busy}>
-            Clear API key
-          </button>
-        </div>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>API Key</div>
+            <input
+              value={apiKeyDraft}
+              onChange={(e) => onChangeApiKeyDraft(e.target.value)}
+              disabled={busy}
+              placeholder={apiKeyPresent ? '(configured)' : ''}
+              className={textInputClassName}
+            />
+            <div style={{ fontSize: 12, opacity: 0.75 }}>status: {apiKeyPresent ? 'configured' : 'not configured'} (value not displayed)</div>
+          </label>
 
-        {testResult ? <div style={{ opacity: 0.85, fontSize: 12 }}>test: {testResult}</div> : null}
+          <label style={{ display: 'grid', gap: 6 }}>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>Auth Header</div>
+            <input
+              value={authHeaderName}
+              onChange={(e) => onChangeAuthHeaderName(e.target.value)}
+              disabled={busy}
+              spellCheck={false}
+              placeholder="Authorization"
+              className={textInputClassName}
+            />
+          </label>
 
-        <div style={{ opacity: 0.85, fontSize: 12 }}>
-          sync status: {String(job?.status ?? 'idle')} · started: {formatTime(job?.startedAt)}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={onSave} disabled={busy}>
+              Save
+            </button>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={onTest} disabled={busy}>
+              Test Connection
+            </button>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={onClearKey} disabled={busy}>
+              Clear API key
+            </button>
+          </div>
+
+          {testResult ? <div style={{ opacity: 0.85, fontSize: 12 }}>test: {testResult}</div> : null}
+
+          <div style={{ opacity: 0.85, fontSize: 12 }}>
+            sync status: {String(job?.status ?? 'idle')} · started: {formatTime(job?.startedAt)}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Paths">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Paths</h2>
+
+        <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: '1fr 1fr' }}>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>AI Chats Folder</div>
+              <input
+                value={chatFolder}
+                onChange={(e) => onChangeChatFolder(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                placeholder="SyncNos-AIChats"
+                className={textInputClassName}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>Web Clipper Folder</div>
+              <input
+                value={articleFolder}
+                onChange={(e) => onChangeArticleFolder(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                placeholder="SyncNos-WebArticles"
+                className={textInputClassName}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className={buttonClassName} style={buttonStyle as any} onClick={onSave} disabled={busy}>
+              Save
+            </button>
+          </div>
+
+          <div style={{ opacity: 0.85, fontSize: 12 }}>Vault-relative folder paths. Nested folders supported. Empty uses defaults.</div>
+        </div>
+      </section>
+    </>
   );
 }
-
