@@ -13,7 +13,6 @@ type StartContentBootstrapInput = {
   inpageButton?: { initRuntime?: (runtime: { getURL?: (path: string) => string } | null) => void };
 };
 
-const WEB_INPAGE_VISIBILITY_MESSAGE = 'webclipperSetWebInpageEnabled';
 const STORAGE_KEY = 'inpage_supported_only';
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
@@ -78,7 +77,6 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
 
   const supportedHost = isSupportedHost(location?.hostname || '');
 
-  const runtimeApi = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
   const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
 
   function readSupportedOnly(): Promise<boolean> {
@@ -117,64 +115,9 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
       .catch(() => applySupportedOnly(false));
   }
 
-  // Keep pages in sync with storage changes.
-  let unsubscribeStorage: (() => void) | null = null;
-  try {
-    const onChanged = (changes: any, areaName: string) => {
-      if (areaName !== 'local') return;
-      if (!changes || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-      applySupportedOnly(changes[STORAGE_KEY]?.newValue === true);
-    };
-    storageApi?.onChanged?.addListener?.(onChanged);
-    unsubscribeStorage = () => {
-      try {
-        storageApi?.onChanged?.removeListener?.(onChanged);
-      } catch (_e) {
-        // ignore
-      }
-    };
-  } catch (_e) {
-    unsubscribeStorage = null;
-  }
-
-  try {
-    runtimeApi?.onMessage?.addListener?.((msg: any, _sender: any, sendResponse: any) => {
-      if (!msg || msg.type !== WEB_INPAGE_VISIBILITY_MESSAGE) return;
-
-      if (supportedHost) {
-        try {
-          sendResponse?.({ ok: true, ignored: true });
-        } catch (_e) {
-          // ignore
-        }
-        return;
-      }
-
-      const enabled = msg.enabled === true;
-      if (enabled) {
-        if (!active) startController();
-      } else if (active) {
-        stopController();
-      }
-
-      try {
-        sendResponse?.({ ok: true, enabled });
-      } catch (_e) {
-        // ignore
-      }
-    });
-  } catch (_e) {
-    // ignore
-  }
-
   return {
     stop() {
       stopController();
-      try {
-        unsubscribeStorage?.();
-      } catch (_e) {
-        // ignore
-      }
     },
   };
 }
