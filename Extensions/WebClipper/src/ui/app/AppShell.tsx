@@ -51,7 +51,7 @@ export default function AppShell() {
       <ConversationsProvider>
         <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
           {sidebarCollapsed ? null : (
-            <aside className="tw-flex tw-w-[320px] tw-min-w-[320px] tw-flex-col tw-gap-2 tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-3 tw-backdrop-blur-sm">
+            <aside className="tw-flex tw-w-[320px] tw-min-w-[320px] tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-0 tw-backdrop-blur-sm">
               <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
             </aside>
           )}
