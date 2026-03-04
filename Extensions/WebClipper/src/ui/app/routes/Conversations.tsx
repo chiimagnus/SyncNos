@@ -189,46 +189,82 @@ export default function Conversations() {
   const dangerButtonClass = `${baseButtonClass} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
 
   return (
-    <section className="tw-flex tw-flex-col tw-gap-4 lg:tw-h-[calc(100dvh-160px)]">
-      <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-4">
-        <div className="tw-min-w-0">
-          <h1 className="tw-m-0 tw-text-[26px] tw-font-black tw-leading-none tw-tracking-[-0.01em] tw-text-[var(--text)]">Conversations</h1>
-          <p className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-            Review captured chats, batch actions, and message-level details.
-          </p>
+    <section className="tw-grid tw-min-h-0 tw-gap-3 lg:tw-h-full lg:tw-grid-cols-[340px_minmax(0,1fr)]">
+      <aside className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation list">
+        <div className="tw-flex tw-items-end tw-justify-between tw-gap-2">
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Captured List</h2>
+          <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+            {selectedIds.length}/{items.length} selected
+          </span>
         </div>
-        <button onClick={refresh} disabled={loadingList} type="button" className={primaryButtonClass}>
-          {loadingList ? 'Loading…' : 'Refresh'}
-        </button>
-      </header>
 
-      {listError ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
+        <div className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-3">
+          <label className="tw-inline-flex tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+            />
+            Select all
+          </label>
+          <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+            {loadingList ? 'Refreshing list...' : 'Ready'}
+          </span>
+        </div>
 
-      <section className="tw-grid tw-gap-3 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation list">
-          <div className="tw-flex tw-items-end tw-justify-between tw-gap-2">
-            <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Captured List</h2>
-            <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-              {selectedIds.length}/{items.length} selected
-            </span>
+        <div className="route-scroll tw-mt-3 tw-grid tw-max-h-[44vh] tw-gap-2 tw-overflow-auto tw-pr-1 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-max-h-none">
+          {items.length ? null : <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No conversations yet.</div>}
+
+          {items.map((c) => {
+            const id = Number(c.id);
+            const active = Number(c.id) === Number(activeId);
+            const title = c.title && String(c.title).trim() ? String(c.title).trim() : '(Untitled)';
+            return (
+              <button
+                key={String(c.id)}
+                onClick={() => setActiveId(id)}
+                type="button"
+                className={`tw-w-full tw-rounded-xl tw-border tw-p-2.5 tw-text-left tw-transition-colors tw-duration-200 ${
+                  active
+                    ? 'tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)]'
+                    : 'tw-border-[var(--border)] tw-bg-white hover:tw-border-[var(--border-strong)] hover:tw-bg-[var(--panel)]'
+                }`}
+              >
+                <div className="tw-flex tw-items-center tw-gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedIdSet.has(id)}
+                    onChange={() => toggleSelected(id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+                  />
+                  <div className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text)]">{title}</div>
+                </div>
+                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                  {c.source} · {formatTime(c.lastCapturedAt)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+
+      <section className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation detail">
+        <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
+          <div className="tw-min-w-0">
+            <h2 className="tw-m-0 tw-max-w-[85%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
+              {selected ? selected.title || '(Untitled)' : 'Detail'}
+            </h2>
+            <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+              {selected ? `${selected.source} · ${selected.conversationKey}` : 'Select one conversation from sidebar'}
+            </div>
           </div>
 
-          <div className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <label className="tw-inline-flex tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleAll}
-                className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
-              />
-              Select all
-            </label>
-            <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-              {loadingList ? 'Refreshing list...' : 'Ready'}
-            </span>
-          </div>
-
-          <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
+          <div className="tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-2">
+            <button onClick={refresh} disabled={loadingList} type="button" className={primaryButtonClass}>
+              {loadingList ? 'Loading…' : 'Refresh'}
+            </button>
             <button
               onClick={() => onSyncObsidian().catch(() => {})}
               disabled={!selectedIds.length || syncingObsidian}
@@ -270,77 +306,31 @@ export default function Conversations() {
               Delete
             </button>
           </div>
+        </header>
 
-          <div className="route-scroll tw-mt-3 tw-grid tw-max-h-[42vh] tw-gap-2 tw-overflow-auto tw-pr-1 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-max-h-none">
-            {items.length ? null : <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No conversations yet.</div>}
+        {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
+        {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Loading…</p> : null}
+        {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
 
-            {items.map((c) => {
-              const id = Number(c.id);
-              const active = Number(c.id) === Number(activeId);
-              const title = c.title && String(c.title).trim() ? String(c.title).trim() : '(Untitled)';
-              return (
-                <button
-                  key={String(c.id)}
-                  onClick={() => setActiveId(id)}
-                  type="button"
-                  className={`tw-w-full tw-rounded-xl tw-border tw-p-2.5 tw-text-left tw-transition-colors tw-duration-200 ${
-                    active
-                      ? 'tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)]'
-                      : 'tw-border-[var(--border)] tw-bg-white hover:tw-border-[var(--border-strong)] hover:tw-bg-[var(--panel)]'
-                  }`}
-                >
-                  <div className="tw-flex tw-items-center tw-gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={selectedIdSet.has(id)}
-                      onChange={() => toggleSelected(id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
-                    />
-                    <div className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text)]">{title}</div>
-                  </div>
-                  <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-                    {c.source} · {formatTime(c.lastCapturedAt)}
-                  </div>
-                </button>
-              );
-            })}
+        {detail?.messages?.length ? (
+          <div className="route-scroll tw-mt-3 tw-grid tw-gap-2.5 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-overflow-auto lg:tw-pr-1">
+            {detail.messages.map((m) => (
+              <article key={String(m.id)} className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/55 tw-p-3">
+                <header className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+                  <div className="tw-font-mono tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em] tw-text-[var(--text)]">{m.role}</div>
+                  <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{formatTime(m.updatedAt)}</div>
+                </header>
+                <pre className="tw-m-0 tw-mt-2 tw-whitespace-pre-wrap tw-font-mono tw-text-[12px] tw-leading-5 tw-text-[var(--muted)]">
+                  {m.contentMarkdown || m.contentText || ''}
+                </pre>
+              </article>
+            ))}
           </div>
-        </aside>
-
-        <section className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-4 lg:tw-flex lg:tw-min-h-0 lg:tw-flex-col" aria-label="Conversation detail">
-          <div className="tw-flex tw-flex-wrap tw-items-end tw-justify-between tw-gap-2">
-            <h2 className="tw-m-0 tw-max-w-[80%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
-              {selected ? selected.title || '(Untitled)' : 'Detail'}
-            </h2>
-            <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-              {selected ? `${selected.source} · ${selected.conversationKey}` : null}
-            </div>
-          </div>
-
-          {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Loading…</p> : null}
-          {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
-
-          {detail?.messages?.length ? (
-            <div className="route-scroll tw-mt-3 tw-grid tw-gap-2.5 lg:tw-min-h-0 lg:tw-flex-1 lg:tw-overflow-auto lg:tw-pr-1">
-              {detail.messages.map((m) => (
-                <article key={String(m.id)} className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/55 tw-p-3">
-                  <header className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-                    <div className="tw-font-mono tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em] tw-text-[var(--text)]">{m.role}</div>
-                    <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{formatTime(m.updatedAt)}</div>
-                  </header>
-                  <pre className="tw-m-0 tw-mt-2 tw-whitespace-pre-wrap tw-font-mono tw-text-[12px] tw-leading-5 tw-text-[var(--muted)]">
-                    {m.contentMarkdown || m.contentText || ''}
-                  </pre>
-                </article>
-              ))}
-            </div>
-          ) : activeId ? (
-            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No messages.</p>
-          ) : (
-            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Select a conversation.</p>
-          )}
-        </section>
+        ) : activeId ? (
+          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No messages.</p>
+        ) : (
+          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Select a conversation.</p>
+        )}
       </section>
     </section>
   );
