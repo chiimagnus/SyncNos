@@ -41,11 +41,18 @@ export default function Settings() {
   const params = useMemo<SearchParams>(() => {
     const s = new URLSearchParams(routerLocation.search || '');
     const rawSection = String(s.get('section') || '').trim().toLowerCase();
+    const rawFocus = String(s.get('focus') || '').trim().toLowerCase();
+
+    // Backward compat: older deep links may use `section=notion-ai`.
+    if (rawSection === 'notion-ai') {
+      return { section: 'notion', focus: rawFocus || 'notion-ai' };
+    }
+
     const section: SettingsSectionKey =
-      rawSection === 'article' || rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'notion-ai' || rawSection === 'inpage'
+      rawSection === 'article' || rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'inpage'
         ? (rawSection as SettingsSectionKey)
         : 'notion';
-    const focus = String(s.get('focus') || '').trim().toLowerCase();
+    const focus = rawFocus;
     return { section, focus };
   }, [routerLocation.search]);
 
@@ -97,6 +104,7 @@ export default function Settings() {
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
+  const notionAiRef = useRef<HTMLDivElement | null>(null);
 
   // Notion AI
   const [notionAiModelIndex, setNotionAiModelIndex] = useState<string>('');
@@ -504,6 +512,12 @@ export default function Settings() {
     backupImportRef.current?.scrollIntoView({ block: 'start' });
   }, [activeSection, focusKey]);
 
+  useEffect(() => {
+    if (activeSection !== 'notion') return;
+    if (focusKey !== 'notion-ai') return;
+    notionAiRef.current?.scrollIntoView({ block: 'start' });
+  }, [activeSection, focusKey]);
+
   return (
     <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0">
       <SettingsSidebarNav activeSection={activeSection} onSelectSection={setActiveSection} />
@@ -513,20 +527,32 @@ export default function Settings() {
           <SettingsHeader busy={busy} error={error} onRefresh={() => refresh().catch(() => {})} />
 
           {activeSection === 'notion' ? (
-            <NotionOAuthSection
-              busy={busy}
-              notionStatusText={notionStatusText}
-              notionClientId={notionClientId}
-              notionConnected={!!notionConnected}
-              pollingNotion={pollingNotion}
-              loadingNotionPages={loadingNotionPages}
-              notionParentPageId={notionParentPageId}
-              notionPageOptions={notionPageOptions}
-              notionJob={notionJob}
-              onConnectOrDisconnect={() => onNotionConnectOrDisconnect().catch(() => {})}
-              onSaveNotionParentPage={(id) => onSaveNotionParentPage(id).catch(() => {})}
-              onLoadNotionPages={() => onLoadNotionPages().catch(() => {})}
-            />
+            <>
+              <NotionOAuthSection
+                busy={busy}
+                notionStatusText={notionStatusText}
+                notionClientId={notionClientId}
+                notionConnected={!!notionConnected}
+                pollingNotion={pollingNotion}
+                loadingNotionPages={loadingNotionPages}
+                notionParentPageId={notionParentPageId}
+                notionPageOptions={notionPageOptions}
+                notionJob={notionJob}
+                onConnectOrDisconnect={() => onNotionConnectOrDisconnect().catch(() => {})}
+                onSaveNotionParentPage={(id) => onSaveNotionParentPage(id).catch(() => {})}
+                onLoadNotionPages={() => onLoadNotionPages().catch(() => {})}
+              />
+
+              <div ref={notionAiRef} id="settings-notion-ai">
+                <NotionAISection
+                  busy={busy}
+                  modelIndex={notionAiModelIndex}
+                  onChangeModelIndex={setNotionAiModelIndex}
+                  onSave={() => onSaveNotionAiModelIndex().catch(() => {})}
+                  onReset={() => onResetNotionAiModelIndex().catch(() => {})}
+                />
+              </div>
+            </>
           ) : null}
 
           {activeSection === 'article' ? <ArticleFetchSection busy={busy} statusText={articleFetchStatus} onFetchCurrentPage={() => onFetchCurrentPage().catch(() => {})} /> : null}
@@ -567,16 +593,6 @@ export default function Settings() {
               fileInputRef={fileInputRef}
               onExport={() => handleBackupExport().catch(() => {})}
               onImportFile={(file) => importFromFile(file).catch(() => {})}
-            />
-          ) : null}
-
-          {activeSection === 'notion-ai' ? (
-            <NotionAISection
-              busy={busy}
-              modelIndex={notionAiModelIndex}
-              onChangeModelIndex={setNotionAiModelIndex}
-              onSave={() => onSaveNotionAiModelIndex().catch(() => {})}
-              onReset={() => onResetNotionAiModelIndex().catch(() => {})}
             />
           ) : null}
 
