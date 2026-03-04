@@ -1,6 +1,6 @@
 import { syncConversationMessages, upsertConversation } from '../../conversations/data/storage';
-
-type AnyTab = { id?: number; url?: string; title?: string };
+import { scriptingExecuteScript } from '../../platform/webext/scripting';
+import { tabsGet, tabsQuery } from '../../platform/webext/tabs';
 
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
@@ -8,88 +8,6 @@ const READABILITY_FILE = 'src/vendor/readability.js';
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
-}
-
-function getApis() {
-  const anyGlobal = globalThis as any;
-  return {
-    chrome: anyGlobal.chrome,
-    browser: anyGlobal.browser,
-  };
-}
-
-function runtimeLastErrorMessage(fallback: string) {
-  const { chrome } = getApis();
-  if (chrome?.runtime?.lastError?.message) {
-    return String(chrome.runtime.lastError.message || fallback || 'runtime error');
-  }
-  return String(fallback || 'runtime error');
-}
-
-function queryTabs(queryInfo: any): Promise<AnyTab[]> {
-  const { chrome, browser } = getApis();
-
-  if (chrome?.tabs?.query) {
-    return new Promise((resolve, reject) => {
-      chrome.tabs.query(queryInfo, (tabs: AnyTab[]) => {
-        if (chrome?.runtime?.lastError) {
-          reject(toError(runtimeLastErrorMessage('tabs.query failed')));
-          return;
-        }
-        resolve(Array.isArray(tabs) ? tabs : []);
-      });
-    });
-  }
-
-  if (browser?.tabs?.query) {
-    return Promise.resolve(browser.tabs.query(queryInfo));
-  }
-
-  return Promise.reject(toError('tabs.query unavailable'));
-}
-
-function getTab(tabId: number): Promise<AnyTab | null> {
-  const { chrome, browser } = getApis();
-
-  if (chrome?.tabs?.get) {
-    return new Promise((resolve, reject) => {
-      chrome.tabs.get(tabId, (tab: AnyTab) => {
-        if (chrome?.runtime?.lastError) {
-          reject(toError(runtimeLastErrorMessage('tabs.get failed')));
-          return;
-        }
-        resolve(tab || null);
-      });
-    });
-  }
-
-  if (browser?.tabs?.get) {
-    return Promise.resolve(browser.tabs.get(tabId));
-  }
-
-  return Promise.reject(toError('tabs.get unavailable'));
-}
-
-function executeScript(details: any): Promise<any[]> {
-  const { chrome, browser } = getApis();
-
-  if (chrome?.scripting?.executeScript) {
-    return new Promise((resolve, reject) => {
-      chrome.scripting.executeScript(details, (results: any[]) => {
-        if (chrome?.runtime?.lastError) {
-          reject(toError(runtimeLastErrorMessage('executeScript failed')));
-          return;
-        }
-        resolve(Array.isArray(results) ? results : []);
-      });
-    });
-  }
-
-  if (browser?.scripting?.executeScript) {
-    return Promise.resolve(browser.scripting.executeScript(details));
-  }
-
-  return Promise.reject(toError('scripting.executeScript unavailable'));
 }
 
 function normalizeHttpUrl(raw: unknown) {
@@ -151,26 +69,26 @@ function fallbackDescription(text: unknown) {
 
 async function resolveTargetTab(tabId?: number) {
   if (Number.isFinite(Number(tabId)) && Number(tabId) > 0) {
-    const tab = await getTab(Number(tabId));
+    const tab = await tabsGet(Number(tabId));
     if (!tab || !Number.isFinite(Number(tab.id))) throw toError('target tab not found');
     return tab;
   }
 
-  const tabs = await queryTabs({ active: true, currentWindow: true });
+  const tabs = await tabsQuery({ active: true, currentWindow: true });
   const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
   if (!tab || !Number.isFinite(Number(tab.id))) throw toError('active tab not found');
   return tab;
 }
 
 async function ensureReadability(tabId: number) {
-  await executeScript({
+  await scriptingExecuteScript({
     target: { tabId, allFrames: false },
     files: [READABILITY_FILE],
   });
 }
 
 async function extractArticleOnTab(tabId: number) {
-  const results = await executeScript({
+  const results = await scriptingExecuteScript({
     target: { tabId, allFrames: false },
     func: async ({ stabilizationTimeoutMs, stabilizationMinTextLength }: any) => {
       const timeoutMs = Math.max(1_000, Number(stabilizationTimeoutMs) || 10_000);
