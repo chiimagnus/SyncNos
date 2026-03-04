@@ -92,7 +92,7 @@
 
 Phase 3（JS→TS）收口状态：
 - `src + entrypoints` 运行时代码已收敛为 TS 主实现。
-- runtime JS allowlist 仅保留第三方脚本资产：`src/vendor/readability.js`。
+- runtime JS allowlist 仅保留第三方脚本资产：`public/src/vendor/readability.js`（产物路径仍为 `src/vendor/readability.js`）。
 
 ### Obsidian 约束
 
