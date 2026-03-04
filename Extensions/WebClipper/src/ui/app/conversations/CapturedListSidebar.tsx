@@ -314,27 +314,33 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
           const checked = selectedIds.includes(id);
           const { key: sourceKey, label: sourceLabel } = getSourceMeta((conversation as any).source);
           const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
-          const isActive = Number(id) === Number(activeId) && location.pathname !== '/settings';
-
-          const rowBase =
-            'tw-group tw-flex tw-gap-2.5 tw-rounded-2xl tw-border tw-bg-[#fffaf7] tw-p-3 tw-transition tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]';
-          const rowClass = isActive
-            ? `${rowBase} tw-border-[var(--border-strong)] tw-shadow-[var(--shadow)]`
-            : `${rowBase} tw-border-[var(--border)] hover:tw-border-[var(--border-strong)] hover:tw-shadow-[var(--shadow)] hover:-tw-translate-y-0.5`;
-
-          return (
-            <div
+	          const isActive = Number(id) === Number(activeId) && location.pathname !== '/settings';
+	
+	          const rowBase =
+	            'tw-group tw-relative tw-flex tw-gap-2.5 tw-rounded-2xl tw-border tw-bg-[#fffaf7] tw-p-3 tw-transition tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]';
+	          const rowClass = isActive
+	            ? `${rowBase} tw-border-[var(--border-strong)] tw-bg-[#fff2ea] tw-shadow-[var(--shadow)]`
+	            : `${rowBase} tw-border-[var(--border)] hover:tw-border-[var(--border-strong)] hover:tw-shadow-[var(--shadow)] hover:-tw-translate-y-0.5`;
+	
+	          return (
+	            <div
               key={String((conversation as any).id)}
               className={rowClass}
               data-conversation-id={String((conversation as any).id)}
               aria-label={(conversation as any).title || '(untitled)'}
-              onClick={(e) => onRowClick(e, id)}
-              role="button"
-              tabIndex={0}
-            >
-              <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--muted)]">
-                <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} aria-label="Select" />
-              </label>
+	              onClick={(e) => onRowClick(e, id)}
+	              role="button"
+	              tabIndex={0}
+	            >
+	              {isActive ? (
+	                <span
+	                  aria-hidden="true"
+	                  className="tw-absolute tw-left-0 tw-top-2 tw-h-[calc(100%-16px)] tw-w-1 tw-rounded-r-full tw-bg-[var(--text)] tw-shadow-[0_0_0_1px_rgba(217,89,38,0.18)]"
+	                />
+	              ) : null}
+	              <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--muted)]">
+	                <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} aria-label="Select" />
+	              </label>
 
               <div className="tw-min-w-0 tw-flex-1">
                 <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
