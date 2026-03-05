@@ -31,7 +31,7 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
   const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
 
   const bubbleBase =
-    'tw-border tw-rounded-[10px] tw-p-2 tw-shadow-[0_1px_0_rgba(217,89,38,0.06)]';
+    'tw-min-w-0 tw-border tw-rounded-[10px] tw-p-2 tw-shadow-[0_1px_0_rgba(217,89,38,0.06)]';
 
   const bubbleRoleClass =
     bubbleRole === 'user'
@@ -55,7 +55,8 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
     [
       // NOTE: Tailwind uses `prefix: "tw-"`. For arbitrary properties/selectors, do NOT
       // prefix the `[...]` segment, only prefix the actual utility (e.g. `[&_p]:tw-mt-0`).
-      'tw-break-words [overflow-wrap:anywhere] tw-overflow-x-auto tw-leading-[1.42]',
+      // Keep the container shrinkable in flex/grid layouts.
+      'tw-min-w-0 tw-break-words [overflow-wrap:anywhere] tw-overflow-x-hidden tw-leading-[1.42]',
       '[&>*:first-child]:tw-mt-0 [&>*:last-child]:tw-mb-0',
 
       '[&_p]:tw-mt-0 [&_p]:tw-mb-2',
@@ -78,7 +79,8 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[rgba(217,89,38,0.2)] [&_pre]:tw-bg-[rgba(255,241,234,0.62)] [&_pre]:tw-overflow-auto',
       '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-leading-[1.45]',
 
-      '[&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
+      // Tables can be wider than the viewport; let the table itself scroll instead of the whole bubble.
+      '[&_table]:tw-block [&_table]:tw-overflow-x-auto [&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
       '[&_th]:tw-border [&_th]:tw-border-[rgba(217,89,38,0.2)] [&_th]:tw-px-[6px] [&_th]:tw-py-[4px] [&_th]:tw-align-top [&_th]:tw-text-[12px] [&_th]:tw-font-[700]',
       '[&_td]:tw-border [&_td]:tw-border-[rgba(217,89,38,0.2)] [&_td]:tw-px-[6px] [&_td]:tw-py-[4px] [&_td]:tw-align-top [&_td]:tw-text-[12px]',
       '[&_thead_th]:tw-bg-[rgba(255,241,234,0.75)]',
