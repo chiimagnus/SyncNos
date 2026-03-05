@@ -1,5 +1,6 @@
 import type { NotionPageOption } from '../utils';
 import { buttonClassName, cardClassName, selectClassName } from '../ui';
+import { SettingsFormRow } from './SettingsFormRow';
 
 export function NotionOAuthSection(props: {
   busy: boolean;
@@ -44,34 +45,35 @@ export function NotionOAuthSection(props: {
         </button>
       </div>
 
-      <div className="tw-mt-3 tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3" aria-label="Parent page selector">
-        <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Parent Page</div>
-        <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-          <select
-            id="notionPages"
-            className={`${selectClassName} tw-w-full`}
-            value={notionParentPageId}
-            disabled={busy || !notionConnected}
-            onChange={(e) => onSaveNotionParentPage(e.target.value)}
-          >
-            {notionPageOptions.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
-            {notionPageOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            title="Refresh"
-            onClick={onLoadNotionPages}
-            disabled={busy || !notionConnected || loadingNotionPages}
-            className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-xs tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)] disabled:tw-cursor-not-allowed disabled:tw-opacity-60"
-            aria-label="Refresh pages"
-          >
-            ↻
-          </button>
-        </div>
+      <div className="tw-mt-3" aria-label="Parent page selector">
+        <SettingsFormRow label="Parent Page">
+          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+            <select
+              id="notionPages"
+              className={`${selectClassName} tw-w-full`}
+              value={notionParentPageId}
+              disabled={busy || !notionConnected}
+              onChange={(e) => onSaveNotionParentPage(e.target.value)}
+            >
+              {notionPageOptions.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
+              {notionPageOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              title="Refresh"
+              onClick={onLoadNotionPages}
+              disabled={busy || !notionConnected || loadingNotionPages}
+              className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-xs tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)] disabled:tw-cursor-not-allowed disabled:tw-opacity-60"
+              aria-label="Refresh pages"
+            >
+              ↻
+            </button>
+          </div>
+        </SettingsFormRow>
       </div>
     </section>
   );
