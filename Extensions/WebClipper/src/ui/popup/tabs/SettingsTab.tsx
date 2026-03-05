@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-import type { SettingsSectionKey } from '../../../src/ui/app/routes/settings/types';
-import { SettingsScene } from '../../../src/ui/settings/SettingsScene';
+import type { SettingsSectionKey } from '../../app/routes/settings/types';
+import { SettingsScene } from '../../settings/SettingsScene';
 
 export default function SettingsTab() {
   const [activeSection, setActiveSection] = useState<SettingsSectionKey>('notion');

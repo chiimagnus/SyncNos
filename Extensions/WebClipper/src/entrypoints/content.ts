@@ -1,17 +1,17 @@
-import '../src/ui/styles/tokens.css';
+import '../ui/styles/tokens.css';
 
-import { createContentController } from '../src/bootstrap/content-controller.ts';
-import { startContentBootstrap } from '../src/bootstrap/content.ts';
-import { createCollectorEnv } from '../src/collectors/collector-env.ts';
-import { registerAllCollectors } from '../src/collectors/register-all.ts';
-import { createCollectorsRegistry } from '../src/collectors/registry.ts';
-import runtimeObserverApi from '../src/collectors/runtime-observer.ts';
-import incrementalUpdaterApi from '../src/conversations/content/incremental-updater.ts';
-import notionAiModelPickerApi from '../src/integrations/notionai-model-picker.ts';
-import normalizeApi from '../src/shared/normalize.ts';
-import inpageButtonApi from '../src/ui/inpage/inpage-button.ts';
-import inpageTipApi from '../src/ui/inpage/inpage-tip.ts';
-import { createRuntimeClient } from '../src/platform/runtime/client.ts';
+import { createContentController } from '../bootstrap/content-controller.ts';
+import { startContentBootstrap } from '../bootstrap/content.ts';
+import { createCollectorEnv } from '../collectors/collector-env.ts';
+import { registerAllCollectors } from '../collectors/register-all.ts';
+import { createCollectorsRegistry } from '../collectors/registry.ts';
+import runtimeObserverApi from '../collectors/runtime-observer.ts';
+import incrementalUpdaterApi from '../conversations/content/incremental-updater.ts';
+import notionAiModelPickerApi from '../integrations/notionai-model-picker.ts';
+import normalizeApi from '../shared/normalize.ts';
+import inpageButtonApi from '../ui/inpage/inpage-button.ts';
+import inpageTipApi from '../ui/inpage/inpage-tip.ts';
+import { createRuntimeClient } from '../platform/runtime/client.ts';
 
 export default defineContentScript({
   // Inpage visibility is controlled at runtime by `inpage_supported_only`.
