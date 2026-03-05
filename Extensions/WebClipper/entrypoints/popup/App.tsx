@@ -1,7 +1,6 @@
 import '../../src/ui/styles/tailwind.css';
 import '../../src/ui/styles/tokens.css';
 import '../../src/ui/styles/flash-ok.css';
-import '../../src/ui/styles/popup.css';
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -46,33 +45,55 @@ export default function App() {
   const tabIndex = tab === 'chats' ? 0 : tab === 'settings' ? 1 : 2;
 
   return (
-    <div className="app">
-      <header className="header">
-        <div className="title">
-          <img className="appLogo" src={getURL('icons/icon-48.png' as any)} alt="" />
-          <span>SyncNos</span>
-          <button className="sourceOpen" type="button" title="Open App" onClick={() => onOpenApp().catch(() => {})}>
+    <div
+      className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg)] tw-text-[var(--text)]"
+      style={{
+        fontFamily:
+          '"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",sans-serif',
+        fontSize: 13,
+        lineHeight: 1.45,
+      }}
+    >
+      <header className="tw-border-b tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-px-3 tw-py-3 tw-backdrop-blur-md">
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+            <img
+              className="tw-size-8 tw-rounded-xl tw-object-contain"
+              src={getURL('icons/icon-48.png' as any)}
+              alt=""
+              draggable={false}
+            />
+            <span className="tw-min-w-0 tw-truncate tw-text-sm tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
+          </div>
+
+          <button
+            type="button"
+            title="Open App"
+            onClick={() => onOpenApp().catch(() => {})}
+            className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[12px] tw-font-black tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+            aria-label="Open App"
+          >
             ↗
           </button>
         </div>
 
-        <nav
-          className="tabs tw-select-none"
-          role="tablist"
-          aria-label="Popup tabs"
-          style={{ ['--tab-i' as any]: tabIndex } as any}
-        >
-          <span className="tabIndicator" aria-hidden="true" />
-          {tabs.map((t) => {
+        <nav className="tw-mt-3 tw-grid tw-grid-cols-3 tw-rounded-full tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 tw-p-1 tw-select-none" role="tablist" aria-label="Popup tabs">
+          {tabs.map((t, i) => {
             const active = tab === t.id;
             return (
               <button
                 key={t.id}
-                className={['tab', active ? 'is-active' : ''].filter(Boolean).join(' ')}
                 type="button"
                 role="tab"
                 aria-selected={active}
                 onClick={() => setTab(t.id)}
+                className={[
+                  'tw-h-9 tw-rounded-full tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200',
+                  active
+                    ? 'tw-bg-[var(--btn-bg)] tw-text-[var(--text)] tw-shadow-[0_1px_0_rgba(0,0,0,0.05)]'
+                    : 'tw-bg-transparent tw-text-[var(--muted)] hover:tw-text-[var(--text)]',
+                  i === tabIndex ? '' : '',
+                ].join(' ')}
               >
                 {t.label}
               </button>
@@ -81,21 +102,25 @@ export default function App() {
         </nav>
       </header>
 
-      <section id="viewChats" className={['view', tab === 'chats' ? 'is-active' : ''].filter(Boolean).join(' ')} role="tabpanel">
-        <ChatsTab />
-      </section>
+      <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
+        {tab === 'chats' ? (
+          <section id="viewChats" className="tw-h-full tw-min-h-0" role="tabpanel" aria-label="Chats">
+            <ChatsTab />
+          </section>
+        ) : null}
 
-      <section
-        id="viewSettings"
-        className={['view', tab === 'settings' ? 'is-active' : ''].filter(Boolean).join(' ')}
-        role="tabpanel"
-      >
-        <SettingsTab />
-      </section>
+        {tab === 'settings' ? (
+          <section id="viewSettings" className="tw-h-full tw-min-h-0" role="tabpanel" aria-label="Settings">
+            <SettingsTab />
+          </section>
+        ) : null}
 
-      <section id="viewAbout" className={['view', tab === 'about' ? 'is-active' : ''].filter(Boolean).join(' ')} role="tabpanel">
-        <AboutTab />
-      </section>
+        {tab === 'about' ? (
+          <section id="viewAbout" className="tw-h-full tw-min-h-0" role="tabpanel" aria-label="About">
+            <AboutTab />
+          </section>
+        ) : null}
+      </main>
     </div>
   );
 }
