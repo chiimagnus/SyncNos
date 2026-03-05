@@ -42,8 +42,6 @@ export default function App() {
     [],
   );
 
-  const tabIndex = tab === 'chats' ? 0 : tab === 'settings' ? 1 : 2;
-
   return (
     <div
       className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg)] tw-text-[var(--text)]"
@@ -66,40 +64,45 @@ export default function App() {
             <span className="tw-min-w-0 tw-truncate tw-text-sm tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
           </div>
 
-          <button
-            type="button"
-            title="Open App"
-            onClick={() => onOpenApp().catch(() => {})}
-            className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[12px] tw-font-black tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-            aria-label="Open App"
-          >
-            ↗
-          </button>
-        </div>
+          <div className="tw-flex tw-flex-none tw-items-center tw-gap-2">
+            <nav
+              className="tw-grid tw-w-[216px] tw-shrink-0 tw-select-none tw-grid-cols-3 tw-rounded-full tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 tw-p-1"
+              role="tablist"
+              aria-label="Popup tabs"
+            >
+              {tabs.map((t) => {
+                const active = tab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(t.id)}
+                    className={[
+                      'tw-h-9 tw-rounded-full tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200',
+                      active
+                        ? 'tw-bg-[var(--btn-bg)] tw-text-[var(--text)] tw-shadow-[0_1px_0_rgba(0,0,0,0.05)]'
+                        : 'tw-bg-transparent tw-text-[var(--muted)] hover:tw-text-[var(--text)]',
+                    ].join(' ')}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </nav>
 
-        <nav className="tw-mt-3 tw-grid tw-grid-cols-3 tw-rounded-full tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 tw-p-1 tw-select-none" role="tablist" aria-label="Popup tabs">
-          {tabs.map((t, i) => {
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTab(t.id)}
-                className={[
-                  'tw-h-9 tw-rounded-full tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200',
-                  active
-                    ? 'tw-bg-[var(--btn-bg)] tw-text-[var(--text)] tw-shadow-[0_1px_0_rgba(0,0,0,0.05)]'
-                    : 'tw-bg-transparent tw-text-[var(--muted)] hover:tw-text-[var(--text)]',
-                  i === tabIndex ? '' : '',
-                ].join(' ')}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </nav>
+            <button
+              type="button"
+              title="Open App"
+              onClick={() => onOpenApp().catch(() => {})}
+              className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[12px] tw-font-black tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+              aria-label="Open App"
+            >
+              ↗
+            </button>
+          </div>
+        </div>
       </header>
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
