@@ -1,6 +1,5 @@
-import { useMemo } from 'react';
 import { useConversationsApp } from '../conversations/conversations-context';
-import { createMarkdownRenderer } from '../../shared/markdown';
+import { ChatMessageBubble } from '../../shared/ChatMessageBubble';
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -24,8 +23,6 @@ export default function Conversations() {
     refreshList,
     refreshActiveDetail,
   } = useConversationsApp();
-
-  const md = useMemo(() => createMarkdownRenderer({ openLinksInNewTab: true }), []);
 
   const baseButtonClass =
     'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
@@ -70,19 +67,18 @@ export default function Conversations() {
 
         {detail?.messages?.length ? (
           <div className="tw-mt-3 tw-grid tw-gap-2.5">
-            {detail.messages.map((m) => (
-              <article key={String(m.id)} className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)]/55 tw-p-3">
-                <header className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-                  <div className="tw-font-mono tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em] tw-text-[var(--text)]">{m.role}</div>
-                  <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{formatTime(m.updatedAt)}</div>
-                </header>
-                {(() => {
-                  const text = String(m.contentMarkdown || m.contentText || '');
-                  const html = md.render(text);
-                  return <div className="wcMarkdown tw-mt-2 tw-text-[12px] tw-leading-5 tw-text-[var(--muted)]" dangerouslySetInnerHTML={{ __html: html }} />;
-                })()}
-              </article>
-            ))}
+            {detail.messages.map((m) => {
+              const text = String(m.contentMarkdown || m.contentText || '');
+              return (
+                <ChatMessageBubble
+                  key={String(m.id)}
+                  role={m.role}
+                  headerLeft={String(m.role || 'Message')}
+                  headerRight={formatTime(m.updatedAt)}
+                  markdown={text}
+                />
+              );
+            })}
           </div>
         ) : activeId ? (
           <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No messages.</p>
