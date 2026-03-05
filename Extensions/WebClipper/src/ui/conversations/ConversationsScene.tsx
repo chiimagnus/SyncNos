@@ -14,7 +14,7 @@ export type ConversationsSceneProps = {
 
 export function ConversationsScene({ defaultNarrowRoute = 'list' }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId } = useConversationsApp();
+  const { activeId, selectedConversation } = useConversationsApp();
   const [narrowRoute, setNarrowRoute] = useState<NarrowRoute>(defaultNarrowRoute);
 
   useEffect(() => {
@@ -47,8 +47,8 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
                 Back
               </button>
 
-              <div className="tw-min-w-0 tw-flex-1 tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
-                {activeId ? 'Detail' : 'Chats'}
+              <div className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
+                {activeId ? String(selectedConversation?.title || '').trim() || '(Untitled)' : 'Chats'}
               </div>
 
               <div className="tw-w-[74px]" aria-hidden="true" />
@@ -76,4 +76,3 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
     </div>
   );
 }
-
