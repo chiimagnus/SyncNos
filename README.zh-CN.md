@@ -72,6 +72,7 @@ SyncNos 由两部分组成：
 
 - 抓取支持网站的 AI 聊天并保存到浏览器本地存储。
 - 导出所选对话为 Markdown（单文件合并或多文件 zip 导出）。
+- Popup/App 的对话详情支持消息 Markdown 渲染，便于阅读。
 - 通过 `Obsidian Local REST API` 同步到 Obsidian（`http://127.0.0.1:27123`）。
 - 数据库备份：
   - 导出 `*.zip`（`manifest.json` + `sources/conversations.csv` + `sources/...` + `config/storage-local.json`）
@@ -85,6 +86,7 @@ SyncNos 由两部分组成：
 - Inpage 按钮显示范围可配置：
   - 默认在所有 `http(s)` 页面显示
   - 可切换为仅在支持 AI 站点 + Notion 页面显示
+  - 切换后对新打开/刷新页面生效
   - 不影响 Settings 中的 `Fetch Current Page`
 - Notion 同步按 kind 分库：
   - 聊天：`SyncNos-AI Chats`
