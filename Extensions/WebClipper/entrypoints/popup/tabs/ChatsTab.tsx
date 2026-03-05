@@ -6,7 +6,7 @@ import { syncNotionConversations, syncObsidianConversations } from '../../../src
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
 import { buildConversationsMarkdownZipExport } from '../../../src/sync/local/markdown-export';
 import { tabsCreate } from '../../../src/platform/webext/tabs';
-import { createMarkdownRenderer } from '../../../src/ui/shared/markdown';
+import { ChatMessageBubble } from '../../../src/ui/shared/ChatMessageBubble';
 
 type SourceMeta = { key: string; label: string };
 
@@ -80,14 +80,6 @@ async function copyTextToClipboard(text: string) {
 
 type PreviewState = { conversationId: number; left: number; top: number } | null;
 
-function normalizeRole(role: unknown) {
-  const r = String(role || 'assistant').toLowerCase();
-  if (r === 'user') return 'user';
-  if (r === 'assistant')
-     return 'assistant';
-  return 'other';
-}
-
 export default function ChatsTab() {
   const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,10 +101,6 @@ export default function ChatsTab() {
   const [syncingObsidian, setSyncingObsidian] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
-
-  const md = useMemo(() => {
-    return createMarkdownRenderer();
-  }, []);
 
   const [preview, setPreview] = useState<PreviewState>(null);
   const [previewDetail, setPreviewDetail] = useState<ConversationDetail | null>(null);
@@ -530,9 +518,9 @@ export default function ChatsTab() {
       >
         <div className="chatPreviewBody">
           {previewConversation ? (
-            <div className="chatPreviewMsg">
-              <div className="chatPreviewMsgRole">{previewConversation.title || '(untitled)'}</div>
-              <div className="chatPreviewMsgMarkdown">
+            <div className="tw-rounded-[10px] tw-border tw-border-[var(--border)] tw-bg-white tw-p-2 tw-text-[var(--text)]">
+              <div className="tw-mb-1.5 tw-text-[11px] tw-font-[760] tw-text-[var(--muted)]">{previewConversation.title || '(untitled)'}</div>
+              <div className="tw-break-words tw-[overflow-wrap:anywhere] tw-overflow-x-auto tw-leading-[1.42]">
                 {(() => {
                   const meta = getSourceMeta(previewConversation.source);
                   return <span className={['sourceTag', `sourceTag--${meta.key}`].join(' ')}>{meta.label || previewConversation.source}</span>;
@@ -546,14 +534,14 @@ export default function ChatsTab() {
             <div className="chatPreviewPlaceholder">No messages.</div>
           ) : null}
           {previewMessages.slice(-8).map((m) => {
-            const role = normalizeRole(m.role);
             const text = String(m.contentMarkdown || m.contentText || '');
-            const html = md.render(text);
             return (
-              <div key={m.id} className={['chatPreviewMsg', role === 'user' ? 'chatPreviewMsg--user' : role === 'assistant' ? 'chatPreviewMsg--assistant' : 'chatPreviewMsg--other'].join(' ')}>
-                <div className="chatPreviewMsgRole">{String(m.role || 'Message')}</div>
-                <div className="chatPreviewMsgMarkdown" dangerouslySetInnerHTML={{ __html: html }} />
-              </div>
+              <ChatMessageBubble
+                key={m.id}
+                role={m.role}
+                headerLeft={String(m.role || 'Message')}
+                markdown={text}
+              />
             );
           })}
         </div>
