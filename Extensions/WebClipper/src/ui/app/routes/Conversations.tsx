@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useConversationsApp } from '../conversations/conversations-context';
+import { createMarkdownRenderer } from '../../shared/markdown';
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -23,6 +24,8 @@ export default function Conversations() {
     refreshList,
     refreshActiveDetail,
   } = useConversationsApp();
+
+  const md = useMemo(() => createMarkdownRenderer({ openLinksInNewTab: true }), []);
 
   const baseButtonClass =
     'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
@@ -73,9 +76,11 @@ export default function Conversations() {
                   <div className="tw-font-mono tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em] tw-text-[var(--text)]">{m.role}</div>
                   <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{formatTime(m.updatedAt)}</div>
                 </header>
-                <pre className="tw-m-0 tw-mt-2 tw-whitespace-pre-wrap tw-font-mono tw-text-[12px] tw-leading-5 tw-text-[var(--muted)]">
-                  {m.contentMarkdown || m.contentText || ''}
-                </pre>
+                {(() => {
+                  const text = String(m.contentMarkdown || m.contentText || '');
+                  const html = md.render(text);
+                  return <div className="wcMarkdown tw-mt-2 tw-text-[12px] tw-leading-5 tw-text-[var(--muted)]" dangerouslySetInnerHTML={{ __html: html }} />;
+                })()}
               </article>
             ))}
           </div>

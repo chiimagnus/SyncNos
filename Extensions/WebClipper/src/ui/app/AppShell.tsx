@@ -218,10 +218,10 @@ export default function AppShell() {
                 <button
                   type="button"
                   onClick={closeSettings}
-                  className="tw-absolute tw-right-3 tw-top-3 tw-z-20 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                  className="tw-absolute tw-right-1 tw-top-1 tw-z-20 tw-inline-flex tw-size-6 tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0 tw-text-[var(--muted)] tw-shadow-none tw-outline-none tw-ring-0 tw-transition-colors tw-duration-200 hover:tw-bg-[var(--panel-strong)] hover:tw-text-[var(--text)]"
                   aria-label="Close settings"
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                     <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
