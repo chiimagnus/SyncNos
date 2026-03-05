@@ -43,7 +43,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
               ) : null}
 
               <div className="tw-min-w-0">
-                <h2 className="tw-m-0 tw-max-w-[85%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
+                <h2 className="tw-m-0 tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text)] tw-break-words [overflow-wrap:anywhere]">
                   {selected ? selected.title || '(Untitled)' : 'Detail'}
                 </h2>
                 <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
