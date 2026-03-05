@@ -3,6 +3,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],
+  entrypointsDir: 'src/entrypoints',
   manifest: {
     name: 'SyncNos-AI+Web Clipper',
     version: '1.1.0',
@@ -10,7 +11,6 @@ export default defineConfig({
       'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
     permissions: [
       'storage',
-      'downloads',
       'tabs',
       'webNavigation',
       'activeTab',

@@ -1,5 +1,5 @@
-import { ConversationsProvider } from '../../../src/ui/conversations/conversations-context';
-import { ConversationsScene } from '../../../src/ui/conversations/ConversationsScene';
+import { ConversationsProvider } from '../../conversations/conversations-context';
+import { ConversationsScene } from '../../conversations/ConversationsScene';
 
 export default function ChatsTab() {
   return (

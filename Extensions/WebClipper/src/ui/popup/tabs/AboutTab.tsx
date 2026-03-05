@@ -1,5 +1,5 @@
-import { getManifest, getURL } from '../../../src/platform/runtime/runtime';
-import { tabsCreate } from '../../../src/platform/webext/tabs';
+import { getManifest, getURL } from '../../../platform/runtime/runtime';
+import { tabsCreate } from '../../../platform/webext/tabs';
 
 export default function AboutTab() {
   const version = (() => {
@@ -93,3 +93,4 @@ export default function AboutTab() {
     </div>
   );
 }
+

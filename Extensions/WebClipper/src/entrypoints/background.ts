@@ -1,16 +1,16 @@
-import { createBackgroundServices } from '../src/bootstrap/background-services.ts';
-import { registerConversationHandlers } from '../src/conversations/background/handlers';
-import { registerSyncHandlers } from '../src/sync/background-handlers';
-import { createBackgroundRouter } from '../src/platform/messaging/background-router';
-import { registerWebArticleHandlers } from '../src/collectors/web/article-fetch-background-handlers';
-import { registerUiMessageHandlers } from '../src/platform/messaging/ui-background-handlers';
+import { createBackgroundServices } from '../bootstrap/background-services.ts';
+import { registerConversationHandlers } from '../conversations/background/handlers';
+import { registerSyncHandlers } from '../sync/background-handlers';
+import { createBackgroundRouter } from '../platform/messaging/background-router';
+import { registerWebArticleHandlers } from '../collectors/web/article-fetch-background-handlers';
+import { registerUiMessageHandlers } from '../platform/messaging/ui-background-handlers';
 import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
-} from '../src/sync/notion/auth/oauth';
-import { registerNotionSettingsHandlers } from '../src/sync/notion/settings-background-handlers';
-import { registerObsidianSettingsHandlers } from '../src/sync/obsidian/settings-background-handlers';
-import { onInstalled } from '../src/platform/runtime/runtime';
+} from '../sync/notion/auth/oauth';
+import { registerNotionSettingsHandlers } from '../sync/notion/settings-background-handlers';
+import { registerObsidianSettingsHandlers } from '../sync/obsidian/settings-background-handlers';
+import { onInstalled } from '../platform/runtime/runtime';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
