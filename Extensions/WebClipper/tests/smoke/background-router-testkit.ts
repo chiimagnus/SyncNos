@@ -16,7 +16,6 @@ import {
   testConnection as testObsidianConnection,
 } from '../../src/sync/obsidian/obsidian-sync-orchestrator.ts';
 import { registerObsidianSettingsHandlers } from '../../src/sync/obsidian/settings-background-handlers';
-import backgroundInpageWebVisibility from '../../src/bootstrap/background-inpage-web-visibility.ts';
 
 export function createTestBackgroundRouter() {
   const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -33,7 +32,7 @@ export function createTestBackgroundRouter() {
   registerWebArticleHandlers(router);
   registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
-  registerUiMessageHandlers(router, { backgroundInpageWebVisibility });
+  registerUiMessageHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: () => instanceId,
     notionSyncOrchestrator: {
