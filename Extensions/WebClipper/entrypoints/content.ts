@@ -1,5 +1,4 @@
 import '../src/ui/styles/tokens.css';
-import '../src/ui/styles/flash-ok.css';
 
 import { createContentController } from '../src/bootstrap/content-controller.ts';
 import { startContentBootstrap } from '../src/bootstrap/content.ts';

@@ -1,6 +1,5 @@
 import '../../src/ui/styles/tailwind.css';
 import '../../src/ui/styles/tokens.css';
-import '../../src/ui/styles/flash-ok.css';
 
 import { useEffect, useMemo, useState } from 'react';
 
