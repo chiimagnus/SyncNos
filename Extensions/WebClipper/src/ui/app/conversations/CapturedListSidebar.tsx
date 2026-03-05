@@ -41,61 +41,55 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
-      <div className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden">
-        <div className="tw-sticky tw-top-0 tw-z-20 tw-border-b tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
-            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-              {logoUrl ? (
-                <img src={logoUrl} alt="SyncNos" className="tw-size-8 tw-rounded-xl tw-object-contain" draggable={false} />
-              ) : (
-                <span
-                  className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
-                  aria-hidden="true"
-                >
-                  SN
-                </span>
-              )}
-            </div>
-
-            <div className="tw-flex tw-items-center tw-gap-2">
-              <NavLink
-                to="/settings"
-                state={{
-                  backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
-                  from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
-                }}
-                className={({ isActive }) => settingsClass(isActive)}
+      <div className="tw-border-b tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
+        <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
+          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+            {logoUrl ? (
+              <img src={logoUrl} alt="SyncNos" className="tw-size-8 tw-rounded-xl tw-object-contain" draggable={false} />
+            ) : (
+              <span
+                className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
+                aria-hidden="true"
               >
-                <span className="tw-sr-only">Settings</span>
-                <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
-              </NavLink>
+                SN
+              </span>
+            )}
+          </div>
 
-              <button
-                type="button"
-                onClick={() => refreshList().catch(() => {})}
-                className={iconButtonClass()}
-                aria-label="Refresh list"
-                disabled={loadingList}
-              >
-                <RefreshIcon />
-              </button>
+          <div className="tw-flex tw-items-center tw-gap-2">
+            <NavLink
+              to="/settings"
+              state={{
+                backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+                from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
+              }}
+              className={({ isActive }) => settingsClass(isActive)}
+            >
+              <span className="tw-sr-only">Settings</span>
+              <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
+            </NavLink>
 
-              <button type="button" onClick={onCollapse} className={iconButtonClass()} aria-label="Collapse sidebar">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => refreshList().catch(() => {})}
+              className={iconButtonClass()}
+              aria-label="Refresh list"
+              disabled={loadingList}
+            >
+              <RefreshIcon />
+            </button>
+
+            <button type="button" onClick={onCollapse} className={iconButtonClass()} aria-label="Collapse sidebar">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
         </div>
-
-        <ConversationListPane
-          suppressActiveRow={routerLocation.pathname === '/settings'}
-          onOpenConversation={() => navigate('/')}
-        />
       </div>
+
+      <ConversationListPane suppressActiveRow={routerLocation.pathname === '/settings'} onOpenConversation={() => navigate('/')} />
     </div>
   );
 }
-
