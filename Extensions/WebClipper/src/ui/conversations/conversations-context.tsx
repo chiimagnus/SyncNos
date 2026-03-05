@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import type { Conversation, ConversationDetail } from '../../../conversations/domain/models';
-import { buildConversationBasename } from '../../../conversations/domain/file-naming';
-import { formatConversationMarkdown } from '../../../conversations/domain/markdown';
-import { createZipBlob } from '../../../sync/backup/zip-utils';
-import { deleteConversations, getConversationDetail, listConversations } from '../../../conversations/client/repo';
-import { syncNotionConversations, syncObsidianConversations } from '../../../sync/repo';
+import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
+import { buildConversationBasename } from '../../conversations/domain/file-naming';
+import { formatConversationMarkdown } from '../../conversations/domain/markdown';
+import { createZipBlob } from '../../sync/backup/zip-utils';
+import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
+import { syncNotionConversations, syncObsidianConversations } from '../../sync/repo';
 
 type ConversationsAppState = {
   loadingList: boolean;
@@ -270,3 +270,4 @@ export function useConversationsApp() {
   if (!ctx) throw new Error('useConversationsApp must be used within ConversationsProvider');
   return ctx;
 }
+
