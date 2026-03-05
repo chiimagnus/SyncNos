@@ -4,7 +4,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
 
 import { ConversationListPane } from '../../conversations/ConversationListPane';
-import { useConversationsApp } from './conversations-context';
+import { useConversationsApp } from '../../conversations/conversations-context';
 
 function settingsClass(isActive: boolean) {
   const base =
