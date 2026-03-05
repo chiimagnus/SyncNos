@@ -19,7 +19,7 @@
 **Non-goals（非目标）:**
 - 不变更数据结构、存储协议、同步逻辑（仅重构 UI 组织与样式实现）。
 - 不改动任何国际化字段（除非后续明确要求）。
-- About tab 是否迁移到 Tailwind 不作为阻断项（可做但不强制）。
+- 不要求 popup 与 app 的“外层导航壳”完全一致（popup 保留 tabs；app 保留 sidebar+main 结构）。
 
 **Approach（方案）:**
 - P1：抽共享组件 `ChatMessageBubble`（已完成）。
@@ -49,6 +49,7 @@ P2（本次深化必须满足）：
    - `< md`：iOS push 单栏（section 列表 -> section 详情 -> 返回）。
 6. 样式一致（至少 Chats + Settings + Markdown 气泡相关）：
    - 组件样式使用 Tailwind utilities，不再依赖 popup/app 两套独立 class 选择器块。
+   - `Extensions/WebClipper/src/ui/styles/popup.css` 被彻底移除（含 About 与 tabs/header 的旧样式）。
 7. `Extensions/WebClipper` 下编译、测试、打包校验通过：
    - `npm run compile`
    - `npm test`
@@ -57,163 +58,16 @@ P2（本次深化必须满足）：
 
 ---
 
-## P1（最高优先级）：建立共享组件并接入两入口
+## P1（已完成，作为基线，不再执行）
 
-### Task 1: 冻结现状与对齐口径（只读确认）
+当前分支已完成“消息气泡 + Markdown 渲染”统一，后续 P2 直接复用即可：
+- 共享 Markdown renderer：`Extensions/WebClipper/src/ui/shared/markdown.ts`（默认 `openLinksInNewTab=true`），并有测试 `Extensions/WebClipper/src/ui/shared/markdown.test.ts`。
+- 共享消息气泡组件：`Extensions/WebClipper/src/ui/shared/ChatMessageBubble.tsx`（Tailwind-only，user 绿色气泡）。
+- App Conversations 详情与 popup 预览消息已接入 `ChatMessageBubble`，并移除旧的 markdown CSS 选择器依赖：
+  - `Extensions/WebClipper/entrypoints/app/style.css`：移除 `.wcMarkdown ...`
+  - `Extensions/WebClipper/src/ui/styles/popup.css`：移除 `.chatPreviewMsgMarkdown ...`（注意：该文件会在 P2 Task 10 被彻底删除）
 
-**Files:**
-- Read: `Extensions/WebClipper/src/ui/shared/markdown.ts`
-- Read: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
-- Read: `Extensions/WebClipper/entrypoints/popup/tabs/ChatsTab.tsx`
-- Read: `Extensions/WebClipper/entrypoints/app/style.css`
-- Read: `Extensions/WebClipper/src/ui/styles/popup.css`
-
-**Step 1: 记录当前差异点**
-- 行为差异：app 传 `openLinksInNewTab:true`，popup 未传。
-- 样式差异：app 用 `.wcMarkdown ...`；popup 用 `.chatPreviewMsgMarkdown ...`，并有绿色 user 气泡覆盖。
-
-**Step 2: 验证（无命令，检查点）**
-- Expected: 已明确 P1 只迁移“消息气泡 + Markdown”，其余 popup/app 样式不动。
-
-**Step 3:（可选）原子提交**
-- 无需提交。
-
----
-
-### Task 2: 新增共享组件：`ChatMessageBubble`（Tailwind-only）
-
-**Files:**
-- Create: `Extensions/WebClipper/src/ui/shared/ChatMessageBubble.tsx`
-- Modify（如需）: `Extensions/WebClipper/src/ui/shared/markdown.ts`
-
-**Step 1: 实现共享组件**
-- 组件职责：
-  - 输入：`role`（user/assistant/other），`title`（可选），`metaRight`（可选），`markdown`（string）。
-  - 内部：创建 markdown renderer（固定 `openLinksInNewTab:true`），`md.render(markdown)`，并输出 `dangerouslySetInnerHTML`。
-  - 样式：全部 Tailwind（prefix 为 `tw-`），包括：
-    - 气泡容器（user 绿色，assistant 白色，other 淡色）
-    - Markdown 子元素（table/p/h*/ul/ol/blockquote/code/pre/a）
-  - 注意：使用 Tailwind arbitrary selector variants 代替 `.wcMarkdown` / `.chatPreviewMsgMarkdown` CSS。
-
-- 行为：链接统一 `_blank` + `rel`。
-
-**Step 2: 验证**
-Run: `cd Extensions/WebClipper && npm run compile`
-Expected: TypeScript 编译通过。
-
-**Step 3:（可选）原子提交**
-Run: `git add Extensions/WebClipper/src/ui/shared/ChatMessageBubble.tsx Extensions/WebClipper/src/ui/shared/markdown.ts`
-Run: `git commit -m "feat: task2 - add shared chat bubble markdown renderer"`
-
----
-
-### Task 3: App 路由接入共享组件并移除 `.wcMarkdown` 依赖
-
-**Files:**
-- Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
-- Modify: `Extensions/WebClipper/entrypoints/app/style.css`
-
-**Step 1: 接入**
-- 将 `Conversations.tsx` 的消息渲染替换为 `<ChatMessageBubble ... />`。
-- 确保 role 映射与 popup 一致（user 绿色）。
-- 删除/不再使用 `wcMarkdown` wrapper class。
-
-**Step 2: 清理 CSS**
-- 从 `entrypoints/app/style.css` 删除 `.wcMarkdown ...` 规则块（以及只服务于该块的细碎样式）。
-- 保留 Tailwind 指令与其它仍在使用的全局设置（不要在本任务里扩大迁移范围）。
-
-**Step 3: 验证**
-Run: `cd Extensions/WebClipper && npm run compile`
-Expected: 编译通过。
-
-**Step 4:（可选）原子提交**
-Run: `git add Extensions/WebClipper/src/ui/app/routes/Conversations.tsx Extensions/WebClipper/entrypoints/app/style.css`
-Run: `git commit -m "refactor: task3 - use shared chat bubble in app"`
-
----
-
-### Task 4: Popup 预览接入共享组件并移除 `.chatPreviewMsgMarkdown` 依赖
-
-**Files:**
-- Modify: `Extensions/WebClipper/entrypoints/popup/tabs/ChatsTab.tsx`
-- Modify: `Extensions/WebClipper/src/ui/styles/popup.css`
-
-**Step 1: 接入**
-- 将 popup 的 preview messages 渲染替换为 `<ChatMessageBubble ... />`。
-- 移除 `createMarkdownRenderer()` 的本地 `useMemo`（由共享组件统一负责）。
-- 统一行为：链接新开 tab。
-
-**Step 2: 清理 CSS**
-- 从 `src/ui/styles/popup.css` 删除 `.chatPreviewMsgMarkdown ...` 相关规则块（包含 user 气泡 markdown 颜色覆盖）。
-- 若 `.chatPreviewMsg` / `.chatPreviewMsgRole` 仅用于该渲染区域，也同步迁移到 Tailwind 并删除对应规则（以实际使用为准，避免影响 popup 其它区域）。
-
-**Step 3: 验证**
-Run: `cd Extensions/WebClipper && npm run compile`
-Expected: 编译通过。
-
-**Step 4:（可选）原子提交**
-Run: `git add Extensions/WebClipper/entrypoints/popup/tabs/ChatsTab.tsx Extensions/WebClipper/src/ui/styles/popup.css`
-Run: `git commit -m "refactor: task4 - use shared chat bubble in popup preview"`
-
----
-
-### Task 5: 补一个最小测试锁定链接行为（防止回归）
-
-**Files:**
-- Create: `Extensions/WebClipper/src/ui/shared/markdown.test.ts`（或放在 `Extensions/WebClipper/tests/`，以项目现有测试组织为准）
-
-**Step 1: 测试内容**
-- 调用 `createMarkdownRenderer({ openLinksInNewTab: true })` 或通过共享组件的内部 helper。
-- 输入：`[x](https://example.com)`
-- 断言输出 HTML 包含：
-  - `<a ... target="_blank" ...>`
-  - `rel` 同时包含 `noreferrer` 与 `noopener`
-
-**Step 2: 验证**
-Run: `cd Extensions/WebClipper && npm test`
-Expected: PASS。
-
-**Step 3:（可选）原子提交**
-Run: `git add Extensions/WebClipper/src/ui/shared/markdown.test.ts`
-Run: `git commit -m "test: task5 - lock markdown link target behavior"`
-
----
-
-### Task 6: 端到端验证（构建 + 人工 UI）
-
-**Files:**
-- None
-
-**Step 1: 构建验证**
-Run: `cd Extensions/WebClipper && npm run build`
-Expected: build 成功。
-
-**Step 2:（建议）打包一致性校验**
-Run: `cd Extensions/WebClipper && npm run check`
-Expected: check 通过。
-
-**Step 3: 人工 UI 验证**
-Run: `cd Extensions/WebClipper && npm run dev`
-- 在浏览器打开扩展 popup：
-  - user 消息为绿色气泡
-  - Markdown table/code/pre/blockquote/a 等样式正确
-  - 点击链接新开 tab
-- 点击 popup Header 的 “Open App” 打开 app 路由：
-  - 同样的消息展示与 popup 一致（气泡 + Markdown）
-  - 点击链接新开 tab
-
-**Step 4:（可选）回归提交**
-- 如果前面按 task 提交，这里不需要额外提交。
-
----
-
-## P2（可选，后续）：逐步把剩余 popup/app 的自定义 CSS 迁移到 Tailwind
-
-> 仅在你确认要“彻底不用旧 CSS 文件”时执行。本计划不默认执行。
-
-候选拆分方向（每块都应是独立小任务，并确保不影响其它 tab）：
-- Popup：将 `popup.css` 中与 ChatsTab/SettingsTab/AboutTab 各自相关的样式，逐步迁移到对应 TSX 内的 Tailwind class。
-- App：将 `entrypoints/app/style.css` 中剩余全局 CSS 逐步收敛到 `tokens.css` 或 TSX Tailwind class；最终仅保留 Tailwind 指令文件。
+执行本计划时：从 **P2 Task 7** 开始即可。
 
 ---
 
@@ -284,14 +138,16 @@ Run: `cd Extensions/WebClipper && npm run dev`
 **Goal:**
 - popup 仍是 `Chats / Settings / About` tabs，但 Chats/Settings 不再有自己的实现与样式体系。
 - popup 宽度/高度约束仍然可用（窄屏自然进入 iOS push）。
+- 彻底移除 `src/ui/styles/popup.css`（tabs/header/About 也迁移到 Tailwind）。
 
 **Files (expected):**
 - Refactor: `Extensions/WebClipper/entrypoints/popup/App.tsx`
-  - tabs UI 逐步迁移为 Tailwind utilities（减少/移除对 `popup.css` 的依赖）
+  - tabs UI 迁移为 Tailwind utilities（移除对 `popup.css` 的依赖）
   - Chats tab: render shared `ConversationsScene`
   - Settings tab: render shared Settings（refactor 后）
-- Optional: `Extensions/WebClipper/entrypoints/popup/style.css` 仅保留最小尺寸约束（其余转 Tailwind）
-- Cleanup: `Extensions/WebClipper/src/ui/styles/popup.css` 移除 Chats/Settings 相关的遗留样式（仅保留仍被 About 或其它区域使用的样式，或将其也迁移）
+- Refactor: `Extensions/WebClipper/entrypoints/popup/tabs/AboutTab.tsx`（迁移到 Tailwind）
+- Refactor: `Extensions/WebClipper/entrypoints/popup/style.css` 保留最小全局约束（仅用于 popup viewport 尺寸/滚动容器兜底；其余样式用 Tailwind）
+- Delete: `Extensions/WebClipper/src/ui/styles/popup.css`
 
 **Validation:**
 - `cd Extensions/WebClipper && npm run compile`
@@ -314,3 +170,13 @@ Check:
 - App（宽屏）：
   - Chats：侧边栏 + 主视图
   - Settings：双栏导航
+
+---
+
+## P3（可选，后续）：进一步收敛剩余全局 CSS 到 Tailwind
+
+说明：本计划的 P2 已明确要求 **删除 `src/ui/styles/popup.css`**，但 `entrypoints/*/style.css` 仍可能保留极少量“全局约束/兜底”规则（例如 popup viewport 尺寸）。
+
+若后续你希望把剩余全局 CSS 也完全收敛到 TSX 内的 Tailwind utilities，可按以下方向拆小任务逐步推进：
+- Popup：把 `entrypoints/popup/style.css` 收敛到最小（或用根容器 inline style 替代），确保不影响 popup 尺寸/滚动体验。
+- App：将 `entrypoints/app/style.css` 中剩余全局规则逐步迁移到 TSX Tailwind；最终仅保留 Tailwind 指令文件（如仍需要）。
