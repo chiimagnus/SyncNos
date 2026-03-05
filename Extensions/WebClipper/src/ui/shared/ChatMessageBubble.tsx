@@ -31,7 +31,7 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
   const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
 
   const bubbleBase =
-    'tw-border tw-rounded-[10px] tw-p-2 tw-bg-white tw-text-[var(--text)] tw-shadow-[0_1px_0_rgba(217,89,38,0.06)]';
+    'tw-border tw-rounded-[10px] tw-p-2 tw-shadow-[0_1px_0_rgba(217,89,38,0.06)]';
 
   const bubbleRoleClass =
     bubbleRole === 'user'
