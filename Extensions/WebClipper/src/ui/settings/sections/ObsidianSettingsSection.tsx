@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react';
 
 import { buttonClassName, cardClassName, textInputClassName } from '../ui';
+import { SettingsFormRow } from './SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
   busy: boolean;
@@ -65,8 +66,7 @@ export function ObsidianSettingsSection(props: {
         </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Base URL</div>
+          <SettingsFormRow label="Base URL">
             <input
               value={apiBaseUrl}
               onChange={(e) => onChangeApiBaseUrl(e.target.value)}
@@ -78,10 +78,9 @@ export function ObsidianSettingsSection(props: {
               className={textInputClassName}
               aria-label="Obsidian API base url"
             />
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">API Key</div>
+          <SettingsFormRow label="API Key">
             <input
               value={apiKeyDraft}
               onChange={(e) => onChangeApiKeyDraft(e.target.value)}
@@ -95,10 +94,9 @@ export function ObsidianSettingsSection(props: {
               className={textInputClassName}
               aria-label="Obsidian API key"
             />
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Auth Header</div>
+          <SettingsFormRow label="Auth Header">
             <input
               value={authHeaderName}
               onChange={(e) => onChangeAuthHeaderName(e.target.value)}
@@ -110,24 +108,21 @@ export function ObsidianSettingsSection(props: {
               className={textInputClassName}
               aria-label="Obsidian auth header name"
             />
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]"> </div>
+          <SettingsFormRow label="">
             <div className="tw-flex tw-items-center tw-gap-2">
               <button className={buttonClassName} onClick={onTest} disabled={busy} type="button">
                 Test
               </button>
             </div>
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Status</div>
+          <SettingsFormRow label="Status" align="start">
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{statusText}</div>
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Note</div>
+          <SettingsFormRow label="Note" align="start">
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
               Install and configure Obsidian Local REST API first.{' '}
               <a
@@ -143,8 +138,7 @@ export function ObsidianSettingsSection(props: {
                 Open Setup Guide
               </a>
             </div>
-          </div>
-
+          </SettingsFormRow>
         </div>
       </section>
 
@@ -152,8 +146,7 @@ export function ObsidianSettingsSection(props: {
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Paths</h2>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">AI Chats Folder</div>
+          <SettingsFormRow label="AI Chats Folder">
             <input
               value={chatFolder}
               onChange={(e) => onChangeChatFolder(e.target.value)}
@@ -165,10 +158,9 @@ export function ObsidianSettingsSection(props: {
               className={textInputClassName}
               aria-label="Obsidian AI chats folder"
             />
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Web Clipper Folder</div>
+          <SettingsFormRow label="Web Clipper Folder">
             <input
               value={articleFolder}
               onChange={(e) => onChangeArticleFolder(e.target.value)}
@@ -180,14 +172,13 @@ export function ObsidianSettingsSection(props: {
               className={textInputClassName}
               aria-label="Obsidian web clipper folder"
             />
-          </div>
+          </SettingsFormRow>
 
-          <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3">
-            <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Note</div>
+          <SettingsFormRow label="Note" align="start">
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
               Vault-relative folder paths. Nested folders supported. Empty uses defaults.
             </div>
-          </div>
+          </SettingsFormRow>
         </div>
       </section>
     </>

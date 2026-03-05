@@ -1,4 +1,5 @@
 import { buttonClassName, cardClassName, textInputClassName } from '../ui';
+import { SettingsFormRow } from './SettingsFormRow';
 
 export function NotionAISection(props: {
   busy: boolean;
@@ -15,43 +16,45 @@ export function NotionAISection(props: {
       </div>
 
       <div className="tw-mt-3 tw-grid tw-gap-2">
-        <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3" aria-label="Preferred model index">
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Model Index</div>
-          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-            <input
-              id="notionAiModelIndex"
-              value={modelIndex}
-              onChange={(e) => onChangeModelIndex(e.target.value)}
-              disabled={busy}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              placeholder="3"
-              aria-label="Notion AI preferred model index"
-              className={`${textInputClassName} tw-w-[120px]`}
-            />
-            <button id="btnNotionAiModelSave" className={buttonClassName} onClick={onSave} disabled={busy} type="button">
-              Save
-            </button>
-            <button
-              id="btnNotionAiModelReset"
-              className={buttonClassName}
-              onClick={onReset}
-              disabled={busy}
-              type="button"
-              title="Reset to default"
-            >
-              Reset
-            </button>
-          </div>
+        <div aria-label="Preferred model index">
+          <SettingsFormRow label="Model Index">
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+              <input
+                id="notionAiModelIndex"
+                value={modelIndex}
+                onChange={(e) => onChangeModelIndex(e.target.value)}
+                disabled={busy}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                placeholder="3"
+                aria-label="Notion AI preferred model index"
+                className={`${textInputClassName} tw-w-[120px]`}
+              />
+              <button id="btnNotionAiModelSave" className={buttonClassName} onClick={onSave} disabled={busy} type="button">
+                Save
+              </button>
+              <button
+                id="btnNotionAiModelReset"
+                className={buttonClassName}
+                onClick={onReset}
+                disabled={busy}
+                type="button"
+                title="Reset to default"
+              >
+                Reset
+              </button>
+            </div>
+          </SettingsFormRow>
         </div>
 
-        <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-start tw-gap-3" aria-label="Notion AI model note">
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">Note</div>
-          <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-            Applies only when Notion AI model is set to Auto. Menu order may change in Notion.
-          </div>
+        <div aria-label="Notion AI model note">
+          <SettingsFormRow label="Note" align="start">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+              Applies only when Notion AI model is set to Auto. Menu order may change in Notion.
+            </div>
+          </SettingsFormRow>
         </div>
       </div>
     </section>
