@@ -3,6 +3,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],
+  entrypointsDir: 'src/entrypoints',
   manifest: {
     name: 'SyncNos-AI+Web Clipper',
     version: '1.1.0',

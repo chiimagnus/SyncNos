@@ -68,7 +68,6 @@ const requiredItems = [
   "tsconfig.json",
   "postcss.config.cjs",
   "tailwind.config.cjs",
-  "entrypoints",
   "public",
   "src",
   "package.json",
