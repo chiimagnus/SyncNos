@@ -128,6 +128,7 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
@@ -222,6 +223,24 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
     return () => document.removeEventListener('click', onDocClick, true);
   }, [exportOpen]);
 
+  useEffect(() => {
+    if (hasSelection) return;
+    setDeleteConfirmOpen(false);
+  }, [hasSelection]);
+
+  useEffect(() => {
+    if (!deleteConfirmOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (deleting) return;
+      setDeleteConfirmOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [deleteConfirmOpen, deleting]);
+
   const onSetFilterKey = (key: string) => {
     const next = String(key || 'all').trim().toLowerCase() || 'all';
     setFilterKey(next);
@@ -283,6 +302,11 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
     'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
   const actionButton = `${actionButtonBase} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)] hover:tw-bg-[var(--btn-bg-hover)]`;
   const dangerButton = `${actionButtonBase} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
+
+  const onConfirmDelete = async () => {
+    await deleteSelected();
+    setDeleteConfirmOpen(false);
+  };
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
@@ -433,7 +457,7 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
                   type="button"
                   className={dangerButton}
                   title="Delete selected"
-                  onClick={() => deleteSelected().catch(() => {})}
+                  onClick={() => setDeleteConfirmOpen(true)}
                   disabled={!hasSelection || busy}
                 >
                   Delete
@@ -535,6 +559,42 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
           </div>
         </div>
       </div>
+
+      {deleteConfirmOpen ? (
+        <div className="tw-fixed tw-inset-0 tw-z-40 tw-flex tw-items-center tw-justify-center tw-bg-black/30 tw-p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete conversations confirmation"
+            className="tw-w-full tw-max-w-[340px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-4 tw-shadow-[var(--shadow)]"
+          >
+            <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">Delete selected conversations?</div>
+            <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+              This cannot be undone.
+            </div>
+            <div className="tw-mt-3 tw-flex tw-justify-end tw-gap-2">
+              <button
+                type="button"
+                className={actionButton}
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={dangerButton}
+                onClick={() => {
+                  void onConfirmDelete();
+                }}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
