@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Conversations from './routes/Conversations';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
-import { ConversationsProvider } from './conversations/conversations-context';
+import { ConversationsProvider } from '../conversations/conversations-context';
 import { ConversationsScene } from '../conversations/ConversationsScene';
+import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
@@ -215,7 +215,7 @@ export default function AppShell() {
               aria-hidden={showSettingsSheet}
             >
               <Routes location={routesLocation}>
-                <Route path="/" element={<Conversations />} />
+                <Route path="/" element={<ConversationDetailPane />} />
                 <Route path="/settings" element={<Navigate to="/" replace />} />
                 <Route path="/sync" element={<Navigate to="/settings" replace />} />
                 <Route path="/backup" element={<Navigate to="/settings" replace />} />
