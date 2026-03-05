@@ -18,19 +18,15 @@ export type ConversationDetailPaneProps = {
 export function ConversationDetailPane({ onBack }: ConversationDetailPaneProps) {
   const {
     activeId,
-    loadingList,
     listError,
     selectedConversation: selected,
     loadingDetail,
     detailError,
     detail,
-    refreshList,
-    refreshActiveDetail,
   } = useConversationsApp();
 
   const baseButtonClass =
     'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
-  const primaryButtonClass = `${baseButtonClass} tw-border-[var(--text)] tw-bg-[var(--text)] tw-text-white hover:tw-bg-[#c94f20]`;
   const outlineButtonClass = `${baseButtonClass} tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--text)] hover:tw-border-[var(--border-strong)]`;
 
   return (
@@ -52,20 +48,6 @@ export function ConversationDetailPane({ onBack }: ConversationDetailPaneProps) 
                 {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : 'Select one conversation from list'}
               </div>
             </div>
-          </div>
-
-          <div className="tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-2">
-            <button onClick={() => refreshList().catch(() => {})} disabled={loadingList} type="button" className={primaryButtonClass}>
-              {loadingList ? 'Loading…' : 'Refresh List'}
-            </button>
-            <button
-              onClick={() => refreshActiveDetail().catch(() => {})}
-              disabled={!activeId || loadingDetail}
-              type="button"
-              className={primaryButtonClass}
-            >
-              {loadingDetail ? 'Loading…' : 'Reload Detail'}
-            </button>
           </div>
         </header>
 
@@ -97,4 +79,3 @@ export function ConversationDetailPane({ onBack }: ConversationDetailPaneProps) 
     </section>
   );
 }
-
