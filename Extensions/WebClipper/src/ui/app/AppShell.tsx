@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Conversations from './routes/Conversations';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
-import { ConversationsProvider } from './conversations/conversations-context';
+import { ConversationsProvider } from '../conversations/conversations-context';
+import { ConversationsScene } from '../conversations/ConversationsScene';
+import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
+import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_KEY = 'webclipper_app_sidebar_width';
@@ -125,12 +127,13 @@ export default function AppShell() {
   };
 
   function AppShellFrame() {
+    const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
 
-    const showSettingsSheet = location.pathname === '/settings';
+    const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
-    const backgroundLocation = state?.backgroundLocation ?? null;
+    const backgroundLocation = showSettingsSheet ? state?.backgroundLocation ?? null : null;
 
     const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
@@ -154,9 +157,11 @@ export default function AppShell() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showSettingsSheet]);
 
+    const renderSidebar = !isNarrow && !sidebarCollapsed;
+
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
-        {sidebarCollapsed ? null : (
+        {renderSidebar ? (
           <aside
             className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-0 tw-backdrop-blur-sm"
             style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
@@ -172,10 +177,10 @@ export default function AppShell() {
               <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border-strong)]/40 tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
             </div>
           </aside>
-        )}
+        ) : null}
 
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
-          {sidebarCollapsed ? (
+          {!isNarrow && sidebarCollapsed ? (
             <button
               type="button"
               onClick={() => setCollapsed(false)}
@@ -186,20 +191,37 @@ export default function AppShell() {
             </button>
           ) : null}
 
-          <div
-            className={[
-              'route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4',
-              showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
-            ].join(' ')}
-            aria-hidden={showSettingsSheet}
-          >
-            <Routes location={routesLocation}>
-              <Route path="/" element={<Conversations />} />
-              <Route path="/settings" element={<Navigate to="/" replace />} />
-              <Route path="/sync" element={<Navigate to="/settings" replace />} />
-              <Route path="/backup" element={<Navigate to="/settings" replace />} />
-            </Routes>
-          </div>
+          {isNarrow ? (
+            <div
+              className={[
+                'tw-h-full tw-min-h-0',
+                showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
+              ].join(' ')}
+              aria-hidden={showSettingsSheet}
+            >
+              <Routes location={routesLocation}>
+                <Route path="/" element={<ConversationsScene />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/sync" element={<Navigate to="/settings" replace />} />
+                <Route path="/backup" element={<Navigate to="/settings" replace />} />
+              </Routes>
+            </div>
+          ) : (
+            <div
+              className={[
+                'route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4',
+                showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
+              ].join(' ')}
+              aria-hidden={showSettingsSheet}
+            >
+              <Routes location={routesLocation}>
+                <Route path="/" element={<ConversationDetailPane />} />
+                <Route path="/settings" element={<Navigate to="/" replace />} />
+                <Route path="/sync" element={<Navigate to="/settings" replace />} />
+                <Route path="/backup" element={<Navigate to="/settings" replace />} />
+              </Routes>
+            </div>
+          )}
 
           {showSettingsSheet ? (
             <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label="Settings">

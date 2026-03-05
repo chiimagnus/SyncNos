@@ -5,10 +5,17 @@
 
 body {
   margin: 0;
+  overflow: hidden;
 }
 
 html,
 body,
 #root {
   height: 100%;
+}
+
+html,
+body {
+  width: 420px;
+  min-height: 600px;
 }
