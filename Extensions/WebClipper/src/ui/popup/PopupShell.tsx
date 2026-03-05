@@ -1,17 +1,17 @@
-import '../../src/ui/styles/tailwind.css';
-import '../../src/ui/styles/tokens.css';
-
 import { useEffect, useMemo, useState } from 'react';
+
+import { getURL } from '../../platform/runtime/runtime';
+import { storageGet, storageSet } from '../../platform/storage/local';
+import { tabsCreate } from '../../platform/webext/tabs';
 
 import AboutTab from './tabs/AboutTab';
 import ChatsTab from './tabs/ChatsTab';
 import SettingsTab from './tabs/SettingsTab';
-import { storageGet, storageSet } from '../../src/platform/storage/local';
-import { getURL } from '../../src/platform/runtime/runtime';
-import { tabsCreate } from '../../src/platform/webext/tabs';
 
-export default function App() {
-  const [tab, setTab] = useState<'chats' | 'settings' | 'about'>('chats');
+type PopupTabId = 'chats' | 'settings' | 'about';
+
+export default function PopupShell() {
+  const [tab, setTab] = useState<PopupTabId>('chats');
 
   useEffect(() => {
     storageGet(['popup_active_tab'])
@@ -126,3 +126,4 @@ export default function App() {
     </div>
   );
 }
+
