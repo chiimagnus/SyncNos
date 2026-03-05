@@ -30,10 +30,24 @@ export function BackupSection(props: {
   lastBackupExportAt: number;
   backupImportRef: RefObject<HTMLDivElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
+  importLabel?: string;
+  onImportClick?: () => void;
   onExport: () => void;
   onImportFile: (file: File) => void;
 }) {
-  const { busy, exportStatus, importStatus, importStats, lastBackupExportAt, backupImportRef, fileInputRef, onExport, onImportFile } = props;
+  const {
+    busy,
+    exportStatus,
+    importStatus,
+    importStats,
+    lastBackupExportAt,
+    backupImportRef,
+    fileInputRef,
+    importLabel,
+    onImportClick,
+    onExport,
+    onImportFile,
+  } = props;
 
   return (
     <section style={cardStyle as any} className={cardClassName} aria-label="Database Backup">
@@ -49,10 +63,11 @@ export function BackupSection(props: {
           disabled={busy}
           onClick={() => {
             if (busy) return;
-            fileInputRef.current?.click();
+            if (onImportClick) onImportClick();
+            else fileInputRef.current?.click();
           }}
         >
-          Import…
+          {importLabel || 'Import…'}
         </button>
         <input
           ref={fileInputRef}
@@ -74,4 +89,3 @@ export function BackupSection(props: {
     </section>
   );
 }
-
