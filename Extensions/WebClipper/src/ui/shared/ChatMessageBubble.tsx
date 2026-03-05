@@ -19,13 +19,13 @@ export type ChatMessageBubbleProps = {
   className?: string;
 };
 
+// Shared singleton to avoid per-message renderer instantiation.
+const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
+
 export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, className }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
 
-  // Keep behavior consistent across all entrypoints.
-  const md = useMemo(() => createMarkdownRenderer({ openLinksInNewTab: true }), []);
-
-  const html = useMemo(() => md.render(String(markdown || '')), [md, markdown]);
+  const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
 
   const bubbleBase =
     'tw-border tw-rounded-[10px] tw-p-2 tw-bg-white tw-text-[var(--text)] tw-shadow-[0_1px_0_rgba(217,89,38,0.06)]';
