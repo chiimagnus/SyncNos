@@ -72,6 +72,7 @@ SyncNos has two parts:
 
 - Capture AI chats from supported sites into local browser storage.
 - Export selected conversations as Markdown (single merged file or multi-file zip).
+- Popup/App renders message Markdown in conversation detail view for readability.
 - Sync selected conversations to Obsidian via `Obsidian Local REST API` (`http://127.0.0.1:27123`).
 - Database backup:
   - Export `*.zip` (`manifest.json` + `sources/conversations.csv` + `sources/...` + `config/storage-local.json`)
@@ -85,6 +86,7 @@ SyncNos has two parts:
 - Configurable Inpage button visibility:
   - Default: all `http(s)` pages
   - Optional: only supported AI sites + Notion pages
+  - Takes effect after page refresh
   - Does not affect `Fetch Current Page` in Settings
 - Notion sync writes by kind:
   - Chats: `SyncNos-AI Chats`

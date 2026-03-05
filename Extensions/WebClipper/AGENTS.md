@@ -28,7 +28,7 @@
 - inpage 显示范围开关：`inpage_supported_only`（`chrome.storage.local`）。
   - 默认值 `false`：所有 `http(s)` 页面显示 inpage 按钮。
   - 值为 `true`：仅在已支持 AI 站点 + Notion 页面显示 inpage 按钮（普通网页隐藏）。
-  - 切换后应立即生效（当前页面无需刷新）。
+  - 切换后对**新打开/刷新**的页面生效（当前实现仅在 content script 启动时读取配置）。
   - 该开关只影响 inpage 按钮显示，不影响 popup 中 `Fetch Current Page` 能力。
 
 ## 工程开发规范（建议）
@@ -74,8 +74,8 @@
 - **WebExtensions API 封装层**：`src/platform/webext/`
   - `tabs.ts` / `scripting.ts` / `web-navigation.ts` 统一封装 `chrome.*` 与 `browser.*` 差异；业务模块优先调用封装函数，避免散落全局 API 访问。
 - **兼容层已移除**：`src/runtime-context.ts` + `src/export/bootstrap.ts` 已删除；禁止依赖 `globalThis.WebClipper` 的隐式注入。
-- **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/bootstrap/background-services.ts` + `src/platform/messaging/background-router.ts`
-  - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
+- **后台初始化与路由（当前）**：`entrypoints/background.ts` + `src/bootstrap/background-services.ts` + `src/platform/messaging/background-router.ts`
+  - `entrypoints/background.ts` 负责创建 services、注册各类 handlers，并启动 router。
 - **本地内容库（conversations/messages）**：`src/conversations/`
   - 按职责拆分：`domain/`（类型/纯函数）+ `data/`（IndexedDB）+ `background/`（handlers/storage）+ `client/`（UI 调用）+ `content/`（增量 diff）
 - **Notion 同步模块**：`src/sync/notion/`
@@ -86,11 +86,12 @@
   - background：`src/sync/obsidian/obsidian-sync-orchestrator.ts`。
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch.ts` + `src/collectors/web/article-fetch-background-handlers.ts`
   - background 侧通过 `scriptingExecuteScript`（`src/platform/webext/scripting.ts`）注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
-- **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.ts`
-  - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
-  - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
-    - `src/bootstrap/background-inpage-web-visibility.ts`
-  - 为了“无需刷新立即生效”，已注入的普通网页 tab 会收到一条消息并 stop/cleanup inpage controller（见 `src/bootstrap/content.ts`）。
+- **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
+  - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
+- **Inpage 显示范围设置**：`entrypoints/content.ts` + `src/bootstrap/content.ts`
+  - popup 写入：`entrypoints/popup/tabs/SettingsTab.tsx`（保存 `inpage_supported_only` 到 `chrome.storage.local`）。
+  - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_supported_only` 决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。
+  - 当前实现仅在启动时读取配置，因此切换开关后需刷新页面生效。
 
 Phase 3（JS→TS）收口状态：
 - `src + entrypoints` 运行时代码已收敛为 TS 主实现。
@@ -159,8 +160,7 @@ Phase 3（JS→TS）收口状态：
 - 源码包应包含可读源码（不转译/拼接/压缩），并能复现提交的 `.xpi`
 - 环境要求（已在本仓库验证）：
   - OS: macOS / Linux / Windows
-  - Node.js: `v25.1.0`
-  - npm: `11.6.2`
+  - Node.js: `20.x`（CI 默认）
   - `zip` 命令：macOS 自带；Ubuntu/Debian 可用 `sudo apt-get install zip`
 - 构建步骤：
   1. `npm --prefix Extensions/WebClipper install`

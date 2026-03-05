@@ -42,7 +42,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 ### 2.3 WebClipper：对话采集与本地入库
 
 - 用户价值：在不打断对话的前提下，把浏览器中的 AI 对话可靠地留存为可导出/可同步的记录
-- 触发方式：用户打开支持站点的对话页面（自动采集为主，手动触发为辅）；inpage 按钮默认可在所有 `http(s)` 页面出现，也可在设置中切换为“仅支持站点显示”
+- 触发方式：用户打开支持站点的对话页面（自动采集为主，手动触发为辅）；inpage 按钮默认可在所有 `http(s)` 页面出现，也可在设置中切换为“仅支持站点显示”（切换后对新打开/刷新页面生效）
 - 输入：对话页面中可见的消息内容与必要元信息（如 URL、时间等）
 - 输出：扩展本地数据库中的“会话/消息”记录（持续增量更新）
 - 关键边界与失败方式：
@@ -124,7 +124,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 ### 3.3 WebClipper：对话采集 → 导出/Obsidian/备份/同步 Notion
 
 1. 用户在支持站点进行对话，扩展自动增量采集并本地入库
-   - inpage 按钮默认在所有 `http(s)` 页面可见；用户可在 Settings 开启“仅在支持站点显示 Inpage 按钮”
+   - inpage 按钮默认在所有 `http(s)` 页面可见；用户可在 Settings 开启“仅在支持站点显示 Inpage 按钮”（切换后对新打开/刷新页面生效）
    - 或用户在设置页点击 “Fetch Current Page”，将当前网页文章抓取为 `sourceType=article` 的会话并入库
 2. 用户在扩展弹窗中选择会话，执行：
    - 删除会话（需二次确认弹窗），或
@@ -177,7 +177,7 @@ flowchart TD
 - WebClipper Obsidian 约束：通过 Obsidian Local REST API（localhost HTTP）写入/更新 vault 文件；若 Obsidian 未运行或端口不可用，扩展应返回可理解的失败提示
 - WebClipper 备份约束：备份导出仅 Zip v2（`manifest.json + sources/conversations.csv + sources/... + config/storage-local.json`）；导入为合并模式（Zip v2 + legacy JSON）；备份文件不应包含 Notion token/secret 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
-- WebClipper inpage 显示范围约束：配置项 `inpage_supported_only=false` 时全站显示；为 `true` 时仅支持站点显示；该配置不影响 popup 手动抓取当前页
+- WebClipper inpage 显示范围约束：配置项 `inpage_supported_only=false` 时全站显示；为 `true` 时仅支持站点显示；切换后对新打开/刷新页面生效；该配置不影响 popup 手动抓取当前页
 - WebClipper Markdown 渲染约束：`contentMarkdown` 可用时按 Markdown 结构写入 Notion blocks；不可用时回退纯文本，避免同步中断
 
 ## 6 产物与可见结果（Outputs）
