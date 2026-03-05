@@ -131,9 +131,9 @@ export default function AppShell() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const showSettingsSheet = location.pathname === '/settings';
+    const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
-    const backgroundLocation = state?.backgroundLocation ?? null;
+    const backgroundLocation = showSettingsSheet ? state?.backgroundLocation ?? null : null;
 
     const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
@@ -201,7 +201,7 @@ export default function AppShell() {
             >
               <Routes location={routesLocation}>
                 <Route path="/" element={<ConversationsScene />} />
-                <Route path="/settings" element={<Navigate to="/" replace />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/sync" element={<Navigate to="/settings" replace />} />
                 <Route path="/backup" element={<Navigate to="/settings" replace />} />
               </Routes>
