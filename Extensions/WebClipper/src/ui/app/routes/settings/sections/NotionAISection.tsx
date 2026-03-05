@@ -1,4 +1,4 @@
-import { buttonClassName, buttonStyle, cardClassName, cardStyle, textInputClassName } from '../ui';
+import { buttonClassName, cardClassName, textInputClassName } from '../ui';
 
 export function NotionAISection(props: {
   busy: boolean;
@@ -9,7 +9,7 @@ export function NotionAISection(props: {
 }) {
   const { busy, modelIndex, onChangeModelIndex, onSave, onReset } = props;
   return (
-    <section style={cardStyle as any} className={cardClassName} aria-label="Notion AI settings">
+    <section className={cardClassName} aria-label="Notion AI settings">
       <div className="tw-flex tw-items-center tw-gap-2">
         <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Notion AI</h2>
       </div>
@@ -29,16 +29,14 @@ export function NotionAISection(props: {
               step={1}
               placeholder="3"
               aria-label="Notion AI preferred model index"
-              className={textInputClassName}
-              style={{ width: 120 }}
+              className={`${textInputClassName} tw-w-[120px]`}
             />
-            <button id="btnNotionAiModelSave" className={buttonClassName} style={buttonStyle as any} onClick={onSave} disabled={busy} type="button">
+            <button id="btnNotionAiModelSave" className={buttonClassName} onClick={onSave} disabled={busy} type="button">
               Save
             </button>
             <button
               id="btnNotionAiModelReset"
               className={buttonClassName}
-              style={buttonStyle as any}
               onClick={onReset}
               disabled={busy}
               type="button"

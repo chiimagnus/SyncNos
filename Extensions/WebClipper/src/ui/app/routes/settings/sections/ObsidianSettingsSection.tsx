@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 
-import { buttonClassName, buttonStyle, cardClassName, cardStyle, textInputClassName } from '../ui';
+import { buttonClassName, cardClassName, textInputClassName } from '../ui';
 
 export function ObsidianSettingsSection(props: {
   busy: boolean;
@@ -58,7 +58,7 @@ export function ObsidianSettingsSection(props: {
 
   return (
     <>
-      <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Local REST API">
+      <section className={cardClassName} aria-label="Obsidian Local REST API">
         <div className="tw-flex tw-items-center tw-gap-2">
           <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
           <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Local REST API</h2>
@@ -115,7 +115,7 @@ export function ObsidianSettingsSection(props: {
           <div className="tw-grid tw-grid-cols-[110px_1fr] tw-items-center tw-gap-3">
             <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]"> </div>
             <div className="tw-flex tw-items-center tw-gap-2">
-              <button className={buttonClassName} style={buttonStyle as any} onClick={onTest} disabled={busy} type="button">
+              <button className={buttonClassName} onClick={onTest} disabled={busy} type="button">
                 Test
               </button>
             </div>
@@ -148,7 +148,7 @@ export function ObsidianSettingsSection(props: {
         </div>
       </section>
 
-      <section style={cardStyle as any} className={cardClassName} aria-label="Obsidian Paths">
+      <section className={cardClassName} aria-label="Obsidian Paths">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Obsidian Paths</h2>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
