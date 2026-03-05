@@ -13,9 +13,10 @@ function formatTime(ts?: number) {
 
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
+  hideHeader?: boolean;
 };
 
-export function ConversationDetailPane({ onBack }: ConversationDetailPaneProps) {
+export function ConversationDetailPane({ onBack, hideHeader = false }: ConversationDetailPaneProps) {
   const {
     activeId,
     listError,
@@ -32,24 +33,26 @@ export function ConversationDetailPane({ onBack }: ConversationDetailPaneProps) 
   return (
     <section>
       <section className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Conversation detail">
-        <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
-          <div className="tw-flex tw-min-w-0 tw-items-start tw-gap-2">
-            {onBack ? (
-              <button type="button" onClick={onBack} className={outlineButtonClass} aria-label="Back">
-                Back
-              </button>
-            ) : null}
+        {!hideHeader ? (
+          <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
+            <div className="tw-flex tw-min-w-0 tw-items-start tw-gap-2">
+              {onBack ? (
+                <button type="button" onClick={onBack} className={outlineButtonClass} aria-label="Back">
+                  Back
+                </button>
+              ) : null}
 
-            <div className="tw-min-w-0">
-              <h2 className="tw-m-0 tw-max-w-[85%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
-                {selected ? selected.title || '(Untitled)' : 'Detail'}
-              </h2>
-              <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-                {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : 'Select one conversation from list'}
+              <div className="tw-min-w-0">
+                <h2 className="tw-m-0 tw-max-w-[85%] tw-truncate tw-text-[20px] tw-font-extrabold tw-tracking-[-0.01em] tw-text-[var(--text)]">
+                  {selected ? selected.title || '(Untitled)' : 'Detail'}
+                </h2>
+                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                  {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : 'Select one conversation from list'}
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        ) : null}
 
         {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
         {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Loading…</p> : null}

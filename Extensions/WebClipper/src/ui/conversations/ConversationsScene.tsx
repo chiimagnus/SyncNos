@@ -34,6 +34,11 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
 
   if (isNarrow) {
     if (narrowRoute === 'detail') {
+      const title = activeId ? String(selectedConversation?.title || '').trim() || '(Untitled)' : 'Chats';
+      const subtitle = activeId && selectedConversation
+        ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
+        : '';
+
       return (
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
           <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--panel)]/60 tw-px-3 tw-py-2 tw-backdrop-blur-sm">
@@ -47,8 +52,13 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
                 Back
               </button>
 
-              <div className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
-                {activeId ? String(selectedConversation?.title || '').trim() || '(Untitled)' : 'Chats'}
+              <div className="tw-min-w-0 tw-flex-1 tw-text-center">
+                <div className="tw-min-w-0 tw-truncate tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">{title}</div>
+                {subtitle ? (
+                  <div className="tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+                    {subtitle}
+                  </div>
+                ) : null}
               </div>
 
               <div className="tw-w-[74px]" aria-hidden="true" />
@@ -56,7 +66,7 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
           </div>
 
           <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
-            <ConversationDetailPane />
+            <ConversationDetailPane hideHeader />
           </div>
         </div>
       );
