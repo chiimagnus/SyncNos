@@ -1,7 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./entrypoints/**/*.{html,ts,tsx}",
     "./src/**/*.{html,js,jsx,ts,tsx}",
   ],
   theme: {
@@ -13,4 +12,3 @@ module.exports = {
     preflight: false,
   },
 };
-
