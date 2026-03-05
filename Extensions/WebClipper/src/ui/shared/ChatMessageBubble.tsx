@@ -6,8 +6,11 @@ type BubbleRole = 'user' | 'assistant' | 'other';
 
 function normalizeRole(role: unknown): BubbleRole {
   const r = String(role || '').trim().toLowerCase();
-  if (r === 'user') return 'user';
-  if (r === 'assistant') return 'assistant';
+  if (!r) return 'other';
+
+  // Normalize common variants from legacy data / different collectors.
+  if (r === 'user' || r === 'human' || r === 'me' || r === 'you') return 'user';
+  if (r === 'assistant' || r === 'ai' || r === 'bot' || r === 'model') return 'assistant';
   return 'other';
 }
 
