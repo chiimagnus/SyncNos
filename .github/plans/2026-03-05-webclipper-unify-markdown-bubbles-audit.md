@@ -1,73 +1,80 @@
-# Audit Report: WebClipper Popup/App 统一 Markdown 渲染与气泡样式
+# Audit Report: WebClipper Popup/App Unify Chats/Settings (2026-03-05)
 
-- Repo root: `SyncNos/`
-- Plan: `.github/plans/2026-03-05-webclipper-unify-markdown-bubbles-implementation-plan.md`
-- Auditor: `plan-task-auditor`
-- Scope: 仅审计并对齐计划中的 Task 1-6（消息气泡 + Markdown 渲染一致性），不扩大到全量 CSS 迁移。
+Plan: `.github/plans/2026-03-05-webclipper-unify-markdown-bubbles-implementation-plan.md`
 
-## TODO Board (N=6)
+Repo: `SyncNos/Extensions/WebClipper`
 
-1. Task 1: 冻结现状与对齐口径（只读确认）
-2. Task 2: 新增共享组件：`ChatMessageBubble`（Tailwind-only）
-3. Task 3: App 路由接入共享组件并移除 `.wcMarkdown` 依赖
-4. Task 4: Popup 预览接入共享组件并移除 `.chatPreviewMsgMarkdown` 依赖
-5. Task 5: 补一个最小测试锁定链接行为（防止回归）
-6. Task 6: 端到端验证（构建 + 人工 UI）
+## TODO Board (5 Tasks)
+
+1. Task 7: `useIsNarrowScreen`
+2. Task 8: Conversations scene + iOS push + popup reuse
+3. Task 9: Settings scene + iOS push + popup reuse
+4. Task 10: Popup shell restyle + remove `src/ui/styles/popup.css`
+5. Task 11: Manual UI acceptance (`npm run dev`)
 
 ## Task-to-File Map
 
-- Task 1:
-  - `Extensions/WebClipper/src/ui/shared/markdown.ts`
-  - `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
-  - `Extensions/WebClipper/entrypoints/popup/tabs/ChatsTab.tsx`
-  - `Extensions/WebClipper/entrypoints/app/style.css`
-  - `Extensions/WebClipper/src/ui/styles/popup.css`
-- Task 2:
-  - `Extensions/WebClipper/src/ui/shared/ChatMessageBubble.tsx`
-  - `Extensions/WebClipper/src/ui/shared/markdown.ts`
-- Task 3:
-  - `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
-  - `Extensions/WebClipper/entrypoints/app/style.css`
-- Task 4:
-  - `Extensions/WebClipper/entrypoints/popup/tabs/ChatsTab.tsx`
-  - `Extensions/WebClipper/src/ui/styles/popup.css`
-- Task 5:
-  - `Extensions/WebClipper/src/ui/shared/markdown.test.ts`
-- Task 6:
-  - 验证命令：`npm run build`, `npm run check`,（人工）`npm run dev`
+- Task 7
+- `Extensions/WebClipper/src/ui/shared/hooks/useIsNarrowScreen.ts`
+
+- Task 8
+- `Extensions/WebClipper/src/ui/conversations/conversations-context.tsx`
+- `Extensions/WebClipper/src/ui/conversations/ConversationsScene.tsx`
+- `Extensions/WebClipper/src/ui/conversations/ConversationListPane.tsx`
+- `Extensions/WebClipper/src/ui/conversations/ConversationDetailPane.tsx`
+- `Extensions/WebClipper/src/ui/app/AppShell.tsx`
+- `Extensions/WebClipper/src/ui/app/conversations/CapturedListSidebar.tsx`
+- `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
+- `Extensions/WebClipper/entrypoints/popup/tabs/ChatsTab.tsx`
+
+- Task 9
+- `Extensions/WebClipper/src/ui/settings/SettingsScene.tsx`
+- `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+- `Extensions/WebClipper/src/ui/app/AppShell.tsx`
+- `Extensions/WebClipper/entrypoints/popup/tabs/SettingsTab.tsx`
+- `Extensions/WebClipper/src/ui/app/routes/settings/types.ts`
+- `Extensions/WebClipper/src/ui/app/routes/settings/sections/BackupSection.tsx`
+- `Extensions/WebClipper/src/ui/app/routes/settings/sections/ArticleFetchSection.tsx`
+
+- Task 10
+- `Extensions/WebClipper/entrypoints/popup/App.tsx`
+- `Extensions/WebClipper/entrypoints/popup/style.css`
+- `Extensions/WebClipper/entrypoints/popup/tabs/AboutTab.tsx`
+- `Extensions/WebClipper/src/ui/styles/tokens.css`
+- (deleted) `Extensions/WebClipper/src/ui/styles/popup.css`
+
+- Task 11
+- Manual: `cd Extensions/WebClipper && npm run dev`
 
 ## Findings (Open First)
 
-### Finding F-01
+## Finding F-01
 
-- Task: `Task 2: 新增共享组件：ChatMessageBubble（Tailwind-only）`
+- Task: `Task 8: Conversations（Chats）抽成共享 Scene（含 iOS push）`
 - Severity: `Medium`
 - Status: `Resolved`
-- Location: `Extensions/WebClipper/src/ui/shared/ChatMessageBubble.tsx:26`
-- Summary: `ChatMessageBubble` 为每个 bubble 实例各自创建一份 `markdown-it` renderer（`useMemo` 绑定到组件实例），列表渲染时会产生 N 份 renderer。
-- Risk: 性能与内存回退（与之前 app/popup 各自只创建 1 份 renderer 相比）；也增加未来行为漂移的机会（renderer 配置变更需要保证每个实例一致）。
-- Expected fix: 将 renderer 提升为模块级单例（或以 shared hook/单例函数提供），bubble 内仅负责 `md.render()`，避免每条消息重复 new renderer。
+- Location: `Extensions/WebClipper/src/ui/app/conversations/CapturedListSidebar.tsx:1`
+- Summary: App route sidebar bottom action dock not visible due to nested scroll containers (outer sidebar scroll + inner `ConversationListPane` scroll with `sticky bottom`).
+- Risk: Sidebar selection/actions become inaccessible; user-perceived regression in app Chats wide layout.
+- Expected fix: Make the sidebar use a single scroll container (remove the outer overflow wrapper and keep header outside), so `ConversationListPane`'s sticky bottom dock can render at the actual sidebar bottom.
 - Validation:
   - `cd Extensions/WebClipper && npm run compile`
   - `cd Extensions/WebClipper && npm test`
-  - `cd Extensions/WebClipper && npm run build`
-- Resolution evidence: commit `a021b1f7` + compile/test/build 通过（见下方 Fix/Validation log）。
+  - Manual: app wide layout verify sidebar bottom dock is visible.
+- Resolution evidence: commit `745dec3d` (remove nested scroll wrapper; keep header above `ConversationListPane`), `npm run compile` pass, `npm test` pass.
 
 ## Fix Log
 
-- Resolved F-01:
-  - Change: 提升 renderer 为模块级单例（避免每条消息重复创建 renderer）
-  - Commit: `a021b1f7`
+- `745dec3d` fix(webclipper-ui): restore sidebar bottom dock in app chats
 
 ## Validation Log
 
-- `cd Extensions/WebClipper && npm run compile` PASS
-- `cd Extensions/WebClipper && npm test` PASS
-- `cd Extensions/WebClipper && npm run build` PASS
-- `cd Extensions/WebClipper && npm run check` PASS
-- Manual UI: 未在本环境实际打开浏览器验证（需要人手在扩展 popup 与 app 路由点开对比）。
+- Task 7: `npm run compile` (pass)
+- Task 8: `npm run compile` (pass), `npm test` (pass)
+- Task 9: `npm run compile` (pass), `npm test` (pass)
+- Task 10: `npm run compile` (pass), `npm run build` (pass), `npm run check` (pass)
+- Task 11: `npm run dev` started successfully (manual interaction pending)
 
-## Current Status / Residual Risk
+## Final Status / Residual Risks
 
-- 计划验收点（openLinksInNewTab、新气泡样式、去除旧 markdown CSS 块）已实现并通过自动化构建与测试。
-- Residual: 无阻断项（仍建议补一轮人工 UI 对比确认“完全一致”的视觉细节）。
+- No open findings. Residual risk: manual UI checks (Task 11) still require human verification of narrow/wide interactions.
