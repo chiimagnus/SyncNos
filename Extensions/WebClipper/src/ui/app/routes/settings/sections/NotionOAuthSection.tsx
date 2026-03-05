@@ -1,5 +1,5 @@
 import type { NotionPageOption } from '../utils';
-import { buttonClassName, cardClassName, cardStyle, selectClassName } from '../ui';
+import { buttonClassName, cardClassName, selectClassName } from '../ui';
 
 export function NotionOAuthSection(props: {
   busy: boolean;
@@ -29,7 +29,7 @@ export function NotionOAuthSection(props: {
   } = props;
 
   return (
-    <section style={cardStyle as any} className={cardClassName} aria-label="Notion settings">
+    <section className={cardClassName} aria-label="Notion settings">
       <div className="tw-flex tw-items-center tw-gap-2">
         <img className="tw-h-5 tw-w-5 tw-shrink-0" src={notionLogoUrl} alt="" aria-hidden="true" />
         <div className="tw-min-w-0 tw-flex-1 tw-text-[var(--text)]">
@@ -49,11 +49,10 @@ export function NotionOAuthSection(props: {
         <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
           <select
             id="notionPages"
-            className={selectClassName}
+            className={`${selectClassName} tw-w-full`}
             value={notionParentPageId}
             disabled={busy || !notionConnected}
             onChange={(e) => onSaveNotionParentPage(e.target.value)}
-            style={{ width: '100%' }}
           >
             {notionPageOptions.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
             {notionPageOptions.map((p) => (
