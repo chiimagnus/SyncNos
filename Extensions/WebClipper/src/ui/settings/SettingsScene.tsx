@@ -17,14 +17,14 @@ import { tabsCreate } from '../../platform/webext/tabs';
 
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 
-import { SettingsSidebarNav } from '../app/routes/settings/SettingsSidebarNav';
-import { SETTINGS_SECTIONS, type SettingsSectionKey } from '../app/routes/settings/types';
-import { ArticleFetchSection } from '../app/routes/settings/sections/ArticleFetchSection';
-import { BackupSection } from '../app/routes/settings/sections/BackupSection';
-import { InpageSection } from '../app/routes/settings/sections/InpageSection';
-import { NotionAISection } from '../app/routes/settings/sections/NotionAISection';
-import { NotionOAuthSection } from '../app/routes/settings/sections/NotionOAuthSection';
-import { ObsidianSettingsSection } from '../app/routes/settings/sections/ObsidianSettingsSection';
+import { SettingsSidebarNav } from './SettingsSidebarNav';
+import { SETTINGS_SECTIONS, type SettingsSectionKey } from './types';
+import { ArticleFetchSection } from './sections/ArticleFetchSection';
+import { BackupSection } from './sections/BackupSection';
+import { InpageSection } from './sections/InpageSection';
+import { NotionAISection } from './sections/NotionAISection';
+import { NotionOAuthSection } from './sections/NotionOAuthSection';
+import { ObsidianSettingsSection } from './sections/ObsidianSettingsSection';
 import {
   formatProgress,
   isZipFile,
@@ -34,7 +34,7 @@ import {
   unwrap,
   type ApiResponse,
   type NotionPageOption,
-} from '../app/routes/settings/utils';
+} from './utils';
 
 type NarrowRoute = 'list' | 'detail';
 

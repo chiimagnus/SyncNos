@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import type { SettingsSectionKey } from './settings/types';
+import type { SettingsSectionKey } from '../../settings/types';
 import { SettingsScene } from '../../settings/SettingsScene';
 
 export default function Settings() {
@@ -48,4 +48,3 @@ export default function Settings() {
     />
   );
 }
-
