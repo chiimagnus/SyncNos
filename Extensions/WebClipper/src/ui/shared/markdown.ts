@@ -3,12 +3,13 @@ import MarkdownIt from 'markdown-it';
 export type MarkdownRendererOptions = {
   /**
    * If true, rendered links will open in a new tab.
-   * Defaults to false to preserve legacy popup behavior.
+   * Defaults to true to keep popup/app behavior consistent.
    */
   openLinksInNewTab?: boolean;
 };
 
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
+  const openLinksInNewTab = options.openLinksInNewTab ?? true;
   const inst = new MarkdownIt({
     html: false,
     breaks: true,
@@ -22,7 +23,7 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     // ignore
   }
 
-  if (options.openLinksInNewTab) {
+  if (openLinksInNewTab) {
     const defaultRender =
       inst.renderer.rules.link_open ||
       ((tokens, idx, opts, _env, self) => {
@@ -41,4 +42,3 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
 
   return inst;
 }
-
