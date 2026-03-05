@@ -81,6 +81,10 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       'tw-[&_td]:tw-border tw-[&_td]:tw-border-[rgba(217,89,38,0.2)] tw-[&_td]:tw-px-[6px] tw-[&_td]:tw-py-[4px] tw-[&_td]:tw-align-top tw-[&_td]:tw-text-[12px]',
       'tw-[&_thead_th]:tw-bg-[rgba(255,241,234,0.75)]',
 
+      // Images: never overflow the bubble, and avoid giant original-size rendering.
+      'tw-[&_img]:tw-block tw-[&_img]:tw-max-w-full tw-[&_img]:tw-h-auto tw-[&_img]:tw-max-h-[min(360px,50vh)] tw-[&_img]:tw-object-contain',
+      'tw-[&_img]:tw-rounded-[10px] tw-[&_img]:tw-border tw-[&_img]:tw-border-[rgba(217,89,38,0.18)]',
+
       'tw-[&_a]:tw-text-[#2563eb] tw-[&_a]:tw-underline tw-[&_a]:tw-underline-offset-[1px]',
     ].join(' ') + (className ? ` ${className}` : '');
 
