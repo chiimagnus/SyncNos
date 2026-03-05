@@ -53,39 +53,43 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
   // Tailwind-only Markdown styling (no global CSS selectors).
   const mdClass =
     [
-      'tw-break-words tw-[overflow-wrap:anywhere] tw-overflow-x-auto tw-leading-[1.42]',
-      'tw-[&>*:first-child]:tw-mt-0 tw-[&>*:last-child]:tw-mb-0',
+      // NOTE: Tailwind uses `prefix: "tw-"`. For arbitrary properties/selectors, do NOT
+      // prefix the `[...]` segment, only prefix the actual utility (e.g. `[&_p]:tw-mt-0`).
+      'tw-break-words [overflow-wrap:anywhere] tw-overflow-x-auto tw-leading-[1.42]',
+      '[&>*:first-child]:tw-mt-0 [&>*:last-child]:tw-mb-0',
 
-      'tw-[&_p]:tw-mt-0 tw-[&_p]:tw-mb-2',
+      '[&_p]:tw-mt-0 [&_p]:tw-mb-2',
 
-      'tw-[&_h1]:tw-mt-2.5 tw-[&_h1]:tw-mb-1.5 tw-[&_h1]:tw-text-[15px] tw-[&_h1]:tw-leading-[1.32] tw-[&_h1]:tw-tracking-[-0.01em] tw-[&_h1]:tw-font-[800]',
-      'tw-[&_h2]:tw-mt-2.5 tw-[&_h2]:tw-mb-1.5 tw-[&_h2]:tw-text-[14px] tw-[&_h2]:tw-leading-[1.32] tw-[&_h2]:tw-tracking-[-0.01em] tw-[&_h2]:tw-font-[800]',
-      'tw-[&_h3]:tw-mt-2.5 tw-[&_h3]:tw-mb-1.5 tw-[&_h3]:tw-text-[13px] tw-[&_h3]:tw-leading-[1.32] tw-[&_h3]:tw-tracking-[-0.01em] tw-[&_h3]:tw-font-[780]',
-      'tw-[&_h4]:tw-mt-2.5 tw-[&_h4]:tw-mb-1.5 tw-[&_h4]:tw-text-[13px] tw-[&_h4]:tw-leading-[1.32] tw-[&_h4]:tw-tracking-[-0.01em] tw-[&_h4]:tw-font-[780]',
-      'tw-[&_h5]:tw-mt-2.5 tw-[&_h5]:tw-mb-1.5 tw-[&_h5]:tw-text-[13px] tw-[&_h5]:tw-leading-[1.32] tw-[&_h5]:tw-tracking-[-0.01em] tw-[&_h5]:tw-font-[780]',
-      'tw-[&_h6]:tw-mt-2.5 tw-[&_h6]:tw-mb-1.5 tw-[&_h6]:tw-text-[13px] tw-[&_h6]:tw-leading-[1.32] tw-[&_h6]:tw-tracking-[-0.01em] tw-[&_h6]:tw-font-[780]',
+      '[&_h1]:tw-mt-2.5 [&_h1]:tw-mb-1.5 [&_h1]:tw-text-[15px] [&_h1]:tw-leading-[1.32] [&_h1]:tw-tracking-[-0.01em] [&_h1]:tw-font-[800]',
+      '[&_h2]:tw-mt-2.5 [&_h2]:tw-mb-1.5 [&_h2]:tw-text-[14px] [&_h2]:tw-leading-[1.32] [&_h2]:tw-tracking-[-0.01em] [&_h2]:tw-font-[800]',
+      '[&_h3]:tw-mt-2.5 [&_h3]:tw-mb-1.5 [&_h3]:tw-text-[13px] [&_h3]:tw-leading-[1.32] [&_h3]:tw-tracking-[-0.01em] [&_h3]:tw-font-[780]',
+      '[&_h4]:tw-mt-2.5 [&_h4]:tw-mb-1.5 [&_h4]:tw-text-[13px] [&_h4]:tw-leading-[1.32] [&_h4]:tw-tracking-[-0.01em] [&_h4]:tw-font-[780]',
+      '[&_h5]:tw-mt-2.5 [&_h5]:tw-mb-1.5 [&_h5]:tw-text-[13px] [&_h5]:tw-leading-[1.32] [&_h5]:tw-tracking-[-0.01em] [&_h5]:tw-font-[780]',
+      '[&_h6]:tw-mt-2.5 [&_h6]:tw-mb-1.5 [&_h6]:tw-text-[13px] [&_h6]:tw-leading-[1.32] [&_h6]:tw-tracking-[-0.01em] [&_h6]:tw-font-[780]',
 
-      'tw-[&_ul]:tw-mt-0 tw-[&_ul]:tw-mb-2 tw-[&_ul]:tw-pl-5 tw-[&_ul]:tw-list-disc',
-      'tw-[&_ol]:tw-mt-0 tw-[&_ol]:tw-mb-2 tw-[&_ol]:tw-pl-5 tw-[&_ol]:tw-list-decimal',
-      'tw-[&_ul>li+li]:tw-mt-1 tw-[&_ol>li+li]:tw-mt-1',
+      '[&_ul]:tw-mt-0 [&_ul]:tw-mb-2 [&_ul]:tw-pl-5 [&_ul]:tw-list-disc',
+      '[&_ol]:tw-mt-0 [&_ol]:tw-mb-2 [&_ol]:tw-pl-5 [&_ol]:tw-list-decimal',
+      '[&_ul>li+li]:tw-mt-1 [&_ol>li+li]:tw-mt-1',
 
-      'tw-[&_blockquote]:tw-mt-0 tw-[&_blockquote]:tw-mb-2 tw-[&_blockquote]:tw-px-[9px] tw-[&_blockquote]:tw-py-[6px] tw-[&_blockquote]:tw-border-l-[3px] tw-[&_blockquote]:tw-border-l-[rgba(217,89,38,0.35)] tw-[&_blockquote]:tw-bg-[rgba(255,241,234,0.75)] tw-[&_blockquote]:tw-text-[var(--muted)]',
+      '[&_blockquote]:tw-mt-0 [&_blockquote]:tw-mb-2 [&_blockquote]:tw-px-[9px] [&_blockquote]:tw-py-[6px] [&_blockquote]:tw-border-l-[3px] [&_blockquote]:tw-border-l-[rgba(217,89,38,0.35)] [&_blockquote]:tw-bg-[rgba(255,241,234,0.75)] [&_blockquote]:tw-text-[var(--muted)]',
 
-      'tw-[&_code]:tw-px-[5px] tw-[&_code]:tw-py-[1px] tw-[&_code]:tw-rounded-[6px] tw-[&_code]:tw-bg-[rgba(217,89,38,0.12)] tw-[&_code]:tw-font-mono tw-[&_code]:tw-text-[12px]',
+      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[rgba(217,89,38,0.12)] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
 
-      'tw-[&_pre]:tw-mt-0 tw-[&_pre]:tw-mb-2 tw-[&_pre]:tw-px-[10px] tw-[&_pre]:tw-py-[8px] tw-[&_pre]:tw-rounded-[8px] tw-[&_pre]:tw-border tw-[&_pre]:tw-border-[rgba(217,89,38,0.2)] tw-[&_pre]:tw-bg-[rgba(255,241,234,0.62)] tw-[&_pre]:tw-overflow-auto',
-      'tw-[&_pre>code]:tw-block tw-[&_pre>code]:tw-p-0 tw-[&_pre>code]:tw-bg-transparent tw-[&_pre>code]:tw-rounded-none tw-[&_pre>code]:tw-leading-[1.45]',
+      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[rgba(217,89,38,0.2)] [&_pre]:tw-bg-[rgba(255,241,234,0.62)] [&_pre]:tw-overflow-auto',
+      '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-leading-[1.45]',
 
-      'tw-[&_table]:tw-border-collapse tw-[&_table]:tw-w-max tw-[&_table]:tw-max-w-full',
-      'tw-[&_th]:tw-border tw-[&_th]:tw-border-[rgba(217,89,38,0.2)] tw-[&_th]:tw-px-[6px] tw-[&_th]:tw-py-[4px] tw-[&_th]:tw-align-top tw-[&_th]:tw-text-[12px] tw-[&_th]:tw-font-[700]',
-      'tw-[&_td]:tw-border tw-[&_td]:tw-border-[rgba(217,89,38,0.2)] tw-[&_td]:tw-px-[6px] tw-[&_td]:tw-py-[4px] tw-[&_td]:tw-align-top tw-[&_td]:tw-text-[12px]',
-      'tw-[&_thead_th]:tw-bg-[rgba(255,241,234,0.75)]',
+      '[&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
+      '[&_th]:tw-border [&_th]:tw-border-[rgba(217,89,38,0.2)] [&_th]:tw-px-[6px] [&_th]:tw-py-[4px] [&_th]:tw-align-top [&_th]:tw-text-[12px] [&_th]:tw-font-[700]',
+      '[&_td]:tw-border [&_td]:tw-border-[rgba(217,89,38,0.2)] [&_td]:tw-px-[6px] [&_td]:tw-py-[4px] [&_td]:tw-align-top [&_td]:tw-text-[12px]',
+      '[&_thead_th]:tw-bg-[rgba(255,241,234,0.75)]',
 
       // Images: never overflow the bubble, and avoid giant original-size rendering.
-      'tw-[&_img]:tw-block tw-[&_img]:tw-max-w-full tw-[&_img]:tw-h-auto tw-[&_img]:tw-max-h-[min(360px,50vh)] tw-[&_img]:tw-object-contain',
-      'tw-[&_img]:tw-rounded-[10px] tw-[&_img]:tw-border tw-[&_img]:tw-border-[rgba(217,89,38,0.18)]',
+      '[&_img]:tw-block [&_img]:tw-h-auto [&_img]:tw-object-contain',
+      // "Small image" policy: cap both width and height, but never overflow the bubble.
+      '[&_img]:tw-max-w-[min(360px,100%)] [&_img]:tw-max-h-[240px]',
+      '[&_img]:tw-rounded-[10px] [&_img]:tw-border [&_img]:tw-border-[rgba(217,89,38,0.18)]',
 
-      'tw-[&_a]:tw-text-[#2563eb] tw-[&_a]:tw-underline tw-[&_a]:tw-underline-offset-[1px]',
+      '[&_a]:tw-text-[#2563eb] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
     ].join(' ') + (className ? ` ${className}` : '');
 
   return (
