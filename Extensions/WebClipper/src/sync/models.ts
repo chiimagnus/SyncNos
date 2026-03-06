@@ -35,6 +35,9 @@ export type SyncJobSnapshot = {
   updatedAt: number;
   finishedAt: number | null;
   conversationIds: number[];
+  currentConversationId?: number;
+  currentConversationTitle?: string;
+  currentStage?: string;
   okCount: number;
   failCount: number;
   perConversation: SyncPerConversationResult[];
