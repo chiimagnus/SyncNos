@@ -6,11 +6,7 @@ import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgres
 import { extractZipEntries } from '../../../sync/backup/zip-utils';
 import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
-import {
-  ARTICLE_MESSAGE_TYPES,
-  NOTION_MESSAGE_TYPES,
-  OBSIDIAN_MESSAGE_TYPES,
-} from '../../../platform/messaging/message-contracts';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
 import { getURL, send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
 import { tabsCreate } from '../../../platform/webext/tabs';
@@ -93,9 +89,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
   const [obsidianStatus, setObsidianStatus] = useState<string>('Idle');
-
-  // Article fetch
-  const [articleFetchStatus, setArticleFetchStatus] = useState<string>('Idle');
 
   // Backup
   const [exportStatus, setExportStatus] = useState<string>('Idle');
@@ -525,25 +518,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     }
   }, [busy, openExtensionAppSettings, useAppImport]);
 
-  const onFetchCurrentPage = useCallback(async () => {
-    setArticleFetchStatus('Fetching…');
-
-    await runTask(
-      async () => {
-        const response = await send<ApiResponse<any>>(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, {});
-        const data = unwrap(response);
-        const conversationId = Number((data as any)?.conversationId) || 0;
-        setArticleFetchStatus(conversationId ? `Saved ✓ (conversationId=${conversationId})` : 'Done ✓');
-      },
-      {
-        fallbackMessage: 'fetch failed',
-        onError: (message) => {
-          setArticleFetchStatus(`Error: ${message}`);
-        },
-      }
-    );
-  }, [runTask]);
-
   const onOpenObsidianSetupGuide = useCallback(() => {
     openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md');
   }, []);
@@ -606,9 +580,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onSaveObsidianSettings,
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
-
-    articleFetchStatus,
-    onFetchCurrentPage,
 
     exportStatus,
     importStatus,

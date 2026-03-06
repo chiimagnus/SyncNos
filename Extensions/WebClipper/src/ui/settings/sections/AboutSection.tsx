@@ -1,7 +1,9 @@
 import { getManifest, getURL } from '../../../platform/runtime/runtime';
 import { tabsCreate } from '../../../platform/webext/tabs';
 
-export default function AboutTab() {
+import { buttonClassName, cardClassName } from '../ui';
+
+export function AboutSection() {
   const version = (() => {
     try {
       const manifest = getManifest();
@@ -16,8 +18,8 @@ export default function AboutTab() {
   };
 
   return (
-    <div className="route-scroll tw-h-full tw-min-h-0 tw-overflow-auto tw-overflow-x-hidden tw-p-3" aria-label="About content">
-      <section className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="About SyncNos WebClipper">
+    <>
+      <section className={cardClassName} aria-label="About SyncNos WebClipper">
         <div className="tw-flex tw-items-center tw-gap-3">
           <img className="tw-size-10 tw-rounded-2xl tw-object-contain" src={getURL('icons/icon-48.png' as any)} alt="" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
@@ -31,7 +33,7 @@ export default function AboutTab() {
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label="Links">
           <button
             id="btnAboutMacApp"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)]"
+            className={buttonClassName}
             type="button"
             onClick={() => openUrl('https://apps.apple.com/app/syncnos/id6755133888').catch(() => {})}
           >
@@ -39,7 +41,7 @@ export default function AboutTab() {
           </button>
           <button
             id="btnAboutSource"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)]"
+            className={buttonClassName}
             type="button"
             onClick={() => openUrl('https://github.com/chiimagnus/SyncNos').catch(() => {})}
           >
@@ -47,7 +49,7 @@ export default function AboutTab() {
           </button>
           <button
             id="btnAboutChangelog"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)]"
+            className={buttonClassName}
             type="button"
             onClick={() => openUrl('https://chiimagnus.notion.site/syncnos-changelog').catch(() => {})}
           >
@@ -56,7 +58,7 @@ export default function AboutTab() {
         </div>
       </section>
 
-      <section className="tw-mt-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Author">
+      <section className={cardClassName} aria-label="Author">
         <div className="tw-flex tw-items-center tw-gap-3">
           <img className="tw-size-10 tw-rounded-2xl tw-object-cover" src={getURL('icons/author-avatar.png' as any)} alt="Chii Magnus avatar" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
@@ -68,7 +70,7 @@ export default function AboutTab() {
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
           <button
             id="btnAboutMail"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)]"
+            className={buttonClassName}
             type="button"
             onClick={() =>
               openUrl('mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback').catch(() => {})
@@ -78,7 +80,7 @@ export default function AboutTab() {
           </button>
           <button
             id="btnAboutGitHub"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)]"
+            className={buttonClassName}
             type="button"
             onClick={() => openUrl('https://github.com/chiimagnus').catch(() => {})}
           >
@@ -87,10 +89,9 @@ export default function AboutTab() {
         </div>
       </section>
 
-      <section className="tw-mt-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Donate QR code">
+      <section className={cardClassName} aria-label="Donate QR code">
         <img className="tw-w-full tw-rounded-2xl tw-object-cover" src={getURL('icons/buymeacoffee1.jpg' as any)} alt="Chii Magnus donate QR code" draggable={false} />
       </section>
-    </div>
+    </>
   );
 }
-

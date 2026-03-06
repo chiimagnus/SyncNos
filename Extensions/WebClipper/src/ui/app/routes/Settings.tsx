@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import type { SettingsSectionKey } from '../../settings/types';
+import {
+  isSettingsSectionKey,
+  readStoredSettingsSection,
+  type SettingsSectionKey,
+  writeStoredSettingsSection,
+} from '../../settings/types';
 import { SettingsScene } from '../../settings/SettingsScene';
 
 export default function Settings() {
@@ -21,10 +26,7 @@ export default function Settings() {
       return { section: 'notion', focus: rawFocus || 'notion-ai', explicit: true };
     }
 
-    const section: SettingsSectionKey =
-      rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'article' || rawSection === 'inpage'
-        ? (rawSection as SettingsSectionKey)
-        : 'notion';
+    const section: SettingsSectionKey = isSettingsSectionKey(rawSection) ? rawSection : readStoredSettingsSection();
     const focus = rawFocus;
     return { section, focus, explicit };
   }, [routerLocation.search]);
@@ -33,6 +35,7 @@ export default function Settings() {
   const focusKey = params.focus;
 
   const setActiveSection = (key: SettingsSectionKey) => {
+    writeStoredSettingsSection(key);
     const next = new URLSearchParams(routerLocation.search || '');
     next.set('section', key);
     next.delete('focus');

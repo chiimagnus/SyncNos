@@ -4,11 +4,10 @@ import { getURL } from '../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../platform/storage/local';
 import { tabsCreate } from '../../platform/webext/tabs';
 
-import AboutTab from './tabs/AboutTab';
 import ChatsTab from './tabs/ChatsTab';
 import SettingsTab from './tabs/SettingsTab';
 
-type PopupTabId = 'chats' | 'settings' | 'about';
+type PopupTabId = 'chats' | 'settings';
 
 export default function PopupShell() {
   const [tab, setTab] = useState<PopupTabId>('chats');
@@ -17,7 +16,8 @@ export default function PopupShell() {
     storageGet(['popup_active_tab'])
       .then((res) => {
         const v = String(res?.popup_active_tab || '').trim();
-        if (v === 'settings' || v === 'about' || v === 'chats') setTab(v);
+        if (v === 'settings' || v === 'chats') setTab(v);
+        else if (v === 'about') setTab('settings');
       })
       .catch(() => {});
   }, []);
@@ -36,7 +36,6 @@ export default function PopupShell() {
     () => [
       { id: 'chats' as const, label: 'Chats' },
       { id: 'settings' as const, label: 'Settings' },
-      { id: 'about' as const, label: 'About' },
     ],
     [],
   );
@@ -65,7 +64,7 @@ export default function PopupShell() {
 
           <div className="tw-flex tw-flex-none tw-items-center tw-gap-2">
             <nav
-              className="tw-grid tw-w-[216px] tw-shrink-0 tw-select-none tw-grid-cols-3 tw-rounded-full tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 tw-p-1"
+              className="tw-grid tw-w-[152px] tw-shrink-0 tw-select-none tw-grid-cols-2 tw-rounded-full tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 tw-p-1"
               role="tablist"
               aria-label="Popup tabs"
             >
@@ -116,14 +115,7 @@ export default function PopupShell() {
             <SettingsTab />
           </section>
         ) : null}
-
-        {tab === 'about' ? (
-          <section id="viewAbout" className="tw-h-full tw-min-h-0" role="tabpanel" aria-label="About">
-            <AboutTab />
-          </section>
-        ) : null}
       </main>
     </div>
   );
 }
-

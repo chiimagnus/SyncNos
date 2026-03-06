@@ -7,7 +7,7 @@ import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useSettingsSceneController } from './hooks/useSettingsSceneController';
 import { SettingsSidebarNav } from './SettingsSidebarNav';
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from './types';
-import { ArticleFetchSection } from './sections/ArticleFetchSection';
+import { AboutSection } from './sections/AboutSection';
 import { BackupSection } from './sections/BackupSection';
 import { InpageSection } from './sections/InpageSection';
 import { NotionAISection } from './sections/NotionAISection';
@@ -41,7 +41,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
   const {
     busy,
-    error,
 
     notionConnected,
     pollingNotion,
@@ -75,9 +74,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
 
-    articleFetchStatus,
-    onFetchCurrentPage,
-
     exportStatus,
     importStatus,
     importStats,
@@ -95,8 +91,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
   const renderDetailContent = () => (
     <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
-      {error ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{error}</p> : null}
-
       {activeSection === 'notion' ? (
         <>
           <NotionOAuthSection
@@ -165,16 +159,6 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'article' ? (
-        <ArticleFetchSection
-          busy={busy}
-          status={articleFetchStatus}
-          onFetch={() => {
-            void onFetchCurrentPage();
-          }}
-        />
-      ) : null}
-
       {activeSection === 'backup' ? (
         <BackupSection
           busy={busy}
@@ -210,6 +194,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           }}
         />
       ) : null}
+
+      {activeSection === 'about' ? <AboutSection /> : null}
     </section>
   );
 
@@ -248,13 +234,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     return (
       <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
-        <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--panel)]/60 tw-px-3 tw-py-3 tw-backdrop-blur-sm">
-          <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">Settings</div>
-          <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-            Integrations, backup, and app behavior.
-          </div>
-        </div>
-
         <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-2">
           <nav className="tw-grid tw-gap-2" aria-label="Settings sections">
             {SETTINGS_SECTIONS.map((section) => (
