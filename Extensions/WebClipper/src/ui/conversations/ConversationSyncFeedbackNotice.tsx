@@ -52,6 +52,9 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
       ? 0
       : Math.min(100, Math.max(8, Math.round((feedback.done / feedback.total) * 100) || 0))
     : 0;
+  const currentItemLabel = feedback.currentConversationTitle.trim()
+    || (feedback.currentConversationId ? `Conversation #${feedback.currentConversationId}` : '');
+  const currentStageLabel = feedback.currentStage.trim();
 
   return (
     <div
@@ -84,6 +87,18 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           </div>
 
           <div className="tw-mt-1 tw-text-xs tw-font-semibold">{feedback.message}</div>
+
+          {feedback.phase === 'running' && currentItemLabel ? (
+            <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-opacity-90">
+              Current: {currentItemLabel}
+            </div>
+          ) : null}
+
+          {feedback.phase === 'running' && currentStageLabel ? (
+            <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-opacity-75">
+              Stage: {currentStageLabel}
+            </div>
+          ) : null}
 
           {feedback.total > 0 ? (
             <div className="tw-mt-2 tw-h-1.5 tw-overflow-hidden tw-rounded-full tw-bg-white/60">

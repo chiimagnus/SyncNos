@@ -19,6 +19,9 @@ export type ConversationSyncFeedbackState = {
   phase: ConversationSyncFeedbackPhase;
   total: number;
   done: number;
+  currentConversationId: number | null;
+  currentConversationTitle: string;
+  currentStage: string;
   failures: SyncFailureSummary[];
   message: string;
   updatedAt: number;
@@ -44,6 +47,9 @@ const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
   phase: 'idle',
   total: 0,
   done: 0,
+  currentConversationId: null,
+  currentConversationTitle: '',
+  currentStage: '',
   failures: [],
   message: '',
   updatedAt: 0,
@@ -106,6 +112,9 @@ function toTerminalFeedback(summary: SyncRunSummary, total: number): Conversatio
     phase,
     total: safeTotal,
     done: safeTotal,
+    currentConversationId: null,
+    currentConversationTitle: '',
+    currentStage: '',
     failures,
     message: buildFinishedMessage(summary, safeTotal),
     updatedAt: Date.now(),
@@ -146,6 +155,9 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       phase: 'running',
       total,
       done: Math.min(completed, total || completed),
+      currentConversationId: Number(job.currentConversationId) || null,
+      currentConversationTitle: String(job.currentConversationTitle || ''),
+      currentStage: String(job.currentStage || ''),
       failures,
       message: buildRunningMessage(job.provider, completed, total),
       updatedAt: Number(job.updatedAt) || Date.now(),
@@ -159,6 +171,9 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       phase: 'failed',
       total,
       done: Math.min(completed, total || completed),
+      currentConversationId: Number(job.currentConversationId) || null,
+      currentConversationTitle: String(job.currentConversationTitle || ''),
+      currentStage: String(job.currentStage || ''),
       failures,
       message: buildAbortedMessage(job),
       updatedAt: Number(job.updatedAt) || Date.now(),
@@ -337,6 +352,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         phase: 'running',
         total: ids.length,
         done: 0,
+        currentConversationId: ids[0] || null,
+        currentConversationTitle: ids.length ? `Conversation #${ids[0]}` : '',
+        currentStage: 'Preparing queue',
         failures: [],
         message: buildRunningMessage(provider, 0, ids.length),
         updatedAt: Date.now(),
@@ -370,6 +388,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           phase: 'failed',
           total: 0,
           done: 0,
+          currentConversationId: null,
+          currentConversationTitle: '',
+          currentStage: '',
           failures: [{ conversationId: 0, error: error instanceof Error ? error.message : String(error || 'sync failed') }],
           message: toErrorMessage(provider, error),
           updatedAt: Date.now(),
