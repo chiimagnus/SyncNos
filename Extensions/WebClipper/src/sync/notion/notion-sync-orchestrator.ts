@@ -11,6 +11,8 @@ import notionFilesApiDefault from './notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '../../platform/storage/local';
 
+const SYNC_PROVIDER = 'notion';
+
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
     const t = convo.title || "";
@@ -37,8 +39,35 @@ import { storageGet, storageRemove } from '../../platform/storage/local';
       mode: r.mode || (r.ok ? "ok" : "fail"),
       appended: Number(r.appended) || 0,
       error: r.error || "",
-      at: Date.now()
+      at: Number(r.at) || Date.now()
     }));
+  }
+
+  function buildFailureSummaries(results) {
+    return results
+      .filter((r) => !r.ok)
+      .map((r) => ({ conversationId: Number(r.conversationId) || 0, error: String(r.error || "unknown error") }));
+  }
+
+  function normalizeJob(job) {
+    if (!job || typeof job !== "object") return null;
+    const perConversation = toPerConversationSnapshot(Array.isArray(job.perConversation) ? job.perConversation : []);
+    const okCount = Number(job.okCount);
+    const failCount = Number(job.failCount);
+    return {
+      ...job,
+      provider: SYNC_PROVIDER,
+      status: job.status === "finished" ? "done" : String(job.status || "done"),
+      startedAt: Number(job.startedAt) || 0,
+      updatedAt: Number(job.updatedAt) || Date.now(),
+      finishedAt: job.finishedAt == null ? null : Number(job.finishedAt) || null,
+      conversationIds: Array.isArray(job.conversationIds)
+        ? job.conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+        : [],
+      okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((r) => r.ok).length,
+      failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((r) => !r.ok).length,
+      perConversation,
+    };
   }
 
   function canUpgradeImageBlocks(notionSyncService, blocks) {
@@ -97,8 +126,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     if (!notionJobStore || typeof notionJobStore.abortRunningJobIfFromOtherInstance !== "function") {
       throw new Error("notion sync job store missing");
     }
-    const job = await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId);
-    return { job };
+    const job = normalizeJob(await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId));
+    return { provider: SYNC_PROVIDER, job, instanceId };
   }
 
   async function syncConversations(input) {
@@ -150,11 +179,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     const jobStartedAt = Date.now();
     await notionJobStore.setJob({
       id: jobId,
+      provider: SYNC_PROVIDER,
       instanceId,
       status: "running",
       startedAt: jobStartedAt,
       updatedAt: jobStartedAt,
+      finishedAt: null,
       conversationIds: ids,
+      okCount: 0,
+      failCount: 0,
       perConversation: []
     });
 
@@ -333,11 +366,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         // eslint-disable-next-line no-await-in-loop
         await notionJobStore.setJob({
           id: jobId,
+          provider: SYNC_PROVIDER,
           instanceId,
           status: "running",
           startedAt: jobStartedAt,
           updatedAt: Date.now(),
+          finishedAt: null,
           conversationIds: ids,
+          okCount: results.filter((r) => r.ok).length,
+          failCount: results.filter((r) => !r.ok).length,
           perConversation: toPerConversationSnapshot(results)
         });
       } catch (_e) {
@@ -350,9 +387,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
     const okCount = results.filter((r) => r.ok).length;
     const failCount = results.length - okCount;
-    const failures = results.filter((r) => !r.ok);
+    const failures = buildFailureSummaries(results);
     await notionJobStore.setJob({
       id: jobId,
+      provider: SYNC_PROVIDER,
       instanceId,
       status: "done",
       startedAt: jobStartedAt,
@@ -363,7 +401,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       failCount,
       perConversation: toPerConversationSnapshot(results)
     });
-    return { results, okCount, failCount, failures, jobId };
+    return { provider: SYNC_PROVIDER, results, okCount, failCount, failures, jobId, instanceId };
   }
 
   return {

@@ -1,6 +1,6 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
 import { send } from '../platform/runtime/runtime';
-import type { NotionSyncJobStatus, ObsidianSyncStatus } from './models';
+import type { NotionSyncJobStatus, ObsidianSyncStatus, SyncRunSummary } from './models';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
@@ -34,21 +34,21 @@ function normalizeIds(ids: unknown): number[] {
     : [];
 }
 
-export async function syncNotionConversations(conversationIds: number[]): Promise<any> {
+export async function syncNotionConversations(conversationIds: number[]): Promise<SyncRunSummary> {
   const ids = normalizeIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
-  const res = await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
+  const res = await send<ApiResponse<SyncRunSummary>>(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
   return unwrap(res);
 }
 
 export async function syncObsidianConversations(
   conversationIds: number[],
   { forceFullConversationIds }: { forceFullConversationIds?: number[] } = {},
-): Promise<any> {
+): Promise<SyncRunSummary> {
   const ids = normalizeIds(conversationIds);
   if (!ids.length) throw new Error('No conversations selected');
   const forceFull = normalizeIds(forceFullConversationIds);
-  const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, {
+  const res = await send<ApiResponse<SyncRunSummary>>(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, {
     conversationIds: ids,
     forceFullConversationIds: forceFull.length ? forceFull : undefined,
   });
