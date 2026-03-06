@@ -174,6 +174,9 @@ describe('Conversations sync feedback', () => {
       updatedAt: Date.now(),
       finishedAt: null,
       conversationIds: [11, 22],
+      currentConversationId: 22,
+      currentConversationTitle: 'Current sync target',
+      currentStage: 'Uploading message blocks',
       okCount: 1,
       failCount: 0,
       perConversation: [{ conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() }],
@@ -200,6 +203,8 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
     expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
+    expect(runningNotice?.textContent).toContain('Current: Current sync target');
+    expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
 
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
@@ -252,6 +257,8 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
     expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
+    expect(runningNotice?.textContent).toContain('Current: Current sync target');
+    expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
 
     const notionButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim().startsWith('Notion')) as HTMLButtonElement | undefined;
     expect(notionButton?.disabled).toBe(true);
@@ -274,6 +281,8 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
     expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
     expect(runningNotice?.textContent).not.toContain('sync already in progress');
+    expect(runningNotice?.textContent).toContain('Current: Current sync target');
+    expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
   });
 
   it('hydrates persisted terminal feedback and clears the persisted job on dismiss', async () => {
