@@ -127,10 +127,10 @@ function ensureBubble() {
   const doc = getDoc();
   if (!doc || !doc.documentElement) return null;
 
-  const existing = doc.getElementById(BUBBLE_ID) as HTMLDivElement | null;
+  const existing = doc.getElementById(BUBBLE_ID) as HTMLElement | null;
   if (existing) return existing;
 
-  const bubble = document.createElement('div');
+  const bubble = document.createElement('webclipper-inpage-bubble');
   bubble.id = BUBBLE_ID;
   bubble.className = 'webclipper-inpage-bubble';
   bubble.setAttribute('role', 'status');

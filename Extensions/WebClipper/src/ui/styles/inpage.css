@@ -115,6 +115,7 @@
 }
 
 .webclipper-inpage-bubble {
+  all: initial;
   --bubble-bg: rgba(24, 24, 26, 0.92);
   --bubble-border: rgba(255, 255, 255, 0.18);
   --bubble-text: #ffffff;
@@ -126,6 +127,7 @@
   left: 0;
   top: 0;
   z-index: 2147483647;
+  box-sizing: border-box;
   max-width: min(300px, 100vw);
   padding: 7px 11px;
   border: 1px solid var(--bubble-border);
