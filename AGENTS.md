@@ -1,6 +1,9 @@
 # 仓库指南
 
-SyncNos 是一款 macOS 应用，将 Apple Books、GoodLinks、微信读书、得到和微信聊天 OCR 中的高亮笔记同步到 Notion。
+SyncNos 仓库当前包含两条产品线：
+
+- `SyncNos/`：macOS App，将 Apple Books、GoodLinks、微信读书、得到和微信聊天 OCR 中的高亮笔记同步到 Notion。
+- `Extensions/WebClipper/`：浏览器扩展，抓取 AI 对话与网页文章，支持本地保存、导出、备份，以及同步到 Notion / Obsidian。
 
 需要注意，当我没有明确说明的情况下，不要查看不要编辑国际化字段
 
@@ -43,6 +46,7 @@ xcodebuild -scheme SyncNos build # 构建
 
 | 规范 | 路径 |
 |------|------|
+| 业务全局地图 | `.github/docs/business-logic.md` |
 | 架构与业务 | `SyncNos/AGENTS.md` |
 | SwiftData 后台服务 | `SyncNos/Services/AGENTS.md` |
 | 动态字体 | `SyncNos/Services/Core/AGENTS.md` |
