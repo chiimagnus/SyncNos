@@ -41,7 +41,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
   const {
     busy,
-    error,
 
     notionConnected,
     pollingNotion,
@@ -92,8 +91,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
   const renderDetailContent = () => (
     <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
-      {error ? <p className="tw-m-0 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{error}</p> : null}
-
       {activeSection === 'notion' ? (
         <>
           <NotionOAuthSection
