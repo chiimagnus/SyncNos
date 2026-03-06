@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import type { SettingsSectionKey } from '../../settings/types';
+import { DEFAULT_SETTINGS_SECTION_KEY, type SettingsSectionKey } from '../../settings/types';
 import { SettingsScene } from '../../settings/SettingsScene';
 
 export default function Settings() {
@@ -24,7 +24,7 @@ export default function Settings() {
     const section: SettingsSectionKey =
       rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'inpage' || rawSection === 'about'
         ? (rawSection as SettingsSectionKey)
-        : 'notion';
+        : DEFAULT_SETTINGS_SECTION_KEY;
     const focus = rawFocus;
     return { section, focus, explicit };
   }, [routerLocation.search]);

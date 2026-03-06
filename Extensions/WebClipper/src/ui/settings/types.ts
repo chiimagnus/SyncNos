@@ -11,3 +11,5 @@ export const SETTINGS_SECTIONS: Array<{
   { key: 'inpage', label: 'Inpage', description: 'Inpage button visibility behavior.' },
   { key: 'about', label: 'About', description: 'Project, author, and support links.' },
 ];
+
+export const DEFAULT_SETTINGS_SECTION_KEY: SettingsSectionKey = SETTINGS_SECTIONS[0]?.key ?? 'backup';
