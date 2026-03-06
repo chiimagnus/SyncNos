@@ -24,13 +24,24 @@ type Deps = {
   };
 };
 
+function toSyncErrorResponse(router: AnyRouter, error: unknown) {
+  const message = String((error as any)?.message ?? error ?? 'sync failed');
+  const code = String((error as any)?.code ?? '').trim();
+  if (code) return router.err(message, { code });
+  return router.err(message);
+}
+
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const data = await deps.notionSyncOrchestrator.syncConversations({
-      conversationIds: msg?.conversationIds,
-      instanceId: deps.getInstanceId(),
-    });
-    return router.ok(data);
+    try {
+      const data = await deps.notionSyncOrchestrator.syncConversations({
+        conversationIds: msg?.conversationIds,
+        instanceId: deps.getInstanceId(),
+      });
+      return router.ok(data);
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 
   router.register(NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS, async () => {
@@ -54,11 +65,15 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const data = await deps.obsidianSyncOrchestrator.syncConversations({
-      conversationIds: msg?.conversationIds,
-      forceFullConversationIds: msg?.forceFullConversationIds,
-      instanceId: deps.getInstanceId(),
-    });
-    return router.ok(data);
+    try {
+      const data = await deps.obsidianSyncOrchestrator.syncConversations({
+        conversationIds: msg?.conversationIds,
+        forceFullConversationIds: msg?.forceFullConversationIds,
+        instanceId: deps.getInstanceId(),
+      });
+      return router.ok(data);
+    } catch (error) {
+      return toSyncErrorResponse(router, error);
+    }
   });
 }

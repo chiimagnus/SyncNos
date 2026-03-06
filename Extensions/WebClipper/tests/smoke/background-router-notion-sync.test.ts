@@ -430,4 +430,46 @@ describe('background-router notion sync', () => {
     expect(ensureCalls).toEqual(['db_stale', 'db_new']);
     expect(clearCacheCalls).toBe(1);
   });
+
+  it('returns structured already-running sync error metadata', async () => {
+    const chromeMock = mockChromeStorage();
+    const runningJobStore = createInMemoryJobStore();
+    await runningJobStore.setJob({
+      id: 'job-running',
+      provider: 'notion',
+      instanceId: 'same-instance',
+      status: 'running',
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      finishedAt: null,
+      conversationIds: [1],
+      okCount: 0,
+      failCount: 0,
+      perConversation: [],
+    });
+
+    const router = createRouter({
+      chromeMock,
+      instanceId: 'same-instance',
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => null,
+          getMessagesByConversationId: async () => [],
+        },
+        syncService: {
+          createPageInDatabase: async () => ({ id: 'p1' }),
+          appendChildren: async () => ({ ok: true }),
+          messagesToBlocks: () => [],
+        },
+        jobStore: runningJobStore,
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toBe('sync already in progress');
+    expect(res.error?.extra?.code).toBe('sync_already_running');
+  });
 });

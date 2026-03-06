@@ -7,10 +7,10 @@
 **Non-goals（非目标）:**
 - 不修改国际化字段。
 - 不重做设置页整体信息架构，也不顺手改 unrelated UI 文案。
-- 不引入新的后台持久化机制；优先复用现有 sync job / status 通道。
+- 不引入与 `chrome.storage.local` 并列的全新持久化后端；允许在现有 sync job / status 通道上收敛为共享 sync job store。
 - 不改动 Notion / Obsidian 具体同步算法本身，除非为统一返回契约所必需。
 
-**Approach（方案）:** 这次修复不在按钮上补文案，也不继续依赖原生 `alert()`。核心思路是把“同步任务反馈”上升为共享契约：先统一前后台同步结果与 job status 的类型，再在 `ConversationsProvider` 中接入一个共享的 sync task controller，负责启动任务、轮询后台进度、归一化成功/部分失败/失败结果，最后由 `ConversationListPane` 渲染统一的反馈 UI。因为 popup 与 app 都复用 `src/ui/conversations/*`，只要控制器与列表面板修好，两端会一起修复。
+**Approach（方案）:** 这次修复不在按钮上补文案，也不继续依赖原生 `alert()`。核心思路是把“同步任务反馈”上升为共享契约：先统一前后台同步结果与 job status 的类型，并把 Notion / Obsidian 收敛到同一套持久化 sync job store，再在 `ConversationsProvider` 中接入一个共享的 sync task controller，负责启动任务、hydrate 既有任务、接管正在运行的 job、轮询后台进度、归一化成功/部分失败/失败结果，最后由 `ConversationListPane` 渲染统一的反馈 UI。因为 popup 与 app 都复用 `src/ui/conversations/*`，只要控制器与列表面板修好，两端会一起修复。
 
 **Acceptance（验收）:**
 - popup 与 app 会话列表点击 `Notion` / `Obsidian` 后，能看到明确的“同步中”反馈，而不是只有按钮禁用。
@@ -30,14 +30,20 @@
 ### Task 1: 统一 sync 返回类型，消灭 `any` 和“resolve 但 silent fail”的盲区
 
 **Files:**
+- Create: `Extensions/WebClipper/src/sync/sync-job-store.ts`
 - Modify: `Extensions/WebClipper/src/sync/models.ts`
 - Modify: `Extensions/WebClipper/src/sync/repo.ts`
+- Modify: `Extensions/WebClipper/src/platform/messaging/message-contracts.ts`
+- Modify: `Extensions/WebClipper/src/sync/background-handlers.ts`
+- Modify: `Extensions/WebClipper/src/entrypoints/background.ts`
 - Modify: `Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.ts`
+- Modify: `Extensions/WebClipper/src/sync/notion/notion-sync-job-store.ts`
 - Modify: `Extensions/WebClipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
+- Create: `Extensions/WebClipper/src/sync/obsidian/obsidian-sync-job-store.ts`
 
 **Step 1: 定义共享类型**
 
-在 `src/sync/models.ts` 中补充明确的共享契约，至少包含：
+在 `src/sync/models.ts` 中补充明确的共享契约，并在 `src/sync/sync-job-store.ts` 中实现 provider 共享的持久化 job store，至少包含：
 - `SyncProvider = 'notion' | 'obsidian'`
 - `SyncPerConversationResult`
 - `SyncRunSummary`

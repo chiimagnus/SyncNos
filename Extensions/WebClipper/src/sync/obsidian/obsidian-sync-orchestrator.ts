@@ -71,6 +71,12 @@ function buildSyncSummary(results: any[], instanceId: unknown) {
   return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
 }
 
+function buildAlreadyRunningError() {
+  const error = new Error('sync already in progress') as Error & { code?: string };
+  error.code = 'sync_already_running';
+  return error;
+}
+
 function pickLocalCursor(messages: any[]) {
   const list = Array.isArray(messages) ? messages : [];
   if (!list.length) return { lastSyncedSequence: null, lastSyncedMessageKey: '' };
@@ -477,7 +483,7 @@ async function syncConversations({
 
   const safeInstanceId = safeString(instanceId);
   const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
-  if (obsidianSyncJobStore.isRunningJob(existingJob)) throw new Error('sync already in progress');
+  if (obsidianSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
   const currentJob: any = {
     id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
