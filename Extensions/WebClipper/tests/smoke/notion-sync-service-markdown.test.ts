@@ -66,6 +66,41 @@ describe("notion-sync-service markdown", () => {
     expect(bold?.text?.content).toBe("b");
   });
 
+  it("downgrades oversized inline equations into chunkable literal code text", async () => {
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
+
+    const longExpression = "x".repeat(2118);
+    const blocks = notionSyncService.markdownToNotionBlocks(`Before $${longExpression}$ after`);
+    const paragraphs = blocks.filter((b: any) => b && b.type === "paragraph");
+    expect(paragraphs.length).toBeGreaterThan(0);
+
+    const richText = paragraphs.flatMap((block: any) => block?.paragraph?.rich_text || []);
+    expect(richText.some((item: any) => item?.type === "equation")).toBe(false);
+    const fallbackLiteral = richText
+      .filter((item: any) => item?.type === "text" && item?.annotations?.code)
+      .map((item: any) => item?.text?.content || "")
+      .join("");
+    expect(fallbackLiteral).toContain(`$${longExpression}$`);
+  });
+
+  it("downgrades oversized block equations into plain-text code blocks", async () => {
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
+
+    const longExpression = "y".repeat(2118);
+    const blocks = notionSyncService.markdownToNotionBlocks(["$$", longExpression, "$$"].join("\n"));
+    expect(blocks.some((b: any) => b && b.type === "equation")).toBe(false);
+    const codeBlocks = blocks.filter((b: any) => b && b.type === "code");
+    expect(codeBlocks.length).toBeGreaterThan(0);
+    const literal = codeBlocks
+      .flatMap((block: any) => block?.code?.rich_text || [])
+      .map((item: any) => item?.text?.content || "")
+      .join("");
+    expect(literal).toContain("$$");
+    expect(literal).toContain(longExpression);
+  });
+
   it("converts image markdown to notion image blocks", async () => {
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();

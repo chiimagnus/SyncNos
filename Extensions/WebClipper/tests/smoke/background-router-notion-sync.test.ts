@@ -431,6 +431,63 @@ describe('background-router notion sync', () => {
     expect(clearCacheCalls).toBe(1);
   });
 
+  it('reuses the rebuilt database for later conversations in the same batch after stale database recovery', async () => {
+    const createCalls: string[] = [];
+    const ensureCalls: string[] = [];
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: {
+          ensureDatabase: async () => {
+            if (!ensureCalls.length) {
+              ensureCalls.push('db_stale');
+              return { databaseId: 'db_stale' };
+            }
+            ensureCalls.push('db_new');
+            return { databaseId: 'db_new' };
+          },
+          clearCachedDatabaseId: async () => true,
+        },
+        storage: {
+          getSyncMappingByConversation: async (conversationId: number) => ({
+            conversation: { id: conversationId, title: `Hello ${conversationId}`, url: `https://x/${conversationId}`, source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async (conversationId: number) => [
+            { messageKey: `m${conversationId}`, role: 'user', contentText: 'hi', sequence: 1 },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          createPageInDatabase: async (_t: string, payload: any) => {
+            createCalls.push(payload.databaseId);
+            if (payload.databaseId === 'db_stale') {
+              throw new Error(
+                'notion api failed: POST /v1/pages HTTP 404 {"code":"object_not_found","message":"Could not find database with ID: db_stale"}',
+              );
+            }
+            return { id: `p_${createCalls.length}` };
+          },
+          appendChildren: async () => ({ ok: true }),
+          messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2] });
+    expect(res.ok).toBe(true);
+    expect(res.data.okCount).toBe(2);
+    expect(createCalls).toEqual(['db_stale', 'db_new', 'db_new']);
+    expect(ensureCalls).toEqual(['db_stale', 'db_new']);
+  });
+
   it('returns structured already-running sync error metadata', async () => {
     const chromeMock = mockChromeStorage();
     const runningJobStore = createInMemoryJobStore();
