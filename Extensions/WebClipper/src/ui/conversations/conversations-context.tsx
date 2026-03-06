@@ -5,7 +5,7 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { createZipBlob } from '../../sync/backup/zip-utils';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
-import { syncNotionConversations, syncObsidianConversations } from '../../sync/repo';
+import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 
 type ConversationsAppState = {
   loadingList: boolean;
@@ -22,6 +22,7 @@ type ConversationsAppState = {
   selectedConversation: Conversation | null;
 
   exporting: boolean;
+  syncFeedback: ConversationSyncFeedbackState;
   syncingNotion: boolean;
   syncingObsidian: boolean;
   deleting: boolean;
@@ -36,6 +37,7 @@ type ConversationsAppState = {
   exportSelectedMarkdown: (opts: { mergeSingle: boolean }) => Promise<void>;
   syncSelectedNotion: () => Promise<void>;
   syncSelectedObsidian: () => Promise<void>;
+  clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
 };
 
@@ -58,9 +60,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
 
   const [exporting, setExporting] = useState(false);
-  const [syncingNotion, setSyncingNotion] = useState(false);
-  const [syncingObsidian, setSyncingObsidian] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { feedback: syncFeedback, clearFeedback: clearSyncFeedback, startSync, syncingNotion, syncingObsidian } = useConversationSyncFeedback();
 
   const selectedConversation = useMemo(
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
@@ -194,28 +195,14 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const syncSelectedNotion = useCallback(async () => {
     const ids = selectedIds.slice();
     if (!ids.length) return;
-    setSyncingNotion(true);
-    try {
-      await syncNotionConversations(ids);
-    } catch (e) {
-      alert((e as any)?.message ?? String(e ?? 'notion sync failed'));
-    } finally {
-      setSyncingNotion(false);
-    }
-  }, [selectedIds]);
+    await startSync('notion', ids);
+  }, [selectedIds, startSync]);
 
   const syncSelectedObsidian = useCallback(async () => {
     const ids = selectedIds.slice();
     if (!ids.length) return;
-    setSyncingObsidian(true);
-    try {
-      await syncObsidianConversations(ids);
-    } catch (e) {
-      alert((e as any)?.message ?? String(e ?? 'obsidian sync failed'));
-    } finally {
-      setSyncingObsidian(false);
-    }
-  }, [selectedIds]);
+    await startSync('obsidian', ids);
+  }, [selectedIds, startSync]);
 
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
@@ -245,6 +232,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     detail,
     selectedConversation,
     exporting,
+    syncFeedback,
     syncingNotion,
     syncingObsidian,
     deleting,
@@ -257,6 +245,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
+    clearSyncFeedback,
     deleteSelected,
   };
 

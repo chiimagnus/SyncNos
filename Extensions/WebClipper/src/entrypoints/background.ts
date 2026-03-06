@@ -8,6 +8,7 @@ import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
 } from '../sync/notion/auth/oauth';
+import obsidianSyncJobStore from '../sync/obsidian/obsidian-sync-job-store.ts';
 import { registerNotionSettingsHandlers } from '../sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '../sync/obsidian/settings-background-handlers';
 import { onInstalled } from '../platform/runtime/runtime';
@@ -58,6 +59,7 @@ export default defineBackground(() => {
   try {
     const id = getBackgroundInstanceId();
     services?.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
+    obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(id).catch(() => {});
   } catch (_e) {
     // ignore
   }
