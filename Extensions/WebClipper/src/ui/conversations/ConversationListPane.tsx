@@ -6,6 +6,7 @@ import { getConversationDetail } from '../../conversations/client/repo';
 import { tabsCreate } from '../../platform/webext/tabs';
 
 import { useConversationsApp } from './conversations-context';
+import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 
 type SourceMeta = { key: string; label: string };
 
@@ -125,12 +126,14 @@ export function ConversationListPane({
     setActiveId,
     clearSelected,
     exporting,
+    syncFeedback,
     syncingNotion,
     syncingObsidian,
     deleting,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
+    clearSyncFeedback,
     deleteSelected,
   } = useConversationsApp();
 
@@ -251,6 +254,14 @@ export function ConversationListPane({
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [deleteConfirmOpen, deleting]);
+
+  useEffect(() => {
+    if (syncFeedback.phase !== 'success') return;
+    const timer = window.setTimeout(() => {
+      clearSyncFeedback();
+    }, 3200);
+    return () => window.clearTimeout(timer);
+  }, [clearSyncFeedback, syncFeedback.phase, syncFeedback.updatedAt]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -579,6 +590,8 @@ export function ConversationListPane({
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[#2563eb]">{String(filteredItems.length)}</span>
               </div>
             </div>
+
+            <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} />
           </div>
         </div>
       </div>
