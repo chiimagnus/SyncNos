@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { SettingsSectionKey } from '../../app/routes/settings/types';
+import type { SettingsSectionKey } from '../../settings/types';
 import { SettingsScene } from '../../settings/SettingsScene';
 
 export default function SettingsTab() {
@@ -12,4 +12,3 @@ export default function SettingsTab() {
     </div>
   );
 }
-
