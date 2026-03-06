@@ -86,8 +86,8 @@ function normalizeCurrentJob(job: any, instanceId: unknown) {
     updatedAt: Number(job.updatedAt) || Date.now(),
     finishedAt: job.finishedAt == null ? null : Number(job.finishedAt) || null,
     conversationIds: normalizeIds(job.conversationIds),
-    okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((row) => row && row.ok).length,
-    failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((row) => row && !row.ok).length,
+    okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((row: any) => row && row.ok).length,
+    failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((row: any) => row && !row.ok).length,
     perConversation,
   };
 }
