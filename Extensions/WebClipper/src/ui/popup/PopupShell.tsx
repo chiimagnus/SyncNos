@@ -22,26 +22,26 @@ export default function PopupShell() {
         lineHeight: 1.45,
       }}
     >
-      <header className="tw-border-b tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-px-3 tw-py-3 tw-backdrop-blur-md">
+      <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
             <img
-              className="tw-size-8 tw-rounded-xl tw-object-contain"
+              className="tw-size-7 tw-rounded-lg tw-object-contain"
               src={getURL('icons/icon-48.png' as any)}
               alt=""
               draggable={false}
             />
-            <span className="tw-min-w-0 tw-truncate tw-text-sm tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
+            <span className="tw-min-w-0 tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
           </div>
 
           <button
             type="button"
             title="Open Settings"
             onClick={() => onOpenSettings().catch(() => {})}
-            className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+            className="tw-inline-flex tw-size-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
             aria-label="Open Settings"
           >
-            <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
+            <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
       </header>
