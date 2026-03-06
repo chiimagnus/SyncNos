@@ -184,5 +184,61 @@ describe('notion-db-manager', () => {
     expect(chromeMock.__removed.some((keys) => keys.includes('notion_db_id_syncnos_ai_chats'))).toBe(true);
     expect(calls.some((c) => c.method === 'GET' && c.path === '/v1/databases/db_old')).toBe(true);
   });
-});
 
+  it('does not reuse cached databases that are already in trash', async () => {
+    const calls: any[] = [];
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'GET' && req.path === '/v1/databases/db_trashed') {
+        return {
+          id: 'db_trashed',
+          object: 'database',
+          archived: false,
+          in_trash: true,
+          properties: { Name: { type: 'title' } },
+        };
+      }
+      if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_new' };
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    const chromeMock = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: 'db_trashed' } });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    const res = await notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p' });
+    expect(res.databaseId).toBe('db_new');
+    expect(chromeMock.__removed.some((keys) => keys.includes('notion_db_id_syncnos_ai_chats'))).toBe(true);
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
+  });
+
+  it('ignores trashed exact-title search results and creates a fresh database', async () => {
+    const calls: any[] = [];
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'POST' && req.path === '/v1/search') {
+        return {
+          results: [
+            {
+              id: 'db_trashed',
+              object: 'database',
+              archived: false,
+              in_trash: true,
+              title: [{ plain_text: 'SyncNos-AI Chats' }],
+            },
+          ],
+        };
+      }
+      if (req.method === 'POST' && req.path === '/v1/databases') return { id: 'db_new' };
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    const res = await notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p' });
+    expect(res.databaseId).toBe('db_new');
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
+  });
+});

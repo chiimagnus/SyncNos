@@ -59,6 +59,14 @@ import { storageGet, storageRemove, storageSet } from '../../platform/storage/lo
     };
   }
 
+  function isUsableDatabase(database) {
+    if (!database || typeof database !== "object") return false;
+    if (database.object != null && database.object !== "database") return false;
+    if (database.in_trash === true) return false;
+    if (database.archived === true) return false;
+    return true;
+  }
+
   async function getDatabase(accessToken, databaseId) {
     const notionFetch = getNotionFetch();
     return notionFetch({ accessToken, method: "GET", path: `/v1/databases/${databaseId}` });
@@ -142,6 +150,7 @@ import { storageGet, storageRemove, storageSet } from '../../platform/storage/lo
     if (cached) {
       try {
         const db = await getDatabase(accessToken, cached);
+        if (!isUsableDatabase(db)) throw new Error("cached database is archived");
         await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec: spec });
         return { databaseId: cached, title: spec.title, reused: true, database: db };
       } catch (_e) {
@@ -153,7 +162,7 @@ import { storageGet, storageRemove, storageSet } from '../../platform/storage/lo
     const found = await searchDatabases(accessToken, spec.title);
     const results = Array.isArray(found.results) ? found.results : [];
     const exact = results.find((d) => {
-      if (!d || d.object !== "database") return false;
+      if (!isUsableDatabase(d)) return false;
       const t = Array.isArray(d.title) ? d.title.map((x) => x.plain_text || "").join("").trim() : "";
       return t === spec.title;
     });
