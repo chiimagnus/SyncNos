@@ -176,7 +176,7 @@ Run: `git commit -m "feat: task3 - render shared sync progress and failure feedb
 ### Task 4: 为 conversations sync feedback 补回归测试
 
 **Files:**
-- Create: `Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.tsx`
+- Create: `Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.ts`
 - Modify: `Extensions/WebClipper/src/ui/conversations/conversations-context.tsx`（如需导出可测试 helper）
 - Modify: `Extensions/WebClipper/src/ui/conversations/ConversationListPane.tsx`（如需稳定选择器）
 
@@ -202,14 +202,14 @@ Run: `git commit -m "feat: task3 - render shared sync progress and failure feedb
 
 **Step 4: 验证**
 
-Run: `npm --prefix Extensions/WebClipper run test -- tests/smoke/conversations-sync-feedback.test.tsx`
+Run: `npm --prefix Extensions/WebClipper run test -- tests/smoke/conversations-sync-feedback.test.ts`
 
 Expected:
 - 新增 smoke test 通过
 
 **Step 5:（可选）原子提交**
 
-Run: `git add Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.tsx`
+Run: `git add Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.ts`
 
 Run: `git commit -m "test: task4 - cover webclipper sync feedback states"`
 
@@ -247,7 +247,7 @@ Expected:
 
 **Step 4:（可选）原子提交**
 
-Run: `git add Extensions/WebClipper/src/ui/conversations/conversations-context.tsx Extensions/WebClipper/src/ui/conversations/ConversationListPane.tsx Extensions/WebClipper/src/sync/models.ts Extensions/WebClipper/src/sync/repo.ts Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.tsx`
+Run: `git add Extensions/WebClipper/src/ui/conversations/conversations-context.tsx Extensions/WebClipper/src/ui/conversations/ConversationListPane.tsx Extensions/WebClipper/src/sync/models.ts Extensions/WebClipper/src/sync/repo.ts Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.ts`
 
 Run: `git commit -m "fix: task5 - finalize webclipper sync feedback flow"`
 
