@@ -59,6 +59,7 @@ describe("inpage-tip speech bubble", () => {
 
     const bubble = document.getElementById("webclipper-inpage-bubble");
     expect(bubble).toBeTruthy();
+    expect(bubble?.tagName).toBe("WEBCLIPPER-INPAGE-BUBBLE");
     expect(bubble?.dataset.kind).toBe("error");
     expect(bubble?.dataset.placement).toBe("left");
     expect(bubble?.shadowRoot?.textContent).toContain("Save failed");
