@@ -251,13 +251,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     return (
       <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
-        <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--panel)]/60 tw-px-3 tw-py-3 tw-backdrop-blur-sm">
-          <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">Settings</div>
-          <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-            Integrations, backup, and app behavior.
-          </div>
-        </div>
-
         <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-2">
           <nav className="tw-grid tw-gap-2" aria-label="Settings sections">
             {SETTINGS_SECTIONS.map((section) => (
