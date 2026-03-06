@@ -11,6 +11,8 @@ const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const syncNotionConversations = vi.fn();
 const syncObsidianConversations = vi.fn();
+const clearNotionSyncJobStatus = vi.fn();
+const clearObsidianSyncStatus = vi.fn();
 const getNotionSyncJobStatus = vi.fn();
 const getObsidianSyncStatus = vi.fn();
 
@@ -25,6 +27,8 @@ vi.mock('../../src/conversations/client/repo', () => ({
 }));
 
 vi.mock('../../src/sync/repo', () => ({
+  clearNotionSyncJobStatus: (...args: any[]) => clearNotionSyncJobStatus(...args),
+  clearObsidianSyncStatus: (...args: any[]) => clearObsidianSyncStatus(...args),
   syncNotionConversations: (...args: any[]) => syncNotionConversations(...args),
   syncObsidianConversations: (...args: any[]) => syncObsidianConversations(...args),
   getNotionSyncJobStatus: (...args: any[]) => getNotionSyncJobStatus(...args),
@@ -106,12 +110,17 @@ describe('Conversations sync feedback', () => {
     deleteConversations.mockReset();
     syncNotionConversations.mockReset();
     syncObsidianConversations.mockReset();
+    clearNotionSyncJobStatus.mockReset();
+    clearObsidianSyncStatus.mockReset();
     getNotionSyncJobStatus.mockReset();
     getObsidianSyncStatus.mockReset();
 
     listConversations.mockResolvedValue([baseConversation]);
     getConversationDetail.mockResolvedValue({ id: 11, messages: [] });
     deleteConversations.mockResolvedValue(null);
+    clearNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
+    clearObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });
+    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
     getObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });
   });
 
@@ -149,28 +158,39 @@ describe('Conversations sync feedback', () => {
     });
   }
 
+  function clickDismissButton() {
+    const button = document.querySelector('[aria-label="Dismiss sync feedback"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    act(() => {
+      button!.click();
+    });
+  }
+
+  function notionRunningJob(overrides: Record<string, unknown> = {}) {
+    return {
+      provider: 'notion',
+      status: 'running',
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      finishedAt: null,
+      conversationIds: [11, 22],
+      okCount: 1,
+      failCount: 0,
+      perConversation: [{ conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() }],
+      ...overrides,
+    };
+  }
+
   it('shows running progress and then success summary', async () => {
     const run = deferred<any>();
     syncNotionConversations.mockImplementation(() => run.promise);
-    getNotionSyncJobStatus.mockResolvedValue({
-      provider: 'notion',
-      instanceId: 'notion-test',
-      job: {
-        provider: 'notion',
-        status: 'running',
-        startedAt: Date.now(),
-        updatedAt: Date.now(),
-        finishedAt: null,
-        conversationIds: [11, 22],
-        okCount: 1,
-        failCount: 0,
-        perConversation: [{ conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() }],
-      },
-    });
+    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: null });
 
     await renderPane();
     selectFirstConversation();
     clickNotionButton();
+
+    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: notionRunningJob() });
 
     await act(async () => {
       await flushMicrotasks();
@@ -180,6 +200,25 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
     expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
+
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: {
+        provider: 'notion',
+        status: 'done',
+        startedAt: Date.now() - 500,
+        updatedAt: Date.now(),
+        finishedAt: Date.now(),
+        conversationIds: [11, 22],
+        okCount: 2,
+        failCount: 0,
+        perConversation: [
+          { conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() },
+          { conversationId: 22, ok: true, mode: 'created', appended: 4, error: '', at: Date.now() },
+        ],
+      },
+    });
 
     await act(async () => {
       run.resolve({
@@ -195,6 +234,8 @@ describe('Conversations sync feedback', () => {
         instanceId: 'notion-test',
       });
       await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
     });
 
     const successNotice = document.getElementById('conversationSyncFeedback');
@@ -203,20 +244,22 @@ describe('Conversations sync feedback', () => {
     expect(successNotice?.textContent).toContain('Notion sync completed (2/2)');
   });
 
-  it('shows partial failure summary when sync resolves with failures', async () => {
-    syncNotionConversations.mockResolvedValue({
-      provider: 'notion',
-      okCount: 1,
-      failCount: 1,
-      failures: [{ conversationId: 11, error: 'missing parentPageId' }],
-      results: [
-        { conversationId: 11, ok: false, mode: 'failed', appended: 0, error: 'missing parentPageId', at: Date.now() },
-        { conversationId: 22, ok: true, mode: 'created', appended: 4, error: '', at: Date.now() },
-      ],
-      jobId: 'job-partial',
-      instanceId: 'notion-test',
-    });
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
+  it('hydrates an existing running notion job on mount', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: notionRunningJob() });
+    await renderPane();
+
+    const runningNotice = document.getElementById('conversationSyncFeedback');
+    expect(runningNotice).toBeTruthy();
+    expect(runningNotice?.getAttribute('data-phase')).toBe('running');
+    expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
+
+    const notionButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim().startsWith('Notion')) as HTMLButtonElement | undefined;
+    expect(notionButton?.disabled).toBe(true);
+  });
+
+  it('attaches to the existing running notion job instead of showing sync already in progress as failure', async () => {
+    syncNotionConversations.mockRejectedValue(new Error('sync already in progress'));
+    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: notionRunningJob() });
 
     await renderPane();
     selectFirstConversation();
@@ -226,19 +269,54 @@ describe('Conversations sync feedback', () => {
       await flushMicrotasks();
     });
 
-    const partialNotice = document.getElementById('conversationSyncFeedback');
-    expect(partialNotice).toBeTruthy();
-    expect(partialNotice?.getAttribute('data-phase')).toBe('partial-failed');
-    expect(partialNotice?.textContent).toContain('Notion sync partially failed (1/2 failed)');
-    expect(partialNotice?.textContent).toContain('#11: missing parentPageId');
+    const runningNotice = document.getElementById('conversationSyncFeedback');
+    expect(runningNotice).toBeTruthy();
+    expect(runningNotice?.getAttribute('data-phase')).toBe('running');
+    expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
+    expect(runningNotice?.textContent).not.toContain('sync already in progress');
   });
 
-  it('shows direct failure feedback without relying on alert', async () => {
+  it('hydrates persisted terminal feedback and clears the persisted job on dismiss', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: {
+        provider: 'notion',
+        status: 'done',
+        startedAt: Date.now() - 800,
+        updatedAt: Date.now(),
+        finishedAt: Date.now(),
+        conversationIds: [11],
+        okCount: 0,
+        failCount: 1,
+        perConversation: [
+          { conversationId: 11, ok: false, mode: 'failed', appended: 0, error: 'missing parentPageId', at: Date.now() },
+        ],
+      },
+    });
+
+    await renderPane();
+
+    const failureNotice = document.getElementById('conversationSyncFeedback');
+    expect(failureNotice).toBeTruthy();
+    expect(failureNotice?.getAttribute('data-phase')).toBe('failed');
+    expect(failureNotice?.textContent).toContain('Notion sync failed (1/1)');
+    expect(failureNotice?.textContent).toContain('#11: missing parentPageId');
+
+    clickDismissButton();
+
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    expect(clearNotionSyncJobStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows direct preflight failure without fake progress counters', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis, 'alert', { configurable: true, value: alertSpy });
 
     syncNotionConversations.mockRejectedValue(new Error('notion not connected'));
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
 
     await renderPane();
     selectFirstConversation();
@@ -252,6 +330,8 @@ describe('Conversations sync feedback', () => {
     expect(failureNotice).toBeTruthy();
     expect(failureNotice?.getAttribute('data-phase')).toBe('failed');
     expect(failureNotice?.textContent).toContain('Notion sync failed: notion not connected');
+    expect(failureNotice?.textContent).not.toContain('0/1');
+    expect(failureNotice?.textContent).not.toContain('#?:');
     expect(alertSpy).not.toHaveBeenCalled();
   });
 });

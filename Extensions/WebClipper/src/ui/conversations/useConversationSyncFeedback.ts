@@ -34,6 +34,11 @@ type UseConversationSyncFeedbackDeps = {
   syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncRunSummary>;
 };
 
+type ActiveRun = {
+  provider: SyncProvider;
+  token: number;
+};
+
 const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
   provider: null,
   phase: 'idle',
@@ -212,7 +217,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const syncObsidianConversations = deps.syncObsidianConversations ?? defaultSyncObsidianConversations;
 
   const [feedback, setFeedback] = useState<ConversationSyncFeedbackState>(IDLE_FEEDBACK);
+  const [activeRun, setActiveRun] = useState<ActiveRun | null>(null);
   const disposedRef = useRef(false);
+  const runTokenRef = useRef(0);
 
   const refreshFromBackground = useCallback(
     async (preferredProvider?: SyncProvider | null) => {
@@ -223,7 +230,22 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       if (disposedRef.current) return null;
 
       const job = pickPrimaryJob(notionStatus?.job ?? null, obsidianStatus?.job ?? null, preferredProvider);
-      setFeedback(job ? toFeedbackFromJob(job) : IDLE_FEEDBACK);
+      if (job?.status === 'running') {
+        setActiveRun((current) => {
+          if (current?.provider === job.provider) return current;
+          const token = runTokenRef.current + 1;
+          runTokenRef.current = token;
+          return { provider: job.provider, token };
+        });
+      } else {
+        runTokenRef.current += 1;
+        setActiveRun(null);
+      }
+      setFeedback((current) => {
+        if (job) return toFeedbackFromJob(job);
+        if (current.phase === 'failed' && current.summary == null) return current;
+        return IDLE_FEEDBACK;
+      });
       return job;
     },
     [getNotionSyncJobStatus, getObsidianSyncStatus],
@@ -248,19 +270,28 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   }, [feedback.provider, refreshFromBackground]);
 
   useEffect(() => {
-    if (feedback.phase !== 'running' || !feedback.provider) return;
-    const getStatus = feedback.provider === 'notion' ? getNotionSyncJobStatus : getObsidianSyncStatus;
+    if (!activeRun) return;
+    const token = activeRun.token;
+    const provider = activeRun.provider;
+    const getStatus = provider === 'notion' ? getNotionSyncJobStatus : getObsidianSyncStatus;
     let disposed = false;
 
     const poll = async () => {
       try {
         const status = await getStatus();
-        if (disposed || disposedRef.current) return;
+        if (disposed || disposedRef.current || runTokenRef.current !== token) return;
         if (!status?.job) {
-          await refreshFromBackground(feedback.provider);
+          await refreshFromBackground(provider);
           return;
         }
-        setFeedback(toFeedbackFromJob(status.job));
+        setFeedback((current) => {
+          if (current.phase !== 'running' || current.provider !== provider) return current;
+          return toFeedbackFromJob(status.job!);
+        });
+        if (status.job.status !== 'running') {
+          runTokenRef.current += 1;
+          setActiveRun((current) => (current?.token === token ? null : current));
+        }
       } catch (_error) {
         // Polling is best-effort; storage updates and sync completion still refresh the visible state.
       }
@@ -275,7 +306,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [feedback.phase, feedback.provider, getNotionSyncJobStatus, getObsidianSyncStatus, refreshFromBackground]);
+  }, [activeRun, getNotionSyncJobStatus, getObsidianSyncStatus, refreshFromBackground]);
 
   const clearFeedback = useCallback(() => {
     const current = feedback;
@@ -297,6 +328,10 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       const ids = normalizeIds(conversationIds);
       if (!ids.length) return null;
 
+      const token = runTokenRef.current + 1;
+      runTokenRef.current = token;
+      setActiveRun({ provider, token });
+
       setFeedback({
         provider,
         phase: 'running',
@@ -313,6 +348,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           ? await syncNotionConversations(ids)
           : await syncObsidianConversations(ids);
         if (disposedRef.current) return summary;
+        runTokenRef.current += 1;
+        setActiveRun((current) => (current?.token === token ? null : current));
+        setFeedback(toTerminalFeedback(summary, ids.length));
         await refreshFromBackground(provider);
         return summary;
       } catch (error) {
@@ -320,10 +358,14 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
 
         const message = providerFromError(error);
         if (message.includes('sync already in progress')) {
+          runTokenRef.current += 1;
+          setActiveRun((current) => (current?.token === token ? null : current));
           await refreshFromBackground(provider);
           return null;
         }
 
+        runTokenRef.current += 1;
+        setActiveRun((current) => (current?.token === token ? null : current));
         setFeedback({
           provider,
           phase: 'failed',
