@@ -7,7 +7,6 @@ import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useSettingsSceneController } from './hooks/useSettingsSceneController';
 import { SettingsSidebarNav } from './SettingsSidebarNav';
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from './types';
-import { ArticleFetchSection } from './sections/ArticleFetchSection';
 import { AboutSection } from './sections/AboutSection';
 import { BackupSection } from './sections/BackupSection';
 import { InpageSection } from './sections/InpageSection';
@@ -75,9 +74,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveObsidianSettings,
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
-
-    articleFetchStatus,
-    onFetchCurrentPage,
 
     exportStatus,
     importStatus,
@@ -163,16 +159,6 @@ export function SettingsScene(props: SettingsSceneProps) {
             void onTestObsidianConnection();
           }}
           onOpenSetupGuide={onOpenObsidianSetupGuide}
-        />
-      ) : null}
-
-      {activeSection === 'article' ? (
-        <ArticleFetchSection
-          busy={busy}
-          status={articleFetchStatus}
-          onFetch={() => {
-            void onFetchCurrentPage();
-          }}
         />
       ) : null}
 
