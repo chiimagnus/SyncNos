@@ -47,6 +47,11 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   const provider = feedback.provider === 'notion' ? 'Notion' : 'Obsidian';
   const canDismiss = feedback.phase !== 'running';
   const liveMode = feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'assertive' : 'polite';
+  const progressWidth = feedback.total > 0
+    ? feedback.done <= 0
+      ? 0
+      : Math.min(100, Math.max(8, Math.round((feedback.done / feedback.total) * 100) || 0))
+    : 0;
 
   return (
     <div
@@ -84,7 +89,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
             <div className="tw-mt-2 tw-h-1.5 tw-overflow-hidden tw-rounded-full tw-bg-white/60">
               <div
                 className="tw-h-full tw-rounded-full tw-bg-current tw-transition-[width] tw-duration-300"
-                style={{ width: `${Math.max(6, Math.min(100, Math.round((feedback.done / feedback.total) * 100) || 0))}%` }}
+                style={{ width: `${progressWidth}%` }}
               />
             </div>
           ) : null}
@@ -96,7 +101,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                   key={`${failure.conversationId || 'unknown'}-${index}`}
                   className="tw-text-[11px] tw-font-semibold tw-opacity-90"
                 >
-                  #{failure.conversationId || '?'}: {failure.error}
+                  {failure.conversationId > 0 ? `#${failure.conversationId}: ${failure.error}` : failure.error}
                 </div>
               ))}
             </div>
