@@ -1,11 +1,15 @@
-import { Settings as SettingsIcon } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL } from '../../platform/runtime/runtime';
 import { tabsCreate } from '../../platform/webext/tabs';
 
+import type { PopupHeaderState } from '../conversations/ConversationsScene';
 import ChatsTab from './tabs/ChatsTab';
 
 export default function PopupShell() {
+  const [headerState, setHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
+
   const onOpenSettings = async () => {
     const url = getURL('/app.html#/settings');
     await tabsCreate({ url });
@@ -24,15 +28,39 @@ export default function PopupShell() {
     >
       <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
-            <img
-              className="tw-size-7 tw-rounded-lg tw-object-contain"
-              src={getURL('icons/icon-48.png' as any)}
-              alt=""
-              draggable={false}
-            />
-            <span className="tw-min-w-0 tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
-          </div>
+          {headerState.mode === 'detail' ? (
+            <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
+              <button
+                type="button"
+                onClick={headerState.onBack}
+                className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                aria-label="Back to chats"
+              >
+                <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+
+              <div className="tw-min-w-0 tw-flex-1">
+                <div className="tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em] tw-text-[var(--text)]">
+                  {headerState.title}
+                </div>
+                {headerState.subtitle ? (
+                  <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+                    {headerState.subtitle}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
+              <img
+                className="tw-size-7 tw-rounded-lg tw-object-contain"
+                src={getURL('icons/icon-48.png' as any)}
+                alt=""
+                draggable={false}
+              />
+              <span className="tw-min-w-0 tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
+            </div>
+          )}
 
           <button
             type="button"
@@ -48,7 +76,7 @@ export default function PopupShell() {
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label="Chats">
-          <ChatsTab />
+          <ChatsTab onPopupHeaderStateChange={setHeaderState} />
         </section>
       </main>
     </div>
