@@ -1,44 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL } from '../../platform/runtime/runtime';
-import { storageGet, storageSet } from '../../platform/storage/local';
 import { tabsCreate } from '../../platform/webext/tabs';
 
 import ChatsTab from './tabs/ChatsTab';
-import SettingsTab from './tabs/SettingsTab';
-
-type PopupTabId = 'chats' | 'settings';
 
 export default function PopupShell() {
-  const [tab, setTab] = useState<PopupTabId>('chats');
-
-  useEffect(() => {
-    storageGet(['popup_active_tab'])
-      .then((res) => {
-        const v = String(res?.popup_active_tab || '').trim();
-        if (v === 'settings' || v === 'chats') setTab(v);
-        else if (v === 'about') setTab('settings');
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    storageSet({ popup_active_tab: tab }).catch(() => {});
-  }, [tab]);
-
-  const onOpenApp = async () => {
-    const url = getURL('/app.html#/');
+  const onOpenSettings = async () => {
+    const url = getURL('/app.html#/settings');
     await tabsCreate({ url });
     window.close();
   };
-
-  const tabs = useMemo(
-    () => [
-      { id: 'chats' as const, label: 'Chats' },
-      { id: 'settings' as const, label: 'Settings' },
-    ],
-    [],
-  );
 
   return (
     <div
@@ -62,59 +34,22 @@ export default function PopupShell() {
             <span className="tw-min-w-0 tw-truncate tw-text-sm tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
           </div>
 
-          <div className="tw-flex tw-flex-none tw-items-center tw-gap-2">
-            <nav
-              className="tw-grid tw-w-[152px] tw-shrink-0 tw-select-none tw-grid-cols-2 tw-rounded-full tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 tw-p-1"
-              role="tablist"
-              aria-label="Popup tabs"
-            >
-              {tabs.map((t) => {
-                const active = tab === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTab(t.id)}
-                    className={[
-                      'tw-h-9 tw-rounded-full tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200',
-                      active
-                        ? 'tw-bg-[var(--btn-bg)] tw-text-[var(--text)] tw-shadow-[0_1px_0_rgba(0,0,0,0.05)]'
-                        : 'tw-bg-transparent tw-text-[var(--muted)] hover:tw-text-[var(--text)]',
-                    ].join(' ')}
-                  >
-                    {t.label}
-                  </button>
-                );
-              })}
-            </nav>
-
-            <button
-              type="button"
-              title="Open App"
-              onClick={() => onOpenApp().catch(() => {})}
-              className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[12px] tw-font-black tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-              aria-label="Open App"
-            >
-              ↗
-            </button>
-          </div>
+          <button
+            type="button"
+            title="Open Settings"
+            onClick={() => onOpenSettings().catch(() => {})}
+            className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+            aria-label="Open Settings"
+          >
+            <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
       </header>
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
-        {tab === 'chats' ? (
-          <section id="viewChats" className="tw-h-full tw-min-h-0" role="tabpanel" aria-label="Chats">
-            <ChatsTab />
-          </section>
-        ) : null}
-
-        {tab === 'settings' ? (
-          <section id="viewSettings" className="tw-h-full tw-min-h-0" role="tabpanel" aria-label="Settings">
-            <SettingsTab />
-          </section>
-        ) : null}
+        <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label="Chats">
+          <ChatsTab />
+        </section>
       </main>
     </div>
   );
