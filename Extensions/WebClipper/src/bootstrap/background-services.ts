@@ -10,6 +10,7 @@ import notionApi from '../sync/notion/notion-api.ts';
 import notionFilesApi from '../sync/notion/notion-files-api.ts';
 
 import {
+  clearSyncStatus as clearObsidianSyncStatus,
   getSyncStatus as getObsidianSyncStatus,
   syncConversations as obsidianSyncConversations,
   testConnection as testObsidianConnection,
@@ -20,6 +21,7 @@ import { conversationKinds } from '../protocols/conversation-kinds.ts';
 export type NotionSyncOrchestrator = {
   syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
   getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
+  clearSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
 };
 
 export type ObsidianSyncOrchestrator = {
@@ -29,6 +31,7 @@ export type ObsidianSyncOrchestrator = {
     instanceId: string;
   }) => Promise<unknown>;
   getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+  clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
   testConnection: (input: { instanceId: string }) => Promise<unknown>;
 };
 
@@ -60,6 +63,7 @@ export function createBackgroundServices(): BackgroundServices {
     obsidianSyncOrchestrator: {
       syncConversations: obsidianSyncConversations,
       getSyncStatus: async (input: { instanceId: string }) => getObsidianSyncStatus(input as any),
+      clearSyncStatus: async (input: { instanceId: string }) => clearObsidianSyncStatus(input as any),
       testConnection: testObsidianConnection,
     },
   };

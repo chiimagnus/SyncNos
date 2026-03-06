@@ -8,7 +8,8 @@ describe("background-router obsidian sync routes", () => {
     const calls: any = {
       testConnection: 0,
       getSyncStatus: 0,
-      syncConversations: null
+      syncConversations: null,
+      syncMode: 'success',
     };
 
     const store: Record<string, unknown> = {};
@@ -53,13 +54,22 @@ describe("background-router obsidian sync routes", () => {
       notionSyncOrchestrator: {
         syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
         getSyncJobStatus: async () => ({ job: null }),
+        clearSyncJobStatus: async () => ({ job: null }),
       },
       obsidianSyncOrchestrator: {
         async getSyncStatus({ instanceId }: any) {
           calls.getSyncStatus += 1;
           return { job: null, instanceId };
         },
+        async clearSyncStatus({ instanceId }: any) {
+          return { job: null, instanceId };
+        },
         async syncConversations(payload: any) {
+          if (calls.syncMode === 'already-running') {
+            const error = new Error('sync already in progress') as Error & { code?: string };
+            error.code = 'sync_already_running';
+            throw error;
+          }
           calls.syncConversations = payload;
           return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
         },
@@ -101,5 +111,14 @@ describe("background-router obsidian sync routes", () => {
     expect(calls.syncConversations?.conversationIds).toEqual([1, 2]);
     expect(calls.syncConversations?.forceFullConversationIds).toEqual([2]);
     expect(typeof calls.syncConversations?.instanceId).toBe("string");
+
+    calls.syncMode = 'already-running';
+    const conflictRes = await router.__handleMessageForTests({
+      type: "obsidianSyncConversations",
+      conversationIds: [1],
+    });
+    expect(conflictRes.ok).toBe(false);
+    expect(conflictRes.error?.message).toBe('sync already in progress');
+    expect(conflictRes.error?.extra?.code).toBe('sync_already_running');
   });
 });

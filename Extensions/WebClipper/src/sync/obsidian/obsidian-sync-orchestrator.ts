@@ -22,8 +22,9 @@ import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
+import obsidianSyncJobStore from './obsidian-sync-job-store.ts';
 
-let currentJob: any = null;
+const SYNC_PROVIDER = 'obsidian';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -67,7 +68,19 @@ function buildSyncSummary(results: any[], instanceId: unknown) {
   const failures = results
     .filter((r) => !r.ok)
     .map((r) => ({ conversationId: r.conversationId, error: r.error || 'unknown error' }));
-  return { okCount, failCount, failures, results, instanceId: safeString(instanceId) };
+  return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
+}
+
+function buildAlreadyRunningError() {
+  const error = new Error('sync already in progress') as Error & { code?: string };
+  error.code = 'sync_already_running';
+  return error;
+}
+
+function toCurrentConversationTitle(convo: any, conversationId: number) {
+  const title = safeString(convo && convo.title);
+  if (title) return title;
+  return `Conversation #${Number(conversationId) || '?'}`;
 }
 
 function pickLocalCursor(messages: any[]) {
@@ -450,8 +463,13 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
   return { ok: true, data: res.data || null, instanceId: safeString(instanceId) };
 }
 
-function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  return { job: currentJob, instanceId: safeString(instanceId) };
+async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+  return { provider: SYNC_PROVIDER, job: await obsidianSyncJobStore.getJob(), instanceId: safeString(instanceId) };
+}
+
+async function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+  await obsidianSyncJobStore.setJob(null);
+  return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
 }
 
 async function syncConversations({
@@ -466,33 +484,63 @@ async function syncConversations({
   const ids = normalizeIds(conversationIds);
   const forceFullIds = new Set(normalizeIds(forceFullConversationIds));
   if (!ids.length) {
-    return { okCount: 0, failCount: 0, failures: [], results: [], instanceId: safeString(instanceId) };
+    return { provider: SYNC_PROVIDER, okCount: 0, failCount: 0, failures: [], results: [], instanceId: safeString(instanceId) };
   }
 
-  currentJob = {
+  const safeInstanceId = safeString(instanceId);
+  const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
+  if (obsidianSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
+
+  const currentJob: any = {
+    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    provider: SYNC_PROVIDER,
+    instanceId: safeInstanceId,
     status: 'running',
     startedAt: Date.now(),
+    updatedAt: Date.now(),
     finishedAt: null,
     conversationIds: ids,
+    okCount: 0,
+    failCount: 0,
     perConversation: [],
   };
+  async function persistCurrentJob(partial: Record<string, unknown> = {}) {
+    Object.assign(currentJob, partial, { updatedAt: Date.now() });
+    await obsidianSyncJobStore.setJob({ ...currentJob });
+  }
+
+  await persistCurrentJob({
+    currentConversationId: ids[0] || undefined,
+    currentStage: ids.length ? 'Preparing queue' : '',
+  });
 
   const results: any[] = [];
 
   for (const conversationId of ids) {
     let row: any = null;
     try {
+      await persistCurrentJob({
+        currentConversationId: conversationId,
+        currentConversationTitle: `Conversation #${conversationId}`,
+        currentStage: 'Loading conversation',
+      });
       const decision: any = await decideSyncModeForConversation({
         conversationId,
         forceFull: forceFullIds.has(conversationId),
       });
       if (decision && decision.isFinal) {
+        await persistCurrentJob({
+          currentConversationId: conversationId,
+          currentConversationTitle: toCurrentConversationTitle((decision as any).convo, conversationId),
+          currentStage: 'Finishing current item',
+        });
         row = decision.row;
       } else if (decision && decision.mode && decision.conversationId) {
         const writer = getMarkdownWriterModule();
         const metaMod = getSyncMetadataModule();
         const clientRes: any = await buildClient();
         const client = clientRes.ok ? clientRes.client : null;
+        const currentTitle = toCurrentConversationTitle(decision.convo, conversationId);
 
         if (!clientRes.ok || !client) {
           row = buildPerConversationResult({
@@ -508,6 +556,11 @@ async function syncConversations({
           decision.mode === 'full_rebuild_forced' ||
           decision.mode === 'full_rebuild_rename'
         ) {
+          await persistCurrentJob({
+            currentConversationId: conversationId,
+            currentConversationTitle: currentTitle,
+            currentStage: decision.mode === 'full_rebuild_rename' ? 'Renaming note' : 'Writing full note',
+          });
           const syncnosObject = metaMod.buildSyncnosObject({
             conversation: decision.convo,
             cursor: pickLocalCursor(decision.messages),
@@ -530,6 +583,11 @@ async function syncConversations({
           } else {
             const deleteAfter = decision.deleteAfterFilePath ? safeString(decision.deleteAfterFilePath) : '';
             if (deleteAfter && deleteAfter !== safeString(decision.filePath) && typeof client.deleteVaultFile === 'function') {
+              await persistCurrentJob({
+                currentConversationId: conversationId,
+                currentConversationTitle: currentTitle,
+                currentStage: 'Deleting old note path',
+              });
               const delRes = await client.deleteVaultFile(deleteAfter);
               if (!delRes || !delRes.ok) {
                 row = buildPerConversationResult({
@@ -562,6 +620,11 @@ async function syncConversations({
             }
           }
         } else if (decision.mode === 'incremental_append') {
+          await persistCurrentJob({
+            currentConversationId: conversationId,
+            currentConversationTitle: currentTitle,
+            currentStage: 'Appending new messages',
+          });
           const chunk = writer.buildIncrementalAppendMarkdown({ newMessages: decision.newMessages });
           const patchRes = await writer.appendUnderMessagesHeading({
             client,
@@ -596,6 +659,11 @@ async function syncConversations({
               at: Date.now(),
             });
           } else if (!patchRes.ok && isPatchFailed && !isIdempotentDup) {
+            await persistCurrentJob({
+              currentConversationId: conversationId,
+              currentConversationTitle: currentTitle,
+              currentStage: 'Falling back to full rebuild',
+            });
             const syncnosObject = metaMod.buildSyncnosObject({
               conversation: decision.convo,
               cursor: pickLocalCursor(decision.messages),
@@ -626,6 +694,11 @@ async function syncConversations({
               });
             }
           } else {
+            await persistCurrentJob({
+              currentConversationId: conversationId,
+              currentConversationTitle: currentTitle,
+              currentStage: 'Updating sync metadata',
+            });
             const syncnosObject = metaMod.buildSyncnosObject({
               conversation: decision.convo,
               cursor: decision.nextCursor,
@@ -691,15 +764,27 @@ async function syncConversations({
     }
     results.push(row);
     currentJob.perConversation.push(row);
+    currentJob.okCount = results.filter((r) => r.ok).length;
+    currentJob.failCount = results.length - currentJob.okCount;
+    await persistCurrentJob({
+      currentConversationId: conversationId,
+      currentConversationTitle: undefined,
+      currentStage: 'Finishing current item',
+    });
   }
 
-  currentJob.status = 'finished';
+  currentJob.status = 'done';
   currentJob.finishedAt = Date.now();
+  await persistCurrentJob({
+    currentConversationId: undefined,
+    currentConversationTitle: undefined,
+    currentStage: undefined,
+  });
 
   return buildSyncSummary(results, instanceId);
 }
 
-const api = { testConnection, getSyncStatus, syncConversations };
+const api = { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
 
-export { testConnection, getSyncStatus, syncConversations };
+export { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
 export default api;
