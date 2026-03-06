@@ -22,7 +22,7 @@ export default function Settings() {
     }
 
     const section: SettingsSectionKey =
-      rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'article' || rawSection === 'inpage' || rawSection === 'about'
+      rawSection === 'obsidian' || rawSection === 'backup' || rawSection === 'inpage' || rawSection === 'about'
         ? (rawSection as SettingsSectionKey)
         : 'notion';
     const focus = rawFocus;
