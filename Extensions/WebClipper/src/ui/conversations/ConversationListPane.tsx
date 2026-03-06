@@ -103,9 +103,19 @@ export type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
   activeRowId?: number | null;
   suppressActiveRow?: boolean;
+  initialScrollTop?: number;
+  scrollRestoreKey?: number;
+  onListScrollTopChange?: (scrollTop: number) => void;
 };
 
-export function ConversationListPane({ onOpenConversation, activeRowId, suppressActiveRow }: ConversationListPaneProps) {
+export function ConversationListPane({
+  onOpenConversation,
+  activeRowId,
+  suppressActiveRow,
+  initialScrollTop = 0,
+  scrollRestoreKey = 0,
+  onListScrollTopChange,
+}: ConversationListPaneProps) {
   const {
     items,
     activeId,
@@ -129,6 +139,7 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
   const [exportOpen, setExportOpen] = useState(false);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
@@ -241,6 +252,13 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
     return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [deleteConfirmOpen, deleting]);
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nextTop = Math.max(0, Number(initialScrollTop) || 0);
+    el.scrollTop = nextTop;
+  }, [initialScrollTop, scrollRestoreKey]);
+
   const onSetFilterKey = (key: string) => {
     const next = String(key || 'all').trim().toLowerCase() || 'all';
     setFilterKey(next);
@@ -261,6 +279,7 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
       if (target.closest('button')) return;
       if (target.closest('a')) return;
     }
+    onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
     const id = Number(conversationId);
     setActiveId(id);
     onOpenConversation?.(id);
@@ -310,7 +329,11 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
-      <div className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden">
+      <div
+        ref={scrollRef}
+        className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden"
+        onScroll={() => onListScrollTopChange?.(scrollRef.current?.scrollTop || 0)}
+      >
         <div className="tw-grid tw-gap-2 tw-px-3 tw-py-3">
           {filteredItems.length ? null : (
             <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
