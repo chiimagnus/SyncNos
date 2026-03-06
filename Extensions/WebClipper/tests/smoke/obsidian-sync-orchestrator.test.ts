@@ -139,7 +139,7 @@ describe("obsidian-sync-orchestrator", () => {
     expect(syncRes.results[0].ok).toBe(true);
 
     const status = await orch.getSyncStatus({ instanceId: "x" });
-    expect(status.job?.status).toBe("finished");
+    expect(status.job?.status).toBe("done");
   });
 
   it("falls back to full rebuild when cursor updatedAt mismatches local history", async () => {
