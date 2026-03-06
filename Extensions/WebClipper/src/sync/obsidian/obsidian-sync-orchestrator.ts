@@ -22,10 +22,9 @@ import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
+import obsidianSyncJobStore from './obsidian-sync-job-store.ts';
 
 const SYNC_PROVIDER = 'obsidian';
-
-let currentJob: any = null;
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -70,26 +69,6 @@ function buildSyncSummary(results: any[], instanceId: unknown) {
     .filter((r) => !r.ok)
     .map((r) => ({ conversationId: r.conversationId, error: r.error || 'unknown error' }));
   return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
-}
-
-function normalizeCurrentJob(job: any, instanceId: unknown) {
-  if (!job || typeof job !== 'object') return null;
-  const perConversation = Array.isArray(job.perConversation) ? job.perConversation.slice() : [];
-  const okCount = Number(job.okCount);
-  const failCount = Number(job.failCount);
-  return {
-    ...job,
-    provider: SYNC_PROVIDER,
-    instanceId: safeString(job.instanceId || instanceId),
-    status: safeString(job.status) === 'finished' ? 'done' : safeString(job.status) || 'done',
-    startedAt: Number(job.startedAt) || 0,
-    updatedAt: Number(job.updatedAt) || Date.now(),
-    finishedAt: job.finishedAt == null ? null : Number(job.finishedAt) || null,
-    conversationIds: normalizeIds(job.conversationIds),
-    okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((row: any) => row && row.ok).length,
-    failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((row: any) => row && !row.ok).length,
-    perConversation,
-  };
 }
 
 function pickLocalCursor(messages: any[]) {
@@ -472,8 +451,13 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
   return { ok: true, data: res.data || null, instanceId: safeString(instanceId) };
 }
 
-function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  return { provider: SYNC_PROVIDER, job: normalizeCurrentJob(currentJob, instanceId), instanceId: safeString(instanceId) };
+async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+  return { provider: SYNC_PROVIDER, job: await obsidianSyncJobStore.getJob(), instanceId: safeString(instanceId) };
+}
+
+async function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
+  await obsidianSyncJobStore.setJob(null);
+  return { provider: SYNC_PROVIDER, job: null, instanceId: safeString(instanceId) };
 }
 
 async function syncConversations({
@@ -491,10 +475,14 @@ async function syncConversations({
     return { provider: SYNC_PROVIDER, okCount: 0, failCount: 0, failures: [], results: [], instanceId: safeString(instanceId) };
   }
 
-  currentJob = {
+  const safeInstanceId = safeString(instanceId);
+  const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
+  if (obsidianSyncJobStore.isRunningJob(existingJob)) throw new Error('sync already in progress');
+
+  const currentJob: any = {
     id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
     provider: SYNC_PROVIDER,
-    instanceId: safeString(instanceId),
+    instanceId: safeInstanceId,
     status: 'running',
     startedAt: Date.now(),
     updatedAt: Date.now(),
@@ -504,6 +492,7 @@ async function syncConversations({
     failCount: 0,
     perConversation: [],
   };
+  await obsidianSyncJobStore.setJob(currentJob);
 
   const results: any[] = [];
 
@@ -722,16 +711,18 @@ async function syncConversations({
     currentJob.updatedAt = Date.now();
     currentJob.okCount = results.filter((r) => r.ok).length;
     currentJob.failCount = results.length - currentJob.okCount;
+    await obsidianSyncJobStore.setJob({ ...currentJob });
   }
 
   currentJob.status = 'done';
   currentJob.updatedAt = Date.now();
   currentJob.finishedAt = Date.now();
+  await obsidianSyncJobStore.setJob({ ...currentJob });
 
   return buildSyncSummary(results, instanceId);
 }
 
-const api = { testConnection, getSyncStatus, syncConversations };
+const api = { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
 
-export { testConnection, getSyncStatus, syncConversations };
+export { testConnection, getSyncStatus, clearSyncStatus, syncConversations };
 export default api;

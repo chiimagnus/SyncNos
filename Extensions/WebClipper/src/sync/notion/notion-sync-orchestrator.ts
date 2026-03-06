@@ -123,11 +123,20 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
   async function getSyncJobStatus(input) {
     const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
-    if (!notionJobStore || typeof notionJobStore.abortRunningJobIfFromOtherInstance !== "function") {
+    if (!notionJobStore || typeof notionJobStore.getJob !== "function") {
       throw new Error("notion sync job store missing");
     }
-    const job = normalizeJob(await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId));
+    const job = normalizeJob(await notionJobStore.getJob());
     return { provider: SYNC_PROVIDER, job, instanceId };
+  }
+
+  async function clearSyncJobStatus(input) {
+    const instanceId = input && input.instanceId != null ? String(input.instanceId) : '';
+    if (!notionJobStore || typeof notionJobStore.setJob !== "function") {
+      throw new Error("notion sync job store missing");
+    }
+    await notionJobStore.setJob(null);
+    return { provider: SYNC_PROVIDER, job: null, instanceId };
   }
 
   async function syncConversations(input) {
@@ -405,6 +414,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
   }
 
   return {
+    clearSyncJobStatus,
     getSyncJobStatus,
     syncConversations,
   };
@@ -427,6 +437,10 @@ const defaultOrchestrator = createNotionSyncOrchestrator(createDefaultNotionServ
 
 export async function getSyncJobStatus(input: { instanceId: string }) {
   return defaultOrchestrator.getSyncJobStatus(input as any);
+}
+
+export async function clearSyncJobStatus(input: { instanceId: string }) {
+  return defaultOrchestrator.clearSyncJobStatus(input as any);
 }
 
 export async function syncConversations(input: { conversationIds?: unknown[]; instanceId: string }) {

@@ -84,13 +84,14 @@ function createRouter({
   });
 
   registerSyncHandlers(router as any, {
-    getInstanceId: () => instanceId,
-    notionSyncOrchestrator,
-    obsidianSyncOrchestrator: {
-      getSyncStatus: async () => ({ job: null }),
-      syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
-    },
-  });
+      getInstanceId: () => instanceId,
+      notionSyncOrchestrator,
+      obsidianSyncOrchestrator: {
+        getSyncStatus: async () => ({ job: null }),
+        clearSyncStatus: async () => ({ job: null }),
+        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+      },
+    });
 
   return router;
 }

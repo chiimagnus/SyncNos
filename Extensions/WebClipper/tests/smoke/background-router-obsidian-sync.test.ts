@@ -53,10 +53,14 @@ describe("background-router obsidian sync routes", () => {
       notionSyncOrchestrator: {
         syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
         getSyncJobStatus: async () => ({ job: null }),
+        clearSyncJobStatus: async () => ({ job: null }),
       },
       obsidianSyncOrchestrator: {
         async getSyncStatus({ instanceId }: any) {
           calls.getSyncStatus += 1;
+          return { job: null, instanceId };
+        },
+        async clearSyncStatus({ instanceId }: any) {
           return { job: null, instanceId };
         },
         async syncConversations(payload: any) {
