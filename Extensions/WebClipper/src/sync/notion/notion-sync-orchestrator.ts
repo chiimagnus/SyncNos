@@ -49,6 +49,12 @@ const SYNC_PROVIDER = 'notion';
       .map((r) => ({ conversationId: Number(r.conversationId) || 0, error: String(r.error || "unknown error") }));
   }
 
+  function buildAlreadyRunningError() {
+    const error = new Error("sync already in progress");
+    error.code = "sync_already_running";
+    return error;
+  }
+
   function normalizeJob(job) {
     if (!job || typeof job !== "object") return null;
     const perConversation = toPerConversationSnapshot(Array.isArray(job.perConversation) ? job.perConversation : []);
@@ -152,7 +158,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     }
 
     const existingJob = await notionJobStore.abortRunningJobIfFromOtherInstance(instanceId);
-    if (notionJobStore.isRunningJob(existingJob)) throw new Error("sync already in progress");
+    if (notionJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
     const token = await (notionTokenStore && notionTokenStore.getToken ? notionTokenStore.getToken() : Promise.resolve(null));
     if (!token || !token.accessToken) throw new Error("notion not connected");

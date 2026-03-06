@@ -204,8 +204,8 @@ function pickPrimaryJob(
   return ordered[0];
 }
 
-function providerFromError(error: unknown): string {
-  return String(error instanceof Error ? error.message : error || '').trim().toLowerCase();
+function errorCode(error: unknown): string {
+  return String((error as any)?.extra?.code ?? (error as any)?.code ?? '').trim().toLowerCase();
 }
 
 export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDeps = {}) {
@@ -356,8 +356,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       } catch (error) {
         if (disposedRef.current) throw error;
 
-        const message = providerFromError(error);
-        if (message.includes('sync already in progress')) {
+        if (errorCode(error) === 'sync_already_running') {
           runTokenRef.current += 1;
           setActiveRun((current) => (current?.token === token ? null : current));
           await refreshFromBackground(provider);

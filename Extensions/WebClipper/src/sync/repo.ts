@@ -9,7 +9,9 @@ function unwrap<T>(res: ApiResponse<T>): T {
   if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
   if (res.ok) return res.data as T;
   const message = res.error?.message ?? 'unknown error';
-  throw new Error(message);
+  const error = new Error(message) as Error & { extra?: unknown };
+  error.extra = res.error?.extra ?? null;
+  throw error;
 }
 
 export async function getNotionSyncJobStatus(): Promise<NotionSyncJobStatus> {
