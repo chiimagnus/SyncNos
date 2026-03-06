@@ -220,8 +220,6 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
     if (!ids.length) return;
-    const ok = confirm(`Delete ${ids.length} conversation(s)? This cannot be undone.`);
-    if (!ok) return;
 
     setDeleting(true);
     try {
@@ -270,4 +268,3 @@ export function useConversationsApp() {
   if (!ctx) throw new Error('useConversationsApp must be used within ConversationsProvider');
   return ctx;
 }
-
