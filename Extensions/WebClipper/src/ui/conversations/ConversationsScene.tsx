@@ -8,11 +8,21 @@ import { useConversationsApp } from './conversations-context';
 
 type NarrowRoute = 'list' | 'detail';
 
+export type PopupHeaderState =
+  | { mode: 'list' }
+  | {
+      mode: 'detail';
+      title: string;
+      subtitle: string;
+      onBack: () => void;
+    };
+
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
+  onPopupHeaderStateChange?: (state: PopupHeaderState) => void;
 };
 
-export function ConversationsScene({ defaultNarrowRoute = 'list' }: ConversationsSceneProps) {
+export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderStateChange }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const { activeId, selectedConversation } = useConversationsApp();
   const [narrowRoute, setNarrowRoute] = useState<NarrowRoute>(defaultNarrowRoute);
@@ -22,6 +32,31 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
     // When switching into narrow mode, keep users at the list by default.
     setNarrowRoute(defaultNarrowRoute);
   }, [defaultNarrowRoute, isNarrow]);
+
+  useEffect(() => {
+    if (!onPopupHeaderStateChange) return;
+
+    if (!isNarrow || narrowRoute !== 'detail') {
+      onPopupHeaderStateChange({ mode: 'list' });
+      return;
+    }
+
+    const title = activeId ? String(selectedConversation?.title || '').trim() || '(Untitled)' : 'Chats';
+    const subtitle = activeId && selectedConversation
+      ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
+      : '';
+
+    onPopupHeaderStateChange({
+      mode: 'detail',
+      title,
+      subtitle,
+      onBack: () => setNarrowRoute('list'),
+    });
+
+    return () => {
+      onPopupHeaderStateChange({ mode: 'list' });
+    };
+  }, [activeId, isNarrow, narrowRoute, onPopupHeaderStateChange, selectedConversation]);
 
   const list = (
     <ConversationListPane
@@ -34,37 +69,8 @@ export function ConversationsScene({ defaultNarrowRoute = 'list' }: Conversation
 
   if (isNarrow) {
     if (narrowRoute === 'detail') {
-      const title = activeId ? String(selectedConversation?.title || '').trim() || '(Untitled)' : 'Chats';
-      const subtitle = activeId && selectedConversation
-        ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
-        : '';
-
       return (
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
-          <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--panel)]/60 tw-px-3 tw-py-2 tw-backdrop-blur-sm">
-            <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-              <button
-                type="button"
-                className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]"
-                onClick={() => setNarrowRoute('list')}
-                aria-label="Back"
-              >
-                Back
-              </button>
-
-              <div className="tw-min-w-0 tw-flex-1 tw-text-center">
-                <div className="tw-min-w-0 tw-truncate tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">{title}</div>
-                {subtitle ? (
-                  <div className="tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-                    {subtitle}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="tw-w-[74px]" aria-hidden="true" />
-            </div>
-          </div>
-
           <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
             <ConversationDetailPane hideHeader />
           </div>
