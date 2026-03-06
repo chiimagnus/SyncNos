@@ -23,6 +23,8 @@ import {
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
 
+const SYNC_PROVIDER = 'obsidian';
+
 let currentJob: any = null;
 
 function safeString(v: unknown) {
@@ -67,7 +69,27 @@ function buildSyncSummary(results: any[], instanceId: unknown) {
   const failures = results
     .filter((r) => !r.ok)
     .map((r) => ({ conversationId: r.conversationId, error: r.error || 'unknown error' }));
-  return { okCount, failCount, failures, results, instanceId: safeString(instanceId) };
+  return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
+}
+
+function normalizeCurrentJob(job: any, instanceId: unknown) {
+  if (!job || typeof job !== 'object') return null;
+  const perConversation = Array.isArray(job.perConversation) ? job.perConversation.slice() : [];
+  const okCount = Number(job.okCount);
+  const failCount = Number(job.failCount);
+  return {
+    ...job,
+    provider: SYNC_PROVIDER,
+    instanceId: safeString(job.instanceId || instanceId),
+    status: safeString(job.status) === 'finished' ? 'done' : safeString(job.status) || 'done',
+    startedAt: Number(job.startedAt) || 0,
+    updatedAt: Number(job.updatedAt) || Date.now(),
+    finishedAt: job.finishedAt == null ? null : Number(job.finishedAt) || null,
+    conversationIds: normalizeIds(job.conversationIds),
+    okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((row) => row && row.ok).length,
+    failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((row) => row && !row.ok).length,
+    perConversation,
+  };
 }
 
 function pickLocalCursor(messages: any[]) {
@@ -451,7 +473,7 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
 }
 
 function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
-  return { job: currentJob, instanceId: safeString(instanceId) };
+  return { provider: SYNC_PROVIDER, job: normalizeCurrentJob(currentJob, instanceId), instanceId: safeString(instanceId) };
 }
 
 async function syncConversations({
@@ -466,14 +488,20 @@ async function syncConversations({
   const ids = normalizeIds(conversationIds);
   const forceFullIds = new Set(normalizeIds(forceFullConversationIds));
   if (!ids.length) {
-    return { okCount: 0, failCount: 0, failures: [], results: [], instanceId: safeString(instanceId) };
+    return { provider: SYNC_PROVIDER, okCount: 0, failCount: 0, failures: [], results: [], instanceId: safeString(instanceId) };
   }
 
   currentJob = {
+    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    provider: SYNC_PROVIDER,
+    instanceId: safeString(instanceId),
     status: 'running',
     startedAt: Date.now(),
+    updatedAt: Date.now(),
     finishedAt: null,
     conversationIds: ids,
+    okCount: 0,
+    failCount: 0,
     perConversation: [],
   };
 
@@ -691,9 +719,13 @@ async function syncConversations({
     }
     results.push(row);
     currentJob.perConversation.push(row);
+    currentJob.updatedAt = Date.now();
+    currentJob.okCount = results.filter((r) => r.ok).length;
+    currentJob.failCount = results.length - currentJob.okCount;
   }
 
-  currentJob.status = 'finished';
+  currentJob.status = 'done';
+  currentJob.updatedAt = Date.now();
   currentJob.finishedAt = Date.now();
 
   return buildSyncSummary(results, instanceId);
