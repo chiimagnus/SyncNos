@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
+import { useNarrowListDetailRoute } from '../shared/hooks/useNarrowListDetailRoute';
 
 import { ConversationDetailPane } from './ConversationDetailPane';
 import { ConversationListPane } from './ConversationListPane';
@@ -25,13 +26,11 @@ export type ConversationsSceneProps = {
 export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderStateChange }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const { activeId, selectedConversation } = useConversationsApp();
-  const [narrowRoute, setNarrowRoute] = useState<NarrowRoute>(defaultNarrowRoute);
-
-  useEffect(() => {
-    if (!isNarrow) return;
-    // When switching into narrow mode, keep users at the list by default.
-    setNarrowRoute(defaultNarrowRoute);
-  }, [defaultNarrowRoute, isNarrow]);
+  const [listScrollTop, setListScrollTop] = useState(0);
+  const { route: narrowRoute, openDetail, returnToList, listRestoreKey } = useNarrowListDetailRoute({
+    isNarrow,
+    defaultRoute: defaultNarrowRoute,
+  });
 
   useEffect(() => {
     if (!onPopupHeaderStateChange) return;
@@ -50,19 +49,21 @@ export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderS
       mode: 'detail',
       title,
       subtitle,
-      onBack: () => setNarrowRoute('list'),
+      onBack: returnToList,
     });
 
     return () => {
       onPopupHeaderStateChange({ mode: 'list' });
     };
-  }, [activeId, isNarrow, narrowRoute, onPopupHeaderStateChange, selectedConversation]);
+  }, [activeId, isNarrow, narrowRoute, onPopupHeaderStateChange, returnToList, selectedConversation]);
 
   const list = (
     <ConversationListPane
+      initialScrollTop={listScrollTop}
+      scrollRestoreKey={listRestoreKey}
+      onListScrollTopChange={setListScrollTop}
       onOpenConversation={() => {
-        if (!isNarrow) return;
-        setNarrowRoute('detail');
+        openDetail();
       }}
     />
   );
