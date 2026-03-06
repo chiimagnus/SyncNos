@@ -1,6 +1,7 @@
 // @ts-nocheck
 
   const MAX_TEXT = 1900;
+  const MAX_EQUATION_EXPRESSION = 1900;
 
   function splitText(text) {
     const s = String(text || "");
@@ -81,8 +82,46 @@
     return { type: "text", text, annotations: base };
   }
 
+  function normalizeEquationExpression(expression) {
+    return String(expression || "").trim();
+  }
+
+  function canUseNativeEquation(expression) {
+    return normalizeEquationExpression(expression).length <= MAX_EQUATION_EXPRESSION;
+  }
+
+  function inlineEquationFallbackRich(expression) {
+    const expr = normalizeEquationExpression(expression);
+    if (!expr) return [];
+    return [textRich(`$${expr}$`, { annotations: { code: true } })];
+  }
+
+  function blockEquationFallbackBlocks(expression) {
+    const expr = normalizeEquationExpression(expression);
+    if (!expr) return [];
+    const literal = `$$\n${expr}\n$$`;
+    return splitText(literal)
+      .filter((part) => String(part || "").length)
+      .map((part) => ({
+        object: "block",
+        type: "code",
+        code: {
+          rich_text: [textRich(part, { annotations: { code: true } })],
+          language: "plain text"
+        }
+      }));
+  }
+
   function equationRich(expression) {
-    return { type: "equation", equation: { expression: String(expression || "").trim() } };
+    const expr = normalizeEquationExpression(expression);
+    return { type: "equation", equation: { expression: expr } };
+  }
+
+  function inlineEquationRich(expression) {
+    const expr = normalizeEquationExpression(expression);
+    if (!expr) return [];
+    if (canUseNativeEquation(expr)) return [equationRich(expr)];
+    return inlineEquationFallbackRich(expr);
   }
 
   function mergeRichText(list) {
@@ -216,7 +255,7 @@
           if (end > 1) {
             const expr = rest.slice(1, end);
             const tail = rest.slice(end + 1);
-            out.push(equationRich(expr));
+            out.push(...inlineEquationRich(expr));
             out.push(...parsePlain(tail, ann));
             return out;
           }
@@ -331,9 +370,13 @@
     }
 
     function pushEquationBlock(expression) {
-      const expr = String(expression || "").trim();
+      const expr = normalizeEquationExpression(expression);
       if (!expr) return;
-      out.push({ object: "block", type: "equation", equation: { expression: expr } });
+      if (canUseNativeEquation(expr)) {
+        out.push({ object: "block", type: "equation", equation: { expression: expr } });
+        return;
+      }
+      out.push(...blockEquationFallbackBlocks(expr));
     }
 
     function parseImageLine(line) {
