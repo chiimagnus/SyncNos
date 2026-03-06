@@ -6,14 +6,14 @@ import {
   setSyncJob,
 } from '../sync-job-store.ts';
 
-export const NOTION_SYNC_JOB_KEY = SYNC_JOB_STORAGE_KEYS.notion;
+export const OBSIDIAN_SYNC_JOB_KEY = SYNC_JOB_STORAGE_KEYS.obsidian;
 
 export async function getJob() {
-  return getSyncJob('notion');
+  return getSyncJob('obsidian');
 }
 
 export async function setJob(job: any) {
-  return setSyncJob('notion', job);
+  return setSyncJob('obsidian', job);
 }
 
 export function isRunningJob(job: any, staleMs?: number) {
@@ -21,11 +21,11 @@ export function isRunningJob(job: any, staleMs?: number) {
 }
 
 export async function abortRunningJobIfFromOtherInstance(instanceId: string) {
-  return abortRunningSyncJobIfFromOtherInstance('notion', instanceId);
+  return abortRunningSyncJobIfFromOtherInstance('obsidian', instanceId);
 }
 
 const api = {
-  NOTION_SYNC_JOB_KEY,
+  OBSIDIAN_SYNC_JOB_KEY,
   getJob,
   setJob,
   isRunningJob,

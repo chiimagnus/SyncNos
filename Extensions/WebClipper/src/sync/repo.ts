@@ -17,8 +17,18 @@ export async function getNotionSyncJobStatus(): Promise<NotionSyncJobStatus> {
   return unwrap(res);
 }
 
+export async function clearNotionSyncJobStatus(): Promise<NotionSyncJobStatus> {
+  const res = await send<ApiResponse<NotionSyncJobStatus>>(NOTION_MESSAGE_TYPES.CLEAR_SYNC_JOB_STATUS);
+  return unwrap(res);
+}
+
 export async function getObsidianSyncStatus(): Promise<ObsidianSyncStatus> {
   const res = await send<ApiResponse<ObsidianSyncStatus>>(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS);
+  return unwrap(res);
+}
+
+export async function clearObsidianSyncStatus(): Promise<ObsidianSyncStatus> {
+  const res = await send<ApiResponse<ObsidianSyncStatus>>(OBSIDIAN_MESSAGE_TYPES.CLEAR_SYNC_STATUS);
   return unwrap(res);
 }
 

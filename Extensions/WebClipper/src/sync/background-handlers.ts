@@ -11,6 +11,7 @@ type Deps = {
   notionSyncOrchestrator: {
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;
     getSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
+    clearSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
   };
   obsidianSyncOrchestrator: {
     syncConversations: (input: {
@@ -19,6 +20,7 @@ type Deps = {
       instanceId: string;
     }) => Promise<unknown>;
     getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
+    clearSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
   };
 };
 
@@ -36,8 +38,18 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
     return router.ok(data);
   });
 
+  router.register(NOTION_MESSAGE_TYPES.CLEAR_SYNC_JOB_STATUS, async () => {
+    const data = await deps.notionSyncOrchestrator.clearSyncJobStatus({ instanceId: deps.getInstanceId() });
+    return router.ok(data);
+  });
+
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
     const data = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId: deps.getInstanceId() });
+    return router.ok(data);
+  });
+
+  router.register(OBSIDIAN_MESSAGE_TYPES.CLEAR_SYNC_STATUS, async () => {
+    const data = await deps.obsidianSyncOrchestrator.clearSyncStatus({ instanceId: deps.getInstanceId() });
     return router.ok(data);
   });
 

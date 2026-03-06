@@ -11,6 +11,7 @@ export const NOTION_MESSAGE_TYPES = {
   DISCONNECT: 'notionDisconnect',
   SYNC_CONVERSATIONS: 'notionSyncConversations',
   GET_SYNC_JOB_STATUS: 'getNotionSyncJobStatus',
+  CLEAR_SYNC_JOB_STATUS: 'clearNotionSyncJobStatus',
 } as const;
 
 export const OBSIDIAN_MESSAGE_TYPES = {
@@ -19,6 +20,7 @@ export const OBSIDIAN_MESSAGE_TYPES = {
   TEST_CONNECTION: 'obsidianTestConnection',
   SYNC_CONVERSATIONS: 'obsidianSyncConversations',
   GET_SYNC_STATUS: 'obsidianGetSyncStatus',
+  CLEAR_SYNC_STATUS: 'clearObsidianSyncStatus',
 } as const;
 
 export const ARTICLE_MESSAGE_TYPES = {
