@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  clearNotionSyncJobStatus as defaultClearNotionSyncJobStatus,
+  clearObsidianSyncStatus as defaultClearObsidianSyncStatus,
   getNotionSyncJobStatus as defaultGetNotionSyncJobStatus,
   getObsidianSyncStatus as defaultGetObsidianSyncStatus,
   syncNotionConversations as defaultSyncNotionConversations,
   syncObsidianConversations as defaultSyncObsidianConversations,
 } from '../../sync/repo';
-import type { SyncFailureSummary, SyncJobStatusResponse, SyncProvider, SyncRunSummary } from '../../sync/models';
+import { SYNC_JOB_STORAGE_KEYS } from '../../sync/sync-job-store';
+import { storageOnChanged } from '../../platform/storage/local';
+import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary } from '../../sync/models';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
 
@@ -22,16 +26,12 @@ export type ConversationSyncFeedbackState = {
 };
 
 type UseConversationSyncFeedbackDeps = {
+  clearNotionSyncJobStatus?: () => Promise<SyncJobStatusResponse>;
+  clearObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
   getNotionSyncJobStatus?: () => Promise<SyncJobStatusResponse>;
   getObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
   syncNotionConversations?: (conversationIds: number[]) => Promise<SyncRunSummary>;
   syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncRunSummary>;
-};
-
-type ActiveRun = {
-  provider: SyncProvider;
-  token: number;
-  total: number;
 };
 
 const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
@@ -53,6 +53,13 @@ function normalizeIds(ids: number[]) {
   return Array.from(new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)));
 }
 
+function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((row) => row && typeof row === 'object' && (row as any).ok === false)
+    .map((row) => ({ conversationId: Number((row as any).conversationId) || 0, error: String((row as any).error || 'unknown error') }));
+}
+
 function buildRunningMessage(provider: SyncProvider, done: number, total: number) {
   const label = providerLabel(provider);
   if (total > 0) return `${label} syncing ${Math.min(done, total)}/${total}`;
@@ -65,6 +72,12 @@ function buildFinishedMessage(summary: SyncRunSummary, total: number) {
   if (summary.failCount <= 0) return `${label} sync completed (${summary.okCount}/${safeTotal})`;
   if (summary.okCount > 0) return `${label} sync partially failed (${summary.failCount}/${safeTotal} failed)`;
   return `${label} sync failed (${summary.failCount}/${safeTotal})`;
+}
+
+function buildAbortedMessage(job: SyncJobSnapshot) {
+  const label = providerLabel(job.provider);
+  const reason = String(job.abortedReason || '').trim();
+  return reason ? `${label} sync stopped: ${reason}` : `${label} sync stopped`;
 }
 
 function toFailureSummaries(summary: SyncRunSummary) {
@@ -101,89 +114,196 @@ function toErrorMessage(provider: SyncProvider, error: unknown) {
   return text ? `${label} sync failed: ${text}` : `${label} sync failed`;
 }
 
+function toSummaryFromJob(job: SyncJobSnapshot): SyncRunSummary | null {
+  if (!job || job.status === 'running') return null;
+  return {
+    provider: job.provider,
+    okCount: Number(job.okCount) || 0,
+    failCount: Number(job.failCount) || 0,
+    failures: toFailureSummariesFromRows(job.perConversation),
+    results: Array.isArray(job.perConversation) ? job.perConversation.slice() : [],
+    jobId: job.id,
+    instanceId: job.instanceId,
+  };
+}
+
+function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState {
+  const completed = Math.max(
+    Array.isArray(job.perConversation) ? job.perConversation.length : 0,
+    (Number(job.okCount) || 0) + (Number(job.failCount) || 0),
+  );
+  const total = Math.max(completed, Array.isArray(job.conversationIds) ? job.conversationIds.length : 0);
+  const failures = toFailureSummariesFromRows(job.perConversation);
+
+  if (job.status === 'running') {
+    return {
+      provider: job.provider,
+      phase: 'running',
+      total,
+      done: Math.min(completed, total || completed),
+      failures,
+      message: buildRunningMessage(job.provider, completed, total),
+      updatedAt: Number(job.updatedAt) || Date.now(),
+      summary: null,
+    };
+  }
+
+  if (job.status === 'aborted') {
+    return {
+      provider: job.provider,
+      phase: 'failed',
+      total,
+      done: Math.min(completed, total || completed),
+      failures,
+      message: buildAbortedMessage(job),
+      updatedAt: Number(job.updatedAt) || Date.now(),
+      summary: toSummaryFromJob(job),
+    };
+  }
+
+  return toTerminalFeedback(
+    {
+      provider: job.provider,
+      okCount: Number(job.okCount) || 0,
+      failCount: Number(job.failCount) || 0,
+      failures,
+      results: Array.isArray(job.perConversation) ? job.perConversation.slice() : [],
+      jobId: job.id,
+      instanceId: job.instanceId,
+    },
+    total,
+  );
+}
+
+function pickPrimaryJob(
+  notionJob: SyncJobSnapshot | null,
+  obsidianJob: SyncJobSnapshot | null,
+  preferredProvider?: SyncProvider | null,
+) {
+  const jobs = [notionJob, obsidianJob].filter(Boolean) as SyncJobSnapshot[];
+  if (!jobs.length) return null;
+
+  const compare = (a: SyncJobSnapshot, b: SyncJobSnapshot) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+  const running = jobs.filter((job) => job.status === 'running').sort(compare);
+  if (preferredProvider) {
+    const preferredRunning = running.find((job) => job.provider === preferredProvider);
+    if (preferredRunning) return preferredRunning;
+  }
+  if (running.length) return running[0];
+
+  const ordered = jobs.slice().sort(compare);
+  if (preferredProvider) {
+    const preferred = ordered.find((job) => job.provider === preferredProvider);
+    if (preferred) return preferred;
+  }
+  return ordered[0];
+}
+
+function providerFromError(error: unknown): string {
+  return String(error instanceof Error ? error.message : error || '').trim().toLowerCase();
+}
+
 export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDeps = {}) {
+  const clearNotionSyncJobStatus = deps.clearNotionSyncJobStatus ?? defaultClearNotionSyncJobStatus;
+  const clearObsidianSyncStatus = deps.clearObsidianSyncStatus ?? defaultClearObsidianSyncStatus;
   const getNotionSyncJobStatus = deps.getNotionSyncJobStatus ?? defaultGetNotionSyncJobStatus;
   const getObsidianSyncStatus = deps.getObsidianSyncStatus ?? defaultGetObsidianSyncStatus;
   const syncNotionConversations = deps.syncNotionConversations ?? defaultSyncNotionConversations;
   const syncObsidianConversations = deps.syncObsidianConversations ?? defaultSyncObsidianConversations;
 
   const [feedback, setFeedback] = useState<ConversationSyncFeedbackState>(IDLE_FEEDBACK);
-  const [activeRun, setActiveRun] = useState<ActiveRun | null>(null);
-  const runTokenRef = useRef(0);
+  const disposedRef = useRef(false);
 
-  const clearFeedback = useCallback(() => {
-    setFeedback((current) => (current.phase === 'running' ? current : IDLE_FEEDBACK));
-  }, []);
+  const refreshFromBackground = useCallback(
+    async (preferredProvider?: SyncProvider | null) => {
+      const [notionStatus, obsidianStatus] = await Promise.all([
+        getNotionSyncJobStatus().catch(() => ({ provider: 'notion', job: null } as SyncJobStatusResponse)),
+        getObsidianSyncStatus().catch(() => ({ provider: 'obsidian', job: null } as SyncJobStatusResponse)),
+      ]);
+      if (disposedRef.current) return null;
+
+      const job = pickPrimaryJob(notionStatus?.job ?? null, obsidianStatus?.job ?? null, preferredProvider);
+      setFeedback(job ? toFeedbackFromJob(job) : IDLE_FEEDBACK);
+      return job;
+    },
+    [getNotionSyncJobStatus, getObsidianSyncStatus],
+  );
 
   useEffect(() => {
-    if (!activeRun) return;
+    disposedRef.current = false;
+    void refreshFromBackground();
+    return () => {
+      disposedRef.current = true;
+    };
+  }, [refreshFromBackground]);
 
-    const token = activeRun.token;
-    const provider = activeRun.provider;
-    const getStatus = provider === 'notion' ? getNotionSyncJobStatus : getObsidianSyncStatus;
+  useEffect(() => {
+    const watchedKeys = new Set(Object.values(SYNC_JOB_STORAGE_KEYS));
+    return storageOnChanged((changes, areaName) => {
+      if (areaName !== 'local' || !changes || typeof changes !== 'object') return;
+      const changed = Object.keys(changes).some((key) => watchedKeys.has(key));
+      if (!changed) return;
+      void refreshFromBackground(feedback.provider);
+    });
+  }, [feedback.provider, refreshFromBackground]);
+
+  useEffect(() => {
+    if (feedback.phase !== 'running' || !feedback.provider) return;
+    const getStatus = feedback.provider === 'notion' ? getNotionSyncJobStatus : getObsidianSyncStatus;
     let disposed = false;
 
     const poll = async () => {
       try {
         const status = await getStatus();
-        if (disposed || runTokenRef.current !== token) return;
-        const job = status?.job;
-        if (!job) return;
-
-        const total = Math.max(activeRun.total, Array.isArray(job.conversationIds) ? job.conversationIds.length : 0);
-        const done = Array.isArray(job.perConversation) ? job.perConversation.length : 0;
-        const failures = Array.isArray(job.perConversation)
-          ? job.perConversation
-              .filter((row) => row && row.ok === false)
-              .map((row) => ({ conversationId: Number(row.conversationId) || 0, error: String(row.error || 'unknown error') }))
-          : [];
-
-        setFeedback((current) => {
-          if (current.phase !== 'running' || current.provider !== provider) return current;
-          return {
-            ...current,
-            total,
-            done,
-            failures,
-            updatedAt: Date.now(),
-            message: buildRunningMessage(provider, done, total),
-          };
-        });
-
-        if (job.status !== 'running') setActiveRun((current) => (current?.token === token ? null : current));
+        if (disposed || disposedRef.current) return;
+        if (!status?.job) {
+          await refreshFromBackground(feedback.provider);
+          return;
+        }
+        setFeedback(toFeedbackFromJob(status.job));
       } catch (_error) {
-        // Polling is best-effort; final state still comes from the main sync promise.
+        // Polling is best-effort; storage updates and sync completion still refresh the visible state.
       }
     };
 
     void poll();
     const timer = window.setInterval(() => {
       void poll();
-    }, 400);
+    }, 500);
 
     return () => {
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [activeRun, getNotionSyncJobStatus, getObsidianSyncStatus]);
+  }, [feedback.phase, feedback.provider, getNotionSyncJobStatus, getObsidianSyncStatus, refreshFromBackground]);
+
+  const clearFeedback = useCallback(() => {
+    const current = feedback;
+    if (current.phase === 'running') return;
+    if (!current.provider) {
+      setFeedback(IDLE_FEEDBACK);
+      return;
+    }
+
+    setFeedback(IDLE_FEEDBACK);
+    const clear = current.provider === 'notion' ? clearNotionSyncJobStatus : clearObsidianSyncStatus;
+    void clear()
+      .catch(() => undefined)
+      .then(() => refreshFromBackground());
+  }, [clearNotionSyncJobStatus, clearObsidianSyncStatus, feedback, refreshFromBackground]);
 
   const startSync = useCallback(
     async (provider: SyncProvider, conversationIds: number[]) => {
       const ids = normalizeIds(conversationIds);
       if (!ids.length) return null;
 
-      const token = runTokenRef.current + 1;
-      runTokenRef.current = token;
-      const total = ids.length;
-
-      setActiveRun({ provider, token, total });
       setFeedback({
         provider,
         phase: 'running',
-        total,
+        total: ids.length,
         done: 0,
         failures: [],
-        message: buildRunningMessage(provider, 0, total),
+        message: buildRunningMessage(provider, 0, ids.length),
         updatedAt: Date.now(),
         summary: null,
       });
@@ -192,19 +312,22 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         const summary = provider === 'notion'
           ? await syncNotionConversations(ids)
           : await syncObsidianConversations(ids);
-        if (runTokenRef.current !== token) return summary;
-
-        setActiveRun((current) => (current?.token === token ? null : current));
-        setFeedback(toTerminalFeedback(summary, total));
+        if (disposedRef.current) return summary;
+        await refreshFromBackground(provider);
         return summary;
       } catch (error) {
-        if (runTokenRef.current !== token) throw error;
+        if (disposedRef.current) throw error;
 
-        setActiveRun((current) => (current?.token === token ? null : current));
+        const message = providerFromError(error);
+        if (message.includes('sync already in progress')) {
+          await refreshFromBackground(provider);
+          return null;
+        }
+
         setFeedback({
           provider,
           phase: 'failed',
-          total,
+          total: 0,
           done: 0,
           failures: [{ conversationId: 0, error: error instanceof Error ? error.message : String(error || 'sync failed') }],
           message: toErrorMessage(provider, error),
@@ -214,7 +337,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         throw error;
       }
     },
-    [syncNotionConversations, syncObsidianConversations],
+    [refreshFromBackground, syncNotionConversations, syncObsidianConversations],
   );
 
   return {
