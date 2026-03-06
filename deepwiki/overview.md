@@ -93,6 +93,9 @@ if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 ## 如何导航
 - 从 [architecture.md](architecture.md) 看系统边界与契约，再进入 `modules/` 理解各产品线的内部组织。
 - 与运行约束相关的问题，优先看 [configuration.md](configuration.md) 与 [workflow.md](workflow.md)。
+- 与“数据到底存在哪里、哪些是本地事实源、哪些是外部产物”相关的问题，优先看 [storage.md](storage.md)。
+- 与打包、tag、商店发布和 Release 产物相关的问题，优先看 [release.md](release.md)。
+- 与故障定位、权限问题、同步失败或版本校验失败相关的问题，优先看 [troubleshooting.md](troubleshooting.md)。
 - 与验证和回归相关的问题，优先看 [testing.md](testing.md)。
 - 与命名语义和跨文档一致性相关的问题，优先看 [glossary.md](glossary.md)。
 
@@ -101,6 +104,10 @@ if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 - 未被明确要求时，不要查看或编辑国际化字段；中文 deepwiki 只整理事实，不修改现有多语言资源。
 - WebClipper 的正式发布包由 GitHub Actions 生成，本地主要用于 WXT 开发与验证，不应手工替代 CI 发布流程。
 - 文档同步应以代码和脚本为准，而不是在文档之间互相抄写。
+
+## Coverage Gaps（如有）
+- `overview.md` 负责建立整个仓库的第一层心智模型，因此不会继续展开到 Notion 集成、OCR、WebClipper collectors 等子系统细节。
+- 更细的事实面已经拆到 `modules/`、`storage.md`、`release.md` 和 `troubleshooting.md`；如果还需要更细粒度导航，应优先在这些专题页继续细分。
 
 ## 来源引用（Source References）
 - `README.md`
