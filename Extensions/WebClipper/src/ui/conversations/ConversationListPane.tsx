@@ -409,8 +409,8 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
         </div>
 
         <div className="tw-sticky tw-bottom-0 tw-z-20 tw-border-t tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
-          <div className="tw-px-3 tw-py-3">
-            <div className={['tw-flex tw-min-h-11 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
+          <div className="tw-px-3 tw-py-2">
+            <div className={['tw-flex tw-min-h-9 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
               <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label="Select all">
                 <input
                   ref={selectAllRef}
@@ -419,7 +419,7 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
                   aria-label="Select all"
                   checked={allSelected}
                   onChange={() => toggleAll(visibleIds)}
-                  className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+                  className="tw-size-4 tw-cursor-pointer tw-accent-[var(--text)]"
                 />
                 <span className="tw-sr-only">Select all</span>
               </label>
@@ -430,7 +430,7 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
                 onChange={(e) => onSetFilterKey(e.target.value)}
                 disabled={hasSelection}
                 className={[
-                  'tw-h-9 tw-max-w-[120px] tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+                  'tw-h-8 tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
                   hasSelection ? 'tw-hidden' : '',
                 ].join(' ')}
                 aria-label="Source filter"
@@ -542,11 +542,11 @@ export function ConversationListPane({ onOpenConversation, activeRowId, suppress
               <div
                 id="stats"
                 className={[
-                  'tw-flex tw-flex-none tw-items-end tw-gap-1 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--muted)]',
+                  'tw-flex tw-flex-none tw-items-end tw-gap-0.5 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--muted)]',
                   'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
                   hasSelection
                     ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none'
-                    : 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-2 tw-py-[3px]',
+                    : 'tw-max-w-[320px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-1 tw-py-0',
                 ].join(' ')}
               >
                 <span className="tw-text-[var(--muted)]">Today:</span>
