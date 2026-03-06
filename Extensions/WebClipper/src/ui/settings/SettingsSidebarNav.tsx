@@ -9,12 +9,7 @@ export function SettingsSidebarNav(props: {
 
   return (
     <aside className="tw-w-[240px] tw-shrink-0 tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/40">
-      <div className="tw-p-4">
-        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">Settings</div>
-        <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">Integrations, backup, and app behavior.</div>
-      </div>
-
-      <nav className="tw-px-2 tw-pb-4" aria-label="Settings sections">
+      <nav className="tw-p-2 tw-pb-4" aria-label="Settings sections">
         {SETTINGS_SECTIONS.map((s) => {
           const active = activeSection === s.key;
           return (
