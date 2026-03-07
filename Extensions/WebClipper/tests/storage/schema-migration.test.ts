@@ -173,3 +173,142 @@ describe("storage schema migration (v2 NotionAI thread id)", () => {
     expect(maps.some((m) => m.source === "notionai" && m.conversationKey === stableKey && m.notionPageId === "page_1")).toBe(true);
   });
 });
+
+describe("storage schema migration (v4 legacy article rows)", () => {
+  it("rewrites legacy article source/key/url to canonical web article values", async () => {
+    const db1 = await openV1Db();
+    const t1 = db1.transaction(["conversations", "messages", "sync_mappings"], "readwrite");
+    const convStore = t1.objectStore("conversations");
+    const msgStore = t1.objectStore("messages");
+    const mapStore = t1.objectStore("sync_mappings");
+
+    const legacyId = await reqToPromise<number>(convStore.add({
+      sourceType: "article",
+      source: "article",
+      conversationKey: "article_https://example.com/post",
+      title: "Legacy article",
+      url: "https://example.com/post#frag",
+      notionPageId: "page_old",
+      warningFlags: [],
+      lastCapturedAt: 10,
+    }));
+    await reqToPromise(msgStore.add({
+      conversationId: legacyId,
+      messageKey: "article_body",
+      role: "assistant",
+      contentText: "hello",
+      sequence: 1,
+      updatedAt: 10,
+    }));
+    await reqToPromise(mapStore.add({
+      source: "article",
+      conversationKey: "article_https://example.com/post",
+      notionPageId: "page_old",
+      updatedAt: 10,
+    }));
+    await txDone(t1);
+    db1.close();
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(["conversations", "messages", "sync_mappings"], "readonly");
+    const convs = await reqToPromise<any[]>(t2.objectStore("conversations").getAll());
+    const msgs = await reqToPromise<any[]>(t2.objectStore("messages").getAll());
+    const maps = await reqToPromise<any[]>(t2.objectStore("sync_mappings").getAll());
+    await txDone(t2);
+    db2.close();
+
+    expect(convs).toHaveLength(1);
+    expect(convs[0]).toMatchObject({
+      id: legacyId,
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      url: "https://example.com/post",
+      notionPageId: "page_old",
+    });
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({
+      conversationId: legacyId,
+      messageKey: "article_body",
+    });
+    expect(maps).toHaveLength(1);
+    expect(maps[0]).toMatchObject({
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      notionPageId: "page_old",
+    });
+  });
+
+  it("merges duplicate legacy/canonical article rows onto a single canonical conversation", async () => {
+    const db1 = await openV1Db();
+    const t1 = db1.transaction(["conversations", "messages", "sync_mappings"], "readwrite");
+    const convStore = t1.objectStore("conversations");
+    const msgStore = t1.objectStore("messages");
+    const mapStore = t1.objectStore("sync_mappings");
+
+    const canonicalId = await reqToPromise<number>(convStore.add({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      title: "Canonical article",
+      url: "https://example.com/post",
+      warningFlags: [],
+      lastCapturedAt: 20,
+    }));
+    const legacyId = await reqToPromise<number>(convStore.add({
+      sourceType: "article",
+      source: "article",
+      conversationKey: "article_https://example.com/post",
+      title: "",
+      url: "https://example.com/post#frag",
+      notionPageId: "page_old",
+      warningFlags: [],
+      lastCapturedAt: 10,
+    }));
+
+    await reqToPromise(msgStore.add({
+      conversationId: legacyId,
+      messageKey: "article_body",
+      role: "assistant",
+      contentText: "legacy body",
+      sequence: 1,
+      updatedAt: 10,
+    }));
+    await reqToPromise(mapStore.add({
+      source: "article",
+      conversationKey: "article_https://example.com/post",
+      notionPageId: "page_old",
+      updatedAt: 10,
+    }));
+    await txDone(t1);
+    db1.close();
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(["conversations", "messages", "sync_mappings"], "readonly");
+    const convs = await reqToPromise<any[]>(t2.objectStore("conversations").getAll());
+    const msgs = await reqToPromise<any[]>(t2.objectStore("messages").getAll());
+    const maps = await reqToPromise<any[]>(t2.objectStore("sync_mappings").getAll());
+    await txDone(t2);
+    db2.close();
+
+    expect(convs).toHaveLength(1);
+    expect(convs[0]).toMatchObject({
+      id: canonicalId,
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      notionPageId: "page_old",
+    });
+    expect(convs.some((c) => Number(c.id) === legacyId)).toBe(false);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({
+      conversationId: canonicalId,
+      messageKey: "article_body",
+    });
+    expect(maps).toHaveLength(1);
+    expect(maps[0]).toMatchObject({
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      notionPageId: "page_old",
+    });
+  });
+});
