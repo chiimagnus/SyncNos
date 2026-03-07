@@ -166,6 +166,14 @@ describe('Conversations sync feedback', () => {
     });
   }
 
+  function clickOpenDetailsButton() {
+    const button = document.querySelector('[aria-label="Open Notion sync details"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    act(() => {
+      button!.click();
+    });
+  }
+
   function notionRunningJob(overrides: Record<string, unknown> = {}) {
     return {
       provider: 'notion',
@@ -310,7 +318,13 @@ describe('Conversations sync feedback', () => {
     expect(failureNotice).toBeTruthy();
     expect(failureNotice?.getAttribute('data-phase')).toBe('failed');
     expect(failureNotice?.textContent).toContain('Notion sync failed (1/1)');
-    expect(failureNotice?.textContent).toContain('#11: missing parentPageId');
+    expect(failureNotice?.textContent).not.toContain('missing parentPageId');
+
+    clickOpenDetailsButton();
+
+    const details = document.querySelector('[aria-label="Notion sync details"]');
+    expect(details).toBeTruthy();
+    expect(details?.textContent).toContain('missing parentPageId');
 
     clickDismissButton();
 
