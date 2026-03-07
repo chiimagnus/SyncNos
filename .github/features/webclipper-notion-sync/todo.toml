@@ -76,10 +76,10 @@ note = "notion-sync-service tests passed"
 [[tasks]]
 id = "P3-T1"
 title = "在 Notion API 层补齐结构化错误字段并补解析测试"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t1"
 commit = ""
-note = ""
+note = "implementing structured notion errors"
 
 [[tasks]]
 id = "P3-T2"
