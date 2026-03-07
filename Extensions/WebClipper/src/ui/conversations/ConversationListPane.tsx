@@ -5,6 +5,7 @@ import { formatConversationMarkdown } from '../../conversations/domain/markdown'
 import { getConversationDetail } from '../../conversations/client/repo';
 import { tabsCreate } from '../../platform/webext/tabs';
 
+import { t } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 
@@ -155,7 +156,7 @@ export function ConversationListPane({
       map.set(meta.key, { key: meta.key, label: meta.label || meta.key });
     }
     const opts = Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-    return [{ key: 'all', label: 'All' }, ...opts];
+    return [{ key: 'all', label: t('allFilter') }, ...opts];
   }, [items]);
 
   useEffect(() => {
@@ -348,7 +349,7 @@ export function ConversationListPane({
         <div className="tw-grid tw-gap-2 tw-px-3 tw-py-3">
           {filteredItems.length ? null : (
             <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-              No conversations yet.
+              {t('noConversations')}
             </div>
           )}
 
@@ -382,7 +383,7 @@ export function ConversationListPane({
                   />
                 ) : null}
                 <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--muted)]">
-                  <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} aria-label="Select" />
+                  <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} aria-label={t('selectLabel')} />
                 </label>
 
                 <div className="tw-min-w-0 tw-flex-1">
@@ -392,7 +393,7 @@ export function ConversationListPane({
                     </div>
                     {hasWarningFlags(conversation as any) ? (
                       <span className="tw-inline-flex tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--warn-bg)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--muted)]">
-                        warning
+                        {t('warningBadge')}
                       </span>
                     ) : null}
                   </div>
@@ -403,8 +404,8 @@ export function ConversationListPane({
                         'tw-inline-flex tw-size-[18px] tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[12px] tw-font-black tw-text-[var(--muted)] hover:tw-border-[rgba(217,89,38,0.35)] hover:tw-bg-white hover:tw-text-[var(--text)]'
                       }
                       type="button"
-                      aria-label="Copy full markdown"
-                      title={copiedId === id ? 'Copied' : 'Copy full markdown'}
+                      aria-label={t('copyFullMarkdown')}
+                      title={copiedId === id ? t('copied') : t('copyFullMarkdown')}
                       onClick={(e) => void onCopyConversation(conversation as any, e)}
                     >
                       {copiedId === id ? '✓' : '⧉'}
@@ -413,8 +414,8 @@ export function ConversationListPane({
                     <button
                       className="tw-inline-flex tw-size-[18px] tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[12px] tw-font-black tw-text-[var(--muted)] hover:tw-border-[rgba(217,89,38,0.35)] hover:tw-bg-white hover:tw-text-[var(--text)] disabled:tw-cursor-not-allowed disabled:tw-opacity-40"
                       type="button"
-                      aria-label="Open original chat"
-                      title={safeUrl ? 'Open chat' : 'No link available'}
+                      aria-label={t('openOriginalChat')}
+                      title={safeUrl ? t('openChat') : t('noLinkAvailable')}
                       disabled={!safeUrl}
                       onClick={(e) => void openConversationUrl(String((conversation as any).url || ''), e)}
                     >
@@ -445,17 +446,17 @@ export function ConversationListPane({
         <div className="tw-sticky tw-bottom-0 tw-z-20 tw-border-t tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
           <div className="tw-px-3 tw-py-2">
             <div className={['tw-flex tw-min-h-9 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
-              <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label="Select all">
+              <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label={t('selectAll')}>
                 <input
                   ref={selectAllRef}
                   id="chkSelectAll"
                   type="checkbox"
-                  aria-label="Select all"
+                  aria-label={t('selectAll')}
                   checked={allSelected}
                   onChange={() => toggleAll(visibleIds)}
                   className="tw-size-4 tw-cursor-pointer tw-accent-[var(--text)]"
                 />
-                <span className="tw-sr-only">Select all</span>
+                <span className="tw-sr-only">{t('selectAll')}</span>
               </label>
 
               <select
@@ -490,11 +491,11 @@ export function ConversationListPane({
                   id="btnDelete"
                   type="button"
                   className={dangerButton}
-                  title="Delete selected"
+                  title={t('deleteButton')}
                   onClick={() => setDeleteConfirmOpen(true)}
                   disabled={!hasSelection || busy}
                 >
-                  Delete
+                  {t('deleteButton')}
                 </button>
 
                 <div ref={exportWrapRef} className="tw-relative">
@@ -510,7 +511,7 @@ export function ConversationListPane({
                     }}
                     disabled={!hasSelection || exporting || busy}
                   >
-                    <span className="tw-leading-none">Export</span>
+                    <span className="tw-leading-none">{t('exportButton')}</span>
                     <span
                       className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
                       aria-hidden="true"
@@ -522,7 +523,7 @@ export function ConversationListPane({
                   <div
                     id="exportMenu"
                     role="menu"
-                    aria-label="Export options"
+                    aria-label={t('exportOptions')}
                     hidden={!exportOpen}
                     className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[150px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-1.5 tw-shadow-[var(--shadow)]"
                   >
@@ -536,7 +537,7 @@ export function ConversationListPane({
                         void exportSelectedMarkdown({ mergeSingle: true });
                       }}
                     >
-                      Single Markdown
+                      {t('singleMarkdown')}
                     </button>
                     <button
                       id="menuExportMultiMarkdown"
@@ -548,7 +549,7 @@ export function ConversationListPane({
                         void exportSelectedMarkdown({ mergeSingle: false });
                       }}
                     >
-                      Multi Markdown
+                      {t('multiMarkdown')}
                     </button>
                   </div>
                 </div>
@@ -559,7 +560,7 @@ export function ConversationListPane({
                   onClick={() => syncSelectedObsidian().catch(() => {})}
                   disabled={!hasSelection || busy}
                 >
-                  {syncingObsidian ? 'Obsidian...' : 'Obsidian'}
+                  {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
                 </button>
                 <button
                   type="button"
@@ -567,7 +568,7 @@ export function ConversationListPane({
                   onClick={() => syncSelectedNotion().catch(() => {})}
                   disabled={!hasSelection || busy}
                 >
-                  {syncingNotion ? 'Notion...' : 'Notion'}
+                  {syncingNotion ? t('notionSyncing') : t('notionSync')}
                 </button>
               </div>
 
@@ -583,10 +584,10 @@ export function ConversationListPane({
                     : 'tw-max-w-[320px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-1 tw-py-0',
                 ].join(' ')}
               >
-                <span className="tw-text-[var(--muted)]">Today:</span>
+                <span className="tw-text-[var(--muted)]">{t('todayLabel')}</span>
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--wc-ok)]">{String(todayCount)}</span>
                 <span className="tw-text-[rgba(184,94,58,0.7)]">·</span>
-                <span className="tw-text-[var(--muted)]">Total:</span>
+                <span className="tw-text-[var(--muted)]">{t('totalLabel')}</span>
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[#2563eb]">{String(filteredItems.length)}</span>
               </div>
             </div>
@@ -604,9 +605,9 @@ export function ConversationListPane({
             aria-label="Delete conversations confirmation"
             className="tw-w-full tw-max-w-[340px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-4 tw-shadow-[var(--shadow)]"
           >
-            <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">Delete selected conversations?</div>
+            <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">{t('deleteConfirmTitle')}</div>
             <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
-              This cannot be undone.
+              {t('deleteConfirmBody')}
             </div>
             <div className="tw-mt-3 tw-flex tw-justify-end tw-gap-2">
               <button
@@ -615,7 +616,7 @@ export function ConversationListPane({
                 onClick={() => setDeleteConfirmOpen(false)}
                 disabled={deleting}
               >
-                Cancel
+                {t('cancelButton')}
               </button>
               <button
                 type="button"
@@ -625,7 +626,7 @@ export function ConversationListPane({
                 }}
                 disabled={deleting}
               >
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? t('deletingDots') : t('deleteButton')}
               </button>
             </div>
           </div>
