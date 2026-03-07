@@ -53,6 +53,10 @@
         const rid = parsed.request_id || parsed.requestId || parsed.requestID;
         if (rid) err.requestId = String(rid);
       }
+      if (!err.notionMessage) {
+        const fallback = String(text || "").trim();
+        if (fallback) err.notionMessage = fallback;
+      }
       throw err;
     }
     return text ? JSON.parse(text) : {};

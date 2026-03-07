@@ -116,6 +116,8 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   }
 
   function parseNotionErrorMessage(error) {
+    const explicit = error && error.notionMessage ? String(error.notionMessage) : "";
+    if (explicit.trim()) return explicit.trim();
     const message = error && error.message ? String(error.message) : String(error || "");
     const apiMessageMatch = message.match(/"message"\s*:\s*"([^"]+)"/i);
     if (apiMessageMatch && apiMessageMatch[1]) {
