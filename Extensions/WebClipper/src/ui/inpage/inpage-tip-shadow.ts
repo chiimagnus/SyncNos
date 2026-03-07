@@ -1,40 +1,11 @@
-import inpageCssRaw from '../styles/inpage.css?raw';
+import inpageTipCssRaw from '../styles/inpage-tip.css?raw';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
-
-function toBubbleHostCss(css: string) {
-  return css
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="left"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="left"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="right"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="right"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="top"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="top"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="bottom"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="bottom"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll('.webclipper-inpage-bubble.is-enter', ':host(.is-enter)')
-    .replaceAll('.webclipper-inpage-bubble[data-kind="loading"]', ':host([data-kind="loading"])')
-    .replaceAll('.webclipper-inpage-bubble[data-kind="error"]', ':host([data-kind="error"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="left"]', ':host([data-placement="left"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="right"]', ':host([data-placement="right"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="top"]', ':host([data-placement="top"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="bottom"]', ':host([data-placement="bottom"])')
-    .replace(/\.webclipper-inpage-bubble(?!_)/g, ':host');
-}
-
-const BUBBLE_SHADOW_CSS = toBubbleHostCss(String(inpageCssRaw || ''));
+const BUBBLE_SHADOW_CSS = String(inpageTipCssRaw || '');
 
 type TipKind = 'default' | 'loading' | 'error';
 
@@ -51,6 +22,21 @@ function clamp(v: number, min: number, max: number) {
 
 function getDoc() {
   return document;
+}
+
+function setImportantStyle(el: HTMLElement, name: string, value: string) {
+  el.style.setProperty(name, value, 'important');
+}
+
+function applyBubbleHostLayoutStyles(el: HTMLElement) {
+  setImportantStyle(el, 'display', 'block');
+  setImportantStyle(el, 'position', 'fixed');
+  setImportantStyle(el, 'z-index', '2147483647');
+  setImportantStyle(el, 'pointer-events', 'none');
+  setImportantStyle(el, 'margin', '0');
+  setImportantStyle(el, 'padding', '0');
+  setImportantStyle(el, 'border', '0');
+  setImportantStyle(el, 'background', 'transparent');
 }
 
 function getViewport() {
@@ -135,6 +121,7 @@ function ensureBubble() {
   bubble.className = 'webclipper-inpage-bubble';
   bubble.setAttribute('role', 'status');
   bubble.setAttribute('aria-live', 'polite');
+  applyBubbleHostLayoutStyles(bubble);
 
   const shadow = bubble.attachShadow({ mode: 'open' });
 
@@ -142,14 +129,18 @@ function ensureBubble() {
   style.textContent = BUBBLE_SHADOW_CSS;
   shadow.appendChild(style);
 
+  const surface = document.createElement('div');
+  surface.className = 'webclipper-inpage-bubble__surface';
+  shadow.appendChild(surface);
+
   const text = document.createElement('span');
   text.className = 'webclipper-inpage-bubble__text';
-  shadow.appendChild(text);
+  surface.appendChild(text);
 
   const arrow = document.createElement('span');
   arrow.className = 'webclipper-inpage-bubble__arrow';
   arrow.setAttribute('aria-hidden', 'true');
-  shadow.appendChild(arrow);
+  surface.appendChild(arrow);
 
   doc.documentElement.appendChild(bubble);
   return bubble;
@@ -173,8 +164,8 @@ function positionBubble(el: HTMLElement) {
   const pos = computeBubblePosition(anchorRect, bubbleRect, viewport, placement);
 
   (el as any).dataset.placement = pos.placement;
-  el.style.left = `${Math.round(pos.left)}px`;
-  el.style.top = `${Math.round(pos.top)}px`;
+  setImportantStyle(el, 'left', `${Math.round(pos.left)}px`);
+  setImportantStyle(el, 'top', `${Math.round(pos.top)}px`);
 }
 
 function stopFollowLoop() {

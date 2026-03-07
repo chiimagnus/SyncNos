@@ -26,8 +26,11 @@ function loadInpageTip() {
   return inpageTipApi;
 }
 
-function appendIconRect(rect: { left: number; right: number; top: number; bottom: number; width: number; height: number }) {
-  const btn = document.createElement("button");
+function appendIconRect(
+  rect: { left: number; right: number; top: number; bottom: number; width: number; height: number },
+  tagName = "button"
+) {
+  const btn = document.createElement(tagName);
   btn.id = "webclipper-inpage-btn";
   btn.getBoundingClientRect = () => rect as DOMRect;
   document.body.appendChild(btn);
@@ -63,6 +66,40 @@ describe("inpage-tip speech bubble", () => {
     expect(bubble?.dataset.kind).toBe("error");
     expect(bubble?.dataset.placement).toBe("left");
     expect(bubble?.shadowRoot?.textContent).toContain("Save failed");
+  });
+
+  it("hardens host styles against page-level custom-element overrides", () => {
+    const pageStyle = document.createElement("style");
+    pageStyle.textContent = `
+      webclipper-inpage-bubble {
+        position: absolute !important;
+        display: flex !important;
+        padding: 40px !important;
+        background: hotpink !important;
+        color: lime !important;
+        pointer-events: auto !important;
+      }
+      webclipper-inpage-btn {
+        position: static !important;
+        display: block !important;
+      }
+    `;
+    document.head.appendChild(pageStyle);
+    appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 }, "webclipper-inpage-btn");
+    const api = loadInpageTip();
+
+    api.showSaveTip("Save failed", { kind: "error" });
+
+    const bubble = document.getElementById("webclipper-inpage-bubble") as HTMLElement | null;
+    expect(bubble).toBeTruthy();
+    expect(bubble?.style.position).toBe("fixed");
+    expect(bubble?.style.display).toBe("block");
+    expect(bubble?.style.pointerEvents).toBe("none");
+    expect(bubble?.style.getPropertyPriority("position")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("display")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("pointer-events")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("left")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("top")).toBe("important");
   });
 
   it.each([

@@ -9,8 +9,8 @@ import runtimeObserverApi from '../collectors/runtime-observer.ts';
 import incrementalUpdaterApi from '../conversations/content/incremental-updater.ts';
 import notionAiModelPickerApi from '../integrations/notionai-model-picker.ts';
 import normalizeApi from '../shared/normalize.ts';
-import inpageButtonApi from '../ui/inpage/inpage-button.ts';
-import inpageTipApi from '../ui/inpage/inpage-tip.ts';
+import { inpageButtonApi } from '../ui/inpage/inpage-button-shadow.ts';
+import { inpageTipApi } from '../ui/inpage/inpage-tip-shadow.ts';
 import { createRuntimeClient } from '../platform/runtime/client.ts';
 
 export default defineContentScript({
