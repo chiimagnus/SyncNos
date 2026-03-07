@@ -66,6 +66,14 @@ commit = "ae627eef"
 note = "tests passed"
 
 [[tasks]]
+id = "P3-T0"
+title = "修复 URL 属性为空导致的 Notion validation_error"
+status = "completed"
+plan = "plan-p3.md#p3-t0"
+commit = "057149cd"
+note = "notion-sync-service tests passed"
+
+[[tasks]]
 id = "P3-T1"
 title = "在 Notion API 层补齐结构化错误字段并补解析测试"
 status = "pending"

@@ -13,6 +13,30 @@
 
 ---
 
+## P3-T0 修复 URL 属性为空导致的 Notion validation_error
+
+**Context:**
+- Notion 的 `url` 属性不接受空字符串；如果我们发送 `URL: { url: "" }` 或 `URL: {}`，Notion 会拒绝整个请求，导致该 conversation 同步失败。
+
+**Fix:**
+- 统一将缺失/空/非法 URL 归一为 `null`（而不是 `""`）。
+- 覆盖 Notion sync service 与 conversation kind properties builder 两条路径。
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/sync/notion/notion-sync-service.ts`
+- Modify: `Extensions/WebClipper/src/protocols/conversation-kinds.ts`
+- Modify: `Extensions/WebClipper/tests/smoke/notion-sync-service.test.ts`
+
+**Step 1: 验证**
+
+Run: `npm --prefix Extensions/WebClipper run test -- notion-sync-service`
+
+Expected: 为空/缺失 URL 时 `URL.url === null`，不会再触发 Notion validation_error。
+
+**Step 2: 原子提交**
+
+Run: `git commit -m "fix: avoid Notion validation error for empty URL property"`
+
 ## P3-T1 在 Notion API 层补齐结构化错误字段并补解析测试
 
 **Files:**
