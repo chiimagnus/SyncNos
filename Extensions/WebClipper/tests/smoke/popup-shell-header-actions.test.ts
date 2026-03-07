@@ -1,0 +1,134 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, createElement } from 'react';
+import ReactDOM from 'react-dom/client';
+import { JSDOM } from 'jsdom';
+import type { ReactNode } from 'react';
+
+vi.mock('../../src/platform/runtime/runtime', () => ({
+  getURL: (path: string) => path,
+}));
+
+vi.mock('../../src/platform/webext/tabs', () => ({
+  tabsCreate: vi.fn(),
+}));
+
+vi.mock('../../src/ui/conversations/conversations-context', () => ({
+  ConversationsProvider: ({ children }: { children: ReactNode }) => children,
+  useConversationsApp: () => ({
+    refreshList: vi.fn(),
+    refreshActiveDetail: vi.fn(),
+  }),
+}));
+
+vi.mock('../../src/ui/popup/usePopupCurrentPageCapture', () => ({
+  usePopupCurrentPageCapture: () => ({
+    buttonDisabled: false,
+    buttonLabel: 'Fetch AI Chat',
+    capture: vi.fn(),
+    captureState: { available: true, kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
+    checking: false,
+    fetching: false,
+    refreshState: vi.fn(),
+    status: null,
+  }),
+}));
+
+vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
+  default: (props: { onPopupHeaderStateChange?: (state: any) => void }) =>
+    createElement(
+      'div',
+      null,
+      createElement('button', {
+        type: 'button',
+        onClick: () => {
+          props.onPopupHeaderStateChange?.({ mode: 'list' });
+        },
+      }, 'show-list'),
+      createElement('button', {
+        type: 'button',
+        onClick: () => {
+          props.onPopupHeaderStateChange?.({
+            mode: 'detail',
+            title: 'Conversation',
+            subtitle: 'chatgpt · key',
+            onBack: () => {
+              props.onPopupHeaderStateChange?.({ mode: 'list' });
+            },
+          });
+        },
+      }, 'show-detail'),
+    ),
+}));
+
+import PopupShell from '../../src/ui/popup/PopupShell';
+
+function setupDom() {
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+    url: 'https://example.com/',
+    pretendToBeVisual: true,
+  });
+
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
+  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
+  Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
+  Object.defineProperty(globalThis, 'getComputedStyle', {
+    configurable: true,
+    value: dom.window.getComputedStyle.bind(dom.window),
+  });
+  Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
+    configurable: true,
+    value: true,
+  });
+}
+
+function cleanupDom() {
+  delete (globalThis as any).window;
+  delete (globalThis as any).document;
+  delete (globalThis as any).navigator;
+  delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).Node;
+  delete (globalThis as any).localStorage;
+  delete (globalThis as any).getComputedStyle;
+  delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+}
+
+describe('PopupShell header actions', () => {
+  let root: ReactDOM.Root | null = null;
+
+  beforeEach(() => {
+    setupDom();
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+  });
+
+  afterEach(() => {
+    act(() => {
+      root?.unmount();
+    });
+    root = null;
+    cleanupDom();
+  });
+
+  it('shows fetch and settings in list mode, then swaps to More in detail mode', () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+
+    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail') as HTMLButtonElement | undefined;
+    expect(detailButton).toBeTruthy();
+
+    act(() => {
+      detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeTruthy();
+  });
+});

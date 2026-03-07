@@ -4,17 +4,41 @@ import { ChevronLeft, Settings as SettingsIcon } from 'lucide-react';
 import { getURL } from '../../platform/runtime/runtime';
 import { tabsCreate } from '../../platform/webext/tabs';
 
+import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
 import type { PopupHeaderState } from '../conversations/ConversationsScene';
 import ChatsTab from './tabs/ChatsTab';
+import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
 
 export default function PopupShell() {
+  return (
+    <ConversationsProvider>
+      <PopupShellFrame />
+    </ConversationsProvider>
+  );
+}
+
+function PopupShellFrame() {
   const [headerState, setHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
+  const { refreshList, refreshActiveDetail } = useConversationsApp();
+  const {
+    buttonDisabled,
+    buttonLabel,
+    capture,
+    status,
+  } = usePopupCurrentPageCapture({
+    onCaptured: async () => {
+      await refreshList();
+      await refreshActiveDetail();
+    },
+  });
 
   const onOpenSettings = async () => {
     const url = getURL('/app.html#/settings');
     await tabsCreate({ url });
     window.close();
   };
+
+  const showListActions = headerState.mode !== 'detail';
 
   return (
     <div
@@ -62,17 +86,56 @@ export default function PopupShell() {
             </div>
           )}
 
-          <button
-            type="button"
-            title="Open Settings"
-            onClick={() => onOpenSettings().catch(() => {})}
-            className="tw-inline-flex tw-size-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-            aria-label="Open Settings"
-          >
-            <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
-          </button>
+          {showListActions ? (
+            <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
+              <button
+                type="button"
+                title={buttonDisabled ? status?.message || 'Current page cannot be captured' : buttonLabel}
+                onClick={() => capture().catch(() => {})}
+                disabled={buttonDisabled}
+                className="tw-inline-flex tw-h-8 tw-max-w-[168px] tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/72 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] disabled:tw-cursor-not-allowed disabled:tw-text-[var(--muted)] disabled:tw-opacity-70"
+                aria-label={buttonLabel}
+              >
+                <span className="tw-truncate">{buttonLabel}</span>
+              </button>
+
+              <button
+                type="button"
+                title="Open Settings"
+                onClick={() => onOpenSettings().catch(() => {})}
+                className="tw-inline-flex tw-size-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                aria-label="Open Settings"
+              >
+                <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="More actions coming soon"
+              className="tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--muted)] tw-opacity-80"
+              aria-label="More actions coming soon"
+            >
+              More
+            </button>
+          )}
         </div>
       </header>
+
+      {showListActions && status?.message ? (
+        <div
+          className={[
+            'tw-border-b tw-px-3 tw-py-2 tw-text-[11px] tw-font-semibold',
+            status.kind === 'error'
+              ? 'tw-border-[#fecaca] tw-bg-[#fef2f2] tw-text-[#b91c1c]'
+              : 'tw-border-[#bbf7d0] tw-bg-[#f0fdf4] tw-text-[#166534]',
+          ].join(' ')}
+          role={status.kind === 'error' ? 'alert' : 'status'}
+        >
+          {status.message}
+        </div>
+      ) : null}
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label="Chats">
