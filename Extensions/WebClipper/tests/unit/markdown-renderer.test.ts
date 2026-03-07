@@ -23,5 +23,10 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noreferrer noopener"');
   });
-});
 
+  it('keeps links in the current tab when openLinksInNewTab is disabled', () => {
+    const md = createMarkdownRenderer({ openLinksInNewTab: false });
+    const html = md.render('[x](https://example.com)');
+    expect(html).not.toContain('target="_blank"');
+  });
+});
