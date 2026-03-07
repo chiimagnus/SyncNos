@@ -5,6 +5,7 @@ import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { createNotionSyncOrchestrator } from '../../src/sync/notion/notion-sync-orchestrator.ts';
 import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
 import { NOTION_SYNC_JOB_KEY } from '../../src/sync/notion/notion-sync-job-store.ts';
+import { notionFetch } from '../../src/sync/notion/notion-api.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
@@ -829,6 +830,112 @@ describe('background-router notion sync', () => {
     expect(appendedBlocks[0]?.image?.file_upload?.id).toBe('u1');
   });
 
+  it('returns warning when image upload upgrade keeps external images', async () => {
+    const chromeMock = mockChromeStorage();
+
+    let appendedBlocks: any[] = [];
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          updatePageProperties: async () => ({ ok: true }),
+          clearPageChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
+            appendedBlocks = blocks;
+            return { ok: true };
+          },
+          messagesToBlocks: () => [
+            {
+              object: 'block',
+              type: 'image',
+              image: { type: 'external', external: { url: 'https://example.com/a.png' } },
+            },
+          ],
+          hasExternalImageBlocks: () => true,
+          // Simulate "degraded" behavior: upgrade attempted but image remains external.
+          upgradeImageBlocksToFileUploads: async (accessToken: string, blocks: any[]) => blocks,
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(appendedBlocks[0]?.image?.type).toBe('external');
+    expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+  });
+
+  it('preserves warnings when a later Notion step fails', async () => {
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          updatePageProperties: async () => ({ ok: true }),
+          clearPageChildren: async () => ({ ok: true }),
+          appendChildren: async () => {
+            throw new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 500');
+          },
+          messagesToBlocks: () => [
+            {
+              object: 'block',
+              type: 'image',
+              image: { type: 'external', external: { url: 'https://example.com/a.png' } },
+            },
+          ],
+          hasExternalImageBlocks: () => true,
+          upgradeImageBlocksToFileUploads: async (accessToken: string, blocks: any[]) => blocks,
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.failCount).toBe(1);
+    expect(res.data.results[0].ok).toBe(false);
+    expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+  });
+
   it('recovers once by clearing cached database id when create page returns database object_not_found', async () => {
     const createCalls: string[] = [];
     const ensureCalls: string[] = [];
@@ -1010,11 +1117,10 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           appendChildren: async () => {
-            const error: any = new Error(
-              'notion api failed: PATCH /v1/blocks/p_new/children HTTP 400 {"code":"validation_error","message":"body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`."}',
-            );
+            const error: any = new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 400');
             error.status = 400;
             error.code = 'validation_error';
+            error.notionMessage = 'body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`.';
             throw error;
           },
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
@@ -1031,5 +1137,38 @@ describe('background-router notion sync', () => {
     expect(res.data.results[0].error).toBe(
       'Notion rejected one content block because it contained too many rich text fragments. The content needs to be split into smaller blocks.',
     );
+  });
+
+  it('parses structured error metadata from Notion API responses', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      // @ts-expect-error test global
+      globalThis.fetch = vi.fn(async () => ({
+        ok: false,
+        status: 429,
+        headers: { get: (key: string) => (String(key).toLowerCase() === 'retry-after' ? '2' : null) },
+        text: async () =>
+          JSON.stringify({
+            object: 'error',
+            status: 429,
+            code: 'rate_limited',
+            message: 'Too many requests',
+            request_id: 'req_123',
+          }),
+      }));
+
+      await expect(
+        notionFetch({ accessToken: 't', method: 'GET', path: '/v1/pages/p1', body: null }),
+      ).rejects.toMatchObject({
+        status: 429,
+        code: 'rate_limited',
+        retryAfterMs: 2000,
+        requestId: 'req_123',
+        notionMessage: 'Too many requests',
+      });
+    } finally {
+      // @ts-expect-error test global
+      globalThis.fetch = originalFetch;
+    }
   });
 });

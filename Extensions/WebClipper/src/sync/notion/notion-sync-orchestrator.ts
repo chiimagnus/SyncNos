@@ -82,6 +82,7 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
       mode: r.mode || (r.ok ? "ok" : "fail"),
       appended: Number(r.appended) || 0,
       error: r.error || "",
+      warnings: Array.isArray(r.warnings) ? r.warnings : [],
       at: Number(r.at) || Date.now()
     }));
   }
@@ -115,6 +116,8 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   }
 
   function parseNotionErrorMessage(error) {
+    const explicit = error && error.notionMessage ? String(error.notionMessage) : "";
+    if (explicit.trim()) return explicit.trim();
     const message = error && error.message ? String(error.message) : String(error || "");
     const apiMessageMatch = message.match(/"message"\s*:\s*"([^"]+)"/i);
     if (apiMessageMatch && apiMessageMatch[1]) {
@@ -254,15 +257,43 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return true;
   }
 
+  function countExternalImageBlocks(blocks) {
+    const list = Array.isArray(blocks) ? blocks : [];
+    let count = 0;
+    for (const b of list) {
+      if (!b || b.type !== "image" || !b.image) continue;
+      if (b.image.type === "external") count += 1;
+    }
+    return count;
+  }
+
   async function buildBlocksForSync({ notionSyncService, accessToken, source, messagesList }) {
+    const warnings = [];
     let blocks = notionSyncService.messagesToBlocks(messagesList, { source });
-    if (!canUpgradeImageBlocks(notionSyncService, blocks)) return blocks;
+    if (!canUpgradeImageBlocks(notionSyncService, blocks)) return { blocks, warnings };
+
+    const externalBefore = countExternalImageBlocks(blocks);
     try {
       blocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, blocks);
-    } catch (_e) {
-      // ignore (fallback: external images)
+    } catch (e) {
+      warnings.push({
+        code: "notion_image_upload_failed",
+        message: "Image upload upgrade failed; keeping external images.",
+        extra: { error: e && e.message ? String(e.message) : String(e) },
+      });
+      return { blocks, warnings };
     }
-    return blocks;
+
+    const externalAfter = countExternalImageBlocks(blocks);
+    if (externalBefore > 0 && externalAfter > 0) {
+      warnings.push({
+        code: "notion_image_upload_degraded",
+        message: `Some images could not be uploaded to Notion and were kept as external URLs (${externalAfter}/${externalBefore}).`,
+        extra: { externalAfter, externalBefore },
+      });
+    }
+
+    return { blocks, warnings };
   }
 
   async function getNotionParentPageId() {
@@ -436,6 +467,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
     async function processConversation(id, index) {
       const trace = createConversationTrace(id);
+      const warnings: any[] = [];
       await writeRunningJob({
         currentConversationId: id,
         currentConversationTitle: `Conversation #${id}`,
@@ -562,12 +594,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           });
           trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
-          const blocks = await buildBlocksForSync({
+          const built = await buildBlocksForSync({
             notionSyncService,
             accessToken: token.accessToken,
             source: convo.source,
             messagesList: messages
           });
+          const blocks = built.blocks;
+          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
@@ -584,7 +618,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
+          setResultAt(index, {
+            conversationId: id,
+            ok: true,
+            notionPageId: pageId,
+            mode: "created",
+            appended: messages.length,
+            warnings
+          });
           trace.flush({ mode: "created", ok: true, blockCount: blocks.length });
           return;
         }
@@ -617,12 +658,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           await notionSyncService.clearPageChildren(token.accessToken, pageId);
           trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
-          const blocks = await buildBlocksForSync({
+          const built = await buildBlocksForSync({
             notionSyncService,
             accessToken: token.accessToken,
             source: convo.source,
             messagesList: messages
           });
+          const blocks = built.blocks;
+          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
@@ -639,7 +682,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
+          setResultAt(index, {
+            conversationId: id,
+            ok: true,
+            notionPageId: pageId,
+            mode: "rebuilt",
+            appended: messages.length,
+            warnings
+          });
           trace.flush({ mode: "rebuilt", ok: true, blockCount: blocks.length });
         } else if (inc.newMessages && inc.newMessages.length) {
           await writeRunningJob({
@@ -655,12 +705,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           });
           trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
-          const blocks = await buildBlocksForSync({
+          const built = await buildBlocksForSync({
             notionSyncService,
             accessToken: token.accessToken,
             source: convo.source,
             messagesList: inc.newMessages
           });
+          const blocks = built.blocks;
+          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
@@ -677,7 +729,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
+          setResultAt(index, {
+            conversationId: id,
+            ok: true,
+            notionPageId: pageId,
+            mode: "appended",
+            appended: inc.newMessages.length,
+            warnings
+          });
           trace.flush({ mode: "appended", ok: true, blockCount: blocks.length });
         } else {
           const desiredProperties = pageSpec.buildUpdateProperties(convo);
@@ -719,7 +778,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       } catch (e) {
         const normalizedError = normalizeNotionSyncError(e);
-        setResultAt(index, { conversationId: id, ok: false, error: normalizedError });
+        setResultAt(index, { conversationId: id, ok: false, error: normalizedError, warnings });
         trace.flush({ mode: "failed", ok: false, error: normalizedError });
       }
 

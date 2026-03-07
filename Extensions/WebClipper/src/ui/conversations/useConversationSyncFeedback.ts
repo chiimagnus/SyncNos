@@ -10,7 +10,7 @@ import {
 } from '../../sync/repo';
 import { SYNC_JOB_STORAGE_KEYS } from '../../sync/sync-job-store';
 import { storageOnChanged } from '../../platform/storage/local';
-import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary } from '../../sync/models';
+import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '../../sync/models';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
 
@@ -23,6 +23,7 @@ export type ConversationSyncFeedbackState = {
   currentConversationTitle: string;
   currentStage: string;
   failures: SyncFailureSummary[];
+  warnings: SyncWarningSummary[];
   message: string;
   updatedAt: number;
   summary: SyncRunSummary | null;
@@ -51,6 +52,7 @@ const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
   currentConversationTitle: '',
   currentStage: '',
   failures: [],
+  warnings: [],
   message: '',
   updatedAt: 0,
   summary: null,
@@ -69,6 +71,32 @@ function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
   return rows
     .filter((row) => row && typeof row === 'object' && (row as any).ok === false)
     .map((row) => ({ conversationId: Number((row as any).conversationId) || 0, error: String((row as any).error || 'unknown error') }));
+}
+
+export type SyncWarningSummary = {
+  conversationId: number;
+  code: string;
+  message: string;
+  extra?: unknown;
+};
+
+function toWarningSummariesFromRows(rows: unknown): SyncWarningSummary[] {
+  if (!Array.isArray(rows)) return [];
+  const out: SyncWarningSummary[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const conversationId = Number((row as any).conversationId) || 0;
+    const warnings = (row as any).warnings;
+    if (!Array.isArray(warnings) || !warnings.length) continue;
+    for (const w of warnings as SyncWarning[]) {
+      if (!w || typeof w !== 'object') continue;
+      const code = String((w as any).code || '').trim() || 'warning';
+      const message = String((w as any).message || '').trim() || code;
+      const extra = (w as any).extra;
+      out.push({ conversationId, code, message, extra });
+    }
+  }
+  return out;
 }
 
 function buildRunningMessage(provider: SyncProvider, done: number, total: number) {
@@ -98,8 +126,13 @@ function toFailureSummaries(summary: SyncRunSummary) {
     .map((result) => ({ conversationId: Number(result.conversationId) || 0, error: String(result.error || 'unknown error') }));
 }
 
+function toWarningSummaries(summary: SyncRunSummary) {
+  return toWarningSummariesFromRows(summary.results);
+}
+
 function toTerminalFeedback(summary: SyncRunSummary, total: number): ConversationSyncFeedbackState {
   const failures = toFailureSummaries(summary);
+  const warnings = toWarningSummaries(summary);
   const safeTotal = Math.max(total, summary.results.length, summary.okCount + summary.failCount);
   const phase: ConversationSyncFeedbackPhase = summary.failCount <= 0
     ? 'success'
@@ -116,6 +149,7 @@ function toTerminalFeedback(summary: SyncRunSummary, total: number): Conversatio
     currentConversationTitle: '',
     currentStage: '',
     failures,
+    warnings,
     message: buildFinishedMessage(summary, safeTotal),
     updatedAt: Date.now(),
     summary,
@@ -148,6 +182,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
   );
   const total = Math.max(completed, Array.isArray(job.conversationIds) ? job.conversationIds.length : 0);
   const failures = toFailureSummariesFromRows(job.perConversation);
+  const warnings = toWarningSummariesFromRows(job.perConversation);
 
   if (job.status === 'running') {
     return {
@@ -159,6 +194,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       currentConversationTitle: String(job.currentConversationTitle || ''),
       currentStage: String(job.currentStage || ''),
       failures,
+      warnings,
       message: buildRunningMessage(job.provider, completed, total),
       updatedAt: Number(job.updatedAt) || Date.now(),
       summary: null,
@@ -175,6 +211,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       currentConversationTitle: String(job.currentConversationTitle || ''),
       currentStage: String(job.currentStage || ''),
       failures,
+      warnings,
       message: buildAbortedMessage(job),
       updatedAt: Number(job.updatedAt) || Date.now(),
       summary: toSummaryFromJob(job),
@@ -356,6 +393,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         currentConversationTitle: ids.length ? `Conversation #${ids[0]}` : '',
         currentStage: 'Preparing queue',
         failures: [],
+        warnings: [],
         message: buildRunningMessage(provider, 0, ids.length),
         updatedAt: Date.now(),
         summary: null,
@@ -392,6 +430,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           currentConversationTitle: '',
           currentStage: '',
           failures: [{ conversationId: 0, error: error instanceof Error ? error.message : String(error || 'sync failed') }],
+          warnings: [],
           message: toErrorMessage(provider, error),
           updatedAt: Date.now(),
           summary: null,

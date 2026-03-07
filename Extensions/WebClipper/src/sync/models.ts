@@ -7,12 +7,19 @@ export type SyncFailureSummary = {
   error: string;
 };
 
+export type SyncWarning = {
+  code: string;
+  message: string;
+  extra?: unknown;
+};
+
 export type SyncPerConversationResult = {
   conversationId: number;
   ok: boolean;
   mode: string;
   appended: number;
   error: string;
+  warnings?: SyncWarning[];
   at: number;
 };
 

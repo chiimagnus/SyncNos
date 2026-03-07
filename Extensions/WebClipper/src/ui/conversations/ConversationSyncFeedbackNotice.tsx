@@ -48,7 +48,7 @@ function SummaryBody(props: {
   showRunningStageDetail: boolean;
   currentStageLabel: string;
   progressWidth: number;
-  failureCount: number;
+  issueCount: number;
   detailsOpen: boolean;
   canShowDetails: boolean;
   onToggleDetails: () => void;
@@ -61,7 +61,7 @@ function SummaryBody(props: {
     showRunningStageDetail,
     currentStageLabel,
     progressWidth,
-    failureCount,
+    issueCount,
     detailsOpen,
     canShowDetails,
     onToggleDetails,
@@ -86,7 +86,7 @@ function SummaryBody(props: {
         ) : null}
         {canShowDetails ? (
           <span className="tw-text-[11px] tw-font-semibold tw-opacity-75">
-            {failureCount} issue{failureCount === 1 ? '' : 's'} · {detailsOpen ? 'Hide details' : 'View details'}
+            {issueCount} issue{issueCount === 1 ? '' : 's'} · {detailsOpen ? 'Hide details' : 'View details'}
           </span>
         ) : null}
       </div>
@@ -164,9 +164,11 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
 
   const tones = toneClasses(feedback.phase);
   const failures = Array.isArray(feedback.failures) ? feedback.failures : [];
+  const warnings = Array.isArray(feedback.warnings) ? feedback.warnings : [];
   const provider = feedback.provider === 'notion' ? 'Notion' : 'Obsidian';
   const canDismiss = feedback.phase !== 'running';
-  const canShowDetails = failures.length > 0;
+  const issueCount = failures.length + warnings.length;
+  const canShowDetails = issueCount > 0;
   const liveMode = feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'assertive' : 'polite';
   const progressWidth = feedback.total > 0
     ? feedback.done <= 0
@@ -206,7 +208,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           showRunningStageDetail={showRunningStageDetail}
           currentStageLabel={currentStageLabel}
           progressWidth={progressWidth}
-          failureCount={failures.length}
+          issueCount={issueCount}
           detailsOpen={detailsOpen}
           canShowDetails={canShowDetails}
           onToggleDetails={() => setDetailsOpen((open) => !open)}
@@ -247,6 +249,27 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           </div>
 
           <div className="tw-mt-3 tw-max-h-[min(45vh,320px)] tw-space-y-2 tw-overflow-auto tw-pr-1">
+            {warnings.length ? (
+              <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5">
+                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">Warnings</div>
+                <div className="tw-mt-2 tw-space-y-2">
+                  {warnings.map((warning, index) => (
+                    <div
+                      key={`${warning?.conversationId || 'unknown'}-${warning?.code || 'warning'}-${index}`}
+                      className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
+                    >
+                      <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
+                        {Number(warning?.conversationId) > 0 ? `Conversation #${Number(warning?.conversationId)}` : 'Conversation'}
+                      </div>
+                      <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                        {String(warning?.message || warning?.code || 'warning')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {failures.map((failure, index) => (
               <div
                 key={`${failure.conversationId || 'unknown'}-${index}`}

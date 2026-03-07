@@ -54,8 +54,16 @@ function asDate(value: unknown) {
 }
 
 function asUrl(value: unknown) {
-  const url = String(value || '').trim();
-  return { url: url || '' };
+  const raw = String(value ?? '').trim();
+  if (!raw) return { url: null };
+  try {
+    const parsed = new URL(raw);
+    const protocol = String(parsed.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return { url: null };
+    return { url: raw };
+  } catch (_e) {
+    return { url: null };
+  }
 }
 
 function toArticleBodyMessages(messages: unknown[]): any[] {
