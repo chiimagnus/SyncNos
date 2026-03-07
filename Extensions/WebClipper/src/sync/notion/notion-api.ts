@@ -2,6 +2,14 @@
 
   const NOTION_VERSION = "2022-06-28";
 
+  function safeJsonParse(text) {
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch (_e) {
+      return null;
+    }
+  }
+
   function parseRetryAfterMs(res) {
     try {
       const raw = res && res.headers && typeof res.headers.get === "function"
@@ -38,11 +46,12 @@
       err.status = res.status;
       const retryAfterMs = parseRetryAfterMs(res);
       if (retryAfterMs > 0) err.retryAfterMs = retryAfterMs;
-      try {
-        const parsed = text ? JSON.parse(text) : null;
-        if (parsed && parsed.code) err.code = String(parsed.code);
-      } catch (_e) {
-        // ignore
+      const parsed = safeJsonParse(text);
+      if (parsed && typeof parsed === "object") {
+        if (parsed.code) err.code = String(parsed.code);
+        if (parsed.message) err.notionMessage = String(parsed.message);
+        const rid = parsed.request_id || parsed.requestId || parsed.requestID;
+        if (rid) err.requestId = String(rid);
       }
       throw err;
     }
