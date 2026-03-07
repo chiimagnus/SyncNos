@@ -65,6 +65,36 @@ describe("inpage-tip speech bubble", () => {
     expect(bubble?.shadowRoot?.textContent).toContain("Save failed");
   });
 
+  it("hardens host styles against page-level custom-element overrides", () => {
+    const pageStyle = document.createElement("style");
+    pageStyle.textContent = `
+      webclipper-inpage-bubble {
+        position: absolute !important;
+        display: flex !important;
+        padding: 40px !important;
+        background: hotpink !important;
+        color: lime !important;
+        pointer-events: auto !important;
+      }
+    `;
+    document.head.appendChild(pageStyle);
+    appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 });
+    const api = loadInpageTip();
+
+    api.showSaveTip("Save failed", { kind: "error" });
+
+    const bubble = document.getElementById("webclipper-inpage-bubble") as HTMLElement | null;
+    expect(bubble).toBeTruthy();
+    expect(bubble?.style.position).toBe("fixed");
+    expect(bubble?.style.display).toBe("block");
+    expect(bubble?.style.pointerEvents).toBe("none");
+    expect(bubble?.style.getPropertyPriority("position")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("display")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("pointer-events")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("left")).toBe("important");
+    expect(bubble?.style.getPropertyPriority("top")).toBe("important");
+  });
+
   it.each([
     { name: "left edge", rect: { left: 2, right: 42, top: 360, bottom: 400, width: 40, height: 40 }, expected: "right" },
     {

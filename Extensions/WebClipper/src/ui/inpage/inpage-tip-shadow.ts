@@ -5,6 +5,43 @@ const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
+const BUBBLE_FONT = '12px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+
+const BASE_BUBBLE_HOST_STYLES = Object.freeze([
+  ['display', 'block'],
+  ['position', 'fixed'],
+  ['z-index', '2147483647'],
+  ['box-sizing', 'border-box'],
+  ['max-width', 'min(300px, 100vw)'],
+  ['padding', '7px 11px'],
+  ['border-radius', '12px'],
+  ['color', '#ffffff'],
+  ['font', BUBBLE_FONT],
+  ['letter-spacing', '0.01em'],
+  ['box-shadow', '0 12px 28px rgba(0, 0, 0, 0.28)'],
+  ['pointer-events', 'none'],
+  ['user-select', 'none'],
+  ['word-break', 'break-word'],
+  ['white-space', 'normal'],
+]);
+
+const KIND_BUBBLE_HOST_STYLES = Object.freeze({
+  default: {
+    background:
+      'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), rgba(24, 24, 26, 0.92)',
+    border: '1px solid rgba(255, 255, 255, 0.18)',
+  },
+  loading: {
+    background:
+      'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), rgba(184, 88, 26, 0.92)',
+    border: '1px solid rgba(255, 196, 138, 0.72)',
+  },
+  error: {
+    background:
+      'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), rgba(156, 33, 33, 0.94)',
+    border: '1px solid rgba(255, 157, 157, 0.78)',
+  },
+} as const);
 
 function toBubbleHostCss(css: string) {
   return css
@@ -51,6 +88,22 @@ function clamp(v: number, min: number, max: number) {
 
 function getDoc() {
   return document;
+}
+
+function setImportantStyle(el: HTMLElement, name: string, value: string) {
+  el.style.setProperty(name, value, 'important');
+}
+
+function applyBaseBubbleHostStyles(el: HTMLElement) {
+  for (const [name, value] of BASE_BUBBLE_HOST_STYLES) {
+    setImportantStyle(el, name, value);
+  }
+}
+
+function applyKindBubbleHostStyles(el: HTMLElement, kind: TipKind) {
+  const styles = KIND_BUBBLE_HOST_STYLES[kind] || KIND_BUBBLE_HOST_STYLES.default;
+  setImportantStyle(el, 'background', styles.background);
+  setImportantStyle(el, 'border', styles.border);
 }
 
 function getViewport() {
@@ -135,6 +188,8 @@ function ensureBubble() {
   bubble.className = 'webclipper-inpage-bubble';
   bubble.setAttribute('role', 'status');
   bubble.setAttribute('aria-live', 'polite');
+  applyBaseBubbleHostStyles(bubble);
+  applyKindBubbleHostStyles(bubble, 'default');
 
   const shadow = bubble.attachShadow({ mode: 'open' });
 
@@ -160,6 +215,7 @@ function setTextAndKind(el: HTMLElement, text: unknown, kind?: TipKind) {
   const textEl = shadow?.querySelector?.('.webclipper-inpage-bubble__text') as HTMLElement | null;
   if (textEl) textEl.textContent = String(text || '');
   const normalizedKind: TipKind = kind === 'error' || kind === 'loading' ? kind : 'default';
+  applyKindBubbleHostStyles(el, normalizedKind);
   (el as any).dataset.kind = normalizedKind;
 }
 
@@ -173,8 +229,8 @@ function positionBubble(el: HTMLElement) {
   const pos = computeBubblePosition(anchorRect, bubbleRect, viewport, placement);
 
   (el as any).dataset.placement = pos.placement;
-  el.style.left = `${Math.round(pos.left)}px`;
-  el.style.top = `${Math.round(pos.top)}px`;
+  setImportantStyle(el, 'left', `${Math.round(pos.left)}px`);
+  setImportantStyle(el, 'top', `${Math.round(pos.top)}px`);
 }
 
 function stopFollowLoop() {
