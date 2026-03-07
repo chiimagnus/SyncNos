@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { registerNotionSettingsHandlers } from '../../src/sync/notion/settings-background-handlers';
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
@@ -49,6 +49,24 @@ function createInMemoryJobStore() {
     isRunningJob: (value: any) => !!value && value.status === 'running',
     abortRunningJobIfFromOtherInstance: async () => job,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function waitFor(predicate: () => boolean, label: string) {
+  for (let i = 0; i < 50; i += 1) {
+    if (predicate()) return true;
+    await Promise.resolve();
+  }
+  throw new Error(`timed out waiting for ${label}`);
 }
 
 function createRouter({
@@ -227,6 +245,87 @@ describe('background-router notion sync', () => {
     expect(blocksFromCount).toBe(1);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
+  });
+
+  it('processes conversations with limited concurrency and keeps result order stable', async () => {
+    vi.useFakeTimers();
+    try {
+      const chromeMock = mockChromeStorage();
+      const blockers = new Map<number, ReturnType<typeof deferred<void>>>([
+        [1, deferred<void>()],
+        [2, deferred<void>()],
+        [3, deferred<void>()],
+      ]);
+      const started: number[] = [];
+      let active = 0;
+      let maxActive = 0;
+
+      const router = createRouter({
+        chromeMock,
+        notionServices: {
+          tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+          dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+          storage: {
+            getSyncMappingByConversation: async (conversationId: number) => ({
+              conversation: {
+                id: conversationId,
+                title: `Hello ${conversationId}`,
+                url: `https://x/${conversationId}`,
+                source: 'chatgpt',
+                notionPageId: `p_${conversationId}`,
+              },
+              mapping: { notionPageId: `p_${conversationId}`, lastSyncedMessageKey: `m0_${conversationId}` },
+            }),
+            getMessagesByConversationId: async (conversationId: number) => [
+              { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
+              { messageKey: `m1_${conversationId}`, role: 'assistant', contentText: 'new', sequence: 2 },
+            ],
+            setSyncCursor: async () => true,
+          },
+          syncService: {
+            getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
+            updatePageProperties: async () => ({ ok: true }),
+            clearPageChildren: async () => ({ ok: true }),
+            appendChildren: async (_t: string, pageId: string) => {
+              const conversationId = Number(String(pageId).split('_')[1]);
+              started.push(conversationId);
+              active += 1;
+              maxActive = Math.max(maxActive, active);
+              const blocker = blockers.get(conversationId);
+              if (blocker) await blocker.promise;
+              active -= 1;
+              return { ok: true };
+            },
+            messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
+            isPageUsableForDatabase: () => true,
+            pageBelongsToDatabase: () => true,
+          },
+          jobStore: createInMemoryJobStore(),
+        },
+      });
+
+      const syncPromise = router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2, 3] });
+
+      await waitFor(() => started.length === 2, 'two active conversations');
+      expect(started).toEqual([1, 2]);
+      expect(maxActive).toBe(2);
+
+      blockers.get(1)!.resolve();
+      await vi.advanceTimersByTimeAsync(250);
+      await waitFor(() => started.includes(3), 'third conversation to start');
+
+      blockers.get(2)!.resolve();
+      blockers.get(3)!.resolve();
+      await vi.advanceTimersByTimeAsync(500);
+
+      const res = await syncPromise;
+      expect(res.ok).toBe(true);
+      expect(maxActive).toBe(2);
+      expect(res.data.results.map((row: any) => row.conversationId)).toEqual([1, 2, 3]);
+      expect(res.data.results.every((row: any) => row.ok)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rebuilds when cursor is missing but page exists', async () => {
@@ -484,7 +583,7 @@ describe('background-router notion sync', () => {
     const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2] });
     expect(res.ok).toBe(true);
     expect(res.data.okCount).toBe(2);
-    expect(createCalls).toEqual(['db_stale', 'db_new', 'db_new']);
+    expect(createCalls).toEqual(['db_stale', 'db_stale', 'db_new', 'db_new']);
     expect(ensureCalls).toEqual(['db_stale', 'db_new']);
   });
 
