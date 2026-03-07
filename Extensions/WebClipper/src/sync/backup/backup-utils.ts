@@ -150,6 +150,11 @@ export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: Unknow
   if (Number.isFinite(aAt)) next.lastSyncedAt = aAt;
   else if (Number.isFinite(bAt)) next.lastSyncedAt = bAt;
 
+  const aMessageUpdatedAt = Number(a.lastSyncedMessageUpdatedAt);
+  const bMessageUpdatedAt = Number(b.lastSyncedMessageUpdatedAt);
+  if (Number.isFinite(aMessageUpdatedAt)) next.lastSyncedMessageUpdatedAt = aMessageUpdatedAt;
+  else if (Number.isFinite(bMessageUpdatedAt)) next.lastSyncedMessageUpdatedAt = bMessageUpdatedAt;
+
   const aUpdated = Number(a.updatedAt) || 0;
   const bUpdated = Number(b.updatedAt) || 0;
   next.updatedAt = Math.max(aUpdated, bUpdated, 0);

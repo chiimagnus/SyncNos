@@ -4,6 +4,7 @@ import {
   filterStorageForBackup,
   mergeConversationRecord,
   mergeMessageRecord,
+  mergeSyncMappingRecord,
   uniqueConversationKey,
   validateBackupDocument,
   validateBackupManifest,
@@ -171,5 +172,37 @@ describe('backup backup-utils', () => {
     expect(merged2.contentText).toBe('hi!');
     expect(merged2.updatedAt).toBe(12);
     expect(merged2.sequence).toBe(2);
+  });
+
+  it('mergeSyncMappingRecord keeps local cursor fields but fills missing message updatedAt from backup', () => {
+    const merged = mergeSyncMappingRecord(
+      {
+        id: 10,
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        notionPageId: 'page_local',
+        lastSyncedMessageKey: 'm1',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 100,
+        updatedAt: 200,
+      },
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        notionPageId: 'page_backup',
+        lastSyncedMessageKey: 'm2',
+        lastSyncedSequence: 2,
+        lastSyncedAt: 300,
+        lastSyncedMessageUpdatedAt: 456,
+        updatedAt: 400,
+      },
+    );
+
+    expect(merged.notionPageId).toBe('page_local');
+    expect(merged.lastSyncedMessageKey).toBe('m1');
+    expect(merged.lastSyncedSequence).toBe(1);
+    expect(merged.lastSyncedAt).toBe(100);
+    expect(merged.lastSyncedMessageUpdatedAt).toBe(456);
+    expect(merged.updatedAt).toBe(400);
   });
 });

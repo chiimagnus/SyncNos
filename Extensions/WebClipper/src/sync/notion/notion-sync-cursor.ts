@@ -2,17 +2,25 @@ export type NotionSyncCursor = {
   lastSyncedMessageKey: string;
   lastSyncedSequence: number | null;
   lastSyncedAt?: number;
+  lastSyncedMessageUpdatedAt?: number | null;
 };
 
-export function extractCursor(mapping: unknown): Pick<NotionSyncCursor, 'lastSyncedMessageKey' | 'lastSyncedSequence'> {
+export function extractCursor(
+  mapping: unknown,
+): Pick<NotionSyncCursor, 'lastSyncedMessageKey' | 'lastSyncedSequence' | 'lastSyncedMessageUpdatedAt'> {
   const m = mapping && typeof mapping === 'object' ? (mapping as any) : {};
   const lastSyncedMessageKey =
     m.lastSyncedMessageKey && String(m.lastSyncedMessageKey).trim()
       ? String(m.lastSyncedMessageKey).trim()
       : '';
   const lastSyncedSequence = Number(m.lastSyncedSequence);
+  const lastSyncedMessageUpdatedAt = Number(m.lastSyncedMessageUpdatedAt);
   const seq = Number.isFinite(lastSyncedSequence) ? lastSyncedSequence : null;
-  return { lastSyncedMessageKey, lastSyncedSequence: seq };
+  return {
+    lastSyncedMessageKey,
+    lastSyncedSequence: seq,
+    lastSyncedMessageUpdatedAt: Number.isFinite(lastSyncedMessageUpdatedAt) ? lastSyncedMessageUpdatedAt : null,
+  };
 }
 
 export function computeNewMessages(messages: unknown, cursor: Partial<NotionSyncCursor> | null | undefined): {
@@ -49,14 +57,23 @@ export function computeNewMessages(messages: unknown, cursor: Partial<NotionSync
 
 export function lastMessageCursor(messages: unknown): NotionSyncCursor {
   const list = Array.isArray(messages) ? messages : [];
-  if (!list.length) return { lastSyncedMessageKey: '', lastSyncedSequence: null, lastSyncedAt: Date.now() };
+  if (!list.length) {
+    return {
+      lastSyncedMessageKey: '',
+      lastSyncedSequence: null,
+      lastSyncedAt: Date.now(),
+      lastSyncedMessageUpdatedAt: null,
+    };
+  }
 
   const last = list[list.length - 1] as any;
   const key = last && last.messageKey ? String(last.messageKey) : '';
   const seq = Number(last && last.sequence);
+  const updatedAt = Number(last && last.updatedAt);
   return {
     lastSyncedMessageKey: key,
     lastSyncedSequence: Number.isFinite(seq) ? seq : null,
     lastSyncedAt: Date.now(),
+    lastSyncedMessageUpdatedAt: Number.isFinite(updatedAt) ? updatedAt : null,
   };
 }
