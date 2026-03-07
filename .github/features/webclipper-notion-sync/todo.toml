@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T1"
+current_task_id = "P3-T2"
 
 [[tasks]]
 id = "P1-T1"
@@ -76,10 +76,10 @@ note = "notion-sync-service tests passed"
 [[tasks]]
 id = "P3-T1"
 title = "在 Notion API 层补齐结构化错误字段并补解析测试"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t1"
-commit = ""
-note = "implementing structured notion errors"
+commit = "2a648df7"
+note = "tests passed"
 
 [[tasks]]
 id = "P3-T2"
