@@ -830,6 +830,60 @@ describe('background-router notion sync', () => {
     expect(appendedBlocks[0]?.image?.file_upload?.id).toBe('u1');
   });
 
+  it('returns warning when image upload upgrade keeps external images', async () => {
+    const chromeMock = mockChromeStorage();
+
+    let appendedBlocks: any[] = [];
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          updatePageProperties: async () => ({ ok: true }),
+          clearPageChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
+            appendedBlocks = blocks;
+            return { ok: true };
+          },
+          messagesToBlocks: () => [
+            {
+              object: 'block',
+              type: 'image',
+              image: { type: 'external', external: { url: 'https://example.com/a.png' } },
+            },
+          ],
+          hasExternalImageBlocks: () => true,
+          // Simulate "degraded" behavior: upgrade attempted but image remains external.
+          upgradeImageBlocksToFileUploads: async (accessToken: string, blocks: any[]) => blocks,
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(appendedBlocks[0]?.image?.type).toBe('external');
+    expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+  });
+
   it('recovers once by clearing cached database id when create page returns database object_not_found', async () => {
     const createCalls: string[] = [];
     const ensureCalls: string[] = [];
