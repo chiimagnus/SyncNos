@@ -7,9 +7,9 @@
 
 ## 任务看板
 
-- [ ] P3-T1 在 Notion API 层补齐结构化错误字段并补解析测试
-- [ ] P3-T2 在同步结果中引入 warning，并打通图片上传降级场景
-- [ ] P3-T3 在反馈状态模型中接入 warning
+- [x] P3-T1 在 Notion API 层补齐结构化错误字段并补解析测试
+- [x] P3-T2 在同步结果中引入 warning，并打通图片上传降级场景
+- [x] P3-T3 在反馈状态模型中接入 warning
 
 ## 任务到文件的映射
 
@@ -27,20 +27,28 @@
 
 ## 发现项
 
-待审计。
+本 phase 未发现需要返工的缺陷或明显回归风险。
+
+已确认点：
+- `notionFetch()` 失败时 `Error.message` 兼容性保留，同时补齐 `status/code/retryAfterMs/requestId/notionMessage` 字段。
+- `warnings` 不影响 `ok/fail` 判定，且进入 per-conversation snapshot 与 UI feedback。
+- notice 的摘要区仍保持紧凑；warning 详情仅在 popover 中展示，不重新遮挡 list view。
 
 ## 修复日志
 
-- 待填充
+- 已完成：P3-T1 `2a648df7`
+- 已完成：P3-T2 `017ce2bf`
+- 已完成：P3-T3 `bd6abc4f`
 
 ## 验证日志
 
-- 待填充
+- `npm --prefix Extensions/WebClipper run compile` passed
+- `npm --prefix Extensions/WebClipper run test` passed
 
 ## 最终状态与剩余风险
 
-- 当前状态：`Open`
-- 剩余风险：`待 P3 实现与审计完成后更新`
+- 当前状态：`Resolved`
+- 剩余风险：warning 目前仅展示 `message`（未展开 `extra`）；若后续需要更强 debug 能力，可以在 popover 中按需追加折叠的 raw JSON 展示，但不应影响摘要区布局。
 
 ## 审计约束
 
