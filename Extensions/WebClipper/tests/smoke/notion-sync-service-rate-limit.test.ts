@@ -9,6 +9,24 @@ async function loadNotionSyncService() {
   return loadFresh("../../src/sync/notion/notion-sync-service.ts");
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function waitFor(predicate: () => boolean, label: string) {
+  for (let i = 0; i < 50; i += 1) {
+    if (predicate()) return true;
+    await Promise.resolve();
+  }
+  throw new Error(`timed out waiting for ${label}`);
+}
+
 function notionResponse({
   ok = true,
   status = 200,
@@ -124,5 +142,55 @@ describe("notion-sync-service rate limit", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(timeoutSpy).not.toHaveBeenCalled();
+  });
+
+  it("caps clearPageChildren delete concurrency at the configured limit", async () => {
+    const notionSyncService = await loadNotionSyncService();
+    const blockers = new Map<string, ReturnType<typeof deferred<any>>>();
+    let activeDeletes = 0;
+    let maxActiveDeletes = 0;
+
+    const fetchMock = vi.fn((url: string, init?: { method?: string }) => {
+      if (String(url).includes("/children?page_size=100")) {
+        return Promise.resolve(notionResponse({
+          ok: true,
+          status: 200,
+          body: {
+            results: Array.from({ length: 8 }, (_, index) => ({ id: `block_${index}` })),
+            has_more: false,
+            next_cursor: null,
+          },
+        }));
+      }
+
+      if (init?.method === "DELETE") {
+        const blockId = String(url).split("/v1/blocks/")[1];
+        const blocker = deferred<any>();
+        blockers.set(blockId, blocker);
+        activeDeletes += 1;
+        maxActiveDeletes = Math.max(maxActiveDeletes, activeDeletes);
+        return blocker.promise.then(() => {
+          activeDeletes -= 1;
+          return notionResponse({ ok: true, status: 200, body: {} });
+        });
+      }
+
+      throw new Error(`unexpected fetch: ${String(url)} ${String(init?.method || "GET")}`);
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    const promise = notionSyncService.clearPageChildren("token", "page_4");
+
+    await waitFor(() => blockers.size === 6, "initial delete workers");
+    expect(maxActiveDeletes).toBe(6);
+
+    for (const blocker of blockers.values()) blocker.resolve(undefined);
+
+    await waitFor(() => blockers.size === 8, "remaining delete workers");
+    for (const blocker of blockers.values()) blocker.resolve(undefined);
+
+    await promise;
+    expect(maxActiveDeletes).toBe(6);
+    expect(fetchMock).toHaveBeenCalledTimes(9);
   });
 });
