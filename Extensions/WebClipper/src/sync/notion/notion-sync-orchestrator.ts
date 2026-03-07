@@ -695,7 +695,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               properties: desiredProperties
             });
           }
-          if (storage.setSyncCursor) {
+          if (storage.setSyncCursor && inc && inc.ok) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
@@ -703,7 +703,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
           }
           const nextCursor = lastMessageCursor(messages);
-          if (storage.setSyncCursor) {
+          if (storage.setSyncCursor && inc && inc.ok) {
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
