@@ -1,4 +1,4 @@
-import inpageCssRaw from '../styles/inpage.css?raw';
+import inpageButtonCssRaw from '../styles/inpage-button.css?raw';
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
@@ -28,12 +28,30 @@ function toButtonHostCss(css: string) {
     .replace(/\.webclipper-inpage-btn(?!_)/g, ':host');
 }
 
-const BUTTON_SHADOW_CSS = toButtonHostCss(String(inpageCssRaw || ''));
+const BUTTON_SHADOW_CSS = toButtonHostCss(String(inpageButtonCssRaw || ''));
 
 let runtime: InpageRuntime = null;
 
 function initRuntime(nextRuntime: InpageRuntime) {
   runtime = nextRuntime || null;
+}
+
+function setImportantStyle(el: HTMLElement, name: string, value: string) {
+  el.style.setProperty(name, value, 'important');
+}
+
+function applyButtonHostLayoutStyles(el: HTMLElement) {
+  setImportantStyle(el, 'display', 'inline-flex');
+  setImportantStyle(el, 'position', 'fixed');
+  setImportantStyle(el, 'z-index', '2147483647');
+  setImportantStyle(el, 'margin', '0');
+  setImportantStyle(el, 'padding', '0');
+  setImportantStyle(el, 'border', '0');
+  setImportantStyle(el, 'background', 'transparent');
+  setImportantStyle(el, 'cursor', 'pointer');
+  setImportantStyle(el, 'user-select', 'none');
+  setImportantStyle(el, 'box-shadow', 'none');
+  setImportantStyle(el, 'isolation', 'isolate');
 }
 
 function clamp(v: number, min: number, max: number) {
@@ -247,6 +265,7 @@ function ensureInpageButton({
   btn.setAttribute('aria-label', INPAGE_BUTTON_LABEL);
   btn.setAttribute('role', 'button');
   (btn as any).tabIndex = 0;
+  applyButtonHostLayoutStyles(btn);
 
   ensureButtonShadow(btn);
 

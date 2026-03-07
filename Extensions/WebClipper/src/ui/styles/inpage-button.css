@@ -1,0 +1,129 @@
+.webclipper-inpage-btn {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 2147483647;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+  font: 12px/1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: none;
+  isolation: isolate;
+  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.webclipper-inpage-btn:hover {
+  transform: translateY(-1px);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18));
+}
+
+.webclipper-inpage-btn:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.35);
+  outline-offset: 2px;
+}
+
+.webclipper-inpage-btn__icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+}
+
+.webclipper-inpage-btn.is-easter-3 {
+  animation: webclipperInpageShake 520ms ease-in-out both;
+}
+
+.webclipper-inpage-btn.is-easter-5 {
+  animation: webclipperInpageSpin 760ms cubic-bezier(0.28, 0.88, 0.38, 1) both;
+}
+
+.webclipper-inpage-btn.is-easter-7 {
+  animation: webclipperInpageBounce 1100ms cubic-bezier(0.18, 1, 0.32, 1) both;
+}
+
+.webclipper-inpage-btn.is-easter-7 .webclipper-inpage-btn__icon {
+  animation: webclipperInpageRainbow 1100ms linear both;
+}
+
+@keyframes webclipperInpageShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-3px);
+  }
+  40%,
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes webclipperInpageSpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  58% {
+    transform: rotate(324deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes webclipperInpageBounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  24% {
+    transform: translateY(-6px) scale(1.03);
+  }
+  46% {
+    transform: translateY(0) scale(1);
+  }
+  64% {
+    transform: translateY(-3px) scale(1.02);
+  }
+}
+
+@keyframes webclipperInpageRainbow {
+  0% {
+    filter: hue-rotate(0deg) brightness(1);
+  }
+  30% {
+    filter: hue-rotate(110deg) brightness(1.08);
+  }
+  60% {
+    filter: hue-rotate(220deg) brightness(1.12);
+  }
+  100% {
+    filter: hue-rotate(360deg) brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webclipper-inpage-btn {
+    transition: none;
+  }
+
+  .webclipper-inpage-btn.is-easter-3,
+  .webclipper-inpage-btn.is-easter-5,
+  .webclipper-inpage-btn.is-easter-7,
+  .webclipper-inpage-btn.is-easter-7 .webclipper-inpage-btn__icon {
+    animation: none;
+    filter: none;
+  }
+}
