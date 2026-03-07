@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createContentController } from "../../src/bootstrap/content-controller.ts";
+import { createCurrentPageCaptureService } from "../../src/bootstrap/current-page-capture.ts";
 
 type TickFn = (() => Promise<void>) | null;
 
@@ -32,12 +33,20 @@ function createHarness(options?: {
     isInvalidContextError: () => false
   };
 
+  const collectorsRegistry = {
+    pickActive: () => ({ id: options?.collectorId || "gemini", collector }),
+    list: () => []
+  };
+
+  const currentPageCapture = createCurrentPageCaptureService({
+    runtime,
+    collectorsRegistry,
+  });
+
   const controller = createContentController({
     runtime,
-    collectorsRegistry: {
-      pickActive: () => ({ id: options?.collectorId || "gemini", collector }),
-      list: () => []
-    },
+    collectorsRegistry,
+    currentPageCapture,
     inpageTip: {
       showSaveTip: (text: string, opts: any) => {
         tipCalls.push({ text, opts });

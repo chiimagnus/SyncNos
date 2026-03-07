@@ -1,6 +1,8 @@
 import '../ui/styles/tokens.css';
 
 import { createContentController } from '../bootstrap/content-controller.ts';
+import { registerCurrentPageCaptureContentHandlers } from '../bootstrap/current-page-capture-content-handlers.ts';
+import { createCurrentPageCaptureService } from '../bootstrap/current-page-capture.ts';
 import { startContentBootstrap } from '../bootstrap/content.ts';
 import { createCollectorEnv } from '../collectors/collector-env.ts';
 import { registerAllCollectors } from '../collectors/register-all.ts';
@@ -22,9 +24,17 @@ export default defineContentScript({
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
     const collectorsRegistry = createCollectorsRegistry();
     registerAllCollectors(collectorsRegistry, env);
+    const currentPageCapture = createCurrentPageCaptureService({
+      runtime,
+      collectorsRegistry,
+    });
+
+    registerCurrentPageCaptureContentHandlers(currentPageCapture);
+
     const controller = createContentController({
       runtime,
       collectorsRegistry,
+      currentPageCapture,
       inpageButton: inpageButtonApi,
       inpageTip: inpageTipApi,
       runtimeObserver: runtimeObserverApi,

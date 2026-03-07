@@ -1,3 +1,5 @@
+import type { CurrentPageCaptureService } from './current-page-capture';
+
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
   onInvalidated?: (listener: (error: Error) => void) => () => void;
@@ -35,6 +37,7 @@ type RuntimeObserverApi = {
 type Deps = {
   runtime: RuntimeClient | null;
   collectorsRegistry: CollectorRegistry | null;
+  currentPageCapture: CurrentPageCaptureService;
   inpageButton: InpageButtonApi | null;
   inpageTip: InpageTipApi | null;
   runtimeObserver: RuntimeObserverApi | null;
@@ -45,10 +48,6 @@ type Deps = {
 const CORE_MESSAGE_TYPES = Object.freeze({
   UPSERT_CONVERSATION: 'upsertConversation',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
-});
-
-const ARTICLE_MESSAGE_TYPES = Object.freeze({
-  FETCH_ACTIVE_TAB: 'fetchActiveTabArticle',
 });
 
 const UI_MESSAGE_TYPES = Object.freeze({
@@ -68,18 +67,12 @@ function pickLineByLevel(level: number): string {
   return lines[index] || lines[0] || '';
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  const maybeError = error as { message?: unknown };
-  const message = maybeError?.message ?? error;
-  const normalized = String(message || fallback || 'Save failed').trim();
-  return normalized || fallback || 'Save failed';
-}
-
 export function createContentController(deps: Deps) {
   const runtime = deps.runtime;
+  const collectorsRegistry = deps.collectorsRegistry;
+  const currentPageCapture = deps.currentPageCapture;
   const inpageButton = deps.inpageButton;
   const inpageTip = deps.inpageTip;
-  const collectorsRegistry = deps.collectorsRegistry;
   const runtimeObserver = deps.runtimeObserver;
   const incrementalUpdater = deps.incrementalUpdater;
   const notionAiModelPicker = deps.notionAiModelPicker;
@@ -103,18 +96,6 @@ export function createContentController(deps: Deps) {
     return runtime.send(type, payload);
   }
 
-  async function runManualSaveFlow(input: { startText: string; run: () => Promise<any> }) {
-    showInpageTip(input.startText || 'Saving...', 'loading');
-    try {
-      const value = await input.run();
-      showInpageTip('Saved', 'ok');
-      return value;
-    } catch (error) {
-      showInpageTip(errorMessage(error, 'Save failed'), 'error');
-      throw error;
-    }
-  }
-
   function getCollector() {
     const picked = collectorsRegistry?.pickActive?.();
     if (!picked || !picked.collector) return null;
@@ -124,21 +105,24 @@ export function createContentController(deps: Deps) {
   function getInpageCollector() {
     const list = collectorsRegistry?.list?.() || [];
     if (!Array.isArray(list) || !list.length) return null;
+
     const locationPayload = {
       href: location.href,
       hostname: location.hostname,
       pathname: location.pathname,
     };
+
     for (const item of list) {
       if (!item) continue;
       const matcher = typeof item.inpageMatches === 'function' ? item.inpageMatches : item.matches;
       if (typeof matcher !== 'function') continue;
       try {
         if (matcher(locationPayload)) return { id: item.id, ...(item.collector || {}) };
-      } catch (_e) {
+      } catch (_error) {
         // ignore matcher errors
       }
     }
+
     return null;
   }
 
@@ -184,45 +168,16 @@ export function createContentController(deps: Deps) {
         showInpageTip('Saving...', 'loading');
         return;
       }
+
       manualSaveInFlight = true;
       try {
-        const collector = getCollector() || getInpageCollector();
-        if (!collector) return;
-
-        if (collector.id === 'web') {
-          await runManualSaveFlow({
-            startText: 'Saving...',
-            run: async () => {
-              const response = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
-              if (!response?.ok) {
-                throw new Error(response?.error?.message || 'Fetch failed');
-              }
-              return response;
-            },
-          });
-          return;
-        }
-
-        if (typeof collector.capture !== 'function') return;
-        await runManualSaveFlow({
-          startText:
-            typeof collector.prepareManualCapture === 'function'
-              ? 'Loading full history...'
-              : 'Saving...',
-          run: async () => {
-            if (typeof collector.prepareManualCapture === 'function') {
-              await collector.prepareManualCapture();
-              showInpageTip('Saving...', 'loading');
-            }
-            const snapshot = await Promise.resolve(collector.capture({ manual: true }));
-            if (!snapshot) throw new Error('No visible conversation found');
-            const saved = await saveSnapshot(snapshot);
-            if (!saved) throw new Error('No visible conversation found');
-            return saved;
+        await currentPageCapture.captureCurrentPage({
+          onProgress: (progress) => {
+            showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
           },
         });
-      } catch (_e) {
-        // tip already shown
+      } catch (_error) {
+        // tip already shown in progress callback
       } finally {
         manualSaveInFlight = false;
       }
@@ -232,7 +187,7 @@ export function createContentController(deps: Deps) {
       try {
         const response = await send(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP);
         if (!response?.ok) showInpageTip('Click toolbar icon to open panel', 'error');
-      } catch (_e) {
+      } catch (_error) {
         showInpageTip('Click toolbar icon to open panel', 'error');
       }
     };
@@ -244,14 +199,14 @@ export function createContentController(deps: Deps) {
       if (line) showInpageTip(line);
     };
 
-  function refreshInpageButton() {
-    const collector = getCollector();
-    const inpageCollector = collector || getInpageCollector();
-    inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
-    inpageButton?.ensureInpageButton?.({
-      collectorId: inpageCollector?.id,
-      onClick: clickSave,
-      onDoubleClick: openPopupPanel,
+    function refreshInpageButton() {
+      const collector = getCollector();
+      const inpageCollector = collector || getInpageCollector();
+      inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
+      inpageButton?.ensureInpageButton?.({
+        collectorId: inpageCollector?.id,
+        onClick: clickSave,
+        onDoubleClick: openPopupPanel,
         onCombo: showComboLine,
       });
       return collector;
@@ -266,14 +221,12 @@ export function createContentController(deps: Deps) {
       },
       onTick: async () => {
         if (stopped) return;
+
         try {
           notionAiModelPicker?.maybeApply?.();
 
           const collector = refreshInpageButton();
           if (!collector || typeof collector.capture !== 'function') return;
-
-          // Google AI Studio uses virtualized rendering; auto-capture often sees only the visible turns
-          // and would overwrite history. Keep manual save only for this source.
           if (collector.id === 'googleaistudio') return;
 
           const snapshot = await Promise.resolve(collector.capture());
