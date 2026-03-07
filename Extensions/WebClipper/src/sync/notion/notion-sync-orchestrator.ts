@@ -536,8 +536,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
           trace.flush({ mode: "created", ok: true, blockCount: blocks.length });
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((r) => setTimeout(r, 250));
           return;
         }
 
@@ -664,7 +662,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         // ignore
       }
 
-      await new Promise((r) => setTimeout(r, 250));
     }
 
     const queue = ids.map((id, index) => ({ id, index }));
