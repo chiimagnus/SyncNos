@@ -884,6 +884,58 @@ describe('background-router notion sync', () => {
     expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
   });
 
+  it('preserves warnings when a later Notion step fails', async () => {
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+          ],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          updatePageProperties: async () => ({ ok: true }),
+          clearPageChildren: async () => ({ ok: true }),
+          appendChildren: async () => {
+            throw new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 500');
+          },
+          messagesToBlocks: () => [
+            {
+              object: 'block',
+              type: 'image',
+              image: { type: 'external', external: { url: 'https://example.com/a.png' } },
+            },
+          ],
+          hasExternalImageBlocks: () => true,
+          upgradeImageBlocksToFileUploads: async (accessToken: string, blocks: any[]) => blocks,
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.failCount).toBe(1);
+    expect(res.data.results[0].ok).toBe(false);
+    expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+  });
+
   it('recovers once by clearing cached database id when create page returns database object_not_found', async () => {
     const createCalls: string[] = [];
     const ensureCalls: string[] = [];
