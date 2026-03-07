@@ -356,6 +356,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     const resultSlots = ids.map(() => null);
     const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const jobStartedAt = Date.now();
+    let runningJobWriteChain = Promise.resolve(true);
 
     function currentResults() {
       return resultSlots.filter(Boolean);
@@ -367,21 +368,27 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     }
 
     async function writeRunningJob(partial = {}) {
-      const results = currentResults();
-      await notionJobStore.setJob({
-        id: jobId,
-        provider: SYNC_PROVIDER,
-        instanceId,
-        status: "running",
-        startedAt: jobStartedAt,
-        updatedAt: Date.now(),
-        finishedAt: null,
-        conversationIds: ids,
-        okCount: results.filter((r) => r.ok).length,
-        failCount: results.filter((r) => !r.ok).length,
-        perConversation: toPerConversationSnapshot(results),
-        ...partial
-      });
+      runningJobWriteChain = runningJobWriteChain
+        .catch(() => true)
+        .then(async () => {
+          const results = currentResults();
+          await notionJobStore.setJob({
+            id: jobId,
+            provider: SYNC_PROVIDER,
+            instanceId,
+            status: "running",
+            startedAt: jobStartedAt,
+            updatedAt: Date.now(),
+            finishedAt: null,
+            conversationIds: ids,
+            okCount: results.filter((r) => r.ok).length,
+            failCount: results.filter((r) => !r.ok).length,
+            perConversation: toPerConversationSnapshot(results),
+            ...partial
+          });
+          return true;
+        });
+      await runningJobWriteChain;
     }
 
     await writeRunningJob({
@@ -478,6 +485,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           } catch (createErr) {
             const shouldRecoverDb = isMissingDatabaseError(createErr);
             if (!shouldRecoverDb) throw createErr;
+            const recoveredStorageKey = String(dbSpec.storageKey || "");
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
@@ -486,7 +494,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             trace.mark("rebuild database");
             // Rebuild once per storage key and share the recovery across concurrent conversations.
             // eslint-disable-next-line no-await-in-loop
-            dbId = await recoverDbForStorageKey(kind, dbSpec);
+            dbId = recoveredMissingDbByStorageKey.has(recoveredStorageKey) && dbIdByKindId.get(kind.id)
+              ? String(dbIdByKindId.get(kind.id) || "")
+              : await recoverDbForStorageKey(kind, dbSpec);
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),

@@ -64,9 +64,31 @@ function deferred<T>() {
 async function waitFor(predicate: () => boolean, label: string) {
   for (let i = 0; i < 50; i += 1) {
     if (predicate()) return true;
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
   throw new Error(`timed out waiting for ${label}`);
+}
+
+function createDelayedJobStore() {
+  let job: any = null;
+  const runningCounts: number[] = [];
+  return {
+    NOTION_SYNC_JOB_KEY,
+    runningCounts,
+    getJob: async () => job,
+    setJob: async (next: any) => {
+      const count = Array.isArray(next?.perConversation) ? next.perConversation.length : 0;
+      const delayMs = next?.status === 'running' && count === 0 ? 20 : 0;
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      job = next;
+      if (next?.status === 'running') runningCounts.push(count);
+      return true;
+    },
+    isRunningJob: (value: any) => !!value && value.status === 'running',
+    abortRunningJobIfFromOtherInstance: async () => job,
+  };
 }
 
 function createRouter({
@@ -319,6 +341,63 @@ describe('background-router notion sync', () => {
     expect(maxActive).toBe(2);
     expect(res.data.results.map((row: any) => row.conversationId)).toEqual([1, 2, 3]);
     expect(res.data.results.every((row: any) => row.ok)).toBe(true);
+  });
+
+  it('keeps running job progress monotonic when concurrent workers write status updates', async () => {
+    vi.useFakeTimers();
+    const chromeMock = mockChromeStorage();
+    try {
+      // @ts-expect-error test global
+      globalThis.chrome = chromeMock;
+      const delayedJobStore = createDelayedJobStore();
+      const orchestrator = createNotionSyncOrchestrator({
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async (conversationId: number) => ({
+            conversation: {
+              id: conversationId,
+              title: `Hello ${conversationId}`,
+              url: `https://x/${conversationId}`,
+              source: 'chatgpt',
+              notionPageId: `p_${conversationId}`,
+            },
+            mapping: { notionPageId: `p_${conversationId}`, lastSyncedMessageKey: `m0_${conversationId}` },
+          }),
+          getMessagesByConversationId: async (conversationId: number) => [
+            { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
+            { messageKey: `m1_${conversationId}`, role: 'assistant', contentText: 'new', sequence: 2 },
+          ],
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
+          updatePageProperties: async () => ({ ok: true }),
+          clearPageChildren: async () => ({ ok: true }),
+          appendChildren: async () => ({ ok: true }),
+          messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
+          isPageUsableForDatabase: () => true,
+          pageBelongsToDatabase: () => true,
+        },
+        jobStore: delayedJobStore,
+        conversationKinds,
+        notionApi: {},
+        notionFilesApi: {},
+      } as any);
+
+      const syncPromise = orchestrator.syncConversations({ conversationIds: [1, 2], instanceId: 'status-test' });
+      await vi.runAllTimersAsync();
+      const result = await syncPromise;
+
+      expect(result.okCount).toBe(2);
+      const runningCounts = delayedJobStore.runningCounts;
+      for (let i = 1; i < runningCounts.length; i += 1) {
+        expect(runningCounts[i]).toBeGreaterThanOrEqual(runningCounts[i - 1]);
+      }
+    } finally {
+      vi.useRealTimers();
+      delete (globalThis as any).chrome;
+    }
   });
 
   it('rebuilds when cursor is missing but page exists', async () => {
