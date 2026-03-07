@@ -467,6 +467,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
     async function processConversation(id, index) {
       const trace = createConversationTrace(id);
+      const warnings: any[] = [];
       await writeRunningJob({
         currentConversationId: id,
         currentConversationTitle: `Conversation #${id}`,
@@ -600,7 +601,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: messages
           });
           const blocks = built.blocks;
-          const warnings = built.warnings;
+          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
@@ -664,7 +665,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: messages
           });
           const blocks = built.blocks;
-          const warnings = built.warnings;
+          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
@@ -711,7 +712,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: inc.newMessages
           });
           const blocks = built.blocks;
-          const warnings = built.warnings;
+          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
@@ -777,7 +778,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       } catch (e) {
         const normalizedError = normalizeNotionSyncError(e);
-        setResultAt(index, { conversationId: id, ok: false, error: normalizedError });
+        setResultAt(index, { conversationId: id, ok: false, error: normalizedError, warnings });
         trace.flush({ mode: "failed", ok: false, error: normalizedError });
       }
 
