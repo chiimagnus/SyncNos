@@ -5,6 +5,7 @@ import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { createNotionSyncOrchestrator } from '../../src/sync/notion/notion-sync-orchestrator.ts';
 import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
 import { NOTION_SYNC_JOB_KEY } from '../../src/sync/notion/notion-sync-job-store.ts';
+import { notionFetch } from '../../src/sync/notion/notion-api.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
@@ -1031,5 +1032,38 @@ describe('background-router notion sync', () => {
     expect(res.data.results[0].error).toBe(
       'Notion rejected one content block because it contained too many rich text fragments. The content needs to be split into smaller blocks.',
     );
+  });
+
+  it('parses structured error metadata from Notion API responses', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      // @ts-expect-error test global
+      globalThis.fetch = vi.fn(async () => ({
+        ok: false,
+        status: 429,
+        headers: { get: (key: string) => (String(key).toLowerCase() === 'retry-after' ? '2' : null) },
+        text: async () =>
+          JSON.stringify({
+            object: 'error',
+            status: 429,
+            code: 'rate_limited',
+            message: 'Too many requests',
+            request_id: 'req_123',
+          }),
+      }));
+
+      await expect(
+        notionFetch({ accessToken: 't', method: 'GET', path: '/v1/pages/p1', body: null }),
+      ).rejects.toMatchObject({
+        status: 429,
+        code: 'rate_limited',
+        retryAfterMs: 2000,
+        requestId: 'req_123',
+        notionMessage: 'Too many requests',
+      });
+    } finally {
+      // @ts-expect-error test global
+      globalThis.fetch = originalFetch;
+    }
   });
 });
