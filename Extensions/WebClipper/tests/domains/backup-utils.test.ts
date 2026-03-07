@@ -174,7 +174,7 @@ describe('backup backup-utils', () => {
     expect(merged2.sequence).toBe(2);
   });
 
-  it('mergeSyncMappingRecord keeps local cursor fields but fills missing message updatedAt from backup', () => {
+  it('mergeSyncMappingRecord does not mix incoming message updatedAt into a different local cursor anchor', () => {
     const merged = mergeSyncMappingRecord(
       {
         id: 10,
@@ -202,7 +202,31 @@ describe('backup backup-utils', () => {
     expect(merged.lastSyncedMessageKey).toBe('m1');
     expect(merged.lastSyncedSequence).toBe(1);
     expect(merged.lastSyncedAt).toBe(100);
-    expect(merged.lastSyncedMessageUpdatedAt).toBe(456);
+    expect(merged.lastSyncedMessageUpdatedAt).toBeUndefined();
     expect(merged.updatedAt).toBe(400);
+  });
+
+  it('mergeSyncMappingRecord can fill message updatedAt when incoming cursor matches the chosen anchor', () => {
+    const merged = mergeSyncMappingRecord(
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        notionPageId: 'page_local',
+      },
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        notionPageId: 'page_backup',
+        lastSyncedMessageKey: 'm2',
+        lastSyncedSequence: 2,
+        lastSyncedAt: 300,
+        lastSyncedMessageUpdatedAt: 456,
+        updatedAt: 400,
+      },
+    );
+
+    expect(merged.lastSyncedMessageKey).toBe('m2');
+    expect(merged.lastSyncedSequence).toBe(2);
+    expect(merged.lastSyncedMessageUpdatedAt).toBe(456);
   });
 });

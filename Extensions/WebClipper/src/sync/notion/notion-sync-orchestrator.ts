@@ -186,6 +186,44 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return `Conversation #${Number(id) || "?"}`;
   }
 
+  function readRichText(items) {
+    const list = Array.isArray(items) ? items : [];
+    return list
+      .map((item) => {
+        if (!item || typeof item !== "object") return "";
+        if (item.plain_text != null) return String(item.plain_text);
+        if (item.text && item.text.content != null) return String(item.text.content);
+        return "";
+      })
+      .join("");
+  }
+
+  function normalizePagePropertyValue(property) {
+    const prop = property && typeof property === "object" ? property : {};
+    if (Array.isArray(prop.title)) return readRichText(prop.title);
+    if (Array.isArray(prop.rich_text)) return readRichText(prop.rich_text);
+    if (Array.isArray(prop.multi_select)) {
+      return prop.multi_select
+        .map((item) => String(item && item.name ? item.name : "").trim())
+        .filter(Boolean)
+        .sort()
+        .join("|");
+    }
+    if (prop.date && typeof prop.date === "object") return String(prop.date.start || "");
+    if (prop.url != null) return String(prop.url || "");
+    return JSON.stringify(prop);
+  }
+
+  function pagePropertiesNeedUpdate(page, desiredProperties) {
+    const pageProperties = page && page.properties && typeof page.properties === "object" ? page.properties : {};
+    const desired = desiredProperties && typeof desiredProperties === "object" ? desiredProperties : {};
+    for (const [key, value] of Object.entries(desired)) {
+      if (!Object.prototype.hasOwnProperty.call(pageProperties, key)) return true;
+      if (normalizePagePropertyValue(pageProperties[key]) !== normalizePagePropertyValue(value)) return true;
+    }
+    return false;
+  }
+
   function normalizeJob(job) {
     if (!job || typeof job !== "object") return null;
     const perConversation = toPerConversationSnapshot(Array.isArray(job.perConversation) ? job.perConversation : []);
@@ -448,6 +486,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         if (!pageId && convo.notionPageId) pageId = String(convo.notionPageId || "");
 
         let pageUsable = false;
+        let existingPage = null;
         if (pageId) {
           await writeRunningJob({
             currentConversationId: id,
@@ -458,6 +497,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           try {
             // eslint-disable-next-line no-await-in-loop
             const page = await notionSyncService.getPage(token.accessToken, pageId);
+            existingPage = page;
             pageUsable = notionSyncService.isPageUsableForDatabase
               ? notionSyncService.isPageUsableForDatabase(page, dbId)
               : notionSyncService.pageBelongsToDatabase(page, dbId);
@@ -640,17 +680,21 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
           trace.flush({ mode: "appended", ok: true, blockCount: blocks.length });
         } else {
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "Updating page properties"
-          });
-          trace.mark("update page properties");
-          // eslint-disable-next-line no-await-in-loop
-          await notionSyncService.updatePageProperties(token.accessToken, {
-            pageId,
-            properties: pageSpec.buildUpdateProperties(convo)
-          });
+          const desiredProperties = pageSpec.buildUpdateProperties(convo);
+          const needsPropertyUpdate = pagePropertiesNeedUpdate(existingPage, desiredProperties);
+          if (needsPropertyUpdate) {
+            await writeRunningJob({
+              currentConversationId: id,
+              currentConversationTitle: toCurrentConversationTitle(convo, id),
+              currentStage: "Updating page properties"
+            });
+            trace.mark("update page properties");
+            // eslint-disable-next-line no-await-in-loop
+            await notionSyncService.updatePageProperties(token.accessToken, {
+              pageId,
+              properties: desiredProperties
+            });
+          }
           if (storage.setSyncCursor) {
             await writeRunningJob({
               currentConversationId: id,
@@ -664,8 +708,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "updated_properties", appended: 0 });
-          trace.flush({ mode: "updated_properties", ok: true, blockCount: 0 });
+          setResultAt(index, {
+            conversationId: id,
+            ok: true,
+            notionPageId: pageId,
+            mode: needsPropertyUpdate ? "updated_properties" : "no_changes",
+            appended: 0
+          });
+          trace.flush({ mode: needsPropertyUpdate ? "updated_properties" : "no_changes", ok: true, blockCount: 0 });
         }
       } catch (e) {
         const normalizedError = normalizeNotionSyncError(e);

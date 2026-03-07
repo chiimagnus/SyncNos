@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T1"
+current_task_id = "P3-T1"
 
 [[tasks]]
 id = "P1-T1"
@@ -44,26 +44,26 @@ note = "audit fix in 3a712e3a"
 [[tasks]]
 id = "P2-T1"
 title = "先打通现有 cursor 字段，再决定是否新增摘要字段"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t1"
-commit = ""
-note = ""
+commit = "a8d311e4"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T2"
 title = "将 article rebuild 条件改为正文级精确判定"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t2"
-commit = ""
-note = ""
+commit = "8289127a"
+note = "tests passed"
 
 [[tasks]]
 id = "P2-T3"
 title = "明确仅属性更新路径并补测试"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t3"
-commit = ""
-note = ""
+commit = "ae627eef"
+note = "tests passed"
 
 [[tasks]]
 id = "P3-T1"

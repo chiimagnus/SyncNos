@@ -310,7 +310,17 @@ describe('background-router notion sync', () => {
           },
         },
         syncService: {
-          getPage: async () => ({ parent: { type: 'database_id', database_id: 'db_articles' }, archived: false }),
+          getPage: async () => ({
+            parent: { type: 'database_id', database_id: 'db_articles' },
+            archived: false,
+            properties: {
+              Name: { title: [{ plain_text: 'Old article title' }] },
+              URL: { url: 'https://x/article' },
+              Author: { rich_text: [] },
+              Published: { rich_text: [] },
+              Description: { rich_text: [{ plain_text: 'old description' }] },
+            },
+          }),
           updatePageProperties: async (_t: string, req: any) => {
             calls.push({ op: 'updateProps', req });
             return { ok: true };
@@ -335,6 +345,87 @@ describe('background-router notion sync', () => {
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe('updated_properties');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
+    expect(calls.some((c) => c.op === 'clear')).toBe(false);
+    expect(calls.some((c) => c.op === 'append')).toBe(false);
+    expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
+  });
+
+  it('keeps no_changes when neither body nor page properties changed', async () => {
+    const calls: any[] = [];
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: {
+              id: 1,
+              sourceType: 'article',
+              title: 'Same article title',
+              url: 'https://x/article',
+              description: 'same description',
+              notionPageId: 'p1',
+            },
+            mapping: {
+              notionPageId: 'p1',
+              lastSyncedMessageKey: 'article_body',
+              lastSyncedMessageUpdatedAt: 1000,
+            },
+          }),
+          getMessagesByConversationId: async () => [
+            {
+              messageKey: 'article_body',
+              role: 'assistant',
+              contentText: 'same body',
+              contentMarkdown: 'same body',
+              sequence: 1,
+              updatedAt: 1000,
+            },
+          ],
+          setSyncCursor: async (_id: number, cursor: any) => {
+            calls.push({ op: 'setCursor', cursor });
+            return true;
+          },
+        },
+        syncService: {
+          getPage: async () => ({
+            parent: { type: 'database_id', database_id: 'db_articles' },
+            archived: false,
+            properties: {
+              Name: { title: [{ plain_text: 'Same article title' }] },
+              URL: { url: 'https://x/article' },
+              Author: { rich_text: [] },
+              Published: { rich_text: [] },
+              Description: { rich_text: [{ plain_text: 'same description' }] },
+            },
+          }),
+          updatePageProperties: async (_t: string, req: any) => {
+            calls.push({ op: 'updateProps', req });
+            return { ok: true };
+          },
+          clearPageChildren: async () => {
+            calls.push({ op: 'clear' });
+            return { ok: true };
+          },
+          appendChildren: async () => {
+            calls.push({ op: 'append' });
+            return { ok: true };
+          },
+          messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
+          isPageUsableForDatabase: () => true,
+          pageBelongsToDatabase: () => true,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.results[0].mode).toBe('no_changes');
+    expect(calls.some((c) => c.op === 'updateProps')).toBe(false);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
     expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
