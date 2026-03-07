@@ -260,9 +260,23 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
   }
 
   function buildPageProperties({ title, url, ai, includeDate, capturedAt }) {
+    function coerceHttpUrlOrNull(input) {
+      const raw = String(input ?? '').trim();
+      if (!raw) return null;
+      try {
+        const parsed = new URL(raw);
+        const protocol = String(parsed.protocol || '').toLowerCase();
+        if (protocol !== 'http:' && protocol !== 'https:') return null;
+        return raw;
+      } catch (_e) {
+        return null;
+      }
+    }
+
     const props = {
       Name: { title: [{ type: "text", text: { content: title || "Untitled" } }] },
-      URL: { url: url || "" }
+      // Notion rejects empty string for URL properties; use null when missing/invalid.
+      URL: { url: coerceHttpUrlOrNull(url) }
     };
     if (includeDate) {
       const at = Number(capturedAt);
