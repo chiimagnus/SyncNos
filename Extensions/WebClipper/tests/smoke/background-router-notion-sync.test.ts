@@ -1065,11 +1065,10 @@ describe('background-router notion sync', () => {
           },
           createPageInDatabase: async () => ({ id: 'p_new' }),
           appendChildren: async () => {
-            const error: any = new Error(
-              'notion api failed: PATCH /v1/blocks/p_new/children HTTP 400 {"code":"validation_error","message":"body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`."}',
-            );
+            const error: any = new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 400');
             error.status = 400;
             error.code = 'validation_error';
+            error.notionMessage = 'body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`.';
             throw error;
           },
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
