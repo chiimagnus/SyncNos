@@ -86,6 +86,20 @@ describe('notion-sync-service', () => {
     expect(lastReq.body.properties.Date).toBeUndefined();
   });
 
+  it('uses null URL when missing/empty to avoid Notion validation errors', async () => {
+    let lastReq: any = null;
+    notionFetchImpl = async (req: any) => {
+      lastReq = req;
+      return { id: 'p1' };
+    };
+
+    await notionSyncService.createPageInDatabase('t', { databaseId: 'db', title: 'Hello', url: '' as any, ai: 'chatgpt' });
+    expect(lastReq.body.properties.URL.url).toBeNull();
+
+    await notionSyncService.updatePageProperties('t', { pageId: 'p1', title: 'Hello', url: undefined as any, ai: 'chatgpt' });
+    expect(lastReq.body.properties.URL.url).toBeNull();
+  });
+
   it('detects page database parent', async () => {
     const page = { parent: { type: 'database_id', database_id: 'db1' } };
     expect(notionSyncService.pageBelongsToDatabase(page, 'db1')).toBe(true);
@@ -174,4 +188,3 @@ describe('notion-sync-service', () => {
     await clearing;
   });
 });
-
