@@ -55,6 +55,88 @@ const SYNC_PROVIDER = 'notion';
     return error;
   }
 
+  function parseHttpStatus(error) {
+    const explicit = error && error.status != null ? Number(error.status) : NaN;
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    const message = error && error.message ? String(error.message) : String(error || "");
+    const match = message.match(/\bHTTP\s+(\d{3})\b/i);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function parseNotionErrorCode(error) {
+    const explicit = String(error && error.code ? error.code : "").trim();
+    if (explicit) return explicit.toLowerCase();
+    const message = error && error.message ? String(error.message) : String(error || "");
+    const codeMatch = message.match(/"code"\s*:\s*"([^"]+)"/i);
+    return codeMatch ? String(codeMatch[1] || "").trim().toLowerCase() : "";
+  }
+
+  function parseNotionErrorMessage(error) {
+    const message = error && error.message ? String(error.message) : String(error || "");
+    const apiMessageMatch = message.match(/"message"\s*:\s*"([^"]+)"/i);
+    if (apiMessageMatch && apiMessageMatch[1]) {
+      try {
+        return JSON.parse(`"${apiMessageMatch[1]}"`);
+      } catch (_e) {
+        return String(apiMessageMatch[1]);
+      }
+    }
+    return message;
+  }
+
+  function formatRetryHint(error) {
+    const retryAfterMs = error && error.retryAfterMs != null ? Number(error.retryAfterMs) : 0;
+    if (!Number.isFinite(retryAfterMs) || retryAfterMs <= 0) return "";
+    const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+    return ` Retry in about ${seconds}s.`;
+  }
+
+  function normalizeNotionSyncError(error) {
+    const rawMessage = error && error.message ? String(error.message) : String(error || "unknown error");
+    if (!rawMessage) return "unknown error";
+    if (!rawMessage.toLowerCase().includes("notion api failed:")) return rawMessage;
+
+    const status = parseHttpStatus(error);
+    const code = parseNotionErrorCode(error);
+    const notionMessage = parseNotionErrorMessage(error).replace(/^notion api failed:\s*/i, "").trim();
+    const lowerMessage = notionMessage.toLowerCase();
+
+    if (code === "validation_error") {
+      if (lowerMessage.includes("rich_text.length should be") || lowerMessage.includes("rich_text.length")) {
+        return "Notion rejected one content block because it contained too many rich text fragments. The content needs to be split into smaller blocks.";
+      }
+      return `Notion validation failed: ${notionMessage}`;
+    }
+
+    if (status === 401) {
+      return "Notion authorization expired. Please reconnect Notion and try again.";
+    }
+
+    if (status === 403) {
+      return "Notion denied access to the target page or database. Please confirm the integration still has permission.";
+    }
+
+    if (status === 404 || code === "object_not_found") {
+      if (lowerMessage.includes("database")) {
+        return "The target Notion database no longer exists or is no longer accessible. Please reselect the parent page and retry.";
+      }
+      if (lowerMessage.includes("page")) {
+        return "The target Notion page no longer exists or is no longer accessible. Please retry after reconnecting Notion or rebuilding the page.";
+      }
+      return "The target Notion object was not found. Please reconnect Notion or reselect the parent page and retry.";
+    }
+
+    if (status === 429 || code === "rate_limited") {
+      return `Notion rate limited this sync.${formatRetryHint(error)}`.trim();
+    }
+
+    if (status >= 500) {
+      return "Notion service is temporarily unavailable. Please retry later.";
+    }
+
+    return notionMessage || rawMessage;
+  }
+
   function toCurrentConversationTitle(convo, id) {
     const title = convo && convo.title ? String(convo.title).trim() : "";
     if (title) return title;
@@ -462,7 +544,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
         }
       } catch (e) {
-        results.push({ conversationId: id, ok: false, error: e && e.message ? e.message : String(e) });
+        results.push({ conversationId: id, ok: false, error: normalizeNotionSyncError(e) });
       }
 
       try {

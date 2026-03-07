@@ -139,4 +139,18 @@ describe("notion-sync-service markdown", () => {
     const blocks = notionSyncService.messagesToBlocks(messages, { source: "zai" });
     expect(blocks.some((b: any) => b && b.type === "code")).toBe(true);
   });
+
+  it("splits oversized rich_text arrays into multiple notion blocks", async () => {
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
+
+    const markdown = Array.from({ length: 140 }, (_, index) => `**bold-${index}**`).join(" ");
+    const blocks = notionSyncService.markdownToNotionBlocks(markdown);
+    const paragraphs = blocks.filter((block: any) => block && block.type === "paragraph");
+
+    expect(paragraphs.length).toBeGreaterThan(1);
+    expect(
+      paragraphs.every((block: any) => (block?.paragraph?.rich_text || []).length <= 100),
+    ).toBe(true);
+  });
 });
