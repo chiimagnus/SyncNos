@@ -26,8 +26,11 @@ function loadInpageTip() {
   return inpageTipApi;
 }
 
-function appendIconRect(rect: { left: number; right: number; top: number; bottom: number; width: number; height: number }) {
-  const btn = document.createElement("button");
+function appendIconRect(
+  rect: { left: number; right: number; top: number; bottom: number; width: number; height: number },
+  tagName = "button"
+) {
+  const btn = document.createElement(tagName);
   btn.id = "webclipper-inpage-btn";
   btn.getBoundingClientRect = () => rect as DOMRect;
   document.body.appendChild(btn);
@@ -76,9 +79,13 @@ describe("inpage-tip speech bubble", () => {
         color: lime !important;
         pointer-events: auto !important;
       }
+      webclipper-inpage-btn {
+        position: static !important;
+        display: block !important;
+      }
     `;
     document.head.appendChild(pageStyle);
-    appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 });
+    appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 }, "webclipper-inpage-btn");
     const api = loadInpageTip();
 
     api.showSaveTip("Save failed", { kind: "error" });
