@@ -59,6 +59,26 @@ describe('notion-sync-cursor', () => {
     expect(res.rebuild).toBe(true);
   });
 
+  it('computeNewMessages falls back to sequence when messageKey drifts', () => {
+    const messages = [
+      { messageKey: 'new_key', sequence: 1 },
+      { messageKey: 'm2', sequence: 2 },
+    ];
+    const res = computeNewMessages(messages, { lastSyncedMessageKey: 'old_key', lastSyncedSequence: 1 });
+    expect(res.ok).toBe(true);
+    expect(res.mode).toBe('append');
+    expect(res.newMessages.map((m) => m.messageKey)).toEqual(['m2']);
+    expect(res.rebuild).toBe(false);
+  });
+
+  it('computeNewMessages treats missing anchor as incomplete when local snapshot has not reached stored sequence', () => {
+    const messages = [{ messageKey: 'm1', sequence: 1 }];
+    const res = computeNewMessages(messages, { lastSyncedMessageKey: 'old_key', lastSyncedSequence: 99 });
+    expect(res.ok).toBe(false);
+    expect(res.mode).toBe('cursor_incomplete');
+    expect(res.rebuild).toBe(false);
+  });
+
   it('computeNewMessages appends by sequence cursor', () => {
     const messages = [
       { messageKey: 'm1', sequence: 1 },

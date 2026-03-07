@@ -41,13 +41,43 @@ export function computeNewMessages(messages: unknown, cursor: Partial<NotionSync
         ? Number(rawSeq)
         : null;
 
+  const findIndexBySeq = (needle: number) =>
+    list.findIndex((m) => m && Number((m as any).sequence) === needle);
+
+  const maxSequence = () => {
+    let max = -Infinity;
+    for (const m of list) {
+      if (!m) continue;
+      const s = Number((m as any).sequence);
+      if (Number.isFinite(s)) max = Math.max(max, s);
+    }
+    return Number.isFinite(max) ? max : null;
+  };
+
   if (key) {
     const idx = list.findIndex((m) => m && String((m as any).messageKey || '') === key);
-    if (idx < 0) return { ok: false, mode: 'cursor_missing', newMessages: [], rebuild: true };
+    if (idx < 0) {
+      // messageKey might drift after refresh; fall back to sequence when available.
+      if (seq != null) {
+        const seqIdx = findIndexBySeq(seq);
+        if (seqIdx >= 0) return { ok: true, mode: 'append', newMessages: list.slice(seqIdx + 1), rebuild: false };
+
+        const maxSeq = maxSequence();
+        if (maxSeq != null && maxSeq < seq) {
+          return { ok: false, mode: 'cursor_incomplete', newMessages: [], rebuild: false };
+        }
+        return { ok: false, mode: 'cursor_mismatch', newMessages: [], rebuild: false };
+      }
+      return { ok: false, mode: 'cursor_missing', newMessages: [], rebuild: true };
+    }
     return { ok: true, mode: 'append', newMessages: list.slice(idx + 1), rebuild: false };
   }
 
   if (seq != null) {
+    const maxSeq = maxSequence();
+    if (maxSeq != null && maxSeq < seq) {
+      return { ok: false, mode: 'cursor_incomplete', newMessages: [], rebuild: false };
+    }
     const next = list.filter((m) => m && Number((m as any).sequence) > seq);
     return { ok: true, mode: 'append', newMessages: next, rebuild: false };
   }
