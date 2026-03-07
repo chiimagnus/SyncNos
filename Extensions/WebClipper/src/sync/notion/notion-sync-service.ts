@@ -6,8 +6,8 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
 
   const MAX_TEXT = 1900;
   const APPEND_BATCH = 90;
-  const APPEND_RATE_DELAY_MS = 250;
-  const CLEAR_DELETE_CONCURRENCY = 3;
+  const APPEND_MAX_ATTEMPTS = 5;
+  const CLEAR_DELETE_CONCURRENCY = 6;
   const CLEAR_DELETE_MAX_ATTEMPTS = 5;
 
   function getNotionFetch() {
@@ -198,6 +198,29 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
     }
   }
 
+  async function appendBatchWithRetry(accessToken, pageId, batch) {
+    const notionFetch = getNotionFetch();
+    let attempt = 0;
+    for (;;) {
+      attempt += 1;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        return await notionFetch({
+          accessToken,
+          method: "PATCH",
+          path: `/v1/blocks/${pageId}/children`,
+          body: { children: batch }
+        });
+      } catch (error) {
+        const status = parseHttpStatus(error);
+        const retryable = status === 429 || status === 503;
+        if (!retryable || attempt >= APPEND_MAX_ATTEMPTS) throw error;
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(retryDelayMs(error, attempt));
+      }
+    }
+  }
+
   async function parallelEach(items, worker, concurrency) {
     const queue = Array.isArray(items) ? items.slice() : [];
     if (!queue.length) return true;
@@ -228,18 +251,11 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
   }
 
   async function appendChildren(accessToken, pageId, blocks) {
-    const notionFetch = getNotionFetch();
     let remaining = Array.isArray(blocks) ? blocks.slice() : [];
     while (remaining.length) {
       const batch = remaining.slice(0, APPEND_BATCH);
       remaining = remaining.slice(APPEND_BATCH);
-      await notionFetch({
-        accessToken,
-        method: "PATCH",
-        path: `/v1/blocks/${pageId}/children`,
-        body: { children: batch }
-      });
-      if (remaining.length) await sleep(APPEND_RATE_DELAY_MS);
+      await appendBatchWithRetry(accessToken, pageId, batch);
     }
   }
 

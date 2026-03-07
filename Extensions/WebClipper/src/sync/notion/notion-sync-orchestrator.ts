@@ -12,6 +12,49 @@ import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-s
 import { storageGet, storageRemove } from '../../platform/storage/local';
 
 const SYNC_PROVIDER = 'notion';
+const SYNC_CONVERSATION_CONCURRENCY = 2;
+
+  function notionTraceEnabled() {
+    try {
+      return !!(globalThis && globalThis.__SYNCNOS_NOTION_TRACE__);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function createConversationTrace(conversationId) {
+    const enabled = notionTraceEnabled();
+    const startedAt = Date.now();
+    let lastAt = startedAt;
+    const stages = [];
+
+    function mark(stage) {
+      if (!enabled) return;
+      const now = Date.now();
+      stages.push({
+        stage: String(stage || "unknown"),
+        elapsedMs: now - startedAt,
+        sinceLastMs: now - lastAt,
+      });
+      lastAt = now;
+    }
+
+    function flush(meta = {}) {
+      if (!enabled || !stages.length) return;
+      try {
+        console.debug("[SyncNos][NotionTrace]", {
+          conversationId: Number(conversationId) || 0,
+          totalMs: Date.now() - startedAt,
+          stages: stages.slice(),
+          ...meta,
+        });
+      } catch (_e) {
+        // ignore debug logging failures
+      }
+    }
+
+    return { mark, flush };
+  }
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
@@ -263,38 +306,89 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     if (!conversationKinds || typeof conversationKinds.pick !== "function") throw new Error("conversation kinds missing");
 
     const dbIdByKindId = new Map();
+    const dbIdPromiseByKindId = new Map();
     const recoveredMissingDbByStorageKey = new Set();
+    const dbRecoveryPromiseByStorageKey = new Map();
 
     async function ensureDbForKind(kind) {
       const existing = dbIdByKindId.get(kind.id);
       if (existing) return String(existing);
+      const pending = dbIdPromiseByKindId.get(kind.id);
+      if (pending) return pending;
       const spec = kind && kind.notion && kind.notion.dbSpec ? kind.notion.dbSpec : null;
       if (!spec) throw new Error(`missing dbSpec for kind ${kind && kind.id ? kind.id : "?"}`);
-      const db = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec: spec });
-      const dbId = db && db.databaseId ? String(db.databaseId) : "";
-      if (!dbId) throw new Error(`missing databaseId for kind ${kind.id}`);
-      dbIdByKindId.set(kind.id, dbId);
-      return dbId;
+      const dbPromise = (async () => {
+        const db = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec: spec });
+        const dbId = db && db.databaseId ? String(db.databaseId) : "";
+        if (!dbId) throw new Error(`missing databaseId for kind ${kind.id}`);
+        dbIdByKindId.set(kind.id, dbId);
+        return dbId;
+      })();
+      dbIdPromiseByKindId.set(kind.id, dbPromise);
+      try {
+        return await dbPromise;
+      } finally {
+        dbIdPromiseByKindId.delete(kind.id);
+      }
     }
 
-    const results = [];
+    async function recoverDbForStorageKey(kind, dbSpec) {
+      const storageKey = String(dbSpec && dbSpec.storageKey ? dbSpec.storageKey : "");
+      const pending = dbRecoveryPromiseByStorageKey.get(storageKey);
+      if (pending) return pending;
+      const recoveryPromise = (async () => {
+        await clearCachedDatabaseId(notionDbManager, storageKey);
+        const rebuiltDb = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec });
+        const rebuiltDbId = rebuiltDb && rebuiltDb.databaseId ? String(rebuiltDb.databaseId) : "";
+        if (!rebuiltDbId) throw new Error(`missing databaseId for kind ${kind.id}`);
+        dbIdByKindId.set(kind.id, rebuiltDbId);
+        recoveredMissingDbByStorageKey.add(storageKey);
+        return rebuiltDbId;
+      })();
+      dbRecoveryPromiseByStorageKey.set(storageKey, recoveryPromise);
+      try {
+        return await recoveryPromise;
+      } finally {
+        dbRecoveryPromiseByStorageKey.delete(storageKey);
+      }
+    }
+
+    const resultSlots = ids.map(() => null);
     const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const jobStartedAt = Date.now();
+    let runningJobWriteChain = Promise.resolve(true);
+
+    function currentResults() {
+      return resultSlots.filter(Boolean);
+    }
+
+    function setResultAt(index, result) {
+      resultSlots[index] = result;
+      return result;
+    }
+
     async function writeRunningJob(partial = {}) {
-      await notionJobStore.setJob({
-        id: jobId,
-        provider: SYNC_PROVIDER,
-        instanceId,
-        status: "running",
-        startedAt: jobStartedAt,
-        updatedAt: Date.now(),
-        finishedAt: null,
-        conversationIds: ids,
-        okCount: results.filter((r) => r.ok).length,
-        failCount: results.filter((r) => !r.ok).length,
-        perConversation: toPerConversationSnapshot(results),
-        ...partial
-      });
+      runningJobWriteChain = runningJobWriteChain
+        .catch(() => true)
+        .then(async () => {
+          const results = currentResults();
+          await notionJobStore.setJob({
+            id: jobId,
+            provider: SYNC_PROVIDER,
+            instanceId,
+            status: "running",
+            startedAt: jobStartedAt,
+            updatedAt: Date.now(),
+            finishedAt: null,
+            conversationIds: ids,
+            okCount: results.filter((r) => r.ok).length,
+            failCount: results.filter((r) => !r.ok).length,
+            perConversation: toPerConversationSnapshot(results),
+            ...partial
+          });
+          return true;
+        });
+      await runningJobWriteChain;
     }
 
     await writeRunningJob({
@@ -302,7 +396,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       currentStage: ids.length ? "Preparing queue" : ""
     });
 
-    for (const id of ids) {
+    async function processConversation(id, index) {
+      const trace = createConversationTrace(id);
       await writeRunningJob({
         currentConversationId: id,
         currentConversationTitle: `Conversation #${id}`,
@@ -310,6 +405,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       });
 
       try {
+        trace.mark("load conversation");
         // eslint-disable-next-line no-await-in-loop
         const mapped = await (storage.getSyncMappingByConversation ? storage.getSyncMappingByConversation(id) : Promise.resolve(null));
         const convo = mapped && mapped.conversation ? mapped.conversation : null;
@@ -320,8 +416,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           currentStage: "Preparing sync"
         });
         if (!convo) {
-          results.push({ conversationId: id, ok: false, error: "conversation not found" });
-          continue;
+          setResultAt(index, { conversationId: id, ok: false, error: "conversation not found" });
+          return;
         }
 
         const kindPicked = conversationKinds.pick(convo);
@@ -340,6 +436,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           currentStage: "Ensuring database"
         });
 
+        trace.mark("ensure database");
         let dbId = await ensureDbForKind(kind);
 
         // eslint-disable-next-line no-await-in-loop
@@ -357,6 +454,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Checking destination page"
           });
+          trace.mark("check destination page");
           try {
             // eslint-disable-next-line no-await-in-loop
             const page = await notionSyncService.getPage(token.accessToken, pageId);
@@ -376,6 +474,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Creating destination page"
           });
+          trace.mark("create destination page");
           try {
             // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
@@ -384,27 +483,26 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               capturedAt: convo.lastCapturedAt
             });
           } catch (createErr) {
-            const shouldRecoverDb = !recoveredMissingDbByStorageKey.has(String(dbSpec.storageKey)) && isMissingDatabaseError(createErr);
+            const shouldRecoverDb = isMissingDatabaseError(createErr);
             if (!shouldRecoverDb) throw createErr;
-            recoveredMissingDbByStorageKey.add(String(dbSpec.storageKey));
-            // Recover once by clearing stale DB cache and rebuilding under current parent page.
-            // eslint-disable-next-line no-await-in-loop
-            await clearCachedDatabaseId(notionDbManager, String(dbSpec.storageKey));
+            const recoveredStorageKey = String(dbSpec.storageKey || "");
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Rebuilding database"
             });
+            trace.mark("rebuild database");
+            // Rebuild once per storage key and share the recovery across concurrent conversations.
             // eslint-disable-next-line no-await-in-loop
-            const rebuiltDb = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec });
-            dbId = rebuiltDb && rebuiltDb.databaseId ? String(rebuiltDb.databaseId) : "";
-            if (!dbId) throw createErr;
-            dbIdByKindId.set(kind.id, dbId);
+            dbId = recoveredMissingDbByStorageKey.has(recoveredStorageKey) && dbIdByKindId.get(kind.id)
+              ? String(dbIdByKindId.get(kind.id) || "")
+              : await recoverDbForStorageKey(kind, dbSpec);
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Creating destination page"
             });
+            trace.mark("create destination page");
             // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
@@ -422,6 +520,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Uploading message blocks"
           });
+          trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
             notionSyncService,
@@ -430,6 +529,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: messages
           });
           if (blocks.length) {
+            trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
             await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
           }
@@ -440,13 +540,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Saving sync cursor"
             });
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((r) => setTimeout(r, 250));
-          continue;
+          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
+          trace.flush({ mode: "created", ok: true, blockCount: blocks.length });
+          return;
         }
 
         const inc = computeNewMessages(messages, cursor);
@@ -466,13 +566,16 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Rebuilding destination page"
           });
+          trace.mark("rebuild page properties");
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
             properties: pageSpec.buildUpdateProperties(convo)
           });
+          trace.mark("clear page children");
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.clearPageChildren(token.accessToken, pageId);
+          trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
             notionSyncService,
@@ -481,6 +584,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: messages
           });
           if (blocks.length) {
+            trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
             await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
           }
@@ -491,21 +595,25 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Saving sync cursor"
             });
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
+          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
+          trace.flush({ mode: "rebuilt", ok: true, blockCount: blocks.length });
         } else if (inc.newMessages && inc.newMessages.length) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Appending new messages"
           });
+          trace.mark("update page properties");
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
             properties: pageSpec.buildUpdateProperties(convo)
           });
+          trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
             notionSyncService,
@@ -514,6 +622,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: inc.newMessages
           });
           if (blocks.length) {
+            trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
             await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
           }
@@ -524,10 +633,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Saving sync cursor"
             });
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
+          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
+          trace.flush({ mode: "appended", ok: true, blockCount: blocks.length });
         } else {
           if (storage.setSyncCursor) {
             await writeRunningJob({
@@ -538,17 +649,20 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           const nextCursor = lastMessageCursor(messages);
           if (storage.setSyncCursor) {
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
+          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
+          trace.flush({ mode: "no_changes", ok: true, blockCount: 0 });
         }
       } catch (e) {
-        results.push({ conversationId: id, ok: false, error: normalizeNotionSyncError(e) });
+        const normalizedError = normalizeNotionSyncError(e);
+        setResultAt(index, { conversationId: id, ok: false, error: normalizedError });
+        trace.flush({ mode: "failed", ok: false, error: normalizedError });
       }
 
       try {
-        // eslint-disable-next-line no-await-in-loop
         await writeRunningJob({
           currentConversationId: id,
           currentConversationTitle: undefined,
@@ -558,10 +672,21 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         // ignore
       }
 
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 250));
     }
 
+    const queue = ids.map((id, index) => ({ id, index }));
+    let cursorIndex = 0;
+    const workerCount = Math.max(1, Math.min(SYNC_CONVERSATION_CONCURRENCY, queue.length));
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const next = queue[cursorIndex];
+        cursorIndex += 1;
+        if (!next) return;
+        await processConversation(next.id, next.index);
+      }
+    }));
+
+    const results = currentResults();
     const okCount = results.filter((r) => r.ok).length;
     const failCount = results.length - okCount;
     const failures = buildFailureSummaries(results);
