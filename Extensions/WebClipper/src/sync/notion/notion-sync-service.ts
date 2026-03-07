@@ -7,7 +7,7 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
   const MAX_TEXT = 1900;
   const APPEND_BATCH = 90;
   const APPEND_MAX_ATTEMPTS = 5;
-  const CLEAR_DELETE_CONCURRENCY = 3;
+  const CLEAR_DELETE_CONCURRENCY = 6;
   const CLEAR_DELETE_MAX_ATTEMPTS = 5;
 
   function getNotionFetch() {
