@@ -66,11 +66,176 @@ function withOptionalId<T extends Record<string, any>>(
   return { ...payload };
 }
 
+function safeString(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function normalizeArticleUrl(raw: unknown): string {
+  const text = safeString(raw);
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = safeString(url.protocol).toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
+
+function isArticlePayload(payload: any): boolean {
+  return safeString(payload?.sourceType).toLowerCase() === 'article';
+}
+
+function pickPreferredArticleConversation(candidates: any[]): any | null {
+  const list = Array.isArray(candidates) ? candidates.slice() : [];
+  if (!list.length) return null;
+  list.sort((a, b) => {
+    const aCanonical = safeString(a?.source) === 'web' && safeString(a?.conversationKey).startsWith('article:') ? 1 : 0;
+    const bCanonical = safeString(b?.source) === 'web' && safeString(b?.conversationKey).startsWith('article:') ? 1 : 0;
+    if (bCanonical !== aCanonical) return bCanonical - aCanonical;
+
+    const aMapped = safeString(a?.notionPageId) ? 1 : 0;
+    const bMapped = safeString(b?.notionPageId) ? 1 : 0;
+    if (bMapped !== aMapped) return bMapped - aMapped;
+
+    const at = Number(a?.lastCapturedAt) || 0;
+    const bt = Number(b?.lastCapturedAt) || 0;
+    if (bt !== at) return bt - at;
+
+    const aid = Number(a?.id) || 0;
+    const bid = Number(b?.id) || 0;
+    return bid - aid;
+  });
+  return list[0] || null;
+}
+
+async function findExistingArticleConversationByUrl(
+  conversationsStore: IDBObjectStore,
+  rawUrl: unknown,
+): Promise<any | null> {
+  const normalizedUrl = normalizeArticleUrl(rawUrl);
+  if (!normalizedUrl) return null;
+  const rows = (await reqToPromise(conversationsStore.getAll() as any)) as any[];
+  const matched = rows.filter((row) => {
+    if (safeString(row?.sourceType).toLowerCase() !== 'article') return false;
+    return normalizeArticleUrl(row?.url) === normalizedUrl;
+  });
+  return pickPreferredArticleConversation(matched);
+}
+
+function pickMaxFiniteNumber(...values: unknown[]): number | null {
+  let max: number | null = null;
+  for (const value of values) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) continue;
+    if (max == null || numberValue > max) max = numberValue;
+  }
+  return max;
+}
+
+function mergeSyncMappingRecord(base: any, incoming: any, fallbackNotionPageId: string): any {
+  const current = base && typeof base === 'object' ? { ...base } : {};
+  const next = incoming && typeof incoming === 'object' ? incoming : {};
+  const notionPageId =
+    safeString(current.notionPageId) ||
+    safeString(next.notionPageId) ||
+    safeString(fallbackNotionPageId);
+  const lastSyncedMessageKey =
+    safeString(current.lastSyncedMessageKey) || safeString(next.lastSyncedMessageKey);
+  const lastSyncedSequence = pickMaxFiniteNumber(current.lastSyncedSequence, next.lastSyncedSequence);
+  const lastSyncedAt = pickMaxFiniteNumber(current.lastSyncedAt, next.lastSyncedAt);
+  const lastSyncedMessageUpdatedAt = pickMaxFiniteNumber(
+    current.lastSyncedMessageUpdatedAt,
+    next.lastSyncedMessageUpdatedAt,
+  );
+  const updatedAt = pickMaxFiniteNumber(current.updatedAt, next.updatedAt, Date.now()) || Date.now();
+
+  return {
+    ...current,
+    notionPageId,
+    lastSyncedMessageKey,
+    lastSyncedSequence,
+    lastSyncedAt,
+    lastSyncedMessageUpdatedAt,
+    updatedAt,
+  };
+}
+
+async function migrateSyncMappingKey(
+  syncMappingsStore: IDBObjectStore,
+  input: {
+    legacySource: unknown;
+    legacyConversationKey: unknown;
+    nextSource: unknown;
+    nextConversationKey: unknown;
+    fallbackNotionPageId?: unknown;
+  },
+): Promise<void> {
+  const legacySource = safeString(input.legacySource);
+  const legacyConversationKey = safeString(input.legacyConversationKey);
+  const nextSource = safeString(input.nextSource);
+  const nextConversationKey = safeString(input.nextConversationKey);
+  const fallbackNotionPageId = safeString(input.fallbackNotionPageId);
+
+  if (!nextSource || !nextConversationKey) return;
+  const idx = syncMappingsStore.index('by_source_conversationKey');
+
+  const target = (await reqToPromise(idx.get([nextSource, nextConversationKey]) as any)) as any;
+  if (legacySource === nextSource && legacyConversationKey === nextConversationKey) {
+    if (!target) return;
+    const merged = mergeSyncMappingRecord(target, null, fallbackNotionPageId);
+    if (JSON.stringify(merged) !== JSON.stringify(target)) {
+      await reqToPromise(syncMappingsStore.put(merged));
+    }
+    return;
+  }
+
+  if (!legacySource || !legacyConversationKey) {
+    if (!target) return;
+    const merged = mergeSyncMappingRecord(target, null, fallbackNotionPageId);
+    if (JSON.stringify(merged) !== JSON.stringify(target)) {
+      await reqToPromise(syncMappingsStore.put(merged));
+    }
+    return;
+  }
+
+  const legacy = (await reqToPromise(idx.get([legacySource, legacyConversationKey]) as any)) as any;
+  if (!legacy) {
+    if (!target) return;
+    const merged = mergeSyncMappingRecord(target, null, fallbackNotionPageId);
+    if (JSON.stringify(merged) !== JSON.stringify(target)) {
+      await reqToPromise(syncMappingsStore.put(merged));
+    }
+    return;
+  }
+
+  if (!target) {
+    legacy.source = nextSource;
+    legacy.conversationKey = nextConversationKey;
+    const merged = mergeSyncMappingRecord(legacy, null, fallbackNotionPageId);
+    await reqToPromise(syncMappingsStore.put(merged));
+    return;
+  }
+
+  const merged = mergeSyncMappingRecord(target, legacy, fallbackNotionPageId);
+  await reqToPromise(syncMappingsStore.put(merged));
+
+  const legacyId = Number(legacy.id);
+  if (Number.isFinite(legacyId) && legacyId > 0 && legacyId !== Number(target.id)) {
+    await reqToPromise(syncMappingsStore.delete(legacyId));
+  }
+}
+
 export async function upsertConversation(payload: any): Promise<Conversation> {
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations'], 'readwrite');
+  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
   const idx = stores.conversations.index('by_source_conversationKey');
-  const existing: any = await reqToPromise(idx.get([payload.source, payload.conversationKey]) as any);
+  let existing: any = await reqToPromise(idx.get([payload.source, payload.conversationKey]) as any);
+  if (!existing && isArticlePayload(payload)) {
+    existing = await findExistingArticleConversationByUrl(stores.conversations, payload.url);
+  }
 
   const now = Date.now();
   const nextTitle =
@@ -87,7 +252,9 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
     author: payload.author || (existing ? existing.author || '' : ''),
     publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
     description: payload.description || (existing ? existing.description || '' : ''),
-    warningFlags: Array.isArray(payload.warningFlags) ? payload.warningFlags : [],
+    warningFlags: Array.isArray(payload.warningFlags)
+      ? payload.warningFlags
+      : (existing ? existing.warningFlags || [] : []),
     notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
     lastCapturedAt: payload.lastCapturedAt || now,
   };
@@ -95,6 +262,13 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const record: any = withOptionalId(existing && existing.id, baseRecord);
 
   if (existing) {
+    await migrateSyncMappingKey(stores.sync_mappings, {
+      legacySource: existing.source,
+      legacyConversationKey: existing.conversationKey,
+      nextSource: record.source,
+      nextConversationKey: record.conversationKey,
+      fallbackNotionPageId: record.notionPageId,
+    });
     await reqToPromise(stores.conversations.put(record));
     await txDone(t);
     return record;
