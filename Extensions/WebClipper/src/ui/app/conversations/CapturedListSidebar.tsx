@@ -3,6 +3,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
 
+import { t } from '../../../i18n';
 import { ConversationListPane } from '../../conversations/ConversationListPane';
 import { useConversationsApp } from '../../conversations/conversations-context';
 
@@ -65,7 +66,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               }}
               className={({ isActive }) => settingsClass(isActive)}
             >
-              <span className="tw-sr-only">Settings</span>
+              <span className="tw-sr-only">{t('settingsLabel')}</span>
               <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
             </NavLink>
 
@@ -73,13 +74,13 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               type="button"
               onClick={() => refreshList().catch(() => {})}
               className={iconButtonClass()}
-              aria-label="Refresh list"
+              aria-label={t('refreshList')}
               disabled={loadingList}
             >
               <RefreshIcon />
             </button>
 
-            <button type="button" onClick={onCollapse} className={iconButtonClass()} aria-label="Collapse sidebar">
+            <button type="button" onClick={onCollapse} className={iconButtonClass()} aria-label={t('collapseSidebar')}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
