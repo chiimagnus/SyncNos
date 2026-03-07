@@ -202,9 +202,9 @@ describe('Conversations sync feedback', () => {
     const runningNotice = document.getElementById('conversationSyncFeedback');
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
-    expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
     expect(runningNotice?.textContent).toContain('Current: Current sync target');
     expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
+    expect(runningNotice?.textContent).not.toContain('Notion syncing 1/2');
 
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
@@ -256,9 +256,9 @@ describe('Conversations sync feedback', () => {
     const runningNotice = document.getElementById('conversationSyncFeedback');
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
-    expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
     expect(runningNotice?.textContent).toContain('Current: Current sync target');
     expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
+    expect(runningNotice?.textContent).not.toContain('Notion syncing 1/2');
 
     const notionButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim().startsWith('Notion')) as HTMLButtonElement | undefined;
     expect(notionButton?.disabled).toBe(true);
@@ -279,10 +279,10 @@ describe('Conversations sync feedback', () => {
     const runningNotice = document.getElementById('conversationSyncFeedback');
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
-    expect(runningNotice?.textContent).toContain('Notion syncing 1/2');
     expect(runningNotice?.textContent).not.toContain('sync already in progress');
     expect(runningNotice?.textContent).toContain('Current: Current sync target');
     expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
+    expect(runningNotice?.textContent).not.toContain('Notion syncing 1/2');
   });
 
   it('hydrates persisted terminal feedback and clears the persisted job on dismiss', async () => {

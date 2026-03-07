@@ -55,6 +55,14 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   const currentItemLabel = feedback.currentConversationTitle.trim()
     || (feedback.currentConversationId ? `Conversation #${feedback.currentConversationId}` : '');
   const currentStageLabel = feedback.currentStage.trim();
+  const primaryMessage = feedback.phase === 'running'
+    ? currentItemLabel
+      ? `Current: ${currentItemLabel}`
+      : currentStageLabel
+        ? `Stage: ${currentStageLabel}`
+        : feedback.message
+    : feedback.message;
+  const showRunningStageDetail = feedback.phase === 'running' && !!currentItemLabel && !!currentStageLabel;
 
   return (
     <div
@@ -86,15 +94,9 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
             ) : null}
           </div>
 
-          <div className="tw-mt-1 tw-text-xs tw-font-semibold">{feedback.message}</div>
+          <div className="tw-mt-1 tw-text-xs tw-font-semibold">{primaryMessage}</div>
 
-          {feedback.phase === 'running' && currentItemLabel ? (
-            <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-opacity-90">
-              Current: {currentItemLabel}
-            </div>
-          ) : null}
-
-          {feedback.phase === 'running' && currentStageLabel ? (
+          {showRunningStageDetail ? (
             <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-opacity-75">
               Stage: {currentStageLabel}
             </div>
