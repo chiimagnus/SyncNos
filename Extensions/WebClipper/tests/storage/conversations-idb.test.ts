@@ -19,6 +19,14 @@ function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+function txDone(t: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error || new Error("tx failed"));
+    t.onabort = () => reject(t.error || new Error("tx aborted"));
+  });
+}
+
 async function deleteDb(name: string) {
   const req = indexedDB.deleteDatabase(name);
   await reqToPromise(req as unknown as IDBRequest<unknown>);
@@ -99,5 +107,68 @@ describe("conversations storage-idb", () => {
 
     const items = await getConversations();
     expect(items.length).toBe(0);
+  });
+
+  it("reuses and rewrites legacy article conversation rows by normalized url", async () => {
+    const db = await openDb();
+    const t = db.transaction(["conversations", "sync_mappings"], "readwrite");
+    const conversations = t.objectStore("conversations");
+    const mappings = t.objectStore("sync_mappings");
+
+    const legacyId = await reqToPromise<number>(conversations.add({
+      sourceType: "article",
+      source: "article",
+      conversationKey: "article_https://example.com/post",
+      title: "Legacy title",
+      url: "https://example.com/post#frag",
+      notionPageId: "page_old",
+      warningFlags: [],
+      lastCapturedAt: 1,
+    }));
+
+    await reqToPromise(mappings.add({
+      source: "article",
+      conversationKey: "article_https://example.com/post",
+      notionPageId: "page_old",
+      updatedAt: 1,
+    }));
+    await txDone(t);
+    db.close();
+
+    const conversation = await upsertConversation({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      title: "New title",
+      url: "https://example.com/post",
+      lastCapturedAt: 2,
+    });
+
+    expect(Number(conversation.id)).toBe(legacyId);
+    expect(conversation.source).toBe("web");
+    expect(conversation.conversationKey).toBe("article:https://example.com/post");
+    expect(conversation.url).toBe("https://example.com/post");
+
+    const reopened = await openDb();
+    const verifyTx = reopened.transaction(["conversations", "sync_mappings"], "readonly");
+    const verifyConversations = await reqToPromise<any[]>(verifyTx.objectStore("conversations").getAll());
+    const verifyMappings = await reqToPromise<any[]>(verifyTx.objectStore("sync_mappings").getAll());
+    await txDone(verifyTx);
+    reopened.close();
+
+    expect(verifyConversations).toHaveLength(1);
+    expect(verifyConversations[0]).toMatchObject({
+      id: legacyId,
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      url: "https://example.com/post",
+      notionPageId: "page_old",
+    });
+    expect(verifyMappings).toHaveLength(1);
+    expect(verifyMappings[0]).toMatchObject({
+      source: "web",
+      conversationKey: "article:https://example.com/post",
+      notionPageId: "page_old",
+    });
   });
 });
