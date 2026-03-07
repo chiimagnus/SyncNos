@@ -1,153 +1,122 @@
 # 架构
 
 ## 系统上下文
-- SyncNos 不是“一个 UI + 一个后端”的单体仓库，而是“macOS App + MV3 浏览器扩展 + 发布流水线 + 业务说明文档”的组合。
-- 两条产品线共享的核心目标是把异构内容整理为稳定的 Notion 写入结果，但采集入口、运行时边界和本地存储模型完全不同。
-- 仓库级文档的价值在于把业务约束写清楚：什么时候必须先授权、哪些敏感信息只能保存在本地、哪些发布动作只能由 CI 执行。
+SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebClipper）、**本地事实与同步层**（SwiftData / Keychain / IndexedDB / Notion / Obsidian）、以及 **交付层**（GitHub Release / CWS / AMO）。理解架构时最重要的不是“有哪些目录”，而是“哪个运行时拥有哪类状态，以及哪些契约负责在运行时之间传递数据”。
 
-| 外部参与者 / 边界 | 交互方 | 主要关系 | 关键路径 |
+| 外部边界 | 主要交互方 | 真实职责 | 关键文件 |
 | --- | --- | --- | --- |
-| 用户 | App、WebClipper | 选择 Parent Page、触发同步、管理本地内容 | `README.md`, `.github/docs/business-logic.md` |
-| Notion | App、WebClipper | 接收数据库、页面属性与 block 写入 | `SyncNos/AGENTS.md`, `Extensions/WebClipper/AGENTS.md` |
-| 浏览器页面 | WebClipper | 提供 AI 对话 DOM 与网页正文 | `Extensions/WebClipper/src/entrypoints/content.ts` |
-| 本地数据源 | App | 提供 Apple Books / GoodLinks 数据库、站点 Cookie、OCR 输入 | `SyncNos/AGENTS.md` |
-| Obsidian Local REST API | WebClipper | 作为可选同步目标写入 vault 文件 | `.github/guide/obsidian/LocalRestAPI.zh.md` |
-| GitHub Actions | Release / WebClipper 发布 | 负责生成 Release、zip、xpi 和商店发布 | `.github/workflows/*.yml` |
+| 用户 | App、popup、扩展内部 app、网页内 inpage UI | 选择来源、保存会话、选择 Parent Page、触发同步或导出 | `SyncNos/Views/`, `Extensions/WebClipper/src/ui/` |
+| Notion | App + WebClipper | 作为统一云端知识落点 | `NotionSyncEngine.swift`, `notion-sync-orchestrator.ts` |
+| 浏览器页面 | WebClipper content script | 提供 AI 对话 DOM 与网页正文 | `content.ts`, `collectors/`, `article-fetch.ts` |
+| 本地来源 / 本地状态 | App Services、WebClipper storage | 承担来源读取、会话缓存、登录态、游标、映射 | `Services/`, `storage-idb.ts`, `schema.ts` |
+| GitHub Actions / 商店 API | 发布脚本、workflow | 生成 release assets 并发布商店版本 | `.github/workflows/`, `.github/scripts/webclipper/` |
 
-## 组件
-| 组件 | 主要路径 | 职责 | 关键依赖 |
+## 运行时单元
+
+| 运行时单元 | 主要路径 | 核心职责 | 修改时最容易影响谁 |
 | --- | --- | --- | --- |
-| App 视图层 | `SyncNos/Views/` | 负责 SwiftUI 呈现、焦点与窗口交互 | ViewModel、`MenuBarDockKit` |
-| App 状态编排层 | `SyncNos/ViewModels/` | 负责状态管理、业务编排与 UI 绑定 | Services、Observation |
-| App 服务层 | `SyncNos/Services/` | 负责读取来源、缓存、鉴权、同步与搜索 | SwiftData、Notion、站点会话 |
-| App 组合根 | `SyncNos/Services/Core/DIContainer.swift` | 延迟组装服务并维持协议注入边界 | 各服务协议与实现 |
-| WebClipper 入口层 | `Extensions/WebClipper/src/entrypoints/` | 注册 background / content / popup / app 运行时 | WXT、消息路由 |
-| WebClipper 采集层 | `Extensions/WebClipper/src/collectors/` | 把站点 DOM 结构转为统一会话数据 | collectors registry、runtime observer |
-| WebClipper 数据层 | `Extensions/WebClipper/src/conversations/` | 管理会话、消息、IndexedDB 与增量更新 | background handlers、tests |
-| WebClipper 同步层 | `Extensions/WebClipper/src/sync/` | 编排 Notion / Obsidian 同步与设置管理 | message contracts、orchestrator |
-| 发布与打包层 | `.github/workflows/`, `.github/scripts/webclipper/` | 根据 tag 或手动输入生成商店产物 | Node 20、GitHub Release |
+| `SyncNosApp` | `SyncNos/SyncNosApp.swift` | 启动时预热 IAP、自动同步、缓存服务，定义窗口 | 所有 App 启动行为和 Scene 布局 |
+| `AppDelegate` | `SyncNos/AppDelegate.swift` | 菜单栏 / Dock 模式、退出保护、Dock reopen、URL scheme 兜底 | AppKit 生命周期、退出行为、菜单栏 UX |
+| `RootView` | `SyncNos/Views/RootView.swift` | 严格控制 Onboarding → PayWall → MainListView 顺序 | 引导、付费墙、主界面副作用 |
+| `DIContainer` | `SyncNos/Services/Core/DIContainer.swift` | App 组合根，延迟装配服务与协议实现 | 几乎所有 App Service / ViewModel 注入关系 |
+| App Service 层 | `SyncNos/Services/` | 数据源读取、缓存、搜索、鉴权、Notion 同步、自动调度 | 来源适配、同步策略、缓存结构 |
+| background | `Extensions/WebClipper/src/entrypoints/background.ts` | 注册 handlers / router / sync orchestrators，清理孤儿 sync job | 所有扩展后台能力 |
+| content | `Extensions/WebClipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、增量观察器、手动保存逻辑 | 采集稳定性、页面按钮体验 |
+| popup / app | `Extensions/WebClipper/src/entrypoints/popup/`, `src/entrypoints/app/` | 呈现会话列表、设置页、同步 / 导出入口 | 用户操作流、设置写入和状态展示 |
+| 发布层 | `.github/workflows/`, `.github/scripts/webclipper/` | release page、渠道构建、AMO/CWS 发布 | 版本一致性与最终产物 |
 
-## 关键流程
-- **App 同步流程**：在 `SyncNosApp` 初始化期装配依赖和自动同步，再由 ViewModel 调用 `NotionSyncEngine + Adapter` 统一写入 Notion。
-- **扩展采集流程**：content script 在页面加载后构建 collectors registry，background 通过 router 调用会话持久化、文章抓取和同步编排。
-- **扩展发布流程**：tag 触发 workflow 后，先校验 `wxt.config.ts` 的 manifest 版本，再生成 Chrome / Edge / Firefox 产物并上传或发布。
+## App 内部边界
 
-| 流程 | 触发点 | 编排入口 | 产物 |
+| 层 | 主目录 | 主要规则 | 代表实现 |
 | --- | --- | --- | --- |
-| App 启动与预热 | 启动 App | `SyncNos/SyncNosApp.swift` | 主窗口、自动同步状态、预热缓存服务 |
-| App 内容同步 | 用户手动或自动同步 | ViewModel → `NotionSyncEngine` | Notion 数据库 / 页面、同步状态 |
-| WebClipper 自动采集 | 进入支持站点或页面 | `src/entrypoints/content.ts` | 本地会话、消息、inpage 提示 |
-| WebClipper 手动同步 | Popup / App 触发 | `src/entrypoints/background.ts` | Notion 页面、Obsidian 文件、导出文件 |
-| WebClipper 发布 | `v*` tag / workflow_dispatch | `.github/workflows/webclipper-*.yml` | zip、xpi、AMO / CWS 发布动作 |
+| Views | `SyncNos/Views/` | 以 SwiftUI 呈现状态，不直接访问底层存储 | `RootView.swift`, `MainListView` |
+| ViewModels | `SyncNos/ViewModels/` | 编排状态、依赖注入、面向 UI 暴露操作 | `OnboardingViewModel.swift`, `GlobalSearchViewModel.swift` |
+| Services | `SyncNos/Services/` | 协议优先、`@ModelActor`、业务逻辑与同步 | `AutoSyncService.swift`, `IAPService.swift`, cache services |
+| Models | `SyncNos/Models/` | DTO、缓存模型、通知名 | `NotificationNames.swift` |
+| Packages | `Packages/` | 可复用 macOS 能力，不反向依赖业务 UI | `MenuBarDockKit` |
+
+- `RootView` 的门控顺序是 App 架构里非常关键的一层：它确保主列表视图只有在 onboarding 和 paywall 都通过后才初始化。
+- `GlobalSearchViewModel` 与 `Notification.Name` 集中定义，让 App 既能做全局搜索，也能在窗口 / 焦点 / 同步状态之间保持统一事件语义。
+
+## WebClipper 内部边界
+
+| 子系统 | 主目录 | 核心职责 | 代表实现 |
+| --- | --- | --- | --- |
+| collectors | `src/collectors/` | 站点识别、DOM 抽取、消息标准化 | `register-all.ts`, 各站点 collector |
+| conversations | `src/conversations/` | IndexedDB CRUD、本地事实源、UI 读取面 | `storage-idb.ts`, background handlers |
+| sync | `src/sync/` | Notion / Obsidian / 备份的编排层 | `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
+| ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层 | `ConversationsScene.tsx`, `SettingsScene.tsx` |
+| messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts` |
+
+- `content.ts` 把 content runtime 组装成“collectors registry + controller + inpage button/tip + runtime observer + incremental updater + notionAiModelPicker”的组合体。
+- `background.ts` 则把 conversation handlers、article fetch、Notion / Obsidian settings handlers、sync handlers、UI handlers 一次性挂到 router 上，并在实例切换时终止其他 background 实例遗留的 sync job。
+
+## 关键契约
+
+| 契约 | 位置 | 谁依赖它 | 含义 |
+| --- | --- | --- | --- |
+| `NotionSyncSourceProtocol` | `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift` | App 各来源适配器、`NotionSyncEngine` | 把不同来源统一成可同步的条目 / 内容结构 |
+| `NotionSyncConfig` | `SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift` | App 同步引擎 | 定义并发、RPS、批量大小、超时与重试策略 |
+| `Notification.Name` 常量 | `SyncNos/Models/Core/NotificationNames.swift` | App 视图、ViewModel、Service | 统一同步、搜索、窗口、IAP、登录等事件 |
+| `message-contracts.ts` | `Extensions/WebClipper/src/platform/messaging/message-contracts.ts` | content / background / popup / app | 把扩展功能拆成 CORE / NOTION / OBSIDIAN / ARTICLE / UI 五类消息 |
+| `conversation-kinds.ts` | `Extensions/WebClipper/src/protocols/conversation-kinds.ts` | Notion / Obsidian orchestrator | 决定 chat/article 的 DB、folder 与重建规则 |
+| Zip v2 备份契约 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | 备份与恢复流程 | 约束 manifest、CSV、分源 JSON、storage-local.json 的结构 |
 
 ## 图表
 ```mermaid
 flowchart TB
-  subgraph App["SyncNos App"]
-    A1[Views] --> A2[ViewModels]
-    A2 --> A3[Services]
-    A3 --> A4[Models / Cache]
+  subgraph App[SyncNos App]
+    A1[SyncNosApp] --> A2[RootView]
+    A2 --> A3[ViewModels]
+    A3 --> A4[Services / DIContainer]
+    A4 --> A5[SwiftData / Keychain / UserDefaults]
+    A4 --> N[Notion]
   end
 
-  subgraph Extension["WebClipper"]
-    B1[content.ts] --> B2[collectors]
-    B2 --> B3[conversations]
-    B3 --> B4[background.ts router]
-    B4 --> B5[sync orchestrators]
+  subgraph Ext[WebClipper]
+    B1[content.ts] --> B2[Collectors / Inpage]
+    B2 --> B3[IndexedDB]
+    B4[popup / app] --> B5[background.ts router]
+    B3 --> B5
+    B5 --> N
+    B5 --> O[Obsidian / Markdown / Zip]
   end
 
-  A3 --> N[Notion]
-  B5 --> N
-  B5 --> O[Obsidian / Markdown / Zip]
+  R[GitHub Actions] --> G[Release / CWS / AMO]
 ```
 
-## 接口与契约
-| 契约 | 位置 | 主要调用方 | 含义 |
-| --- | --- | --- | --- |
-| `NotionSyncSourceProtocol` | `SyncNos/AGENTS.md` 中的同步架构说明 | 各阅读来源适配器 | 把不同来源转换为统一同步输入，避免修改 `NotionSyncEngine`。 |
-| `DIContainer` 延迟装配 | `SyncNos/Services/Core/DIContainer.swift` | App 各 ViewModel / Service | 保持协议优先和可替换实现。 |
-| `messageContracts` | `Extensions/WebClipper/src/platform/messaging/message-contracts.ts` | popup / app / background / content | 统一消息 type，避免硬编码字符串散落。 |
-| Zip v2 备份结构 | `Extensions/WebClipper/AGENTS.md` | 备份导入导出 | 固定为 `manifest.json + sources/conversations.csv + sources/... + config/storage-local.json`。 |
-| Obsidian Local REST API 配置 | `.github/guide/obsidian/LocalRestAPI.zh.md` | Popup 设置页与 orchestrator | 约束为 `http://127.0.0.1:27123` 与 `Authorization` 头。 |
-| URL Scheme 回调 | `SyncNos/Info.plist`, `SyncNos/AppDelegate.swift` | App OAuth 流程 | 通过 `syncnos://oauth/callback` 兜底接收回调。 |
+## 可靠性与恢复路径
 
-## 关键参数
-| 参数 | 位置 | 默认 / 约束 | 影响 |
-| --- | --- | --- | --- |
-| `autoSync.appleBooks` / `goodLinks` / `weRead` | `SyncNos/SyncNosApp.swift` | UserDefaults 布尔值 | 决定启动后是否自动开启增量同步。 |
-| `SyncNos.FontScaleLevel` | `SyncNos/Services/Core/AGENTS.md` | 本地保存的离散等级 | 影响所有 `.scaledFont()` 组件与键盘滚动步长。 |
-| `manifestVersion` | `Extensions/WebClipper/wxt.config.ts` | `3` | 确定扩展运行在 MV3。 |
-| `inpage_supported_only` | `Extensions/WebClipper/AGENTS.md` | 默认 `false` | 决定 inpage 按钮是全站显示还是仅支持站点显示。 |
-| Obsidian Base URL | `.github/guide/obsidian/LocalRestAPI.zh.md` | `http://127.0.0.1:27123` | 决定扩展是否能写入本地 vault。 |
-| Node 版本 | `.github/workflows/webclipper-release.yml` | `20` | 发布 workflow 的固定执行环境。 |
-
-| 平台 / 运行时 | 约束 | 说明 |
+| 场景 | 当前机制 | 架构意义 |
 | --- | --- | --- |
-| macOS App | `macOS 14.0+`, Swift 6.0+ | 依赖 SwiftUI、SwiftData 与 MenuBarDockKit。 |
-| WebClipper | Chrome / Edge / Firefox, MV3 | `entrypointsDir` 固定为 `src/entrypoints`。 |
-| 发布流水线 | GitHub Actions | WebClipper 正式产物不在本地手工维护。 |
+| App 高并发 ensure Database / Properties | `NotionSyncEngine.EnsureCache` | 避免同一数据库在批量同步里重复 ensure，降低 409 / 429 风险 |
+| App 同步进行中退出 | `AppDelegate.applicationShouldTerminate` 弹确认框 | 防止用户在批量同步中途静默退出 |
+| 扩展 background 实例切换 | `abortRunningJobIfFromOtherInstance()` | 防止旧实例残留 job 误导 UI 状态 |
+| Obsidian PATCH 失败 | orchestrator 回退到 full rebuild | 确保“能修复目标文件”优先于“必须增量追加” |
+| Notion 数据库被删 | Notion orchestrator 可清空缓存的 DB id 后重建一次 | 降低“缓存指向已删除数据库”造成的永久失败 |
+| Keychain / 登录态读取副作用 | `SiteLoginsStore` 延迟加载 | 避免 App 一启动就触发不必要的读取与权限行为 |
 
-## 错误处理与可靠性
-- App 侧强调“未授权或未选择 Parent Page 时阻止写入”，避免出现成功外观但无目标落点的同步。
-- App 在退出时会检查 `syncActivityMonitor.isSyncing`，必要时弹出确认，避免中途终止批量同步。
-- WebClipper 要求关键路径返回结构化错误，尤其是 OAuth、数据库创建/复用、Notion blocks 写入和 Obsidian 连接。
-- WebClipper 备份会显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret`，降低敏感信息泄露风险。
-
-| 场景 | 当前策略 | 说明 |
-| --- | --- | --- |
-| 同步进行中退出 App | 弹窗确认后决定是否终止 | `AppDelegate.applicationShouldTerminate` |
-| 页面结构变化导致 collector 识别失败 | 尽量保留可识别内容并给出提示 | `Extensions/WebClipper/AGENTS.md` 的 collector 约束 |
-| Obsidian 不可达 | UI 显示失败，要求检查端口 / 插件 / API Key | `LocalRestAPI.zh.md` |
-| 发布版本不匹配 | workflow 校验 manifest 版本与 tag | `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` |
-
-## 示例片段
-### 片段 1：WebClipper 后台把消息处理注册集中在一个 router
-```ts
-registerConversationHandlers(router);
-registerWebArticleHandlers(router);
-registerNotionSettingsHandlers(router, { ... });
-registerObsidianSettingsHandlers(router, { ... });
-registerSyncHandlers(router, { ... });
-router.start();
-```
-
-### 片段 2：App 通过 DIContainer 做惰性依赖装配
-```swift
-var notionClient: NotionClientProtocol {
-    if _notionClient == nil {
-        _notionClient = NotionClient(configStore: notionConfigStore)
-    }
-    return _notionClient!
-}
-```
-
-## 运行时与部署
-| 运行单元 | 部署表面 | 说明 |
-| --- | --- | --- |
-| `SyncNosApp` 主窗口 | macOS 桌面应用 | 含主窗口、Settings、Logs 与菜单栏模式。 |
-| `AppDelegate` | macOS 生命周期 | 负责菜单栏 Popover、URL scheme 与退出确认。 |
-| background service worker | MV3 浏览器扩展 | 负责消息编排、同步 job 与设置 handlers。 |
-| content script | 浏览器页面 | 负责 DOM 观察、inpage UI 和自动采集。 |
-| popup / app | 扩展 React UI | 提供会话列表、设置、导出和手动同步入口。 |
-| GitHub Actions | 云端 CI/CD | 负责 release 页面和商店交付。 |
-
-## 扩展性说明
-- App 新增阅读来源的推荐路径是：在 `DataSources-From/` 增加读取服务，在 `DataSources-To/Notion/Sync/Adapters/` 增加适配器，然后由 ViewModel 调用 `NotionSyncEngine.sync(source:)`。
-- WebClipper 新增 AI 站点时，应优先扩展 collectors registry，而不是把站点判断散落到 popup 或 background。
-- 可复用的 macOS 能力优先放进 `Packages/`，例如 `MenuBarDockKit` 已抽离出菜单栏 / Dock / `WindowReader` 等通用功能。
+## 修改热点
+- **App 同步热点**：`DIContainer.swift`、`NotionSyncEngine.swift`、`NotionSyncSourceProtocol.swift`、各 `DataSources-From` / `DataSources-To` 适配器。
+- **App 门控热点**：`RootView.swift`、`OnboardingViewModel.swift`、`IAPService.swift`、`PayWallViewModel.swift`。
+- **扩展采集热点**：`content.ts`、`bootstrap/content-controller.ts`、`collectors/`、`article-fetch.ts`。
+- **扩展同步热点**：`storage-idb.ts`、`schema.ts`、`notion-sync-orchestrator.ts`、`obsidian-sync-orchestrator.ts`、`conversation-kinds.ts`。
+- **发布热点**：`wxt.config.ts`、`package.json`、`.github/workflows/webclipper-*.yml`、`.github/scripts/webclipper/*.mjs`。
 
 ## 来源引用（Source References）
-- `.github/docs/business-logic.md`
-- `SyncNos/AGENTS.md`
-- `SyncNos/Services/AGENTS.md`
-- `SyncNos/Services/Core/AGENTS.md`
-- `SyncNos/Services/Core/DIContainer.swift`
 - `SyncNos/SyncNosApp.swift`
 - `SyncNos/AppDelegate.swift`
-- `SyncNos/Info.plist`
-- `Extensions/WebClipper/AGENTS.md`
+- `SyncNos/Views/RootView.swift`
+- `SyncNos/Services/Core/DIContainer.swift`
+- `SyncNos/Services/SyncScheduling/AutoSyncService.swift`
+- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
+- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
+- `SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
+- `SyncNos/Models/Core/NotificationNames.swift`
 - `Extensions/WebClipper/src/entrypoints/background.ts`
 - `Extensions/WebClipper/src/entrypoints/content.ts`
+- `Extensions/WebClipper/src/bootstrap/content.ts`
 - `Extensions/WebClipper/src/platform/messaging/message-contracts.ts`
-- `Extensions/WebClipper/wxt.config.ts`
-- `Packages/MenuBarDockKit/README.md`
+- `Extensions/WebClipper/src/protocols/conversation-kinds.ts`
+- `.github/workflows/release.yml`
+- `.github/workflows/webclipper-release.yml`

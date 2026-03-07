@@ -1,84 +1,84 @@
 # 依赖关系
 
-## 构建与运行时
-| 产品线 | 语言 | 核心框架 / 运行时 | 构建入口 | 运行目标 |
+## 构建与运行时矩阵
+
+| 产品线 / 层 | 语言 | 核心运行时 / 框架 | 构建入口 | 运行目标 |
 | --- | --- | --- | --- | --- |
-| SyncNos App | Swift 6.0+ | SwiftUI、SwiftData、StoreKit、AppKit | `SyncNos.xcodeproj`, `xcodebuild` | macOS 14.0+ |
-| WebClipper | TypeScript 5.9+ | WXT、React 19、MV3、Vitest | `package.json`, `wxt.config.ts` | Chrome / Edge / Firefox |
-| 共享自动化 | YAML + Node | GitHub Actions、Node 20 | `.github/workflows/*.yml` | Release / 商店发布 |
+| SyncNos App | Swift 6 | SwiftUI、SwiftData、StoreKit 2、AppKit | `SyncNos.xcodeproj`, `xcodebuild` | macOS 14.0+ |
+| MenuBarDockKit | SwiftPM | 本地可复用 macOS 组件 | `Packages/MenuBarDockKit/Package.swift` | 被 App 直接依赖 |
+| WebClipper | TypeScript 5.9 | WXT、MV3、React 19、React Router 7、Vitest | `Extensions/WebClipper/package.json`, `wxt.config.ts` | Chrome / Edge / Firefox |
+| 交付层 | YAML + Node 20 | GitHub Actions、打包脚本、商店 API | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` | GitHub Release / CWS / AMO |
 
-## 依赖细节
-| 依赖 | 类型 | 版本 / 约束 | 用途 |
+## WebClipper 主要依赖
+
+| 依赖 | 类型 | 版本 | 用途 |
 | --- | --- | --- | --- |
-| `react` | 运行时依赖 | `^19.2.4` | WebClipper popup / app UI 渲染。 |
-| `react-router-dom` | 运行时依赖 | `7.13.1` | WebClipper 应用内路由。 |
-| `markdown-it` | 运行时依赖 | `^14.1.0` | 渲染消息 Markdown。 |
-| `wxt` | 开发依赖 | `^0.20.18` | MV3 扩展开发与构建。 |
-| `vitest` | 开发依赖 | `^2.1.8` | WebClipper 单元测试。 |
-| `typescript` | 开发依赖 | `^5.9.3` | WebClipper 类型检查与编译约束。 |
-| `tailwindcss` | 开发依赖 | `^3.4.17` | 扩展 UI 样式系统。 |
+| `react`, `react-dom` | runtime | `^19.2.4` | popup / app UI 渲染 |
+| `react-router-dom` | runtime | `7.13.1` | 扩展内部 app 路由 |
+| `markdown-it` | runtime | `^14.1.0` | Markdown 消息渲染 |
+| `lucide-react` | runtime | `^0.541.0` | UI 图标 |
+| `wxt` | dev | `^0.20.18` | MV3 开发与构建 |
+| `@wxt-dev/module-react` | dev | `^1.1.5` | WXT React 模块 |
+| `typescript` | dev | `^5.9.3` | 类型检查与编译约束 |
+| `vitest` | dev | `^2.1.8` | 单元测试 |
+| `fake-indexeddb`, `jsdom` | dev | `^6.2.2`, `^28.1.0` | 存储与 DOM 测试环境 |
+| `tailwindcss`, `postcss`, `autoprefixer` | dev | `^3.4.17`, `^8.5.6`, `^10.4.21` | 扩展 UI 样式链 |
 
-| Apple / Swift 侧依赖 | 类型 | 来源 | 用途 |
+## App 主要依赖
+
+| 依赖 | 类型 | 来源 | 用途 |
 | --- | --- | --- | --- |
-| SwiftUI | 系统框架 | `SyncNos/AGENTS.md` | App 界面、窗口和 Commands。 |
-| SwiftData | 系统框架 | `SyncNos/Services/AGENTS.md` | 缓存模型、后台 `@ModelActor` 服务。 |
-| StoreKit | 系统框架 | `SyncNos/SyncNosApp.swift` | 订阅与试用状态管理。 |
-| AppKit | 系统框架 | `SyncNos/AppDelegate.swift`, 键盘导航文档 | 菜单栏、键盘事件和窗口管理。 |
-| `MenuBarDockKit` | 本地 SwiftPM 包 | `Packages/MenuBarDockKit/Package.swift` | 菜单栏 / Dock / `WindowReader` 通用能力。 |
+| SwiftUI | 系统框架 | App 工程 | 主窗口、设置窗口、日志窗口、Commands |
+| SwiftData | 系统框架 | `Services/*CacheService.swift` | 本地缓存、后台 `@ModelActor` 访问 |
+| StoreKit 2 | 系统框架 | `IAPService.swift` | 30 天试用期、购买、恢复购买 |
+| AppKit | 系统框架 | `AppDelegate.swift` | 菜单栏、Dock、窗口 reopen、退出确认 |
+| `MenuBarDockKit` | 本地 SwiftPM 包 | `Packages/MenuBarDockKit/` | 菜单栏 Popover、Dock / Window 辅助能力 |
+| WebKit | 系统框架 | `SiteLoginsStore.swift` | 清理 WebKit cookies 等站点登录态相关能力 |
 
-## 外部服务
-| 服务 / 系统 | 调用方 | 协议 / 方式 | 用途 |
+## 外部服务与平台
+
+| 服务 / 平台 | 调用方 | 方式 | 作用 |
 | --- | --- | --- | --- |
-| Notion API / OAuth | App + WebClipper | HTTPS | 创建 / 复用数据库、页面与 blocks。 |
-| Obsidian Local REST API | WebClipper | 本地 HTTP `127.0.0.1:27123` | 把聊天或文章写入 vault。 |
-| Apple Books / GoodLinks 数据库 | App | 本地目录 + SQLite | 读取高亮、笔记和元数据。 |
-| WeRead / Dedao 站点会话 | App | Cookie / 登录态 | 拉取站点侧高亮与笔记。 |
-| 浏览器本地存储 | WebClipper | IndexedDB + `chrome.storage.local` | 存会话、设置与备份元信息。 |
-| GitHub Release / 商店 API | WebClipper 发布流程 | GitHub Actions / CWS / AMO | 生成和发布浏览器扩展产物。 |
+| Notion API / OAuth | App + WebClipper | HTTPS | Parent Page、数据库、页面属性、blocks 写入 |
+| Obsidian Local REST API | WebClipper | 本地 HTTP | 把会话或文章写入 vault |
+| Apple Books / GoodLinks 本地库 | App | 本地目录 / SQLite | 读取阅读高亮与元数据 |
+| WeRead / Dedao 登录态 | App | Cookie Header / 站点会话 | 拉取在线阅读内容 |
+| 浏览器 DOM | WebClipper | content script | 采集 AI 对话与网页正文 |
+| GitHub Release / CWS / AMO | workflow + scripts | GitHub Actions / 商店 API | 生成与发布浏览器扩展产物 |
 
-## 开发工具
-| 工具 | 位置 | 用途 | 备注 |
+## 工具链与验证入口
+
+| 工具 / 命令 | 位置 | 用途 | 备注 |
 | --- | --- | --- | --- |
-| `xcodebuild` | 根 `AGENTS.md` | App 构建校验 | 文档改动通常不需要执行。 |
-| `npm --prefix Extensions/WebClipper run compile` | `package.json` | TypeScript 编译检查 | WebClipper 默认验证顺序的第一步。 |
-| `npm --prefix Extensions/WebClipper run test` | `package.json` | Vitest 单元测试 | 覆盖渲染、游标、IndexedDB 迁移等。 |
-| `npm --prefix Extensions/WebClipper run build` | `package.json` | 构建 Chrome / Edge 产物 | 发布前也会在 workflow 中执行。 |
-| `node .github/scripts/webclipper/package-release-assets.mjs` | 根 `AGENTS.md` | 打包 Chrome / Edge / Firefox 发布资产 | 由 CI 主导。 |
-| `softprops/action-gh-release@v2` | `.github/workflows/release.yml` | 发布 GitHub Release | 把 tag 内容写到 Release 页面。 |
+| `xcodebuild -scheme SyncNos -configuration Debug build` | 根 `AGENTS.md` | App 构建校验 | App 改动后的最小构建验证 |
+| `npm --prefix Extensions/WebClipper run compile` | `package.json` | TypeScript 类型检查 | 默认验证顺序第一步 |
+| `npm --prefix Extensions/WebClipper run test` | `package.json` | Vitest 单元测试 | 游标、迁移、Markdown、存储逻辑 |
+| `npm --prefix Extensions/WebClipper run build` | `package.json` | 生成 Chrome / Edge 构建产物 | `check` 之前的基础步骤 |
+| `npm --prefix Extensions/WebClipper run check` | `package.json` | build 后跑 `check-dist.mjs` | 验证 dist 完整性与关键引用 |
+| `node .github/scripts/webclipper/package-release-assets.mjs` | `.github/scripts/webclipper/` | 打包 Chrome / Edge / Firefox 正式附件 | workflow 直接复用 |
 
-## 示例片段
-### 片段 1：WebClipper 的脚本入口直接体现依赖关系
-```json
-"dev": "wxt --mv3",
-"build": "wxt build --mv3",
-"check": "npm run build && node ../../.github/scripts/webclipper/check-dist.mjs --root=Extensions/WebClipper/.output/chrome-mv3",
-"test": "vitest run"
-```
+## 版本与兼容性规则
 
-### 片段 2：MenuBarDockKit 是一个本地 SwiftPM 包，而不是外部二进制依赖
-```swift
-let package = Package(
-    name: "MenuBarDockKit",
-    platforms: [.macOS(.v14)],
-    products: [.library(name: "MenuBarDockKit", targets: ["MenuBarDockKit"])]
-)
-```
+| 项 | 当前值 | 来源 | 为什么重要 |
+| --- | --- | --- | --- |
+| WebClipper `package.json` 版本 | `0.14.6` | `Extensions/WebClipper/package.json` | 表示 npm 包层面的版本语义 |
+| WebClipper manifest 版本 | `1.1.3` | `Extensions/WebClipper/wxt.config.ts` | CWS / AMO workflow 直接拿它和 tag 对齐 |
+| Manifest 模式 | `3` | `wxt.config.ts` | 决定扩展是 MV3 架构 |
+| Swift tools version | `6.0` | `Packages/MenuBarDockKit/Package.swift` | 说明本地 SwiftPM 包按 Swift 6 维护 |
+| App 平台 | macOS 14.0+ | `Package.swift`, 仓库文档 | SwiftUI + SwiftData + AppKit 组合的最低运行环境 |
+| CI Node 版本 | `20` | `webclipper-*.yml` | 统一打包与发布环境 |
 
-## 兼容性说明
-| 维度 | 约束 | 说明 |
+- **重要区分**：WebClipper 发布 workflow 只强制校验 `wxt.config.ts` 的 `manifest.version` 与 `v*` tag 是否一致，不会校验 `package.json` 的 `version`。
+- **权限边界**：扩展 manifest 使用 `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting`，并配合广泛 `host_permissions` 覆盖支持站点与普通网页；UI 是否真正启动仍受运行时 gating 控制。
+
+## 修改依赖时最应该注意什么
+
+| 改动类型 | 先看哪里 | 需要同步什么 |
 | --- | --- | --- |
-| App 平台 | macOS 14.0+ | 使用 SwiftUI + SwiftData + AppKit 组合。 |
-| WebClipper 浏览器 | Chrome / Edge / Firefox | 开发产物由 WXT 输出为 MV3 结构。 |
-| 扩展权限 | `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 配合 `host_permissions` 访问支持站点和 Notion。 |
-| Obsidian 连接 | 仅 HTTP insecure 模式 | 当前不支持自签名 HTTPS。 |
-
-## 版本说明
-| 项 | 当前值 | 来源 | 说明 |
-| --- | --- | --- | --- |
-| WebClipper `package.json` 版本 | `0.14.6` | `Extensions/WebClipper/package.json` | NPM 包层面的版本号。 |
-| WebClipper manifest 版本 | `1.1.2` | `Extensions/WebClipper/wxt.config.ts` | workflow 会校验其与 tag 是否一致。 |
-| Swift tools 版本 | `6.0` | `Packages/MenuBarDockKit/Package.swift` | 说明本地 SwiftPM 包使用 Swift 6。 |
-| GitHub Actions Node 版本 | `20` | `.github/workflows/webclipper-*.yml` | CI 中固定的 Node 执行环境。 |
+| App 新服务或新来源 | `SyncNos/AGENTS.md`, `DIContainer.swift` | 协议、注入、Service / ViewModel 边界 |
+| 扩展新增依赖 / 构建插件 | `package.json`, `wxt.config.ts`, workflow | 构建、本地验证、CI 环境 |
+| 发布版本调整 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | manifest version 与 tag |
+| 新增权限或 host 权限 | `wxt.config.ts`, `bootstrap/content.ts` | manifest、运行时 gating、文档 |
 
 ## 来源引用（Source References）
 - `AGENTS.md`
@@ -87,11 +87,8 @@ let package = Package(
 - `SyncNos/AppDelegate.swift`
 - `Extensions/WebClipper/package.json`
 - `Extensions/WebClipper/wxt.config.ts`
-- `Extensions/WebClipper/AGENTS.md`
 - `Packages/MenuBarDockKit/Package.swift`
-- `Packages/MenuBarDockKit/README.md`
-- `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
-- `.github/guide/obsidian/LocalRestAPI.zh.md`
+- `.github/scripts/webclipper/package-release-assets.mjs`
