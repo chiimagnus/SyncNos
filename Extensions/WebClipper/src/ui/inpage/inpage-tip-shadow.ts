@@ -1,77 +1,11 @@
-import inpageCssRaw from '../styles/inpage.css?raw';
+import inpageTipCssRaw from '../styles/inpage-tip.css?raw';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
-const BUBBLE_FONT = '12px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
-
-const BASE_BUBBLE_HOST_STYLES = Object.freeze([
-  ['display', 'block'],
-  ['position', 'fixed'],
-  ['z-index', '2147483647'],
-  ['box-sizing', 'border-box'],
-  ['max-width', 'min(300px, 100vw)'],
-  ['padding', '7px 11px'],
-  ['border-radius', '12px'],
-  ['color', '#ffffff'],
-  ['font', BUBBLE_FONT],
-  ['letter-spacing', '0.01em'],
-  ['box-shadow', '0 12px 28px rgba(0, 0, 0, 0.28)'],
-  ['pointer-events', 'none'],
-  ['user-select', 'none'],
-  ['word-break', 'break-word'],
-  ['white-space', 'normal'],
-]);
-
-const KIND_BUBBLE_HOST_STYLES = Object.freeze({
-  default: {
-    background:
-      'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), rgba(24, 24, 26, 0.92)',
-    border: '1px solid rgba(255, 255, 255, 0.18)',
-  },
-  loading: {
-    background:
-      'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), rgba(184, 88, 26, 0.92)',
-    border: '1px solid rgba(255, 196, 138, 0.72)',
-  },
-  error: {
-    background:
-      'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), rgba(156, 33, 33, 0.94)',
-    border: '1px solid rgba(255, 157, 157, 0.78)',
-  },
-} as const);
-
-function toBubbleHostCss(css: string) {
-  return css
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="left"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="left"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="right"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="right"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="top"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="top"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll(
-      '.webclipper-inpage-bubble[data-placement="bottom"] .webclipper-inpage-bubble__arrow',
-      ':host([data-placement="bottom"]) .webclipper-inpage-bubble__arrow',
-    )
-    .replaceAll('.webclipper-inpage-bubble.is-enter', ':host(.is-enter)')
-    .replaceAll('.webclipper-inpage-bubble[data-kind="loading"]', ':host([data-kind="loading"])')
-    .replaceAll('.webclipper-inpage-bubble[data-kind="error"]', ':host([data-kind="error"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="left"]', ':host([data-placement="left"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="right"]', ':host([data-placement="right"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="top"]', ':host([data-placement="top"])')
-    .replaceAll('.webclipper-inpage-bubble[data-placement="bottom"]', ':host([data-placement="bottom"])')
-    .replace(/\.webclipper-inpage-bubble(?!_)/g, ':host');
-}
-
-const BUBBLE_SHADOW_CSS = toBubbleHostCss(String(inpageCssRaw || ''));
+const BUBBLE_SHADOW_CSS = String(inpageTipCssRaw || '');
 
 type TipKind = 'default' | 'loading' | 'error';
 
@@ -94,16 +28,15 @@ function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
 }
 
-function applyBaseBubbleHostStyles(el: HTMLElement) {
-  for (const [name, value] of BASE_BUBBLE_HOST_STYLES) {
-    setImportantStyle(el, name, value);
-  }
-}
-
-function applyKindBubbleHostStyles(el: HTMLElement, kind: TipKind) {
-  const styles = KIND_BUBBLE_HOST_STYLES[kind] || KIND_BUBBLE_HOST_STYLES.default;
-  setImportantStyle(el, 'background', styles.background);
-  setImportantStyle(el, 'border', styles.border);
+function applyBubbleHostLayoutStyles(el: HTMLElement) {
+  setImportantStyle(el, 'display', 'block');
+  setImportantStyle(el, 'position', 'fixed');
+  setImportantStyle(el, 'z-index', '2147483647');
+  setImportantStyle(el, 'pointer-events', 'none');
+  setImportantStyle(el, 'margin', '0');
+  setImportantStyle(el, 'padding', '0');
+  setImportantStyle(el, 'border', '0');
+  setImportantStyle(el, 'background', 'transparent');
 }
 
 function getViewport() {
@@ -188,8 +121,7 @@ function ensureBubble() {
   bubble.className = 'webclipper-inpage-bubble';
   bubble.setAttribute('role', 'status');
   bubble.setAttribute('aria-live', 'polite');
-  applyBaseBubbleHostStyles(bubble);
-  applyKindBubbleHostStyles(bubble, 'default');
+  applyBubbleHostLayoutStyles(bubble);
 
   const shadow = bubble.attachShadow({ mode: 'open' });
 
@@ -197,14 +129,18 @@ function ensureBubble() {
   style.textContent = BUBBLE_SHADOW_CSS;
   shadow.appendChild(style);
 
+  const surface = document.createElement('div');
+  surface.className = 'webclipper-inpage-bubble__surface';
+  shadow.appendChild(surface);
+
   const text = document.createElement('span');
   text.className = 'webclipper-inpage-bubble__text';
-  shadow.appendChild(text);
+  surface.appendChild(text);
 
   const arrow = document.createElement('span');
   arrow.className = 'webclipper-inpage-bubble__arrow';
   arrow.setAttribute('aria-hidden', 'true');
-  shadow.appendChild(arrow);
+  surface.appendChild(arrow);
 
   doc.documentElement.appendChild(bubble);
   return bubble;
@@ -215,7 +151,6 @@ function setTextAndKind(el: HTMLElement, text: unknown, kind?: TipKind) {
   const textEl = shadow?.querySelector?.('.webclipper-inpage-bubble__text') as HTMLElement | null;
   if (textEl) textEl.textContent = String(text || '');
   const normalizedKind: TipKind = kind === 'error' || kind === 'loading' ? kind : 'default';
-  applyKindBubbleHostStyles(el, normalizedKind);
   (el as any).dataset.kind = normalizedKind;
 }
 
