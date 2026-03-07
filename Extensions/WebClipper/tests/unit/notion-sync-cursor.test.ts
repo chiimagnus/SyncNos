@@ -3,8 +3,30 @@ import { computeNewMessages, extractCursor, lastMessageCursor } from '../../src/
 
 describe('notion-sync-cursor', () => {
   it('extractCursor returns empty cursor for missing mapping', () => {
-    expect(extractCursor(null)).toEqual({ lastSyncedMessageKey: '', lastSyncedSequence: null });
-    expect(extractCursor({})).toEqual({ lastSyncedMessageKey: '', lastSyncedSequence: null });
+    expect(extractCursor(null)).toEqual({
+      lastSyncedMessageKey: '',
+      lastSyncedSequence: null,
+      lastSyncedMessageUpdatedAt: null,
+    });
+    expect(extractCursor({})).toEqual({
+      lastSyncedMessageKey: '',
+      lastSyncedSequence: null,
+      lastSyncedMessageUpdatedAt: null,
+    });
+  });
+
+  it('extractCursor keeps lastSyncedMessageUpdatedAt when mapping has it', () => {
+    expect(
+      extractCursor({
+        lastSyncedMessageKey: 'm1',
+        lastSyncedSequence: 1,
+        lastSyncedMessageUpdatedAt: 123,
+      }),
+    ).toEqual({
+      lastSyncedMessageKey: 'm1',
+      lastSyncedSequence: 1,
+      lastSyncedMessageUpdatedAt: 123,
+    });
   });
 
   it('computeNewMessages returns empty mode for no messages', () => {
@@ -66,11 +88,12 @@ describe('notion-sync-cursor', () => {
 
   it('lastMessageCursor picks last message key/sequence', () => {
     const cursor = lastMessageCursor([
-      { messageKey: 'm1', sequence: 1 },
-      { messageKey: 'm2', sequence: 2 },
+      { messageKey: 'm1', sequence: 1, updatedAt: 50 },
+      { messageKey: 'm2', sequence: 2, updatedAt: 75 },
     ]);
     expect(cursor.lastSyncedMessageKey).toBe('m2');
     expect(cursor.lastSyncedSequence).toBe(2);
     expect(typeof cursor.lastSyncedAt).toBe('number');
+    expect(cursor.lastSyncedMessageUpdatedAt).toBe(75);
   });
 });
