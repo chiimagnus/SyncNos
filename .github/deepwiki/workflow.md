@@ -1,93 +1,78 @@
 # 工作流
 
 ## 协作入口
+
 | 变更类型 | 先看哪里 | 为什么 |
 | --- | --- | --- |
-| 仓库级行为或共享业务 | `AGENTS.md`, `.github/docs/business-logic.md` | 先确认是不是同时影响两条产品线。 |
-| App 改动 | `SyncNos/AGENTS.md`, `SyncNos/Services/AGENTS.md` | 需要遵守 MVVM、协议注入和 SwiftData 约束。 |
-| WebClipper 改动 | `Extensions/WebClipper/AGENTS.md` | 需要先判断属于 background / content / popup / app。 |
-| 发布 / 打包改动 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` | 防止本地流程与 CI 产物脱节。 |
+| 仓库级行为 / 共享业务规则 | `AGENTS.md`, `.github/docs/business-logic.md`, [business-context.md](business-context.md) | 先确认是不是同时影响两条产品线 |
+| App 改动 | `SyncNos/AGENTS.md`, `SyncNos/Services/AGENTS.md` | 要遵守 MVVM、协议注入、SwiftData 后台访问约束 |
+| WebClipper 改动 | `Extensions/WebClipper/AGENTS.md` | 要先判断属于 background / content / popup / app 哪一层 |
+| 发布 / 打包改动 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` | 防止本地流程与 CI 产物分叉 |
+| 文档 / deepwiki 改动 | 代码 / 配置 / workflow → deepwiki | 文档必须以事实源为准，而不是彼此转述 |
 
 ## 仓库级文档工作流
-| 步骤 | 动作 | 输出 |
+
+| 步骤 | 动作 | 产出 |
 | --- | --- | --- |
-| 1 | 先从代码、脚本和配置确认实际行为 | 避免文档互相抄写。 |
-| 2 | 确认是否影响仓库级入口文档 | 必要时更新 `AGENTS.md`、产品线 `AGENTS.md`、`business-logic.md`。 |
-| 3 | 保持产品线边界清晰 | App 约束和扩展约束分开描述。 |
-| 4 | 非明确要求下不碰国际化字段 | 降低与本次任务无关的多语言改动风险。 |
+| 1 | 先核对代码、配置、脚本与 workflow | 明确真实行为 |
+| 2 | 判断影响面是否跨产品线 | 决定是否要改 `AGENTS.md`、`business-logic.md`、deepwiki |
+| 3 | 用产品线边界组织叙述 | 避免把 App 约束和扩展约束混写 |
+| 4 | 未被明确要求时不碰 i18n 字段 | 降低与任务无关的多语言改动风险 |
+| 5 | 更新 deepwiki 时同步 `INDEX.md` 与 `GENERATION.md` | 保证知识入口和元数据一致 |
 
 ## SyncNos App 开发工作流
+
 | 步骤 | 动作 | 关键约束 |
 | --- | --- | --- |
-| 1 | 判断改动属于 `Models`、`Services`、`ViewModels` 还是 `Views` | 不要跨层混杂职责。 |
-| 2 | 涉及 OCR、字体、键盘、数据源或同步目标时先看专项文档 | 避免绕过现有约定。 |
-| 3 | 通过协议和 DIContainer 注入改动 Service / ViewModel | 避免引入新的全局状态。 |
-| 4 | 至少执行一次构建与最小人工冒烟 | 文档中明确要求构建和同步验证。 |
+| 1 | 先判断改动属于 `Models` / `Services` / `ViewModels` / `Views` | 不要跨层混杂职责 |
+| 2 | 涉及 OCR、动态字体、键盘焦点、数据源、同步目标时先读专项文档 | 避免绕开已有约定 |
+| 3 | 改业务逻辑时优先通过协议和 `DIContainer` 注入 | 避免引入新的全局耦合 |
+| 4 | 至少做一次构建和最小人工冒烟 | 不要只靠静态阅读判断正确 |
 
 ## WebClipper 开发工作流
+
 | 步骤 | 动作 | 关键约束 |
 | --- | --- | --- |
-| 1 | 先确认职责边界 | 采集进 `collectors/content`，持久化进 `background`，UI 进 `popup` / `app`。 |
-| 2 | 如果涉及权限、content scripts、消息协议或构建产物 | 同时检查 WXT 入口、manifest 和 CI 脚本是否一致。 |
-| 3 | 默认按 `compile` → `test` → `build` 验证 | 先查类型，再查逻辑，再查产物。 |
-| 4 | 影响 Firefox / 发布打包 / manifest 重写时追加 `build:firefox` 和 `check` | 防止只在特定渠道暴露问题。 |
+| 1 | 先判断职责边界 | 采集进 `collectors/content`，持久化进 `background/conversations`，UI 进 `popup` / `app` |
+| 2 | 涉及权限、消息协议、manifest、content scripts 时同步看 `wxt.config.ts` 和 workflow | 这些改动最容易本地成功、CI 失败 |
+| 3 | 默认按 `compile` → `test` → `build` 验证 | 先查类型，再查逻辑，再查产物 |
+| 4 | 涉及 Firefox / 商店发布 / manifest 重写时补 `build:firefox` 和 `check` | 防止渠道特定错误 |
+| 5 | collector 改动要同时考虑自动采集、手动保存、popup 列表和同步下游 | 采集不是孤立层 |
+
+## Deepwiki / 文档维护工作流
+
+| 场景 | 应该怎么做 | 为什么 |
+| --- | --- | --- |
+| 新增或调整仓库级行为 | 先改代码 / 配置，再回写 deepwiki | 避免 deepwiki 成为旧事实 |
+| 改动影响阅读路径 | 同步更新 `INDEX.md` | 让后续读者能正确进入相关页面 |
+| 页面集合变化 | 同步更新 `GENERATION.md` | 便于下次增量更新对比 |
+| 无法确认的区域 | 在 Coverage Gaps 里写明 | 防止 deepwiki 假装完整 |
 
 ## 发布与打包工作流
-| 工作流 | 触发 | 主要动作 | 产物 |
+
+| 工作流 | 触发方式 | 主要动作 | 结果 |
 | --- | --- | --- | --- |
-| `release.yml` | `v*` tag / 手动触发 | 创建 GitHub Release | Release 页面与自动备注 |
-| `webclipper-release.yml` | `v*` tag / 手动触发 | 构建 Chrome / Edge / Firefox 资产并上传 | zip / xpi |
-| `webclipper-amo-publish.yml` | `v*` tag / 手动触发 | 校验 manifest 版本、构建 XPI、生成 AMO source、提交 AMO | Firefox 商店版本 |
-| `webclipper-cws-publish.yml` | `v*` tag / 手动触发 | 校验 manifest 版本、构建 Chrome zip、上传 Chrome Web Store | Chrome 商店版本 |
-
-## 图表
-```mermaid
-flowchart LR
-  A[开始修改] --> B{判断产品线}
-  B -->|App| C[阅读 SyncNos 文档]
-  B -->|WebClipper| D[阅读 WebClipper 文档]
-  C --> E[实现 + 构建 + 冒烟]
-  D --> F[实现 + compile/test/build]
-  E --> G[必要时同步仓库级文档]
-  F --> G
-  G --> H{是否需要发布}
-  H -->|否| I[提交代码]
-  H -->|是| J[推 tag / workflow_dispatch]
-  J --> K[GitHub Actions 生成产物]
-```
-
-## 示例片段
-### 片段 1：GitHub Release 由单独 workflow 负责
-```yaml
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-```
-
-### 片段 2：WebClipper 产物打包命令由 CI 直接复用
-```bash
-node .github/scripts/webclipper/package-release-assets.mjs --target=chrome --zip
-node .github/scripts/webclipper/package-release-assets.mjs --target=edge --zip
-node .github/scripts/webclipper/package-release-assets.mjs --target=firefox --zip
-```
+| `release.yml` | `v*` tag / `workflow_dispatch` | 创建 GitHub Release 页面和静态链接体 | Release 页面 |
+| `webclipper-release.yml` | `v*` tag / `workflow_dispatch` | 构建 Chrome / Edge / Firefox 资产并上传 Release | zip / xpi 附件 |
+| `webclipper-amo-publish.yml` | `v*` tag / `workflow_dispatch` | 校验 manifest 版本、构建 XPI、打包 source zip、发布 AMO | Firefox 商店版本 |
+| `webclipper-cws-publish.yml` | `v*` tag / `workflow_dispatch` | 校验 manifest 版本、构建 Chrome zip、上传 CWS | Chrome 商店版本 |
 
 ## 常见决策点
-- 是否需要更新仓库级文档：只要共享行为变了，就不仅仅更新某个产品线目录下的说明。
-- 是否需要改动 CI：如果改动 manifest、产物命名或发布路径，通常需要同步 workflow 与 `.github/scripts/webclipper/*.mjs`。
-- 是否需要增加权限：WebClipper 默认强调最小权限；新增权限之前要先能解释“为什么原有方案不够”。
-- 是否需要调整模块边界：App 优先维持 `Views → ViewModels → Services → Models` 单向依赖，扩展优先维持 collectors / conversations / sync / UI 分层。
+- **是否需要改仓库级文档**：只要共享业务规则、主入口、验证顺序、发布链路或产品语义变了，就不应只改某个子目录里的说明。
+- **是否需要改 CI / scripts**：如果变动 manifest、产物命名、商店渠道、打包参数，通常也要同步 `.github/workflows/` 与 `.github/scripts/webclipper/`。
+- **是否需要新增权限**：WebClipper 默认强调最小权限 + 运行时 gating；新增权限前要能解释为什么现有权限无法满足需求。
+- **是否需要调整模块边界**：App 保持 `Views → ViewModels → Services → Models`；扩展保持 collectors / conversations / sync / ui 的清晰拆分。
 
 ## 来源引用（Source References）
 - `AGENTS.md`
 - `.github/docs/business-logic.md`
 - `SyncNos/AGENTS.md`
+- `SyncNos/Services/AGENTS.md`
 - `Extensions/WebClipper/AGENTS.md`
+- `Extensions/WebClipper/package.json`
+- `Extensions/WebClipper/wxt.config.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
 - `.github/scripts/webclipper/package-release-assets.mjs`
-- `.github/scripts/webclipper/package-amo-source.mjs`
-- `.github/scripts/webclipper/publish-amo.mjs`

@@ -1,125 +1,108 @@
 # 模块：WebClipper
 
 ## 职责
-- 负责从支持站点采集 AI 对话、从普通网页抓取文章，并先写入本地浏览器数据库。
-- 负责在 popup / app 中提供导出、备份、删除、Notion 同步与 Obsidian 同步等用户入口。
-- 通过 MV3 的 background + content + popup + app 分层，把采集、存储、同步和渲染职责拆开。
+- 从支持 AI 站点采集对话、从普通网页抓正文，并把结果先写入本地浏览器数据库。
+- 提供 popup / app / inpage 三类用户入口，让用户进行保存、导出、备份、Notion 同步、Obsidian 同步与设置管理。
+- 通过 MV3 的 background + content + popup + app 分层，保持“采集、持久化、同步、展示”边界清晰。
 
 ## 关键文件
+
 | 路径 | 作用 | 为什么重要 |
 | --- | --- | --- |
-| `Extensions/WebClipper/src/entrypoints/background.ts` | 后台 service worker 入口 | 负责注册 router 与所有后台 handlers。 |
-| `Extensions/WebClipper/src/entrypoints/content.ts` | 内容脚本入口 | 负责 collectors、inpage 与运行时 gating。 |
-| `Extensions/WebClipper/src/platform/messaging/message-contracts.ts` | 消息协议 | popup / app / background / content 的共享契约。 |
-| `Extensions/WebClipper/src/collectors/` | 站点采集适配器 | 新 AI 站点通常从这里扩展。 |
-| `Extensions/WebClipper/src/conversations/` | 会话与消息数据层 | 管理 IndexedDB、增量更新与背景 handlers。 |
-| `Extensions/WebClipper/src/sync/` | Notion / Obsidian 同步编排 | 负责外部写入和状态返回。 |
-| `Extensions/WebClipper/wxt.config.ts` | manifest 与权限配置 | 决定扩展能力边界。 |
-| `Extensions/WebClipper/package.json` | 构建、测试和打包脚本 | 体现默认验证顺序。 |
+| `src/entrypoints/background.ts` | 后台 service worker 入口 | 注册 router、handlers、OAuth listener、sync orchestrators |
+| `src/entrypoints/content.ts` | 内容脚本入口 | 组装 collectors registry、inpage UI、runtime observer |
+| `src/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_supported_only` 与支持站点如何影响 UI 启动 |
+| `src/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击开 popup、article fetch、Google AI Studio 手动保存都在这里 |
+| `src/collectors/` | 站点采集适配器 | 新 AI 站点通常从这里扩展 |
+| `src/conversations/data/storage-idb.ts` | 本地会话数据层 | 承载 IndexedDB 事实源 |
+| `src/platform/idb/schema.ts` | DB schema 与迁移 | 处理 NotionAI stable key migration |
+| `src/sync/notion/notion-sync-orchestrator.ts` | Notion 同步编排 | 控制 DB / page / cursor / rebuild |
+| `src/sync/obsidian/obsidian-sync-orchestrator.ts` | Obsidian 同步编排 | 控制 append / rebuild / rename / fallback |
+| `src/ui/settings/SettingsScene.tsx` | 设置页总入口 | 管理 Notion、Notion AI、Obsidian、Backup、Inpage、About |
 
 ## 运行时结构
-| 运行时单元 | 主要路径 | 职责 | 关键依赖 |
+
+| 运行时 | 主要职责 | 关键依赖 | 代表文件 |
 | --- | --- | --- | --- |
-| background | `src/entrypoints/background.ts` | 路由消息、编排同步、管理后台状态 | background router、handlers |
-| content | `src/entrypoints/content.ts` | 观察页面、注册 collectors、显示 inpage UI | runtime client、registry |
-| popup | `src/entrypoints/popup/` | 轻量入口 UI | React、消息协议 |
-| app | `src/entrypoints/app/` | 更完整的扩展页面 UI | React Router、共享 UI 组件 |
-| collectors | `src/collectors/` | 把站点 DOM 转成统一会话结构 | collector env、registry |
-| conversations | `src/conversations/` | IndexedDB 数据访问和会话操作 | storage tests、background handlers |
-| sync | `src/sync/` | Notion / Obsidian / 设置编排 | orchestrators、settings handlers |
+| background | 消息路由、同步 job、设置处理、OAuth 监听 | router、sync orchestrators、settings handlers | `background.ts` |
+| content | 页面观察、collector 识别、inpage UI、自动 / 手动保存 | collectors registry、runtime observer、incremental updater | `content.ts`, `content-controller.ts` |
+| popup | 轻量会话 / 设置入口 | React 组件、ConversationsProvider | `src/entrypoints/popup/` |
+| app | 扩展完整页面 UI | React Router、ConversationsScene、SettingsScene | `src/entrypoints/app/` |
+| conversations | 本地事实源与 CRUD | IndexedDB、background handlers | `storage-idb.ts` |
+| sync | Notion / Obsidian / backup 编排层 | `conversation-kinds.ts`, settings stores | `src/sync/` |
 
-## 对外接口
-| 接口 / 入口 | 位置 | 用途 | 备注 |
-| --- | --- | --- | --- |
-| `CORE_MESSAGE_TYPES` | `message-contracts.ts` | conversations 相关 CRUD 和同步消息 | popup / app / background 共享。 |
-| `NOTION_MESSAGE_TYPES` | `message-contracts.ts` | Notion 授权与同步消息 | 用于手动 Notion 同步。 |
-| `OBSIDIAN_MESSAGE_TYPES` | `message-contracts.ts` | Obsidian 设置与同步消息 | 用于 Local REST API 连接。 |
-| `ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB` | `message-contracts.ts` | 手动抓取当前网页文章 | 生成 `article` 会话。 |
-| popup / Settings | `src/ui/popup/tabs/SettingsTab.tsx`（由 AGENTS 指向） | 修改 Obsidian / inpage / 备份配置 | 是用户主要设置入口。 |
+## 支持的采集面
 
-## 输入与输出（Inputs and Outputs）
-输入/输出在下表中汇总。
-
-| 类型 | 名称 | 位置 | 说明 |
-| --- | --- | --- | --- |
-| 输入 | 支持站点 DOM | `src/collectors/` | 采集 AI 对话消息。 |
-| 输入 | 当前网页正文 | `FETCH_ACTIVE_TAB` + article fetch handlers | 把普通网页抓取为 article 会话。 |
-| 输入 | 用户设置 | popup / `chrome.storage.local` | 控制 inpage、Obsidian、Notion 等行为。 |
-| 输入 | 备份 zip / legacy JSON | 备份导入流程 | 恢复 conversations 与非敏感设置。 |
-| 输出 | IndexedDB conversations / messages | `src/conversations/` | 作为本地事实源供 UI 和同步使用。 |
-| 输出 | Markdown / Zip 文件 | 导出流程 | 让用户离线保存内容。 |
-| 输出 | Obsidian 文件 | Local REST API | 写入或重命名 vault 中的笔记。 |
-| 输出 | Notion 页面 | Notion 同步 orchestrator | 写入 `SyncNos-AI Chats` 或 `SyncNos-Web Articles`。 |
-
-## 配置
-| 配置项 | 位置 | 默认 / 约束 | 作用 |
-| --- | --- | --- | --- |
-| `manifestVersion` | `wxt.config.ts` | `3` | 固定为 MV3。 |
-| `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一入口目录。 |
-| `inpage_supported_only` | `Extensions/WebClipper/AGENTS.md` | `false` | 决定 inpage 是否全站显示。 |
-| Obsidian `Base URL` | `LocalRestAPI.zh.md` | `http://127.0.0.1:27123` | 控制本地插件连接。 |
-| Obsidian `Auth Header` | `LocalRestAPI.zh.md` | `Authorization` | 控制 API Key 发送方式。 |
-| 备份敏感键排除 | `Extensions/WebClipper/AGENTS.md` | 固定排除列表 | 防止敏感信息导出到备份。 |
-
-## 图表
-```mermaid
-flowchart LR
-  C[content.ts] --> R[collectors registry]
-  R --> DB[conversations / IndexedDB]
-  P[popup / app] --> BG[background router]
-  DB --> BG
-  BG --> N[Notion]
-  BG --> O[Obsidian / Markdown / Zip]
-```
-
-## 示例片段
-### 片段 1：content script 会先搭建采集环境，再启动 inpage 控制器
-```ts
-const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
-const collectorsRegistry = createCollectorsRegistry();
-registerAllCollectors(collectorsRegistry, env);
-const controller = createContentController({ runtime, collectorsRegistry, ... });
-startContentBootstrap({ runtime, inpageButton: inpageButtonApi, createController: () => controller });
-```
-
-### 片段 2：消息协议把扩展功能拆分为若干明确的消息族
-```ts
-export const OBSIDIAN_MESSAGE_TYPES = {
-  GET_SETTINGS: 'obsidianGetSettings',
-  SAVE_SETTINGS: 'obsidianSaveSettings',
-  TEST_CONNECTION: 'obsidianTestConnection',
-  SYNC_CONVERSATIONS: 'obsidianSyncConversations'
-} as const;
-```
-
-## 边界情况
-| 场景 | 影响 | 对应机制 |
+| 类型 | 当前覆盖 | 关键特点 |
 | --- | --- | --- |
-| `inpage_supported_only` 切换后当前页不生效 | 用户误以为开关失效 | 需要刷新或新开页面。 |
-| collector 无法适配站点改版 | 会话采集不完整 | 应优先在 collector 层补齐 DOM 兼容。 |
-| 备份包含敏感键 | 有泄露风险 | 当前策略显式排除 `notion_oauth_token*` 和 client secret。 |
-| 双击 / 多击 inpage 按钮行为复杂 | 容易误判 | 仓库已定义 `400ms` 结算窗口和多击彩蛋规则。 |
-| Obsidian PATCH 冲突 | 无法增量写入 | orchestrator 会回退全量重建。 |
+| AI 对话站点 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai | 通过 collectors registry 统一注册 |
+| 普通网页文章 | 任意 `http(s)` 页面 | 手动抓取时注入 `readability.js` 提取正文 |
+| inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_supported_only` 控制 | 单击保存、双击开 popup、多击彩蛋提示 |
 
-## 测试
-| 验证面 | 推荐方式 | 关注点 |
+- `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_supported_only` 后决定是否启动。
+- `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
+- Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
+
+## 本地数据与同步结构
+
+| 区域 | 主要实现 | 关键点 |
 | --- | --- | --- |
-| 类型检查 | `npm --prefix Extensions/WebClipper run compile` | 消息协议、collector 类型和 UI 调用面。 |
-| 单元测试 | `npm --prefix Extensions/WebClipper run test` | Markdown 渲染、游标、IndexedDB 迁移。 |
-| 构建 | `npm --prefix Extensions/WebClipper run build` | 产物与 manifest 正确生成。 |
-| Firefox 兼容 | `run build:firefox` + `run check`（必要时） | 涉及发布打包和 manifest 细节时必须补。 |
-| 人工验证 | 支持站点 + 普通网页 + popup 设置流 | 验证自动采集、文章抓取、导出与同步按钮。 |
+| 本地会话库 | `storage-idb.ts` | `upsertConversation()` / `syncConversationMessages()` 负责 conversation + message 快照更新 |
+| Schema 与迁移 | `schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=3`，并处理 NotionAI stable key migration |
+| 会话种类 | `conversation-kinds.ts` | `chat` 与 `article` 决定 Notion DB、Obsidian folder 与重建规则 |
+| Notion 同步 | `notion-sync-orchestrator.ts` | 需要 token + `notion_parent_page_id`，cursor 命中 append，否则 rebuild |
+| Obsidian 同步 | `obsidian-sync-orchestrator.ts` | 支持 `incremental_append`、`full_rebuild`、rename；PATCH 失败回退 `full_rebuild_fallback` |
+| 备份导入导出 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | Zip v2、敏感键排除、merge import |
+
+- article 会话通过 `sourceType='article'` 标记，并保存单条 `article_body` 正文消息。
+- Notion orchestrator 会按 kind 选择 `SyncNos-AI Chats` 或 `SyncNos-Web Articles` 数据库，并在数据库缓存失效时尝试恢复一次。
+- Obsidian orchestrator 在 patch 失败时不是直接报错，而是尽量回退全量重建，优先保证文件最终可恢复到正确状态。
+
+## 设置与 UI 入口
+
+| UI 区域 | 主要实现 | 说明 |
+| --- | --- | --- |
+| 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `conversations-context.tsx` | popup 与 app 共享同一套会话读取与选择逻辑 |
+| 设置页 | `SettingsScene.tsx` | 真实设置中枢，整合 Notion OAuth、Notion AI、Obsidian、Backup、Inpage、About |
+| Markdown 渲染 | `ui/shared/markdown.ts`, `ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
+| popup 打开 | `ui-background-handlers.ts` | 双击 inpage 按钮时尝试 `openPopup()`，失败则回退提示 |
+
+- Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, 以及 Obsidian 连接参数。
+- `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
+
+## 修改热点与扩展点
+- **新增支持站点**：先改 `collectors/` 和 `register-all.ts`，不要把站点判断散落到 popup 或 background。
+- **改 inpage 体验**：先看 `content-controller.ts`, `bootstrap/content.ts`, `inpage-button-shadow.ts`, `inpage-tip-shadow.ts`。
+- **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
+- **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
+- **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
+
+## 测试与调试抓手
+
+| 场景 | 抓手 | 说明 |
+| --- | --- | --- |
+| TypeScript 契约回归 | `npm --prefix Extensions/WebClipper run compile` | 最先发现消息类型、collector 输出或 UI 调用问题 |
+| 会话 / mapping 迁移异常 | `schema.ts`, `schema-migration.test.ts` | 升级问题先看迁移逻辑 |
+| cursor / append / rebuild 异常 | `notion-sync-cursor.test.ts`, Notion / Obsidian orchestrators | 先判断是 mapping 问题还是目标系统问题 |
+| inpage 行为异常 | `bootstrap/content.ts`, `content-controller.ts`, `inpage-button-shadow.ts` | 看 gating、点击动作和 runtime invalidation |
+| article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
 
 ## 来源引用（Source References）
-- `Extensions/WebClipper/AGENTS.md`
-- `Extensions/WebClipper/package.json`
 - `Extensions/WebClipper/wxt.config.ts`
+- `Extensions/WebClipper/package.json`
 - `Extensions/WebClipper/src/entrypoints/background.ts`
 - `Extensions/WebClipper/src/entrypoints/content.ts`
+- `Extensions/WebClipper/src/bootstrap/content.ts`
+- `Extensions/WebClipper/src/bootstrap/content-controller.ts`
+- `Extensions/WebClipper/src/collectors/register-all.ts`
+- `Extensions/WebClipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
+- `Extensions/WebClipper/src/collectors/web/article-fetch.ts`
+- `Extensions/WebClipper/src/collectors/web/article-fetch-background-handlers.ts`
+- `Extensions/WebClipper/src/platform/idb/schema.ts`
+- `Extensions/WebClipper/src/conversations/data/storage-idb.ts`
 - `Extensions/WebClipper/src/platform/messaging/message-contracts.ts`
-- `Extensions/WebClipper/src/collectors/`
-- `Extensions/WebClipper/src/conversations/`
-- `Extensions/WebClipper/src/sync/`
-- `Extensions/WebClipper/tests/`
-- `.github/guide/obsidian/LocalRestAPI.zh.md`
-- `.github/workflows/webclipper-release.yml`
+- `Extensions/WebClipper/src/platform/messaging/ui-background-handlers.ts`
+- `Extensions/WebClipper/src/protocols/conversation-kinds.ts`
+- `Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.ts`
+- `Extensions/WebClipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
+- `Extensions/WebClipper/src/ui/settings/SettingsScene.tsx`

@@ -1,122 +1,98 @@
 # 概览
 
-## 目标
-- SyncNos 是一个围绕“信息沉淀到 Notion”的双产品线仓库：桌面端负责阅读高亮与 OCR，同步扩展负责 AI 对话与网页文章。
-- 主要用户是希望把阅读、聊天与网页内容持续沉淀到 Notion / Obsidian 的个人知识管理用户。
-- 仓库既包含实际产品代码，也包含多份开发约束文档，因此阅读顺序比单纯扫目录更重要。
+## 仓库是什么
+- SyncNos 是一个围绕“异构内容 → 稳定知识资产”展开的双产品线仓库，而不是单一 app 或单一脚本集合。
+- 正式的业务入口页是 [business-context.md](business-context.md)；本页负责在业务语义之上，再给出目录、入口、运行时和产物层面的整体地图。
+- 两条产品线共享“最终可沉淀到 Notion”的目标，但一个是 macOS App、一个是 MV3 扩展，本地状态、鉴权、同步节奏和测试方式都不同。
 
-| 产品线 | 解决问题 | 主要输入 | 主要输出 | 首读文档 |
+| 产品线 | 主目录 | 运行时 | 主要输入 | 主要输出 |
 | --- | --- | --- | --- | --- |
-| SyncNos App | 将阅读高亮、笔记和聊天 OCR 同步到 Notion | Apple Books / GoodLinks 数据库、WeRead / Dedao Cookie、聊天截图 | Notion 数据库、页面、SwiftData 缓存 | `SyncNos/AGENTS.md` |
-| WebClipper | 将 AI 对话与网页文章本地保存、导出，并按需同步到 Notion / Obsidian | 浏览器 DOM、文章正文、用户设置、备份包 | IndexedDB 记录、Markdown / Zip、Notion 页面、Obsidian 文件 | `Extensions/WebClipper/AGENTS.md` |
+| SyncNos App | `SyncNos/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
+| WebClipper | `Extensions/WebClipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、本地导出、Notion 页面、Obsidian 文件 |
 
-## 仓库布局
+## 顶层目录地图
+
 | 路径 | 角色 | 典型内容 | 阅读建议 |
 | --- | --- | --- | --- |
-| `SyncNos/` | macOS App 主工程 | `Models/`、`Services/`、`ViewModels/`、`Views/` | 先看 `SyncNos/AGENTS.md`，再按层进入。 |
-| `Extensions/WebClipper/` | 浏览器扩展 | `src/entrypoints/`、`src/collectors/`、`src/sync/` | 先确认改动属于 background / content / popup / app。 |
-| `.github/docs/` | 仓库级业务与技术文档 | `business-logic.md`、键盘导航等专项文档 | 用来建立“为什么这样设计”的背景。 |
-| `.github/workflows/` | GitHub Actions 流程 | release、WebClipper 打包与商店发布 | 关注产物生成与版本一致性。 |
-| `Packages/` | 可复用 SwiftPM 模块 | `MenuBarDockKit` | 仅存放可复用且不反向依赖 UI 的能力。 |
-| `Resource/` | 共享资源 | `flows.svg` 等图示资源 | 有助于理解双产品线如何汇聚到输出端。 |
+| `SyncNos/` | macOS App 主工程 | `Models/`, `Services/`, `ViewModels/`, `Views/` | 先读 `SyncNos/AGENTS.md`，再按 MVVM + 协议注入边界进入。 |
+| `Extensions/WebClipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/conversations/`, `src/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app 哪一层。 |
+| `.github/docs/` | 仓库级业务与专项文档 | `business-logic.md`、键盘焦点文档等 | 用来理解“为什么这样设计”。 |
+| `.github/workflows/` | CI / Release / 商店发布入口 | `release.yml`, `webclipper-release.yml`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 看真实交付链路而不是猜测。 |
+| `.github/scripts/webclipper/` | WebClipper 打包 / 发布脚本 | 打包 release assets、AMO source、AMO 发布 | 与 workflow 配套理解渠道差异。 |
+| `Packages/` | 本地 SwiftPM 包 | `MenuBarDockKit` | 放可复用的 macOS 能力，而不是业务 UI。 |
+| `Resource/` | 共享资源与图示 | `flows.svg` | 适合配合理解双产品线的最终输出面。 |
 
-## 入口点
-| 入口 | 位置 | 作用 | 常用操作 |
+## 关键入口文件
+
+| 入口 | 路径 | 作用 | 为什么先看这里 |
 | --- | --- | --- | --- |
-| App 启动入口 | `SyncNos/SyncNosApp.swift` | 初始化订阅、自动同步和主窗口 | `xcodebuild -scheme SyncNos -configuration Debug build` |
-| App 生命周期 | `SyncNos/AppDelegate.swift` | 处理菜单栏、退出确认、URL scheme 回调 | 结合 `Info.plist` 理解 OAuth 回调。 |
-| Xcode 工程 | `SyncNos.xcodeproj` | App 构建入口 | 用 `open SyncNos.xcodeproj` 打开。 |
-| WebClipper 打包入口 | `Extensions/WebClipper/package.json` | 管理 dev / build / compile / test 脚本 | `npm --prefix Extensions/WebClipper install` |
-| WXT 配置 | `Extensions/WebClipper/wxt.config.ts` | 定义 manifest、权限和入口目录 | 与商店版本、tag 校验有关。 |
-| 扩展后台入口 | `Extensions/WebClipper/src/entrypoints/background.ts` | 组装 router、handlers 与同步 orchestrator | 观察后台消息流。 |
-| 扩展内容脚本入口 | `Extensions/WebClipper/src/entrypoints/content.ts` | 注册 collectors、inpage 控制器和增量更新 | 观察页面采集与 runtime gating。 |
+| App 启动入口 | `SyncNos/SyncNosApp.swift` | 启动 IAP、预热缓存、决定是否启动自动同步、定义主窗口 / 设置 / 日志窗口 | 它决定用户一启动 App 会发生什么 |
+| App 生命周期入口 | `SyncNos/AppDelegate.swift` | 菜单栏 / Dock 模式、同步中退出保护、Dock reopen、OAuth URL scheme 兜底 | 它决定 AppKit 层的行为边界 |
+| App 根门控 | `SyncNos/Views/RootView.swift` | 按顺序切换 Onboarding → PayWall → MainListView | 它解释为什么主界面不是总能直接出现 |
+| 扩展后台入口 | `Extensions/WebClipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job | 它决定所有后台能力如何挂接 |
+| 扩展内容入口 | `Extensions/WebClipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、runtime observer、增量更新 | 它决定页面采集是如何启动的 |
+| WXT / manifest 入口 | `Extensions/WebClipper/wxt.config.ts` | 版本号、权限、host permissions、entrypointsDir | 它是发布版本和能力边界的代码事实源 |
+| 脚本入口 | `Extensions/WebClipper/package.json` | `dev`, `compile`, `test`, `build`, `check` | 它定义扩展侧默认验证顺序 |
 
-| 导航入口 | 位置 | 价值 | 推荐场景 |
+## 主要来源与主要产物
+
+| 类型 | 来源 / 产物 | 生产或消费方 | 说明 |
 | --- | --- | --- | --- |
-| `README.md` | 仓库根目录 | 最高层产品介绍与下载/开发入口 | 初次进入仓库。 |
-| `AGENTS.md` | 仓库根目录 | 产品线分流、命令、文档同步规则 | 准备修改任何内容前。 |
-| `.github/docs/business-logic.md` | 仓库级文档 | 双产品线共享业务语义 | 写文档或梳理数据流时。 |
+| 阅读来源 | Apple Books、GoodLinks、WeRead、Dedao、聊天 OCR | SyncNos App | App 先做来源适配，再统一走 Notion 同步引擎 |
+| 页面来源 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai、普通网页 | WebClipper | 扩展先采集为本地会话，再派生到任意目标 |
+| 本地事实源 | SwiftData / UserDefaults / Keychain；IndexedDB / `chrome.storage.local` | 两条产品线各自维护 | 这是 debug、迁移、恢复、回归时最先要看的地方 |
+| 外部结果 | Notion 数据库 / 页面、Obsidian 文件、Markdown / Zip 导出、Release 附件 | App + WebClipper + GitHub Actions | 对用户可见，但不是所有情况下都等于事实源 |
 
-## 关键产物
-| 产物 | 生产方 | 位置/目标 | 说明 |
-| --- | --- | --- | --- |
-| Notion 数据库 / 页面 | App + WebClipper | 用户选择的 Parent Page 下 | App 以“条目 → 页面”为主，WebClipper 以“会话 / 文章 → 页面”为主。 |
-| 本地缓存 | App | SwiftData / UserDefaults / Keychain | 支撑增量同步、授权状态和本地安全存储。 |
-| 浏览器本地数据库 | WebClipper | IndexedDB + `chrome.storage.local` | 支撑会话列表、导出、备份与设置。 |
-| Markdown / Zip 导出 | WebClipper | 用户本地文件系统 | 支持单文件、多文件 zip 和 Zip v2 备份。 |
-| 发布包 | GitHub Actions | Release / Chrome / Edge / Firefox 渠道 | WebClipper 正式包由 CI 统一生成。 |
+## 常用命令与工程入口
 
-## 关键工作流
-| 工作流 | 命令/动作 | 结果 |
+| 场景 | 命令 / 入口 | 结果 |
 | --- | --- | --- |
-| App 构建 | `xcodebuild -scheme SyncNos -configuration Debug build` | 验证 macOS App 工程可构建。 |
-| WebClipper 开发 | `npm --prefix Extensions/WebClipper run dev` | 启动 Chrome MV3 开发模式。 |
-| WebClipper 检查 | `npm --prefix Extensions/WebClipper run compile` / `run test` / `run build` | 依次完成类型检查、单测、构建。 |
-| 文档理解 | 阅读 `README.md` → `AGENTS.md` → 产品线 `AGENTS.md` | 快速建立修改边界和导航方式。 |
-| 发布 | 推送 `v*` tag 或手动触发 workflow | 生成 GitHub Release 与各商店产物。 |
+| 打开 App 工程 | `open SyncNos.xcodeproj` | 在 Xcode 中进入 macOS 工程 |
+| App 构建 | `xcodebuild -scheme SyncNos -configuration Debug build` | 验证桌面端可构建 |
+| 扩展安装依赖 | `npm --prefix Extensions/WebClipper install` | 安装 WebClipper 依赖 |
+| 扩展类型检查 | `npm --prefix Extensions/WebClipper run compile` | 先发现 TS 类型 / 契约问题 |
+| 扩展单测 | `npm --prefix Extensions/WebClipper run test` | 覆盖游标、IndexedDB 迁移、Markdown 等关键逻辑 |
+| 扩展构建 | `npm --prefix Extensions/WebClipper run build` | 生成 Chrome / Edge 产物 |
+| 扩展 Firefox 构建 | `npm --prefix Extensions/WebClipper run build:firefox` | 生成 Firefox 产物 |
+| 扩展产物校验 | `npm --prefix Extensions/WebClipper run check` | build 后再跑 `check-dist.mjs` 做完整性检查 |
 
 ## 图表
 ![SyncNos 双产品线输出流程图](assets/repository-flow-01.svg)
 
 ```mermaid
 flowchart LR
-  A[本地阅读与聊天来源] --> B[SyncNos App]
-  C[浏览器页面与 AI 对话] --> D[WebClipper]
+  A[阅读高亮 / 登录态 / OCR] --> B[SyncNos App]
+  C[AI 对话 / 网页正文] --> D[WebClipper]
   B --> E[Notion]
   D --> E
   D --> F[Markdown / Zip / Obsidian]
+  B --> G[SwiftData / Keychain / UserDefaults]
+  D --> H[IndexedDB / chrome.storage.local]
 ```
 
-## 示例片段
-### 片段 1：App 会在启动期决定是否开启自动同步
-```swift
-let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
-    || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
-    || UserDefaults.standard.bool(forKey: "autoSync.weRead")
-if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
-```
+## 推荐导航
+- 如果你还没建立产品语义，先回到 [business-context.md](business-context.md)。
+- 如果你需要判断“代码应该改哪里”，先看 [architecture.md](architecture.md) 和对应 `modules/` 页面。
+- 如果你想理解“为什么本地有这些缓存 / mapping / backup 文件”，优先看 [storage.md](storage.md)。
+- 如果你要发布 WebClipper，优先看 [release.md](release.md)、[configuration.md](configuration.md) 和 [testing.md](testing.md)。
+- 如果你正在排查“配置没生效 / 按钮不显示 / workflow 失败 / 同步重建”，优先看 [troubleshooting.md](troubleshooting.md)。
 
-### 片段 2：WebClipper 的开发、构建与测试命令都由 package.json 统一暴露
-```json
-"dev": "wxt --mv3",
-"build": "wxt build --mv3",
-"compile": "tsc --noEmit",
-"test": "vitest run"
-```
-
-## 从哪里开始
-- 先读 `README.md` 和 `.github/docs/business-logic.md`，理解这不是单一 App，而是“桌面同步 + 浏览器采集”组合仓库。
-- 再读根 `AGENTS.md`，确认你要进入 `SyncNos/` 还是 `Extensions/WebClipper/`。
-- 如果关注 App，同步阅读 `SyncNos/AGENTS.md`、`SyncNos/Services/AGENTS.md` 与 `SyncNos/Services/Core/AGENTS.md`。
-- 如果关注扩展，同步阅读 `Extensions/WebClipper/AGENTS.md`、`package.json` 和 `wxt.config.ts`。
-
-## 如何导航
-- 从 [architecture.md](architecture.md) 看系统边界与契约，再进入 `modules/` 理解各产品线的内部组织。
-- 与运行约束相关的问题，优先看 [configuration.md](configuration.md) 与 [workflow.md](workflow.md)。
-- 与“数据到底存在哪里、哪些是本地事实源、哪些是外部产物”相关的问题，优先看 [storage.md](storage.md)。
-- 与打包、tag、商店发布和 Release 产物相关的问题，优先看 [release.md](release.md)。
-- 与故障定位、权限问题、同步失败或版本校验失败相关的问题，优先看 [troubleshooting.md](troubleshooting.md)。
-- 与验证和回归相关的问题，优先看 [testing.md](testing.md)。
-- 与命名语义和跨文档一致性相关的问题，优先看 [glossary.md](glossary.md)。
-
-## 常见陷阱
-- 仓库默认要求先判断产品线，不要把 App 的 MVVM 约束和 WebClipper 的 MV3 约束混在一起。
-- 未被明确要求时，不要查看或编辑国际化字段；中文 deepwiki 只整理事实，不修改现有多语言资源。
-- WebClipper 的正式发布包由 GitHub Actions 生成，本地主要用于 WXT 开发与验证，不应手工替代 CI 发布流程。
-- 文档同步应以代码和脚本为准，而不是在文档之间互相抄写。
-
-## Coverage Gaps（如有）
-- `overview.md` 负责建立整个仓库的第一层心智模型，因此不会继续展开到 Notion 集成、OCR、WebClipper collectors 等子系统细节。
-- 更细的事实面已经拆到 `modules/`、`storage.md`、`release.md` 和 `troubleshooting.md`；如果还需要更细粒度导航，应优先在这些专题页继续细分。
+## 常见误区
+- **误区 1：把仓库当成一个统一 UI。** 实际上 App 和 WebClipper 在运行时、权限、存储、同步触发方式上完全不同。
+- **误区 2：把 Notion 当成唯一事实源。** 对扩展来说，Notion 只是本地会话库的一个输出面；对 App 来说，也仍然有本地缓存和登录态作为运行前提。
+- **误区 3：只看 README 就开始改代码。** 这个仓库大量关键约束在 `AGENTS.md`、产品线 `AGENTS.md` 和专项文档里。
 
 ## 来源引用（Source References）
 - `README.md`
 - `AGENTS.md`
 - `.github/docs/business-logic.md`
-- `SyncNos/AGENTS.md`
 - `SyncNos/SyncNosApp.swift`
 - `SyncNos/AppDelegate.swift`
-- `Extensions/WebClipper/AGENTS.md`
+- `SyncNos/Views/RootView.swift`
 - `Extensions/WebClipper/package.json`
 - `Extensions/WebClipper/wxt.config.ts`
+- `Extensions/WebClipper/src/entrypoints/background.ts`
+- `Extensions/WebClipper/src/entrypoints/content.ts`
+- `.github/workflows/release.yml`
+- `.github/workflows/webclipper-release.yml`
 - `Resource/flows.svg`

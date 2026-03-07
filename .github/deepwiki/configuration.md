@@ -1,85 +1,95 @@
 # 配置
 
 ## 配置入口
-| 配置面 | 路径 / 界面 | 写入方 | 说明 |
+
+| 配置面 | 路径 / 界面 | 存储位置 | 说明 |
 | --- | --- | --- | --- |
-| App 启动与行为配置 | `SyncNos/SyncNosApp.swift` + UserDefaults | App | 管理自动同步、调试引导等启动期行为。 |
-| App 基础设施配置 | `SyncNos/Services/Core/AGENTS.md` | App | 管理字体缩放、日志、DI 注册等跨模块配置。 |
-| App URL scheme | `SyncNos/Info.plist` | Xcode / App | 配置 `syncnos` 回调用于 OAuth 兜底处理。 |
-| WebClipper manifest 配置 | `Extensions/WebClipper/wxt.config.ts` | WXT | 管理名称、版本、权限和 host permissions。 |
-| WebClipper 本地设置 | popup `Settings`、`chrome.storage.local` | WebClipper UI | 管理 inpage、Obsidian、Notion 相关设置。 |
-| 发布参数 | `.github/workflows/*.yml` | GitHub Actions | 管理 tag、发布目标与 Node 版本。 |
+| App 启动与门控 | `SyncNosApp.swift`, `RootView.swift` | UserDefaults | 控制 onboarding、自动同步、调试开关 |
+| App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
+| App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
+| WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions |
+| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、inpage 开关、Notion AI 模型偏好 |
+| 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
 
 ## macOS App 配置项
-| 配置项 | 位置 | 默认 / 示例 | 作用 |
+
+| 配置项 | 位置 | 默认 / 约束 | 作用 |
 | --- | --- | --- | --- |
-| `debug.forceOnboardingEveryLaunch` | `SyncNos/SyncNosApp.swift` | `false` | Debug 环境下可强制每次启动重置引导状态。 |
-| `autoSync.appleBooks` | `SyncNos/SyncNosApp.swift` | UserDefaults 布尔值 | 启动后决定是否开启 Apple Books 自动同步。 |
-| `autoSync.goodLinks` | `SyncNos/SyncNosApp.swift` | UserDefaults 布尔值 | 启动后决定是否开启 GoodLinks 自动同步。 |
-| `autoSync.weRead` | `SyncNos/SyncNosApp.swift` | UserDefaults 布尔值 | 启动后决定是否开启 WeRead 自动同步。 |
-| `SyncNos.FontScaleLevel` | `SyncNos/Services/Core/AGENTS.md` | 离散等级 | 控制 App 全局字体与布局缩放。 |
-| `CFBundleURLSchemes = syncnos` | `SyncNos/Info.plist` | 固定值 | 处理 OAuth URL callback。 |
+| `hasCompletedOnboarding` | `RootView.swift`, `OnboardingViewModel.swift` | `false` → 完成后写为 `true` | 决定是否先进入 onboarding |
+| `debug.forceOnboardingEveryLaunch` | `SyncNosApp.swift` | Debug 默认注册为 `false` | 开发时强制每次启动重走 onboarding |
+| `autoSync.appleBooks` / `goodLinks` / `weRead` | `SyncNosApp.swift` | UserDefaults 布尔值 | 决定启动时是否自动开启 AutoSyncService |
+| `SyncNos.FontScaleLevel` | `SyncNos/Services/Core/AGENTS.md` | 离散等级 | 控制字体与布局缩放 |
+| `CFBundleURLSchemes = syncnos` | `Info.plist` | 固定 | 处理 OAuth URL callback 兜底 |
+| Notion 同步参数 | `NotionSyncConfig.swift` | `batchConcurrency=3`, `readRPS=8`, `writeRPS=3`, `appendBatchSize=50`, `timeout=120s` | 控制 App 到 Notion 的吞吐与稳定性 |
 
 ## WebClipper 配置项
-| 配置项 | 位置 | 默认 / 示例 | 作用 |
-| --- | --- | --- | --- |
-| `manifestVersion` | `wxt.config.ts` | `3` | 决定扩展运行在 MV3。 |
-| `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 固定 background / content / popup / app 的入口目录。 |
-| `inpage_supported_only` | `Extensions/WebClipper/AGENTS.md` | `false` | 控制 inpage 按钮显示范围。 |
-| Obsidian `Base URL` | `LocalRestAPI.zh.md` | `http://127.0.0.1:27123` | 连接本地 Obsidian 插件。 |
-| Obsidian `Auth Header` | `LocalRestAPI.zh.md` | `Authorization` | 发送 API Key 的请求头名。 |
-| 备份敏感键排除 | `Extensions/WebClipper/AGENTS.md` | `notion_oauth_token*`, `notion_oauth_client_secret` | 避免把敏感配置写进备份包。 |
 
-## 构建与发布参数
+| 配置项 | 位置 | 当前值 / 默认 | 作用 |
+| --- | --- | --- | --- |
+| `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
+| `manifest.version` | `wxt.config.ts` | `1.1.3` | 商店 workflow 校验的版本事实源 |
+| `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
+| `inpage_supported_only` | `chrome.storage.local`, `bootstrap/content.ts` | 默认按 `false` 处理 | 控制非支持站点是否也启动 inpage UI |
+| `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, SettingsScene controller | 用户选择值 | 决定扩展 Notion 的写入根 |
+| `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
+| Obsidian 设置 | `obsidian*` settings store | `apiBaseUrl`, `authHeaderName`, `chatFolder`, `articleFolder`, 可选 API Key | 控制扩展写入本地 vault |
+| 备份敏感键排除 | `backup-utils.ts` | 精确排除 `notion_oauth_token_v1`, `notion_oauth_client_secret`，且排除任何 `notion_oauth_token*` | 避免敏感信息进入备份 |
+
+## 发布参数
+
 | 参数 | 位置 | 值 / 规则 | 影响 |
 | --- | --- | --- | --- |
-| Node 版本 | `.github/workflows/webclipper-release.yml` | `20` | 统一 WebClipper CI 环境。 |
-| WebClipper manifest 版本 | `wxt.config.ts` | `1.1.2` | 发布 workflow 会校验其与 tag 一致。 |
-| Release 触发条件 | `.github/workflows/release.yml` | `push tags: v*` 或 `workflow_dispatch` | 决定 GitHub Release 何时生成。 |
-| CWS `publish_target` | `.github/workflows/webclipper-cws-publish.yml` | `default` / `trustedTesters` | 决定 Chrome Web Store 发布范围。 |
-| AMO 发布通道 | `.github/workflows/webclipper-amo-publish.yml` | `listed` | 决定 Firefox 商店提交流程。 |
+| Release 触发条件 | `.github/workflows/release.yml` | `push tags: v*` 或 `workflow_dispatch` | 决定 GitHub Release 页面何时创建 |
+| WebClipper CI Node 版本 | `webclipper-*.yml` | `20` | 保持构建与发布一致 |
+| CWS `publish_target` | `webclipper-cws-publish.yml` | `default` / `trustedTesters` | 控制 Chrome Web Store 发布范围 |
+| AMO channel | `webclipper-amo-publish.yml` | `listed` | 控制 Firefox 商店提交通道 |
+| 版本一致性规则 | `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | `tag 去掉 v == manifest.version` | 阻止错误版本发布 |
 
 ## 权限与安全边界
-| 面 | 配置 | 安全意图 | 备注 |
+
+| 面 | 真实配置 | 安全意图 | 备注 |
 | --- | --- | --- | --- |
-| 扩展权限 | `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 尽量保持最小权限集合 | 额外权限需要明确理由。 |
-| 扩展 host permissions | 支持站点、Notion、`http(s)://*/*` | 让 content script 在运行时决定是否激活 | 通过 `inpage_supported_only` 做 UI gating。 |
-| App 本地敏感存储 | Keychain / 加密服务 | 避免凭据明文落盘 | Chats 本地存储加密由 `EncryptionService` 支撑。 |
-| 备份导入导出 | 排除敏感键 | 防止 API Token 跟随备份传播 | Zip v2 仍保留非敏感设置。 |
+| 扩展权限 | `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 尽量只保留采集与本地保存所需能力 | 新增权限必须解释原因 |
+| 扩展 host permissions | 支持站点 + Notion + `http://*/*` + `https://*/*` | 允许 content script 在运行时自行判断是否激活 | UI 级别再由 `inpage_supported_only` 做 gating |
+| App 敏感存储 | Keychain / 加密服务 | 避免站点 Cookie、加密密钥、试用期关键数据明文落盘 | `SiteLoginsStore`, `EncryptionService`, `IAPService` |
+| 备份导入导出 | denylist + 前缀过滤 | 防止 OAuth token 跟随备份扩散 | Zip v2 仍保留非敏感运行设置 |
+
+## 常见误配
+- **改了 `wxt.config.ts` 的 `manifest.version` 却没对齐 tag**：CWS / AMO workflow 会直接报 `manifest version mismatch`。
+- **切了 `inpage_supported_only` 但当前页不变**：因为 content script 只在启动时读取该开关，必须刷新或新开页面。
+- **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
+- **Obsidian 使用了错误的 URL / header / API Key**：当前设计默认围绕 `http://127.0.0.1:27123` 与 `Authorization` 头工作。
+- **App 只改 UI 没考虑字体缩放或窗口模式**：新视图若没调用现有字体 / 窗口辅助能力，体验会与主窗口不一致。
 
 ## 示例片段
-### 片段 1：WebClipper 的 manifest 配置把能力和边界写得很直白
+### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
+  version: '1.1.3',
   permissions: ['storage', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
 ```
 
-### 片段 2：App 的 URL scheme 由 Info.plist 固定声明
-```xml
-<key>CFBundleURLSchemes</key>
-<array>
-  <string>syncnos</string>
-</array>
+### 片段 2：App 同步参数是代码层常量，而不是运行时配置面板
+```swift
+static let batchConcurrency: Int = 3
+static let notionReadRequestsPerSecond: Int = 8
+static let notionWriteRequestsPerSecond: Int = 3
+static let requestTimeoutSeconds: TimeInterval = 120
 ```
 
-## 常见误配
-- 打开 Obsidian 连接失败时，先检查是不是误用了 `https://127.0.0.1:27124`；当前仓库只支持 HTTP insecure 模式。
-- 修改 `wxt.config.ts` 中的 `version` 后，如果没有同步 tag，发布 workflow 会因为 manifest 版本不匹配而失败。
-- `inpage_supported_only` 的变更只会对新打开或刷新后的页面生效，当前页面不会热更新。
-- App 新增顶层窗口时，如果忘记应用 `.applyFontScale()` 或没有考虑菜单栏 / Dock 模式，体验会与现有窗口不一致。
-
 ## 来源引用（Source References）
-- `AGENTS.md`
 - `SyncNos/SyncNosApp.swift`
 - `SyncNos/AppDelegate.swift`
+- `SyncNos/Views/RootView.swift`
 - `SyncNos/Info.plist`
-- `SyncNos/Services/Core/AGENTS.md`
-- `Extensions/WebClipper/package.json`
+- `SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
 - `Extensions/WebClipper/wxt.config.ts`
-- `Extensions/WebClipper/AGENTS.md`
-- `.github/guide/obsidian/LocalRestAPI.zh.md`
+- `Extensions/WebClipper/src/bootstrap/content.ts`
+- `Extensions/WebClipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `Extensions/WebClipper/src/sync/backup/backup-utils.ts`
+- `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
