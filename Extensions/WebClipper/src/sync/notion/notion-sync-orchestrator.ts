@@ -640,6 +640,17 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
           trace.flush({ mode: "appended", ok: true, blockCount: blocks.length });
         } else {
+          await writeRunningJob({
+            currentConversationId: id,
+            currentConversationTitle: toCurrentConversationTitle(convo, id),
+            currentStage: "Updating page properties"
+          });
+          trace.mark("update page properties");
+          // eslint-disable-next-line no-await-in-loop
+          await notionSyncService.updatePageProperties(token.accessToken, {
+            pageId,
+            properties: pageSpec.buildUpdateProperties(convo)
+          });
           if (storage.setSyncCursor) {
             await writeRunningJob({
               currentConversationId: id,
@@ -653,8 +664,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
-          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
-          trace.flush({ mode: "no_changes", ok: true, blockCount: 0 });
+          setResultAt(index, { conversationId: id, ok: true, notionPageId: pageId, mode: "updated_properties", appended: 0 });
+          trace.flush({ mode: "updated_properties", ok: true, blockCount: 0 });
         }
       } catch (e) {
         const normalizedError = normalizeNotionSyncError(e);

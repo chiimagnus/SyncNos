@@ -269,6 +269,77 @@ describe('background-router notion sync', () => {
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
 
+  it('updates page properties without rebuilding body when article content is unchanged', async () => {
+    const calls: any[] = [];
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db_articles' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: {
+              id: 1,
+              sourceType: 'article',
+              title: 'Updated article title',
+              url: 'https://x/article',
+              description: 'new description only',
+              notionPageId: 'p1',
+            },
+            mapping: {
+              notionPageId: 'p1',
+              lastSyncedMessageKey: 'article_body',
+              lastSyncedMessageUpdatedAt: 1000,
+            },
+          }),
+          getMessagesByConversationId: async () => [
+            {
+              messageKey: 'article_body',
+              role: 'assistant',
+              contentText: 'same body',
+              contentMarkdown: 'same body',
+              sequence: 1,
+              updatedAt: 1000,
+            },
+          ],
+          setSyncCursor: async (_id: number, cursor: any) => {
+            calls.push({ op: 'setCursor', cursor });
+            return true;
+          },
+        },
+        syncService: {
+          getPage: async () => ({ parent: { type: 'database_id', database_id: 'db_articles' }, archived: false }),
+          updatePageProperties: async (_t: string, req: any) => {
+            calls.push({ op: 'updateProps', req });
+            return { ok: true };
+          },
+          clearPageChildren: async () => {
+            calls.push({ op: 'clear' });
+            return { ok: true };
+          },
+          appendChildren: async () => {
+            calls.push({ op: 'append' });
+            return { ok: true };
+          },
+          messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
+          isPageUsableForDatabase: () => true,
+          pageBelongsToDatabase: () => true,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.results[0].mode).toBe('updated_properties');
+    expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
+    expect(calls.some((c) => c.op === 'clear')).toBe(false);
+    expect(calls.some((c) => c.op === 'append')).toBe(false);
+    expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
+  });
+
   it('processes conversations with limited concurrency and keeps result order stable', async () => {
     const chromeMock = mockChromeStorage();
     const blockers = new Map<number, ReturnType<typeof deferred<void>>>([
