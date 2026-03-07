@@ -93,7 +93,6 @@ flowchart LR
 | 发布版本不一致 | workflow | `manifest version mismatch` | 检查 `wxt.config.ts` 与 tag |
 
 ## 来源引用（Source References）
-- `.github/docs/business-logic.md`
 - `SyncNos/SyncNosApp.swift`
 - `SyncNos/Views/RootView.swift`
 - `SyncNos/Services/SyncScheduling/AutoSyncService.swift`

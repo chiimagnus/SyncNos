@@ -4,9 +4,9 @@
 
 | 变更类型 | 先看哪里 | 为什么 |
 | --- | --- | --- |
-| 仓库级行为 / 共享业务规则 | `AGENTS.md`, `.github/docs/business-logic.md`, [business-context.md](business-context.md) | 先确认是不是同时影响两条产品线 |
-| App 改动 | `SyncNos/AGENTS.md`, `SyncNos/Services/AGENTS.md` | 要遵守 MVVM、协议注入、SwiftData 后台访问约束 |
-| WebClipper 改动 | `Extensions/WebClipper/AGENTS.md` | 要先判断属于 background / content / popup / app 哪一层 |
+| 仓库级行为 / 共享业务规则 | [business-context.md](business-context.md), [INDEX.md](INDEX.md), `AGENTS.md`, `README.md` | 先用 deepwiki 建立上下文，再确认是不是同时影响两条产品线 |
+| App 改动 | [modules/syncnos-app.md](modules/syncnos-app.md), `SyncNos/AGENTS.md`, `SyncNos/Services/AGENTS.md` | 先理解产品线边界，再遵守 MVVM、协议注入、SwiftData 后台访问约束 |
+| WebClipper 改动 | [modules/webclipper.md](modules/webclipper.md), `Extensions/WebClipper/AGENTS.md` | 先理解运行时边界，再判断属于 background / content / popup / app 哪一层 |
 | 发布 / 打包改动 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` | 防止本地流程与 CI 产物分叉 |
 | 文档 / deepwiki 改动 | 代码 / 配置 / workflow → deepwiki | 文档必须以事实源为准，而不是彼此转述 |
 
@@ -15,7 +15,7 @@
 | 步骤 | 动作 | 产出 |
 | --- | --- | --- |
 | 1 | 先核对代码、配置、脚本与 workflow | 明确真实行为 |
-| 2 | 判断影响面是否跨产品线 | 决定是否要改 `AGENTS.md`、`business-logic.md`、deepwiki |
+| 2 | 判断影响面是否跨产品线 | 决定是否要改 `AGENTS.md`、`README.md`、deepwiki |
 | 3 | 用产品线边界组织叙述 | 避免把 App 约束和扩展约束混写 |
 | 4 | 未被明确要求时不碰 i18n 字段 | 降低与任务无关的多语言改动风险 |
 | 5 | 更新 deepwiki 时同步 `INDEX.md` 与 `GENERATION.md` | 保证知识入口和元数据一致 |
@@ -43,6 +43,7 @@
 
 | 场景 | 应该怎么做 | 为什么 |
 | --- | --- | --- |
+| 初次进入仓库 / 新任务预读 | 先读 `business-context.md`，再按产品线进入 `modules/*.md`，最后回到 `AGENTS.md` | 先建立产品语义，再读取执行约束 |
 | 新增或调整仓库级行为 | 先改代码 / 配置，再回写 deepwiki | 避免 deepwiki 成为旧事实 |
 | 改动影响阅读路径 | 同步更新 `INDEX.md` | 让后续读者能正确进入相关页面 |
 | 页面集合变化 | 同步更新 `GENERATION.md` | 便于下次增量更新对比 |
@@ -65,7 +66,7 @@
 
 ## 来源引用（Source References）
 - `AGENTS.md`
-- `.github/docs/business-logic.md`
+- `README.md`
 - `SyncNos/AGENTS.md`
 - `SyncNos/Services/AGENTS.md`
 - `Extensions/WebClipper/AGENTS.md`
