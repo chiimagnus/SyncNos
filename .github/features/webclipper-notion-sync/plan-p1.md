@@ -167,10 +167,14 @@ Run: `git commit -m "perf: task5 - 优化notion清空页面子块并发"`
 
 ---
 
-## Phase Exit Checklist
+## Phase Audit
 
 - Run: `npm --prefix Extensions/WebClipper run compile`
 - Run: `npm --prefix Extensions/WebClipper run test`
 - Run: `npm --prefix Extensions/WebClipper run build`
 - Audit file: `audit-p1.md`
-- Rule: 完成本 phase 全部 tasks 后，必须先完成 `audit-p1.md`，再推进到 P2
+- Rule: 完成本 phase 全部 tasks 后，`executing-plans` 必须自动进入 `audit-p1.md` 的审计闭环，再推进到 P2
+- Flow:
+  1. 先由主代理或只读 `subagent` 记录发现
+  2. 再修复问题
+  3. 再运行本 phase 验证命令

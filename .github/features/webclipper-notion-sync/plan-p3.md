@@ -42,7 +42,7 @@ Expected: 新增错误解析断言通过；兼容现有 orchestrator 行为。
 
 Run: `git add Extensions/WebClipper/src/sync/notion/notion-api.ts Extensions/WebClipper/tests/smoke/background-router-notion-sync.test.ts`
 
-Run: `git commit -m "refactor: task11 - 为notion错误补齐结构化字段"`
+Run: `git commit -m "refactor: task1 - 为notion错误补齐结构化字段"`
 
 ---
 
@@ -74,7 +74,7 @@ Expected: 降级场景会返回 warning；同步结果类型定义一致。
 
 Run: `git add Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.ts Extensions/WebClipper/src/sync/models.ts Extensions/WebClipper/tests/smoke/background-router-notion-sync.test.ts`
 
-Run: `git commit -m "feat: task12 - 为notion同步结果增加warning结构"`
+Run: `git commit -m "feat: task2 - 为notion同步结果增加warning结构"`
 
 ---
 
@@ -104,13 +104,17 @@ Expected: 反馈 notice 测试通过，warning 不遮挡列表。
 
 Run: `git add Extensions/WebClipper/src/ui/conversations/useConversationSyncFeedback.ts Extensions/WebClipper/src/ui/conversations/ConversationSyncFeedbackNotice.tsx Extensions/WebClipper/tests/smoke/conversations-sync-feedback.test.ts`
 
-Run: `git commit -m "feat: task13 - 在同步反馈中展示notion警告信息"`
+Run: `git commit -m "feat: task3 - 在同步反馈中展示notion警告信息"`
 
 ---
 
-## Phase Exit Checklist
+## Phase Audit
 
 - Run: `npm --prefix Extensions/WebClipper run compile`
 - Run: `npm --prefix Extensions/WebClipper run test`
 - Audit file: `audit-p3.md`
-- Rule: 完成本 phase 全部 tasks 后，必须先完成 `audit-p3.md`
+- Rule: 完成本 phase 全部 tasks 后，`executing-plans` 必须自动进入 `audit-p3.md` 的审计闭环
+- Flow:
+  1. 先由主代理或只读 `subagent` 记录发现
+  2. 再修复问题
+  3. 再运行本 phase 验证命令

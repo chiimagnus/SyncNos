@@ -43,7 +43,7 @@ Expected: 编译通过；旧 mapping 读取逻辑兼容。
 
 Run: `git add Extensions/WebClipper/src/sync/notion/notion-sync-cursor.ts Extensions/WebClipper/src/conversations/data/storage-idb.ts Extensions/WebClipper/src/sync/backup/backup-utils.ts`
 
-Run: `git commit -m "refactor: task7 - 打通notion重建判定所需游标字段"`
+Run: `git commit -m "refactor: task1 - 打通notion重建判定所需游标字段"`
 
 ---
 
@@ -76,7 +76,7 @@ Expected: article 内容未变化时不 rebuild；正文变化时仍可正确进
 
 Run: `git add Extensions/WebClipper/src/protocols/conversation-kinds.ts Extensions/WebClipper/tests/smoke/background-router-notion-sync.test.ts`
 
-Run: `git commit -m "fix: task8 - 收敛article同步重建触发条件"`
+Run: `git commit -m "fix: task2 - 收敛article同步重建触发条件"`
 
 ---
 
@@ -105,13 +105,17 @@ Expected: 正文未变时不调用 `clearPageChildren()`；属性可更新。
 
 Run: `git add Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.ts Extensions/WebClipper/tests/smoke/background-router-notion-sync.test.ts`
 
-Run: `git commit -m "fix: task9 - 支持notion页面属性更新而不重建正文"`
+Run: `git commit -m "fix: task3 - 支持notion页面属性更新而不重建正文"`
 
 ---
 
-## Phase Exit Checklist
+## Phase Audit
 
 - Run: `npm --prefix Extensions/WebClipper run compile`
 - Run: `npm --prefix Extensions/WebClipper run test -- background-router-notion-sync notion-sync-service-markdown notion-sync-service-rate-limit`
 - Audit file: `audit-p2.md`
-- Rule: 完成本 phase 全部 tasks 后，必须先完成 `audit-p2.md`，再推进到 P3
+- Rule: 完成本 phase 全部 tasks 后，`executing-plans` 必须自动进入 `audit-p2.md` 的审计闭环，再推进到 P3
+- Flow:
+  1. 先由主代理或只读 `subagent` 记录发现
+  2. 再修复问题
+  3. 再运行本 phase 验证命令
