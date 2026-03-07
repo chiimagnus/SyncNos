@@ -335,6 +335,46 @@ describe('Conversations sync feedback', () => {
     expect(clearNotionSyncJobStatus).toHaveBeenCalledTimes(1);
   });
 
+  it('shows warnings inside the details popover without failing the overall sync', async () => {
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: {
+        provider: 'notion',
+        status: 'done',
+        startedAt: Date.now() - 800,
+        updatedAt: Date.now(),
+        finishedAt: Date.now(),
+        conversationIds: [11],
+        okCount: 1,
+        failCount: 0,
+        perConversation: [
+          {
+            conversationId: 11,
+            ok: true,
+            mode: 'created',
+            appended: 1,
+            error: '',
+            warnings: [{ code: 'notion_image_upload_degraded', message: 'Some images could not be uploaded.' }],
+            at: Date.now(),
+          },
+        ],
+      },
+    });
+
+    await renderPane();
+
+    const notice = document.getElementById('conversationSyncFeedback');
+    expect(notice).toBeTruthy();
+    expect(notice?.getAttribute('data-phase')).toBe('success');
+
+    clickOpenDetailsButton();
+    const details = document.querySelector('[aria-label="Notion sync details"]');
+    expect(details).toBeTruthy();
+    expect(details?.textContent).toContain('Warnings');
+    expect(details?.textContent).toContain('Some images could not be uploaded.');
+  });
+
   it('shows direct preflight failure without fake progress counters', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis, 'alert', { configurable: true, value: alertSpy });
