@@ -84,10 +84,10 @@ note = "tests passed"
 [[tasks]]
 id = "P3-T2"
 title = "在同步结果中引入 warning，并打通图片上传降级场景"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t2"
 commit = ""
-note = ""
+note = "adding warning container"
 
 [[tasks]]
 id = "P3-T3"
