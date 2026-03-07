@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { t } from '../../i18n';
 import type { ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 
 type ConversationSyncFeedbackNoticeProps = {
@@ -33,10 +34,10 @@ function toneClasses(phase: ConversationSyncFeedbackState['phase']) {
 }
 
 function phaseLabel(phase: ConversationSyncFeedbackState['phase']) {
-  if (phase === 'running') return 'Syncing';
-  if (phase === 'success') return 'Completed';
-  if (phase === 'partial-failed') return 'Partial failure';
-  if (phase === 'failed') return 'Failed';
+  if (phase === 'running') return t('phaseRunning');
+  if (phase === 'success') return t('phaseSuccess');
+  if (phase === 'partial-failed') return t('phasePartialFailed');
+  if (phase === 'failed') return t('phaseFailed');
   return '';
 }
 
@@ -86,7 +87,7 @@ function SummaryBody(props: {
         ) : null}
         {canShowDetails ? (
           <span className="tw-text-[11px] tw-font-semibold tw-opacity-75">
-            {issueCount} issue{issueCount === 1 ? '' : 's'} · {detailsOpen ? 'Hide details' : 'View details'}
+            {issueCount} {issueCount === 1 ? t('issuesSingular') : t('issuesPlural')} · {detailsOpen ? t('hideDetails') : t('viewDetails')}
           </span>
         ) : null}
       </div>
@@ -95,7 +96,7 @@ function SummaryBody(props: {
 
       {showRunningStageDetail ? (
         <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-opacity-75">
-          Stage: {currentStageLabel}
+          {t('stagePrefix')} {currentStageLabel}
         </div>
       ) : null}
 
@@ -120,7 +121,7 @@ function SummaryBody(props: {
       onClick={onToggleDetails}
       aria-expanded={detailsOpen}
       aria-haspopup="dialog"
-      aria-label={`Open ${provider} sync details`}
+      aria-label={`Open ${provider} ${t('syncDetails')}`}
       className="tw-block tw-min-w-0 tw-flex-1 tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-text-inherit tw-shadow-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-current"
     >
       {content}
@@ -176,13 +177,13 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
       : Math.min(100, Math.max(8, Math.round((feedback.done / feedback.total) * 100) || 0))
     : 0;
   const currentItemLabel = feedback.currentConversationTitle.trim()
-    || (feedback.currentConversationId ? `Conversation #${feedback.currentConversationId}` : '');
+    || (feedback.currentConversationId ? `${t('conversationLabel')} #${feedback.currentConversationId}` : '');
   const currentStageLabel = feedback.currentStage.trim();
   const primaryMessage = feedback.phase === 'running'
     ? currentItemLabel
-      ? `Current: ${currentItemLabel}`
+      ? `${t('currentPrefix')} ${currentItemLabel}`
       : currentStageLabel
-        ? `Stage: ${currentStageLabel}`
+        ? `${t('stagePrefix')} ${currentStageLabel}`
         : feedback.message
     : feedback.message;
   const showRunningStageDetail = feedback.phase === 'running' && !!currentItemLabel && !!currentStageLabel;
@@ -219,7 +220,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
             type="button"
             onClick={onDismiss}
             className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-current/20 tw-bg-white/65 tw-text-[11px] tw-font-black tw-transition-colors tw-duration-150 hover:tw-bg-white"
-            aria-label="Dismiss sync feedback"
+            aria-label={t('dismissSyncFeedback')}
           >
             ×
           </button>
@@ -229,16 +230,16 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
       {canShowDetails && detailsOpen ? (
         <div
           role="dialog"
-          aria-label={`${provider} sync details`}
+          aria-label={`${provider} ${t('syncDetails')}`}
           className="tw-absolute tw-bottom-[calc(100%+8px)] tw-left-0 tw-right-0 tw-z-30 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-3 tw-text-[var(--text)] tw-shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
         >
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <div className="tw-text-xs tw-font-extrabold">{provider} sync details</div>
+            <div className="tw-text-xs tw-font-extrabold">{provider} {t('syncDetails')}</div>
             <button
               type="button"
               onClick={() => setDetailsOpen(false)}
               className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-white/65 tw-text-[11px] tw-font-black tw-transition-colors tw-duration-150 hover:tw-bg-white"
-              aria-label={`Close ${provider} sync details`}
+              aria-label={`Close ${provider} ${t('syncDetails')}`}
             >
               ×
             </button>
@@ -251,7 +252,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           <div className="tw-mt-3 tw-max-h-[min(45vh,320px)] tw-space-y-2 tw-overflow-auto tw-pr-1">
             {warnings.length ? (
               <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5">
-                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">Warnings</div>
+                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">{t('warningsHeading')}</div>
                 <div className="tw-mt-2 tw-space-y-2">
                   {warnings.map((warning, index) => (
                     <div
@@ -259,7 +260,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                       className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
                     >
                       <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
-                        {Number(warning?.conversationId) > 0 ? `Conversation #${Number(warning?.conversationId)}` : 'Conversation'}
+                        {Number(warning?.conversationId) > 0 ? `${t('conversationLabel')} #${Number(warning?.conversationId)}` : t('conversationLabel')}
                       </div>
                       <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
                         {String(warning?.message || warning?.code || 'warning')}
@@ -276,7 +277,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                 className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
               >
                 <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
-                  {failure.conversationId > 0 ? `Conversation #${failure.conversationId}` : 'Conversation'}
+                  {failure.conversationId > 0 ? `${t('conversationLabel')} #${failure.conversationId}` : t('conversationLabel')}
                 </div>
                 <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
                   {failure.error}

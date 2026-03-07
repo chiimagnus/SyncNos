@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { getURL } from '../../platform/runtime/runtime';
 
+import { t } from '../../i18n';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 
 import { useSettingsSceneController } from './hooks/useSettingsSceneController';
@@ -216,10 +217,10 @@ export function SettingsScene(props: SettingsSceneProps) {
                 onClick={() => setNarrowRoute('list')}
                 aria-label="Back"
               >
-                Back
+                {t('backButton')}
               </button>
               <div className="tw-min-w-0 tw-flex-1 tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
-                {activeSectionMeta?.label || 'Settings'}
+                {activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : 'Settings'}
               </div>
               <div className="tw-w-[74px]" aria-hidden="true" />
             </div>
@@ -243,8 +244,8 @@ export function SettingsScene(props: SettingsSceneProps) {
                 onClick={() => setActiveSection(section.key)}
                 className="tw-flex tw-w-full tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-3 tw-py-3 tw-text-left tw-transition tw-duration-150 hover:tw-border-[var(--border-strong)] hover:tw-shadow-[var(--shadow)]"
               >
-                <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">{section.label}</div>
-                <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{section.description}</div>
+                <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">{t(`section_${section.key}_label` as Parameters<typeof t>[0])}</div>
+                <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{t(`section_${section.key}_desc` as Parameters<typeof t>[0])}</div>
               </button>
             ))}
           </nav>
