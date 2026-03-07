@@ -125,7 +125,7 @@ describe("notion-sync-orchestrator kind routing", () => {
     expect(updateCalls.length).toBe(0);
   });
 
-  it("forces rebuild for article when message updatedAt is newer than mapping.lastSyncedAt (even if cursor matches)", async () => {
+  it("forces rebuild for article when the synced article body updatedAt changes (even if cursor matches)", async () => {
     const calls: any[] = [];
 
     // @ts-expect-error test global
@@ -144,7 +144,12 @@ describe("notion-sync-orchestrator kind routing", () => {
     const storage = {
       getSyncMappingByConversation: async () => ({
         conversation: { id: 1, sourceType: "article", title: "A", url: "https://a", lastCapturedAt: 1000, notionPageId: "p1" },
-        mapping: { notionPageId: "p1", lastSyncedMessageKey: "article_body", lastSyncedAt: 1000 }
+        mapping: {
+          notionPageId: "p1",
+          lastSyncedMessageKey: "article_body",
+          lastSyncedAt: 1000,
+          lastSyncedMessageUpdatedAt: 1000,
+        }
       }),
       getMessagesByConversationId: async () => [{
         messageKey: "article_body",
