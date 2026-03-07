@@ -13,6 +13,48 @@ import { storageGet, storageRemove } from '../../platform/storage/local';
 
 const SYNC_PROVIDER = 'notion';
 
+  function notionTraceEnabled() {
+    try {
+      return !!(globalThis && globalThis.__SYNCNOS_NOTION_TRACE__);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function createConversationTrace(conversationId) {
+    const enabled = notionTraceEnabled();
+    const startedAt = Date.now();
+    let lastAt = startedAt;
+    const stages = [];
+
+    function mark(stage) {
+      if (!enabled) return;
+      const now = Date.now();
+      stages.push({
+        stage: String(stage || "unknown"),
+        elapsedMs: now - startedAt,
+        sinceLastMs: now - lastAt,
+      });
+      lastAt = now;
+    }
+
+    function flush(meta = {}) {
+      if (!enabled || !stages.length) return;
+      try {
+        console.debug("[SyncNos][NotionTrace]", {
+          conversationId: Number(conversationId) || 0,
+          totalMs: Date.now() - startedAt,
+          stages: stages.slice(),
+          ...meta,
+        });
+      } catch (_e) {
+        // ignore debug logging failures
+      }
+    }
+
+    return { mark, flush };
+  }
+
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
     const t = convo.title || "";
@@ -303,6 +345,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     });
 
     for (const id of ids) {
+      const trace = createConversationTrace(id);
       await writeRunningJob({
         currentConversationId: id,
         currentConversationTitle: `Conversation #${id}`,
@@ -310,6 +353,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       });
 
       try {
+        trace.mark("load conversation");
         // eslint-disable-next-line no-await-in-loop
         const mapped = await (storage.getSyncMappingByConversation ? storage.getSyncMappingByConversation(id) : Promise.resolve(null));
         const convo = mapped && mapped.conversation ? mapped.conversation : null;
@@ -340,6 +384,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           currentStage: "Ensuring database"
         });
 
+        trace.mark("ensure database");
         let dbId = await ensureDbForKind(kind);
 
         // eslint-disable-next-line no-await-in-loop
@@ -357,6 +402,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Checking destination page"
           });
+          trace.mark("check destination page");
           try {
             // eslint-disable-next-line no-await-in-loop
             const page = await notionSyncService.getPage(token.accessToken, pageId);
@@ -376,6 +422,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Creating destination page"
           });
+          trace.mark("create destination page");
           try {
             // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
@@ -395,6 +442,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Rebuilding database"
             });
+            trace.mark("rebuild database");
             // eslint-disable-next-line no-await-in-loop
             const rebuiltDb = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec });
             dbId = rebuiltDb && rebuiltDb.databaseId ? String(rebuiltDb.databaseId) : "";
@@ -405,6 +453,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Creating destination page"
             });
+            trace.mark("create destination page");
             // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
@@ -422,6 +471,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Uploading message blocks"
           });
+          trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
             notionSyncService,
@@ -430,6 +480,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: messages
           });
           if (blocks.length) {
+            trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
             await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
           }
@@ -440,10 +491,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Saving sync cursor"
             });
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
           results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
+          trace.flush({ mode: "created", ok: true, blockCount: blocks.length });
           // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 250));
           continue;
@@ -466,13 +519,16 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Rebuilding destination page"
           });
+          trace.mark("rebuild page properties");
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
             properties: pageSpec.buildUpdateProperties(convo)
           });
+          trace.mark("clear page children");
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.clearPageChildren(token.accessToken, pageId);
+          trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
             notionSyncService,
@@ -481,6 +537,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: messages
           });
           if (blocks.length) {
+            trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
             await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
           }
@@ -491,21 +548,25 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Saving sync cursor"
             });
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
           results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
+          trace.flush({ mode: "rebuilt", ok: true, blockCount: blocks.length });
         } else if (inc.newMessages && inc.newMessages.length) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "Appending new messages"
           });
+          trace.mark("update page properties");
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
             properties: pageSpec.buildUpdateProperties(convo)
           });
+          trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
             notionSyncService,
@@ -514,6 +575,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             messagesList: inc.newMessages
           });
           if (blocks.length) {
+            trace.mark("append children");
             // eslint-disable-next-line no-await-in-loop
             await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
           }
@@ -524,10 +586,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "Saving sync cursor"
             });
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
           results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
+          trace.flush({ mode: "appended", ok: true, blockCount: blocks.length });
         } else {
           if (storage.setSyncCursor) {
             await writeRunningJob({
@@ -538,13 +602,16 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           const nextCursor = lastMessageCursor(messages);
           if (storage.setSyncCursor) {
+            trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, nextCursor);
           }
           results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
+          trace.flush({ mode: "no_changes", ok: true, blockCount: 0 });
         }
       } catch (e) {
         results.push({ conversationId: id, ok: false, error: normalizeNotionSyncError(e) });
+        trace.flush({ mode: "failed", ok: false, error: normalizeNotionSyncError(e) });
       }
 
       try {
