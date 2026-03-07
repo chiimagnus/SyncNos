@@ -27,9 +27,11 @@
 
 ## 发现项
 
-本 phase 未发现需要返工的缺陷或明显回归风险。
+发现并修复：
+- `normalizeNotionSyncError()` 未优先使用结构化 `error.notionMessage`，导致结构化收益在 UI 侧不稳定。已修复：`f7a22f15`。
+- warnings 仅在成功分支落盘，若后续步骤失败会丢失 warnings（例如图片降级后 append/cursor 失败）。已修复：`6cbdde49`。
 
-已确认点：
+确认点：
 - `notionFetch()` 失败时 `Error.message` 兼容性保留，同时补齐 `status/code/retryAfterMs/requestId/notionMessage` 字段。
 - `warnings` 不影响 `ok/fail` 判定，且进入 per-conversation snapshot 与 UI feedback。
 - notice 的摘要区仍保持紧凑；warning 详情仅在 popover 中展示，不重新遮挡 list view。
@@ -39,6 +41,8 @@
 - 已完成：P3-T1 `2a648df7`
 - 已完成：P3-T2 `017ce2bf`
 - 已完成：P3-T3 `bd6abc4f`
+- 审计修复：优先使用结构化 Notion 错误信息 `f7a22f15`
+- 审计修复：失败场景保留 warnings `6cbdde49`
 
 ## 验证日志
 
