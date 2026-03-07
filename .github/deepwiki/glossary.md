@@ -9,9 +9,9 @@
 | 术语 | 定义 | 常见位置 |
 | --- | --- | --- |
 | 双产品线 | 同一仓库内同时维护的 macOS App 与浏览器扩展 | `README.md`, `AGENTS.md` |
-| Parent Page | Notion 中承载 SyncNos 产物的父页面 | `.github/docs/business-logic.md`, Settings / Notion 配置 |
-| 条目（Item） | 一个可同步对象，如书、文章、会话 | `.github/docs/business-logic.md` |
-| 内容片段 | 条目里的高亮、笔记、消息或正文 | `.github/docs/business-logic.md` |
+| Parent Page | Notion 中承载 SyncNos 产物的父页面 | `business-context.md`, Settings / Notion 配置 |
+| 条目（Item） | 一个可同步对象，如书、文章、会话 | `business-context.md`, `data-flow.md` |
+| 内容片段 | 条目里的高亮、笔记、消息或正文 | `business-context.md`, `data-flow.md` |
 | 本地事实源 | 当前最可信的本地状态，而不是派生结果 | `storage.md`, `data-flow.md` |
 
 ## SyncNos App 术语
@@ -61,7 +61,6 @@
 
 ## 来源引用（Source References）
 - `README.md`
-- `.github/docs/business-logic.md`
 - `SyncNos/Views/RootView.swift`
 - `SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
 - `SyncNos/ViewModels/Account/PayWallViewModel.swift`

@@ -77,7 +77,6 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 
 ## 来源引用（Source References）
 - `README.md`
-- `.github/docs/business-logic.md`
 - `AGENTS.md`
 - `SyncNos/SyncNosApp.swift`
 - `SyncNos/Views/RootView.swift`

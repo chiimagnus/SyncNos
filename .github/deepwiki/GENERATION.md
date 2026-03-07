@@ -54,7 +54,7 @@
 
 | 类别 | 主要来源 |
 | --- | --- |
-| 仓库级语义 | `README.md`, `AGENTS.md`, `.github/docs/business-logic.md` |
+| 仓库级语义 | `README.md`, `AGENTS.md`, `SyncNos/AGENTS.md`, `Extensions/WebClipper/AGENTS.md` |
 | App 入口与主流程 | `SyncNos/SyncNosApp.swift`, `SyncNos/AppDelegate.swift`, `SyncNos/Views/RootView.swift` |
 | App 服务与存储 | `DIContainer.swift`, `NotionSyncEngine.swift`, `IAPService.swift`, `SiteLoginsStore.swift`, `ChatCacheService.swift`, `WebArticleCacheService.swift` |
 | WebClipper 运行时与数据 | `background.ts`, `content.ts`, `bootstrap/content.ts`, `message-contracts.ts`, `schema.ts`, `storage-idb.ts` |

@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | `SyncNos/` | macOS App 主工程 | `Models/`, `Services/`, `ViewModels/`, `Views/` | 先读 `SyncNos/AGENTS.md`，再按 MVVM + 协议注入边界进入。 |
 | `Extensions/WebClipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/conversations/`, `src/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app 哪一层。 |
-| `.github/docs/` | 仓库级业务与专项文档 | `business-logic.md`、键盘焦点文档等 | 用来理解“为什么这样设计”。 |
+| `.github/docs/` | 仓库级专项文档 | 键盘焦点文档等 | 用来理解跨产品线的专项约束。 |
 | `.github/workflows/` | CI / Release / 商店发布入口 | `release.yml`, `webclipper-release.yml`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 看真实交付链路而不是猜测。 |
 | `.github/scripts/webclipper/` | WebClipper 打包 / 发布脚本 | 打包 release assets、AMO source、AMO 发布 | 与 workflow 配套理解渠道差异。 |
 | `Packages/` | 本地 SwiftPM 包 | `MenuBarDockKit` | 放可复用的 macOS 能力，而不是业务 UI。 |
@@ -85,7 +85,6 @@ flowchart LR
 ## 来源引用（Source References）
 - `README.md`
 - `AGENTS.md`
-- `.github/docs/business-logic.md`
 - `SyncNos/SyncNosApp.swift`
 - `SyncNos/AppDelegate.swift`
 - `SyncNos/Views/RootView.swift`

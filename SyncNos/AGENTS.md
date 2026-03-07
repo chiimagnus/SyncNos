@@ -8,6 +8,12 @@
 
 > 备注：本仓库还包含独立浏览器扩展 `WebClipper`（`Extensions/WebClipper/`）。扩展开发约定见 `Extensions/WebClipper/AGENTS.md`。
 
+## 阅读入口（先读）
+
+- 仓库级业务入口：[`../.github/deepwiki/business-context.md`](../.github/deepwiki/business-context.md)
+- App 模块页：[`../.github/deepwiki/modules/syncnos-app.md`](../.github/deepwiki/modules/syncnos-app.md)
+- 需要系统边界、数据流、配置或排障时，再读：[`../.github/deepwiki/architecture.md`](../.github/deepwiki/architecture.md)、[`../.github/deepwiki/data-flow.md`](../.github/deepwiki/data-flow.md)、[`../.github/deepwiki/configuration.md`](../.github/deepwiki/configuration.md)、[`../.github/deepwiki/troubleshooting.md`](../.github/deepwiki/troubleshooting.md)
+
 ### 核心功能
 
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
