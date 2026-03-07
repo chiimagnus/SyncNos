@@ -121,7 +121,7 @@ function SummaryBody(props: {
       aria-expanded={detailsOpen}
       aria-haspopup="dialog"
       aria-label={`Open ${provider} sync details`}
-      className="tw-min-w-0 tw-flex-1 tw-text-left"
+      className="tw-block tw-min-w-0 tw-flex-1 tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-text-inherit tw-shadow-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-current"
     >
       {content}
     </button>
