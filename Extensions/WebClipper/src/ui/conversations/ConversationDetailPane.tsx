@@ -1,5 +1,6 @@
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
+import { t } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 
 function formatTime(ts?: number) {
@@ -38,16 +39,16 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
             <div className="tw-flex tw-min-w-0 tw-items-start tw-gap-2">
               {onBack ? (
                 <button type="button" onClick={onBack} className={outlineButtonClass} aria-label="Back">
-                  Back
+                  {t('backButton')}
                 </button>
               ) : null}
 
               <div className="tw-min-w-0">
                 <h2 className="tw-m-0 tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text)] tw-break-words [overflow-wrap:anywhere]">
-                  {selected ? selected.title || '(Untitled)' : 'Detail'}
+                  {selected ? selected.title || t('untitled') : t('detailTitle')}
                 </h2>
                 <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-                  {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : 'Select one conversation from list'}
+                  {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : t('selectConversationHint')}
                 </div>
               </div>
             </div>
@@ -55,7 +56,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
         ) : null}
 
         {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
-        {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Loading…</p> : null}
+        {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('loadingDots')}</p> : null}
         {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
 
         {detail?.messages?.length ? (
@@ -74,9 +75,9 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
             })}
           </div>
         ) : activeId ? (
-          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">No messages.</p>
+          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('noMessages')}</p>
         ) : (
-          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Select a conversation.</p>
+          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('selectAConversation')}</p>
         )}
       </section>
     </section>

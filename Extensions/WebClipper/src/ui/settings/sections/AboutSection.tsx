@@ -1,6 +1,7 @@
 import { getManifest, getURL } from '../../../platform/runtime/runtime';
 import { tabsCreate } from '../../../platform/webext/tabs';
 
+import { t } from '../../../i18n';
 import { buttonClassName, cardClassName } from '../ui';
 
 export function AboutSection() {
@@ -25,7 +26,7 @@ export function AboutSection() {
           <div className="tw-min-w-0 tw-flex-1">
             <div className="tw-text-base tw-font-black tw-text-[var(--text)]">SyncNos WebClipper</div>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]" id="aboutVersion">
-              {version ? `Version ${version}` : 'Version'}
+              {version ? `${t('versionPrefix')} ${version}` : t('versionPrefix')}
             </div>
           </div>
         </div>
@@ -37,7 +38,7 @@ export function AboutSection() {
             type="button"
             onClick={() => openUrl('https://apps.apple.com/app/syncnos/id6755133888').catch(() => {})}
           >
-            Mac App
+            {t('macApp')}
           </button>
           <button
             id="btnAboutSource"
@@ -45,7 +46,7 @@ export function AboutSection() {
             type="button"
             onClick={() => openUrl('https://github.com/chiimagnus/SyncNos').catch(() => {})}
           >
-            Source Code
+            {t('sourceCode')}
           </button>
           <button
             id="btnAboutChangelog"
@@ -53,7 +54,7 @@ export function AboutSection() {
             type="button"
             onClick={() => openUrl('https://chiimagnus.notion.site/syncnos-changelog').catch(() => {})}
           >
-            Changelog
+            {t('changelog')}
           </button>
         </div>
       </section>
@@ -63,7 +64,7 @@ export function AboutSection() {
           <img className="tw-size-10 tw-rounded-2xl tw-object-cover" src={getURL('icons/author-avatar.png' as any)} alt="Chii Magnus avatar" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
             <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
-            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">Time Machine Creator~</div>
+            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('authorTagline')}</div>
           </div>
         </div>
 
@@ -76,7 +77,7 @@ export function AboutSection() {
               openUrl('mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback').catch(() => {})
             }
           >
-            Mail
+            {t('mail')}
           </button>
           <button
             id="btnAboutGitHub"
