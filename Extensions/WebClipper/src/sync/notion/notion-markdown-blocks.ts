@@ -2,6 +2,7 @@
 
   const MAX_TEXT = 1900;
   const MAX_EQUATION_EXPRESSION = 1900;
+  const MAX_RICH_TEXT_ITEMS = 100;
 
   function splitText(text) {
     const s = String(text || "");
@@ -148,17 +149,20 @@
     const chunks = [];
     let current = [];
     let currentLen = 0;
+    let currentItems = 0;
 
     function flush() {
       if (!current.length) return;
       chunks.push(current);
       current = [];
       currentLen = 0;
+      currentItems = 0;
     }
 
     for (const item of list || []) {
       if (!item) continue;
       if (item.type !== "text") {
+        if (currentItems >= MAX_RICH_TEXT_ITEMS) flush();
         if (current.length) flush();
         chunks.push([item]);
         continue;
@@ -166,6 +170,7 @@
       const content = String(item.text && item.text.content ? item.text.content : "");
       let remaining = content;
       while (remaining.length) {
+        if (currentItems >= MAX_RICH_TEXT_ITEMS) flush();
         const budget = Math.max(1, MAX_TEXT - currentLen);
         const take = remaining.slice(0, budget);
         const nextItem = {
@@ -174,8 +179,9 @@
         };
         current.push(nextItem);
         currentLen += take.length;
+        currentItems += 1;
         remaining = remaining.slice(take.length);
-        if (currentLen >= MAX_TEXT) flush();
+        if (currentLen >= MAX_TEXT || currentItems >= MAX_RICH_TEXT_ITEMS) flush();
       }
     }
     flush();

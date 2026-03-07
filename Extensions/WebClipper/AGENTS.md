@@ -2,6 +2,12 @@
 
 [SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（Markdown）、添加到 Obsidian、本地数据库备份/恢复（备份导出为 Zip v2；导入支持 Zip v2 + legacy JSON，且为合并导入），以及手动同步到 Notion。
 
+## 阅读入口（先读）
+
+- 仓库级业务入口：[`../../.github/deepwiki/business-context.md`](../../.github/deepwiki/business-context.md)
+- WebClipper 模块页：[`../../.github/deepwiki/modules/webclipper.md`](../../.github/deepwiki/modules/webclipper.md)
+- 涉及运行时边界、消息流、存储、发布或排障时，再读：[`../../.github/deepwiki/architecture.md`](../../.github/deepwiki/architecture.md)、[`../../.github/deepwiki/data-flow.md`](../../.github/deepwiki/data-flow.md)、[`../../.github/deepwiki/storage.md`](../../.github/deepwiki/storage.md)、[`../../.github/deepwiki/release.md`](../../.github/deepwiki/release.md)、[`../../.github/deepwiki/troubleshooting.md`](../../.github/deepwiki/troubleshooting.md)
+
 ## 作用范围
 
 - 目标目录：`Extensions/WebClipper/`
