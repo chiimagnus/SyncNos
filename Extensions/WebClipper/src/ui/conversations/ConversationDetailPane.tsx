@@ -34,7 +34,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
 
-  const outlineButtonClass = [buttonTintClassName(), 'tw-bg-white/38 hover:tw-bg-white/55'].join(' ');
+  const outlineButtonClass = buttonTintClassName();
 
   return (
     <section>

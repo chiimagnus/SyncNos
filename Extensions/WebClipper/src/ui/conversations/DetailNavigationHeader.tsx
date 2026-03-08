@@ -14,10 +14,7 @@ export type DetailNavigationHeaderProps = {
 };
 
 const backButtonClass = navIconButtonClassName(false);
-const headerActionButtonClass = [
-  buttonTintClassName(),
-  'tw-h-8 tw-rounded-lg tw-text-[11px] tw-font-black',
-].join(' ');
+const headerActionButtonClass = buttonTintClassName();
 
 export function DetailNavigationHeader({ title, subtitle, actions, onBack }: DetailNavigationHeaderProps) {
   const safeActions = Array.isArray(actions) ? actions : [];
