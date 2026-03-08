@@ -265,31 +265,41 @@ export function SettingsScene(props: SettingsSceneProps) {
     return (
       <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
         <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-2">
-          <nav className="tw-grid tw-gap-3" aria-label={t('settingsSectionsAria')}>
+          <nav className="tw-grid tw-gap-4" aria-label={t('settingsSectionsAria')}>
             {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
-              <div key={groupIndex} className="tw-grid tw-gap-2">
-                <div className="tw-px-1 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.18em] tw-text-[var(--muted)]/80">
+              <div key={groupIndex} className="tw-grid tw-gap-1.5">
+                <div className="tw-px-2 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.16em] tw-text-[var(--muted)] tw-opacity-65">
                   {group.title}
                 </div>
-                {group.sections.map((section) => (
-                  <button
-                    key={section.key}
-                    type="button"
-                    onClick={() => setActiveSection(section.key)}
-                    className="tw-flex tw-w-full tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-3 tw-py-3 tw-text-left tw-transition tw-duration-150 hover:tw-border-[var(--border-strong)] hover:tw-shadow-[var(--shadow)]"
-                  >
-                    <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">
-                      {section.key === 'chat_with'
-                        ? 'Chat with AI'
-                        : t(`section_${section.key}_label` as Parameters<typeof t>[0])}
-                    </div>
-                    <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
-                      {section.key === 'chat_with'
-                        ? 'Prompt + platforms'
-                        : t(`section_${section.key}_desc` as Parameters<typeof t>[0])}
-                    </div>
-                  </button>
-                ))}
+                <div>
+                  {group.sections.map((section, index) => {
+                    const active = activeSection === section.key;
+                    return (
+                      <button
+                        key={section.key}
+                        type="button"
+                        onClick={() => setActiveSection(section.key)}
+                        className={[
+                          'tw-flex tw-w-full tw-appearance-none tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-xl tw-border-0 tw-px-3 tw-py-3 tw-text-left tw-shadow-none tw-transition-colors tw-duration-150',
+                          index === 0 ? '' : 'tw-mt-1',
+                          active ? 'tw-bg-[var(--btn-bg)]' : 'hover:tw-bg-white/48',
+                        ].join(' ')}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">
+                          {section.key === 'chat_with'
+                            ? 'Chat with AI'
+                            : t(`section_${section.key}_label` as Parameters<typeof t>[0])}
+                        </div>
+                        <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+                          {section.key === 'chat_with'
+                            ? 'Prompt + platforms'
+                            : t(`section_${section.key}_desc` as Parameters<typeof t>[0])}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </nav>
