@@ -2,39 +2,42 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
-import type { ReactNode } from 'react';
 
-vi.mock('../../src/platform/runtime/runtime', () => ({
-  getURL: (path: string) => path,
+vi.mock('../../src/i18n', () => ({
+  t: (key: string) => {
+    const labels: Record<string, string> = {
+      backToChatsAria: 'Back to chats',
+      settingsDialogAria: 'Settings dialog',
+      closeSettings: 'Close settings',
+      resizeSidebar: 'Resize sidebar',
+      expandSidebar: 'Expand sidebar',
+    };
+    return labels[key] || key;
+  },
 }));
 
-vi.mock('../../src/platform/webext/tabs', () => ({
-  tabsCreate: vi.fn(),
+vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
+  useIsNarrowScreen: () => true,
+}));
+
+vi.mock('../../src/ui/app/routes/Settings', () => ({
+  default: () => createElement('div', null, 'settings'),
+}));
+
+vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
+  CapturedListSidebar: () => createElement('div', null, 'sidebar'),
 }));
 
 vi.mock('../../src/ui/conversations/conversations-context', () => ({
-  ConversationsProvider: ({ children }: { children: ReactNode }) => children,
-  useConversationsApp: () => ({
-    refreshList: vi.fn(),
-    refreshActiveDetail: vi.fn(),
-  }),
+  ConversationsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('../../src/ui/popup/usePopupCurrentPageCapture', () => ({
-  usePopupCurrentPageCapture: () => ({
-    buttonDisabled: false,
-    buttonLabel: 'Fetch AI Chat',
-    capture: vi.fn(),
-    captureState: { available: true, kind: 'chat', label: 'Fetch AI Chat', collectorId: 'chatgpt' },
-    checking: false,
-    fetching: false,
-    refreshState: vi.fn(),
-    status: null,
-  }),
+vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
+  ConversationDetailPane: () => createElement('div', null, 'detail-pane'),
 }));
 
-vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
-  default: (props: { onPopupHeaderStateChange?: (state: any) => void }) =>
+vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
+  ConversationsScene: (props: { onPopupHeaderStateChange?: (state: any) => void }) =>
     createElement(
       'div',
       null,
@@ -57,7 +60,7 @@ vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
                 label: 'Open in Notion',
                 kind: 'external-link',
                 href: 'https://www.notion.so/example',
-                onTrigger: vi.fn(async () => {}),
+                onTrigger: async () => {},
               },
             ],
             onBack: () => {
@@ -83,7 +86,7 @@ vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
     ),
 }));
 
-import PopupShell from '../../src/ui/popup/PopupShell';
+import AppShell from '../../src/ui/app/AppShell';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -118,7 +121,7 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
-describe('PopupShell header actions', () => {
+describe('AppShell narrow detail header actions', () => {
   let root: ReactDOM.Root | null = null;
 
   beforeEach(() => {
@@ -134,14 +137,10 @@ describe('PopupShell header actions', () => {
     cleanupDom();
   });
 
-  it('shows fetch and settings in list mode, then swaps to Open in Notion in detail mode', () => {
+  it('shows Open in Notion in narrow app detail mode', () => {
     act(() => {
-      root!.render(createElement(PopupShell));
+      root!.render(createElement(AppShell));
     });
-
-    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
     const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail') as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
@@ -150,15 +149,12 @@ describe('PopupShell header actions', () => {
       detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
-  it('keeps the popup detail header action area empty when no actions are available', () => {
+  it('keeps the narrow app detail header action area empty when no actions are available', () => {
     act(() => {
-      root!.render(createElement(PopupShell));
+      root!.render(createElement(AppShell));
     });
 
     const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail-empty') as HTMLButtonElement | undefined;
@@ -168,9 +164,7 @@ describe('PopupShell header actions', () => {
       detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Back to chats"]')).toBeTruthy();
   });
 });

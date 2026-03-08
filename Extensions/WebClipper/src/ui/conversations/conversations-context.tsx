@@ -5,6 +5,8 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { createZipBlob } from '../../sync/backup/zip-utils';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
+import type { DetailHeaderAction } from './detail-header-actions';
+import { resolveDetailHeaderActions } from './detail-header-actions';
 import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 
 type ConversationsAppState = {
@@ -20,6 +22,7 @@ type ConversationsAppState = {
   detail: ConversationDetail | null;
 
   selectedConversation: Conversation | null;
+  detailHeaderActions: DetailHeaderAction[];
 
   exporting: boolean;
   syncFeedback: ConversationSyncFeedbackState;
@@ -66,6 +69,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const selectedConversation = useMemo(
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
     [items, activeId],
+  );
+  const detailHeaderActions = useMemo(
+    () => resolveDetailHeaderActions({ conversation: selectedConversation }),
+    [selectedConversation],
   );
 
   const refreshList = useCallback(async () => {
@@ -231,6 +238,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     detailError,
     detail,
     selectedConversation,
+    detailHeaderActions,
     exporting,
     syncFeedback,
     syncingNotion,

@@ -2,6 +2,7 @@ import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
+import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -25,6 +26,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
     loadingDetail,
     detailError,
     detail,
+    detailHeaderActions,
   } = useConversationsApp();
 
   const baseButtonClass =
@@ -52,6 +54,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 </div>
               </div>
             </div>
+            <DetailHeaderActionBar actions={detailHeaderActions} buttonClassName={outlineButtonClass} />
           </header>
         ) : null}
 
