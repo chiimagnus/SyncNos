@@ -117,6 +117,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
   const [chatWithMaxChars, setChatWithMaxChars] = useState<string>(String(DEFAULT_CHAT_WITH_MAX_CHARS));
   const [chatWithPlatforms, setChatWithPlatforms] = useState<any[]>(DEFAULT_CHAT_WITH_PLATFORMS.slice());
+  const chatWithHydratedRef = useRef(false);
+  const chatWithSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
@@ -192,6 +194,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
       setChatWithMaxChars(String(chatWith.maxChars || DEFAULT_CHAT_WITH_MAX_CHARS));
       setChatWithPlatforms(Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice());
+      chatWithHydratedRef.current = true;
     });
   }, [runTask]);
 
@@ -440,17 +443,27 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     });
   }, [refresh, runTask]);
 
-  const onSaveChatWithSettings = useCallback(async () => {
-    await runTask(async () => {
+  useEffect(() => {
+    if (!chatWithHydratedRef.current) return;
+
+    // Write-through (debounced) to avoid requiring an explicit Save click.
+    if (chatWithSaveTimerRef.current != null) clearTimeout(chatWithSaveTimerRef.current);
+    chatWithSaveTimerRef.current = setTimeout(() => {
       const max = Number(String(chatWithMaxChars || '').trim());
-      await saveChatWithSettings({
+      void saveChatWithSettings({
         promptTemplate: String(chatWithPromptTemplate || ''),
         maxChars: Number.isFinite(max) ? Math.floor(max) : DEFAULT_CHAT_WITH_MAX_CHARS,
         platforms: Array.isArray(chatWithPlatforms) ? (chatWithPlatforms as any) : [],
-      } as any);
-      await refresh();
-    });
-  }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate, refresh, runTask]);
+      } as any).catch(() => {
+        // Don't block the UI on transient storage errors.
+      });
+    }, 450);
+
+    return () => {
+      if (chatWithSaveTimerRef.current != null) clearTimeout(chatWithSaveTimerRef.current);
+      chatWithSaveTimerRef.current = null;
+    };
+  }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate]);
 
   const onResetChatWithSettings = useCallback(async () => {
     await runTask(async () => {
@@ -637,7 +650,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
-    onSaveChatWithSettings,
     onResetChatWithSettings,
   };
 }

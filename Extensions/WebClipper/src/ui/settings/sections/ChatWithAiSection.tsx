@@ -20,10 +20,9 @@ export function ChatWithAiSection(props: {
   onChangeMaxChars: (v: string) => void;
   platforms: ChatWithAiPlatform[];
   onChangePlatforms: (next: ChatWithAiPlatform[]) => void;
-  onSave: () => void;
   onReset: () => void;
 }) {
-  const { busy, promptTemplate, onChangePromptTemplate, maxChars, onChangeMaxChars, platforms, onChangePlatforms, onSave, onReset } = props;
+  const { busy, promptTemplate, onChangePromptTemplate, maxChars, onChangeMaxChars, platforms, onChangePlatforms, onReset } = props;
 
   const rows = useMemo(() => (Array.isArray(platforms) ? platforms : []), [platforms]);
 
@@ -51,12 +50,9 @@ export function ChatWithAiSection(props: {
         <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">
           Chat with AI
         </h2>
-        <button className={buttonClassName} onClick={onSave} disabled={busy} type="button">
-          Save
-        </button>
-        <button className={buttonClassName} onClick={onReset} disabled={busy} type="button" title="Reset to defaults">
-          Reset
-        </button>
+      </div>
+      <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+        Changes are saved automatically.
       </div>
 
       <div className="tw-mt-3 tw-grid tw-gap-2">
@@ -148,6 +144,9 @@ export function ChatWithAiSection(props: {
             <div className="tw-flex tw-items-center tw-gap-2">
               <button type="button" className={buttonClassName} disabled={busy} onClick={addPlatform}>
                 Add platform
+              </button>
+              <button type="button" className={buttonClassName} disabled={busy} onClick={onReset} title="Reset to defaults">
+                Reset
               </button>
             </div>
           </div>
