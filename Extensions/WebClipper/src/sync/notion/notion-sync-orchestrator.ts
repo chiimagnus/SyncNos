@@ -78,6 +78,7 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   function toPerConversationSnapshot(results) {
     return results.map((r) => ({
       conversationId: r.conversationId,
+      conversationTitle: r.conversationTitle || "",
       ok: !!r.ok,
       mode: r.mode || (r.ok ? "ok" : "fail"),
       appended: Number(r.appended) || 0,
@@ -90,7 +91,11 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   function buildFailureSummaries(results) {
     return results
       .filter((r) => !r.ok)
-      .map((r) => ({ conversationId: Number(r.conversationId) || 0, error: String(r.error || "unknown error") }));
+      .map((r) => ({
+        conversationId: Number(r.conversationId) || 0,
+        conversationTitle: String(r.conversationTitle || ""),
+        error: String(r.error || "unknown error"),
+      }));
   }
 
   function buildAlreadyRunningError() {
@@ -436,9 +441,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     async function processConversation(id, index) {
       const trace = createConversationTrace(id);
       const warnings: any[] = [];
+      let conversationTitle = `Conversation #${id}`;
       await writeRunningJob({
         currentConversationId: id,
-        currentConversationTitle: `Conversation #${id}`,
+        currentConversationTitle: conversationTitle,
         currentStage: "Loading conversation"
       });
 
@@ -450,11 +456,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         const mapping = mapped && mapped.mapping ? mapped.mapping : null;
         await writeRunningJob({
           currentConversationId: id,
-          currentConversationTitle: toCurrentConversationTitle(convo, id),
+          currentConversationTitle: (conversationTitle = toCurrentConversationTitle(convo, id)),
           currentStage: "Preparing sync"
         });
         if (!convo) {
-          setResultAt(index, { conversationId: id, ok: false, error: "conversation not found" });
+          setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: "conversation not found" });
           return;
         }
 
@@ -588,6 +594,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: "created",
@@ -652,6 +659,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: "rebuilt",
@@ -699,6 +707,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: "appended",
@@ -737,6 +746,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: needsPropertyUpdate ? "updated_properties" : "no_changes",
@@ -746,7 +756,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       } catch (e) {
         const normalizedError = normalizeNotionSyncError(e);
-        setResultAt(index, { conversationId: id, ok: false, error: normalizedError, warnings });
+        setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: normalizedError, warnings });
         trace.flush({ mode: "failed", ok: false, error: normalizedError });
       }
 

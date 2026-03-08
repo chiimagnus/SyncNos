@@ -4,6 +4,7 @@ export type SyncJobPhase = 'running' | 'done' | 'aborted';
 
 export type SyncFailureSummary = {
   conversationId: number;
+  conversationTitle?: string;
   error: string;
 };
 
@@ -15,6 +16,7 @@ export type SyncWarning = {
 
 export type SyncPerConversationResult = {
   conversationId: number;
+  conversationTitle?: string;
   ok: boolean;
   mode: string;
   appended: number;

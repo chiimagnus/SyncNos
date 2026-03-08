@@ -40,6 +40,7 @@ function normalizeIds(list: unknown) {
 
 function buildPerConversationResult({
   conversationId,
+  conversationTitle,
   ok,
   mode,
   appended,
@@ -47,6 +48,7 @@ function buildPerConversationResult({
   at,
 }: {
   conversationId: number;
+  conversationTitle?: unknown;
   ok: unknown;
   mode: unknown;
   appended: unknown;
@@ -55,6 +57,7 @@ function buildPerConversationResult({
 }) {
   return {
     conversationId,
+    conversationTitle: safeString(conversationTitle),
     ok: !!ok,
     mode: safeString(mode) || (ok ? 'ok' : 'failed'),
     appended: Number.isFinite(Number(appended)) ? Number(appended) : 0,
@@ -68,7 +71,11 @@ function buildSyncSummary(results: any[], instanceId: unknown) {
   const failCount = results.length - okCount;
   const failures = results
     .filter((r) => !r.ok)
-    .map((r) => ({ conversationId: r.conversationId, error: r.error || 'unknown error' }));
+    .map((r) => ({
+      conversationId: r.conversationId,
+      conversationTitle: safeString(r.conversationTitle),
+      error: r.error || 'unknown error',
+    }));
   return { provider: SYNC_PROVIDER, okCount, failCount, failures, results, instanceId: safeString(instanceId) };
 }
 
@@ -220,6 +227,7 @@ async function decideSyncModeForConversation({
       isFinal: true,
       row: buildPerConversationResult({
         conversationId: Number(conversationId),
+        conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
         mode: 'failed',
         appended: 0,
@@ -235,6 +243,7 @@ async function decideSyncModeForConversation({
       isFinal: true,
       row: buildPerConversationResult({
         conversationId: Number(conversationId),
+        conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
         mode: 'empty',
         appended: 0,
@@ -257,6 +266,7 @@ async function decideSyncModeForConversation({
       isFinal: true,
       row: buildPerConversationResult({
         conversationId: Number(conversationId),
+        conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
         mode: 'failed',
         appended: 0,
@@ -290,6 +300,7 @@ async function decideSyncModeForConversation({
       isFinal: true,
       row: buildPerConversationResult({
         conversationId: Number(conversationId),
+        conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: false,
         mode: 'failed',
         appended: 0,
@@ -362,6 +373,7 @@ async function decideSyncModeForConversation({
       isFinal: true,
       row: buildPerConversationResult({
         conversationId: Number(conversationId),
+        conversationTitle: toCurrentConversationTitle(convo, conversationId),
         ok: true,
         mode: 'no_changes',
         appended: 0,
@@ -499,6 +511,7 @@ async function syncConversations({
         if (!clientRes.ok || !client) {
           row = buildPerConversationResult({
             conversationId,
+            conversationTitle: currentTitle,
             ok: false,
             mode: 'failed',
             appended: 0,
@@ -528,6 +541,7 @@ async function syncConversations({
           if (!putRes || !putRes.ok) {
             row = buildPerConversationResult({
               conversationId,
+              conversationTitle: currentTitle,
               ok: false,
               mode: 'failed',
               appended: 0,
@@ -546,6 +560,7 @@ async function syncConversations({
               if (!delRes || !delRes.ok) {
                 row = buildPerConversationResult({
                   conversationId,
+                  conversationTitle: currentTitle,
                   ok: false,
                   mode: 'rename_delete_failed',
                   appended: decision.messages.length,
@@ -555,6 +570,7 @@ async function syncConversations({
               } else {
                 row = buildPerConversationResult({
                   conversationId,
+                  conversationTitle: currentTitle,
                   ok: true,
                   mode: decision.mode,
                   appended: decision.messages.length,
@@ -565,6 +581,7 @@ async function syncConversations({
             } else {
               row = buildPerConversationResult({
                 conversationId,
+                conversationTitle: currentTitle,
                 ok: true,
                 mode: decision.mode,
                 appended: decision.messages.length,
@@ -606,6 +623,7 @@ async function syncConversations({
           if (!patchRes.ok && !isIdempotentDup && !isPatchFailed) {
             row = buildPerConversationResult({
               conversationId,
+              conversationTitle: currentTitle,
               ok: false,
               mode: 'failed',
               appended: 0,
@@ -631,6 +649,7 @@ async function syncConversations({
             if (!putRes || !putRes.ok) {
               row = buildPerConversationResult({
                 conversationId,
+                conversationTitle: currentTitle,
                 ok: false,
                 mode: 'failed',
                 appended: 0,
@@ -640,6 +659,7 @@ async function syncConversations({
             } else {
               row = buildPerConversationResult({
                 conversationId,
+                conversationTitle: currentTitle,
                 ok: true,
                 mode: 'full_rebuild_fallback',
                 appended: decision.messages.length,
@@ -665,6 +685,7 @@ async function syncConversations({
             if (!fmRes || !fmRes.ok) {
               row = buildPerConversationResult({
                 conversationId,
+                conversationTitle: currentTitle,
                 ok: false,
                 mode: 'failed',
                 appended: 0,
@@ -676,6 +697,7 @@ async function syncConversations({
             } else {
               row = buildPerConversationResult({
                 conversationId,
+                conversationTitle: currentTitle,
                 ok: true,
                 mode: 'incremental_append',
                 appended: decision.newMessages.length,
@@ -687,6 +709,7 @@ async function syncConversations({
         } else {
           row = buildPerConversationResult({
             conversationId,
+            conversationTitle: currentTitle,
             ok: false,
             mode: 'failed',
             appended: 0,
@@ -699,6 +722,7 @@ async function syncConversations({
       } else {
         row = buildPerConversationResult({
           conversationId,
+          conversationTitle: `Conversation #${conversationId}`,
           ok: false,
           mode: 'failed',
           appended: 0,
@@ -709,6 +733,7 @@ async function syncConversations({
     } catch (e: any) {
       row = buildPerConversationResult({
         conversationId,
+        conversationTitle: `Conversation #${conversationId}`,
         ok: false,
         mode: 'failed',
         appended: 0,
