@@ -35,7 +35,7 @@ note = ""
 
 [[tasks]]
 id = "P2-T1"
-title = "定义 Obsidian 打开目标协议与 capability resolver"
+title = "定义 Obsidian 打开目标协议与 app-launch resolver"
 status = "pending"
 plan = "plan-p2.md#p2-t1"
 commit = ""
