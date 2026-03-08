@@ -10,6 +10,7 @@ export type DetailHeaderAction = {
   kind: DetailHeaderActionKind;
   provider: DetailHeaderActionProvider;
   slot: DetailHeaderActionSlot;
+  disabled?: boolean;
   href?: string;
   triggerPayload?: Record<string, unknown>;
   afterTriggerLabel?: string;
@@ -22,4 +23,3 @@ export type DetailHeaderActionPort = {
   wait: (ms: number) => Promise<void>;
   reportError: (message: string) => void;
 };
-

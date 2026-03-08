@@ -71,11 +71,16 @@ function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter((row) => row && typeof row === 'object' && (row as any).ok === false)
-    .map((row) => ({ conversationId: Number((row as any).conversationId) || 0, error: String((row as any).error || 'unknown error') }));
+    .map((row) => ({
+      conversationId: Number((row as any).conversationId) || 0,
+      conversationTitle: String((row as any).conversationTitle || '').trim(),
+      error: String((row as any).error || 'unknown error'),
+    }));
 }
 
 export type SyncWarningSummary = {
   conversationId: number;
+  conversationTitle?: string;
   code: string;
   message: string;
   extra?: unknown;
@@ -91,10 +96,11 @@ function toWarningSummariesFromRows(rows: unknown): SyncWarningSummary[] {
     if (!Array.isArray(warnings) || !warnings.length) continue;
     for (const w of warnings as SyncWarning[]) {
       if (!w || typeof w !== 'object') continue;
+      const conversationTitle = String((row as any).conversationTitle || '').trim();
       const code = String((w as any).code || '').trim() || 'warning';
       const message = String((w as any).message || '').trim() || code;
       const extra = (w as any).extra;
-      out.push({ conversationId, code, message, extra });
+      out.push({ conversationId, conversationTitle, code, message, extra });
     }
   }
   return out;
@@ -124,7 +130,11 @@ function toFailureSummaries(summary: SyncRunSummary) {
   if (Array.isArray(summary.failures) && summary.failures.length) return summary.failures;
   return summary.results
     .filter((result) => !result.ok)
-    .map((result) => ({ conversationId: Number(result.conversationId) || 0, error: String(result.error || 'unknown error') }));
+    .map((result) => ({
+      conversationId: Number(result.conversationId) || 0,
+      conversationTitle: String(result.conversationTitle || '').trim(),
+      error: String(result.error || 'unknown error'),
+    }));
 }
 
 function toWarningSummaries(summary: SyncRunSummary) {

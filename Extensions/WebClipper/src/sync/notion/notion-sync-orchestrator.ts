@@ -78,6 +78,7 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   function toPerConversationSnapshot(results) {
     return results.map((r) => ({
       conversationId: r.conversationId,
+      conversationTitle: r.conversationTitle || "",
       ok: !!r.ok,
       mode: r.mode || (r.ok ? "ok" : "fail"),
       appended: Number(r.appended) || 0,
@@ -90,7 +91,11 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   function buildFailureSummaries(results) {
     return results
       .filter((r) => !r.ok)
-      .map((r) => ({ conversationId: Number(r.conversationId) || 0, error: String(r.error || "unknown error") }));
+      .map((r) => ({
+        conversationId: Number(r.conversationId) || 0,
+        conversationTitle: String(r.conversationTitle || ""),
+        error: String(r.error || "unknown error"),
+      }));
   }
 
   function buildAlreadyRunningError() {
@@ -143,43 +148,11 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     if (!rawMessage.toLowerCase().includes("notion api failed:")) return rawMessage;
 
     const status = parseHttpStatus(error);
-    const code = parseNotionErrorCode(error);
     const notionMessage = parseNotionErrorMessage(error).replace(/^notion api failed:\s*/i, "").trim();
-    const lowerMessage = notionMessage.toLowerCase();
-
-    if (code === "validation_error") {
-      if (lowerMessage.includes("rich_text.length should be") || lowerMessage.includes("rich_text.length")) {
-        return "Notion rejected one content block because it contained too many rich text fragments. The content needs to be split into smaller blocks.";
-      }
-      return `Notion validation failed: ${notionMessage}`;
+    if (status === 429) {
+      const retryHint = formatRetryHint(error);
+      return `${notionMessage || rawMessage}${retryHint}`.trim();
     }
-
-    if (status === 401) {
-      return "Notion authorization expired. Please reconnect Notion and try again.";
-    }
-
-    if (status === 403) {
-      return "Notion denied access to the target page or database. Please confirm the integration still has permission.";
-    }
-
-    if (status === 404 || code === "object_not_found") {
-      if (lowerMessage.includes("database")) {
-        return "The target Notion database no longer exists or is no longer accessible. Please reselect the parent page and retry.";
-      }
-      if (lowerMessage.includes("page")) {
-        return "The target Notion page no longer exists or is no longer accessible. Please retry after reconnecting Notion or rebuilding the page.";
-      }
-      return "The target Notion object was not found. Please reconnect Notion or reselect the parent page and retry.";
-    }
-
-    if (status === 429 || code === "rate_limited") {
-      return `Notion rate limited this sync.${formatRetryHint(error)}`.trim();
-    }
-
-    if (status >= 500) {
-      return "Notion service is temporarily unavailable. Please retry later.";
-    }
-
     return notionMessage || rawMessage;
   }
 
@@ -468,9 +441,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     async function processConversation(id, index) {
       const trace = createConversationTrace(id);
       const warnings: any[] = [];
+      let conversationTitle = `Conversation #${id}`;
       await writeRunningJob({
         currentConversationId: id,
-        currentConversationTitle: `Conversation #${id}`,
+        currentConversationTitle: conversationTitle,
         currentStage: "Loading conversation"
       });
 
@@ -482,11 +456,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         const mapping = mapped && mapped.mapping ? mapped.mapping : null;
         await writeRunningJob({
           currentConversationId: id,
-          currentConversationTitle: toCurrentConversationTitle(convo, id),
+          currentConversationTitle: (conversationTitle = toCurrentConversationTitle(convo, id)),
           currentStage: "Preparing sync"
         });
         if (!convo) {
-          setResultAt(index, { conversationId: id, ok: false, error: "conversation not found" });
+          setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: "conversation not found" });
           return;
         }
 
@@ -620,6 +594,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: "created",
@@ -684,6 +659,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: "rebuilt",
@@ -731,6 +707,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: "appended",
@@ -769,6 +746,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
           setResultAt(index, {
             conversationId: id,
+            conversationTitle,
             ok: true,
             notionPageId: pageId,
             mode: needsPropertyUpdate ? "updated_properties" : "no_changes",
@@ -778,7 +756,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         }
       } catch (e) {
         const normalizedError = normalizeNotionSyncError(e);
-        setResultAt(index, { conversationId: id, ok: false, error: normalizedError, warnings });
+        setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: normalizedError, warnings });
         trace.flush({ mode: "failed", ok: false, error: normalizedError });
       }
 

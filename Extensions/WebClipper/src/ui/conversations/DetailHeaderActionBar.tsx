@@ -28,7 +28,7 @@ export function DetailHeaderActionBar({
   const labelResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTrigger = async (action: DetailHeaderAction) => {
-    if (busy) return;
+    if (busy || action.disabled) return;
     setBusy(true);
     try {
       await action.onTrigger();
@@ -97,7 +97,8 @@ export function DetailHeaderActionBar({
           }}
           className={buttonClassName}
           aria-label={action.label}
-          disabled={busy}
+          aria-disabled={action.disabled ? 'true' : undefined}
+          disabled={busy || !!action.disabled}
         >
           {buttonLabel}
         </button>
@@ -154,7 +155,8 @@ export function DetailHeaderActionBar({
                 setMenuOpen(false);
                 void handleTrigger(action);
               }}
-              disabled={busy}
+              aria-disabled={action.disabled ? 'true' : undefined}
+              disabled={busy || !!action.disabled}
             >
               {action.label}
             </button>

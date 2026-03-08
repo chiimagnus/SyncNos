@@ -41,6 +41,13 @@ function phaseLabel(phase: ConversationSyncFeedbackState['phase']) {
   return '';
 }
 
+function conversationLabel(title: unknown, conversationId: unknown) {
+  const resolvedTitle = String(title || '').trim();
+  if (resolvedTitle) return resolvedTitle;
+  const resolvedId = Number(conversationId);
+  return resolvedId > 0 ? `${t('conversationLabel')} #${resolvedId}` : t('conversationLabel');
+}
+
 function SummaryBody(props: {
   tones: ReturnType<typeof toneClasses>;
   provider: string;
@@ -260,7 +267,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                       className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
                     >
                       <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
-                        {Number(warning?.conversationId) > 0 ? `${t('conversationLabel')} #${Number(warning?.conversationId)}` : t('conversationLabel')}
+                        {conversationLabel(warning?.conversationTitle, warning?.conversationId)}
                       </div>
                       <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
                         {String(warning?.message || warning?.code || 'warning')}
@@ -277,7 +284,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                 className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
               >
                 <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
-                  {failure.conversationId > 0 ? `${t('conversationLabel')} #${failure.conversationId}` : t('conversationLabel')}
+                  {conversationLabel(failure.conversationTitle, failure.conversationId)}
                 </div>
                 <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
                   {failure.error}
