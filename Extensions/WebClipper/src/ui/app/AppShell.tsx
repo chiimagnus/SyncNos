@@ -8,6 +8,7 @@ import { ConversationsProvider } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
+import { navIconButtonClassName } from '../shared/nav-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
@@ -166,7 +167,7 @@ function AppShellFrame() {
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
         {renderSidebar ? (
           <aside
-            className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/85 tw-p-0 tw-backdrop-blur-sm"
+            className="tw-relative tw-flex tw-flex-col tw-bg-[var(--panel)]/24 tw-p-0 tw-backdrop-blur-sm"
             style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
           >
             <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
@@ -187,7 +188,7 @@ function AppShellFrame() {
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className="tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-shadow-[var(--shadow)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+              className={['tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-shadow-[var(--shadow)]', navIconButtonClassName(false)].join(' ')}
               aria-label={t('expandSidebar')}
             >
               <ExpandIcon />

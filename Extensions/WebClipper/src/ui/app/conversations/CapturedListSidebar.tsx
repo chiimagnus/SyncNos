@@ -6,17 +6,7 @@ import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
 import { t } from '../../../i18n';
 import { ConversationListPane } from '../../conversations/ConversationListPane';
 import { useConversationsApp } from '../../conversations/conversations-context';
-
-function settingsClass(isActive: boolean) {
-  const base =
-    'tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-transition-colors tw-duration-200';
-  if (isActive) return `${base} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
-  return `${base} tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]`;
-}
-
-function iconButtonClass() {
-  return 'tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]';
-}
+import { navIconButtonClassName } from '../../shared/nav-styles';
 
 function RefreshIcon() {
   return (
@@ -42,7 +32,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
-      <div className="tw-border-b tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
+      <div className="tw-bg-[var(--panel)]/24 tw-backdrop-blur-sm">
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             {logoUrl ? (
@@ -64,7 +54,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                 backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
                 from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
               }}
-              className={({ isActive }) => settingsClass(isActive)}
+              className={({ isActive }) => navIconButtonClassName(isActive)}
             >
               <span className="tw-sr-only">{t('settingsLabel')}</span>
               <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
@@ -73,14 +63,14 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             <button
               type="button"
               onClick={() => refreshList().catch(() => {})}
-              className={iconButtonClass()}
+              className={navIconButtonClassName(false)}
               aria-label={t('refreshList')}
               disabled={loadingList}
             >
               <RefreshIcon />
             </button>
 
-            <button type="button" onClick={onCollapse} className={iconButtonClass()} aria-label={t('collapseSidebar')}>
+            <button type="button" onClick={onCollapse} className={navIconButtonClassName(false)} aria-label={t('collapseSidebar')}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
