@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { tabsQuery, tabsSendMessage } from '../webext/tabs';
 import { CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from './message-contracts';
 
@@ -35,7 +36,7 @@ export function registerUiMessageHandlers(router: AnyRouter) {
   router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async () => {
     const activeTab = await getActiveTab();
     if (!activeTab.ok) {
-      return router.err(activeTab.state.reason || 'Current page cannot be captured', {
+      return router.err(activeTab.state.reason || t('currentPageCannotBeCaptured'), {
         code: 'CAPTURE_UNAVAILABLE',
         state: activeTab.state,
       });
@@ -62,7 +63,7 @@ function unsupportedState(reason: string) {
   return {
     available: false,
     kind: 'unsupported',
-    label: 'Unavailable',
+    label: t('unavailable'),
     collectorId: null,
     reason,
   };
@@ -74,11 +75,11 @@ async function getActiveTab() {
   const tabId = Number(tab?.id);
 
   if (!tab || !Number.isFinite(tabId) || tabId <= 0) {
-    return { ok: false as const, state: unsupportedState('Active tab not found') };
+    return { ok: false as const, state: unsupportedState(t('activeTabNotFound')) };
   }
 
   if (!isHttpUrl(tab.url)) {
-    return { ok: false as const, state: unsupportedState('Current page cannot be captured') };
+    return { ok: false as const, state: unsupportedState(t('currentPageCannotBeCaptured')) };
   }
 
   return { ok: true as const, tab: { ...tab, id: tabId } };
@@ -91,8 +92,8 @@ async function relayToActiveTab(tabId: number, type: string) {
       return {
         ok: false as const,
         code: 'CAPTURE_UNAVAILABLE',
-        message: 'Current page cannot be captured',
-        state: unsupportedState('Current page cannot be captured'),
+        message: t('currentPageCannotBeCaptured'),
+        state: unsupportedState(t('currentPageCannotBeCaptured')),
       };
     }
 
@@ -101,7 +102,7 @@ async function relayToActiveTab(tabId: number, type: string) {
       return { ok: true as const, data: apiResponse.data };
     }
 
-    const message = String(apiResponse.error?.message || 'Current page cannot be captured');
+    const message = String(apiResponse.error?.message || t('currentPageCannotBeCaptured'));
     return {
       ok: false as const,
       code: 'CAPTURE_FAILED',
@@ -112,8 +113,8 @@ async function relayToActiveTab(tabId: number, type: string) {
     return {
       ok: false as const,
       code: 'CAPTURE_UNAVAILABLE',
-      message: 'Current page cannot be captured',
-      state: unsupportedState('Current page cannot be captured'),
+      message: t('currentPageCannotBeCaptured'),
+      state: unsupportedState(t('currentPageCannotBeCaptured')),
     };
   }
 }

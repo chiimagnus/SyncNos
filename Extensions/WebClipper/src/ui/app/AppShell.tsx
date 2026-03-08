@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { t } from '../../i18n';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
 import { ConversationsProvider } from '../conversations/conversations-context';
@@ -170,7 +171,7 @@ export default function AppShell() {
 
             <div
               role="separator"
-              aria-label="Resize sidebar"
+              aria-label={t('resizeSidebar')}
               onPointerDown={onResizePointerDown}
               className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-2 tw-cursor-col-resize tw-touch-none"
             >
@@ -185,7 +186,7 @@ export default function AppShell() {
               type="button"
               onClick={() => setCollapsed(false)}
               className="tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--muted)] tw-shadow-[var(--shadow)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-              aria-label="Expand sidebar"
+              aria-label={t('expandSidebar')}
             >
               <ExpandIcon />
             </button>
@@ -224,7 +225,7 @@ export default function AppShell() {
           )}
 
           {showSettingsSheet ? (
-            <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label="Settings">
+            <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label={t('settingsDialogAria')}>
               <div
                 className="tw-absolute tw-inset-0 tw-bg-transparent"
                 role="presentation"
@@ -241,7 +242,7 @@ export default function AppShell() {
                   type="button"
                   onClick={closeSettings}
                   className="tw-absolute tw-right-1 tw-top-1 tw-z-20 tw-inline-flex tw-size-6 tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0 tw-text-[var(--muted)] tw-shadow-none tw-outline-none tw-ring-0 tw-transition-colors tw-duration-200 hover:tw-bg-[var(--panel-strong)] hover:tw-text-[var(--text)]"
-                  aria-label="Close settings"
+                  aria-label={t('closeSettings')}
                 >
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

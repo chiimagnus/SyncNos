@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { UI_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
 import { send } from '../../platform/runtime/runtime';
+import { t } from '../../i18n';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -34,7 +35,7 @@ function unsupportedState(reason: string): CaptureState {
   return {
     available: false,
     kind: 'unsupported',
-    label: 'Unavailable',
+    label: t('unavailable'),
     collectorId: null,
     reason,
   };
@@ -44,7 +45,7 @@ export function usePopupCurrentPageCapture(input: {
   onCaptured?: () => void | Promise<void>;
 }) {
   const onCaptured = input.onCaptured;
-  const [captureState, setCaptureState] = useState<CaptureState>(() => unsupportedState('Checking current page...'));
+  const [captureState, setCaptureState] = useState<CaptureState>(() => unsupportedState(t('checkingCurrentPage')));
   const [checking, setChecking] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [status, setStatus] = useState<CaptureStatus | null>(null);
@@ -57,10 +58,10 @@ export function usePopupCurrentPageCapture(input: {
       setCaptureState(nextState);
       setStatus(null);
       if (!nextState.available) {
-        setStatus({ kind: 'error', message: nextState.reason || 'Current page cannot be captured' });
+        setStatus({ kind: 'error', message: nextState.reason || t('currentPageCannotBeCaptured') });
       }
     } catch (error) {
-      const message = (error as any)?.message ?? String(error ?? 'Current page cannot be captured');
+      const message = (error as any)?.message ?? String(error ?? t('currentPageCannotBeCaptured'));
       setCaptureState(unsupportedState(message));
       setStatus({ kind: 'error', message });
     } finally {
@@ -81,11 +82,11 @@ export function usePopupCurrentPageCapture(input: {
       const title = String(data?.title || '').trim();
       setStatus({
         kind: 'default',
-        message: title ? `Saved: ${title}` : 'Saved',
+        message: title ? `${t('savedPrefix')}${title}` : t('saved'),
       });
       return data;
     } catch (error) {
-      const message = (error as any)?.message ?? String(error ?? 'Capture failed');
+      const message = (error as any)?.message ?? String(error ?? t('captureFailedFallback'));
       await refreshState();
       setStatus({ kind: 'error', message });
       throw error;
@@ -108,9 +109,9 @@ export function usePopupCurrentPageCapture(input: {
   }, [refreshState]);
 
   const buttonLabel = useMemo(() => {
-    if (fetching) return 'Fetching...';
-    if (checking) return 'Checking...';
-    return captureState.label || 'Unavailable';
+    if (fetching) return t('fetchingDots');
+    if (checking) return t('checkingDots');
+    return captureState.label || t('unavailable');
   }, [captureState.label, checking, fetching]);
 
   return {
