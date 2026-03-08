@@ -65,7 +65,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
-    onSaveChatWithSettings,
     onResetChatWithSettings,
 
     obsidianApiBaseUrl,
@@ -149,9 +148,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeMaxChars={setChatWithMaxChars}
           platforms={chatWithPlatforms as any}
           onChangePlatforms={setChatWithPlatforms as any}
-          onSave={() => {
-            void onSaveChatWithSettings();
-          }}
           onReset={() => {
             void onResetChatWithSettings();
           }}
