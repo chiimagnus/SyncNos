@@ -26,7 +26,7 @@ export type ConversationsSceneProps = {
 
 export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderStateChange }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId, selectedConversation } = useConversationsApp();
+  const { activeId, selectedConversation, detailHeaderActions } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const { route: narrowRoute, openDetail, returnToList, listRestoreKey } = useNarrowListDetailRoute({
     isNarrow,
@@ -56,7 +56,7 @@ export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderS
     return () => {
       onPopupHeaderStateChange({ mode: 'list' });
     };
-  }, [activeId, isNarrow, narrowRoute, onPopupHeaderStateChange, returnToList, selectedConversation]);
+  }, [activeId, detailHeaderActions, isNarrow, narrowRoute, onPopupHeaderStateChange, returnToList, selectedConversation]);
 
   const list = (
     <ConversationListPane
