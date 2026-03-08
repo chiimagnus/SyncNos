@@ -4,6 +4,7 @@ import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailRoute } from '../shared/hooks/useNarrowListDetailRoute';
 
 import { t, formatConversationTitle } from '../../i18n';
+import type { DetailHeaderAction } from './detail-header-actions';
 import { ConversationDetailPane } from './ConversationDetailPane';
 import { ConversationListPane } from './ConversationListPane';
 import { useConversationsApp } from './conversations-context';
@@ -16,6 +17,7 @@ export type PopupHeaderState =
       mode: 'detail';
       title: string;
       subtitle: string;
+      actions: DetailHeaderAction[];
       onBack: () => void;
     };
 
@@ -50,6 +52,7 @@ export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderS
       mode: 'detail',
       title,
       subtitle,
+      actions: detailHeaderActions,
       onBack: returnToList,
     });
 
