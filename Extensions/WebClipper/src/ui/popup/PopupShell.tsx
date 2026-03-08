@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ChevronLeft, Settings as SettingsIcon } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL } from '../../platform/runtime/runtime';
 import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
 
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
+import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import type { PopupHeaderState } from '../conversations/ConversationsScene';
 import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
@@ -39,9 +40,6 @@ function PopupShellFrame() {
   };
 
   const showListActions = headerState.mode !== 'detail';
-  const detailActions = headerState.mode === 'detail' ? headerState.actions : [];
-  const headerActionButtonClass =
-    'tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/72 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]';
 
   return (
     <div
@@ -56,27 +54,12 @@ function PopupShellFrame() {
       <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
           {headerState.mode === 'detail' ? (
-            <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
-              <button
-                type="button"
-                onClick={headerState.onBack}
-                className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-                aria-label={t('backToChatsAria')}
-              >
-                <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-              </button>
-
-              <div className="tw-min-w-0 tw-flex-1">
-                <div className="tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em] tw-text-[var(--text)]">
-                  {headerState.title}
-                </div>
-                {headerState.subtitle ? (
-                  <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-                    {headerState.subtitle}
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            <DetailNavigationHeader
+              title={headerState.title}
+              subtitle={headerState.subtitle}
+              actions={headerState.actions}
+              onBack={headerState.onBack}
+            />
           ) : (
             <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
               <img
@@ -111,23 +94,6 @@ function PopupShellFrame() {
               >
                 <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
               </button>
-            </div>
-          ) : detailActions.length ? (
-            <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
-              {detailActions.map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  title={action.label}
-                  onClick={() => {
-                    action.onTrigger().catch(() => {});
-                  }}
-                  className={headerActionButtonClass}
-                  aria-label={action.label}
-                >
-                  {action.label}
-                </button>
-              ))}
             </div>
           ) : null}
         </div>

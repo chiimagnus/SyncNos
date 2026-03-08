@@ -23,8 +23,16 @@
 
 ## Findings
 
-- 待填写
+- Medium（已修复）：app 窄屏 detail 路由最初没有接入 header state，导致 `Open in Notion` 只在 popup 和宽屏 app 出现，在窄屏 app detail view 中消失。原因是 `AppShell` 的窄屏路径直接渲染 `ConversationsScene`，但没有消费 `onPopupHeaderStateChange`，同时 `ConversationsScene` 在窄屏 detail 模式下会把 `ConversationDetailPane` 设为 `hideHeader`。修复方式：
+  - 抽出共享 `DetailNavigationHeader`
+  - popup 改为复用共享导航头
+  - app 窄屏 shell 接入同一套 header state，并在 detail 模式渲染右上角动作
+  - 新增 `tests/smoke/app-shell-narrow-header-actions.test.ts` 锁定该路由
+- 其余 checklist 项未发现新增问题：Notion URL 仍由 `detail-header-actions.ts` 单点生成；popup 与 app 继续复用同一套 action resolver；无 `notionPageId` 时相关入口保持隐藏；本 phase 未触碰国际化字段。
 
 ## Fix Verification
 
-- 待填写
+- `npm --prefix Extensions/WebClipper run compile`
+- `npm --prefix Extensions/WebClipper run test -- tests/smoke/popup-shell-header-actions.test.ts tests/smoke/app-detail-header-actions.test.ts tests/smoke/detail-header-actions.test.ts tests/smoke/app-shell-narrow-header-actions.test.ts`
+- `npm --prefix Extensions/WebClipper run build`
+- 结果：全部通过，P1 审计闭环完成。

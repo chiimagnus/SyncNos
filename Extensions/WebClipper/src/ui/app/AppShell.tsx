@@ -5,8 +5,9 @@ import { t } from '../../i18n';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
 import { ConversationsProvider } from '../conversations/conversations-context';
-import { ConversationsScene } from '../conversations/ConversationsScene';
+import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
+import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
@@ -127,7 +128,8 @@ export default function AppShell() {
     window.addEventListener('pointercancel', onUp, true);
   };
 
-  function AppShellFrame() {
+function AppShellFrame() {
+    const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
@@ -195,17 +197,30 @@ export default function AppShell() {
           {isNarrow ? (
             <div
               className={[
-                'tw-h-full tw-min-h-0',
+                'tw-flex tw-h-full tw-min-h-0 tw-flex-col',
                 showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
               ].join(' ')}
               aria-hidden={showSettingsSheet}
             >
-              <Routes location={routesLocation}>
-                <Route path="/" element={<ConversationsScene />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/sync" element={<Navigate to="/settings" replace />} />
-                <Route path="/backup" element={<Navigate to="/settings" replace />} />
-              </Routes>
+              {location.pathname === '/' && narrowHeaderState.mode === 'detail' ? (
+                <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
+                  <DetailNavigationHeader
+                    title={narrowHeaderState.title}
+                    subtitle={narrowHeaderState.subtitle}
+                    actions={narrowHeaderState.actions}
+                    onBack={narrowHeaderState.onBack}
+                  />
+                </header>
+              ) : null}
+
+              <div className="tw-min-h-0 tw-flex-1">
+                <Routes location={routesLocation}>
+                  <Route path="/" element={<ConversationsScene onPopupHeaderStateChange={setNarrowHeaderState} />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/sync" element={<Navigate to="/settings" replace />} />
+                  <Route path="/backup" element={<Navigate to="/settings" replace />} />
+                </Routes>
+              </div>
             </div>
           ) : (
             <div
