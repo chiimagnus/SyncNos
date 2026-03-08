@@ -25,8 +25,14 @@
 
 ## Findings
 
-- 待填写
+- High（已修复）：`DetailHeaderActionBar.tsx` 最初在 `actions.length === 0` 时提前 `return null`，但有动作时才调用 hooks，存在从 `0 -> 1/2 actions` 重渲染时触发 hook 顺序错误的风险。修复方式：把 hooks 提前到稳定位置，再在 hooks 之后处理空动作分支，并补充菜单组件测试覆盖。
+- Medium（已修复）：`detail-header-obsidian-target.ts` 的 app-launch + retry 最初只在拉起 App 后重解析一次真实 note path；如果 Obsidian 冷启动较慢，就会反复对 `desiredFilePath` 做 `POST /open/{filename}`，无法在后续重试里发现 legacy / candidate 路径。修复方式：在 launch-before-retry 窗口内每次重试都重新走 resolver，直到拿到真正可打开的 note path 或到达重试上限。
+- Medium（已修复）：`DetailHeaderActionBar.tsx` 曾把 `action.onTrigger()` 异常直接吞掉，`Open in Notion` 打不开时会静默失败。修复方式：动作条统一把未处理异常转换为显式提示，同时保留 Obsidian action 内部的 `reportError` 兜底。
+- 经本地复核，其余 checklist 项未发现新增问题：Obsidian 文件打开仍然只走 Local REST API，`obsidian://open` 仅用于拉起 App；菜单没有泄漏到 detail header 之外；popup / app 继续共用同一套目标集合；本 phase 未触碰国际化字段。
 
 ## Fix Verification
 
-- 待填写
+- `npm --prefix Extensions/WebClipper run compile`
+- `npm --prefix Extensions/WebClipper run test -- tests/smoke/detail-header-obsidian-target.test.ts tests/smoke/detail-header-actions.test.ts tests/smoke/detail-header-action-menu.test.ts tests/smoke/popup-shell-header-actions.test.ts tests/smoke/app-detail-header-actions.test.ts tests/smoke/app-shell-narrow-header-actions.test.ts`
+- `npm --prefix Extensions/WebClipper run build`
+- 结果：全部通过，P2 审计闭环完成。

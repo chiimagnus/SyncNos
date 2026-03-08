@@ -25,4 +25,35 @@ describe("obsidian-note-path", () => {
     expect(p).toContain("My/Custom Folder/");
     expect(p).toMatch(/goodlinks-Untitled-[0-9a-f]{10}\.md$/);
   });
+
+  it("resolves an existing legacy file path before the stable path", async () => {
+    const mod = await loadNotePath();
+
+    const convo = { sourceType: "chat", source: "chatgpt", conversationKey: "abc", title: "Title" };
+    const legacyPath = mod.buildLegacyHashNotePath(convo);
+    const resolved = await mod.resolveExistingNotePath({
+      conversation: convo,
+      noteJsonAccept: "application/vnd.olrapi.note+json",
+      readSyncnosObject: () => ({ ok: false }),
+      client: {
+        async getVaultFile(path: string) {
+          if (path === mod.buildStableNotePath(convo)) {
+            return { ok: false, status: 404, error: { code: "not_found", message: "missing" } };
+          }
+          if (path === legacyPath) {
+            return { ok: true, data: { frontmatter: {} } };
+          }
+          return { ok: false, status: 404, error: { code: "not_found", message: "missing" } };
+        },
+        async listVaultDir() {
+          return { ok: true, data: { files: [] } };
+        },
+      },
+    });
+
+    expect(resolved.ok).toBe(true);
+    expect(resolved.found).toBe(true);
+    expect(resolved.resolvedFilePath).toBe(legacyPath);
+    expect(resolved.matchedBy).toBe("legacy");
+  });
 });

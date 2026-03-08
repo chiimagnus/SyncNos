@@ -13,11 +13,12 @@ import {
   buildIncrementalAppendMarkdown as buildDefaultIncrementalAppendMarkdown,
   replaceSyncnosFrontmatter as replaceDefaultSyncnosFrontmatter,
 } from './obsidian-markdown-writer.ts';
-import { buildStableNotePath as buildDefaultStableNotePath } from './obsidian-note-path.ts';
 import {
-  stableConversationHash16,
-  stableConversationId10 as stableConversationId10Fallback,
-} from '../../conversations/domain/file-naming';
+  buildStableNotePath as buildDefaultStableNotePath,
+  buildLegacyHashNotePath as buildDefaultLegacyHashNotePath,
+  resolveExistingNotePath as resolveDefaultExistingNotePath,
+  stableConversationId10 as stableConversationId10Default,
+} from './obsidian-note-path.ts';
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
@@ -152,6 +153,9 @@ function getLocalRestClientModule() {
 function getNotePathModule() {
   return {
     buildStableNotePath: buildDefaultStableNotePath,
+    buildLegacyHashNotePath: buildDefaultLegacyHashNotePath,
+    resolveExistingNotePath: resolveDefaultExistingNotePath,
+    stableConversationId10: stableConversationId10Default,
   };
 }
 
@@ -246,25 +250,6 @@ async function decideSyncModeForConversation({
   const folderByKindId = pathConfig
     ? { chat: safeString(pathConfig.chatFolder), article: safeString(pathConfig.articleFolder) }
     : undefined;
-  const desiredFilePath = notePathMod.buildStableNotePath(convo, { folderByKindId });
-  const desiredFolder = (() => {
-    const p = safeString(desiredFilePath);
-    const idx = p.lastIndexOf('/');
-    return idx > 0 ? p.slice(0, idx) : '';
-  })();
-  const legacyHashFilePath =
-    notePathMod && typeof (notePathMod as any).buildLegacyHashNotePath === 'function'
-      ? (notePathMod as any).buildLegacyHashNotePath(convo, { folderByKindId })
-      : (() => {
-          const source = safeString(convo && (convo as any).source) || 'unknown';
-          const id = stableConversationHash16(convo);
-          const filename = `${source}-${id}.md`;
-          return desiredFolder ? `${desiredFolder}/${filename}` : filename;
-        })();
-  const stableId10 =
-    notePathMod && typeof (notePathMod as any).stableConversationId10 === 'function'
-      ? safeString((notePathMod as any).stableConversationId10(convo))
-      : stableConversationId10Fallback(convo);
 
   const clientRes: any = await buildClient();
   if (!clientRes.ok) {
@@ -285,63 +270,22 @@ async function decideSyncModeForConversation({
 
   const metaMod = getSyncMetadataModule();
 
-  async function tryGetNote(path: string) {
-    const p = safeString(path);
-    if (!p) return null;
-    const r = await client.getVaultFile(p, { accept });
-    if (r && r.ok) return r;
-    if (r && r.status === 404) return null;
-    throw new Error(r && r.error && r.error.message ? r.error.message : 'remote error');
-  }
-
   let existingRemote: any = null;
   let existingPath = '';
   let deleteAfterFilePath = '';
 
-  try {
-    existingRemote = await tryGetNote(desiredFilePath);
-    existingPath = existingRemote ? desiredFilePath : '';
+  const pathResolution =
+    notePathMod && typeof (notePathMod as any).resolveExistingNotePath === 'function'
+      ? await (notePathMod as any).resolveExistingNotePath({
+          conversation: convo,
+          client,
+          noteJsonAccept: accept,
+          folderByKindId,
+          readSyncnosObject: metaMod.readSyncnosObject,
+        })
+      : null;
 
-    if (!existingRemote && legacyHashFilePath && legacyHashFilePath !== desiredFilePath) {
-      existingRemote = await tryGetNote(legacyHashFilePath);
-      if (existingRemote) {
-        existingPath = legacyHashFilePath;
-      }
-    }
-
-    if (!existingRemote && desiredFolder && stableId10 && typeof client.listVaultDir === 'function') {
-      const listRes = await client.listVaultDir(desiredFolder);
-      const raw = listRes && listRes.ok && listRes.data && typeof listRes.data === 'object' ? listRes.data : null;
-      const files = raw && Array.isArray((raw as any).files) ? (raw as any).files : [];
-      const suffix = `-${stableId10}.md`.toLowerCase();
-      const candidates = files
-        .map((x: any) => safeString(x))
-        .filter((x: string) => !!x && !x.endsWith('/') && x.toLowerCase().endsWith(suffix));
-
-      for (const entry of candidates) {
-        const fullPath = entry.includes('/') ? entry : desiredFolder ? `${desiredFolder}/${entry}` : entry;
-        if (!fullPath || fullPath === desiredFilePath) continue;
-        // eslint-disable-next-line no-await-in-loop
-        const r = await tryGetNote(fullPath);
-        if (!r) continue;
-        const note = r.data && typeof r.data === 'object' ? r.data : null;
-        const frontmatter =
-          note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
-        const parsed = metaMod.readSyncnosObject(frontmatter);
-        if (
-          parsed &&
-          parsed.ok &&
-          parsed.data &&
-          parsed.data.source === safeString(convo.source) &&
-          parsed.data.conversationKey === safeString(convo.conversationKey)
-        ) {
-          existingRemote = r;
-          existingPath = fullPath;
-          break;
-        }
-      }
-    }
-  } catch (e: any) {
+  if (pathResolution && !pathResolution.ok) {
     return {
       isFinal: true,
       row: buildPerConversationResult({
@@ -349,9 +293,19 @@ async function decideSyncModeForConversation({
         ok: false,
         mode: 'failed',
         appended: 0,
-        error: e?.message ? String(e.message) : String(e || 'remote error'),
+        error: pathResolution.error?.message ? String(pathResolution.error.message) : 'remote error',
         at: Date.now(),
       }),
+    };
+  }
+
+  const desiredFilePath = safeString(pathResolution?.desiredFilePath) || notePathMod.buildStableNotePath(convo, { folderByKindId });
+  existingPath = safeString(pathResolution?.resolvedFilePath);
+
+  if (pathResolution?.found && existingPath) {
+    existingRemote = {
+      ok: true,
+      data: pathResolution.note || null,
     };
   }
 

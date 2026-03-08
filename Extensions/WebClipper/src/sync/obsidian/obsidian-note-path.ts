@@ -75,12 +75,197 @@ function buildLegacyHashNotePath(conversation: any, opts?: { folderByKindId?: Re
   return folder ? `${folder}/${filename}` : filename;
 }
 
+type ResolveExistingNotePathInput = {
+  conversation: any;
+  client: any;
+  noteJsonAccept?: string;
+  folderByKindId?: Record<string, unknown>;
+  defaultFolder?: string;
+  readSyncnosObject?: (frontmatter: unknown) => any;
+};
+
+async function resolveExistingNotePath({
+  conversation,
+  client,
+  noteJsonAccept,
+  folderByKindId,
+  defaultFolder,
+  readSyncnosObject,
+}: ResolveExistingNotePathInput) {
+  const convo = conversation || {};
+  const desiredFilePath = buildStableNotePath(convo, { folderByKindId, defaultFolder });
+  const desiredFolder = (() => {
+    const p = safeString(desiredFilePath);
+    const idx = p.lastIndexOf('/');
+    return idx > 0 ? p.slice(0, idx) : '';
+  })();
+  const legacyHashFilePath = buildLegacyHashNotePath(convo, { folderByKindId, defaultFolder });
+  const stableId = stableConversationId10(convo);
+  const accept = safeString(noteJsonAccept) || 'application/vnd.olrapi.note+json';
+
+  if (!client || typeof client.getVaultFile !== 'function') {
+    return {
+      ok: false,
+      desiredFilePath,
+      resolvedFilePath: '',
+      found: false,
+      error: {
+        code: 'invalid_client',
+        message: 'Obsidian client is unavailable.',
+      },
+    };
+  }
+
+  async function tryGetNote(path: string) {
+    const filePath = safeString(path);
+    if (!filePath) return { ok: true, found: false, path: '' };
+
+    const res = await client.getVaultFile(filePath, { accept });
+    if (res && res.ok) {
+      return {
+        ok: true,
+        found: true,
+        path: filePath,
+        data: res.data,
+      };
+    }
+    if (res && (res.status === 404 || safeString(res?.error?.code) === 'not_found')) {
+      return { ok: true, found: false, path: filePath };
+    }
+    return {
+      ok: false,
+      found: false,
+      path: filePath,
+      error: res?.error || {
+        code: 'http_error',
+        status: Number(res?.status) || 0,
+        message: 'Obsidian request failed.',
+      },
+    };
+  }
+
+  const desiredResult = await tryGetNote(desiredFilePath);
+  if (!desiredResult.ok) {
+    return {
+      ok: false,
+      desiredFilePath,
+      resolvedFilePath: '',
+      found: false,
+      error: desiredResult.error,
+    };
+  }
+  if (desiredResult.found) {
+    return {
+      ok: true,
+      desiredFilePath,
+      resolvedFilePath: desiredFilePath,
+      found: true,
+      matchedBy: 'stable',
+      note: desiredResult.data || null,
+    };
+  }
+
+  if (legacyHashFilePath && legacyHashFilePath !== desiredFilePath) {
+    const legacyResult = await tryGetNote(legacyHashFilePath);
+    if (!legacyResult.ok) {
+      return {
+        ok: false,
+        desiredFilePath,
+        resolvedFilePath: '',
+        found: false,
+        error: legacyResult.error,
+      };
+    }
+    if (legacyResult.found) {
+      return {
+        ok: true,
+        desiredFilePath,
+        resolvedFilePath: legacyHashFilePath,
+        found: true,
+        matchedBy: 'legacy',
+        note: legacyResult.data || null,
+      };
+    }
+  }
+
+  if (desiredFolder && stableId && typeof client.listVaultDir === 'function' && typeof readSyncnosObject === 'function') {
+    const listRes = await client.listVaultDir(desiredFolder);
+    if (!listRes?.ok && Number(listRes?.status) !== 404 && safeString(listRes?.error?.code) !== 'not_found') {
+      return {
+        ok: false,
+        desiredFilePath,
+        resolvedFilePath: '',
+        found: false,
+        error: listRes?.error || {
+          code: 'http_error',
+          status: Number(listRes?.status) || 0,
+          message: 'Failed to list Obsidian folder.',
+        },
+      };
+    }
+
+    const files = listRes?.ok && Array.isArray((listRes.data as any)?.files) ? (listRes.data as any).files : [];
+    const suffix = `-${stableId}.md`.toLowerCase();
+    const candidates = files
+      .map((entry: unknown) => safeString(entry))
+      .filter((entry: string) => !!entry && !entry.endsWith('/') && entry.toLowerCase().endsWith(suffix));
+
+    for (const entry of candidates) {
+      const fullPath = entry.includes('/') ? entry : desiredFolder ? `${desiredFolder}/${entry}` : entry;
+      if (!fullPath || fullPath === desiredFilePath) continue;
+      const candidateResult = await tryGetNote(fullPath);
+      if (!candidateResult.ok) {
+        return {
+          ok: false,
+          desiredFilePath,
+          resolvedFilePath: '',
+          found: false,
+          error: candidateResult.error,
+        };
+      }
+      if (!candidateResult.found) continue;
+
+      const frontmatter =
+        candidateResult.data && typeof candidateResult.data === 'object' && candidateResult.data.frontmatter && typeof candidateResult.data.frontmatter === 'object'
+          ? candidateResult.data.frontmatter
+          : null;
+      const parsed = readSyncnosObject(frontmatter);
+      if (
+        parsed &&
+        parsed.ok &&
+        parsed.data &&
+        safeString(parsed.data.source) === safeString(convo.source) &&
+        safeString(parsed.data.conversationKey) === safeString(convo.conversationKey)
+      ) {
+        return {
+          ok: true,
+          desiredFilePath,
+          resolvedFilePath: fullPath,
+          found: true,
+          matchedBy: 'candidate',
+          note: candidateResult.data || null,
+        };
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    desiredFilePath,
+    resolvedFilePath: desiredFilePath,
+    found: false,
+    matchedBy: 'missing',
+    note: null,
+  };
+}
+
 const api = {
   DEFAULT_OBSIDIAN_FOLDER,
   folderForConversation,
   normalizeFolderPath,
   buildStableNotePath,
   buildLegacyHashNotePath,
+  resolveExistingNotePath,
   stableConversationHash16,
   stableConversationId10,
 };
@@ -91,6 +276,7 @@ export {
   normalizeFolderPath,
   buildStableNotePath,
   buildLegacyHashNotePath,
+  resolveExistingNotePath,
   stableConversationHash16,
   stableConversationId10,
 };
