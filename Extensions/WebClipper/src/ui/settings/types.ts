@@ -1,13 +1,19 @@
 export type SettingsSectionKey = 'backup' | 'notion' | 'chat_with' | 'obsidian' | 'inpage' | 'about';
 
-export const SETTINGS_SECTIONS: ReadonlyArray<{ key: SettingsSectionKey }> = [
-  { key: 'backup' },
-  { key: 'notion' },
-  { key: 'obsidian' },
-  { key: 'chat_with' },
-  { key: 'inpage' },
-  { key: 'about' },
+export const SETTINGS_SECTION_GROUPS: ReadonlyArray<ReadonlyArray<{ key: SettingsSectionKey }>> = [
+  [
+    { key: 'backup' },
+    { key: 'notion' },
+    { key: 'obsidian' },
+  ],
+  [
+    { key: 'chat_with' },
+    { key: 'inpage' },
+  ],
+  [{ key: 'about' }],
 ];
+
+export const SETTINGS_SECTIONS: ReadonlyArray<{ key: SettingsSectionKey }> = SETTINGS_SECTION_GROUPS.flat();
 
 export const DEFAULT_SETTINGS_SECTION_KEY: SettingsSectionKey = SETTINGS_SECTIONS[0]?.key ?? 'backup';
 
