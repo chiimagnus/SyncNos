@@ -1,7 +1,7 @@
 import { ChevronLeft } from 'lucide-react';
 
 import { t } from '../../i18n';
-import type { DetailHeaderAction } from './detail-header-actions';
+import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 
 export type DetailNavigationHeaderProps = {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { DetailHeaderAction } from './detail-header-actions';
+import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
