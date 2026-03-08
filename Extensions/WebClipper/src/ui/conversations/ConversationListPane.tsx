@@ -8,6 +8,7 @@ import { tabsCreate } from '../../platform/webext/tabs';
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
+import { navMiniIconButtonClassName } from '../shared/nav-styles';
 
 type SourceMeta = { key: string; label: string };
 
@@ -330,9 +331,9 @@ export function ConversationListPane({
 
   const effectiveActiveRowId = activeRowId != null ? activeRowId : activeId;
   const actionButtonBase =
-    'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-extrabold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
-  const actionButton = `${actionButtonBase} tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-[var(--text)] hover:tw-bg-[var(--btn-bg-hover)]`;
-  const dangerButton = `${actionButtonBase} tw-border-[var(--danger)] tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
+    'tw-inline-flex tw-min-h-9 tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-px-3 tw-text-xs tw-font-extrabold tw-shadow-none tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
+  const actionButton = `${actionButtonBase} tw-bg-[var(--btn-bg)] tw-text-[var(--text)] hover:tw-bg-[var(--btn-bg-hover)]`;
+  const dangerButton = `${actionButtonBase} tw-bg-[var(--danger-bg)] tw-text-[var(--danger)] hover:tw-bg-[#ffd7d3]`;
 
   const onConfirmDelete = async () => {
     await deleteSelected();
@@ -348,7 +349,7 @@ export function ConversationListPane({
       >
         <div className="tw-grid tw-gap-2 tw-px-3 tw-py-3">
           {filteredItems.length ? null : (
-            <div className="tw-rounded-xl tw-border tw-border-dashed tw-border-[var(--border)] tw-bg-[var(--panel)]/70 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <div className="tw-rounded-xl tw-bg-[var(--panel)]/45 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
               {t('noConversations')}
             </div>
           )}
@@ -361,10 +362,8 @@ export function ConversationListPane({
             const isActive = !suppressActiveRow && Number(id) === Number(effectiveActiveRowId);
 
             const rowBase =
-              'tw-group tw-relative tw-flex tw-gap-2.5 tw-rounded-2xl tw-border tw-bg-[#fffaf7] tw-p-3 tw-transition tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]';
-            const rowClass = isActive
-              ? `${rowBase} tw-border-[var(--border-strong)] tw-bg-[#fff2ea] tw-shadow-[var(--shadow)]`
-              : `${rowBase} tw-border-[var(--border)] hover:tw-border-[var(--border-strong)] hover:tw-shadow-[var(--shadow)] hover:-tw-translate-y-0.5`;
+              'tw-group tw-relative tw-flex tw-gap-2.5 tw-rounded-xl tw-bg-white/26 tw-p-3 tw-transition-colors tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]';
+            const rowClass = isActive ? `${rowBase} tw-bg-[var(--btn-bg)]` : `${rowBase} hover:tw-bg-white/34`;
 
             return (
               <div
@@ -379,7 +378,7 @@ export function ConversationListPane({
                 {isActive ? (
                   <span
                     aria-hidden="true"
-                    className="tw-absolute tw-left-0 tw-top-2 tw-h-[calc(100%-16px)] tw-w-1 tw-rounded-r-full tw-bg-[var(--text)] tw-shadow-[0_0_0_1px_rgba(217,89,38,0.18)]"
+                    className="tw-absolute tw-left-0 tw-top-2 tw-h-[calc(100%-16px)] tw-w-1 tw-rounded-r-full tw-bg-[var(--text)]/85"
                   />
                 ) : null}
                 <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--muted)]">
@@ -400,9 +399,7 @@ export function ConversationListPane({
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
                     <button
-                      className={
-                        'tw-inline-flex tw-size-[18px] tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[12px] tw-font-black tw-text-[var(--muted)] hover:tw-border-[rgba(217,89,38,0.35)] hover:tw-bg-white hover:tw-text-[var(--text)]'
-                      }
+                      className={navMiniIconButtonClassName(false)}
                       type="button"
                       aria-label={t('copyFullMarkdown')}
                       title={copiedId === id ? t('copied') : t('copyFullMarkdown')}
@@ -412,7 +409,7 @@ export function ConversationListPane({
                     </button>
 
                     <button
-                      className="tw-inline-flex tw-size-[18px] tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-white/75 tw-text-[12px] tw-font-black tw-text-[var(--muted)] hover:tw-border-[rgba(217,89,38,0.35)] hover:tw-bg-white hover:tw-text-[var(--text)] disabled:tw-cursor-not-allowed disabled:tw-opacity-40"
+                      className={navMiniIconButtonClassName(!safeUrl)}
                       type="button"
                       aria-label={t('openOriginalChat')}
                       title={safeUrl ? t('openChat') : t('noLinkAvailable')}

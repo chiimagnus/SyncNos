@@ -1,4 +1,5 @@
 import { t } from '../../i18n';
+import { navGroupTitleClassName, navItemClassName } from '../shared/nav-styles';
 import type { SettingsSectionKey } from './types';
 import { SETTINGS_SECTION_GROUPS } from './types';
 
@@ -25,9 +26,7 @@ export function SettingsSidebarNav(props: {
                 groupIndex === 0 ? '' : 'tw-pt-3',
               ].join(' ')}
             >
-              <div className="tw-px-3 tw-pb-1.5 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.16em] tw-text-[var(--muted)] tw-opacity-65">
-                {group.title}
-              </div>
+              <div className={navGroupTitleClassName()}>{group.title}</div>
               {group.sections.map((section) => {
                 const active = activeSection === section.key;
                 const label = sectionLabel(section.key);
@@ -36,12 +35,7 @@ export function SettingsSidebarNav(props: {
                     key={section.key}
                     type="button"
                     onClick={() => onSelectSection(section.key)}
-                    className={[
-                      'tw-flex tw-min-h-9 tw-w-full tw-appearance-none tw-items-center tw-rounded-xl tw-border-0 tw-px-3 tw-text-left tw-shadow-none tw-transition-colors tw-duration-150',
-                      active
-                        ? 'tw-bg-[var(--btn-bg)] tw-text-[var(--text)]'
-                        : 'tw-bg-transparent tw-text-[var(--muted)] hover:tw-bg-white/38 hover:tw-text-[var(--text)]',
-                    ].join(' ')}
+                    className={navItemClassName(active)}
                     aria-current={active ? 'page' : undefined}
                   >
                     <div className="tw-truncate tw-text-[13px] tw-font-black tw-leading-5">{label}</div>
