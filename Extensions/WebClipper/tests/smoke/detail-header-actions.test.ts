@@ -22,10 +22,9 @@ vi.mock('../../src/integrations/openin/obsidian-open-target', () => ({
 
 import {
   DETAIL_HEADER_ACTION_LABELS,
-  buildNotionPageUrl,
-  normalizeNotionPageId,
   resolveDetailHeaderActions,
 } from '../../src/integrations/detail-header-actions';
+import { buildNotionPageUrl, normalizeNotionPageId } from '../../src/integrations/openin/openin-detail-header-actions';
 
 describe('detail-header-actions', () => {
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
