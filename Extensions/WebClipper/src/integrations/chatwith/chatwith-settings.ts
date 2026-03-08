@@ -1,6 +1,6 @@
-import { storageGet, storageSet } from '../platform/storage/local';
-import { formatConversationMarkdown } from '../conversations/domain/markdown';
-import type { Conversation, ConversationDetail } from '../conversations/domain/models';
+import { storageGet, storageSet } from '../../platform/storage/local';
+import { formatConversationMarkdown } from '../../conversations/domain/markdown';
+import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
 
 export type ChatWithAiPlatform = {
   id: string;
