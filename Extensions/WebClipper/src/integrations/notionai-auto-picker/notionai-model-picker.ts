@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { storageGet } from '../platform/storage/local';
+import { storageGet } from '../../platform/storage/local';
 
   const STORAGE_KEY = "notion_ai_preferred_model_index";
   // 1-based: menu order includes "自动" at #1.

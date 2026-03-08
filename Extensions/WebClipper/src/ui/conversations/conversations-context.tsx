@@ -5,8 +5,8 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { createZipBlob } from '../../sync/backup/zip-utils';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
-import type { DetailHeaderAction } from './detail-header-actions';
-import { resolveDetailHeaderActions } from './detail-header-actions';
+import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
+import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
 import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 
 type ConversationsAppState = {
