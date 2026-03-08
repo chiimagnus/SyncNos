@@ -9,7 +9,7 @@ import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
 import { getURL, send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
-import { tabsCreate } from '../../../platform/webext/tabs';
+import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
 
 import {
   formatProgress,
@@ -496,8 +496,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   );
 
   const openExtensionAppSettings = useCallback(async () => {
-    const url = getURL('/app.html#/settings');
-    await tabsCreate({ url });
+    await openOrFocusExtensionAppTab({ route: '/settings' });
   }, []);
 
   const handleBackupImportClick = useCallback(async () => {
