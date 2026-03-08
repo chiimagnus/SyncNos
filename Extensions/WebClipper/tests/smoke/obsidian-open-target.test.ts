@@ -7,7 +7,7 @@ import {
 } from '../../src/integrations/openin/obsidian-open-target';
 
 describe('obsidian-open-target', () => {
-  it('surfaces a launch-before-retry trigger when the local API is unreachable', async () => {
+  it('reports the header action as unavailable when the local API is unreachable', async () => {
     const target = await resolveObsidianOpenTarget({
       conversation: {
         id: 1,
@@ -38,8 +38,9 @@ describe('obsidian-open-target', () => {
       },
     });
 
-    expect(target.available).toBe(true);
-    expect(target.trigger?.launchBeforeRetry).toBe(true);
+    expect(target.available).toBe(false);
+    expect(target.availabilityState).toBe('api-unavailable');
+    expect(target.error?.code).toBe('network_error');
   });
 
   it('launches the app URI and then opens the resolved note through the local REST API', async () => {
@@ -85,15 +86,27 @@ describe('obsidian-open-target', () => {
       },
       services,
     });
-    expect(target.available).toBe(true);
-    expect(target.trigger?.launchBeforeRetry).toBe(true);
+    expect(target.available).toBe(false);
+    expect(target.availabilityState).toBe('api-unavailable');
 
     const launchProtocolUrl = vi.fn(async () => true);
     const wait = vi.fn(async () => {});
     const reportError = vi.fn();
 
     const result = await openObsidianTarget({
-      trigger: target.trigger!,
+      trigger: {
+        provider: 'obsidian',
+        openMode: 'rest-api',
+        conversation: {
+          id: 2,
+          source: 'chatgpt',
+          conversationKey: 'conv-2',
+          title: 'Conversation',
+        },
+        resolvedNotePath: 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md',
+        launchBeforeRetry: true,
+        retryPolicy: { maxAttempts: 3, launchDelayMs: 1200, retryDelayMs: 750 },
+      },
       services,
       port: {
         launchProtocolUrl,
@@ -156,14 +169,27 @@ describe('obsidian-open-target', () => {
       },
       services,
     });
-    expect(target.available).toBe(true);
+    expect(target.available).toBe(false);
+    expect(target.availabilityState).toBe('api-unavailable');
 
     const launchProtocolUrl = vi.fn(async () => true);
     const wait = vi.fn(async () => {});
     const reportError = vi.fn();
 
     const result = await openObsidianTarget({
-      trigger: target.trigger!,
+      trigger: {
+        provider: 'obsidian',
+        openMode: 'rest-api',
+        conversation: {
+          id: 3,
+          source: 'chatgpt',
+          conversationKey: 'conv-3',
+          title: 'Conversation',
+        },
+        resolvedNotePath: 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md',
+        launchBeforeRetry: true,
+        retryPolicy: { maxAttempts: 3, launchDelayMs: 1200, retryDelayMs: 750 },
+      },
       services,
       port: {
         launchProtocolUrl,
@@ -237,5 +263,42 @@ describe('obsidian-open-target', () => {
     expect(launchProtocolUrl).toHaveBeenCalledWith(OBSIDIAN_APP_LAUNCH_URL);
     expect(openVaultFile).toHaveBeenCalledTimes(2);
     expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it('marks the header action as not synced when the note does not exist yet', async () => {
+    const target = await resolveObsidianOpenTarget({
+      conversation: {
+        id: 5,
+        source: 'chatgpt',
+        conversationKey: 'conv-5',
+        title: 'Conversation',
+      },
+      services: {
+        settingsStore: {
+          getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+          getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
+        },
+        localRestClient: {
+          NOTE_JSON_ACCEPT: 'application/vnd.olrapi.note+json',
+          createClient: vi.fn(() => ({ ok: true, openVaultFile: vi.fn(async () => ({ ok: true })) })),
+        },
+        notePath: {
+          buildStableNotePath: vi.fn(() => 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md'),
+          resolveExistingNotePath: vi.fn(async () => ({
+            ok: true,
+            desiredFilePath: 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md',
+            resolvedFilePath: '',
+            found: false,
+          })),
+        },
+        metadata: {
+          readSyncnosObject: vi.fn(),
+        },
+      },
+    });
+
+    expect(target.available).toBe(false);
+    expect(target.availabilityState).toBe('not-synced');
+    expect(target.error?.code).toBe('note_not_found');
   });
 });

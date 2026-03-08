@@ -9,6 +9,7 @@ vi.mock('../../src/platform/storage/local', () => ({
 const resolveObsidianOpenTargetMock = vi.fn(async () => ({
   available: false,
   label: 'Open in Obsidian',
+  availabilityState: 'not-synced',
   error: { code: 'note_not_found', message: 'missing' },
 }));
 const openObsidianTargetMock = vi.fn(async () => ({ ok: true }));
@@ -38,6 +39,7 @@ describe('detail-header-actions', () => {
     resolveObsidianOpenTargetMock.mockResolvedValueOnce({
       available: false,
       label: 'Open in Obsidian',
+      availabilityState: 'not-synced',
       error: { code: 'note_not_found', message: 'missing' },
     });
 
@@ -58,6 +60,7 @@ describe('detail-header-actions', () => {
     resolveObsidianOpenTargetMock.mockResolvedValueOnce({
       available: false,
       label: 'Open in Obsidian',
+      availabilityState: 'not-synced',
       error: { code: 'note_not_found', message: 'missing' },
     });
 
@@ -89,6 +92,7 @@ describe('detail-header-actions', () => {
     resolveObsidianOpenTargetMock.mockResolvedValueOnce({
       available: true,
       label: 'Open in Obsidian',
+      availabilityState: 'ready',
       trigger: {
         provider: 'obsidian',
         openMode: 'rest-api',
@@ -128,6 +132,7 @@ describe('detail-header-actions', () => {
     resolveObsidianOpenTargetMock.mockResolvedValueOnce({
       available: true,
       label: 'Open in Obsidian',
+      availabilityState: 'ready',
       trigger: {
         provider: 'obsidian',
         openMode: 'rest-api',
@@ -189,6 +194,7 @@ describe('detail-header-actions', () => {
     resolveObsidianOpenTargetMock.mockResolvedValueOnce({
       available: false,
       label: 'Open in Obsidian',
+      availabilityState: 'not-synced',
       error: { code: 'note_not_found', message: 'missing' },
     });
 
@@ -250,5 +256,28 @@ describe('detail-header-actions', () => {
     } finally {
       Object.defineProperty(globalThis, 'navigator', { configurable: true, value: prevNavigator });
     }
+  });
+
+  it('returns a disabled API status action when Obsidian is unavailable', async () => {
+    resolveObsidianOpenTargetMock.mockResolvedValueOnce({
+      available: false,
+      label: 'Open in Obsidian',
+      availabilityState: 'api-unavailable',
+      error: { code: 'network_error', message: 'fetch failed' },
+    });
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 7,
+        source: 'chatgpt',
+        conversationKey: 'conv-7',
+        title: 'Conversation',
+      },
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.provider).toBe('obsidian');
+    expect(actions[0]?.label).toBe('Obsidian API not connected');
+    expect(actions[0]?.disabled).toBe(true);
   });
 });
