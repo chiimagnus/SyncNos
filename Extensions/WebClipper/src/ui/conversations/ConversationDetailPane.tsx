@@ -3,6 +3,7 @@ import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
+import { buttonTintClassName } from '../shared/button-styles';
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -33,9 +34,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
 
-  const baseButtonClass =
-    'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
-  const outlineButtonClass = `${baseButtonClass} tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--text)] hover:tw-border-[var(--border-strong)]`;
+  const outlineButtonClass = [buttonTintClassName(), 'tw-bg-white/38 hover:tw-bg-white/55'].join(' ');
 
   return (
     <section>
