@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailRoute } from '../shared/hooks/useNarrowListDetailRoute';
 
+import { t, formatConversationTitle } from '../../i18n';
 import { ConversationDetailPane } from './ConversationDetailPane';
 import { ConversationListPane } from './ConversationListPane';
 import { useConversationsApp } from './conversations-context';
@@ -40,7 +41,7 @@ export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderS
       return;
     }
 
-    const title = activeId ? String(selectedConversation?.title || '').trim() || '(Untitled)' : 'Chats';
+    const title = activeId ? formatConversationTitle(selectedConversation?.title) : t('chatsTitle');
     const subtitle = activeId && selectedConversation
       ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
       : '';

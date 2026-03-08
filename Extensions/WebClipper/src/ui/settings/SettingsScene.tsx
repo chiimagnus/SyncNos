@@ -169,7 +169,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           lastBackupExportAt={lastBackupExportAt}
           backupImportRef={backupImportRef}
           fileInputRef={fileInputRef}
-          importLabel={useAppImport ? 'Import in App' : undefined}
+          importLabel={useAppImport ? t('importInApp') : undefined}
           onImportClick={
             useAppImport
               ? () => {

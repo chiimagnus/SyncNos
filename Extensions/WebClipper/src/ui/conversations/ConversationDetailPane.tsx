@@ -1,6 +1,6 @@
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
-import { t } from '../../i18n';
+import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 
 function formatTime(ts?: number) {
@@ -45,7 +45,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
 
               <div className="tw-min-w-0">
                 <h2 className="tw-m-0 tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text)] tw-break-words [overflow-wrap:anywhere]">
-                  {selected ? selected.title || t('untitled') : t('detailTitle')}
+                  {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
                 </h2>
                 <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
                   {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : t('selectConversationHint')}
@@ -67,7 +67,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 <ChatMessageBubble
                   key={String((m as any).id)}
                   role={(m as any).role}
-                  headerLeft={String((m as any).role || 'Message')}
+                  headerLeft={String((m as any).role || t('messageRoleFallback'))}
                   headerRight={formatTime((m as any).updatedAt)}
                   markdown={text}
                 />
