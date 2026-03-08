@@ -25,10 +25,12 @@ function normalizePerConversation(rows: unknown) {
     const value = row && typeof row === 'object' ? row as Record<string, unknown> : {};
     return {
       conversationId: Number(value.conversationId) || 0,
+      conversationTitle: value.conversationTitle == null ? undefined : String(value.conversationTitle || ''),
       ok: value.ok === true,
       mode: String(value.mode || (value.ok === true ? 'ok' : 'failed')),
       appended: Number(value.appended) || 0,
       error: String(value.error || ''),
+      warnings: Array.isArray(value.warnings) ? value.warnings : undefined,
       at: Number(value.at) || Date.now(),
     };
   });

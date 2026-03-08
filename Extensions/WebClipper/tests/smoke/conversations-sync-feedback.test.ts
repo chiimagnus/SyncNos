@@ -307,7 +307,15 @@ describe('Conversations sync feedback', () => {
         okCount: 0,
         failCount: 1,
         perConversation: [
-          { conversationId: 11, ok: false, mode: 'failed', appended: 0, error: 'missing parentPageId', at: Date.now() },
+          {
+            conversationId: 11,
+            conversationTitle: 'Sync feedback chat',
+            ok: false,
+            mode: 'failed',
+            appended: 0,
+            error: 'missing parentPageId',
+            at: Date.now(),
+          },
         ],
       },
     });
@@ -324,6 +332,8 @@ describe('Conversations sync feedback', () => {
 
     const details = document.querySelector('[aria-label="Notion sync details"]');
     expect(details).toBeTruthy();
+    expect(details?.textContent).toContain('Sync feedback chat');
+    expect(details?.textContent).not.toContain('Conversation #11');
     expect(details?.textContent).toContain('missing parentPageId');
 
     clickDismissButton();
@@ -351,6 +361,7 @@ describe('Conversations sync feedback', () => {
         perConversation: [
           {
             conversationId: 11,
+            conversationTitle: 'Sync feedback chat',
             ok: true,
             mode: 'created',
             appended: 1,
@@ -372,6 +383,7 @@ describe('Conversations sync feedback', () => {
     const details = document.querySelector('[aria-label="Notion sync details"]');
     expect(details).toBeTruthy();
     expect(details?.textContent).toContain('Warnings');
+    expect(details?.textContent).toContain('Sync feedback chat');
     expect(details?.textContent).toContain('Some images could not be uploaded.');
   });
 
