@@ -10,6 +10,14 @@ import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/
 import { getURL, send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
+import {
+  DEFAULT_CHAT_WITH_MAX_CHARS,
+  DEFAULT_CHAT_WITH_PLATFORMS,
+  DEFAULT_CHAT_WITH_PROMPT_TEMPLATE,
+  loadChatWithSettings,
+  resetChatWithSettings,
+  saveChatWithSettings,
+} from '../../../chat-with/chat-with-settings';
 
 import {
   formatProgress,
@@ -105,6 +113,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   // Inpage
   const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean>(false);
 
+  // Chat with AI
+  const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
+  const [chatWithMaxChars, setChatWithMaxChars] = useState<string>(String(DEFAULT_CHAT_WITH_MAX_CHARS));
+  const [chatWithPlatforms, setChatWithPlatforms] = useState<any[]>(DEFAULT_CHAT_WITH_PLATFORMS.slice());
+
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
 
@@ -174,6 +187,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setObsidianArticleFolder(String(obsidianSettings?.articleFolder || ''));
       setObsidianApiKeyDraft('');
       setObsidianStatus('Idle');
+
+      const chatWith = await loadChatWithSettings();
+      setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
+      setChatWithMaxChars(String(chatWith.maxChars || DEFAULT_CHAT_WITH_MAX_CHARS));
+      setChatWithPlatforms(Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice());
     });
   }, [runTask]);
 
@@ -422,6 +440,25 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     });
   }, [refresh, runTask]);
 
+  const onSaveChatWithSettings = useCallback(async () => {
+    await runTask(async () => {
+      const max = Number(String(chatWithMaxChars || '').trim());
+      await saveChatWithSettings({
+        promptTemplate: String(chatWithPromptTemplate || ''),
+        maxChars: Number.isFinite(max) ? Math.floor(max) : DEFAULT_CHAT_WITH_MAX_CHARS,
+        platforms: Array.isArray(chatWithPlatforms) ? (chatWithPlatforms as any) : [],
+      } as any);
+      await refresh();
+    });
+  }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate, refresh, runTask]);
+
+  const onResetChatWithSettings = useCallback(async () => {
+    await runTask(async () => {
+      await resetChatWithSettings();
+      await refresh();
+    });
+  }, [refresh, runTask]);
+
   const handleBackupExport = useCallback(async () => {
     if (busy) return;
 
@@ -593,5 +630,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     inpageSupportedOnly,
     onToggleInpageSupportedOnly,
+
+    chatWithPromptTemplate,
+    setChatWithPromptTemplate,
+    chatWithMaxChars,
+    setChatWithMaxChars,
+    chatWithPlatforms,
+    setChatWithPlatforms,
+    onSaveChatWithSettings,
+    onResetChatWithSettings,
   };
 }
