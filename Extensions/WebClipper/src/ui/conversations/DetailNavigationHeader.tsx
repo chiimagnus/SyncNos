@@ -17,6 +17,10 @@ const headerActionButtonClass =
   'tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/72 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]';
 
 export function DetailNavigationHeader({ title, subtitle, actions, onBack }: DetailNavigationHeaderProps) {
+  const safeActions = Array.isArray(actions) ? actions : [];
+  const openActions = safeActions.filter((action) => action.slot === 'open');
+  const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
+
   return (
     <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
       <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
@@ -41,11 +45,21 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         </div>
       </div>
 
-      <DetailHeaderActionBar
-        actions={actions}
-        buttonClassName={headerActionButtonClass}
-        className="tw-flex tw-shrink-0 tw-items-center tw-gap-2"
-      />
+      <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
+        <DetailHeaderActionBar
+          actions={chatWithActions}
+          buttonClassName={headerActionButtonClass}
+          menuTriggerLabel="Chat with..."
+          menuTriggerTitle="Chat with..."
+          menuTriggerAriaLabel="Chat with"
+          menuAriaLabel="Chat with"
+        />
+        <DetailHeaderActionBar
+          actions={openActions}
+          buttonClassName={headerActionButtonClass}
+          className="tw-flex tw-items-center tw-gap-2"
+        />
+      </div>
     </div>
   );
 }

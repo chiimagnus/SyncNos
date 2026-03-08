@@ -62,6 +62,7 @@ vi.mock('../../src/ui/conversations/conversations-context', () => ({
       source: 'gemini',
       conversationKey: 'conv-11',
     },
+    detailHeaderActions: [],
     refreshList: vi.fn(),
     refreshActiveDetail: vi.fn(),
   }),
