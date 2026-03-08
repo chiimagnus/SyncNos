@@ -6,8 +6,8 @@ import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app'
 
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
-import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import type { PopupHeaderState } from '../conversations/ConversationsScene';
+import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-styles';
 import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
 
@@ -51,16 +51,9 @@ function PopupShellFrame() {
         lineHeight: 1.45,
       }}
     >
-      <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-          {headerState.mode === 'detail' ? (
-            <DetailNavigationHeader
-              title={headerState.title}
-              subtitle={headerState.subtitle}
-              actions={headerState.actions}
-              onBack={headerState.onBack}
-            />
-          ) : (
+      {showListActions ? (
+        <header className="tw-bg-[var(--panel)]/24 tw-px-3 tw-py-2 tw-backdrop-blur-sm">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
             <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
               <img
                 className="tw-size-7 tw-rounded-lg tw-object-contain"
@@ -70,16 +63,14 @@ function PopupShellFrame() {
               />
               <span className="tw-min-w-0 tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
             </div>
-          )}
 
-          {showListActions ? (
             <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
               <button
                 type="button"
                 title={buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel}
                 onClick={() => capture().catch(() => {})}
                 disabled={buttonDisabled}
-                className="tw-inline-flex tw-h-8 tw-max-w-[168px] tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/72 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] disabled:tw-cursor-not-allowed disabled:tw-text-[var(--muted)] disabled:tw-opacity-70"
+                className={navPillButtonClassName()}
                 aria-label={buttonLabel}
               >
                 <span className="tw-truncate">{buttonLabel}</span>
@@ -89,15 +80,15 @@ function PopupShellFrame() {
                 type="button"
                 title={t('openSettings')}
                 onClick={() => onOpenSettings().catch(() => {})}
-                className="tw-inline-flex tw-size-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
+                className={navIconButtonSmClassName(false)}
                 aria-label={t('openSettingsAria')}
               >
                 <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
-          ) : null}
-        </div>
-      </header>
+          </div>
+        </header>
+      ) : null}
 
       {showListActions && status?.message ? (
         <div
