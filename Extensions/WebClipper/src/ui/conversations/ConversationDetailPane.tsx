@@ -29,6 +29,10 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
     detailHeaderActions,
   } = useConversationsApp();
 
+  const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
+  const openActions = safeActions.filter((action) => action.slot === 'open');
+  const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
+
   const baseButtonClass =
     'tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3 tw-text-xs tw-font-bold tw-transition-colors tw-duration-200 disabled:tw-cursor-not-allowed disabled:tw-opacity-60';
   const outlineButtonClass = `${baseButtonClass} tw-border-[var(--border)] tw-bg-white/75 tw-text-[var(--text)] hover:tw-border-[var(--border-strong)]`;
@@ -54,7 +58,17 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 </div>
               </div>
             </div>
-            <DetailHeaderActionBar actions={detailHeaderActions} buttonClassName={outlineButtonClass} />
+            <div className="tw-flex tw-items-center tw-gap-2">
+              <DetailHeaderActionBar
+                actions={chatWithActions}
+                buttonClassName={outlineButtonClass}
+                menuTriggerLabel="Chat with..."
+                menuTriggerTitle="Chat with..."
+                menuTriggerAriaLabel="Chat with"
+                menuAriaLabel="Chat with"
+              />
+              <DetailHeaderActionBar actions={openActions} buttonClassName={outlineButtonClass} />
+            </div>
           </header>
         ) : null}
 
