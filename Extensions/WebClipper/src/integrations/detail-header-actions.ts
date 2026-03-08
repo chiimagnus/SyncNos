@@ -1,13 +1,13 @@
-import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
-import { tabsCreate } from '../../platform/webext/tabs';
-import { launchObsidianApp } from '../../sync/obsidian/obsidian-app-launch';
-import { buildChatWithPayload, loadChatWithSettings, truncateForChatWith, type ChatWithAiPlatform } from '../../integrations/chat-with-settings';
+import type { Conversation, ConversationDetail } from '../conversations/domain/models';
+import { tabsCreate } from '../platform/webext/tabs';
+import { launchObsidianApp } from '../sync/obsidian/obsidian-app-launch';
+import { buildChatWithPayload, loadChatWithSettings, truncateForChatWith, type ChatWithAiPlatform } from './chat-with-settings';
 import {
   openObsidianTarget,
   reportObsidianOpenError,
   resolveObsidianOpenTarget,
   waitForDelay,
-} from './detail-header-obsidian-target';
+} from './openin/obsidian-open-target';
 
 export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: 'Open in Notion',

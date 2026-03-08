@@ -4,9 +4,9 @@ import { OBSIDIAN_APP_LAUNCH_URL } from '../../src/sync/obsidian/obsidian-app-la
 import {
   openObsidianTarget,
   resolveObsidianOpenTarget,
-} from '../../src/ui/conversations/detail-header-obsidian-target';
+} from '../../src/integrations/openin/obsidian-open-target';
 
-describe('detail-header-obsidian-target', () => {
+describe('obsidian-open-target', () => {
   it('surfaces a launch-before-retry trigger when the local API is unreachable', async () => {
     const target = await resolveObsidianOpenTarget({
       conversation: {

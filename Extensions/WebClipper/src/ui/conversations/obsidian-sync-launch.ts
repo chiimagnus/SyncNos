@@ -9,7 +9,7 @@ import {
   OBSIDIAN_APP_LAUNCH_URL,
   isLocalObsidianApiBaseUrl,
 } from '../../sync/obsidian/obsidian-app-launch';
-import { DEFAULT_OBSIDIAN_OPEN_RETRY_POLICY, waitForDelay } from './detail-header-obsidian-target';
+import { DEFAULT_OBSIDIAN_OPEN_RETRY_POLICY, waitForDelay } from '../../integrations/openin/obsidian-open-target';
 
 type ObsidianSyncLaunchServices = {
   settingsStore: {
