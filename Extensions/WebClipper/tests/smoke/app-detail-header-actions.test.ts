@@ -95,7 +95,16 @@ describe('ConversationDetailPane header actions', () => {
 
   beforeEach(() => {
     setupDom();
-    currentState.detailHeaderActions[0]!.onTrigger = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'open-in-notion',
+        label: 'Open in Notion',
+        provider: 'notion',
+        kind: 'external-link',
+        href: 'https://www.notion.so/0123456789abcdef0123456789abcdef',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -132,6 +141,33 @@ describe('ConversationDetailPane header actions', () => {
       root!.render(createElement(ConversationDetailPane));
     });
 
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('shows a menu trigger in the app detail header when multiple destinations are available', () => {
+    currentState.detailHeaderActions = [
+      {
+        id: 'open-in-notion',
+        label: 'Open in Notion',
+        provider: 'notion',
+        kind: 'external-link',
+        href: 'https://www.notion.so/0123456789abcdef0123456789abcdef',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'open-in-obsidian',
+        label: 'Open in Obsidian',
+        provider: 'obsidian',
+        kind: 'open-target',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 });

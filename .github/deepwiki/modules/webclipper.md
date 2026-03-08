@@ -69,13 +69,14 @@
 
 - Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, 以及 Obsidian 连接参数。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
-- detail header 右上角的会话级动作由 `detail-header-actions.ts` 统一解析；Phase 1 当前只在存在 `notionPageId` 时显示 `Open in Notion`，popup 的旧 `More` 占位已经移除。
+- detail header 右上角的会话级动作由 `detail-header-actions.ts` 统一解析；当前规则固定为：单目标直出按钮，Notion + Obsidian 双目标时显示菜单，popup 的旧 `More` 占位已经移除。
+- `Open in Obsidian` 的文件打开只走 Local REST API `POST /open/{filename}`；当 API 因 App 未启动不可达时，只用 `obsidian://open` 拉起桌面 App，随后再重试 REST API。
 
 ## 修改热点与扩展点
 - **新增支持站点**：先改 `collectors/` 和 `register-all.ts`，不要把站点判断散落到 popup 或 background。
 - **改 inpage 体验**：先看 `content-controller.ts`, `bootstrap/content.ts`, `inpage-button-shadow.ts`, `inpage-tip-shadow.ts`。
 - **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
-- **改 detail header 打开目标**：先看 `detail-header-actions.ts`, `DetailHeaderActionBar.tsx`, `ConversationsScene.tsx`, `ConversationDetailPane.tsx`，不要在 popup / app JSX 里各自拼目标 URL。
+- **改 detail header 打开目标**：先看 `detail-header-actions.ts`, `detail-header-obsidian-target.ts`, `DetailHeaderActionBar.tsx`, `ConversationsScene.tsx`, `ConversationDetailPane.tsx`，不要在 popup / app JSX 里各自拼目标 URL，也不要把 Obsidian 文件打开退回到 URI file deep link。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
 

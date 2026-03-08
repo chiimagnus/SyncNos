@@ -222,6 +222,11 @@ function createClient({
     return request('DELETE', `/vault/${encoded}`, { accept: 'application/json' });
   }
 
+  function openVaultFile(filePath: string) {
+    const encoded = encodeVaultPath(filePath);
+    return request('POST', `/open/${encoded}`, { accept: 'application/json' });
+  }
+
   function patchVaultFile(
     filePath: string,
     {
@@ -277,6 +282,7 @@ function createClient({
     listVaultDir,
     putVaultFile,
     deleteVaultFile,
+    openVaultFile,
     patchVaultFile,
   };
 }

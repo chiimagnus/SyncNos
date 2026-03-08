@@ -63,6 +63,24 @@ describe("obsidian-local-rest-client", () => {
     expect(String(seen[1].init.method || "")).toBe("DELETE");
   });
 
+  it("supports openVaultFile route for opening an existing note in the app", async () => {
+    const seen: any[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: any, init: any) => {
+      seen.push({ url, init });
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const mod = await loadClient();
+    const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    expect(client.ok).toBe(true);
+
+    // @ts-expect-error narrowed
+    await client.openVaultFile("A Folder/Note.md");
+    expect(String(seen[0].url)).toContain("/open/A%20Folder/Note.md");
+    expect(String(seen[0].init.method || "")).toBe("POST");
+  });
+
   it("normalizes 401 as auth_error with message", async () => {
     // @ts-expect-error test global
     globalThis.fetch = async () => {
