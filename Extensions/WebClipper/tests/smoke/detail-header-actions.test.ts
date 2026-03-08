@@ -13,7 +13,7 @@ const resolveObsidianOpenTargetMock = vi.fn(async () => ({
 }));
 const openObsidianTargetMock = vi.fn(async () => ({ ok: true }));
 
-vi.mock('../../src/ui/conversations/detail-header-obsidian-target', () => ({
+vi.mock('../../src/integrations/openin/obsidian-open-target', () => ({
   resolveObsidianOpenTarget: (...args: any[]) => resolveObsidianOpenTargetMock(...args),
   openObsidianTarget: (...args: any[]) => openObsidianTargetMock(...args),
   waitForDelay: vi.fn(async () => {}),
@@ -25,7 +25,7 @@ import {
   buildNotionPageUrl,
   normalizeNotionPageId,
   resolveDetailHeaderActions,
-} from '../../src/ui/conversations/detail-header-actions';
+} from '../../src/integrations/detail-header-actions';
 
 describe('detail-header-actions', () => {
   it('normalizes a hyphenated Notion page id into the canonical URL form', () => {
