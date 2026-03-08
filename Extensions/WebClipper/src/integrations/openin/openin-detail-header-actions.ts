@@ -1,6 +1,11 @@
 import type { Conversation } from '../../conversations/domain/models';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
 import {
+  buildNotionOpenInAction,
+  buildNotionPageUrl,
+  normalizeNotionPageId,
+} from './notion-openin';
+import {
   openObsidianTarget,
   resolveObsidianOpenTarget,
 } from './obsidian-open-target';
@@ -10,41 +15,7 @@ export const DETAIL_HEADER_ACTION_LABELS = {
   openInObsidian: 'Open in Obsidian',
 } as const;
 
-const NOTION_PAGE_ID_PATTERN = /^[0-9a-f]{32}$/i;
-
-export function normalizeNotionPageId(pageId?: string | null): string {
-  const compact = String(pageId || '').trim().replace(/-/g, '');
-  return NOTION_PAGE_ID_PATTERN.test(compact) ? compact.toLowerCase() : '';
-}
-
-export function buildNotionPageUrl(pageId?: string | null): string {
-  const normalizedPageId = normalizeNotionPageId(pageId);
-  return normalizedPageId ? `https://www.notion.so/${normalizedPageId}` : '';
-}
-
-function buildNotionOpenInAction({
-  conversation,
-  port,
-}: {
-  conversation: Conversation | null | undefined;
-  port: DetailHeaderActionPort;
-}): DetailHeaderAction | null {
-  const notionUrl = buildNotionPageUrl(conversation?.notionPageId);
-  if (!notionUrl) return null;
-
-  return {
-    id: 'open-in-notion',
-    label: DETAIL_HEADER_ACTION_LABELS.openInNotion,
-    kind: 'external-link',
-    provider: 'notion',
-    slot: 'open',
-    href: notionUrl,
-    onTrigger: async () => {
-      const opened = await port.openExternalUrl(notionUrl);
-      if (!opened) throw new Error('Failed to open Notion page');
-    },
-  };
-}
+export { buildNotionPageUrl, normalizeNotionPageId };
 
 async function buildObsidianOpenInAction({
   conversation,
@@ -85,7 +56,7 @@ export async function resolveOpenInDetailHeaderActions({
 }): Promise<DetailHeaderAction[]> {
   const actions: DetailHeaderAction[] = [];
 
-  const notionAction = buildNotionOpenInAction({ conversation, port });
+  const notionAction = buildNotionOpenInAction({ conversation, port, labels: DETAIL_HEADER_ACTION_LABELS });
   if (notionAction) actions.push(notionAction);
 
   try {
@@ -97,4 +68,3 @@ export async function resolveOpenInDetailHeaderActions({
 
   return actions;
 }
-
