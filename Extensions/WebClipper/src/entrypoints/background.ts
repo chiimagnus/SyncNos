@@ -12,11 +12,16 @@ import obsidianSyncJobStore from '../sync/obsidian/obsidian-sync-job-store.ts';
 import { registerNotionSettingsHandlers } from '../sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '../sync/obsidian/settings-background-handlers';
 import { onInstalled } from '../platform/runtime/runtime';
+import { openOrFocusExtensionAppTab } from '../platform/webext/extension-app';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
   if (!backgroundInstanceId) backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   return backgroundInstanceId;
+}
+
+async function openAboutSectionAfterInstallOrUpdate(): Promise<void> {
+  await openOrFocusExtensionAppTab({ route: '/settings?section=about' });
 }
 
 export default defineBackground(() => {
@@ -51,7 +56,11 @@ export default defineBackground(() => {
   try {
     ensureDefaultNotionOAuthClientId().catch(() => {});
     setupNotionOAuthNavigationListener();
-    onInstalled(() => ensureDefaultNotionOAuthClientId().catch(() => {}));
+    onInstalled((details) => {
+      ensureDefaultNotionOAuthClientId().catch(() => {});
+      if (details?.reason !== 'install' && details?.reason !== 'update') return;
+      openAboutSectionAfterInstallOrUpdate().catch(() => {});
+    });
   } catch (_e) {
     // ignore
   }

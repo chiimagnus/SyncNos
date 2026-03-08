@@ -82,7 +82,14 @@ export function getManifest(): any | null {
   }
 }
 
-export function onInstalled(listener: () => void): void {
+export type RuntimeInstalledDetails = {
+  reason?: string;
+  previousVersion?: string;
+  temporary?: boolean;
+  id?: string;
+};
+
+export function onInstalled(listener: (details?: RuntimeInstalledDetails) => void): void {
   if (typeof listener !== 'function') return;
   const anyGlobal = globalThis as any;
   const browserRuntime = anyGlobal.browser?.runtime;

@@ -1,6 +1,6 @@
 import { webextApis, webextError, webextLastErrorMessage } from './base';
 
-type AnyTab = { id?: number; url?: string; title?: string };
+type AnyTab = { id?: number; url?: string; title?: string; windowId?: number; active?: boolean };
 
 export async function tabsCreate(createProperties: any): Promise<AnyTab | null> {
   const { chrome, browser } = webextApis();
@@ -69,6 +69,33 @@ export async function tabsGet(tabId: number): Promise<AnyTab | null> {
   }
 
   throw webextError('tabs.get unavailable');
+}
+
+export async function tabsUpdate(tabId: number, updateProperties: any): Promise<AnyTab | null> {
+  const { chrome, browser } = webextApis();
+  const id = Number(tabId);
+  if (!Number.isFinite(id) || id < 0) {
+    throw webextError('tabs.update unavailable');
+  }
+
+  if (browser?.tabs?.update) {
+    const tab = await Promise.resolve(browser.tabs.update(id, updateProperties));
+    return (tab as any) || null;
+  }
+
+  if (chrome?.tabs?.update) {
+    return await new Promise((resolve, reject) => {
+      chrome.tabs.update(id, updateProperties, (tab: AnyTab) => {
+        if (chrome?.runtime?.lastError) {
+          reject(webextError(webextLastErrorMessage('tabs.update failed')));
+          return;
+        }
+        resolve(tab || null);
+      });
+    });
+  }
+
+  throw webextError('tabs.update unavailable');
 }
 
 export async function tabsSendMessage(tabId: number, message: Record<string, unknown>): Promise<unknown> {
