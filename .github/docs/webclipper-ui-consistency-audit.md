@@ -119,24 +119,16 @@ Popup list 模式右侧按钮：
 
 下面是“最少改动、收益最大”的统一路径，按建议优先级排序。
 
-### 4.1 先统一“按钮 token”（减少自由拼 class）
+### 4.1 先统一“按钮 token”（只保留两种语义：普通 / 危险）
 
-建议把目前散落的按钮外观收敛成 4 类明确语义：
+建议把按钮语义严格收敛为两类：
 
-1) `IconButton`（导航/工具 icon-only）
-- 规格：支持 `sm|md` 两档（对应现有 `navIconButtonSmClassName` / `navIconButtonClassName`）
-- 统一：圆角体系、背景策略、disabled 行为、focus ring
+1) **普通按钮（Normal）**
+- 统一使用 `--btn-bg` / `--btn-bg-hover` / `--text` / `--muted` 这一套表面与文字色
+- `icon / pill / text` 都属于普通按钮，只是 **尺寸与形状（shape/size）变体**，不要再引入新的颜色体系
 
-2) `PrimaryPillButton`（Popup 当前页抓取这种“单个主操作”）
-- 直接用 `navPillButtonClassName()` 作为唯一实现
-- 明确：只用于 header 右侧主操作，不在 footer action bar 中混用
-
-3) `ActionButton`（列表选择态、detail actions 的文本按钮）
-- 以 `buttonTintClassName()` 为基础，但不要在调用点自由叠加 `tw-bg-white/38` 这种“主题特例”
-- 若确实需要“outline/ghost”风格，抽成 `buttonGhostClassName()` 或 `buttonHeaderActionClassName()`，而不是在各处拼字符串
-
-4) `DangerActionButton`（删除）
-- 继续由 `buttonDangerClassName()` 单一真源提供
+2) **危险按钮（Danger）**
+- 统一使用 `buttonDangerClassName()`（仅 `Delete` 这类 destructive 行为）
 
 ### 4.2 再统一“同职责 UI 组件”
 
@@ -169,4 +161,3 @@ Popup list 模式右侧按钮：
 - 手工冒烟：
   - App：宽屏（sidebar + detail）/ 窄屏（detail header 顶栏）都走一遍
   - Popup：list 模式 header / detail 模式 header / export dropdown / detail action dropdown
-
