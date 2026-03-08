@@ -62,18 +62,20 @@
 
 | UI 区域 | 主要实现 | 说明 |
 | --- | --- | --- |
-| 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `conversations-context.tsx` | popup 与 app 共享同一套会话读取与选择逻辑 |
+| 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `conversations-context.tsx`, `detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 打开目标解析逻辑 |
 | 设置页 | `SettingsScene.tsx` | 真实设置中枢，整合 Notion OAuth、Notion AI、Obsidian、Backup、Inpage、About |
 | Markdown 渲染 | `ui/shared/markdown.ts`, `ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
 | popup 打开 | `ui-background-handlers.ts` | 双击 inpage 按钮时尝试 `openPopup()`，失败则回退提示 |
 
 - Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, 以及 Obsidian 连接参数。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
+- detail header 右上角的会话级动作由 `detail-header-actions.ts` 统一解析；Phase 1 当前只在存在 `notionPageId` 时显示 `Open in Notion`，popup 的旧 `More` 占位已经移除。
 
 ## 修改热点与扩展点
 - **新增支持站点**：先改 `collectors/` 和 `register-all.ts`，不要把站点判断散落到 popup 或 background。
 - **改 inpage 体验**：先看 `content-controller.ts`, `bootstrap/content.ts`, `inpage-button-shadow.ts`, `inpage-tip-shadow.ts`。
 - **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
+- **改 detail header 打开目标**：先看 `detail-header-actions.ts`, `DetailHeaderActionBar.tsx`, `ConversationsScene.tsx`, `ConversationDetailPane.tsx`，不要在 popup / app JSX 里各自拼目标 URL。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
 

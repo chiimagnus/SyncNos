@@ -66,6 +66,20 @@ vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
           });
         },
       }, 'show-detail'),
+      createElement('button', {
+        type: 'button',
+        onClick: () => {
+          props.onPopupHeaderStateChange?.({
+            mode: 'detail',
+            title: 'Conversation',
+            subtitle: 'chatgpt · key',
+            actions: [],
+            onBack: () => {
+              props.onPopupHeaderStateChange?.({ mode: 'list' });
+            },
+          });
+        },
+      }, 'show-detail-empty'),
     ),
 }));
 
@@ -139,6 +153,24 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+  });
+
+  it('keeps the popup detail header action area empty when no actions are available', () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail-empty') as HTMLButtonElement | undefined;
+    expect(detailButton).toBeTruthy();
+
+    act(() => {
+      detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 });
