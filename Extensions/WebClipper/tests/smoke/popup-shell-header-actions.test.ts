@@ -80,6 +80,36 @@ vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
           });
         },
       }, 'show-detail-empty'),
+      createElement('button', {
+        type: 'button',
+        onClick: () => {
+          props.onPopupHeaderStateChange?.({
+            mode: 'detail',
+            title: 'Conversation',
+            subtitle: 'chatgpt · key',
+            actions: [
+              {
+                id: 'open-in-notion',
+                label: 'Open in Notion',
+                provider: 'notion',
+                kind: 'external-link',
+                href: 'https://www.notion.so/example',
+                onTrigger: vi.fn(async () => {}),
+              },
+              {
+                id: 'open-in-obsidian',
+                label: 'Open in Obsidian',
+                provider: 'obsidian',
+                kind: 'open-target',
+                onTrigger: vi.fn(async () => {}),
+              },
+            ],
+            onBack: () => {
+              props.onPopupHeaderStateChange?.({ mode: 'list' });
+            },
+          });
+        },
+      }, 'show-detail-menu'),
     ),
 }));
 
@@ -172,5 +202,21 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+  });
+
+  it('shows a menu trigger in popup detail mode when multiple destinations exist', () => {
+    act(() => {
+      root!.render(createElement(PopupShell));
+    });
+
+    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail-menu') as HTMLButtonElement | undefined;
+    expect(detailButton).toBeTruthy();
+
+    act(() => {
+      detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 });
