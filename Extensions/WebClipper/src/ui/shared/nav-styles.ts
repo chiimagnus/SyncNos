@@ -11,16 +11,26 @@ export function navItemClassName(active: boolean): string {
 
 export function navIconButtonClassName(active: boolean): string {
   const base =
-    'tw-inline-flex tw-size-9 tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-p-0 tw-shadow-none tw-transition-colors tw-duration-150';
+    [
+      'tw-inline-flex tw-size-9 tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-p-0',
+      'tw-shadow-none tw-transition-colors tw-duration-150',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+      'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
+    ].join(' ');
   if (active) return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
-  return `${base} tw-bg-white/25 tw-text-[var(--muted)] hover:tw-bg-white/38 hover:tw-text-[var(--text)]`;
+  return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--muted)] hover:tw-bg-[var(--btn-bg-hover)] hover:tw-text-[var(--text)]`;
 }
 
 export function navIconButtonSmClassName(active: boolean): string {
   const base =
-    'tw-inline-flex tw-size-8 tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-p-0 tw-shadow-none tw-transition-colors tw-duration-150';
+    [
+      'tw-inline-flex tw-size-8 tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-p-0',
+      'tw-shadow-none tw-transition-colors tw-duration-150',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+      'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
+    ].join(' ');
   if (active) return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
-  return `${base} tw-bg-white/25 tw-text-[var(--muted)] hover:tw-bg-white/38 hover:tw-text-[var(--text)]`;
+  return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--muted)] hover:tw-bg-[var(--btn-bg-hover)] hover:tw-text-[var(--text)]`;
 }
 
 export function navPillButtonClassName(): string {
@@ -33,7 +43,12 @@ export function navPillButtonClassName(): string {
 
 export function navMiniIconButtonClassName(disabled = false): string {
   const base =
-    'tw-inline-flex tw-size-[18px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-white/22 tw-text-[12px] tw-font-black tw-shadow-none tw-transition-colors tw-duration-150';
+    [
+      'tw-inline-flex tw-size-[18px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0',
+      'tw-bg-[var(--btn-bg)] tw-text-[12px] tw-font-black tw-shadow-none',
+      'tw-transition-colors tw-duration-150',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+    ].join(' ');
   if (disabled) return `${base} tw-cursor-not-allowed tw-opacity-40`;
-  return `${base} tw-text-[var(--muted)] hover:tw-bg-white/36 hover:tw-text-[var(--text)]`;
+  return `${base} tw-text-[var(--muted)] hover:tw-bg-[var(--btn-bg-hover)] hover:tw-text-[var(--text)]`;
 }
