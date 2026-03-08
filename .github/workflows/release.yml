@@ -21,12 +21,10 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           body: |
-            **Links**
-            - Website: https://chiimagnus.notion.io/syncnos
-            - macOS App: https://apps.apple.com/app/syncnos/id6755133888
-            - Chrome Extension: https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
-            - Firefox Extension: https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
-            - Edge Extension: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/syncnos-webclipper-edge-${{ github.ref_name }}.zip
+            [![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
+            [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
+            [![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
+            [![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
           generate_release_notes: true
           append_body: true
           draft: false
