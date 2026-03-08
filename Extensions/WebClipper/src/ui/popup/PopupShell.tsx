@@ -39,6 +39,9 @@ function PopupShellFrame() {
   };
 
   const showListActions = headerState.mode !== 'detail';
+  const detailActions = headerState.mode === 'detail' ? headerState.actions : [];
+  const headerActionButtonClass =
+    'tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/72 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]';
 
   return (
     <div
@@ -109,17 +112,24 @@ function PopupShellFrame() {
                 <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              disabled
-              title={t('moreActionsSoon')}
-              className="tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--muted)] tw-opacity-80"
-              aria-label={t('moreActionsAria')}
-            >
-              {t('moreButton')}
-            </button>
-          )}
+          ) : detailActions.length ? (
+            <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
+              {detailActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  title={action.label}
+                  onClick={() => {
+                    action.onTrigger().catch(() => {});
+                  }}
+                  className={headerActionButtonClass}
+                  aria-label={action.label}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </header>
 

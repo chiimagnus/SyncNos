@@ -51,6 +51,15 @@ vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
             mode: 'detail',
             title: 'Conversation',
             subtitle: 'chatgpt · key',
+            actions: [
+              {
+                id: 'open-in-notion',
+                label: 'Open in Notion',
+                kind: 'external-link',
+                href: 'https://www.notion.so/example',
+                onTrigger: vi.fn(async () => {}),
+              },
+            ],
             onBack: () => {
               props.onPopupHeaderStateChange?.({ mode: 'list' });
             },
@@ -111,14 +120,14 @@ describe('PopupShell header actions', () => {
     cleanupDom();
   });
 
-  it('shows fetch and settings in list mode, then swaps to More in detail mode', () => {
+  it('shows fetch and settings in list mode, then swaps to Open in Notion in detail mode', () => {
     act(() => {
       root!.render(createElement(PopupShell));
     });
 
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
     const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail') as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
@@ -129,6 +138,7 @@ describe('PopupShell header actions', () => {
 
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 });
