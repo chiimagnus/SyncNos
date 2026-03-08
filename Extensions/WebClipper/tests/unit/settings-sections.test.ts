@@ -15,10 +15,15 @@ describe('settings section definitions', () => {
   });
 
   it('groups sections into integrations, behavior, and about areas', () => {
-    expect(SETTINGS_SECTION_GROUPS.map((group) => group.map((section) => section.key))).toEqual([
-      ['backup', 'notion', 'obsidian'],
-      ['chat_with', 'inpage'],
-      ['about'],
+    expect(
+      SETTINGS_SECTION_GROUPS.map((group) => ({
+        title: group.title,
+        keys: group.sections.map((section) => section.key),
+      }))
+    ).toEqual([
+      { title: 'Data', keys: ['backup', 'notion', 'obsidian'] },
+      { title: 'Features', keys: ['chat_with', 'inpage'] },
+      { title: 'About', keys: ['about'] },
     ]);
   });
 });
