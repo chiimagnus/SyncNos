@@ -10,6 +10,7 @@ import { SettingsSidebarNav } from './SettingsSidebarNav';
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from './types';
 import { AboutSection } from './sections/AboutSection';
 import { BackupSection } from './sections/BackupSection';
+import { ChatWithAiSection } from './sections/ChatWithAiSection';
 import { InpageSection } from './sections/InpageSection';
 import { NotionAISection } from './sections/NotionAISection';
 import { NotionOAuthSection } from './sections/NotionOAuthSection';
@@ -57,6 +58,14 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveNotionAiModelIndex,
     onResetNotionAiModelIndex,
     notionAiRef,
+
+    chatWithPromptTemplate,
+    setChatWithPromptTemplate,
+    chatWithMaxChars,
+    setChatWithMaxChars,
+    chatWithPlatforms,
+    setChatWithPlatforms,
+    onResetChatWithSettings,
 
     obsidianApiBaseUrl,
     setObsidianApiBaseUrl,
@@ -128,6 +137,21 @@ export function SettingsScene(props: SettingsSceneProps) {
             />
           </div>
         </>
+      ) : null}
+
+      {activeSection === 'chat_with' ? (
+        <ChatWithAiSection
+          busy={busy}
+          promptTemplate={chatWithPromptTemplate}
+          onChangePromptTemplate={setChatWithPromptTemplate}
+          maxChars={chatWithMaxChars}
+          onChangeMaxChars={setChatWithMaxChars}
+          platforms={chatWithPlatforms as any}
+          onChangePlatforms={setChatWithPlatforms as any}
+          onReset={() => {
+            void onResetChatWithSettings();
+          }}
+        />
       ) : null}
 
       {activeSection === 'obsidian' ? (
@@ -205,6 +229,11 @@ export function SettingsScene(props: SettingsSceneProps) {
     [activeSection]
   );
 
+  const activeSectionLabel = useMemo(() => {
+    if (activeSectionMeta?.key === 'chat_with') return 'Chat with AI';
+    return activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : t('settingsTitle');
+  }, [activeSectionMeta]);
+
   if (isNarrow) {
     if (narrowRoute === 'detail') {
       return (
@@ -220,7 +249,7 @@ export function SettingsScene(props: SettingsSceneProps) {
                 {t('backButton')}
               </button>
               <div className="tw-min-w-0 tw-flex-1 tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
-                {activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : t('settingsTitle')}
+                {activeSectionLabel}
               </div>
               <div className="tw-w-[74px]" aria-hidden="true" />
             </div>
@@ -244,8 +273,16 @@ export function SettingsScene(props: SettingsSceneProps) {
                 onClick={() => setActiveSection(section.key)}
                 className="tw-flex tw-w-full tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-3 tw-py-3 tw-text-left tw-transition tw-duration-150 hover:tw-border-[var(--border-strong)] hover:tw-shadow-[var(--shadow)]"
               >
-                <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">{t(`section_${section.key}_label` as Parameters<typeof t>[0])}</div>
-                <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{t(`section_${section.key}_desc` as Parameters<typeof t>[0])}</div>
+                <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">
+                  {section.key === 'chat_with'
+                    ? 'Chat with AI'
+                    : t(`section_${section.key}_label` as Parameters<typeof t>[0])}
+                </div>
+                <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                  {section.key === 'chat_with'
+                    ? 'Prompt + platforms'
+                    : t(`section_${section.key}_desc` as Parameters<typeof t>[0])}
+                </div>
               </button>
             ))}
           </nav>

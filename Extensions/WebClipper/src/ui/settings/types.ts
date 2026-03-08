@@ -1,8 +1,9 @@
-export type SettingsSectionKey = 'backup' | 'notion' | 'obsidian' | 'inpage' | 'about';
+export type SettingsSectionKey = 'backup' | 'notion' | 'chat_with' | 'obsidian' | 'inpage' | 'about';
 
 export const SETTINGS_SECTIONS: ReadonlyArray<{ key: SettingsSectionKey }> = [
   { key: 'backup' },
   { key: 'notion' },
+  { key: 'chat_with' },
   { key: 'obsidian' },
   { key: 'inpage' },
   { key: 'about' },

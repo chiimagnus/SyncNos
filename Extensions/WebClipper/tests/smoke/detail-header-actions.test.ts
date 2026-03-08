@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const storageGetMock = vi.fn(async () => ({}));
+vi.mock('../../src/platform/storage/local', () => ({
+  storageGet: (...args: any[]) => storageGetMock(...args),
+  storageSet: vi.fn(async () => {}),
+}));
+
 const resolveObsidianOpenTargetMock = vi.fn(async () => ({
   available: false,
   label: 'Open in Obsidian',
@@ -178,5 +184,72 @@ describe('detail-header-actions', () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0]?.provider).toBe('notion');
+  });
+
+  it('resolves Chat with ChatGPT when detail messages exist (Phase 1 clipboard + jump)', async () => {
+    resolveObsidianOpenTargetMock.mockResolvedValueOnce({
+      available: false,
+      label: 'Open in Obsidian',
+      error: { code: 'note_not_found', message: 'missing' },
+    });
+
+    const openExternalUrl = vi.fn(async () => true);
+    const writeText = vi.fn(async () => {});
+    const prevNavigator = (globalThis as any).navigator;
+
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { clipboard: { writeText } },
+    });
+
+    try {
+      storageGetMock.mockResolvedValueOnce({
+        chat_with_ai_platforms_v1: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
+        chat_with_prompt_template_v1: 'Talk about this:\n\n{{article_title}}\n\n{{article_content}}',
+        chat_with_max_chars_v1: 28_000,
+      });
+
+      const actions = await resolveDetailHeaderActions({
+        conversation: {
+          id: 6,
+          sourceType: 'article',
+          source: 'web',
+          conversationKey: 'article:https://example.com',
+          title: 'Example',
+          url: 'https://example.com',
+        },
+        detail: {
+          conversationId: 6,
+          messages: [
+            {
+              id: 1,
+              conversationId: 6,
+              messageKey: 'article_body',
+              role: 'article',
+              contentText: 'Hello world',
+              sequence: 0,
+              updatedAt: Date.now(),
+            },
+          ],
+        },
+        port: {
+          openExternalUrl,
+          launchProtocolUrl: vi.fn(async () => true),
+          wait: vi.fn(async () => {}),
+          reportError: vi.fn(),
+        },
+      });
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0]?.label).toBe('Chat with ChatGPT');
+      expect(actions[0]?.provider).toBe('chatgpt');
+      expect(actions[0]?.slot).toBe('chat-with');
+
+      await actions[0]?.onTrigger();
+      expect(writeText).toHaveBeenCalledTimes(1);
+      expect(openExternalUrl).toHaveBeenCalledWith('https://chatgpt.com/');
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', { configurable: true, value: prevNavigator });
+    }
   });
 });
