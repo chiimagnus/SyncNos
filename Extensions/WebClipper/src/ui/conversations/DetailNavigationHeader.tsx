@@ -3,6 +3,8 @@ import { ChevronLeft } from 'lucide-react';
 import { t } from '../../i18n';
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
+import { navIconButtonClassName } from '../shared/nav-styles';
+import { buttonTintClassName } from '../shared/button-styles';
 
 export type DetailNavigationHeaderProps = {
   title: string;
@@ -11,10 +13,11 @@ export type DetailNavigationHeaderProps = {
   onBack: () => void;
 };
 
-const backButtonClass =
-  'tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]';
-const headerActionButtonClass =
-  'tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/72 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]';
+const backButtonClass = navIconButtonClassName(false);
+const headerActionButtonClass = [
+  buttonTintClassName(),
+  'tw-h-8 tw-rounded-lg tw-text-[11px] tw-font-black',
+].join(' ');
 
 export function DetailNavigationHeader({ title, subtitle, actions, onBack }: DetailNavigationHeaderProps) {
   const safeActions = Array.isArray(actions) ? actions : [];
