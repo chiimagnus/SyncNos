@@ -10,6 +10,7 @@ import { SettingsSidebarNav } from './SettingsSidebarNav';
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from './types';
 import { AboutSection } from './sections/AboutSection';
 import { BackupSection } from './sections/BackupSection';
+import { ChatWithAiSection } from './sections/ChatWithAiSection';
 import { InpageSection } from './sections/InpageSection';
 import { NotionAISection } from './sections/NotionAISection';
 import { NotionOAuthSection } from './sections/NotionOAuthSection';
@@ -57,6 +58,15 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveNotionAiModelIndex,
     onResetNotionAiModelIndex,
     notionAiRef,
+
+    chatWithPromptTemplate,
+    setChatWithPromptTemplate,
+    chatWithMaxChars,
+    setChatWithMaxChars,
+    chatWithPlatforms,
+    setChatWithPlatforms,
+    onSaveChatWithSettings,
+    onResetChatWithSettings,
 
     obsidianApiBaseUrl,
     setObsidianApiBaseUrl,
@@ -124,6 +134,24 @@ export function SettingsScene(props: SettingsSceneProps) {
               }}
               onReset={() => {
                 void onResetNotionAiModelIndex();
+              }}
+            />
+          </div>
+
+          <div id="settings-chat-with-ai">
+            <ChatWithAiSection
+              busy={busy}
+              promptTemplate={chatWithPromptTemplate}
+              onChangePromptTemplate={setChatWithPromptTemplate}
+              maxChars={chatWithMaxChars}
+              onChangeMaxChars={setChatWithMaxChars}
+              platforms={chatWithPlatforms as any}
+              onChangePlatforms={setChatWithPlatforms as any}
+              onSave={() => {
+                void onSaveChatWithSettings();
+              }}
+              onReset={() => {
+                void onResetChatWithSettings();
               }}
             />
           </div>
