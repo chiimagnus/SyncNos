@@ -1,5 +1,6 @@
 import type { Conversation } from '../../conversations/domain/models';
 import { tabsCreate } from '../../platform/webext/tabs';
+import { launchObsidianApp } from '../../sync/obsidian/obsidian-app-launch';
 import {
   openObsidianTarget,
   reportObsidianOpenError,
@@ -61,7 +62,7 @@ export async function openDetailHeaderProtocolUrl(url: string): Promise<boolean>
   const safeUrl = String(url || '').trim();
   if (!safeUrl) return false;
 
-  return openDetailHeaderUrl(safeUrl);
+  return launchObsidianApp(safeUrl);
 }
 
 async function openDetailHeaderUrl(safeUrl: string): Promise<boolean> {
