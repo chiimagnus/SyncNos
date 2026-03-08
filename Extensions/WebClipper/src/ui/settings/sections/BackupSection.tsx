@@ -13,7 +13,7 @@ function ImportStatsList(props: { stats: any }) {
         {t('statsConversations')} +{stats.conversationsAdded} / ~{stats.conversationsUpdated}
       </li>
       <li>
-        {t('statsMessages')} +{stats.messagesAdded} / ~{stats.messagesUpdated} (skipped {stats.messagesSkipped})
+        {t('statsMessages')} +{stats.messagesAdded} / ~{stats.messagesUpdated} ({t('skipped')} {stats.messagesSkipped})
       </li>
       <li>
         {t('statsMappings')} +{stats.mappingsAdded} / ~{stats.mappingsUpdated}

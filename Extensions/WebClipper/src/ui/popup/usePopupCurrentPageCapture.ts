@@ -86,7 +86,7 @@ export function usePopupCurrentPageCapture(input: {
       });
       return data;
     } catch (error) {
-      const message = (error as any)?.message ?? String(error ?? 'Capture failed');
+      const message = (error as any)?.message ?? String(error ?? t('captureFailedFallback'));
       await refreshState();
       setStatus({ kind: 'error', message });
       throw error;
