@@ -5,7 +5,7 @@ import { formatConversationMarkdown } from '../../conversations/domain/markdown'
 import { getConversationDetail } from '../../conversations/client/repo';
 import { tabsCreate } from '../../platform/webext/tabs';
 
-import { t } from '../../i18n';
+import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 
@@ -371,7 +371,7 @@ export function ConversationListPane({
                 key={String((conversation as any).id)}
                 className={rowClass}
                 data-conversation-id={String((conversation as any).id)}
-                aria-label={(conversation as any).title || '(untitled)'}
+                aria-label={formatConversationTitle((conversation as any).title)}
                 onClick={(e) => onRowClick(e, id)}
                 role="button"
                 tabIndex={0}
@@ -389,7 +389,7 @@ export function ConversationListPane({
                 <div className="tw-min-w-0 tw-flex-1">
                   <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
                     <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-text-ellipsis tw-text-sm tw-font-extrabold tw-text-[var(--text)]">
-                      {(conversation as any).title || '(untitled)'}
+                      {formatConversationTitle((conversation as any).title)}
                     </div>
                     {hasWarningFlags(conversation as any) ? (
                       <span className="tw-inline-flex tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--warn-bg)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--muted)]">

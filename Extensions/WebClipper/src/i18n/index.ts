@@ -88,6 +88,8 @@ const en = {
   // ConversationListPane
   allFilter: 'All',
   noConversations: 'No conversations yet.',
+  // untitled is shared: used by ConversationListPane, ConversationDetailPane, and ConversationsScene
+  untitled: '(Untitled)',
   selectLabel: 'Select',
   selectAll: 'Select all',
   copyFullMarkdown: 'Copy full markdown',
@@ -96,6 +98,7 @@ const en = {
   noLinkAvailable: 'No link available',
   openOriginalChat: 'Open original chat',
   warningBadge: 'warning',
+  skipped: 'skipped',
   deleteButton: 'Delete',
   exportButton: 'Export',
   exportOptions: 'Export options',
@@ -114,8 +117,9 @@ const en = {
 
   // ConversationDetailPane
   backButton: 'Back',
+  chatsTitle: 'Chats',
   detailTitle: 'Detail',
-  untitled: '(Untitled)',
+  messageRoleFallback: 'Message',
   selectConversationHint: 'Select one conversation from list',
   loadingDots: 'Loading\u2026',
   noMessages: 'No messages.',
@@ -147,6 +151,7 @@ const en = {
   // usePopupCurrentPageCapture
   checkingCurrentPage: 'Checking current page...',
   unavailable: 'Unavailable',
+  captureFailedFallback: 'Capture failed',
   fetchingDots: 'Fetching...',
   checkingDots: 'Checking...',
   savedPrefix: 'Saved: ',
@@ -161,6 +166,9 @@ const en = {
   settingsLabel: 'Settings',
   refreshList: 'Refresh list',
   collapseSidebar: 'Collapse sidebar',
+
+  // BackupSection / SettingsScene
+  importInApp: 'Import in App',
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -237,6 +245,8 @@ const zh: { [K in TranslationKey]: string } = {
   // ConversationListPane
   allFilter: '全部',
   noConversations: '暂无对话。',
+  // untitled is shared: used by ConversationListPane, ConversationDetailPane, and ConversationsScene
+  untitled: '(无标题)',
   selectLabel: '选择',
   selectAll: '全选',
   copyFullMarkdown: '复制完整 Markdown',
@@ -245,6 +255,7 @@ const zh: { [K in TranslationKey]: string } = {
   noLinkAvailable: '暂无链接',
   openOriginalChat: '打开原始对话',
   warningBadge: '警告',
+  skipped: '跳过',
   deleteButton: '删除',
   exportButton: '导出',
   exportOptions: '导出选项',
@@ -263,8 +274,9 @@ const zh: { [K in TranslationKey]: string } = {
 
   // ConversationDetailPane
   backButton: '返回',
+  chatsTitle: '对话',
   detailTitle: '详情',
-  untitled: '(无标题)',
+  messageRoleFallback: '消息',
   selectConversationHint: '从列表中选择一个对话',
   loadingDots: '加载中\u2026',
   noMessages: '暂无消息。',
@@ -296,6 +308,7 @@ const zh: { [K in TranslationKey]: string } = {
   // usePopupCurrentPageCapture
   checkingCurrentPage: '正在检测当前页面...',
   unavailable: '不支持',
+  captureFailedFallback: '获取失败',
   fetchingDots: '获取中...',
   checkingDots: '检测中...',
   savedPrefix: '已保存：',
@@ -310,10 +323,18 @@ const zh: { [K in TranslationKey]: string } = {
   settingsLabel: '设置',
   refreshList: '刷新列表',
   collapseSidebar: '收起侧边栏',
+
+  // BackupSection / SettingsScene
+  importInApp: '在 App 中导入',
 };
 
 const translations: Record<Locale, { [K in TranslationKey]: string }> = { en, zh };
 
 export function t(key: TranslationKey): string {
-  return translations[currentLocale][key] ?? en[key];
+  return translations[currentLocale][key];
+}
+
+/** Returns the conversation title, falling back to the localised "Untitled" string. */
+export function formatConversationTitle(title: string | null | undefined): string {
+  return String(title || '').trim() || t('untitled');
 }
