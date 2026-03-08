@@ -1,7 +1,7 @@
 import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
 import { tabsCreate } from '../../platform/webext/tabs';
 import { launchObsidianApp } from '../../sync/obsidian/obsidian-app-launch';
-import { buildChatWithPayload, loadChatWithSettings, truncateForChatWith, type ChatWithAiPlatform } from '../../chat-with/chat-with-settings';
+import { buildChatWithPayload, loadChatWithSettings, truncateForChatWith, type ChatWithAiPlatform } from '../../integrations/chat-with-settings';
 import {
   openObsidianTarget,
   reportObsidianOpenError,
