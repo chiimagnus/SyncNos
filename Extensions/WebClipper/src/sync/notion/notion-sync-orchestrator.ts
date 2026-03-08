@@ -143,43 +143,11 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     if (!rawMessage.toLowerCase().includes("notion api failed:")) return rawMessage;
 
     const status = parseHttpStatus(error);
-    const code = parseNotionErrorCode(error);
     const notionMessage = parseNotionErrorMessage(error).replace(/^notion api failed:\s*/i, "").trim();
-    const lowerMessage = notionMessage.toLowerCase();
-
-    if (code === "validation_error") {
-      if (lowerMessage.includes("rich_text.length should be") || lowerMessage.includes("rich_text.length")) {
-        return "Notion rejected one content block because it contained too many rich text fragments. The content needs to be split into smaller blocks.";
-      }
-      return `Notion validation failed: ${notionMessage}`;
+    if (status === 429) {
+      const retryHint = formatRetryHint(error);
+      return `${notionMessage || rawMessage}${retryHint}`.trim();
     }
-
-    if (status === 401) {
-      return "Notion authorization expired. Please reconnect Notion and try again.";
-    }
-
-    if (status === 403) {
-      return "Notion denied access to the target page or database. Please confirm the integration still has permission.";
-    }
-
-    if (status === 404 || code === "object_not_found") {
-      if (lowerMessage.includes("database")) {
-        return "The target Notion database no longer exists or is no longer accessible. Please reselect the parent page and retry.";
-      }
-      if (lowerMessage.includes("page")) {
-        return "The target Notion page no longer exists or is no longer accessible. Please retry after reconnecting Notion or rebuilding the page.";
-      }
-      return "The target Notion object was not found. Please reconnect Notion or reselect the parent page and retry.";
-    }
-
-    if (status === 429 || code === "rate_limited") {
-      return `Notion rate limited this sync.${formatRetryHint(error)}`.trim();
-    }
-
-    if (status >= 500) {
-      return "Notion service is temporarily unavailable. Please retry later.";
-    }
-
     return notionMessage || rawMessage;
   }
 

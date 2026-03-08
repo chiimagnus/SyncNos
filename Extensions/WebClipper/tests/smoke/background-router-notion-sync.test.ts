@@ -1094,7 +1094,7 @@ describe('background-router notion sync', () => {
     expect(res.error?.extra?.code).toBe('sync_already_running');
   });
 
-  it('normalizes notion validation errors in per-conversation failures', async () => {
+  it('preserves raw notion validation errors in per-conversation failures', async () => {
     const chromeMock = mockChromeStorage();
 
     const router = createRouter({
@@ -1135,8 +1135,95 @@ describe('background-router notion sync', () => {
     expect(res.ok).toBe(true);
     expect(res.data.failCount).toBe(1);
     expect(res.data.results[0].error).toBe(
-      'Notion rejected one content block because it contained too many rich text fragments. The content needs to be split into smaller blocks.',
+      'body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`.',
     );
+  });
+
+  it('preserves raw notion service unavailable errors in per-conversation failures', async () => {
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          appendChildren: async () => {
+            const error: any = new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 503');
+            error.status = 503;
+            error.code = 'service_unavailable';
+            error.notionMessage = 'temporarily unavailable';
+            throw error;
+          },
+          messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.failCount).toBe(1);
+    expect(res.data.results[0].error).toBe('temporarily unavailable');
+  });
+
+  it('preserves raw notion rate limit errors and keeps retry hints', async () => {
+    const chromeMock = mockChromeStorage();
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+            mapping: null,
+          }),
+          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          setConversationNotionPageId: async () => true,
+          setSyncCursor: async () => true,
+        },
+        syncService: {
+          getPage: async () => {
+            throw new Error('404');
+          },
+          createPageInDatabase: async () => ({ id: 'p_new' }),
+          appendChildren: async () => {
+            const error: any = new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 429');
+            error.status = 429;
+            error.code = 'rate_limited';
+            error.retryAfterMs = 14_000;
+            error.notionMessage = 'Too many requests';
+            throw error;
+          },
+          messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],
+          isPageUsableForDatabase: () => false,
+          pageBelongsToDatabase: () => false,
+        },
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.failCount).toBe(1);
+    expect(res.data.results[0].error).toBe('Too many requests Retry in about 14s.');
   });
 
   it('parses structured error metadata from Notion API responses', async () => {
