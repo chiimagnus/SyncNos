@@ -11,6 +11,7 @@ import {
 import { SYNC_JOB_STORAGE_KEYS } from '../../sync/sync-job-store';
 import { storageOnChanged } from '../../platform/storage/local';
 import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '../../sync/models';
+import { primeObsidianAppForSync } from './obsidian-sync-launch';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
 
@@ -400,6 +401,10 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       });
 
       try {
+        if (provider === 'obsidian') {
+          await primeObsidianAppForSync();
+        }
+
         const summary = provider === 'notion'
           ? await syncNotionConversations(ids)
           : await syncObsidianConversations(ids);

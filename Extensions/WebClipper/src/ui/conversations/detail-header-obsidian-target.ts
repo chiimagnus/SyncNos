@@ -1,5 +1,4 @@
 import type { Conversation } from '../../conversations/domain/models';
-import { tabsCreate } from '../../platform/webext/tabs';
 import {
   getObsidianConnectionConfig as getDefaultObsidianConnectionConfig,
   getObsidianPathConfig as getDefaultObsidianPathConfig,
@@ -9,12 +8,15 @@ import {
   createClient as createDefaultObsidianClient,
 } from '../../sync/obsidian/obsidian-local-rest-client';
 import {
+  launchObsidianApp,
+  OBSIDIAN_APP_LAUNCH_URL,
+  shouldLaunchObsidianApp,
+} from '../../sync/obsidian/obsidian-app-launch';
+import {
   buildStableNotePath as buildDefaultStableNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
 } from '../../sync/obsidian/obsidian-note-path';
 import { readSyncnosObject as readDefaultSyncnosObject } from '../../sync/obsidian/obsidian-sync-metadata';
-
-export const OBSIDIAN_APP_LAUNCH_URL = 'obsidian://open';
 export const DEFAULT_OBSIDIAN_OPEN_RETRY_POLICY = Object.freeze({
   maxAttempts: 3,
   launchDelayMs: 1200,
@@ -82,34 +84,6 @@ function buildFolderByKindId(pathConfig: Awaited<ReturnType<typeof getDefaultObs
     chat: safeString(pathConfig.chatFolder),
     article: safeString(pathConfig.articleFolder),
   };
-}
-
-function isLocalObsidianApiBaseUrl(apiBaseUrl?: string) {
-  const value = safeString(apiBaseUrl).toLowerCase();
-  return value.startsWith('http://127.0.0.1:') || value.startsWith('http://localhost:');
-}
-
-function shouldLaunchObsidianApp(error: { code?: string; message?: string } | null | undefined, connectionConfig?: { apiBaseUrl?: string }) {
-  return safeString(error?.code) === 'network_error' && isLocalObsidianApiBaseUrl(connectionConfig?.apiBaseUrl);
-}
-
-export async function launchObsidianApp(url: string): Promise<boolean> {
-  const safeUrl = safeString(url);
-  if (!safeUrl) return false;
-
-  try {
-    await tabsCreate({ url: safeUrl, active: true });
-    return true;
-  } catch (_error) {
-    // Fall through to browser APIs when tabs.create is unavailable.
-  }
-
-  try {
-    globalThis.window?.open(safeUrl, '_blank', 'noopener,noreferrer');
-    return true;
-  } catch (_error) {
-    return false;
-  }
 }
 
 export async function waitForDelay(ms: number): Promise<void> {
@@ -310,7 +284,8 @@ export async function openObsidianTarget({
   services?: ObsidianDetailHeaderServices;
   port?: ObsidianTargetActionPort;
 }) {
-  if (trigger.launchBeforeRetry) {
+  let shouldLaunchBeforeRetry = !!trigger.launchBeforeRetry;
+  if (shouldLaunchBeforeRetry) {
     const launched = await port.launchProtocolUrl(OBSIDIAN_APP_LAUNCH_URL);
     if (!launched) {
       const message = 'Failed to launch Obsidian app.';
@@ -324,13 +299,14 @@ export async function openObsidianTarget({
   const attempts = Math.max(1, Number(trigger.retryPolicy.maxAttempts) || 1);
   for (let index = 0; index < attempts; index += 1) {
     let effectiveTrigger = trigger;
-    if (trigger.launchBeforeRetry) {
+    if (shouldLaunchBeforeRetry) {
       const refreshed = await resolveObsidianOpenTarget({
         conversation: trigger.conversation,
         services,
       });
       if (refreshed.available && refreshed.trigger && !refreshed.trigger.launchBeforeRetry) {
         effectiveTrigger = refreshed.trigger;
+        shouldLaunchBeforeRetry = false;
       } else {
         const isLastAttempt = index >= attempts - 1;
         const message =
@@ -351,6 +327,19 @@ export async function openObsidianTarget({
     });
     if (openRes.ok) {
       return { ok: true } as const;
+    }
+
+    if (!shouldLaunchBeforeRetry) {
+      const connectionConfig = await services.settingsStore.getConnectionConfig();
+      if (shouldLaunchObsidianApp(openRes.error, connectionConfig)) {
+        const launched = await port.launchProtocolUrl(OBSIDIAN_APP_LAUNCH_URL);
+        if (launched) {
+          shouldLaunchBeforeRetry = true;
+          await port.wait(trigger.retryPolicy.launchDelayMs);
+          index -= 1;
+          continue;
+        }
+      }
     }
 
     const isLastAttempt = index >= attempts - 1;
