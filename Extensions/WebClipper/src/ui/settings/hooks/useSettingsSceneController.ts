@@ -17,7 +17,7 @@ import {
   loadChatWithSettings,
   resetChatWithSettings,
   saveChatWithSettings,
-} from '../../../chat-with/chat-with-settings';
+} from '../../../integrations/chat-with-settings';
 
 import {
   formatProgress,

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import type { ChatWithAiPlatform } from '../../../chat-with/chat-with-settings';
+import type { ChatWithAiPlatform } from '../../../integrations/chat-with-settings';
 import { buttonClassName, cardClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 
@@ -156,4 +156,3 @@ export function ChatWithAiSection(props: {
     </section>
   );
 }
-
