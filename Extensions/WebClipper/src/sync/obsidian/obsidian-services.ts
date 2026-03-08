@@ -21,6 +21,9 @@ export type ObsidianLocalRestClientModule = {
 
 export type ObsidianNotePathModule = {
   buildStableNotePath: (input: any) => string;
+  buildLegacyHashNotePath?: (input: any) => string;
+  stableConversationId10?: (input: any) => string;
+  resolveExistingNotePath?: (input: any) => Promise<any>;
 };
 
 export type ObsidianSyncMetadataModule = {
@@ -53,4 +56,3 @@ export type ObsidianServices = {
   notePath: ObsidianNotePathModule;
   syncOrchestrator: ObsidianSyncOrchestrator;
 };
-

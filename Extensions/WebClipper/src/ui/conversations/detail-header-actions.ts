@@ -3,20 +3,26 @@ import { tabsCreate } from '../../platform/webext/tabs';
 
 export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: 'Open in Notion',
+  openInObsidian: 'Open in Obsidian',
 } as const;
 
-export type DetailHeaderActionKind = 'external-link';
+export type DetailHeaderActionKind = 'external-link' | 'open-target';
+
+export type DetailHeaderActionProvider = 'notion' | 'obsidian';
 
 export type DetailHeaderAction = {
   id: string;
   label: string;
   kind: DetailHeaderActionKind;
-  href: string;
+  provider: DetailHeaderActionProvider;
+  href?: string;
+  triggerPayload?: Record<string, unknown>;
   onTrigger: () => Promise<void>;
 };
 
 export type DetailHeaderActionPort = {
   openExternalUrl: (url: string) => Promise<boolean>;
+  launchProtocolUrl: (url: string) => Promise<boolean>;
 };
 
 export type ResolveDetailHeaderActionsInput = {
@@ -40,6 +46,19 @@ export async function openDetailHeaderExternalUrl(url: string): Promise<boolean>
   const safeUrl = String(url || '').trim();
   if (!/^https?:\/\//i.test(safeUrl)) return false;
 
+  return openDetailHeaderUrl(safeUrl);
+}
+
+export async function openDetailHeaderProtocolUrl(url: string): Promise<boolean> {
+  const safeUrl = String(url || '').trim();
+  if (!safeUrl) return false;
+
+  return openDetailHeaderUrl(safeUrl);
+}
+
+async function openDetailHeaderUrl(safeUrl: string): Promise<boolean> {
+  if (!safeUrl) return false;
+
   try {
     await tabsCreate({ url: safeUrl, active: true });
     return true;
@@ -57,6 +76,7 @@ export async function openDetailHeaderExternalUrl(url: string): Promise<boolean>
 
 export const defaultDetailHeaderActionPort: DetailHeaderActionPort = {
   openExternalUrl: openDetailHeaderExternalUrl,
+  launchProtocolUrl: openDetailHeaderProtocolUrl,
 };
 
 export function resolveDetailHeaderActions({
@@ -71,6 +91,7 @@ export function resolveDetailHeaderActions({
       id: 'open-in-notion',
       label: DETAIL_HEADER_ACTION_LABELS.openInNotion,
       kind: 'external-link',
+      provider: 'notion',
       href: notionUrl,
       onTrigger: async () => {
         const opened = await port.openExternalUrl(notionUrl);
