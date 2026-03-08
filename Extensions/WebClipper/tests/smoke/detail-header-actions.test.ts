@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const storageGetMock = vi.fn(async () => ({}));
+vi.mock('../../src/platform/storage/local', () => ({
+  storageGet: (...args: any[]) => storageGetMock(...args),
+  storageSet: vi.fn(async () => {}),
+}));
+
 const resolveObsidianOpenTargetMock = vi.fn(async () => ({
   available: false,
   label: 'Open in Obsidian',
@@ -197,6 +203,12 @@ describe('detail-header-actions', () => {
     });
 
     try {
+      storageGetMock.mockResolvedValueOnce({
+        chat_with_ai_platforms_v1: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
+        chat_with_prompt_template_v1: 'Talk about this:\n\n{{article_title}}\n\n{{article_content}}',
+        chat_with_max_chars_v1: 28_000,
+      });
+
       const actions = await resolveDetailHeaderActions({
         conversation: {
           id: 6,
@@ -229,7 +241,7 @@ describe('detail-header-actions', () => {
       });
 
       expect(actions).toHaveLength(1);
-      expect(actions[0]?.label).toBe(DETAIL_HEADER_ACTION_LABELS.chatWithChatGpt);
+      expect(actions[0]?.label).toBe('Chat with ChatGPT');
       expect(actions[0]?.provider).toBe('chatgpt');
       expect(actions[0]?.slot).toBe('chat-with');
 
