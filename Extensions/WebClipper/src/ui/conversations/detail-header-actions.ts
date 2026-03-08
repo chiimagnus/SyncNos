@@ -1,7 +1,7 @@
 import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
-import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { tabsCreate } from '../../platform/webext/tabs';
 import { launchObsidianApp } from '../../sync/obsidian/obsidian-app-launch';
+import { buildChatWithPayload, loadChatWithSettings, truncateForChatWith, type ChatWithAiPlatform } from '../../chat-with/chat-with-settings';
 import {
   openObsidianTarget,
   reportObsidianOpenError,
@@ -12,12 +12,11 @@ import {
 export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: 'Open in Notion',
   openInObsidian: 'Open in Obsidian',
-  chatWithChatGpt: 'Chat with ChatGPT',
 } as const;
 
 export type DetailHeaderActionKind = 'external-link' | 'open-target';
 
-export type DetailHeaderActionProvider = 'notion' | 'obsidian' | 'chatgpt';
+export type DetailHeaderActionProvider = string;
 
 export type DetailHeaderActionSlot = 'open' | 'chat-with';
 
@@ -97,21 +96,6 @@ export const defaultDetailHeaderActionPort: DetailHeaderActionPort = {
   reportError: reportObsidianOpenError,
 };
 
-const CHATGPT_URL = 'https://chatgpt.com/' as const;
-
-const DEFAULT_CHAT_WITH_PROMPT = '和我聊聊这个内容说了什么' as const;
-
-const DEFAULT_MAX_CHAT_WITH_CHARS = 28_000 as const;
-
-function truncateForChatWith(input: string, maxChars: number): { text: string; truncated: boolean } {
-  const text = String(input || '');
-  const limit = Number.isFinite(Number(maxChars)) ? Math.max(1, Math.floor(Number(maxChars))) : DEFAULT_MAX_CHAT_WITH_CHARS;
-  if (text.length <= limit) return { text, truncated: false };
-  const suffix = `\n\n[Truncated: original length=${text.length}]`;
-  const sliceLen = Math.max(0, limit - suffix.length);
-  return { text: `${text.slice(0, sliceLen)}${suffix}`, truncated: true };
-}
-
 async function writeTextToClipboard(value: string): Promise<boolean> {
   const text = String(value ?? '');
   if (!text) return false;
@@ -167,32 +151,43 @@ function buildNotionDetailHeaderAction({
   };
 }
 
-function buildChatWithChatGptAction({
-  conversation,
-  detail,
-  port = defaultDetailHeaderActionPort,
-}: ResolveDetailHeaderActionsInput): DetailHeaderAction | null {
+function buildChatWithPlatformAction(input: {
+  conversation: Conversation | null | undefined;
+  detail: ConversationDetail | null | undefined;
+  port?: DetailHeaderActionPort;
+  platform: ChatWithAiPlatform;
+  payload: string;
+  maxChars: number;
+}): DetailHeaderAction | null {
+  const { conversation, detail, platform, payload } = input;
+  const port = input.port || defaultDetailHeaderActionPort;
+  const maxChars = Number(input.maxChars);
+
   if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return null;
+  if (!platform || !platform.enabled) return null;
+  if (!String(platform.url || '').trim()) return null;
+  if (!String(platform.name || '').trim()) return null;
   // Guard against stale detail data when the active conversation switches.
   if (Number(detail.conversationId) !== Number(conversation.id)) return null;
 
-  const formatted = formatConversationMarkdown(conversation, detail.messages as any);
-  const payload = `${DEFAULT_CHAT_WITH_PROMPT}\n\n---\n\n${formatted}\n`;
-  const truncated = truncateForChatWith(payload, DEFAULT_MAX_CHAT_WITH_CHARS);
+  const truncated = truncateForChatWith(payload, maxChars);
+  const href = String(platform.url || '').trim();
+  const label = `Chat with ${String(platform.name || '').trim()}`;
+  const after = `✅ 已复制，正在跳转 ${String(platform.name || '').trim()}…${truncated.truncated ? ' (truncated)' : ''}`;
 
   return {
-    id: 'chat-with-chatgpt',
-    label: DETAIL_HEADER_ACTION_LABELS.chatWithChatGpt,
+    id: `chat-with-${String(platform.id || '').trim()}`,
+    label,
     kind: 'external-link',
-    provider: 'chatgpt',
+    provider: String(platform.id || 'chat-with'),
     slot: 'chat-with',
-    href: CHATGPT_URL,
-    afterTriggerLabel: `✅ 已复制，正在跳转 ChatGPT…${truncated.truncated ? ' (truncated)' : ''}`,
+    href,
+    afterTriggerLabel: after,
     onTrigger: async () => {
       const copied = await writeTextToClipboard(truncated.text);
       if (!copied) throw new Error('Failed to copy content to clipboard');
-      const opened = await port.openExternalUrl(CHATGPT_URL);
-      if (!opened) throw new Error('Failed to open ChatGPT');
+      const opened = await port.openExternalUrl(href);
+      if (!opened) throw new Error(`Failed to open ${String(platform.name || '').trim()}`);
     },
   };
 }
@@ -206,8 +201,19 @@ export async function resolveDetailHeaderActions({
   const notionAction = buildNotionDetailHeaderAction({ conversation, port });
   if (notionAction) actions.push(notionAction);
 
-  const chatgptAction = buildChatWithChatGptAction({ conversation, detail, port });
-  if (chatgptAction) actions.push(chatgptAction);
+  try {
+    if (conversation && detail && Array.isArray(detail.messages) && detail.messages.length) {
+      const settings = await loadChatWithSettings();
+      const payload = buildChatWithPayload(conversation, detail as any, settings.promptTemplate);
+      for (const platform of settings.platforms || []) {
+        if (!platform || !platform.enabled) continue;
+        const action = buildChatWithPlatformAction({ conversation, detail, port, platform, payload, maxChars: settings.maxChars });
+        if (action) actions.push(action);
+      }
+    }
+  } catch (_e) {
+    // Keep Open actions working even if loading settings fails.
+  }
 
   try {
     const obsidianTarget = await resolveObsidianOpenTarget({ conversation });
