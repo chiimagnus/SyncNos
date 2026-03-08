@@ -1,7 +1,7 @@
 import { en, type TranslationKey } from './locales/en';
 import { zh } from './locales/zh';
 
-type Locale = 'en' | 'zh';
+export type Locale = 'en' | 'zh';
 
 function detectLocale(): Locale {
   try {
@@ -15,9 +15,12 @@ function detectLocale(): Locale {
   return 'en';
 }
 
-export const currentLocale: Locale = detectLocale();
-
 const translations: Record<Locale, { [K in TranslationKey]: string }> = { en, zh };
+const currentLocale: Locale = detectLocale();
+
+export function getCurrentLocale(): Locale {
+  return currentLocale;
+}
 
 export function t(key: TranslationKey): string {
   return translations[currentLocale][key];

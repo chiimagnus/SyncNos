@@ -33,12 +33,12 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
 
   return (
     <section>
-      <section className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label="Conversation detail">
+      <section className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label={t('conversationDetailAria')}>
         {!hideHeader ? (
           <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
             <div className="tw-flex tw-min-w-0 tw-items-start tw-gap-2">
               {onBack ? (
-                <button type="button" onClick={onBack} className={outlineButtonClass} aria-label="Back">
+                <button type="button" onClick={onBack} className={outlineButtonClass} aria-label={t('backButton')}>
                   {t('backButton')}
                 </button>
               ) : null}

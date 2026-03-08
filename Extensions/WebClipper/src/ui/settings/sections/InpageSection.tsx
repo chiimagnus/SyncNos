@@ -4,7 +4,7 @@ import { cardClassName, checkboxClassName } from '../ui';
 export function InpageSection(props: { busy: boolean; supportedOnly: boolean; onToggleSupportedOnly: (next: boolean) => void }) {
   const { busy, supportedOnly, onToggleSupportedOnly } = props;
   return (
-    <section className={cardClassName} aria-label="Inpage Button">
+    <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('inpageButtonHeading')}</h2>
       <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--muted)]">
         <input

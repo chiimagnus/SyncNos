@@ -1,4 +1,5 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
+import { t } from '../i18n';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -165,7 +166,7 @@ export function createContentController(deps: Deps) {
     const clickSave = async () => {
       if (stopped) return;
       if (manualSaveInFlight) {
-        showInpageTip('Saving...', 'loading');
+        showInpageTip(t('savingDots'), 'loading');
         return;
       }
 
@@ -186,9 +187,9 @@ export function createContentController(deps: Deps) {
     const openPopupPanel = async () => {
       try {
         const response = await send(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP);
-        if (!response?.ok) showInpageTip('Click toolbar icon to open panel', 'error');
+        if (!response?.ok) showInpageTip(t('clickToolbarIconToOpenPanel'), 'error');
       } catch (_error) {
-        showInpageTip('Click toolbar icon to open panel', 'error');
+        showInpageTip(t('clickToolbarIconToOpenPanel'), 'error');
       }
     };
 
@@ -236,7 +237,7 @@ export function createContentController(deps: Deps) {
           if (!incremental || !incremental.changed) return;
 
           const saved = await saveSnapshot(incremental.snapshot);
-          if (saved) showInpageTip('Saved', 'ok');
+          if (saved) showInpageTip(t('saved'), 'ok');
         } catch (error) {
           if (runtime?.isInvalidContextError?.(error)) {
             stop();

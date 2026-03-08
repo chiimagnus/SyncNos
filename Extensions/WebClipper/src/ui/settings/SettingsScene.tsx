@@ -215,12 +215,12 @@ export function SettingsScene(props: SettingsSceneProps) {
                 type="button"
                 className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]"
                 onClick={() => setNarrowRoute('list')}
-                aria-label="Back"
+                aria-label={t('backButton')}
               >
                 {t('backButton')}
               </button>
               <div className="tw-min-w-0 tw-flex-1 tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
-                {activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : 'Settings'}
+                {activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : t('settingsTitle')}
               </div>
               <div className="tw-w-[74px]" aria-hidden="true" />
             </div>
@@ -236,7 +236,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     return (
       <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
         <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-2">
-          <nav className="tw-grid tw-gap-2" aria-label="Settings sections">
+          <nav className="tw-grid tw-gap-2" aria-label={t('settingsSectionsAria')}>
             {SETTINGS_SECTIONS.map((section) => (
               <button
                 key={section.key}

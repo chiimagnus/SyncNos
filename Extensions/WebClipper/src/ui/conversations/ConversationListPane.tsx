@@ -468,7 +468,7 @@ export function ConversationListPane({
                   'tw-h-8 tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
                   hasSelection ? 'tw-hidden' : '',
                 ].join(' ')}
-                aria-label="Source filter"
+                aria-label={t('sourceFilterAria')}
               >
                 {sourceOptions.map((opt) => (
                   <option key={opt.key} value={opt.key}>
@@ -602,7 +602,7 @@ export function ConversationListPane({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Delete conversations confirmation"
+            aria-label={t('deleteConfirmDialogAria')}
             className="tw-w-full tw-max-w-[340px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-4 tw-shadow-[var(--shadow)]"
           >
             <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">{t('deleteConfirmTitle')}</div>

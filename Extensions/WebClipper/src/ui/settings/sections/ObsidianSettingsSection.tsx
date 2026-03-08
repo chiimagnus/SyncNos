@@ -60,7 +60,7 @@ export function ObsidianSettingsSection(props: {
 
   return (
     <>
-      <section className={cardClassName} aria-label="Obsidian Local REST API">
+      <section className={cardClassName} aria-label={t('obsidianLocalRestApi')}>
         <div className="tw-flex tw-items-center tw-gap-2">
           <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
           <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('obsidianLocalRestApi')}</h2>
@@ -77,7 +77,7 @@ export function ObsidianSettingsSection(props: {
               spellCheck={false}
               placeholder="http://127.0.0.1:27123"
               className={textInputClassName}
-              aria-label="Obsidian API base url"
+              aria-label={t('baseUrl')}
             />
           </SettingsFormRow>
 
@@ -93,7 +93,7 @@ export function ObsidianSettingsSection(props: {
               disabled={busy}
               placeholder={apiKeyPresent ? apiKeyMasked : ''}
               className={textInputClassName}
-              aria-label="Obsidian API key"
+              aria-label={t('apiKey')}
             />
           </SettingsFormRow>
 
@@ -107,7 +107,7 @@ export function ObsidianSettingsSection(props: {
               spellCheck={false}
               placeholder="Authorization"
               className={textInputClassName}
-              aria-label="Obsidian auth header name"
+              aria-label={t('authHeader')}
             />
           </SettingsFormRow>
 
@@ -143,7 +143,7 @@ export function ObsidianSettingsSection(props: {
         </div>
       </section>
 
-      <section className={cardClassName} aria-label="Obsidian Paths">
+      <section className={cardClassName} aria-label={t('obsidianPaths')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('obsidianPaths')}</h2>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
@@ -157,7 +157,7 @@ export function ObsidianSettingsSection(props: {
               spellCheck={false}
               placeholder="SyncNos-AIChats"
               className={textInputClassName}
-              aria-label="Obsidian AI chats folder"
+              aria-label={t('aiChatsFolder')}
             />
           </SettingsFormRow>
 
@@ -171,7 +171,7 @@ export function ObsidianSettingsSection(props: {
               spellCheck={false}
               placeholder="SyncNos-WebArticles"
               className={textInputClassName}
-              aria-label="Obsidian web clipper folder"
+              aria-label={t('webClipperFolder')}
             />
           </SettingsFormRow>
 

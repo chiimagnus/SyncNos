@@ -225,7 +225,7 @@ export default function AppShell() {
           )}
 
           {showSettingsSheet ? (
-            <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label="Settings">
+            <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label={t('settingsDialogAria')}>
               <div
                 className="tw-absolute tw-inset-0 tw-bg-transparent"
                 role="presentation"
