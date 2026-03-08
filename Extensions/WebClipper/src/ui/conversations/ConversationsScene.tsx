@@ -24,9 +24,14 @@ export type PopupHeaderState =
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
   onPopupHeaderStateChange?: (state: PopupHeaderState) => void;
+  inlineNarrowDetailHeader?: boolean;
 };
 
-export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderStateChange }: ConversationsSceneProps) {
+export function ConversationsScene({
+  defaultNarrowRoute = 'list',
+  onPopupHeaderStateChange,
+  inlineNarrowDetailHeader = false,
+}: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const { activeId, selectedConversation, detailHeaderActions } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
@@ -77,7 +82,7 @@ export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderS
       return (
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
           <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
-            <ConversationDetailPane hideHeader />
+            {inlineNarrowDetailHeader ? <ConversationDetailPane onBack={returnToList} /> : <ConversationDetailPane hideHeader />}
           </div>
         </div>
       );
