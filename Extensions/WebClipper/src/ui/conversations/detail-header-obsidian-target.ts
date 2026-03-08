@@ -310,8 +310,6 @@ export async function openObsidianTarget({
   services?: ObsidianDetailHeaderServices;
   port?: ObsidianTargetActionPort;
 }) {
-  let effectiveTrigger = trigger;
-
   if (trigger.launchBeforeRetry) {
     const launched = await port.launchProtocolUrl(OBSIDIAN_APP_LAUNCH_URL);
     if (!launched) {
@@ -321,21 +319,32 @@ export async function openObsidianTarget({
     }
 
     await port.wait(trigger.retryPolicy.launchDelayMs);
-
-    const refreshed = await resolveObsidianOpenTarget({
-      conversation: trigger.conversation,
-      services,
-    });
-    if (!refreshed.available || !refreshed.trigger) {
-      const message = refreshed.error?.message || 'Failed to resolve the Obsidian note after launching the app.';
-      port.reportError(message);
-      return { ok: false, error: { code: refreshed.error?.code || 'unavailable_after_launch', message } } as const;
-    }
-    effectiveTrigger = refreshed.trigger;
   }
 
-  const attempts = Math.max(1, Number(effectiveTrigger.retryPolicy.maxAttempts) || 1);
+  const attempts = Math.max(1, Number(trigger.retryPolicy.maxAttempts) || 1);
   for (let index = 0; index < attempts; index += 1) {
+    let effectiveTrigger = trigger;
+    if (trigger.launchBeforeRetry) {
+      const refreshed = await resolveObsidianOpenTarget({
+        conversation: trigger.conversation,
+        services,
+      });
+      if (refreshed.available && refreshed.trigger && !refreshed.trigger.launchBeforeRetry) {
+        effectiveTrigger = refreshed.trigger;
+      } else {
+        const isLastAttempt = index >= attempts - 1;
+        const message =
+          refreshed.error?.message ||
+          'Failed to resolve the Obsidian note after launching the app.';
+        if (isLastAttempt || refreshed.error?.code === 'note_not_found') {
+          port.reportError(message);
+          return { ok: false, error: { code: refreshed.error?.code || 'unavailable_after_launch', message } } as const;
+        }
+        await port.wait(trigger.retryPolicy.retryDelayMs);
+        continue;
+      }
+    }
+
     const openRes = await openResolvedObsidianPath({
       resolvedNotePath: effectiveTrigger.resolvedNotePath,
       services,
@@ -350,7 +359,7 @@ export async function openObsidianTarget({
       port.reportError(message);
       return { ok: false, error: { code: openRes.error?.code || 'open_failed', message } } as const;
     }
-    await port.wait(effectiveTrigger.retryPolicy.retryDelayMs);
+    await port.wait(trigger.retryPolicy.retryDelayMs);
   }
 
   const message = 'Failed to open Obsidian note.';

@@ -156,4 +156,27 @@ describe('detail-header-actions', () => {
 
     expect(actions.map((action) => action.provider)).toEqual(['notion', 'obsidian']);
   });
+
+  it('keeps the Notion action when the Obsidian capability probe throws', async () => {
+    resolveObsidianOpenTargetMock.mockRejectedValueOnce(new Error('probe failed'));
+
+    const actions = await resolveDetailHeaderActions({
+      conversation: {
+        id: 5,
+        source: 'chatgpt',
+        conversationKey: 'conv-5',
+        title: 'Conversation',
+        notionPageId: '01234567-89ab-cdef-0123-456789abcdef',
+      },
+      port: {
+        openExternalUrl: vi.fn(async () => true),
+        launchProtocolUrl: vi.fn(async () => true),
+        wait: vi.fn(async () => {}),
+        reportError: vi.fn(),
+      },
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.provider).toBe('notion');
+  });
 });

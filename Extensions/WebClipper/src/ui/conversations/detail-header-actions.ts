@@ -117,25 +117,29 @@ export async function resolveDetailHeaderActions({
   const notionAction = buildNotionDetailHeaderAction({ conversation, port });
   if (notionAction) actions.push(notionAction);
 
-  const obsidianTarget = await resolveObsidianOpenTarget({ conversation });
-  if (obsidianTarget.available && obsidianTarget.trigger) {
-    actions.push({
-      id: 'open-in-obsidian',
-      label: DETAIL_HEADER_ACTION_LABELS.openInObsidian,
-      kind: 'open-target',
-      provider: 'obsidian',
-      triggerPayload: obsidianTarget.trigger as unknown as Record<string, unknown>,
-      onTrigger: async () => {
-        await openObsidianTarget({
-          trigger: obsidianTarget.trigger!,
-          port: {
-            launchProtocolUrl: port.launchProtocolUrl,
-            wait: port.wait,
-            reportError: port.reportError,
-          },
-        });
-      },
-    });
+  try {
+    const obsidianTarget = await resolveObsidianOpenTarget({ conversation });
+    if (obsidianTarget.available && obsidianTarget.trigger) {
+      actions.push({
+        id: 'open-in-obsidian',
+        label: DETAIL_HEADER_ACTION_LABELS.openInObsidian,
+        kind: 'open-target',
+        provider: 'obsidian',
+        triggerPayload: obsidianTarget.trigger as unknown as Record<string, unknown>,
+        onTrigger: async () => {
+          await openObsidianTarget({
+            trigger: obsidianTarget.trigger!,
+            port: {
+              launchProtocolUrl: port.launchProtocolUrl,
+              wait: port.wait,
+              reportError: port.reportError,
+            },
+          });
+        },
+      });
+    }
+  } catch (_error) {
+    // Preserve already-resolved actions such as Notion even if the Obsidian capability probe fails.
   }
 
   return actions;
