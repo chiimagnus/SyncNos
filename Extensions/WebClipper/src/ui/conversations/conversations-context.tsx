@@ -70,10 +70,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
     [items, activeId],
   );
-  const detailHeaderActions = useMemo(
-    () => resolveDetailHeaderActions({ conversation: selectedConversation }),
-    [selectedConversation],
-  );
+  const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
 
   const refreshList = useCallback(async () => {
     setLoadingList(true);
@@ -124,6 +121,28 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     void refreshActiveDetail();
   }, [refreshActiveDetail]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedConversation) {
+      setDetailHeaderActions([]);
+      return;
+    }
+
+    setDetailHeaderActions([]);
+    void resolveDetailHeaderActions({ conversation: selectedConversation })
+      .then((actions) => {
+        if (!cancelled) setDetailHeaderActions(actions);
+      })
+      .catch(() => {
+        if (!cancelled) setDetailHeaderActions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedConversation]);
 
   const toggleSelected = useCallback((id: number) => {
     const safeId = Number(id);

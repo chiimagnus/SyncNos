@@ -1,5 +1,11 @@
 import type { Conversation } from '../../conversations/domain/models';
 import { tabsCreate } from '../../platform/webext/tabs';
+import {
+  openObsidianTarget,
+  reportObsidianOpenError,
+  resolveObsidianOpenTarget,
+  waitForDelay,
+} from './detail-header-obsidian-target';
 
 export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: 'Open in Notion',
@@ -23,6 +29,8 @@ export type DetailHeaderAction = {
 export type DetailHeaderActionPort = {
   openExternalUrl: (url: string) => Promise<boolean>;
   launchProtocolUrl: (url: string) => Promise<boolean>;
+  wait: (ms: number) => Promise<void>;
+  reportError: (message: string) => void;
 };
 
 export type ResolveDetailHeaderActionsInput = {
@@ -77,26 +85,58 @@ async function openDetailHeaderUrl(safeUrl: string): Promise<boolean> {
 export const defaultDetailHeaderActionPort: DetailHeaderActionPort = {
   openExternalUrl: openDetailHeaderExternalUrl,
   launchProtocolUrl: openDetailHeaderProtocolUrl,
+  wait: waitForDelay,
+  reportError: reportObsidianOpenError,
 };
 
-export function resolveDetailHeaderActions({
+function buildNotionDetailHeaderAction({
   conversation,
   port = defaultDetailHeaderActionPort,
-}: ResolveDetailHeaderActionsInput): DetailHeaderAction[] {
+}: ResolveDetailHeaderActionsInput): DetailHeaderAction | null {
   const notionUrl = buildNotionPageUrl(conversation?.notionPageId);
-  if (!notionUrl) return [];
+  if (!notionUrl) return null;
 
-  return [
-    {
-      id: 'open-in-notion',
-      label: DETAIL_HEADER_ACTION_LABELS.openInNotion,
-      kind: 'external-link',
-      provider: 'notion',
-      href: notionUrl,
-      onTrigger: async () => {
-        const opened = await port.openExternalUrl(notionUrl);
-        if (!opened) throw new Error('Failed to open Notion page');
-      },
+  return {
+    id: 'open-in-notion',
+    label: DETAIL_HEADER_ACTION_LABELS.openInNotion,
+    kind: 'external-link',
+    provider: 'notion',
+    href: notionUrl,
+    onTrigger: async () => {
+      const opened = await port.openExternalUrl(notionUrl);
+      if (!opened) throw new Error('Failed to open Notion page');
     },
-  ];
+  };
+}
+
+export async function resolveDetailHeaderActions({
+  conversation,
+  port = defaultDetailHeaderActionPort,
+}: ResolveDetailHeaderActionsInput): Promise<DetailHeaderAction[]> {
+  const actions: DetailHeaderAction[] = [];
+  const notionAction = buildNotionDetailHeaderAction({ conversation, port });
+  if (notionAction) actions.push(notionAction);
+
+  const obsidianTarget = await resolveObsidianOpenTarget({ conversation });
+  if (obsidianTarget.available && obsidianTarget.trigger) {
+    actions.push({
+      id: 'open-in-obsidian',
+      label: DETAIL_HEADER_ACTION_LABELS.openInObsidian,
+      kind: 'open-target',
+      provider: 'obsidian',
+      triggerPayload: obsidianTarget.trigger as unknown as Record<string, unknown>,
+      onTrigger: async () => {
+        await openObsidianTarget({
+          trigger: obsidianTarget.trigger!,
+          port: {
+            launchProtocolUrl: port.launchProtocolUrl,
+            wait: port.wait,
+            reportError: port.reportError,
+          },
+        });
+      },
+    });
+  }
+
+  return actions;
 }
