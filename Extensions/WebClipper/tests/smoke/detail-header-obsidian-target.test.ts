@@ -107,4 +107,74 @@ describe('detail-header-obsidian-target', () => {
     expect(openVaultFile).toHaveBeenCalledWith('SyncNos-AIChats/chatgpt-Conversation-1234567890.md');
     expect(reportError).not.toHaveBeenCalled();
   });
+
+  it('re-resolves the note path across retries until the app is ready', async () => {
+    const openVaultFile = vi.fn(async () => ({ ok: true }));
+    const resolveExistingNotePath = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        desiredFilePath: 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md',
+        error: { code: 'network_error', message: 'fetch failed' },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        desiredFilePath: 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md',
+        error: { code: 'network_error', message: 'still starting' },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        desiredFilePath: 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md',
+        resolvedFilePath: 'SyncNos-AIChats/chatgpt-Old-1234567890.md',
+        found: true,
+      });
+
+    const services = {
+      settingsStore: {
+        getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+        getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
+      },
+      localRestClient: {
+        NOTE_JSON_ACCEPT: 'application/vnd.olrapi.note+json',
+        createClient: vi.fn(() => ({ ok: true, openVaultFile })),
+      },
+      notePath: {
+        buildStableNotePath: vi.fn(() => 'SyncNos-AIChats/chatgpt-Conversation-1234567890.md'),
+        resolveExistingNotePath,
+      },
+      metadata: {
+        readSyncnosObject: vi.fn(),
+      },
+    };
+
+    const target = await resolveObsidianOpenTarget({
+      conversation: {
+        id: 3,
+        source: 'chatgpt',
+        conversationKey: 'conv-3',
+        title: 'Conversation',
+      },
+      services,
+    });
+    expect(target.available).toBe(true);
+
+    const launchProtocolUrl = vi.fn(async () => true);
+    const wait = vi.fn(async () => {});
+    const reportError = vi.fn();
+
+    const result = await openObsidianTarget({
+      trigger: target.trigger!,
+      services,
+      port: {
+        launchProtocolUrl,
+        wait,
+        reportError,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(resolveExistingNotePath).toHaveBeenCalledTimes(3);
+    expect(openVaultFile).toHaveBeenCalledWith('SyncNos-AIChats/chatgpt-Old-1234567890.md');
+    expect(reportError).not.toHaveBeenCalled();
+  });
 });

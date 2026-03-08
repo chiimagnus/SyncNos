@@ -107,4 +107,42 @@ describe('DetailHeaderActionBar', () => {
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
+
+  it('reports an error instead of swallowing a failed action trigger', async () => {
+    const alertSpy = vi.fn();
+    Object.defineProperty(globalThis.window, 'alert', {
+      configurable: true,
+      value: alertSpy,
+    });
+
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'open-in-notion',
+              label: 'Open in Notion',
+              provider: 'notion',
+              kind: 'external-link',
+              href: 'https://www.notion.so/example',
+              onTrigger: vi.fn(async () => {
+                throw new Error('Failed to open Notion page');
+              }),
+            },
+          ],
+          buttonClassName,
+        }),
+      );
+    });
+
+    const button = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+
+    act(() => {
+      button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    await Promise.resolve();
+    expect(alertSpy).toHaveBeenCalledWith('Failed to open Notion page');
+  });
 });

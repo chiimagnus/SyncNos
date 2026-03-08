@@ -9,10 +9,20 @@ export type DetailHeaderActionBarProps = {
 };
 
 export function DetailHeaderActionBar({ actions, buttonClassName, className }: DetailHeaderActionBarProps) {
-  if (!actions.length) return null;
-
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const handleTrigger = (action: DetailHeaderAction) => {
+    action.onTrigger().catch((error) => {
+      const message =
+        error instanceof Error && error.message ? error.message : String(error || 'Action failed.');
+      if (typeof globalThis.window?.alert === 'function') {
+        globalThis.window.alert(message);
+        return;
+      }
+      console.error(message);
+    });
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -36,6 +46,8 @@ export function DetailHeaderActionBar({ actions, buttonClassName, className }: D
     };
   }, [menuOpen]);
 
+  if (!actions.length) return null;
+
   if (actions.length === 1) {
     const action = actions[0]!;
     return (
@@ -45,7 +57,7 @@ export function DetailHeaderActionBar({ actions, buttonClassName, className }: D
           type="button"
           title={action.label}
           onClick={() => {
-            action.onTrigger().catch(() => {});
+            handleTrigger(action);
           }}
           className={buttonClassName}
           aria-label={action.label}
@@ -96,7 +108,7 @@ export function DetailHeaderActionBar({ actions, buttonClassName, className }: D
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
-                action.onTrigger().catch(() => {});
+                handleTrigger(action);
               }}
             >
               {action.label}
