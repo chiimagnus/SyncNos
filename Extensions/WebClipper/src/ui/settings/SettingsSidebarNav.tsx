@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import type { SettingsSectionKey } from './types';
 import { SETTINGS_SECTIONS } from './types';
 
@@ -9,9 +10,11 @@ export function SettingsSidebarNav(props: {
 
   return (
     <aside className="tw-w-[240px] tw-shrink-0 tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/40">
-      <nav className="tw-p-2 tw-pb-4" aria-label="Settings sections">
+      <nav className="tw-p-2 tw-pb-4" aria-label={t('settingsSectionsAria')}>
         {SETTINGS_SECTIONS.map((s) => {
           const active = activeSection === s.key;
+          const label = t(`section_${s.key}_label` as Parameters<typeof t>[0]);
+          const description = t(`section_${s.key}_desc` as Parameters<typeof t>[0]);
           return (
             <button
               key={s.key}
@@ -25,9 +28,9 @@ export function SettingsSidebarNav(props: {
               ].join(' ')}
               aria-current={active ? 'page' : undefined}
             >
-              <div className="tw-text-xs tw-font-extrabold">{s.label}</div>
+              <div className="tw-text-xs tw-font-extrabold">{label}</div>
               <div className={['tw-text-[11px] tw-font-semibold', active ? 'tw-text-[var(--muted)]' : 'tw-text-[var(--muted)]'].join(' ')}>
-                {s.description}
+                {description}
               </div>
             </button>
           );

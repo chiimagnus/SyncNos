@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 
+import { t } from '../../../i18n';
 import { formatTime } from '../utils';
 import { buttonClassName, cardClassName } from '../ui';
 
@@ -9,15 +10,15 @@ function ImportStatsList(props: { stats: any }) {
   return (
     <ul className="tw-m-0 tw-pl-[18px]">
       <li>
-        Conversations: +{stats.conversationsAdded} / ~{stats.conversationsUpdated}
+        {t('statsConversations')} +{stats.conversationsAdded} / ~{stats.conversationsUpdated}
       </li>
       <li>
-        Messages: +{stats.messagesAdded} / ~{stats.messagesUpdated} (skipped {stats.messagesSkipped})
+        {t('statsMessages')} +{stats.messagesAdded} / ~{stats.messagesUpdated} ({t('skipped')} {stats.messagesSkipped})
       </li>
       <li>
-        Mappings: +{stats.mappingsAdded} / ~{stats.mappingsUpdated}
+        {t('statsMappings')} +{stats.mappingsAdded} / ~{stats.mappingsUpdated}
       </li>
-      <li>Settings applied: {stats.settingsApplied}</li>
+      <li>{t('statsSettingsApplied')} {stats.settingsApplied}</li>
     </ul>
   );
 }
@@ -50,12 +51,12 @@ export function BackupSection(props: {
   } = props;
 
   return (
-    <section className={cardClassName} aria-label="Database Backup">
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">Database Backup</h2>
+    <section className={cardClassName} aria-label={t('databaseBackup')}>
+      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('databaseBackup')}</h2>
 
       <div ref={backupImportRef} id="settings-backup-import" className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5">
         <button className={buttonClassName} onClick={onExport} disabled={busy}>
-          Export (Zip v2)
+          {t('exportZip')}
         </button>
         <button
           className={buttonClassName}
@@ -66,7 +67,7 @@ export function BackupSection(props: {
             else fileInputRef.current?.click();
           }}
         >
-          {importLabel || 'Import…'}
+          {importLabel || t('importDots')}
         </button>
         <input
           ref={fileInputRef}
@@ -79,9 +80,9 @@ export function BackupSection(props: {
           }}
         />
       </div>
-      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">export: {exportStatus}</div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">last export: {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">import: {importStatus}</div>
+      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('exportStatus')} {exportStatus}</div>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('lastExport')} {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('importStatus')} {importStatus}</div>
       <div className="tw-mt-2.5">
         <ImportStatsList stats={importStats} />
       </div>
