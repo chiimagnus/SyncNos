@@ -95,7 +95,8 @@
 - **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
 - **会话详情头部打开目标（共享协议）**：`src/ui/conversations/detail-header-actions.ts` + `src/ui/conversations/DetailHeaderActionBar.tsx`
-  - popup 与 app 的 detail header 都应消费同一套 action resolver；P1 当前仅暴露 `Open in Notion`，后续多目标菜单也要在这条协议上扩展。
+  - popup 与 app 的 detail header 都应消费同一套 action resolver；当前规则为：单目标直出按钮，双目标显示菜单。
+  - `Open in Obsidian` 的文件打开只能走 Obsidian Local REST API 的 `POST /open/{filename}`；`obsidian://open` 只允许用于拉起桌面 App，再回到 REST API 完成目标文件打开。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
   - popup 写入：`src/ui/popup/tabs/SettingsTab.tsx`（保存 `inpage_supported_only` 到 `chrome.storage.local`）。
   - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_supported_only` 决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。
