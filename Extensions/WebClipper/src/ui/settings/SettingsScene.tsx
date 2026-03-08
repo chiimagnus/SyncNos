@@ -268,7 +268,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           <nav className="tw-grid tw-gap-3" aria-label={t('settingsSectionsAria')}>
             {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
               <div key={groupIndex} className="tw-grid tw-gap-2">
-                {group.map((section) => (
+                <div className="tw-px-1 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.18em] tw-text-[var(--muted)]/80">
+                  {group.title}
+                </div>
+                {group.sections.map((section) => (
                   <button
                     key={section.key}
                     type="button"

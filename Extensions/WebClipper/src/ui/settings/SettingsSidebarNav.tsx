@@ -24,7 +24,10 @@ export function SettingsSidebarNav(props: {
         <div className="tw-flex tw-flex-col tw-gap-3">
           {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
             <div key={groupIndex} className="tw-flex tw-flex-col tw-gap-1.5">
-              {group.map((section) => {
+              <div className="tw-px-3 tw-pb-1 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.18em] tw-text-[var(--muted)]/80">
+                {group.title}
+              </div>
+              {group.sections.map((section) => {
                 const active = activeSection === section.key;
                 const label = sectionLabel(section.key);
                 const description = sectionDescription(section.key);
