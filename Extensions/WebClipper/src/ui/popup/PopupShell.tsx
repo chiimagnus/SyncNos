@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL } from '../../platform/runtime/runtime';
-import { tabsCreate } from '../../platform/webext/tabs';
+import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
 
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
@@ -34,8 +34,7 @@ function PopupShellFrame() {
   });
 
   const onOpenSettings = async () => {
-    const url = getURL('/app.html#/settings');
-    await tabsCreate({ url });
+    await openOrFocusExtensionAppTab({ route: '/settings' });
     window.close();
   };
 
