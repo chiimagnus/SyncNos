@@ -2,6 +2,16 @@ import { t } from '../../i18n';
 import type { SettingsSectionKey } from './types';
 import { SETTINGS_SECTIONS } from './types';
 
+function sectionLabel(key: SettingsSectionKey): string {
+  if (key === 'chat_with') return 'Chat with AI';
+  return t(`section_${key}_label` as Parameters<typeof t>[0]);
+}
+
+function sectionDescription(key: SettingsSectionKey): string {
+  if (key === 'chat_with') return 'Prompt + platforms';
+  return t(`section_${key}_desc` as Parameters<typeof t>[0]);
+}
+
 export function SettingsSidebarNav(props: {
   activeSection: SettingsSectionKey;
   onSelectSection: (key: SettingsSectionKey) => void;
@@ -13,8 +23,8 @@ export function SettingsSidebarNav(props: {
       <nav className="tw-p-2 tw-pb-4" aria-label={t('settingsSectionsAria')}>
         {SETTINGS_SECTIONS.map((s) => {
           const active = activeSection === s.key;
-          const label = t(`section_${s.key}_label` as Parameters<typeof t>[0]);
-          const description = t(`section_${s.key}_desc` as Parameters<typeof t>[0]);
+          const label = sectionLabel(s.key);
+          const description = sectionDescription(s.key);
           return (
             <button
               key={s.key}

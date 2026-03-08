@@ -65,6 +65,7 @@ describe('DetailHeaderActionBar', () => {
               label: 'Open in Notion',
               provider: 'notion',
               kind: 'external-link',
+              slot: 'open',
               href: 'https://www.notion.so/example',
               onTrigger: vi.fn(async () => {}),
             },
@@ -88,6 +89,7 @@ describe('DetailHeaderActionBar', () => {
               label: 'Open in Notion',
               provider: 'notion',
               kind: 'external-link',
+              slot: 'open',
               href: 'https://www.notion.so/example',
               onTrigger: vi.fn(async () => {}),
             },
@@ -96,6 +98,7 @@ describe('DetailHeaderActionBar', () => {
               label: 'Open in Obsidian',
               provider: 'obsidian',
               kind: 'open-target',
+              slot: 'open',
               onTrigger: vi.fn(async () => {}),
             },
           ],
@@ -124,6 +127,7 @@ describe('DetailHeaderActionBar', () => {
               label: 'Open in Notion',
               provider: 'notion',
               kind: 'external-link',
+              slot: 'open',
               href: 'https://www.notion.so/example',
               onTrigger: vi.fn(async () => {
                 throw new Error('Failed to open Notion page');
@@ -138,11 +142,10 @@ describe('DetailHeaderActionBar', () => {
     const button = document.querySelector('[aria-label="Open in Notion"]') as HTMLButtonElement | null;
     expect(button).toBeTruthy();
 
-    act(() => {
+    await act(async () => {
       button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
     });
-
-    await Promise.resolve();
     expect(alertSpy).toHaveBeenCalledWith('Failed to open Notion page');
   });
 });

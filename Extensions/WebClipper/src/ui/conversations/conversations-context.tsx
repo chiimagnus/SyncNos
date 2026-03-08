@@ -131,7 +131,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     }
 
     setDetailHeaderActions([]);
-    void resolveDetailHeaderActions({ conversation: selectedConversation })
+    void resolveDetailHeaderActions({ conversation: selectedConversation, detail })
       .then((actions) => {
         if (!cancelled) setDetailHeaderActions(actions);
       })
@@ -142,7 +142,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     return () => {
       cancelled = true;
     };
-  }, [selectedConversation]);
+  }, [detail, selectedConversation]);
 
   const toggleSelected = useCallback((id: number) => {
     const safeId = Number(id);

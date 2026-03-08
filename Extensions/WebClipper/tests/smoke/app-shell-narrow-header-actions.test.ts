@@ -59,6 +59,8 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
                 id: 'open-in-notion',
                 label: 'Open in Notion',
                 kind: 'external-link',
+                provider: 'notion',
+                slot: 'open',
                 href: 'https://www.notion.so/example',
                 onTrigger: async () => {},
               },
