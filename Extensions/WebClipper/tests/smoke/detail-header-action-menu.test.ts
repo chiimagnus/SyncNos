@@ -148,4 +148,29 @@ describe('DetailHeaderActionBar', () => {
     });
     expect(alertSpy).toHaveBeenCalledWith('Failed to open Notion page');
   });
+
+  it('renders a disabled direct button for unavailable integrations', () => {
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'open-in-obsidian-unavailable',
+              label: 'Obsidian API not connected',
+              provider: 'obsidian',
+              kind: 'open-target',
+              slot: 'open',
+              disabled: true,
+              onTrigger: vi.fn(async () => {}),
+            },
+          ],
+          buttonClassName,
+        }),
+      );
+    });
+
+    const button = document.querySelector('[aria-label="Obsidian API not connected"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    expect(button?.disabled).toBe(true);
+  });
 });

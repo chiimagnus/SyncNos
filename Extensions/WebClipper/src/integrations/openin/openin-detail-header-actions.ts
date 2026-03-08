@@ -13,6 +13,7 @@ import {
 export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: 'Open in Notion',
   openInObsidian: 'Open in Obsidian',
+  obsidianApiNotConnected: 'Obsidian API not connected',
 } as const;
 
 export { buildNotionPageUrl, normalizeNotionPageId };
@@ -25,6 +26,18 @@ async function buildObsidianOpenInAction({
   port: DetailHeaderActionPort;
 }): Promise<DetailHeaderAction | null> {
   const obsidianTarget = await resolveObsidianOpenTarget({ conversation });
+  if (obsidianTarget.availabilityState === 'api-unavailable') {
+    return {
+      id: 'open-in-obsidian-unavailable',
+      label: DETAIL_HEADER_ACTION_LABELS.obsidianApiNotConnected,
+      kind: 'open-target',
+      provider: 'obsidian',
+      slot: 'open',
+      disabled: true,
+      onTrigger: async () => {},
+    };
+  }
+
   if (!obsidianTarget.available || !obsidianTarget.trigger) return null;
 
   return {
