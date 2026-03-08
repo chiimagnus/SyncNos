@@ -4,6 +4,7 @@ import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailRoute } from '../shared/hooks/useNarrowListDetailRoute';
 
 import { t, formatConversationTitle } from '../../i18n';
+import type { DetailHeaderAction } from './detail-header-actions';
 import { ConversationDetailPane } from './ConversationDetailPane';
 import { ConversationListPane } from './ConversationListPane';
 import { useConversationsApp } from './conversations-context';
@@ -16,6 +17,7 @@ export type PopupHeaderState =
       mode: 'detail';
       title: string;
       subtitle: string;
+      actions: DetailHeaderAction[];
       onBack: () => void;
     };
 
@@ -26,7 +28,7 @@ export type ConversationsSceneProps = {
 
 export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderStateChange }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId, selectedConversation } = useConversationsApp();
+  const { activeId, selectedConversation, detailHeaderActions } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const { route: narrowRoute, openDetail, returnToList, listRestoreKey } = useNarrowListDetailRoute({
     isNarrow,
@@ -50,13 +52,14 @@ export function ConversationsScene({ defaultNarrowRoute = 'list', onPopupHeaderS
       mode: 'detail',
       title,
       subtitle,
+      actions: detailHeaderActions,
       onBack: returnToList,
     });
 
     return () => {
       onPopupHeaderStateChange({ mode: 'list' });
     };
-  }, [activeId, isNarrow, narrowRoute, onPopupHeaderStateChange, returnToList, selectedConversation]);
+  }, [activeId, detailHeaderActions, isNarrow, narrowRoute, onPopupHeaderStateChange, returnToList, selectedConversation]);
 
   const list = (
     <ConversationListPane
