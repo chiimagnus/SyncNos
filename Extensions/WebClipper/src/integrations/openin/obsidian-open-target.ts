@@ -41,6 +41,7 @@ export type ObsidianOpenTriggerPayload = {
 export type ObsidianTargetResolution = {
   available: boolean;
   label: 'Open in Obsidian';
+  availabilityState: 'ready' | 'api-unavailable' | 'not-synced';
   trigger?: ObsidianOpenTriggerPayload;
   error?: {
     code: string;
@@ -205,6 +206,7 @@ export async function resolveObsidianOpenTarget({
     return {
       available: false,
       label: DEFAULT_LABEL,
+      availabilityState: 'api-unavailable',
       error: {
         code: 'missing_conversation',
         message: 'Conversation is unavailable.',
@@ -221,6 +223,7 @@ export async function resolveObsidianOpenTarget({
     return {
       available: false,
       label: DEFAULT_LABEL,
+      availabilityState: 'api-unavailable',
       error: clientRes.error,
     };
   }
@@ -237,6 +240,7 @@ export async function resolveObsidianOpenTarget({
     return {
       available: true,
       label: DEFAULT_LABEL,
+      availabilityState: 'ready',
       trigger: {
         provider: 'obsidian',
         openMode: 'rest-api',
@@ -248,24 +252,10 @@ export async function resolveObsidianOpenTarget({
     };
   }
 
-  if (!pathResolution.ok && shouldLaunchObsidianApp(pathResolution.error, clientRes.connectionConfig)) {
-    return {
-      available: true,
-      label: DEFAULT_LABEL,
-      trigger: {
-        provider: 'obsidian',
-        openMode: 'rest-api',
-        conversation,
-        resolvedNotePath: safeString(pathResolution.desiredFilePath) || desiredFilePath,
-        launchBeforeRetry: true,
-        retryPolicy: { ...DEFAULT_OBSIDIAN_OPEN_RETRY_POLICY },
-      },
-    };
-  }
-
   return {
     available: false,
     label: DEFAULT_LABEL,
+    availabilityState: pathResolution.ok ? 'not-synced' : 'api-unavailable',
     error: pathResolution.ok
       ? {
           code: 'note_not_found',
