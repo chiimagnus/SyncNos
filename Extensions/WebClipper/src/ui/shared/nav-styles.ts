@@ -12,7 +12,7 @@ export function navItemClassName(active: boolean): string {
 export function navIconButtonClassName(active: boolean): string {
   const base =
     [
-      'tw-inline-flex tw-size-9 tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-p-0',
+      'tw-inline-flex tw-size-9 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-p-0',
       'tw-shadow-none tw-transition-colors tw-duration-150',
       'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
       'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
@@ -24,7 +24,7 @@ export function navIconButtonClassName(active: boolean): string {
 export function navIconButtonSmClassName(active: boolean): string {
   const base =
     [
-      'tw-inline-flex tw-size-8 tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-p-0',
+      'tw-inline-flex tw-size-8 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-p-0',
       'tw-shadow-none tw-transition-colors tw-duration-150',
       'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
       'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
