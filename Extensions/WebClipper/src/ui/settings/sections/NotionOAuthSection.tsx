@@ -31,7 +31,7 @@ export function NotionOAuthSection(props: {
   } = props;
 
   return (
-    <section className={cardClassName} aria-label="Notion settings">
+    <section className={cardClassName} aria-label={t('notionOAuth')}>
       <div className="tw-flex tw-items-center tw-gap-2">
         <img className="tw-h-5 tw-w-5 tw-shrink-0" src={notionLogoUrl} alt="" aria-hidden="true" />
         <div className="tw-min-w-0 tw-flex-1 tw-text-[var(--text)]">
@@ -46,7 +46,7 @@ export function NotionOAuthSection(props: {
         </button>
       </div>
 
-      <div className="tw-mt-3" aria-label="Parent page selector">
+      <div className="tw-mt-3" aria-label={t('parentPage')}>
         <SettingsFormRow label={t('parentPage')}>
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             <select
@@ -65,11 +65,11 @@ export function NotionOAuthSection(props: {
             </select>
             <button
               type="button"
-              title="Refresh"
+              title={t('refresh')}
               onClick={onLoadNotionPages}
               disabled={busy || !notionConnected || loadingNotionPages}
               className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border-strong)] tw-bg-[var(--btn-bg)] tw-text-xs tw-font-black tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--btn-bg-hover)] disabled:tw-cursor-not-allowed disabled:tw-opacity-60"
-              aria-label="Refresh pages"
+              aria-label={t('refreshPagesAria')}
             >
               ↻
             </button>

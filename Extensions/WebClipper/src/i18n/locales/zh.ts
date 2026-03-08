@@ -4,6 +4,8 @@ export const zh: { [K in TranslationKey]: string } = {
   // Settings sections
   section_backup_label: '备份',
   section_backup_desc: '导出/导入你的数据库。',
+  section_language_label: '语言',
+  section_language_desc: '选择界面语言。',
   section_notion_label: 'Notion',
   section_notion_desc: 'OAuth 授权 + 同步父页面。',
   section_obsidian_label: 'Obsidian',
@@ -12,6 +14,16 @@ export const zh: { [K in TranslationKey]: string } = {
   section_inpage_desc: '页面内按钮显示行为设置。',
   section_about_label: '关于',
   section_about_desc: '项目、作者与支持链接。',
+  settingsTitle: '设置',
+  settingsSectionsAria: '设置分区',
+  settingsDialogAria: '设置',
+
+  // LanguageSection
+  languageHeading: '语言',
+  languageLabel: '界面语言',
+  languageHint: '应用于 popup、app 和页面内提示。',
+  localeEnglish: 'English',
+  localeChinese: '中文',
 
   // InpageSection
   inpageButtonHeading: '页面内按钮',
@@ -37,6 +49,8 @@ export const zh: { [K in TranslationKey]: string } = {
   connect: '连接',
   parentPage: '父页面',
   clickRefresh: '点击刷新 \u2192',
+  refresh: '刷新',
+  refreshPagesAria: '刷新页面列表',
   connectNotionFirst: '请先连接 Notion',
 
   // NotionAISection
@@ -131,26 +145,46 @@ export const zh: { [K in TranslationKey]: string } = {
   currentPageCannotBeCaptured: '当前页面无法捕获',
   moreActionsSoon: '更多功能即将推出',
   moreButton: '更多',
+  chatsAria: '对话',
 
   // usePopupCurrentPageCapture
   checkingCurrentPage: '正在检测当前页面...',
   unavailable: '不支持',
+  fetchArticle: '抓取文章',
+  fetchAiChat: '抓取 AI 对话',
+  savingDots: '保存中...',
+  loadingFullHistory: '正在加载完整历史...',
   captureFailedFallback: '获取失败',
   fetchingDots: '获取中...',
   checkingDots: '检测中...',
   savedPrefix: '已保存：',
   saved: '已保存',
+  clickToolbarIconToOpenPanel: '请点击工具栏图标打开面板',
+  activeTabNotFound: '未找到当前标签页',
+  noVisibleConversationFound: '未找到可见对话',
 
   // AppShell
   expandSidebar: '展开侧边栏',
   resizeSidebar: '调整侧边栏宽度',
   closeSettings: '关闭设置',
+  sourceFilterAria: '来源筛选',
+  conversationDetailAria: '对话详情',
+  deleteConfirmDialogAria: '删除对话确认',
 
   // CapturedListSidebar
   settingsLabel: '设置',
   refreshList: '刷新列表',
   collapseSidebar: '收起侧边栏',
+  openSettingsAria: '打开设置',
+  moreActionsAria: '更多功能即将推出',
+  backToChatsAria: '返回对话列表',
 
   // BackupSection / SettingsScene
   importInApp: '在 App 中导入',
+
+  // AboutSection
+  aboutSectionAria: '关于 SyncNos WebClipper',
+  linksAria: '链接',
+  authorSectionAria: '作者',
+  donateSectionAria: '赞赏二维码',
 };

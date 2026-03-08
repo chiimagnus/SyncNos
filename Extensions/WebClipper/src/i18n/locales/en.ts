@@ -2,6 +2,8 @@ export const en = {
   // Settings sections
   section_backup_label: 'Backup',
   section_backup_desc: 'Export/import your database.',
+  section_language_label: 'Language',
+  section_language_desc: 'Choose the interface language.',
   section_notion_label: 'Notion',
   section_notion_desc: 'OAuth + parent page for sync.',
   section_obsidian_label: 'Obsidian',
@@ -10,6 +12,16 @@ export const en = {
   section_inpage_desc: 'Inpage button visibility behavior.',
   section_about_label: 'About',
   section_about_desc: 'Project, author, and support links.',
+  settingsTitle: 'Settings',
+  settingsSectionsAria: 'Settings sections',
+  settingsDialogAria: 'Settings',
+
+  // LanguageSection
+  languageHeading: 'Language',
+  languageLabel: 'Interface Language',
+  languageHint: 'Applies to popup, app, and inpage tips.',
+  localeEnglish: 'English',
+  localeChinese: 'Chinese',
 
   // InpageSection
   inpageButtonHeading: 'Inpage Button',
@@ -35,6 +47,8 @@ export const en = {
   connect: 'Connect',
   parentPage: 'Parent Page',
   clickRefresh: 'Click refresh \u2192',
+  refresh: 'Refresh',
+  refreshPagesAria: 'Refresh pages',
   connectNotionFirst: 'Connect Notion first',
 
   // NotionAISection
@@ -131,28 +145,48 @@ export const en = {
   currentPageCannotBeCaptured: 'Current page cannot be captured',
   moreActionsSoon: 'More actions coming soon',
   moreButton: 'More',
+  chatsAria: 'Chats',
 
   // usePopupCurrentPageCapture
   checkingCurrentPage: 'Checking current page...',
   unavailable: 'Unavailable',
+  fetchArticle: 'Fetch Article',
+  fetchAiChat: 'Fetch AI Chat',
+  savingDots: 'Saving...',
+  loadingFullHistory: 'Loading full history...',
   captureFailedFallback: 'Capture failed',
   fetchingDots: 'Fetching...',
   checkingDots: 'Checking...',
   savedPrefix: 'Saved: ',
   saved: 'Saved',
+  clickToolbarIconToOpenPanel: 'Click toolbar icon to open panel',
+  activeTabNotFound: 'Active tab not found',
+  noVisibleConversationFound: 'No visible conversation found',
 
   // AppShell
   expandSidebar: 'Expand sidebar',
   resizeSidebar: 'Resize sidebar',
   closeSettings: 'Close settings',
+  sourceFilterAria: 'Source filter',
+  conversationDetailAria: 'Conversation detail',
+  deleteConfirmDialogAria: 'Delete conversations confirmation',
 
   // CapturedListSidebar
   settingsLabel: 'Settings',
   refreshList: 'Refresh list',
   collapseSidebar: 'Collapse sidebar',
+  openSettingsAria: 'Open Settings',
+  moreActionsAria: 'More actions coming soon',
+  backToChatsAria: 'Back to chats',
 
   // BackupSection / SettingsScene
   importInApp: 'Import in App',
+
+  // AboutSection
+  aboutSectionAria: 'About SyncNos WebClipper',
+  linksAria: 'Links',
+  authorSectionAria: 'Author',
+  donateSectionAria: 'Donate QR code',
 } as const;
 
 export type TranslationKey = keyof typeof en;

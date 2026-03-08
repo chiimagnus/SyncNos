@@ -51,7 +51,7 @@ export function BackupSection(props: {
   } = props;
 
   return (
-    <section className={cardClassName} aria-label="Database Backup">
+    <section className={cardClassName} aria-label={t('databaseBackup')}>
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('databaseBackup')}</h2>
 
       <div ref={backupImportRef} id="settings-backup-import" className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5">

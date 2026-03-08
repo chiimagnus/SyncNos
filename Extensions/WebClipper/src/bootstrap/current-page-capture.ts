@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
@@ -45,8 +47,8 @@ const ARTICLE_MESSAGE_TYPES = Object.freeze({
 function errorMessage(error: unknown, fallback: string): string {
   const maybeError = error as { message?: unknown };
   const message = maybeError?.message ?? error;
-  const normalized = String(message || fallback || 'Capture failed').trim();
-  return normalized || fallback || 'Capture failed';
+  const normalized = String(message || fallback || t('captureFailedFallback')).trim();
+  return normalized || fallback || t('captureFailedFallback');
 }
 
 function normalizeConversationId(value: unknown): number | null {
@@ -102,9 +104,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       return {
         available: false,
         kind: 'unsupported' as const,
-        label: 'Unavailable',
+        label: t('unavailable'),
         collectorId: null,
-        reason: 'Current page cannot be captured',
+        reason: t('currentPageCannotBeCaptured'),
         collector: null,
       };
     }
@@ -113,7 +115,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       return {
         available: true,
         kind: 'article' as const,
-        label: 'Fetch Article',
+        label: t('fetchArticle'),
         collectorId: 'web',
         collector,
       };
@@ -122,7 +124,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     return {
       available: true,
       kind: 'chat' as const,
-      label: 'Fetch AI Chat',
+      label: t('fetchAiChat'),
       collectorId: collector.id,
       collector,
     };
@@ -157,7 +159,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const target = resolveCaptureTarget();
 
     if (!target.available || !target.collector) {
-      throw new Error(target.reason || 'Current page cannot be captured');
+      throw new Error(target.reason || t('currentPageCannotBeCaptured'));
     }
 
     const report = (message: string, kind?: 'default' | 'loading' | 'error') => {
@@ -166,12 +168,12 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
     try {
       if (target.kind === 'article') {
-        report('Saving...', 'loading');
+        report(t('savingDots'), 'loading');
         const response = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
         if (!response?.ok) {
-          throw new Error(response?.error?.message || 'Fetch failed');
+          throw new Error(response?.error?.message || t('captureFailedFallback'));
         }
-        report('Saved', 'default');
+        report(t('saved'), 'default');
         return {
           kind: 'article',
           label: target.label,
@@ -181,23 +183,23 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         };
       }
 
-      report(typeof target.collector.prepareManualCapture === 'function' ? 'Loading full history...' : 'Saving...', 'loading');
+      report(typeof target.collector.prepareManualCapture === 'function' ? t('loadingFullHistory') : t('savingDots'), 'loading');
       if (typeof target.collector.prepareManualCapture === 'function') {
         await target.collector.prepareManualCapture();
-        report('Saving...', 'loading');
+        report(t('savingDots'), 'loading');
       }
 
       const snapshot = await Promise.resolve(target.collector.capture({ manual: true }));
       if (!snapshot) {
-        throw new Error('No visible conversation found');
+        throw new Error(t('noVisibleConversationFound'));
       }
 
       const saved = await saveSnapshot(snapshot);
       if (!saved) {
-        throw new Error('No visible conversation found');
+        throw new Error(t('noVisibleConversationFound'));
       }
 
-      report('Saved', 'default');
+      report(t('saved'), 'default');
       return {
         kind: 'chat',
         label: target.label,
@@ -206,7 +208,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         title: String(snapshot?.conversation?.title || '').trim() || undefined,
       };
     } catch (error) {
-      report(errorMessage(error, 'Capture failed'), 'error');
+      report(errorMessage(error, t('captureFailedFallback')), 'error');
       throw error;
     }
   }

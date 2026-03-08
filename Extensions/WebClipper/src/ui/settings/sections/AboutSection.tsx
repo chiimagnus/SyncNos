@@ -20,7 +20,7 @@ export function AboutSection() {
 
   return (
     <>
-      <section className={cardClassName} aria-label="About SyncNos WebClipper">
+      <section className={cardClassName} aria-label={t('aboutSectionAria')}>
         <div className="tw-flex tw-items-center tw-gap-3">
           <img className="tw-size-10 tw-rounded-2xl tw-object-contain" src={getURL('icons/icon-48.png' as any)} alt="" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
@@ -31,7 +31,7 @@ export function AboutSection() {
           </div>
         </div>
 
-        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label="Links">
+        <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2" aria-label={t('linksAria')}>
           <button
             id="btnAboutMacApp"
             className={buttonClassName}
@@ -59,7 +59,7 @@ export function AboutSection() {
         </div>
       </section>
 
-      <section className={cardClassName} aria-label="Author">
+      <section className={cardClassName} aria-label={t('authorSectionAria')}>
         <div className="tw-flex tw-items-center tw-gap-3">
           <img className="tw-size-10 tw-rounded-2xl tw-object-cover" src={getURL('icons/author-avatar.png' as any)} alt="Chii Magnus avatar" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
@@ -90,7 +90,7 @@ export function AboutSection() {
         </div>
       </section>
 
-      <section className={cardClassName} aria-label="Donate QR code">
+      <section className={cardClassName} aria-label={t('donateSectionAria')}>
         <img className="tw-w-full tw-rounded-2xl tw-object-cover" src={getURL('icons/buymeacoffee1.jpg' as any)} alt="Chii Magnus donate QR code" draggable={false} />
       </section>
     </>

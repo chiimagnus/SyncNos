@@ -10,7 +10,7 @@ export function SettingsSidebarNav(props: {
 
   return (
     <aside className="tw-w-[240px] tw-shrink-0 tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/40">
-      <nav className="tw-p-2 tw-pb-4" aria-label="Settings sections">
+      <nav className="tw-p-2 tw-pb-4" aria-label={t('settingsSectionsAria')}>
         {SETTINGS_SECTIONS.map((s) => {
           const active = activeSection === s.key;
           const label = t(`section_${s.key}_label` as Parameters<typeof t>[0]);

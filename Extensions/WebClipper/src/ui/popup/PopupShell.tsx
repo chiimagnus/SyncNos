@@ -59,7 +59,7 @@ function PopupShellFrame() {
                 type="button"
                 onClick={headerState.onBack}
                 className="tw-inline-flex tw-size-9 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-                aria-label="Back to chats"
+                aria-label={t('backToChatsAria')}
               >
                 <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
               </button>
@@ -105,7 +105,7 @@ function PopupShellFrame() {
                 title={t('openSettings')}
                 onClick={() => onOpenSettings().catch(() => {})}
                 className="tw-inline-flex tw-size-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-text-[var(--muted)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] hover:tw-text-[var(--text)]"
-                aria-label="Open Settings"
+                aria-label={t('openSettingsAria')}
               >
                 <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
               </button>
@@ -116,7 +116,7 @@ function PopupShellFrame() {
               disabled
               title={t('moreActionsSoon')}
               className="tw-inline-flex tw-h-8 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/68 tw-px-3 tw-text-[11px] tw-font-black tw-text-[var(--muted)] tw-opacity-80"
-              aria-label="More actions coming soon"
+              aria-label={t('moreActionsAria')}
             >
               {t('moreButton')}
             </button>
@@ -139,7 +139,7 @@ function PopupShellFrame() {
       ) : null}
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
-        <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label="Chats">
+        <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label={t('chatsAria')}>
           <ChatsTab onPopupHeaderStateChange={setHeaderState} />
         </section>
       </main>
