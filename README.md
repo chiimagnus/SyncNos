@@ -1,6 +1,6 @@
 <div align="center"><a name="readme-top"></a>
 
-# SyncNos
+# SyncNos · Come take a look! Here are our lovely angel sponsors: [SyncNos Angels](https://chiimagnus.notion.site/syncnos-angels)
 
 A toolkit focused on syncing reading highlights and AI conversations.  
 It consolidates multi-source content to Notion and provides a WebClipper browser extension.
