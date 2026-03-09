@@ -143,58 +143,62 @@ export function createEmptyInsightStats(): InsightStats {
 
 export async function getInsightStats(): Promise<InsightStats> {
   const db = await openDb();
-  const t = db.transaction(['conversations', 'messages'], 'readonly');
-  const conversationsStore = t.objectStore('conversations');
-  const messagesStore = t.objectStore('messages');
+  try {
+    const t = db.transaction(['conversations', 'messages'], 'readonly');
+    const conversationsStore = t.objectStore('conversations');
+    const messagesStore = t.objectStore('messages');
 
-  const [conversations, messageCounts] = await Promise.all([
-    readAllConversations(conversationsStore),
-    readMessageCounts(messagesStore),
-  ]);
-  await txDone(t);
+    const [conversations, messageCounts] = await Promise.all([
+      readAllConversations(conversationsStore),
+      readMessageCounts(messagesStore),
+    ]);
+    await txDone(t);
 
-  const stats = createEmptyInsightStats();
-  stats.totalClips = conversations.length;
+    const stats = createEmptyInsightStats();
+    stats.totalClips = conversations.length;
 
-  const chatSources = new Map<string, number>();
-  const articleDomains = new Map<string, number>();
-  const topConversations: InsightTopConversation[] = [];
+    const chatSources = new Map<string, number>();
+    const articleDomains = new Map<string, number>();
+    const topConversations: InsightTopConversation[] = [];
 
-  for (const conversation of conversations) {
-    const sourceType = normalizeSourceType(conversation.sourceType);
+    for (const conversation of conversations) {
+      const sourceType = normalizeSourceType(conversation.sourceType);
 
-    if (sourceType === 'chat') {
-      stats.chatCount += 1;
-      const sourceLabel = normalizeSourceLabel(conversation.source);
-      chatSources.set(sourceLabel, (chatSources.get(sourceLabel) || 0) + 1);
+      if (sourceType === 'chat') {
+        stats.chatCount += 1;
+        const sourceLabel = normalizeSourceLabel(conversation.source);
+        chatSources.set(sourceLabel, (chatSources.get(sourceLabel) || 0) + 1);
 
-      const conversationId = Number(conversation.id);
-      const messageCount = Number(messageCounts.get(conversationId) || 0);
-      stats.totalMessages += messageCount;
-      topConversations.push({
-        conversationId,
-        title: normalizeConversationTitle(conversation.title),
-        messageCount,
-        source: sourceLabel,
-      });
-      continue;
+        const conversationId = Number(conversation.id);
+        const messageCount = Number(messageCounts.get(conversationId) || 0);
+        stats.totalMessages += messageCount;
+        topConversations.push({
+          conversationId,
+          title: normalizeConversationTitle(conversation.title),
+          messageCount,
+          source: sourceLabel,
+        });
+        continue;
+      }
+
+      if (sourceType === 'article') {
+        stats.articleCount += 1;
+        const domain = parseHostname(conversation.url);
+        articleDomains.set(domain, (articleDomains.get(domain) || 0) + 1);
+      }
     }
 
-    if (sourceType === 'article') {
-      stats.articleCount += 1;
-      const domain = parseHostname(conversation.url);
-      articleDomains.set(domain, (articleDomains.get(domain) || 0) + 1);
-    }
+    stats.chatSourceDistribution = buildDistribution(chatSources, INSIGHT_CHAT_SOURCE_LIMIT);
+    stats.articleDomainDistribution = buildDistribution(articleDomains, INSIGHT_ARTICLE_DOMAIN_LIMIT);
+    stats.topConversations = topConversations
+      .sort((a, b) => {
+        if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
+        return b.conversationId - a.conversationId;
+      })
+      .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
+
+    return stats;
+  } finally {
+    db.close();
   }
-
-  stats.chatSourceDistribution = buildDistribution(chatSources, INSIGHT_CHAT_SOURCE_LIMIT);
-  stats.articleDomainDistribution = buildDistribution(articleDomains, INSIGHT_ARTICLE_DOMAIN_LIMIT);
-  stats.topConversations = topConversations
-    .sort((a, b) => {
-      if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
-      return b.conversationId - a.conversationId;
-    })
-    .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
-
-  return stats;
 }
