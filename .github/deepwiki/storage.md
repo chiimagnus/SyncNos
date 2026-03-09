@@ -9,7 +9,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | UserDefaults | SyncNos App | macOS 偏好 | onboarding、自动同步、IAP 状态、提醒态、试用期辅助信息 | `SyncNosApp.swift`, `IAPService.swift` |
 | Keychain | SyncNos App | 系统安全存储 | 站点 Cookie、加密密钥、首次启动 / 设备指纹备份、Notion OAuth 相关敏感信息 | `SiteLoginsStore.swift`, `EncryptionService.swift`, `IAPService.swift` |
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings | `schema.ts`, `storage-idb.ts` |
-| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / inpage / 备份辅助设置 | SettingsScene controller、settings stores |
+| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / inpage / Chat with AI / 设置导航等运行设置 | SettingsScene controller、settings stores |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、manifest | `backup/export.ts`, `backup/import.ts` |
 | 外部结果 | 双产品线 | Notion / Obsidian / 文件系统 | 页面、数据库、Markdown、vault 文件 | sync orchestrators / export |
 
@@ -44,15 +44,16 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 
 | 存储层 | 名称 / 版本 | 结构 | 作用 |
 | --- | --- | --- | --- |
-| IndexedDB | `webclipper`, `DB_VERSION = 3` | `conversations`, `messages`, `sync_mappings` | 扩展侧事实源 |
+| IndexedDB | `webclipper`, `DB_VERSION = 4` | `conversations`, `messages`, `sync_mappings` | 扩展侧事实源 |
 | `conversations` | object store | `sourceType`, `source`, `conversationKey`, `title`, `url`, `lastCapturedAt`, `notionPageId` 等 | 列表、详情、同步入口 |
 | `messages` | object store | `conversationId`, `messageKey`, `contentText`, `contentMarkdown`, `sequence`, `updatedAt` | 生成 Markdown / blocks / note 内容 |
 | `sync_mappings` | object store | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt`, `updatedAt` | 决定是否能增量同步 |
-| `chrome.storage.local` | KV | `inpage_supported_only`, `notion_parent_page_id`, `notion_parent_page_title`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
+| `chrome.storage.local` | KV | `inpage_supported_only`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, `webclipper_settings_active_section`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
 
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
-- `schema.ts` 的 v3 迁移专门处理 NotionAI thread，把 legacy conversation key 重写为 stable key，并同步迁移 mapping。
+- `schema.ts` 的 v2 迁移专门处理 NotionAI thread，把 legacy conversation key 重写为 stable key，并同步迁移 mapping。
+- `schema.ts` 的 v4 迁移会归并 legacy article conversations，把 URL 规范化为 canonical key，减少当前页抓取、article 导入与历史数据升级后的重复会话。
 
 ## 备份、导出与外部落点
 
@@ -73,6 +74,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | Chats v3 minimal | `ChatCacheService.swift` | 移除 OCR 原始 JSON 字段，改用新 store 文件 | 历史 OCR 原始缓存不再保留，需要重导 |
 | Web article cache versioning | `WebArticleCacheService.swift` | `contentVersion = 5` | 抽取策略升级时旧缓存自动 miss |
 | NotionAI stable key migration | `schema.ts`, `schema-migration.test.ts` | 统一 conversation key 与 canonical URL | 避免旧 threadId / URL 导致重复会话 |
+| Legacy article canonicalization | `schema.ts` | `DB_VERSION = 4` 时按 canonical URL / key 归并 article conversations 与 mapping | 避免当前页抓取、article 导入与历史数据升级后出现重复记录 |
 | Mapping 跟随 stable key | `schema-migration.test.ts` | `sync_mappings` 一起迁移 | 保持增量同步连续性 |
 | Unified site logins | `SiteLoginsStore.swift` | 从旧 WeRead / Dedao / GoodLinks key 迁到统一域名表 | 减少多来源各自维护登录态 |
 
@@ -90,7 +92,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 ### 片段 1：WebClipper 的本地数据库名称与版本是固定契约
 ```ts
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 ```
 
 ### 片段 2：App 网页缓存用内容版本控制失效，而不是 TTL
@@ -108,6 +110,8 @@ private var currentContentVersion: Int {
 - `macOS/SyncNos/Models/Sync/SyncedHighlightRecord.swift`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/sync/backup/export.ts`
 - `webclipper/src/sync/backup/import.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
