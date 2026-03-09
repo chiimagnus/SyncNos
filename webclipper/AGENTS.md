@@ -4,13 +4,13 @@
 
 ## 阅读入口（先读）
 
-- 仓库级业务入口：[`../../.github/deepwiki/business-context.md`](../../.github/deepwiki/business-context.md)
-- WebClipper 模块页：[`../../.github/deepwiki/modules/webclipper.md`](../../.github/deepwiki/modules/webclipper.md)
-- 涉及运行时边界、消息流、存储、发布或排障时，再读：[`../../.github/deepwiki/architecture.md`](../../.github/deepwiki/architecture.md)、[`../../.github/deepwiki/data-flow.md`](../../.github/deepwiki/data-flow.md)、[`../../.github/deepwiki/storage.md`](../../.github/deepwiki/storage.md)、[`../../.github/deepwiki/release.md`](../../.github/deepwiki/release.md)、[`../../.github/deepwiki/troubleshooting.md`](../../.github/deepwiki/troubleshooting.md)
+- 仓库级业务入口：[`../.github/deepwiki/business-context.md`](../.github/deepwiki/business-context.md)
+- WebClipper 模块页：[`../.github/deepwiki/modules/webclipper.md`](../.github/deepwiki/modules/webclipper.md)
+- 涉及运行时边界、消息流、存储、发布或排障时，再读：[`../.github/deepwiki/architecture.md`](../.github/deepwiki/architecture.md)、[`../.github/deepwiki/data-flow.md`](../.github/deepwiki/data-flow.md)、[`../.github/deepwiki/storage.md`](../.github/deepwiki/storage.md)、[`../.github/deepwiki/release.md`](../.github/deepwiki/release.md)、[`../.github/deepwiki/troubleshooting.md`](../.github/deepwiki/troubleshooting.md)
 
 ## 作用范围
 
-- 目标目录：`Extensions/WebClipper/`
+- 目标目录：`webclipper/`
 - 平台：
   - Chrome / Chromium（开发时通过“加载已解压的扩展程序”）
   - Edge（Chromium，支持加载 Chrome 产物 / Edge 产物）
@@ -124,7 +124,7 @@ Phase 3（JS→TS）收口状态：
 
 ### 测试与回归
 
-- 涉及以下改动时优先补 `vitest`（`Extensions/WebClipper/tests`）：
+- 涉及以下改动时优先补 `vitest`（`webclipper/tests`）：
   - Notion 同步（blocks 生成、分页/批量、错误分支）
   - OAuth 状态机（pending/error/connected）
   - IndexedDB schema/migration、备份导入合并规则
@@ -132,19 +132,19 @@ Phase 3（JS→TS）收口状态：
 
 ## Quick Start
 
-- 安装依赖：`npm --prefix Extensions/WebClipper install`
-- 本地开发（WXT / Chrome）：`npm --prefix Extensions/WebClipper run dev`
-  - 在 `chrome://extensions` 加载 `Extensions/WebClipper/.output/chrome-mv3/`
-- 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
-- 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
+- 安装依赖：`npm --prefix webclipper install`
+- 本地开发（WXT / Chrome）：`npm --prefix webclipper run dev`
+  - 在 `chrome://extensions` 加载 `webclipper/.output/chrome-mv3/`
+- 构建（WXT / Chrome）：`npm --prefix webclipper run build`
+- 构建（WXT / Firefox）：`npm --prefix webclipper run build:firefox`
 
 ## 命令
 
-- 静态检查（先 build，再校验产物 manifest/icons）：`npm --prefix Extensions/WebClipper run check`
-- 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
-- TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
-- 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
-- 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
+- 静态检查（先 build，再校验产物 manifest/icons）：`npm --prefix webclipper run check`
+- 单元测试（Vitest）：`npm --prefix webclipper run test`
+- TypeScript 编译检查：`npm --prefix webclipper run compile`
+- 构建（WXT / Chrome）：`npm --prefix webclipper run build`
+- 构建（WXT / Firefox）：`npm --prefix webclipper run build:firefox`
 - 发布打包（CI 专用，GitHub Actions 直接调用）：`.github/scripts/webclipper/package-release-assets.mjs`
 - AMO Source 包（CI 专用）：`.github/scripts/webclipper/package-amo-source.mjs`
 - AMO 发布（CI 专用）：`.github/scripts/webclipper/publish-amo.mjs`
@@ -157,7 +157,7 @@ Phase 3（JS→TS）收口状态：
 
 1. 打开 `about:debugging#/runtime/this-firefox`
 2. 点击 “Load Temporary Add-on…”
-3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`
+3. 选择 `webclipper/.output/firefox-mv3/manifest.json`
    - 本地开发仅使用 WXT 产物；发布产物由 CI 生成。
 
 ### AMO 发布产物
@@ -173,7 +173,7 @@ Phase 3（JS→TS）收口状态：
   - Node.js: `20.x`（CI 默认）
   - `zip` 命令：macOS 自带；Ubuntu/Debian 可用 `sudo apt-get install zip`
 - 构建步骤：
-  1. `npm --prefix Extensions/WebClipper install`
+  1. `npm --prefix webclipper install`
   2. `node .github/scripts/webclipper/package-release-assets.mjs --target=firefox --zip --zip-name=SyncNos-WebClipper-firefox.xpi`
   3. `node .github/scripts/webclipper/package-amo-source.mjs`
 
@@ -181,10 +181,10 @@ Phase 3（JS→TS）收口状态：
 
 - 打开 `chrome://extensions`
 - 启用开发者模式
-- 加载已解压扩展：`Extensions/WebClipper/.output/chrome-mv3/`
+- 加载已解压扩展：`webclipper/.output/chrome-mv3/`
 
 ## Edge 开发
 
 - 打开 `edge://extensions`
 - 启用开发人员模式
-- 加载已解压扩展：`Extensions/WebClipper/.output/chrome-mv3/`
+- 加载已解压扩展：`webclipper/.output/chrome-mv3/`

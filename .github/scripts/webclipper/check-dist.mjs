@@ -37,14 +37,14 @@ function fail(message) {
 const cli = parseArgs(process.argv.slice(2));
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..", "..", "..");
-const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
+const webclipperRoot = join(repoRoot, "webclipper");
 const root = cli.root
   ? join(repoRoot, cli.root)
   : join(webclipperRoot, ".output", "chrome-mv3");
 
 const manifestPath = cli.manifest ? join(root, cli.manifest) : join(root, "manifest.json");
 if (!existsSync(manifestPath)) {
-  fail(`manifest.json missing: ${manifestPath} (run \`npm --prefix Extensions/WebClipper run build\` first)`);
+  fail(`manifest.json missing: ${manifestPath} (run \`npm --prefix webclipper run build\` first)`);
 }
 
 let manifest;

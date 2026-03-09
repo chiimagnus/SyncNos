@@ -1,18 +1,18 @@
 # SyncNos 项目规范与架构指南
 
-> 本文件是 `SyncNos/`（macOS App 主工程）的开发规范与架构约定，已融合仓库的通用开发规范；若与通用规范冲突，以本文件为准。
+> 本文件是 `macOS/SyncNos/`（macOS App 主工程）的开发规范与架构约定，已融合仓库的通用开发规范；若与通用规范冲突，以本文件为准。
 
 ## 项目概述
 
 **SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead、Dedao（得到）和微信聊天 OCR 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
 
-> 备注：本仓库还包含独立浏览器扩展 `WebClipper`（`Extensions/WebClipper/`）。扩展开发约定见 `Extensions/WebClipper/AGENTS.md`。
+> 备注：本仓库还包含独立浏览器扩展 `WebClipper`（`webclipper/`）。扩展开发约定见 `webclipper/AGENTS.md`。
 
 ## 阅读入口（先读）
 
-- 仓库级业务入口：[`../.github/deepwiki/business-context.md`](../.github/deepwiki/business-context.md)
-- App 模块页：[`../.github/deepwiki/modules/syncnos-app.md`](../.github/deepwiki/modules/syncnos-app.md)
-- 需要系统边界、数据流、配置或排障时，再读：[`../.github/deepwiki/architecture.md`](../.github/deepwiki/architecture.md)、[`../.github/deepwiki/data-flow.md`](../.github/deepwiki/data-flow.md)、[`../.github/deepwiki/configuration.md`](../.github/deepwiki/configuration.md)、[`../.github/deepwiki/troubleshooting.md`](../.github/deepwiki/troubleshooting.md)
+- 仓库级业务入口：[`../../.github/deepwiki/business-context.md`](../../.github/deepwiki/business-context.md)
+- App 模块页：[`../../.github/deepwiki/modules/syncnos-app.md`](../../.github/deepwiki/modules/syncnos-app.md)
+- 需要系统边界、数据流、配置或排障时，再读：[`../../.github/deepwiki/architecture.md`](../../.github/deepwiki/architecture.md)、[`../../.github/deepwiki/data-flow.md`](../../.github/deepwiki/data-flow.md)、[`../../.github/deepwiki/configuration.md`](../../.github/deepwiki/configuration.md)、[`../../.github/deepwiki/troubleshooting.md`](../../.github/deepwiki/troubleshooting.md)
 
 ### 核心功能
 
@@ -73,16 +73,16 @@
 
 ### 主工程（Xcode Project）
 
-- `SyncNos/Models/`：数据模型（DTO、缓存模型、SwiftData `@Model`）
-- `SyncNos/Services/`：基础设施与业务服务（数据源、同步目标、队列/调度、鉴权等）
-- `SyncNos/ViewModels/`：MVVM ViewModel（UI 状态桥接与业务编排）
-- `SyncNos/Views/`：SwiftUI 视图（展示与交互）
+- `macOS/SyncNos/Models/`：数据模型（DTO、缓存模型、SwiftData `@Model`）
+- `macOS/SyncNos/Services/`：基础设施与业务服务（数据源、同步目标、队列/调度、鉴权等）
+- `macOS/SyncNos/ViewModels/`：MVVM ViewModel（UI 状态桥接与业务编排）
+- `macOS/SyncNos/Views/`：SwiftUI 视图（展示与交互）
 
 ### SwiftPM Packages（按需引入）
 
-- `Packages/`：可复用模块（例如 `Packages/MenuBarDockKit`）
+- `macOS/Packages/`：可复用模块（例如 `macOS/Packages/MenuBarDockKit`）
 
-> 说明：通用规范中“SwiftPM 逻辑层 + Xcode UI 层”的拆分是推荐形态；本仓库当前未把所有 Models/Services 完整下沉到 SwiftPM。新增可复用的纯逻辑模块时优先放入 `Packages/`，并保持依赖方向单向（不反向 import UI）。
+> 说明：通用规范中“SwiftPM 逻辑层 + Xcode UI 层”的拆分是推荐形态；本仓库当前未把所有 Models/Services 完整下沉到 SwiftPM。新增可复用的纯逻辑模块时优先放入 `macOS/Packages/`，并保持依赖方向单向（不反向 import UI）。
 
 ### 依赖方向（必须保持单向）
 
@@ -91,7 +91,7 @@
 ### 推荐的 SwiftPM 逻辑层拆分（规划/新增模块遵循）
 
 - 目标：让 Models/Services 可测试、可复用、可跨平台；UI 层只做绑定与呈现
-- 若新增 `Packages/AppCore`（示例命名）：建议拆成两个 targets
+- 若新增 `macOS/Packages/AppCore`（示例命名）：建议拆成两个 targets
   - `Models`：纯数据结构，零业务逻辑，除 Foundation 外尽量不依赖其它框架
   - `Services`：业务能力与基础设施实现，依赖 `Models`
 - ViewModel 仍留在 Xcode 工程（需要 SwiftUI/Observation，属于 UI 绑定层）
@@ -190,8 +190,8 @@ DIContainer.shared.ocrConfigStore
 
 只需要：
 
-1. 在 `SyncNos/Services/DataSources-From/` 创建数据读取服务
-2. 在 `SyncNos/Services/DataSources-To/Notion/Sync/Adapters/` 创建 Notion 适配器，实现 `NotionSyncSourceProtocol`
+1. 在 `macOS/SyncNos/Services/DataSources-From/` 创建数据读取服务
+2. 在 `macOS/SyncNos/Services/DataSources-To/Notion/Sync/Adapters/` 创建 Notion 适配器，实现 `NotionSyncSourceProtocol`
 3. 在 ViewModel 中调用 `NotionSyncEngine.sync(source: ...)`
 
 **不需要**修改 `NotionSyncEngine` 或 `NotionClient`。
@@ -230,7 +230,7 @@ struct AppleBooksUIProvider: DataSourceUIProvider {
 
 ### 统一通知名称定义
 
-所有通知名称必须在 `SyncNos/Models/Core/NotificationNames.swift` 中统一定义：
+所有通知名称必须在 `macOS/SyncNos/Models/Core/NotificationNames.swift` 中统一定义：
 
 ```swift
 extension Notification.Name {

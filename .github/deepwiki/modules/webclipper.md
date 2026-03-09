@@ -84,28 +84,28 @@
 
 | 场景 | 抓手 | 说明 |
 | --- | --- | --- |
-| TypeScript 契约回归 | `npm --prefix Extensions/WebClipper run compile` | 最先发现消息类型、collector 输出或 UI 调用问题 |
+| TypeScript 契约回归 | `npm --prefix webclipper run compile` | 最先发现消息类型、collector 输出或 UI 调用问题 |
 | 会话 / mapping 迁移异常 | `schema.ts`, `schema-migration.test.ts` | 升级问题先看迁移逻辑 |
 | cursor / append / rebuild 异常 | `notion-sync-cursor.test.ts`, Notion / Obsidian orchestrators | 先判断是 mapping 问题还是目标系统问题 |
 | inpage 行为异常 | `bootstrap/content.ts`, `content-controller.ts`, `inpage-button-shadow.ts` | 看 gating、点击动作和 runtime invalidation |
 | article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
 
 ## 来源引用（Source References）
-- `Extensions/WebClipper/wxt.config.ts`
-- `Extensions/WebClipper/package.json`
-- `Extensions/WebClipper/src/entrypoints/background.ts`
-- `Extensions/WebClipper/src/entrypoints/content.ts`
-- `Extensions/WebClipper/src/bootstrap/content.ts`
-- `Extensions/WebClipper/src/bootstrap/content-controller.ts`
-- `Extensions/WebClipper/src/collectors/register-all.ts`
-- `Extensions/WebClipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch-background-handlers.ts`
-- `Extensions/WebClipper/src/platform/idb/schema.ts`
-- `Extensions/WebClipper/src/conversations/data/storage-idb.ts`
-- `Extensions/WebClipper/src/platform/messaging/message-contracts.ts`
-- `Extensions/WebClipper/src/platform/messaging/ui-background-handlers.ts`
-- `Extensions/WebClipper/src/protocols/conversation-kinds.ts`
-- `Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.ts`
-- `Extensions/WebClipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
-- `Extensions/WebClipper/src/ui/settings/SettingsScene.tsx`
+- `webclipper/wxt.config.ts`
+- `webclipper/package.json`
+- `webclipper/src/entrypoints/background.ts`
+- `webclipper/src/entrypoints/content.ts`
+- `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/collectors/register-all.ts`
+- `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
+- `webclipper/src/collectors/web/article-fetch.ts`
+- `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
+- `webclipper/src/platform/idb/schema.ts`
+- `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/platform/messaging/message-contracts.ts`
+- `webclipper/src/platform/messaging/ui-background-handlers.ts`
+- `webclipper/src/protocols/conversation-kinds.ts`
+- `webclipper/src/sync/notion/notion-sync-orchestrator.ts`
+- `webclipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
+- `webclipper/src/ui/settings/SettingsScene.tsx`

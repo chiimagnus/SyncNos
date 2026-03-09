@@ -16,7 +16,7 @@ It consolidates multi-source content to Notion and provides a WebClipper browser
 
 </div>
 
-<img align="right" src="Extensions/WebClipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="120" />
+<img align="right" src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="120" />
 
 ## Project Overview
 
@@ -27,7 +27,7 @@ SyncNos has two parts:
 
 ## How It Works
 
-![](Resource/flows.svg)
+![](macOS/Resource/flows.svg)
 
 ## macOS App
 
@@ -102,10 +102,10 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI 
 
 ### Development (WXT)
 
-- Install deps: `npm --prefix Extensions/WebClipper install`
-- Dev (Chrome MV3): `npm --prefix Extensions/WebClipper run dev`
-- Build (Chrome / Firefox): `npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
-- Test + typecheck: `npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
+- Install deps: `npm --prefix webclipper install`
+- Dev (Chrome MV3): `npm --prefix webclipper run dev`
+- Build (Chrome / Firefox): `npm --prefix webclipper run build` / `npm --prefix webclipper run build:firefox`
+- Test + typecheck: `npm --prefix webclipper run test` / `npm --prefix webclipper run compile`
 - Runtime code in `src + entrypoints` is TS-only; current JS allowlist only keeps `public/src/vendor/readability.js` (built asset path remains `src/vendor/readability.js`).
 
 </details>

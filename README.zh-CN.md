@@ -16,7 +16,7 @@
 
 </div>
 
-<img align="right" src="Extensions/WebClipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="120" />
+<img align="right" src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="120" />
 
 ## 项目组成
 
@@ -27,7 +27,7 @@ SyncNos 由两部分组成：
 
 ## 工作流程
 
-![](Resource/flows.svg)
+![](macOS/Resource/flows.svg)
 
 ## macOS App
 
@@ -102,10 +102,10 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI /
 
 ### 开发（WXT）
 
-- 安装依赖：`npm --prefix Extensions/WebClipper install`
-- 本地开发（Chrome MV3）：`npm --prefix Extensions/WebClipper run dev`
-- 构建（Chrome / Firefox）：`npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
-- 测试与类型检查：`npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
+- 安装依赖：`npm --prefix webclipper install`
+- 本地开发（Chrome MV3）：`npm --prefix webclipper run dev`
+- 构建（Chrome / Firefox）：`npm --prefix webclipper run build` / `npm --prefix webclipper run build:firefox`
+- 测试与类型检查：`npm --prefix webclipper run test` / `npm --prefix webclipper run compile`
 - `src + entrypoints` 运行时代码已收敛为 TS；当前 JS allowlist 仅保留 `public/src/vendor/readability.js`（构建产物路径仍为 `src/vendor/readability.js`）。
 
 </details>

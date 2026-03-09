@@ -56,7 +56,7 @@
 
 | 产物 | 典型名称 | 生成位置 | 去向 |
 | --- | --- | --- | --- |
-| Chrome zip | `syncnos-webclipper-chrome-<tag>.zip` / `SyncNos-WebClipper-chrome-<tag>.zip` | `Extensions/WebClipper/` 或 workflow 临时目录 | GitHub Release / Chrome Web Store |
+| Chrome zip | `syncnos-webclipper-chrome-<tag>.zip` / `SyncNos-WebClipper-chrome-<tag>.zip` | `webclipper/` 或 workflow 临时目录 | GitHub Release / Chrome Web Store |
 | Edge zip | `syncnos-webclipper-edge-<tag>.zip` | 同上 | GitHub Release |
 | Firefox XPI | `syncnos-webclipper-firefox-<tag>.xpi` / `SyncNos-WebClipper-firefox.xpi` | 同上 | GitHub Release / AMO |
 | AMO Source zip | `SyncNos-WebClipper-amo-source.zip` | 同上 | AMO reviewer source |
@@ -79,8 +79,8 @@
 
 ## 来源引用（Source References）
 - `README.md`
-- `Extensions/WebClipper/package.json`
-- `Extensions/WebClipper/wxt.config.ts`
+- `webclipper/package.json`
+- `webclipper/wxt.config.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`

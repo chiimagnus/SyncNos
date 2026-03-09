@@ -101,14 +101,14 @@ private var currentContentVersion: Int {
 ```
 
 ## 来源引用（Source References）
-- `SyncNos/Services/Auth/IAPService.swift`
-- `SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
-- `SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
-- `SyncNos/Services/WebArticle/WebArticleCacheService.swift`
-- `SyncNos/Models/Sync/SyncedHighlightRecord.swift`
-- `Extensions/WebClipper/src/platform/idb/schema.ts`
-- `Extensions/WebClipper/src/conversations/data/storage-idb.ts`
-- `Extensions/WebClipper/src/sync/backup/export.ts`
-- `Extensions/WebClipper/src/sync/backup/import.ts`
-- `Extensions/WebClipper/src/sync/backup/backup-utils.ts`
-- `Extensions/WebClipper/tests/storage/schema-migration.test.ts`
+- `macOS/SyncNos/Services/Auth/IAPService.swift`
+- `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
+- `macOS/SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
+- `macOS/SyncNos/Services/WebArticle/WebArticleCacheService.swift`
+- `macOS/SyncNos/Models/Sync/SyncedHighlightRecord.swift`
+- `webclipper/src/platform/idb/schema.ts`
+- `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/sync/backup/export.ts`
+- `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
+- `webclipper/tests/storage/schema-migration.test.ts`

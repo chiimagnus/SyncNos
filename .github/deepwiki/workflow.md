@@ -5,8 +5,8 @@
 | 变更类型 | 先看哪里 | 为什么 |
 | --- | --- | --- |
 | 仓库级行为 / 共享业务规则 | [business-context.md](business-context.md), [INDEX.md](INDEX.md), `AGENTS.md`, `README.md` | 先用 deepwiki 建立上下文，再确认是不是同时影响两条产品线 |
-| App 改动 | [modules/syncnos-app.md](modules/syncnos-app.md), `SyncNos/AGENTS.md`, `SyncNos/Services/AGENTS.md` | 先理解产品线边界，再遵守 MVVM、协议注入、SwiftData 后台访问约束 |
-| WebClipper 改动 | [modules/webclipper.md](modules/webclipper.md), `Extensions/WebClipper/AGENTS.md` | 先理解运行时边界，再判断属于 background / content / popup / app 哪一层 |
+| App 改动 | [modules/syncnos-app.md](modules/syncnos-app.md), `macOS/SyncNos/AGENTS.md`, `macOS/SyncNos/Services/AGENTS.md` | 先理解产品线边界，再遵守 MVVM、协议注入、SwiftData 后台访问约束 |
+| WebClipper 改动 | [modules/webclipper.md](modules/webclipper.md), `webclipper/AGENTS.md` | 先理解运行时边界，再判断属于 background / content / popup / app 哪一层 |
 | 发布 / 打包改动 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` | 防止本地流程与 CI 产物分叉 |
 | 文档 / deepwiki 改动 | 代码 / 配置 / workflow → deepwiki | 文档必须以事实源为准，而不是彼此转述 |
 
@@ -67,11 +67,11 @@
 ## 来源引用（Source References）
 - `AGENTS.md`
 - `README.md`
-- `SyncNos/AGENTS.md`
-- `SyncNos/Services/AGENTS.md`
-- `Extensions/WebClipper/AGENTS.md`
-- `Extensions/WebClipper/package.json`
-- `Extensions/WebClipper/wxt.config.ts`
+- `macOS/SyncNos/AGENTS.md`
+- `macOS/SyncNos/Services/AGENTS.md`
+- `webclipper/AGENTS.md`
+- `webclipper/package.json`
+- `webclipper/wxt.config.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
