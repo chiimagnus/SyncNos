@@ -1,6 +1,6 @@
 <div align="center"><a name="readme-top"></a>
 
-# SyncNos
+# SyncNos · 快来看看吧！这是可爱的天使赞助者们[SyncNos Angels](https://chiimagnus.notion.site/syncnos-angels)
 
 一款聚焦「阅读高亮与 AI 对话沉淀」的同步工具集。  
 支持将多源内容整理后同步到 Notion，同时提供 WebClipper 浏览器扩展。
