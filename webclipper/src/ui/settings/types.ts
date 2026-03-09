@@ -18,13 +18,12 @@ export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
     title: 'Features',
     sections: [
       { key: 'chat_with' },
-      { key: 'insight' },
       { key: 'inpage' },
     ],
   },
   {
     title: 'About',
-    sections: [{ key: 'about' }],
+    sections: [{ key: 'insight' }, { key: 'about' }],
   },
 ];
 
