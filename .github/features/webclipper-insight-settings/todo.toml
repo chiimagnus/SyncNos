@@ -1,0 +1,66 @@
+version = 1
+current_task_id = ""
+
+[[tasks]]
+id = "P1-T1"
+title = "搭建 Insight 聚合接口骨架"
+status = "pending"
+plan = "plan-p1.md#p1-t1"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P1-T2"
+title = "实现本地 IndexedDB 聚合与分组规则"
+status = "pending"
+plan = "plan-p1.md#p1-t2"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P1-T3"
+title = "为 Insight 聚合补单元测试"
+status = "pending"
+plan = "plan-p1.md#p1-t3"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P2-T1"
+title = "把 Insight 接入 Settings 导航与 section 路由"
+status = "pending"
+plan = "plan-p2.md#p2-t1"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P2-T2"
+title = "实现 Insight section 的懒加载状态管理"
+status = "pending"
+plan = "plan-p2.md#p2-t2"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P2-T3"
+title = "渲染 Insight 文本骨架与空态/错误态"
+status = "pending"
+plan = "plan-p2.md#p2-t3"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P3-T1"
+title = "引入 Recharts 并实现来源分布图"
+status = "pending"
+plan = "plan-p3.md#p3-t1"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P3-T2"
+title = "完成布局打磨与全链路验证"
+status = "pending"
+plan = "plan-p3.md#p3-t2"
+commit = ""
+note = ""
