@@ -164,42 +164,54 @@ async function extractArticleOnTab(tabId: number) {
         return String(value || '').replace(/\]/g, '\\]');
       }
 
-      function renderInlineNode(node: any): string {
-        if (!node) return '';
-        if (node.nodeType === Node.TEXT_NODE) return normalizeInlineText(node.nodeValue || '');
-        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+	      function renderInlineNode(node: any): string {
+	        if (!node) return '';
+	        if (node.nodeType === Node.TEXT_NODE) return normalizeInlineText(node.nodeValue || '');
+	        if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
-        const tag = String(node.tagName || '').toLowerCase();
-        if (!tag) return '';
+	        const tag = String(node.tagName || '').toLowerCase();
+	        if (!tag) return '';
 
-        if (tag === 'br') return '\n';
-        if (tag === 'img') {
-          const src = sanitizeUrl(node.getAttribute('src') || node.getAttribute('data-src') || '');
-          if (!src) return '';
-          const alt = escapeMarkdownLabel(normalize(node.getAttribute('alt') || ''));
-          return `![${alt}](${src})`;
-        }
-        if (tag === 'a') {
-          const href = sanitizeUrl(node.getAttribute('href') || '');
-          const label = escapeMarkdownLabel(normalize(node.textContent || ''));
-          if (!label) return '';
-          if (!href) return label;
-          return `[${label}](${href})`;
-        }
-        if (tag === 'code') {
-          const text = normalize(node.textContent || '');
-          return text ? `\`${text}\`` : '';
-        }
-        if (tag === 'strong' || tag === 'b') {
-          const inner = renderInlineChildren(node);
-          return inner ? `**${inner}**` : '';
-        }
-        if (tag === 'em' || tag === 'i') {
-          const inner = renderInlineChildren(node);
-          return inner ? `*${inner}*` : '';
-        }
-        return renderInlineChildren(node);
-      }
+	        if (tag === 'br') return '\n';
+	        if (tag === 'img') {
+	          const src = sanitizeUrl(node.getAttribute('src') || node.getAttribute('data-src') || '');
+	          if (!src) return '';
+	          const alt = escapeMarkdownLabel(normalize(node.getAttribute('alt') || ''));
+	          return `![${alt}](${src})`;
+	        }
+	        if (tag === 'a') {
+	          const href = sanitizeUrl(node.getAttribute('href') || '');
+	          const linkedImg = node.querySelector ? node.querySelector('img') : null;
+	          if (linkedImg) {
+	            const src = sanitizeUrl(linkedImg.getAttribute('src') || linkedImg.getAttribute('data-src') || '');
+	            if (src) {
+	              const alt = escapeMarkdownLabel(
+	                normalize(linkedImg.getAttribute('alt') || node.getAttribute('title') || ''),
+	              );
+	              const image = `![${alt}](${src})`;
+	              return href ? `[${image}](${href})` : image;
+	            }
+	          }
+
+	          const label = escapeMarkdownLabel(normalize(node.textContent || ''));
+	          if (!label) return '';
+	          if (!href) return label;
+	          return `[${label}](${href})`;
+	        }
+	        if (tag === 'code') {
+	          const text = normalize(node.textContent || '');
+	          return text ? `\`${text}\`` : '';
+	        }
+	        if (tag === 'strong' || tag === 'b') {
+	          const inner = renderInlineChildren(node);
+	          return inner ? `**${inner}**` : '';
+	        }
+	        if (tag === 'em' || tag === 'i') {
+	          const inner = renderInlineChildren(node);
+	          return inner ? `*${inner}*` : '';
+	        }
+	        return renderInlineChildren(node);
+	      }
 
       function renderInlineChildren(node: any): string {
         if (!node) return '';
@@ -298,27 +310,27 @@ async function extractArticleOnTab(tabId: number) {
         const text = normalize((root as any).innerText || '');
         if (!text) return null;
         const contentHTML = buildHtml('', text);
-        return {
-          ok: true,
-          title,
-          author,
+	        return {
+	          ok: true,
+	          title,
+	          author,
           publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
           excerpt: '',
           contentHTML,
           contentMarkdown: htmlToMarkdown('', text),
           textContent: text,
           warningFlags: [],
-        };
-      }
+	        };
+	      }
 
-      async function waitForDomStabilized() {
-        const deadline = Date.now() + timeoutMs;
-        let last: any = null;
-        let stableTicks = 0;
+	      async function waitForDomStabilized() {
+	        const deadline = Date.now() + timeoutMs;
+	        let last: any = null;
+	        let stableTicks = 0;
 
-        while (Date.now() < deadline) {
-          const root = pickRoot();
-          const text = root ? normalize((root as any).innerText || '') : '';
+	        while (Date.now() < deadline) {
+	          const root = pickRoot();
+	          const text = root ? normalize((root as any).innerText || '') : '';
           const nodeCount =
             root && typeof (root as any).querySelectorAll === 'function'
               ? (root as any).querySelectorAll('*').length
@@ -345,33 +357,70 @@ async function extractArticleOnTab(tabId: number) {
             return;
           }
 
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((resolve) => setTimeout(resolve, 350));
-        }
-      }
+	          // eslint-disable-next-line no-await-in-loop
+	          await new Promise((resolve) => setTimeout(resolve, 350));
+	        }
+	      }
 
-      try {
-        await waitForDomStabilized();
+	      function normalizeDetailsElementsForReadability(doc: any) {
+	        if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
 
-        const wechatRoot = document.querySelector('#js_content') as any;
-        if (wechatRoot) {
-          wechatRoot.style.visibility = 'visible';
-          wechatRoot.style.opacity = '1';
-        }
-        const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
-        noisyNodes.forEach((node: any) => node?.remove?.());
+	        const detailsNodes = Array.from(doc.querySelectorAll('details') as any) as any[];
+	        if (!detailsNodes.length) return;
 
-        if (typeof (globalThis as any).Readability === 'function') {
-          const cloned = document.cloneNode(true) as any;
-          const article = new (globalThis as any).Readability(cloned).parse();
-          if (article) {
-            const title = normalize(article.title || '');
-            const author =
-              normalize(article.byline || '') ||
-              readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
-            const content = normalize(article.content || '');
-            const text = normalize(article.textContent || '');
-            if (content || text) {
+	        for (const details of detailsNodes) {
+	          const detailsEl = details as any;
+	          if (!detailsEl || typeof detailsEl.replaceWith !== 'function') continue;
+
+	          const summary =
+	            typeof detailsEl.querySelector === 'function' ? detailsEl.querySelector(':scope > summary') : null;
+	          const summaryText = normalize(summary?.textContent || '');
+
+	          const container = doc.createElement('div');
+	          container.setAttribute('data-syncnos-origin', 'details');
+
+	          if (summaryText) {
+	            const label = doc.createElement('p');
+	            const strong = doc.createElement('strong');
+	            strong.textContent = summaryText;
+	            label.appendChild(strong);
+	            container.appendChild(label);
+	          }
+
+	          const children = Array.from((detailsEl.childNodes || []) as any) as any[];
+	          for (const child of children) {
+	            if (!child) continue;
+	            if (summary && child === summary) continue;
+	            container.appendChild(child);
+	          }
+
+	          detailsEl.replaceWith(container);
+	        }
+	      }
+
+	      try {
+	        await waitForDomStabilized();
+
+	        const wechatRoot = document.querySelector('#js_content') as any;
+	        if (wechatRoot) {
+	          wechatRoot.style.visibility = 'visible';
+	          wechatRoot.style.opacity = '1';
+	        }
+	        const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
+	        noisyNodes.forEach((node: any) => node?.remove?.());
+
+	        if (typeof (globalThis as any).Readability === 'function') {
+	          const cloned = document.cloneNode(true) as any;
+	          normalizeDetailsElementsForReadability(cloned);
+	          const article = new (globalThis as any).Readability(cloned).parse();
+	          if (article) {
+	            const title = normalize(article.title || '');
+	            const author =
+	              normalize(article.byline || '') ||
+	              readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+	            const content = normalize(article.content || '');
+	            const text = normalize(article.textContent || '');
+	            if (content || text) {
               return {
                 ok: true,
                 title,
