@@ -2,8 +2,8 @@
 
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
-- **仓库形态**：这是一个双产品线仓库——`SyncNos/` 是 macOS App，`Extensions/WebClipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
-- **关键入口**：App 入口是 `SyncNos/SyncNosApp.swift` + `SyncNos/AppDelegate.swift`；扩展入口是 `Extensions/WebClipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
+- **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
+- **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
 | 维度 | 主入口页面 | 你会得到什么 |
@@ -65,7 +65,7 @@
 
 ## Coverage Gaps
 - **App Store 交付链路**：仓库中能看到 App Store 链接，但没有公开的 App Store 提交 workflow 或脚本；deepwiki 明确把它视为“仓库外渠道信息”。
-- **OCR 与键盘焦点专项文档**：仓库已有 `.github/docs/键盘导航与焦点管理技术文档（全项目）.md` 与 `SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
+- **OCR 与键盘焦点专项文档**：仓库已有 `.github/docs/键盘导航与焦点管理技术文档（全项目）.md` 与 `macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
 - **集成专题页**：当前 Notion / Obsidian / collectors 仍主要分布在 `architecture.md`、`data-flow.md` 与 `modules/` 页面；如果未来这些区域继续膨胀，适合再拆专题页。
 
 ## Generation Metadata

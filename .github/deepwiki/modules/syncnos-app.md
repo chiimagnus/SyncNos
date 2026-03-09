@@ -9,25 +9,25 @@
 
 | 路径 | 作用 | 为什么重要 |
 | --- | --- | --- |
-| `SyncNos/SyncNosApp.swift` | App 主入口与启动期预热 | 决定 IAP、自动同步、缓存服务和窗口结构 |
-| `SyncNos/AppDelegate.swift` | 生命周期与菜单栏 / Dock 行为 | 控制同步中退出、Dock reopen、URL scheme 兜底 |
-| `SyncNos/Views/RootView.swift` | onboarding / paywall / main list 门控 | 决定用户进入主流程前的顺序 |
-| `SyncNos/Services/Core/DIContainer.swift` | 依赖装配根 | App 所有 service / viewmodel 的注入中心 |
-| `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift` | 统一 Notion 同步引擎 | 真正决定数据库 / 页面 / block 写入策略 |
-| `SyncNos/Services/SyncScheduling/AutoSyncService.swift` | 自动同步调度 | 定时与通知触发的同步入口 |
-| `SyncNos/Services/Auth/IAPService.swift` | 试用期 / 购买 / 恢复购买 | 支撑 paywall 逻辑 |
-| `SyncNos/Services/SiteLogins/SiteLoginsStore.swift` | 统一站点登录态 Keychain 存储 | 决定 WeRead / Dedao / GoodLinks 等站点会话 |
-| `SyncNos/ViewModels/Search/GlobalSearchViewModel.swift` | 全局搜索 | 体现结果流式聚合与选择保持策略 |
+| `macOS/SyncNos/SyncNosApp.swift` | App 主入口与启动期预热 | 决定 IAP、自动同步、缓存服务和窗口结构 |
+| `macOS/SyncNos/AppDelegate.swift` | 生命周期与菜单栏 / Dock 行为 | 控制同步中退出、Dock reopen、URL scheme 兜底 |
+| `macOS/SyncNos/Views/RootView.swift` | onboarding / paywall / main list 门控 | 决定用户进入主流程前的顺序 |
+| `macOS/SyncNos/Services/Core/DIContainer.swift` | 依赖装配根 | App 所有 service / viewmodel 的注入中心 |
+| `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift` | 统一 Notion 同步引擎 | 真正决定数据库 / 页面 / block 写入策略 |
+| `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift` | 自动同步调度 | 定时与通知触发的同步入口 |
+| `macOS/SyncNos/Services/Auth/IAPService.swift` | 试用期 / 购买 / 恢复购买 | 支撑 paywall 逻辑 |
+| `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift` | 统一站点登录态 Keychain 存储 | 决定 WeRead / Dedao / GoodLinks 等站点会话 |
+| `macOS/SyncNos/ViewModels/Search/GlobalSearchViewModel.swift` | 全局搜索 | 体现结果流式聚合与选择保持策略 |
 
 ## 运行时结构
 
 | 层 / 区域 | 主要目录 | 核心职责 | 代表实现 |
 | --- | --- | --- | --- |
-| Views | `SyncNos/Views/` | 渲染主窗口、设置、日志、列表、搜索 UI | `RootView`, `SettingsView` |
-| ViewModels | `SyncNos/ViewModels/` | 管理引导、付费墙、搜索等业务状态 | `OnboardingViewModel`, `PayWallViewModel`, `GlobalSearchViewModel` |
-| Services | `SyncNos/Services/` | 读取来源、缓存、鉴权、搜索、同步、调度 | `NotionSyncEngine`, `AutoSyncService`, cache services |
-| Models | `SyncNos/Models/` | DTO、缓存模型、通知名 | `NotificationNames.swift` |
-| Packages | `Packages/` | 可复用的 macOS 能力 | `MenuBarDockKit` |
+| Views | `macOS/SyncNos/Views/` | 渲染主窗口、设置、日志、列表、搜索 UI | `RootView`, `SettingsView` |
+| ViewModels | `macOS/SyncNos/ViewModels/` | 管理引导、付费墙、搜索等业务状态 | `OnboardingViewModel`, `PayWallViewModel`, `GlobalSearchViewModel` |
+| Services | `macOS/SyncNos/Services/` | 读取来源、缓存、鉴权、搜索、同步、调度 | `NotionSyncEngine`, `AutoSyncService`, cache services |
+| Models | `macOS/SyncNos/Models/` | DTO、缓存模型、通知名 | `NotificationNames.swift` |
+| Packages | `macOS/Packages/` | 可复用的 macOS 能力 | `MenuBarDockKit` |
 
 ## 启动与门控
 
@@ -80,32 +80,32 @@
 - **改主流程门控**：优先看 `RootView.swift`, `OnboardingViewModel.swift`, `IAPService.swift`, `PayWallViewModel.swift`。
 - **改同步可靠性**：优先看 `NotionSyncEngine.swift`, `NotionSyncConfig.swift`, `AutoSyncService.swift`。
 - **改登录态 / 站点会话**：优先看 `SiteLoginsStore.swift`，而不是直接向各来源散落 Cookie 存储。
-- **改窗口 / 菜单栏 / Dock**：优先看 `AppDelegate.swift` 与 `Packages/MenuBarDockKit/`。
+- **改窗口 / 菜单栏 / Dock**：优先看 `AppDelegate.swift` 与 `macOS/Packages/MenuBarDockKit/`。
 
 ## 测试与调试抓手
 
 | 场景 | 抓手 | 说明 |
 | --- | --- | --- |
-| 构建失败 | `xcodebuild -scheme SyncNos -configuration Debug build` | App 改动后的基本验证 |
+| 构建失败 | `xcodebuild -project macOS/SyncNos.xcodeproj -scheme SyncNos -configuration Debug build` | App 改动后的基本验证 |
 | paywall / onboarding 异常 | `RootView.swift`, `IAPService.swift`, `PayWallViewModel.swift` | 先查状态优先级，再查 UI |
 | 自动同步不触发 | `SyncNosApp.swift`, `AutoSyncService.swift` | 看启动时的三个开关和通知触发链 |
 | 登录态异常 | `SiteLoginsStore.swift` | 看 domain 匹配、Keychain migration、WebKit cookies 清理 |
 | 搜索体验回归 | `GlobalSearchViewModel.swift` | 看 debounce、streaming 结果排序、selection 保持 |
 
 ## 来源引用（Source References）
-- `SyncNos/SyncNosApp.swift`
-- `SyncNos/AppDelegate.swift`
-- `SyncNos/Views/RootView.swift`
-- `SyncNos/Services/Core/DIContainer.swift`
-- `SyncNos/Services/SyncScheduling/AutoSyncService.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
-- `SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
-- `SyncNos/Services/Auth/IAPService.swift`
-- `SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
-- `SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
-- `SyncNos/Services/WebArticle/WebArticleCacheService.swift`
-- `SyncNos/ViewModels/Search/GlobalSearchViewModel.swift`
-- `SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
-- `SyncNos/ViewModels/Account/PayWallViewModel.swift`
+- `macOS/SyncNos/SyncNosApp.swift`
+- `macOS/SyncNos/AppDelegate.swift`
+- `macOS/SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/Services/Core/DIContainer.swift`
+- `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
+- `macOS/SyncNos/Services/Auth/IAPService.swift`
+- `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
+- `macOS/SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
+- `macOS/SyncNos/Services/WebArticle/WebArticleCacheService.swift`
+- `macOS/SyncNos/ViewModels/Search/GlobalSearchViewModel.swift`
+- `macOS/SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
+- `macOS/SyncNos/ViewModels/Account/PayWallViewModel.swift`
 - `.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
