@@ -16,7 +16,7 @@ function DistributionChart(props: {
     return <div className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">{emptyText}</div>;
   }
 
-  const chartHeight = Math.max(180, items.length * 46);
+  const chartHeight = Math.max(212, items.length * 48);
 
   return (
     <div style={{ height: chartHeight }} className="tw-w-full">
@@ -26,7 +26,7 @@ function DistributionChart(props: {
           <YAxis
             type="category"
             dataKey="label"
-            width={88}
+            width={108}
             axisLine={false}
             tickLine={false}
             tick={{ fill: 'var(--text)', fontSize: 12, fontWeight: 700 }}
@@ -87,22 +87,22 @@ export function InsightPanel(props: {
   return (
     <div className="tw-grid tw-gap-4">
       <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label="Insight overview">
-        <div className={cardClassName}>
+        <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
           <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">📦 总 Clip</div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.totalClips)}</div>
         </div>
-        <div className={cardClassName}>
+        <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
           <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">💬 AI 对话</div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.chatCount)}</div>
         </div>
-        <div className={cardClassName}>
+        <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
           <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">📄 网页文章</div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.articleCount)}</div>
         </div>
       </section>
 
       <div className="tw-grid tw-gap-4 lg:tw-grid-cols-2">
-        <section className={cardClassName} aria-label="AI Conversations">
+        <section className={`${cardClassName} tw-h-full`} aria-label="AI Conversations">
           <div className="tw-flex tw-items-start tw-justify-between tw-gap-4">
             <div>
               <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">💬 AI Conversations</h2>
@@ -125,7 +125,7 @@ export function InsightPanel(props: {
           </div>
         </section>
 
-        <section className={cardClassName} aria-label="Web Articles">
+        <section className={`${cardClassName} tw-h-full`} aria-label="Web Articles">
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">📄 Web Articles</h2>
           <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">域名分布</div>
           <div className="tw-mt-4">

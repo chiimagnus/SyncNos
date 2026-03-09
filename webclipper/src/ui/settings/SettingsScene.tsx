@@ -115,8 +115,10 @@ export function SettingsScene(props: SettingsSceneProps) {
     hasLoadedInsight,
   } = useSettingsSceneController({ activeSection, focusKey });
 
+  const detailMaxWidthClassName = activeSection === 'insight' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
+
   const renderDetailContent = () => (
-    <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
+    <section className={`route-scroll tw-mx-auto tw-grid tw-w-full ${detailMaxWidthClassName} tw-gap-4 tw-pr-1`}>
       {activeSection === 'notion' ? (
         <>
           <NotionOAuthSection
