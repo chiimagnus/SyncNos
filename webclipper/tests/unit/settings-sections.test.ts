@@ -9,6 +9,7 @@ describe('settings section definitions', () => {
       'notion',
       'obsidian',
       'chat_with',
+      'insight',
       'inpage',
       'about',
     ]);
@@ -22,7 +23,7 @@ describe('settings section definitions', () => {
       }))
     ).toEqual([
       { title: 'Data', keys: ['backup', 'notion', 'obsidian'] },
-      { title: 'Features', keys: ['chat_with', 'inpage'] },
+      { title: 'Features', keys: ['chat_with', 'insight', 'inpage'] },
       { title: 'About', keys: ['about'] },
     ]);
   });

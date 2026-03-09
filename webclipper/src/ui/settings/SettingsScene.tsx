@@ -25,6 +25,16 @@ export type SettingsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
 };
 
+function getSectionLabel(key: SettingsSectionKey): string {
+  if (key === 'chat_with') return 'Chat with AI';
+  return t(`section_${key}_label` as Parameters<typeof t>[0]);
+}
+
+function getSectionDescription(key: SettingsSectionKey): string {
+  if (key === 'chat_with') return 'Prompt + platforms';
+  return t(`section_${key}_desc` as Parameters<typeof t>[0]);
+}
+
 export function SettingsScene(props: SettingsSceneProps) {
   const { activeSection, focusKey = '', onSelectSection, defaultNarrowRoute = 'list' } = props;
 
@@ -230,8 +240,7 @@ export function SettingsScene(props: SettingsSceneProps) {
   );
 
   const activeSectionLabel = useMemo(() => {
-    if (activeSectionMeta?.key === 'chat_with') return 'Chat with AI';
-    return activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : t('settingsTitle');
+    return activeSectionMeta ? getSectionLabel(activeSectionMeta.key) : t('settingsTitle');
   }, [activeSectionMeta]);
 
   if (isNarrow) {
@@ -286,15 +295,9 @@ export function SettingsScene(props: SettingsSceneProps) {
                         ].join(' ')}
                         aria-current={active ? 'page' : undefined}
                       >
-                        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">
-                          {section.key === 'chat_with'
-                            ? 'Chat with AI'
-                            : t(`section_${section.key}_label` as Parameters<typeof t>[0])}
-                        </div>
+                        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{getSectionLabel(section.key)}</div>
                         <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-                          {section.key === 'chat_with'
-                            ? 'Prompt + platforms'
-                            : t(`section_${section.key}_desc` as Parameters<typeof t>[0])}
+                          {getSectionDescription(section.key)}
                         </div>
                       </button>
                     );
