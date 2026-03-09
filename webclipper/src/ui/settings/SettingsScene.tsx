@@ -11,6 +11,7 @@ import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS, type SettingsSectionKey } f
 import { AboutSection } from './sections/AboutSection';
 import { BackupSection } from './sections/BackupSection';
 import { ChatWithAiSection } from './sections/ChatWithAiSection';
+import { InsightSection } from './sections/InsightSection';
 import { InpageSection } from './sections/InpageSection';
 import { NotionAISection } from './sections/NotionAISection';
 import { NotionOAuthSection } from './sections/NotionOAuthSection';
@@ -107,6 +108,11 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     inpageSupportedOnly,
     onToggleInpageSupportedOnly,
+
+    insightStats,
+    insightLoading,
+    insightError,
+    hasLoadedInsight,
   } = useSettingsSceneController({ activeSection, focusKey });
 
   const renderDetailContent = () => (
@@ -217,6 +223,15 @@ export function SettingsScene(props: SettingsSceneProps) {
           onImportFile={(file) => {
             void importFromFile(file);
           }}
+        />
+      ) : null}
+
+      {activeSection === 'insight' ? (
+        <InsightSection
+          loading={insightLoading}
+          error={insightError}
+          stats={insightStats}
+          hasLoaded={hasLoadedInsight}
         />
       ) : null}
 
