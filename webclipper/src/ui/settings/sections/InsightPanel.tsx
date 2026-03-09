@@ -96,19 +96,19 @@ export function InsightPanel(props: {
     <div className="tw-grid tw-gap-4">
       <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">
+          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
             {t('insightOverviewTotalClips')}
           </div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.totalClips)}</div>
         </div>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">
+          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
             {t('insightOverviewChatCount')}
           </div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.chatCount)}</div>
         </div>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">
+          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
             {t('insightOverviewArticleCount')}
           </div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.articleCount)}</div>
@@ -120,7 +120,7 @@ export function InsightPanel(props: {
           <div className="tw-flex tw-items-start tw-justify-between tw-gap-4">
             <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightChatSectionTitle')}</h2>
             <div className="tw-text-right">
-              <div className="tw-text-xs tw-font-black tw-uppercase tw-tracking-[0.12em] tw-text-[var(--muted)]">
+              <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
                 {t('insightTotalMessagesLabel')}
               </div>
               <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.totalMessages)}</div>
