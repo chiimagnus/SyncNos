@@ -11,6 +11,7 @@ import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS, type SettingsSectionKey } f
 import { AboutSection } from './sections/AboutSection';
 import { BackupSection } from './sections/BackupSection';
 import { ChatWithAiSection } from './sections/ChatWithAiSection';
+import { InsightSection } from './sections/InsightSection';
 import { InpageSection } from './sections/InpageSection';
 import { NotionAISection } from './sections/NotionAISection';
 import { NotionOAuthSection } from './sections/NotionOAuthSection';
@@ -24,6 +25,16 @@ export type SettingsSceneProps = {
   onSelectSection: (key: SettingsSectionKey) => void;
   defaultNarrowRoute?: NarrowRoute;
 };
+
+function getSectionLabel(key: SettingsSectionKey): string {
+  if (key === 'chat_with') return 'Chat with AI';
+  return t(`section_${key}_label` as Parameters<typeof t>[0]);
+}
+
+function getSectionDescription(key: SettingsSectionKey): string {
+  if (key === 'chat_with') return 'Prompt + platforms';
+  return t(`section_${key}_desc` as Parameters<typeof t>[0]);
+}
 
 export function SettingsScene(props: SettingsSceneProps) {
   const { activeSection, focusKey = '', onSelectSection, defaultNarrowRoute = 'list' } = props;
@@ -97,10 +108,17 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     inpageSupportedOnly,
     onToggleInpageSupportedOnly,
+
+    insightStats,
+    insightLoading,
+    insightError,
+    hasLoadedInsight,
   } = useSettingsSceneController({ activeSection, focusKey });
 
+  const detailMaxWidthClassName = activeSection === 'insight' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
+
   const renderDetailContent = () => (
-    <section className="route-scroll tw-mx-auto tw-grid tw-w-full tw-max-w-[980px] tw-gap-4 tw-pr-1">
+    <section className={`route-scroll tw-mx-auto tw-grid tw-w-full ${detailMaxWidthClassName} tw-gap-4 tw-pr-1`}>
       {activeSection === 'notion' ? (
         <>
           <NotionOAuthSection
@@ -210,6 +228,15 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
+      {activeSection === 'insight' ? (
+        <InsightSection
+          loading={insightLoading}
+          error={insightError}
+          stats={insightStats}
+          hasLoaded={hasLoadedInsight}
+        />
+      ) : null}
+
       {activeSection === 'inpage' ? (
         <InpageSection
           busy={busy}
@@ -230,8 +257,7 @@ export function SettingsScene(props: SettingsSceneProps) {
   );
 
   const activeSectionLabel = useMemo(() => {
-    if (activeSectionMeta?.key === 'chat_with') return 'Chat with AI';
-    return activeSectionMeta ? t(`section_${activeSectionMeta.key}_label` as Parameters<typeof t>[0]) : t('settingsTitle');
+    return activeSectionMeta ? getSectionLabel(activeSectionMeta.key) : t('settingsTitle');
   }, [activeSectionMeta]);
 
   if (isNarrow) {
@@ -286,15 +312,9 @@ export function SettingsScene(props: SettingsSceneProps) {
                         ].join(' ')}
                         aria-current={active ? 'page' : undefined}
                       >
-                        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">
-                          {section.key === 'chat_with'
-                            ? 'Chat with AI'
-                            : t(`section_${section.key}_label` as Parameters<typeof t>[0])}
-                        </div>
+                        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{getSectionLabel(section.key)}</div>
                         <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-                          {section.key === 'chat_with'
-                            ? 'Prompt + platforms'
-                            : t(`section_${section.key}_desc` as Parameters<typeof t>[0])}
+                          {getSectionDescription(section.key)}
                         </div>
                       </button>
                     );

@@ -8,6 +8,8 @@ export const en = {
   section_notion_desc: 'OAuth + parent page for sync.',
   section_obsidian_label: 'Obsidian',
   section_obsidian_desc: 'Local REST API settings + sync status.',
+  section_insight_label: 'Insight',
+  section_insight_desc: 'See your local clip stats at a glance.',
   section_inpage_label: 'Inpage',
   section_inpage_desc: 'Inpage button visibility behavior.',
   section_about_label: 'About',

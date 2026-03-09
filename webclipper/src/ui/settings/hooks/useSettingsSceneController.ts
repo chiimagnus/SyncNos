@@ -18,6 +18,7 @@ import {
   resetChatWithSettings,
   saveChatWithSettings,
 } from '../../../integrations/chatwith/chatwith-settings';
+import { getInsightStats, type InsightStats } from '../sections/insight-stats';
 
 import {
   formatProgress,
@@ -119,6 +120,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [chatWithPlatforms, setChatWithPlatforms] = useState<any[]>(DEFAULT_CHAT_WITH_PLATFORMS.slice());
   const chatWithHydratedRef = useRef(false);
   const chatWithSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Insight
+  const [insightStats, setInsightStats] = useState<InsightStats | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState('');
+  const [hasLoadedInsight, setHasLoadedInsight] = useState(false);
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
@@ -465,6 +472,26 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     };
   }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate]);
 
+  useEffect(() => {
+    if (activeSection !== 'insight') return;
+    if (hasLoadedInsight || insightLoading) return;
+
+    setInsightLoading(true);
+    setInsightError('');
+
+    void getInsightStats()
+      .then((stats) => {
+        setInsightStats(stats);
+      })
+      .catch((error) => {
+        setInsightError(toErrorMessage(error, 'failed to load insight'));
+      })
+      .finally(() => {
+        setInsightLoading(false);
+        setHasLoadedInsight(true);
+      });
+  }, [activeSection, hasLoadedInsight, insightLoading]);
+
   const onResetChatWithSettings = useCallback(async () => {
     await runTask(async () => {
       await resetChatWithSettings();
@@ -643,6 +670,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     inpageSupportedOnly,
     onToggleInpageSupportedOnly,
+
+    insightStats,
+    insightLoading,
+    insightError,
+    hasLoadedInsight,
 
     chatWithPromptTemplate,
     setChatWithPromptTemplate,
