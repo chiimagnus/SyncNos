@@ -65,6 +65,9 @@ export function AboutSection() {
           <div className="tw-min-w-0 tw-flex-1">
             <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('authorTagline')}</div>
+            <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-break-words">
+              {t('angelsCta')}
+            </div>
           </div>
         </div>
 
@@ -86,6 +89,14 @@ export function AboutSection() {
             onClick={() => openUrl('https://github.com/chiimagnus').catch(() => {})}
           >
             GitHub
+          </button>
+          <button
+            id="btnAboutAngels"
+            className={buttonClassName}
+            type="button"
+            onClick={() => openUrl('https://chiimagnus.notion.site/syncnos-angels').catch(() => {})}
+          >
+            {t('angelsLinkLabel')}
           </button>
         </div>
       </section>
