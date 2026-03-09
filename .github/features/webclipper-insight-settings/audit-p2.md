@@ -12,10 +12,10 @@
 - 新状态是否意外影响 Notion / Obsidian / Backup / Inpage 既有流程
 
 ## Findings
-- 待审计时填写
+- 已发现并修复：Insight 首次加载过程中若用户快速切走，再切回该 section，会因为取消分支没有复位 `insightLoading` 而永久停留在 loading 状态。
 
 ## Fixes
-- 待审计时填写
+- 调整 Insight 懒加载 effect 的收尾逻辑：无论请求是否被取消，都先复位 `insightLoading`；只有未取消时才写入 `hasLoadedInsight` 与结果，避免切换 section 后卡死。
 
 ## Re-run Commands
 - `npm --prefix webclipper run test -- settings-sections`
