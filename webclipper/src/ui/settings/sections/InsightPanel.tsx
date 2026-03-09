@@ -1,5 +1,7 @@
+import { useLayoutEffect, useRef, useState } from 'react';
+
 import { t } from '../../../i18n';
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Cell, Tooltip, XAxis, YAxis } from 'recharts';
 
 import {
   INSIGHT_OTHER_LABEL,
@@ -23,11 +25,34 @@ function DistributionChart(props: {
   }
 
   const chartHeight = Math.max(212, items.length * 48);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const updateSize = () => {
+      const nextWidth = Math.max(0, Math.floor(node.getBoundingClientRect().width));
+      setChartWidth((prevWidth) => (prevWidth === nextWidth ? prevWidth : nextWidth));
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(() => updateSize());
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [chartHeight, items.length]);
 
   return (
-    <div style={{ height: chartHeight }} className="tw-w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={items} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+    <div ref={containerRef} style={{ height: chartHeight }} className="tw-w-full tw-min-w-0">
+      {chartWidth > 0 ? (
+        <BarChart width={chartWidth} height={chartHeight} data={items} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
           <XAxis type="number" hide allowDecimals={false} />
           <YAxis
             type="category"
@@ -56,7 +81,7 @@ function DistributionChart(props: {
             ))}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }
@@ -116,7 +141,7 @@ export function InsightPanel(props: {
       </section>
 
       <div className="tw-grid tw-gap-4 lg:tw-grid-cols-2">
-        <section className={`${cardClassName} tw-h-full`} aria-label={t('insightChatSectionAria')}>
+        <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
           <div className="tw-flex tw-items-start tw-justify-between tw-gap-4">
             <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightChatSectionTitle')}</h2>
             <div className="tw-text-right">
@@ -138,7 +163,7 @@ export function InsightPanel(props: {
           </div>
         </section>
 
-        <section className={`${cardClassName} tw-h-full`} aria-label={t('insightArticlesSectionAria')}>
+        <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightArticlesSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightArticlesSectionTitle')}</h2>
           <div className="tw-mt-4">
             <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text)]">{t('insightArticleDomainsTitle')}</div>
