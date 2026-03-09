@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { t } from '../../../i18n';
 import type { ChatWithAiPlatform } from '../../../integrations/chatwith/chatwith-settings';
 import { buttonClassName, cardClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
@@ -40,23 +41,23 @@ export function ChatWithAiSection(props: {
   };
 
   const addPlatform = () => {
-    const next = rows.concat([{ id: makePlatformId(), name: 'New Platform', url: 'https://', enabled: true }]);
+    const next = rows.concat([{ id: makePlatformId(), name: t('chatWithPlatformNamePlaceholder'), url: 'https://', enabled: true }]);
     onChangePlatforms(next);
   };
 
   return (
-    <section className={cardClassName} aria-label="Chat with AI">
+    <section className={cardClassName} aria-label={t('chatWithSectionTitle')}>
       <div className="tw-flex tw-items-center tw-gap-2">
         <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">
-          Chat with AI
+          {t('chatWithSectionTitle')}
         </h2>
       </div>
       <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-        Changes are saved automatically.
+        {t('chatWithSectionSubtitle')}
       </div>
 
       <div className="tw-mt-3 tw-grid tw-gap-2">
-        <SettingsFormRow label="Prompt template" align="start">
+        <SettingsFormRow label={t('chatWithPromptTemplateLabel')} align="start">
           <div className="tw-grid tw-gap-2">
             <textarea
               id="chatWithPromptTemplate"
@@ -64,15 +65,15 @@ export function ChatWithAiSection(props: {
               disabled={busy}
               value={promptTemplate}
               onChange={(e) => onChangePromptTemplate(e.target.value)}
-              aria-label="Prompt template"
+              aria-label={t('chatWithPromptTemplateAria')}
             />
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-              Variables: <span className="tw-font-mono">article_content</span>, <span className="tw-font-mono">article_title</span>, <span className="tw-font-mono">article_url</span>, <span className="tw-font-mono">conversation_markdown</span>. Prefer <span className="tw-font-mono">{'{{article_content}}'}</span> style placeholders.
+              {t('chatWithPromptTemplateHint')}
             </div>
           </div>
         </SettingsFormRow>
 
-        <SettingsFormRow label="Max chars" align="start">
+        <SettingsFormRow label={t('chatWithMaxCharsLabel')} align="start">
           <div className="tw-flex tw-items-center tw-gap-2">
             <input
               id="chatWithMaxChars"
@@ -84,16 +85,16 @@ export function ChatWithAiSection(props: {
               min={500}
               step={500}
               placeholder="28000"
-              aria-label="Max chars"
+              aria-label={t('chatWithMaxCharsAria')}
               className={`${textInputClassName} tw-w-[140px]`}
             />
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
-              Long content will be truncated before copying.
+              {t('chatWithMaxCharsHint')}
             </div>
           </div>
         </SettingsFormRow>
 
-        <SettingsFormRow label="Platforms" align="start">
+        <SettingsFormRow label={t('chatWithPlatformsLabel')} align="start">
           <div className="tw-grid tw-gap-2">
             {rows.length ? (
               <div className="tw-grid tw-gap-2">
@@ -107,46 +108,52 @@ export function ChatWithAiSection(props: {
                         onChange={(e) => updatePlatform(p.id, { enabled: !!e.target.checked })}
                         className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
                       />
-                      Enabled
+                      {t('chatWithPlatformsEnabled')}
                     </label>
                     <input
                       value={String(p.name || '')}
                       disabled={busy}
                       onChange={(e) => updatePlatform(p.id, { name: e.target.value })}
-                      aria-label={`Platform name ${p.id}`}
+                      aria-label={`${t('chatWithPlatformNameAriaPrefix')} ${p.id}`}
                       className={`${textInputClassName} tw-w-[180px]`}
-                      placeholder="ChatGPT"
+                      placeholder={t('chatWithPlatformNamePlaceholder')}
                     />
                     <input
                       value={String(p.url || '')}
                       disabled={busy}
                       onChange={(e) => updatePlatform(p.id, { url: e.target.value })}
-                      aria-label={`Platform url ${p.id}`}
+                      aria-label={`${t('chatWithPlatformUrlAriaPrefix')} ${p.id}`}
                       className={`${textInputClassName} tw-min-w-[240px] tw-flex-1`}
-                      placeholder="https://chatgpt.com/"
+                      placeholder={t('chatWithPlatformUrlPlaceholder')}
                     />
                     <button
                       type="button"
                       className={buttonClassName}
                       disabled={busy}
                       onClick={() => removePlatform(p.id)}
-                      aria-label={`Delete platform ${p.id}`}
+                      aria-label={`${t('chatWithDeletePlatformAriaPrefix')} ${p.id}`}
                     >
-                      Delete
+                      {t('chatWithDeletePlatform')}
                     </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">No platforms configured.</div>
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('chatWithNoPlatforms')}</div>
             )}
 
             <div className="tw-flex tw-items-center tw-gap-2">
               <button type="button" className={buttonClassName} disabled={busy} onClick={addPlatform}>
-                Add platform
+                {t('chatWithAddPlatform')}
               </button>
-              <button type="button" className={buttonClassName} disabled={busy} onClick={onReset} title="Reset to defaults">
-                Reset
+              <button
+                type="button"
+                className={buttonClassName}
+                disabled={busy}
+                onClick={onReset}
+                title={t('chatWithResetDefaultsTitle')}
+              >
+                {t('chatWithResetButton')}
               </button>
             </div>
           </div>
