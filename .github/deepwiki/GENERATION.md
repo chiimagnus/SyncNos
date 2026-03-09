@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `38d6fb2ce2b3d48da2e7bb7f02ef87ecba24b96e` |
-| Branch name | `crh` |
-| Generation timestamp | `2026-03-09 21:42:59 CST` |
+| Commit hash | `32a2cea3af18ae289890df66eb5e6cc8853c461c` |
+| Branch name | `main` |
+| Generation timestamp | `2026-03-09 21:51:26 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental refresh |
@@ -40,7 +40,7 @@
 - `assets/repository-flow-01.svg` (existing asset, sourced from `macOS/Resource/flows.svg`)
 
 ## What Changed In This Update
-- 刷新生成元数据时间戳到当前更新批次，并保持当前 `HEAD`（`38d6fb2c`）与分支名 `crh` 一致。
+- 刷新生成元数据时间戳到当前更新批次，并保持当前 `HEAD`（`32a2cea3`）与分支名 `main` 一致。
 - 为 `business-context.md`、`overview.md`、`modules/webclipper.md` 补充 WebClipper `Settings → Insight` 的用户价值、只读统计语义与实际入口文件。
 - 为 `storage.md`、`configuration.md`、`testing.md` 补充 Insight 的本地聚合事实：数据来自 `conversations + messages`、Top N 限制分别是 `4 / 8 / 3`、并新增对应验证路径。
 - 在 `dependencies.md` 记录 `recharts` 已成为 WebClipper 运行时依赖，用于 Insight 的条形图可视化。
