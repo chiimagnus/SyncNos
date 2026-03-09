@@ -8,7 +8,7 @@
 | App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
 | App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
 | WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions |
-| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、inpage 开关、Notion AI 模型偏好 |
+| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、inpage 开关、Chat with AI、自定义设置分区、Notion AI 模型偏好 |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
 
 ## macOS App 配置项
@@ -27,13 +27,17 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.1.3` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.2.2` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
 | `inpage_supported_only` | `chrome.storage.local`, `bootstrap/content.ts` | 默认按 `false` 处理 | 控制非支持站点是否也启动 inpage UI |
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, SettingsScene controller | 用户选择值 | 决定扩展 Notion 的写入根 |
 | `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
+| `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1` | `chatwith-settings.ts`, `chrome.storage.local` | 默认模板 + 平台清单 + `28000` | 控制 Chat with AI 的载荷模板、目标平台和截断长度 |
+| `webclipper_settings_active_section` | `ui/settings/types.ts`, `localStorage` | 默认 `backup` | 记住设置页当前选中的 sidebar 分组 / section |
 | Obsidian 设置 | `obsidian*` settings store | `apiBaseUrl`, `authHeaderName`, `chatFolder`, `articleFolder`, 可选 API Key | 控制扩展写入本地 vault |
 | 备份敏感键排除 | `backup-utils.ts` | 精确排除 `notion_oauth_token_v1`, `notion_oauth_client_secret`，且排除任何 `notion_oauth_token*` | 避免敏感信息进入备份 |
+
+- 扩展 UI 文案没有独立的“语言设置”键；`i18n/index.ts` 会按 `navigator.language` 自动在 `en` / `zh` 间切换。
 
 ## 发布参数
 
@@ -65,7 +69,7 @@
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
-  version: '1.1.3',
+  version: '1.2.2',
   permissions: ['storage', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
@@ -87,6 +91,10 @@ static let requestTimeoutSeconds: TimeInterval = 120
 - `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
 - `webclipper/wxt.config.ts`
 - `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/bootstrap/current-page-capture.ts`
+- `webclipper/src/i18n/index.ts`
+- `webclipper/src/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `.github/workflows/release.yml`

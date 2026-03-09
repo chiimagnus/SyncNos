@@ -34,9 +34,12 @@
 | 文件 | 验证点 | 为什么重要 |
 | --- | --- | --- |
 | `tests/unit/notion-sync-cursor.test.ts` | Notion cursor 的 append / rebuild 判断 | 直接决定是否会重复写入或错误重建 |
-| `tests/storage/schema-migration.test.ts` | IndexedDB v3 NotionAI thread 稳定 key 迁移 | 直接关系到旧数据升级与 mapping 延续 |
+| `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 迁移：NotionAI stable key 与 article canonical key 归并 | 直接关系到旧数据升级与 mapping 延续 |
 | `tests/storage/conversations-idb.test.ts` | conversations / messages 的本地持久化 | 确认 UI 和同步层读到的事实源正确 |
 | `tests/unit/markdown-renderer.test.ts` | 消息渲染与 markdown 输出 | 防止 UI 与导出文本回归 |
+| `tests/smoke/background-router-current-page-capture.test.ts` | popup 当前页抓取与 background relay | 保证当前页抓取不会只在 UI 上“看起来能点” |
+| `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI 详情头动作解析 | 直接影响用户最常点击的打开 / 跳转入口 |
+| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序 | 防止 Chat with AI / Inpage / Backup 导航回退 |
 
 ## 手动冒烟建议
 1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
@@ -49,7 +52,7 @@
 
 | 检查项 | 先看哪里 | 期望 |
 | --- | --- | --- |
-| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | tag 去掉 `v` 后与 `1.1.3` 对齐 |
+| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | tag 去掉 `v` 后与 `1.2.2` 对齐 |
 | Chrome / Firefox 构建均可通过 | `package.json` scripts | `build` / `build:firefox` 成功 |
 | dist 引用完整 | `check-dist.mjs` | `npm run check` 通过 |
 | AMO / CWS 凭据 | workflow secrets | 发布 workflow 不因凭据缺失失败 |
@@ -79,5 +82,9 @@
 - `webclipper/tests/storage/schema-migration.test.ts`
 - `webclipper/tests/storage/conversations-idb.test.ts`
 - `webclipper/tests/unit/markdown-renderer.test.ts`
+- `webclipper/tests/smoke/background-router-current-page-capture.test.ts`
+- `webclipper/tests/smoke/detail-header-actions.test.ts`
+- `webclipper/tests/smoke/app-detail-header-actions.test.ts`
+- `webclipper/tests/unit/settings-sections.test.ts`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
