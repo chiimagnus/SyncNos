@@ -10,11 +10,11 @@ export const en = {
   section_obsidian_desc: 'Local REST API settings + sync status.',
   section_chat_with_label: 'Chat with AI',
   section_chat_with_desc: 'Prompt + platforms.',
-  section_insight_label: 'Insight',
+  section_insight_label: 'About you',
   section_insight_desc: 'See your local clip stats at a glance.',
   section_inpage_label: 'Inpage',
   section_inpage_desc: 'Inpage button visibility behavior.',
-  section_about_label: 'About',
+  section_about_label: 'About me',
   section_about_desc: 'Project, author, and support links.',
   settingsTitle: 'Settings',
   settingsSectionsAria: 'Settings sections',
@@ -210,9 +210,9 @@ export const en = {
   chatWithResetButton: 'Reset',
 
   // InsightSection / InsightPanel
-  insightHeading: 'Insight',
-  insightOverviewAria: 'Insight overview',
-  insightLoadingTitle: 'Loading insight…',
+  insightHeading: 'About you',
+  insightOverviewAria: 'About you overview',
+  insightLoadingTitle: 'Loading about you…',
   insightLoadingSubtitle: 'Reading your local clip stats.',
   insightErrorTitle: 'No data yet',
   insightErrorSubtitle: 'Local stats are temporarily unavailable.',
@@ -236,7 +236,7 @@ export const en = {
   insightTurnsUnit: 'messages',
   insightOtherLabel: 'Other',
   insightUnknownLabel: 'Unknown',
-  insightLoadFailed: 'Failed to load insight',
+  insightLoadFailed: 'Failed to load about you',
 
   // AboutSection
   aboutSectionAria: 'About SyncNos WebClipper',

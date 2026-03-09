@@ -12,11 +12,11 @@ export const zh: { [K in TranslationKey]: string } = {
   section_obsidian_desc: '本地 REST API 设置 + 同步状态。',
   section_chat_with_label: 'Chat with AI',
   section_chat_with_desc: 'Prompt 模板与平台。',
-  section_insight_label: 'Insight 洞察',
+  section_insight_label: 'About you',
   section_insight_desc: '一眼看到你的本地 clip 积累。',
   section_inpage_label: '页面内按钮',
   section_inpage_desc: '页面内按钮显示行为设置。',
-  section_about_label: '关于',
+  section_about_label: 'About me',
   section_about_desc: '项目、作者与支持链接。',
   settingsTitle: '设置',
   settingsSectionsAria: '设置分区',
@@ -210,9 +210,9 @@ export const zh: { [K in TranslationKey]: string } = {
   chatWithResetButton: '重置',
 
   // InsightSection / InsightPanel
-  insightHeading: 'Insight 洞察',
-  insightOverviewAria: 'Insight 总览',
-  insightLoadingTitle: '正在加载 Insight…',
+  insightHeading: 'About you',
+  insightOverviewAria: 'About you 总览',
+  insightLoadingTitle: '正在加载 About you…',
   insightLoadingSubtitle: '正在读取你的本地 clip 统计。',
   insightErrorTitle: '暂无数据',
   insightErrorSubtitle: '本地统计暂时不可用。',
@@ -236,7 +236,7 @@ export const zh: { [K in TranslationKey]: string } = {
   insightTurnsUnit: '条消息',
   insightOtherLabel: '其他',
   insightUnknownLabel: '未知',
-  insightLoadFailed: '加载 Insight 失败',
+  insightLoadFailed: '加载 About you 失败',
 
   // AboutSection
   aboutSectionAria: '关于 SyncNos WebClipper',
