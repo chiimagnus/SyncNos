@@ -62,7 +62,7 @@
 | 项 | 当前值 | 来源 | 为什么重要 |
 | --- | --- | --- | --- |
 | WebClipper `package.json` 版本 | `0.14.6` | `webclipper/package.json` | 表示 npm 包层面的版本语义 |
-| WebClipper manifest 版本 | `1.1.3` | `webclipper/wxt.config.ts` | CWS / AMO workflow 直接拿它和 tag 对齐 |
+| WebClipper manifest 版本 | `1.2.2` | `webclipper/wxt.config.ts` | CWS / AMO workflow 直接拿它和 tag 对齐 |
 | Manifest 模式 | `3` | `wxt.config.ts` | 决定扩展是 MV3 架构 |
 | Swift tools version | `6.0` | `macOS/Packages/MenuBarDockKit/Package.swift` | 说明本地 SwiftPM 包按 Swift 6 维护 |
 | App 平台 | macOS 14.0+ | `Package.swift`, 仓库文档 | SwiftUI + SwiftData + AppKit 组合的最低运行环境 |

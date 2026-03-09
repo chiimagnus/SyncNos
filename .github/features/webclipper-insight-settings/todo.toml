@@ -1,0 +1,66 @@
+version = 1
+current_task_id = ""
+
+[[tasks]]
+id = "P1-T1"
+title = "搭建 Insight 聚合接口骨架"
+status = "completed"
+plan = "plan-p1.md#p1-t1"
+commit = "e33720f84ad2768a56882af2fb180b6142af1a9c"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T2"
+title = "实现本地 IndexedDB 聚合与分组规则"
+status = "completed"
+plan = "plan-p1.md#p1-t2"
+commit = "778e5430b7ef2e45be82868dcc2c632e6cbee3c9"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T3"
+title = "为 Insight 聚合补单元测试"
+status = "completed"
+plan = "plan-p1.md#p1-t3"
+commit = "c37d08991ac2c3c799d6bc6536b52c0e1812b1a9"
+note = "tests passed"
+
+[[tasks]]
+id = "P2-T1"
+title = "把 Insight 接入 Settings 导航与 section 路由"
+status = "completed"
+plan = "plan-p2.md#p2-t1"
+commit = "237fac6355a8ce5212a015df5514c78579b79cf9"
+note = "tests passed"
+
+[[tasks]]
+id = "P2-T2"
+title = "实现 Insight section 的懒加载状态管理"
+status = "completed"
+plan = "plan-p2.md#p2-t2"
+commit = "2ae3c0bb6aed6682b9b8bce2ac7a5e539c612681"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T3"
+title = "渲染 Insight 文本骨架与空态/错误态"
+status = "completed"
+plan = "plan-p2.md#p2-t3"
+commit = "bfaad6fe08b32cac7e3a22729db4008def67afe6"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T1"
+title = "引入 Recharts 并实现来源分布图"
+status = "completed"
+plan = "plan-p3.md#p3-t1"
+commit = "d1ec10741390b75f45dfaecb5462c868a5873247"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T2"
+title = "完成布局打磨与全链路验证"
+status = "completed"
+plan = "plan-p3.md#p3-t2"
+commit = "9f39c23a1f8591165bf83d5ebca29bc8ad6fd28f"
+note = "build passed; popup-shell test fails"
