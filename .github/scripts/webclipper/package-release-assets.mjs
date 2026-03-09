@@ -1,7 +1,6 @@
-import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { resolveRepoRoot, resolveWebclipperRoot, run } from "./script-utils.mjs";
 
 function parseArgs(argv) {
   const args = {
@@ -39,11 +38,6 @@ function parseArgs(argv) {
     }
   }
   return args;
-}
-
-function run(cmd, args, cwd) {
-  const res = spawnSync(cmd, args, { cwd, stdio: "inherit" });
-  if (res.status !== 0) throw new Error(`${cmd} ${args.join(" ")} failed`);
 }
 
 function readText(p) {
@@ -99,12 +93,8 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
   return next;
 }
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(scriptDir, "..", "..", "..");
-const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
-if (!existsSync(join(webclipperRoot, "package.json"))) {
-  throw new Error(`webclipper root not found: ${webclipperRoot}`);
-}
+const repoRoot = resolveRepoRoot(import.meta.url);
+const webclipperRoot = resolveWebclipperRoot(repoRoot);
 
 const cli = parseArgs(process.argv.slice(2));
 const target = String(cli.target || "chrome");

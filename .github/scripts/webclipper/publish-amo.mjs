@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createHmac, randomUUID } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { resolveRepoRoot, resolveWebclipperRoot } from "./script-utils.mjs";
 
 function requiredEnv(name) {
   const v = process.env[name];
@@ -103,9 +103,8 @@ async function main() {
   // AMO API accepts add-on numeric id, slug, or GUID for this path parameter.
   const addonId = requiredEnv("AMO_ADDON_ID");
 
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const repoRoot = resolve(scriptDir, "..", "..", "..");
-  const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
+  const repoRoot = resolveRepoRoot(import.meta.url);
+  const webclipperRoot = resolveWebclipperRoot(repoRoot);
   const baseUrl = (process.env.AMO_BASE_URL || "https://addons.mozilla.org/api/v5").replace(/\/+$/g, "");
   const channel = (process.env.AMO_CHANNEL || "listed").trim();
   const xpiPath = process.env.AMO_XPI_PATH || join(webclipperRoot, "SyncNos-WebClipper-firefox.xpi");
