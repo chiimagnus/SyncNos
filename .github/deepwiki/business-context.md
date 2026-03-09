@@ -15,6 +15,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | Notion Parent Page 下的数据库 / 页面 | App + WebClipper | 统一承载阅读条目、AI chats、web articles | 没授权或没选 Parent Page 时必须阻止写入 |
 | App 本地缓存与状态 | SyncNos App | 支撑增量同步、搜索、登录态、IAP 状态 | 敏感数据优先留在本地 Keychain / 加密存储 |
 | WebClipper 本地会话库 | WebClipper | 让采集、导出、备份、二次同步都基于同一份本地事实 | 先落 IndexedDB，再派生到任何外部目标 |
+| WebClipper Insight 仪表盘 | WebClipper | 把“数据库里的行数”转成用户可见的累计成果、来源结构和最长对话 | 只读、本地计算、不得依赖网络或新增 schema |
 | Markdown / Zip / Obsidian | WebClipper | 支持离线保存、迁移、个人知识库接入 | 备份排除 Notion OAuth token 等敏感键 |
 
 ## 核心用户旅程
@@ -37,6 +38,12 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 3. 抓取结果被保存为 `sourceType = article` 的本地会话，并写入单条 `article_body` 消息。
 4. 后续 Notion / Obsidian / 备份 / 导出都把 article 当作与 chat 并列的一种会话类型处理。
 
+### 旅程 4：用户在 Settings 里查看自己的本地积累到底有多大
+1. 用户进入 WebClipper 的 `Settings → Insight`。
+2. 设置控制器仅在第一次进入该 section 时调用 `getInsightStats()`，从 IndexedDB 的 `conversations` 与 `messages` 现算本地统计。
+3. 仪表盘把结果展示为总 clips、AI Conversations、Web Articles、来源分布、文章域名分布和 Top 3 longest conversations。
+4. 这个视图是**只读的**：它帮助用户“看见积累”，但不会写回新缓存、不会发网络请求，也不会改变 Notion / Obsidian 的同步状态。
+
 ## 改变行为的业务规则
 
 | 规则 | 生效位置 | 为什么重要 | 行为后果 |
@@ -44,6 +51,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | **先授权再写入** | App 与 WebClipper 的 Notion 流程 | 没有 Parent Page 或 token 时，所有“看起来成功”的写入都会变成假象 | 两条产品线都应显式报错而不是静默跳过 |
 | **App 根界面先过门控** | `RootView` | App 在主列表之前会先检查 onboarding 与 paywall，避免主界面副作用（如文件夹授权弹窗）先发生 | 用户看到的顺序是 Onboarding → PayWall → MainListView |
 | **WebClipper 本地优先** | 扩展数据层 | Notion / Obsidian / 导出都不是事实源，事实源是本地 IndexedDB | 删除、迁移、备份和重建都先围绕本地会话库发生 |
+| **Insight 只读，不成为新事实源** | WebClipper Settings | 统计页如果写回缓存或引入额外 schema，会把“观察数据”变成“业务状态” | `Settings → Insight` 每次只读聚合 `conversations` / `messages`，失败时显示错误或空态 |
 | **敏感信息尽量不出本机** | App Keychain、扩展备份 | 站点 Cookie、加密密钥、Notion OAuth token 都不能随意进备份或明文落盘 | 备份显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret` |
 | **采集站点 ≠ UI 一定显示** | WebClipper inpage 逻辑 | 扩展虽然对所有 `http(s)` 注入 content script，但 inpage 按钮是否启动还受 `inpage_supported_only` 控制 | 切换该设置后必须刷新或新开页面 |
 | **并非所有站点都适合自动增量采集** | Google AI Studio collector | 虚拟列表会导致自动采集只看到可见消息 | 该来源保留“手动保存优先”的策略 |
@@ -68,11 +76,13 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | 先看输入如何变成输出 | [data-flow.md](data-flow.md) | 它回答“哪些是事实源，哪些是派生产物”。 |
 | 要改 App 的启动、同步、缓存、IAP 或搜索 | [modules/syncnos-app.md](modules/syncnos-app.md) | 它覆盖 `SyncNosApp`、`RootView`、`DIContainer`、`NotionSyncEngine` 等核心结构。 |
 | 要改扩展的采集、同步、设置或备份 | [modules/webclipper.md](modules/webclipper.md) | 它覆盖 background/content/popup/app、collectors、IndexedDB、sync orchestrators。 |
+| 要改扩展的本地统计、Settings Insight 或分布图 | [modules/webclipper.md](modules/webclipper.md), [storage.md](storage.md), [testing.md](testing.md) | 这些页面一起回答“统计从哪来、限制是什么、改完怎么验证”。 |
 | 要查为什么配置没生效或发布失败 | [configuration.md](configuration.md), [release.md](release.md), [troubleshooting.md](troubleshooting.md) | 这些页面最接近真实错误发生点。 |
 
 ## 业务上最容易误判的点
 - **App 和扩展虽然都能写 Notion，但它们不是一套 UI / 一套存储 / 一套调度逻辑。** App 主要围绕桌面状态、来源授权、SwiftData 和 IAP；扩展围绕 MV3 runtime、本地会话、popup/app UI 与多目标导出。
 - **WebClipper 的“同步”不是采集本身。** 采集先把内容落进本地库，同步只是本地库派生出的后续动作。
+- **Insight 里的 clip 数量代表本地 IndexedDB 会话数，而不是 Notion 里已经存在的页面数。** 如果用户删了本地会话、没同步某些会话，或 Notion 侧做了手工变更，两边数字本来就可能不同。
 - **“能抓到内容”和“能稳定增量同步”不是一个问题。** 例如 Google AI Studio 因虚拟化列表而更依赖手动保存；article 会话则由 `updatedAt` 决定是否重建目标内容。
 
 ## 来源引用（Source References）
@@ -86,4 +96,9 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/protocols/conversation-kinds.ts`
 - `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/ui/settings/SettingsScene.tsx`
+- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/ui/settings/sections/InsightSection.tsx`
+- `webclipper/src/ui/settings/sections/InsightPanel.tsx`
+- `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`

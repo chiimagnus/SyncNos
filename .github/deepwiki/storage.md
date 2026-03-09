@@ -9,7 +9,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | UserDefaults | SyncNos App | macOS 偏好 | onboarding、自动同步、IAP 状态、提醒态、试用期辅助信息 | `SyncNosApp.swift`, `IAPService.swift` |
 | Keychain | SyncNos App | 系统安全存储 | 站点 Cookie、加密密钥、首次启动 / 设备指纹备份、Notion OAuth 相关敏感信息 | `SiteLoginsStore.swift`, `EncryptionService.swift`, `IAPService.swift` |
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings | `schema.ts`, `storage-idb.ts` |
-| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / inpage / Chat with AI / 设置导航等运行设置 | SettingsScene controller、settings stores |
+| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / inpage / Chat with AI / 设置导航等运行设置（不缓存 Insight 统计结果） | SettingsScene controller、settings stores |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、manifest | `backup/export.ts`, `backup/import.ts` |
 | 外部结果 | 双产品线 | Notion / Obsidian / 文件系统 | 页面、数据库、Markdown、vault 文件 | sync orchestrators / export |
 
@@ -54,6 +54,25 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
 - `schema.ts` 的 v2 迁移专门处理 NotionAI thread，把 legacy conversation key 重写为 stable key，并同步迁移 mapping。
 - `schema.ts` 的 v4 迁移会归并 legacy article conversations，把 URL 规范化为 canonical key，减少当前页抓取、article 导入与历史数据升级后的重复会话。
+
+## WebClipper：Insight 统计视图的数据来源
+
+Insight 面板不是新的持久化层，而是对现有本地会话库的**只读聚合视图**。用户进入 `Settings → Insight` 时，控制器会调用 `getInsightStats()`，在同一只读 transaction 中读取 `conversations` 与 `messages`，聚合完成后显式关闭 `db`。
+
+| 指标 | 读取源 | 聚合规则 | UI 去向 |
+| --- | --- | --- | --- |
+| `totalClips` | `conversations` | 只统计识别出的 `chat + article` 数量；忽略其他 `sourceType` | 顶部 Total Clips 卡片 |
+| `chatCount` | `conversations` | `sourceType === 'chat'` 的 conversation 数 | `AI Conversations` 卡片 |
+| `articleCount` | `conversations` | `sourceType === 'article'` 的 conversation 数 | `Web Articles` 卡片 |
+| `chatSourceDistribution` | `conversations.source` | 按平台名分组，排序后保留 Top 4，其余折叠为 `Other` | 左侧来源分布条形图 |
+| `totalMessages` | `messages` + chat conversations | 只累计 chat conversation 的消息数 | Top 3 longest conversations 右侧计数 |
+| `topConversations` | `conversations + messages` | 按 `messageCount desc`、`conversationId desc` 排序后取 Top 3 | 最长对话排行 |
+| `articleDomainDistribution` | `conversations.url` | 从 `url` 提取 hostname，排序后保留 Top 8，其余折叠为 `Other` | 右侧文章域名分布条形图 |
+
+- `INSIGHT_CHAT_SOURCE_LIMIT = 4`、`INSIGHT_ARTICLE_DOMAIN_LIMIT = 8`、`INSIGHT_TOP_CONVERSATION_LIMIT = 3` 都定义在 `insight-stats.ts`。
+- URL 解析失败时进入 `Unknown` 域名桶；空标题通过 `formatConversationTitle()` 规范化为 untitled fallback。
+- Insight 不读 `sync_mappings`，也不关心是否已经同步到 Notion / Obsidian；它只反映**当前本地 IndexedDB** 的事实状态。
+- 统计不依赖 `createdAt` 或网络时间线；它只基于现有 conversation / message 快照做结构化汇总。
 
 ## 备份、导出与外部落点
 
@@ -110,9 +129,12 @@ private var currentContentVersion: Int {
 - `macOS/SyncNos/Models/Sync/SyncedHighlightRecord.swift`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
 - `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/sync/backup/export.ts`
 - `webclipper/src/sync/backup/import.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/tests/storage/schema-migration.test.ts`
+- `webclipper/tests/storage/insight-stats.test.ts`

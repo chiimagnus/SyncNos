@@ -8,7 +8,7 @@
 | App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
 | App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
 | WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions |
-| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、inpage 开关、Chat with AI、自定义设置分区、Notion AI 模型偏好 |
+| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、inpage 开关、Chat with AI、自定义设置分区（含 Insight 导航）、Notion AI 模型偏好 |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
 
 ## macOS App 配置项
@@ -33,11 +33,13 @@
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, SettingsScene controller | 用户选择值 | 决定扩展 Notion 的写入根 |
 | `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
 | `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1` | `chatwith-settings.ts`, `chrome.storage.local` | 默认模板 + 平台清单 + `28000` | 控制 Chat with AI 的载荷模板、目标平台和截断长度 |
-| `webclipper_settings_active_section` | `ui/settings/types.ts`, `localStorage` | 默认 `backup` | 记住设置页当前选中的 sidebar 分组 / section |
+| `webclipper_settings_active_section` | `ui/settings/types.ts`, `localStorage` | 默认 `backup`；支持 `backup / notion / obsidian / chat_with / insight / inpage / about` | 记住设置页当前选中的 sidebar 分组 / section |
+| Insight 统计限制 | `ui/settings/sections/insight-stats.ts` | `INSIGHT_CHAT_SOURCE_LIMIT=4`, `INSIGHT_ARTICLE_DOMAIN_LIMIT=8`, `INSIGHT_TOP_CONVERSATION_LIMIT=3` | 控制平台来源排行、文章域名排行与 Top conversation 截断方式 |
 | Obsidian 设置 | `obsidian*` settings store | `apiBaseUrl`, `authHeaderName`, `chatFolder`, `articleFolder`, 可选 API Key | 控制扩展写入本地 vault |
 | 备份敏感键排除 | `backup-utils.ts` | 精确排除 `notion_oauth_token_v1`, `notion_oauth_client_secret`，且排除任何 `notion_oauth_token*` | 避免敏感信息进入备份 |
 
 - 扩展 UI 文案没有独立的“语言设置”键；`i18n/index.ts` 会按 `navigator.language` 自动在 `en` / `zh` 间切换。
+- Insight 不写入新的 `chrome.storage.local` 键；统计只在用户打开 `Settings → Insight` 时从 IndexedDB 现算，失败时回到错误态或空态。
 
 ## 发布参数
 
@@ -96,6 +98,7 @@ static let requestTimeoutSeconds: TimeInterval = 120
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
 - `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`

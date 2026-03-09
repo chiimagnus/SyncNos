@@ -36,17 +36,19 @@
 | `tests/unit/notion-sync-cursor.test.ts` | Notion cursor 的 append / rebuild 判断 | 直接决定是否会重复写入或错误重建 |
 | `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 迁移：NotionAI stable key 与 article canonical key 归并 | 直接关系到旧数据升级与 mapping 延续 |
 | `tests/storage/conversations-idb.test.ts` | conversations / messages 的本地持久化 | 确认 UI 和同步层读到的事实源正确 |
+| `tests/storage/insight-stats.test.ts` | Insight 聚合：空库、chat/article 混合、Unknown 域名、Top N 折叠、Top 3 对话排序 | 防止本地统计页把“事实源”算错或把尾部来源错误归桶 |
 | `tests/unit/markdown-renderer.test.ts` | 消息渲染与 markdown 输出 | 防止 UI 与导出文本回归 |
 | `tests/smoke/background-router-current-page-capture.test.ts` | popup 当前页抓取与 background relay | 保证当前页抓取不会只在 UI 上“看起来能点” |
 | `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI 详情头动作解析 | 直接影响用户最常点击的打开 / 跳转入口 |
-| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序 | 防止 Chat with AI / Inpage / Backup 导航回退 |
+| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（含 `insight` 位于 `Features` 组、在 `chat_with` 与 `inpage` 之间） | 防止 Settings 导航回退或新分区被错误挪位 |
 
 ## 手动冒烟建议
 1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
 2. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开 popup、多击提示、popup 列表刷新。
 3. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
 4. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`inpage_supported_only` 切换与刷新行为。
-5. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
+5. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态。
+6. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
 
 ## 发布前检查
 
@@ -81,10 +83,13 @@
 - `webclipper/tests/unit/notion-sync-cursor.test.ts`
 - `webclipper/tests/storage/schema-migration.test.ts`
 - `webclipper/tests/storage/conversations-idb.test.ts`
+- `webclipper/tests/storage/insight-stats.test.ts`
 - `webclipper/tests/unit/markdown-renderer.test.ts`
 - `webclipper/tests/smoke/background-router-current-page-capture.test.ts`
 - `webclipper/tests/smoke/detail-header-actions.test.ts`
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`
+- `webclipper/src/ui/settings/sections/InsightSection.tsx`
+- `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`

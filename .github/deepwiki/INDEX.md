@@ -3,6 +3,7 @@
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
 - **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
+- **近期关键变化**：WebClipper 的 Settings 现在包含只读的 Insight 仪表盘，用本地 IndexedDB 现算 clips 总量、AI 对话 / 网页文章分布、Top 3 conversation 与来源结构。
 - **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
@@ -59,6 +60,7 @@
 | 这个仓库到底解决什么问题？ | [business-context.md](business-context.md) | [overview.md](overview.md) |
 | App 为什么会先出现引导或付费墙？ | [business-context.md](business-context.md) | [modules/syncnos-app.md](modules/syncnos-app.md) |
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
+| WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
 | 我应该改哪个目录？ | [overview.md](overview.md) | [architecture.md](architecture.md), `modules/` |
 | 某个数据源 / collector / sync job 影响哪些系统？ | [architecture.md](architecture.md) | [data-flow.md](data-flow.md), [troubleshooting.md](troubleshooting.md) |
 | 怎样验证发布不会炸？ | [release.md](release.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
