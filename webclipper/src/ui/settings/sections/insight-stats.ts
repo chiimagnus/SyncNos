@@ -141,6 +141,11 @@ export function createEmptyInsightStats(): InsightStats {
   };
 }
 
+export function hasInsightData(stats: InsightStats | null | undefined): boolean {
+  if (!stats) return false;
+  return stats.totalClips > 0;
+}
+
 export async function getInsightStats(): Promise<InsightStats> {
   const db = await openDb();
   try {
