@@ -54,7 +54,7 @@ macOS 上 Dock 图标显示/隐藏的核心 API 是：
 
 ### 1) DockPresenceService：统一策略入口（只关心“是否允许隐藏”）
 
-文件：`Packages/MenuBarDockKit/Sources/MenuBarDockKit/DockPresenceService.swift`
+文件：`macOS/Packages/MenuBarDockKit/Sources/MenuBarDockKit/DockPresenceService.swift`
 
 职责：
 
@@ -72,7 +72,7 @@ macOS 上 Dock 图标显示/隐藏的核心 API 是：
 
 ### 2) MainWindowDockVisibilityController：只绑定“主窗口”，监听窗口事件
 
-文件：`Packages/MenuBarDockKit/Sources/MenuBarDockKit/MainWindowDockVisibilityController.swift`
+文件：`macOS/Packages/MenuBarDockKit/Sources/MenuBarDockKit/MainWindowDockVisibilityController.swift`
 
 职责：
 
@@ -86,9 +86,9 @@ macOS 上 Dock 图标显示/隐藏的核心 API 是：
 
 ### 3) RootView 接入：复用现有 WindowReader 拿到主窗口 NSWindow
 
-文件：`SyncNos/Views/RootView.swift`
+文件：`macOS/SyncNos/Views/RootView.swift`
 
-SyncNos 通过 `WindowReader`（`Packages/MenuBarDockKit/Sources/MenuBarDockKit/WindowReader.swift`）拿到 SwiftUI scene 对应的 `NSWindow`。
+SyncNos 通过 `WindowReader`（`macOS/Packages/MenuBarDockKit/Sources/MenuBarDockKit/WindowReader.swift`）拿到 SwiftUI scene 对应的 `NSWindow`。
 
 在 `RootView` 的 `.background(WindowReader(...))` 回调中：
 
@@ -99,7 +99,7 @@ SyncNos 通过 `WindowReader`（`Packages/MenuBarDockKit/Sources/MenuBarDockKit/
 
 ### 4) MenuBarView 接入：打开主窗口前先执行 Dock 准备
 
-文件：`SyncNos/Views/Settings/General/MenuBarView.swift`
+文件：`macOS/SyncNos/Views/Settings/General/MenuBarView.swift`
 
 菜单栏菜单项 “Open SyncNos” 的逻辑变为：
 
@@ -110,7 +110,7 @@ SyncNos 通过 `WindowReader`（`Packages/MenuBarDockKit/Sources/MenuBarDockKit/
 
 ### 5) AppDelegate：关闭最后一个窗口时回到菜单栏形态（覆盖 Settings/Logs）
 
-文件：`SyncNos/AppDelegate.swift`
+文件：`macOS/SyncNos/AppDelegate.swift`
 
 新增/使用：
 

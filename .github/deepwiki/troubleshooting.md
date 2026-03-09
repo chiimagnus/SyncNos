@@ -5,7 +5,7 @@
 | 症状 | 可能范围 | 首查位置 | 快速判断 |
 | --- | --- | --- | --- |
 | App 里同步入口不可用或一开始就失败 | Notion 授权 / Parent Page / paywall 门控 | `RootView.swift`, `IAPService.swift`, `NotionSyncEngine.swift` | 先确认 onboarding 已完成、paywall 状态正确、Notion 已配置 |
-| Apple Books / GoodLinks 没读到内容 | 目录授权 / 来源库 | `SyncNos/AGENTS.md`, 来源服务 | 先确认 macOS 目录权限和来源数据库路径 |
+| Apple Books / GoodLinks 没读到内容 | 目录授权 / 来源库 | `macOS/SyncNos/AGENTS.md`, 来源服务 | 先确认 macOS 目录权限和来源数据库路径 |
 | WeRead / Dedao 登录态失效 | Keychain Cookie / SiteLogins | `SiteLoginsStore.swift` | 看 cookieHeader 是否还能匹配目标域名 |
 | 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
 | WebClipper 页面内按钮没出现 | content script / `inpage_supported_only` / 不支持页面 | `content.ts`, `bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
@@ -85,28 +85,28 @@
 
 | 入口 / 文件 | 适用问题 | 为什么先看这里 |
 | --- | --- | --- |
-| `SyncNos/Views/RootView.swift` | onboarding / paywall / 主界面切换 | 根门控都在这里 |
-| `SyncNos/AppDelegate.swift` | 菜单栏、同步中退出、URL callback | 生命周期级问题集中在这里 |
-| `SyncNos/Services/SiteLogins/SiteLoginsStore.swift` | 登录态与 cookie | 统一域名存储与 legacy migration 都在这里 |
-| `SyncNos/Services/Auth/IAPService.swift` | 试用期、欢迎态、购买缓存 | paywall 逻辑底层事实源 |
-| `Extensions/WebClipper/src/bootstrap/content.ts` | inpage gating、支持站点判断 | 为什么按钮出现 / 不出现最先看这里 |
-| `Extensions/WebClipper/src/bootstrap/content-controller.ts` | 单击 / 双击 / 手动保存 / article fetch | 页面交互实际入口 |
-| `Extensions/WebClipper/src/platform/idb/schema.ts` | 升级后数据异常 | IndexedDB 版本迁移都在这里 |
-| `Extensions/WebClipper/tests/storage/schema-migration.test.ts` | 迁移行为核对 | 最能确认“这是预期迁移还是新 bug” |
+| `macOS/SyncNos/Views/RootView.swift` | onboarding / paywall / 主界面切换 | 根门控都在这里 |
+| `macOS/SyncNos/AppDelegate.swift` | 菜单栏、同步中退出、URL callback | 生命周期级问题集中在这里 |
+| `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift` | 登录态与 cookie | 统一域名存储与 legacy migration 都在这里 |
+| `macOS/SyncNos/Services/Auth/IAPService.swift` | 试用期、欢迎态、购买缓存 | paywall 逻辑底层事实源 |
+| `webclipper/src/bootstrap/content.ts` | inpage gating、支持站点判断 | 为什么按钮出现 / 不出现最先看这里 |
+| `webclipper/src/bootstrap/content-controller.ts` | 单击 / 双击 / 手动保存 / article fetch | 页面交互实际入口 |
+| `webclipper/src/platform/idb/schema.ts` | 升级后数据异常 | IndexedDB 版本迁移都在这里 |
+| `webclipper/tests/storage/schema-migration.test.ts` | 迁移行为核对 | 最能确认“这是预期迁移还是新 bug” |
 | `.github/workflows/webclipper-*.yml` | 发布失败 | 版本校验、secrets、构建顺序的真实来源 |
 
 ## 来源引用（Source References）
-- `SyncNos/Views/RootView.swift`
-- `SyncNos/AppDelegate.swift`
-- `SyncNos/Services/Auth/IAPService.swift`
-- `SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
-- `SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
-- `Extensions/WebClipper/src/bootstrap/content.ts`
-- `Extensions/WebClipper/src/bootstrap/content-controller.ts`
-- `Extensions/WebClipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch.ts`
-- `Extensions/WebClipper/src/platform/idb/schema.ts`
-- `Extensions/WebClipper/tests/storage/schema-migration.test.ts`
+- `macOS/SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/AppDelegate.swift`
+- `macOS/SyncNos/Services/Auth/IAPService.swift`
+- `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
+- `macOS/SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
+- `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
+- `webclipper/src/collectors/web/article-fetch.ts`
+- `webclipper/src/platform/idb/schema.ts`
+- `webclipper/tests/storage/schema-migration.test.ts`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`

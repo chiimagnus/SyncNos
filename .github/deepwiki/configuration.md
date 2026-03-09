@@ -18,7 +18,7 @@
 | `hasCompletedOnboarding` | `RootView.swift`, `OnboardingViewModel.swift` | `false` → 完成后写为 `true` | 决定是否先进入 onboarding |
 | `debug.forceOnboardingEveryLaunch` | `SyncNosApp.swift` | Debug 默认注册为 `false` | 开发时强制每次启动重走 onboarding |
 | `autoSync.appleBooks` / `goodLinks` / `weRead` | `SyncNosApp.swift` | UserDefaults 布尔值 | 决定启动时是否自动开启 AutoSyncService |
-| `SyncNos.FontScaleLevel` | `SyncNos/Services/Core/AGENTS.md` | 离散等级 | 控制字体与布局缩放 |
+| `SyncNos.FontScaleLevel` | `macOS/SyncNos/Services/Core/AGENTS.md` | 离散等级 | 控制字体与布局缩放 |
 | `CFBundleURLSchemes = syncnos` | `Info.plist` | 固定 | 处理 OAuth URL callback 兜底 |
 | Notion 同步参数 | `NotionSyncConfig.swift` | `batchConcurrency=3`, `readRPS=8`, `writeRPS=3`, `appendBatchSize=50`, `timeout=120s` | 控制 App 到 Notion 的吞吐与稳定性 |
 
@@ -80,15 +80,15 @@ static let requestTimeoutSeconds: TimeInterval = 120
 ```
 
 ## 来源引用（Source References）
-- `SyncNos/SyncNosApp.swift`
-- `SyncNos/AppDelegate.swift`
-- `SyncNos/Views/RootView.swift`
-- `SyncNos/Info.plist`
-- `SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
-- `Extensions/WebClipper/wxt.config.ts`
-- `Extensions/WebClipper/src/bootstrap/content.ts`
-- `Extensions/WebClipper/src/ui/settings/hooks/useSettingsSceneController.ts`
-- `Extensions/WebClipper/src/sync/backup/backup-utils.ts`
+- `macOS/SyncNos/SyncNosApp.swift`
+- `macOS/SyncNos/AppDelegate.swift`
+- `macOS/SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/Info.plist`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
+- `webclipper/wxt.config.ts`
+- `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`

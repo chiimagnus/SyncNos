@@ -36,10 +36,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: Extensions/WebClipper/package-lock.json
+          cache-dependency-path: webclipper/package-lock.json
 
       - name: Install WebClipper deps
-        run: npm ci --prefix Extensions/WebClipper
+        run: npm ci --prefix webclipper
 
       - name: Build WebClipper Chrome zip
         run: |
@@ -70,9 +70,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          cp "Extensions/WebClipper/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip"
-          cp "Extensions/WebClipper/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
-          cp "Extensions/WebClipper/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi" "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
+          cp "webclipper/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip"
+          cp "webclipper/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
+          cp "webclipper/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi" "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
 
       - name: Upload assets to GitHub Release
         uses: softprops/action-gh-release@v2

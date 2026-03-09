@@ -36,17 +36,17 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: Extensions/WebClipper/package-lock.json
+          cache-dependency-path: webclipper/package-lock.json
 
       - name: Install WebClipper deps
-        run: npm ci --prefix Extensions/WebClipper
+        run: npm ci --prefix webclipper
 
       - name: Verify manifest version matches tag
         run: |
           set -euo pipefail
           node - <<'NODE'
           const fs = require("fs");
-          const path = "Extensions/WebClipper/wxt.config.ts";
+          const path = "webclipper/wxt.config.ts";
           const tagName = process.env.TAG_NAME;
           const tagVersion = String(tagName || "").replace(/^v/, "");
           const source = fs.readFileSync(path, "utf8");
@@ -79,5 +79,5 @@ jobs:
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           AMO_ADDON_ID: ${{ secrets.AMO_ADDON_ID }}
           AMO_CHANNEL: listed
-          AMO_XPI_PATH: Extensions/WebClipper/SyncNos-WebClipper-firefox.xpi
-          AMO_SOURCE_ZIP_PATH: Extensions/WebClipper/SyncNos-WebClipper-amo-source.zip
+          AMO_XPI_PATH: webclipper/SyncNos-WebClipper-firefox.xpi
+          AMO_SOURCE_ZIP_PATH: webclipper/SyncNos-WebClipper-amo-source.zip

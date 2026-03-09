@@ -12,7 +12,7 @@
 
 | 场景 | 推荐方法 | 关注点 |
 | --- | --- | --- |
-| 工程可构建 | `xcodebuild -scheme SyncNos -configuration Debug build` | 工程、依赖和 Swift 编译是否正常 |
+| 工程可构建 | `xcodebuild -project macOS/SyncNos.xcodeproj -scheme SyncNos -configuration Debug build` | 工程、依赖和 Swift 编译是否正常 |
 | 引导 / 付费墙 / 主界面切换 | `RootView` 相关 Preview + 手动打开 App | 确认 Onboarding → PayWall → MainListView 顺序不乱 |
 | ViewModel / Service 核心逻辑 | 单元测试或最小 mock 验证 | 数据转换、状态变化、边界条件 |
 | 同步冒烟 | 连接至少一个来源并完成一次同步 | Notion 中出现对应数据库 / 页面 |
@@ -22,12 +22,12 @@
 
 | 命令 / 目录 | 覆盖点 | 说明 |
 | --- | --- | --- |
-| `npm --prefix Extensions/WebClipper run compile` | TypeScript 契约与调用面 | 默认验证顺序第一步 |
-| `npm --prefix Extensions/WebClipper run test` | Vitest 单测 | 覆盖游标、IndexedDB 迁移、Markdown 等关键逻辑 |
-| `npm --prefix Extensions/WebClipper run build` | Chrome / Edge 产物 | 验证 WXT 构建与入口配置 |
-| `npm --prefix Extensions/WebClipper run build:firefox` | Firefox 产物 | 涉及 Firefox / 发布打包时必须补跑 |
-| `npm --prefix Extensions/WebClipper run check` | dist 完整性 | build 后再调用 `check-dist.mjs` |
-| `Extensions/WebClipper/tests/` | 测试分层目录 | 当前至少分为 `collectors`, `domains`, `integrations`, `smoke`, `storage`, `unit` |
+| `npm --prefix webclipper run compile` | TypeScript 契约与调用面 | 默认验证顺序第一步 |
+| `npm --prefix webclipper run test` | Vitest 单测 | 覆盖游标、IndexedDB 迁移、Markdown 等关键逻辑 |
+| `npm --prefix webclipper run build` | Chrome / Edge 产物 | 验证 WXT 构建与入口配置 |
+| `npm --prefix webclipper run build:firefox` | Firefox 产物 | 涉及 Firefox / 发布打包时必须补跑 |
+| `npm --prefix webclipper run check` | dist 完整性 | build 后再调用 `check-dist.mjs` |
+| `webclipper/tests/` | 测试分层目录 | 当前至少分为 `collectors`, `domains`, `integrations`, `smoke`, `storage`, `unit` |
 
 ## 代表性测试用例
 
@@ -70,14 +70,14 @@
 
 ## 来源引用（Source References）
 - `AGENTS.md`
-- `SyncNos/AGENTS.md`
-- `SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/AGENTS.md`
+- `macOS/SyncNos/Views/RootView.swift`
 - `.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
-- `Extensions/WebClipper/package.json`
-- `Extensions/WebClipper/tests`
-- `Extensions/WebClipper/tests/unit/notion-sync-cursor.test.ts`
-- `Extensions/WebClipper/tests/storage/schema-migration.test.ts`
-- `Extensions/WebClipper/tests/storage/conversations-idb.test.ts`
-- `Extensions/WebClipper/tests/unit/markdown-renderer.test.ts`
+- `webclipper/package.json`
+- `webclipper/tests`
+- `webclipper/tests/unit/notion-sync-cursor.test.ts`
+- `webclipper/tests/storage/schema-migration.test.ts`
+- `webclipper/tests/storage/conversations-idb.test.ts`
+- `webclipper/tests/unit/markdown-renderer.test.ts`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
