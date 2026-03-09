@@ -1,19 +1,9 @@
-import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join } from "node:path";
+import { resolveRepoRoot, resolveWebclipperRoot, run } from "./script-utils.mjs";
 
-function run(cmd, args, cwd) {
-  const res = spawnSync(cmd, args, { cwd, stdio: "inherit" });
-  if (res.status !== 0) throw new Error(`${cmd} ${args.join(" ")} failed`);
-}
-
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(scriptDir, "..", "..", "..");
-const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
-if (!existsSync(join(webclipperRoot, "package.json"))) {
-  throw new Error(`webclipper root not found: ${webclipperRoot}`);
-}
+const repoRoot = resolveRepoRoot(import.meta.url);
+const webclipperRoot = resolveWebclipperRoot(repoRoot);
 
 const staging = join(webclipperRoot, ".tmp-amo-source");
 const outZip = join(webclipperRoot, "SyncNos-WebClipper-amo-source.zip");

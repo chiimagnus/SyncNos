@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { resolveRepoRoot, resolveWebclipperRoot } from "./script-utils.mjs";
 
 function parseArgs(argv) {
   const args = { root: null, manifest: null };
@@ -35,9 +35,8 @@ function fail(message) {
 }
 
 const cli = parseArgs(process.argv.slice(2));
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(scriptDir, "..", "..", "..");
-const webclipperRoot = join(repoRoot, "webclipper");
+const repoRoot = resolveRepoRoot(import.meta.url);
+const webclipperRoot = resolveWebclipperRoot(repoRoot);
 const root = cli.root
   ? join(repoRoot, cli.root)
   : join(webclipperRoot, ".output", "chrome-mv3");
