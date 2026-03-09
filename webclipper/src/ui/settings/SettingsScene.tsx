@@ -27,12 +27,10 @@ export type SettingsSceneProps = {
 };
 
 function getSectionLabel(key: SettingsSectionKey): string {
-  if (key === 'chat_with') return 'Chat with AI';
   return t(`section_${key}_label` as Parameters<typeof t>[0]);
 }
 
 function getSectionDescription(key: SettingsSectionKey): string {
-  if (key === 'chat_with') return 'Prompt + platforms';
   return t(`section_${key}_desc` as Parameters<typeof t>[0]);
 }
 
