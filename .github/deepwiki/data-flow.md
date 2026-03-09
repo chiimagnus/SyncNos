@@ -93,17 +93,17 @@ flowchart LR
 | 发布版本不一致 | workflow | `manifest version mismatch` | 检查 `wxt.config.ts` 与 tag |
 
 ## 来源引用（Source References）
-- `SyncNos/SyncNosApp.swift`
-- `SyncNos/Views/RootView.swift`
-- `SyncNos/Services/SyncScheduling/AutoSyncService.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
-- `SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
-- `Extensions/WebClipper/src/entrypoints/content.ts`
-- `Extensions/WebClipper/src/bootstrap/content.ts`
-- `Extensions/WebClipper/src/bootstrap/content-controller.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch-background-handlers.ts`
-- `Extensions/WebClipper/src/conversations/data/storage-idb.ts`
-- `Extensions/WebClipper/src/protocols/conversation-kinds.ts`
-- `Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.ts`
-- `Extensions/WebClipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
+- `macOS/SyncNos/SyncNosApp.swift`
+- `macOS/SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
+- `webclipper/src/entrypoints/content.ts`
+- `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/collectors/web/article-fetch.ts`
+- `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
+- `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/protocols/conversation-kinds.ts`
+- `webclipper/src/sync/notion/notion-sync-orchestrator.ts`
+- `webclipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`

@@ -7,32 +7,32 @@
 
 | 产品线 | 主目录 | 运行时 | 主要输入 | 主要输出 |
 | --- | --- | --- | --- | --- |
-| SyncNos App | `SyncNos/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
-| WebClipper | `Extensions/WebClipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、本地导出、Notion 页面、Obsidian 文件 |
+| SyncNos App | `macOS/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
+| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、本地导出、Notion 页面、Obsidian 文件 |
 
 ## 顶层目录地图
 
 | 路径 | 角色 | 典型内容 | 阅读建议 |
 | --- | --- | --- | --- |
-| `SyncNos/` | macOS App 主工程 | `Models/`, `Services/`, `ViewModels/`, `Views/` | 先读 `SyncNos/AGENTS.md`，再按 MVVM + 协议注入边界进入。 |
-| `Extensions/WebClipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/conversations/`, `src/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app 哪一层。 |
+| `macOS/` | macOS App 容器 | `SyncNos/`, `SyncNos.xcodeproj/`, `Packages/`, `Resource/` | 先读 `macOS/SyncNos/AGENTS.md`，再按 MVVM + 协议注入边界进入。 |
+| `webclipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/conversations/`, `src/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app 哪一层。 |
 | `.github/docs/` | 仓库级专项文档 | 键盘焦点文档等 | 用来理解跨产品线的专项约束。 |
 | `.github/workflows/` | CI / Release / 商店发布入口 | `release.yml`, `webclipper-release.yml`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 看真实交付链路而不是猜测。 |
 | `.github/scripts/webclipper/` | WebClipper 打包 / 发布脚本 | 打包 release assets、AMO source、AMO 发布 | 与 workflow 配套理解渠道差异。 |
-| `Packages/` | 本地 SwiftPM 包 | `MenuBarDockKit` | 放可复用的 macOS 能力，而不是业务 UI。 |
-| `Resource/` | 共享资源与图示 | `flows.svg` | 适合配合理解双产品线的最终输出面。 |
+| `macOS/Packages/` | 本地 SwiftPM 包 | `MenuBarDockKit` | 放可复用的 macOS 能力，而不是业务 UI。 |
+| `macOS/Resource/` | 共享资源与图示 | `flows.svg` | 适合配合理解双产品线的最终输出面。 |
 
 ## 关键入口文件
 
 | 入口 | 路径 | 作用 | 为什么先看这里 |
 | --- | --- | --- | --- |
-| App 启动入口 | `SyncNos/SyncNosApp.swift` | 启动 IAP、预热缓存、决定是否启动自动同步、定义主窗口 / 设置 / 日志窗口 | 它决定用户一启动 App 会发生什么 |
-| App 生命周期入口 | `SyncNos/AppDelegate.swift` | 菜单栏 / Dock 模式、同步中退出保护、Dock reopen、OAuth URL scheme 兜底 | 它决定 AppKit 层的行为边界 |
-| App 根门控 | `SyncNos/Views/RootView.swift` | 按顺序切换 Onboarding → PayWall → MainListView | 它解释为什么主界面不是总能直接出现 |
-| 扩展后台入口 | `Extensions/WebClipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job | 它决定所有后台能力如何挂接 |
-| 扩展内容入口 | `Extensions/WebClipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、runtime observer、增量更新 | 它决定页面采集是如何启动的 |
-| WXT / manifest 入口 | `Extensions/WebClipper/wxt.config.ts` | 版本号、权限、host permissions、entrypointsDir | 它是发布版本和能力边界的代码事实源 |
-| 脚本入口 | `Extensions/WebClipper/package.json` | `dev`, `compile`, `test`, `build`, `check` | 它定义扩展侧默认验证顺序 |
+| App 启动入口 | `macOS/SyncNos/SyncNosApp.swift` | 启动 IAP、预热缓存、决定是否启动自动同步、定义主窗口 / 设置 / 日志窗口 | 它决定用户一启动 App 会发生什么 |
+| App 生命周期入口 | `macOS/SyncNos/AppDelegate.swift` | 菜单栏 / Dock 模式、同步中退出保护、Dock reopen、OAuth URL scheme 兜底 | 它决定 AppKit 层的行为边界 |
+| App 根门控 | `macOS/SyncNos/Views/RootView.swift` | 按顺序切换 Onboarding → PayWall → MainListView | 它解释为什么主界面不是总能直接出现 |
+| 扩展后台入口 | `webclipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job | 它决定所有后台能力如何挂接 |
+| 扩展内容入口 | `webclipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、runtime observer、增量更新 | 它决定页面采集是如何启动的 |
+| WXT / manifest 入口 | `webclipper/wxt.config.ts` | 版本号、权限、host permissions、entrypointsDir | 它是发布版本和能力边界的代码事实源 |
+| 脚本入口 | `webclipper/package.json` | `dev`, `compile`, `test`, `build`, `check` | 它定义扩展侧默认验证顺序 |
 
 ## 主要来源与主要产物
 
@@ -47,14 +47,14 @@
 
 | 场景 | 命令 / 入口 | 结果 |
 | --- | --- | --- |
-| 打开 App 工程 | `open SyncNos.xcodeproj` | 在 Xcode 中进入 macOS 工程 |
-| App 构建 | `xcodebuild -scheme SyncNos -configuration Debug build` | 验证桌面端可构建 |
-| 扩展安装依赖 | `npm --prefix Extensions/WebClipper install` | 安装 WebClipper 依赖 |
-| 扩展类型检查 | `npm --prefix Extensions/WebClipper run compile` | 先发现 TS 类型 / 契约问题 |
-| 扩展单测 | `npm --prefix Extensions/WebClipper run test` | 覆盖游标、IndexedDB 迁移、Markdown 等关键逻辑 |
-| 扩展构建 | `npm --prefix Extensions/WebClipper run build` | 生成 Chrome / Edge 产物 |
-| 扩展 Firefox 构建 | `npm --prefix Extensions/WebClipper run build:firefox` | 生成 Firefox 产物 |
-| 扩展产物校验 | `npm --prefix Extensions/WebClipper run check` | build 后再跑 `check-dist.mjs` 做完整性检查 |
+| 打开 App 工程 | `open macOS/SyncNos.xcodeproj` | 在 Xcode 中进入 macOS 工程 |
+| App 构建 | `xcodebuild -project macOS/SyncNos.xcodeproj -scheme SyncNos -configuration Debug build` | 验证桌面端可构建 |
+| 扩展安装依赖 | `npm --prefix webclipper install` | 安装 WebClipper 依赖 |
+| 扩展类型检查 | `npm --prefix webclipper run compile` | 先发现 TS 类型 / 契约问题 |
+| 扩展单测 | `npm --prefix webclipper run test` | 覆盖游标、IndexedDB 迁移、Markdown 等关键逻辑 |
+| 扩展构建 | `npm --prefix webclipper run build` | 生成 Chrome / Edge 产物 |
+| 扩展 Firefox 构建 | `npm --prefix webclipper run build:firefox` | 生成 Firefox 产物 |
+| 扩展产物校验 | `npm --prefix webclipper run check` | build 后再跑 `check-dist.mjs` 做完整性检查 |
 
 ## 图表
 ![SyncNos 双产品线输出流程图](assets/repository-flow-01.svg)
@@ -85,13 +85,13 @@ flowchart LR
 ## 来源引用（Source References）
 - `README.md`
 - `AGENTS.md`
-- `SyncNos/SyncNosApp.swift`
-- `SyncNos/AppDelegate.swift`
-- `SyncNos/Views/RootView.swift`
-- `Extensions/WebClipper/package.json`
-- `Extensions/WebClipper/wxt.config.ts`
-- `Extensions/WebClipper/src/entrypoints/background.ts`
-- `Extensions/WebClipper/src/entrypoints/content.ts`
+- `macOS/SyncNos/SyncNosApp.swift`
+- `macOS/SyncNos/AppDelegate.swift`
+- `macOS/SyncNos/Views/RootView.swift`
+- `webclipper/package.json`
+- `webclipper/wxt.config.ts`
+- `webclipper/src/entrypoints/background.ts`
+- `webclipper/src/entrypoints/content.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
-- `Resource/flows.svg`
+- `macOS/Resource/flows.svg`

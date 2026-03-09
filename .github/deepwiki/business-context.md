@@ -78,12 +78,12 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 ## 来源引用（Source References）
 - `README.md`
 - `AGENTS.md`
-- `SyncNos/SyncNosApp.swift`
-- `SyncNos/Views/RootView.swift`
-- `SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
-- `Extensions/WebClipper/src/collectors/register-all.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch.ts`
-- `Extensions/WebClipper/src/protocols/conversation-kinds.ts`
-- `Extensions/WebClipper/src/bootstrap/content-controller.ts`
-- `Extensions/WebClipper/src/sync/backup/backup-utils.ts`
+- `macOS/SyncNos/SyncNosApp.swift`
+- `macOS/SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
+- `webclipper/src/collectors/register-all.ts`
+- `webclipper/src/collectors/web/article-fetch.ts`
+- `webclipper/src/protocols/conversation-kinds.ts`
+- `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`

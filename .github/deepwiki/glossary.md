@@ -61,14 +61,14 @@
 
 ## 来源引用（Source References）
 - `README.md`
-- `SyncNos/Views/RootView.swift`
-- `SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
-- `SyncNos/ViewModels/Account/PayWallViewModel.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
-- `Extensions/WebClipper/src/collectors/register-all.ts`
-- `Extensions/WebClipper/src/collectors/web/article-fetch.ts`
-- `Extensions/WebClipper/src/bootstrap/content.ts`
-- `Extensions/WebClipper/src/platform/idb/schema.ts`
-- `Extensions/WebClipper/src/platform/messaging/message-contracts.ts`
+- `macOS/SyncNos/Views/RootView.swift`
+- `macOS/SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
+- `macOS/SyncNos/ViewModels/Account/PayWallViewModel.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
+- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift`
+- `webclipper/src/collectors/register-all.ts`
+- `webclipper/src/collectors/web/article-fetch.ts`
+- `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/platform/idb/schema.ts`
+- `webclipper/src/platform/messaging/message-contracts.ts`
 - `.github/workflows/webclipper-release.yml`

@@ -37,7 +37,7 @@
 - [GENERATION.md](GENERATION.md)
 
 ## Asset Inventory
-- `assets/repository-flow-01.svg` (existing asset, sourced from `Resource/flows.svg`)
+- `assets/repository-flow-01.svg` (existing asset, sourced from `macOS/Resource/flows.svg`)
 
 ## What Changed In This Update
 - 新增 `business-context.md`，把 deepwiki 补齐为“业务入口层 + 技术层”的完整结构。
@@ -54,8 +54,8 @@
 
 | 类别 | 主要来源 |
 | --- | --- |
-| 仓库级语义 | `README.md`, `AGENTS.md`, `SyncNos/AGENTS.md`, `Extensions/WebClipper/AGENTS.md` |
-| App 入口与主流程 | `SyncNos/SyncNosApp.swift`, `SyncNos/AppDelegate.swift`, `SyncNos/Views/RootView.swift` |
+| 仓库级语义 | `README.md`, `AGENTS.md`, `macOS/SyncNos/AGENTS.md`, `webclipper/AGENTS.md` |
+| App 入口与主流程 | `macOS/SyncNos/SyncNosApp.swift`, `macOS/SyncNos/AppDelegate.swift`, `macOS/SyncNos/Views/RootView.swift` |
 | App 服务与存储 | `DIContainer.swift`, `NotionSyncEngine.swift`, `IAPService.swift`, `SiteLoginsStore.swift`, `ChatCacheService.swift`, `WebArticleCacheService.swift` |
 | WebClipper 运行时与数据 | `background.ts`, `content.ts`, `bootstrap/content.ts`, `message-contracts.ts`, `schema.ts`, `storage-idb.ts` |
 | WebClipper 采集与同步 | `register-all.ts`, `googleaistudio-collector.ts`, `article-fetch.ts`, `conversation-kinds.ts`, `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
