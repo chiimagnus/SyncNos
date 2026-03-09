@@ -4,7 +4,6 @@ import type { SettingsSectionKey } from './types';
 import { SETTINGS_SECTION_GROUPS } from './types';
 
 function sectionLabel(key: SettingsSectionKey): string {
-  if (key === 'chat_with') return 'Chat with AI';
   return t(`section_${key}_label` as Parameters<typeof t>[0]);
 }
 

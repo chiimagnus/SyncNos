@@ -1,3 +1,4 @@
+import { formatConversationTitle, t } from '../../../i18n';
 import { openDb } from '../../../platform/idb/schema';
 import type { Conversation } from '../../../conversations/domain/models';
 
@@ -26,12 +27,12 @@ export type InsightStats = {
 };
 
 export const INSIGHT_CHAT_SOURCE_LIMIT = 4;
-export const INSIGHT_ARTICLE_DOMAIN_LIMIT = 4;
+export const INSIGHT_ARTICLE_DOMAIN_LIMIT = 8;
 export const INSIGHT_TOP_CONVERSATION_LIMIT = 3;
-export const INSIGHT_OTHER_LABEL = 'Other';
-export const INSIGHT_UNKNOWN_DOMAIN_LABEL = 'Unknown';
-export const INSIGHT_UNKNOWN_SOURCE_LABEL = 'Unknown';
-export const INSIGHT_UNTITLED_CONVERSATION = 'Untitled';
+export const INSIGHT_OTHER_LABEL = t('insightOtherLabel');
+export const INSIGHT_UNKNOWN_DOMAIN_LABEL = t('insightUnknownLabel');
+export const INSIGHT_UNKNOWN_SOURCE_LABEL = t('insightUnknownLabel');
+export const INSIGHT_UNTITLED_CONVERSATION = t('untitled');
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -61,7 +62,7 @@ function normalizeSourceLabel(value: unknown): string {
 }
 
 function normalizeConversationTitle(value: unknown): string {
-  return safeString(value) || INSIGHT_UNTITLED_CONVERSATION;
+  return formatConversationTitle(safeString(value));
 }
 
 function compareDistributionItems(a: InsightDistributionItem, b: InsightDistributionItem): number {
