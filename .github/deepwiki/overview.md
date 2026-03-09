@@ -8,7 +8,7 @@
 | 产品线 | 主目录 | 运行时 | 主要输入 | 主要输出 |
 | --- | --- | --- | --- | --- |
 | SyncNos App | `macOS/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
-| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、本地导出、Notion 页面、Obsidian 文件 |
+| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、Settings Insight、本地导出、Notion 页面、Obsidian 文件 |
 
 ## 顶层目录地图
 
@@ -42,6 +42,8 @@
 | 页面来源 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai、普通网页 | WebClipper | 扩展先采集为本地会话，再派生到任意目标 |
 | 本地事实源 | SwiftData / UserDefaults / Keychain；IndexedDB / `chrome.storage.local` | 两条产品线各自维护 | 这是 debug、迁移、恢复、回归时最先要看的地方 |
 | 外部结果 | Notion 数据库 / 页面、Obsidian 文件、Markdown / Zip 导出、Release 附件 | App + WebClipper + GitHub Actions | 对用户可见，但不是所有情况下都等于事实源 |
+
+- WebClipper 的 Insight 统计面板是**本地会话库的只读视图**：它不生成新的导出产物，也不改变同步链路，而是把 `conversations + messages` 的累计结果变成可见的仪表盘。
 
 ## 常用命令与工程入口
 
@@ -92,6 +94,8 @@ flowchart LR
 - `webclipper/wxt.config.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/entrypoints/content.ts`
+- `webclipper/src/ui/settings/SettingsScene.tsx`
+- `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `macOS/Resource/flows.svg`

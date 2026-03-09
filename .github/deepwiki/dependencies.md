@@ -15,6 +15,7 @@
 | --- | --- | --- | --- |
 | `react`, `react-dom` | runtime | `^19.2.4` | popup / app UI 渲染 |
 | `react-router-dom` | runtime | `7.13.1` | 扩展内部 app 路由 |
+| `recharts` | runtime | `^3.8.0` | Settings Insight 的来源分布 / 域名分布图表 |
 | `markdown-it` | runtime | `^14.1.0` | Markdown 消息渲染 |
 | `lucide-react` | runtime | `^0.541.0` | UI 图标 |
 | `wxt` | dev | `^0.20.18` | MV3 开发与构建 |
