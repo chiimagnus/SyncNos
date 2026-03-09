@@ -490,8 +490,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setInsightError(toErrorMessage(error, 'failed to load insight'));
       })
       .finally(() => {
-        if (cancelled) return;
         setInsightLoading(false);
+        if (cancelled) return;
         setHasLoadedInsight(true);
       });
 
