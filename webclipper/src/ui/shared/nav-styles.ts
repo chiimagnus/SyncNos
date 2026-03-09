@@ -1,5 +1,5 @@
 export function navGroupTitleClassName(): string {
-  return 'tw-px-3 tw-pb-1.5 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.16em] tw-text-[var(--muted)] tw-opacity-65';
+  return 'tw-px-3 tw-pb-1.5 tw-text-[11px] tw-font-bold tw-text-[var(--muted)] tw-opacity-70';
 }
 
 export function navItemClassName(active: boolean): string {
