@@ -1,3 +1,5 @@
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
 import type { InsightDistributionItem, InsightStats, InsightTopConversation } from './insight-stats';
 import { cardClassName } from '../ui';
 
@@ -5,7 +7,7 @@ function formatCount(value: number): string {
   return Number(value || 0).toLocaleString();
 }
 
-function DistributionList(props: {
+function DistributionChart(props: {
   items: InsightDistributionItem[];
   emptyText: string;
 }) {
@@ -14,24 +16,41 @@ function DistributionList(props: {
     return <div className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">{emptyText}</div>;
   }
 
+  const chartHeight = Math.max(180, items.length * 46);
+
   return (
-    <div className="tw-grid tw-gap-2">
-      {items.map((item) => (
-        <div key={item.label} className="tw-grid tw-grid-cols-[minmax(0,1fr)_auto] tw-items-center tw-gap-3">
-          <div className="tw-min-w-0">
-            <div className="tw-flex tw-items-center tw-gap-2">
-              <span className="tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text)]">{item.label}</span>
-              <div className="tw-h-2 tw-flex-1 tw-rounded-full tw-bg-[var(--panel)]/70">
-                <div
-                  className="tw-h-2 tw-rounded-full tw-bg-[var(--text)]/70"
-                  style={{ width: `${Math.max(10, Math.min(100, item.count * 12))}%` }}
-                />
-              </div>
-            </div>
-          </div>
-          <span className="tw-text-sm tw-font-black tw-text-[var(--text)]">{formatCount(item.count)}</span>
-        </div>
-      ))}
+    <div style={{ height: chartHeight }} className="tw-w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={items} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+          <XAxis type="number" hide allowDecimals={false} />
+          <YAxis
+            type="category"
+            dataKey="label"
+            width={88}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: 'var(--text)', fontSize: 12, fontWeight: 700 }}
+          />
+          <Tooltip
+            cursor={{ fill: 'rgba(15, 23, 42, 0.06)' }}
+            formatter={(value) => [formatCount(Number(value || 0)), 'Clips']}
+            contentStyle={{
+              borderRadius: 12,
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+              background: 'rgba(255, 255, 255, 0.96)',
+              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+            }}
+          />
+          <Bar dataKey="count" radius={[0, 10, 10, 0]} barSize={22}>
+            {items.map((item) => (
+              <Cell
+                key={item.label}
+                fill={item.label === 'Other' ? 'rgba(100, 116, 139, 0.55)' : 'rgba(15, 23, 42, 0.78)'}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -97,7 +116,7 @@ export function InsightPanel(props: {
 
           <div className="tw-mt-4">
             <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text)]">平台分布</div>
-            <DistributionList items={stats.chatSourceDistribution} emptyText="暂无数据" />
+            <DistributionChart items={stats.chatSourceDistribution} emptyText="暂无数据" />
           </div>
 
           <div className="tw-mt-5">
@@ -110,7 +129,7 @@ export function InsightPanel(props: {
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">📄 Web Articles</h2>
           <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">域名分布</div>
           <div className="tw-mt-4">
-            <DistributionList items={stats.articleDomainDistribution} emptyText="暂无数据" />
+            <DistributionChart items={stats.articleDomainDistribution} emptyText="暂无数据" />
           </div>
         </section>
       </div>
