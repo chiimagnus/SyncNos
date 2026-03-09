@@ -10,6 +10,8 @@ export const zh: { [K in TranslationKey]: string } = {
   section_notion_desc: 'OAuth 授权 + 同步父页面。',
   section_obsidian_label: 'Obsidian',
   section_obsidian_desc: '本地 REST API 设置 + 同步状态。',
+  section_insight_label: 'Insight 洞察',
+  section_insight_desc: '一眼看到你的本地 clip 积累。',
   section_inpage_label: '页面内按钮',
   section_inpage_desc: '页面内按钮显示行为设置。',
   section_about_label: '关于',
