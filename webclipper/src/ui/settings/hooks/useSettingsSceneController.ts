@@ -476,28 +476,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (activeSection !== 'insight') return;
     if (hasLoadedInsight || insightLoading) return;
 
-    let cancelled = false;
     setInsightLoading(true);
     setInsightError('');
 
     void getInsightStats()
       .then((stats) => {
-        if (cancelled) return;
         setInsightStats(stats);
       })
       .catch((error) => {
-        if (cancelled) return;
         setInsightError(toErrorMessage(error, 'failed to load insight'));
       })
       .finally(() => {
         setInsightLoading(false);
-        if (cancelled) return;
         setHasLoadedInsight(true);
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [activeSection, hasLoadedInsight, insightLoading]);
 
   const onResetChatWithSettings = useCallback(async () => {
