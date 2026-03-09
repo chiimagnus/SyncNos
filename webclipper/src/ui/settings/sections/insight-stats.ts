@@ -155,7 +155,6 @@ export async function getInsightStats(): Promise<InsightStats> {
     await txDone(t);
 
     const stats = createEmptyInsightStats();
-    stats.totalClips = conversations.length;
 
     const chatSources = new Map<string, number>();
     const articleDomains = new Map<string, number>();
@@ -196,6 +195,7 @@ export async function getInsightStats(): Promise<InsightStats> {
         return b.conversationId - a.conversationId;
       })
       .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
+    stats.totalClips = stats.chatCount + stats.articleCount;
 
     return stats;
   } finally {

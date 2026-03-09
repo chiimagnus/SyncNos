@@ -25,7 +25,7 @@ async function deleteDb(name: string) {
 }
 
 async function seedConversation(input: {
-  sourceType: "chat" | "article";
+  sourceType: string;
   source: string;
   conversationKey: string;
   title?: string;
@@ -168,6 +168,38 @@ describe("insight stats", () => {
     expect(stats.articleDomainDistribution).toEqual([
       { label: INSIGHT_UNKNOWN_DOMAIN_LABEL, count: 1 },
     ]);
+  });
+
+  it("keeps total clips aligned with recognized chat and article rows only", async () => {
+    await seedConversation({
+      sourceType: "chat",
+      source: "ChatGPT",
+      conversationKey: "chat-known",
+      title: "Known chat",
+      lastCapturedAt: 1,
+      messageCount: 2,
+    });
+    await seedConversation({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article-known",
+      title: "Known article",
+      url: "https://example.com/post",
+      lastCapturedAt: 2,
+    });
+    await seedConversation({
+      sourceType: "video",
+      source: "YouTube",
+      conversationKey: "video-ignored",
+      title: "Ignored type",
+      lastCapturedAt: 3,
+    });
+
+    const stats = await getInsightStats();
+
+    expect(stats.totalClips).toBe(2);
+    expect(stats.chatCount).toBe(1);
+    expect(stats.articleCount).toBe(1);
   });
 
   it("folds long source and domain tails into the other bucket", async () => {
