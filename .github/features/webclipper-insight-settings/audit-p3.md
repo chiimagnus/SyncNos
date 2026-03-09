@@ -11,10 +11,11 @@
 - 完整验证命令是否都通过，且 SettingsScene 其它 section 无回归
 
 ## Findings
-- 待审计时填写
+- 审计未发现 P3 代码层面的显著问题。图表只消费本地统计结果，空态/错误态与响应式布局都按预期工作。
+- `npm --prefix webclipper run test` 仍会命中仓库现有的 `tests/smoke/popup-shell-header-actions.test.ts` 失败；该失败落在未改动的 PopupShell 头部动作逻辑，不是本轮 Insight 改动引入。
 
 ## Fixes
-- 待审计时填写
+- 本轮未追加 P3 代码修复；保留对仓库既有 popup smoke 失败的说明，避免误判为 Insight 回归。
 
 ## Re-run Commands
 - `npm --prefix webclipper run compile`
