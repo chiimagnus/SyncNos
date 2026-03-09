@@ -86,6 +86,8 @@ export const en = {
   mail: 'Mail',
   versionPrefix: 'Version',
   authorTagline: 'Time Machine Creator~',
+  angelsCta: 'Come take a look! Here are our lovely angel sponsors',
+  angelsLinkLabel: 'SyncNos Angels Sponsors',
 
   // ConversationListPane
   allFilter: 'All',
