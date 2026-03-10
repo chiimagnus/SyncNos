@@ -125,6 +125,30 @@ async function findExistingArticleConversationByUrl(
   return pickPreferredArticleConversation(matched);
 }
 
+async function findExistingConversationForPayload(
+  conversationsStore: IDBObjectStore,
+  payload: any,
+): Promise<any | null> {
+  const source = safeString(payload?.source);
+  const conversationKey = safeString(payload?.conversationKey);
+  if (!source || !conversationKey) return null;
+  const idx = conversationsStore.index('by_source_conversationKey');
+  let existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
+  if (!existing && isArticlePayload(payload)) {
+    existing = await findExistingArticleConversationByUrl(conversationsStore, payload?.url);
+  }
+  return existing || null;
+}
+
+export async function hasConversation(payload: any): Promise<boolean> {
+  if (!payload) return false;
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  const existing = await findExistingConversationForPayload(stores.conversations, payload);
+  await txDone(t);
+  return !!existing;
+}
+
 function pickMaxFiniteNumber(...values: unknown[]): number | null {
   let max: number | null = null;
   for (const value of values) {
@@ -231,11 +255,7 @@ async function migrateSyncMappingKey(
 export async function upsertConversation(payload: any): Promise<Conversation> {
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
-  const idx = stores.conversations.index('by_source_conversationKey');
-  let existing: any = await reqToPromise(idx.get([payload.source, payload.conversationKey]) as any);
-  if (!existing && isArticlePayload(payload)) {
-    existing = await findExistingArticleConversationByUrl(stores.conversations, payload.url);
-  }
+  const existing = await findExistingConversationForPayload(stores.conversations, payload);
 
   const now = Date.now();
   const nextTitle =

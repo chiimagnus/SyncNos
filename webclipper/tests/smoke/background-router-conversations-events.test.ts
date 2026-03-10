@@ -11,6 +11,7 @@ const storageMocks = vi.hoisted(() => ({
   deleteConversationsByIds: vi.fn(),
   listConversations: vi.fn(),
   getConversationDetail: vi.fn(),
+  hasConversation: vi.fn(),
 }));
 
 vi.mock("../../src/conversations/data/write", () => ({
@@ -22,6 +23,7 @@ vi.mock("../../src/conversations/data/storage", () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
   listConversations: storageMocks.listConversations,
   getConversationDetail: storageMocks.getConversationDetail,
+  hasConversation: storageMocks.hasConversation,
 }));
 
 function createRouter() {
@@ -43,6 +45,7 @@ afterEach(() => {
   storageMocks.deleteConversationsByIds.mockReset();
   storageMocks.listConversations.mockReset();
   storageMocks.getConversationDetail.mockReset();
+  storageMocks.hasConversation.mockReset();
 });
 
 describe("background-router conversations events", () => {

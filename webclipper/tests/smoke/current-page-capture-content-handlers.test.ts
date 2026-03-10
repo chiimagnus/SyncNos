@@ -27,6 +27,7 @@ describe('current-page-capture content handlers', () => {
 
     const captureCurrentPage = vi.fn(async (input?: any) => {
       input?.onProgress?.({ message: 'Saving...', kind: 'loading' });
+      input?.onProgress?.({ message: 'Saved: Hello', kind: 'default' });
       return { title: 'Hello' };
     });
 
@@ -62,4 +63,3 @@ describe('current-page-capture content handlers', () => {
     expect(response?.data).toEqual({ title: 'Hello' });
   });
 });
-
