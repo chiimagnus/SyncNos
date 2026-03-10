@@ -40,19 +40,3 @@ status = "completed"
 plan = "plan-p2.md#p2-t2"
 commit = "feat: task5 - 右键菜单提供inpage与自动保存快捷开关"
 note = "compile passed"
-
-[[tasks]]
-id = "P2-T1"
-title = "设置页改为通用分组并拆分卡片"
-status = "completed"
-plan = "plan-p2.md#p2-t1"
-commit = "refactor: task4 - 重排通用设置卡片与布局"
-note = "compile passed"
-
-[[tasks]]
-id = "P2-T2"
-title = "Inpage 按钮右键菜单（快速切换显示/自动保存）"
-status = "pending"
-plan = "plan-p2.md#p2-t2"
-commit = ""
-note = ""
