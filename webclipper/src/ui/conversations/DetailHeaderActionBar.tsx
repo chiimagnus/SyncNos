@@ -83,11 +83,6 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
-  const constrainedButtonClassName = [
-    buttonClassName,
-    'tw-min-w-0 tw-max-w-[min(180px,33vw)] tw-justify-start',
-  ].join(' ');
-
   if (actions.length === 1) {
     const action = actions[0]!;
     const buttonLabel = labelOverride || action.label;
@@ -100,12 +95,12 @@ export function DetailHeaderActionBar({
           onClick={() => {
             void handleTrigger(action);
           }}
-          className={constrainedButtonClassName}
+          className={buttonClassName}
           aria-label={action.label}
           aria-disabled={action.disabled ? 'true' : undefined}
           disabled={busy || !!action.disabled}
         >
-          <span className="tw-block tw-min-w-0 tw-truncate">{buttonLabel}</span>
+          {buttonLabel}
         </button>
       </div>
     );
@@ -132,17 +127,15 @@ export function DetailHeaderActionBar({
           onClick={() => {
             setMenuOpen((value) => !value);
           }}
-          className={constrainedButtonClassName}
+          className={buttonClassName}
           disabled={busy}
         >
-          <span className="tw-flex tw-min-w-0 tw-items-center">
-            <span className="tw-min-w-0 tw-truncate tw-leading-none">{triggerLabel}</span>
-            <span
-              className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
-              aria-hidden="true"
-            >
-              ▾
-            </span>
+          <span className="tw-leading-none">{triggerLabel}</span>
+          <span
+            className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
+            aria-hidden="true"
+          >
+            ▾
           </span>
         </button>
 
