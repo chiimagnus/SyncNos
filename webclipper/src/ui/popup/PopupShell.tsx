@@ -7,6 +7,7 @@ import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app'
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
 import type { PopupHeaderState } from '../conversations/ConversationsScene';
+import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-styles';
 import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
@@ -87,6 +88,17 @@ function PopupShellFrame() {
               </button>
             </div>
           </div>
+        </header>
+      ) : null}
+
+      {!showListActions && headerState.mode === 'detail' ? (
+        <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
+          <DetailNavigationHeader
+            title={headerState.title}
+            subtitle={headerState.subtitle}
+            actions={headerState.actions}
+            onBack={headerState.onBack}
+          />
         </header>
       ) : null}
 

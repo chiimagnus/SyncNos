@@ -22,8 +22,8 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
 
   return (
-    <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-      <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
+    <div className="tw-grid tw-gap-2">
+      <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
         <button
           type="button"
           onClick={onBack}
@@ -45,7 +45,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         </div>
       </div>
 
-      <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
+      <div className="tw-flex tw-flex-wrap tw-justify-end tw-gap-2">
         <DetailHeaderActionBar
           actions={chatWithActions}
           buttonClassName={headerActionButtonClass}
@@ -53,11 +53,12 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           menuTriggerTitle="Chat with..."
           menuTriggerAriaLabel="Chat with"
           menuAriaLabel="Chat with"
+          className="tw-flex tw-flex-wrap tw-justify-end tw-gap-2"
         />
         <DetailHeaderActionBar
           actions={openActions}
           buttonClassName={headerActionButtonClass}
-          className="tw-flex tw-items-center tw-gap-2"
+          className="tw-flex tw-flex-wrap tw-justify-end tw-gap-2"
         />
       </div>
     </div>
