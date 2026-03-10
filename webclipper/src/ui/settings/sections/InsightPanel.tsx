@@ -132,12 +132,12 @@ export function InsightPanel(props: {
           className={selectClassName}
           value={range}
           onChange={(event) => onChangeRange(event.target.value as InsightTimeRange)}
-          aria-label="Time range"
+          aria-label={t('insightRangeAria')}
         >
-          <option value="all">所有数据</option>
-          <option value="today">{stripTrailingLabelPunctuation(t('todayLabel')) || 'Today'}</option>
-          <option value="7d">过去7天</option>
-          <option value="30d">过去30天</option>
+          <option value="all">{t('insightRangeAll')}</option>
+          <option value="today">{t('insightRangeToday')}</option>
+          <option value="7d">{t('insightRange7d')}</option>
+          <option value="30d">{t('insightRange30d')}</option>
         </select>
       </header>
 
