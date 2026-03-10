@@ -78,7 +78,7 @@ async function captureActiveTabCurrentPage(): Promise<void> {
   if (!tab || !Number.isFinite(tabId) || tabId <= 0) return;
   if (!isHttpUrl(tab.url)) return;
 
-  await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.CAPTURE });
+  await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.CAPTURE, payload: { source: 'contextmenu' } });
 }
 
 async function createOrRefreshMenus(api: any) {

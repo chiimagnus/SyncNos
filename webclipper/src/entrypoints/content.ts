@@ -29,7 +29,7 @@ export default defineContentScript({
       collectorsRegistry,
     });
 
-    registerCurrentPageCaptureContentHandlers(currentPageCapture);
+    registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
 
     const controller = createContentController({
       runtime,

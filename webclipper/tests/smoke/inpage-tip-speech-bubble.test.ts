@@ -136,6 +136,18 @@ describe("inpage-tip speech bubble", () => {
     expect(nodes[0].dataset.kind).toBe("error");
   });
 
+  it("falls back to corner placement when anchor is missing", () => {
+    const api = loadInpageTip();
+
+    api.showSaveTip("tip");
+
+    const bubble = document.getElementById("webclipper-inpage-bubble") as HTMLElement | null;
+    expect(bubble).toBeTruthy();
+    expect(bubble?.dataset.placement).toBe("none");
+    expect(bubble?.style.left).toMatch(/px$/);
+    expect(bubble?.style.top).toMatch(/px$/);
+  });
+
   it("removes bubble after 1800ms", () => {
     vi.useFakeTimers();
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
