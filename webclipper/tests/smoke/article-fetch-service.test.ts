@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const storageMocks = {
+  hasConversation: vi.fn(),
   upsertConversation: vi.fn(),
   syncConversationMessages: vi.fn(),
 };
 
 vi.mock("../../src/conversations/data/storage", () => ({
+  hasConversation: storageMocks.hasConversation,
   upsertConversation: storageMocks.upsertConversation,
   syncConversationMessages: storageMocks.syncConversationMessages,
 }));
@@ -17,6 +19,7 @@ async function loadArticleFetchService() {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  storageMocks.hasConversation.mockReset();
   storageMocks.upsertConversation.mockReset();
   storageMocks.syncConversationMessages.mockReset();
   // @ts-expect-error test cleanup
@@ -27,6 +30,7 @@ describe("article-fetch-service", () => {
   it("stores extracted active-tab article into conversations/messages", async () => {
     const upsertConversation = vi.fn(async (payload: any) => ({ id: 11, ...payload }));
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
     storageMocks.upsertConversation.mockImplementation(upsertConversation);
     storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
 

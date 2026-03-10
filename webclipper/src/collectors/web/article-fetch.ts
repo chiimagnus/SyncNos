@@ -1,4 +1,4 @@
-import { syncConversationMessages, upsertConversation } from '../../conversations/data/storage';
+import { hasConversation, syncConversationMessages, upsertConversation } from '../../conversations/data/storage';
 import { scriptingExecuteScript } from '../../platform/webext/scripting';
 import { tabsGet, tabsQuery } from '../../platform/webext/tabs';
 
@@ -482,6 +482,17 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   if (!textContent) throw toError('No article content detected');
 
   const capturedAt = Date.now();
+  let existed = false;
+  try {
+    existed = await hasConversation({
+      sourceType: ARTICLE_SOURCE_TYPE,
+      source: ARTICLE_SOURCE,
+      conversationKey: conversationKeyForUrl(normalizedUrl),
+      url: normalizedUrl,
+    });
+  } catch (_e) {
+    existed = false;
+  }
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: ARTICLE_SOURCE,
@@ -509,6 +520,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   ]);
 
   return {
+    isNew: !existed,
     conversationId: Number((conversation as any).id),
     url: normalizedUrl,
     title,

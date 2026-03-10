@@ -1,6 +1,4 @@
 import { CURRENT_PAGE_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-import { t } from '../i18n';
-
 import type { CurrentPageCaptureService } from './current-page-capture';
 
 type ApiResponse<T> = {
@@ -68,19 +66,9 @@ export function registerCurrentPageCaptureContentHandlers(
               : undefined,
           ),
         )
-        .then((data) => {
-          if (showTip) {
-            const title = String((data as any)?.title || '').trim();
-            if (title) {
-              inpageTip?.showSaveTip?.(`${t('savedPrefix')}${title}`, { kind: 'default' });
-            }
-          }
-          sendResponse(ok(data));
-        })
+        .then((data) => sendResponse(ok(data)))
         .catch((error) => {
-          const message = (error as any)?.message ?? error;
-          if (showTip) inpageTip?.showSaveTip?.(String(message || t('captureFailedFallback')), { kind: 'error' });
-          sendResponse(err(message));
+          sendResponse(err((error as any)?.message ?? error));
         });
       return true;
     }

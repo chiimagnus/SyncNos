@@ -2,6 +2,7 @@ import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/mes
 import {
   deleteConversationsByIds,
   getConversationDetail,
+  hasConversation,
   listConversations,
 } from '../data/storage';
 import {
@@ -33,8 +34,14 @@ export function registerConversationHandlers(router: AnyRouter) {
     const payload = msg.payload || {};
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
+    let existed = false;
+    try {
+      existed = await hasConversation(payload);
+    } catch (_e) {
+      existed = false;
+    }
     const convo = await writeConversationSnapshot(payload);
-    return router.ok(convo);
+    return router.ok({ ...(convo as any), __isNew: !existed });
   });
 
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
