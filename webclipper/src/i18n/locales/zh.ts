@@ -14,6 +14,8 @@ export const zh: { [K in TranslationKey]: string } = {
   section_chat_with_desc: 'Prompt 模板与平台。',
   section_insight_label: 'About you',
   section_insight_desc: '一眼看到你的本地 clip 积累。',
+  section_general_label: '通用',
+  section_general_desc: '页面内按钮显示与自动保存设置。',
   section_inpage_label: '通用',
   section_inpage_desc: '页面内按钮显示与自动保存设置。',
   section_about_label: 'About me',

@@ -12,6 +12,8 @@ export const en = {
   section_chat_with_desc: 'Prompt + platforms.',
   section_insight_label: 'About you',
   section_insight_desc: 'See your local clip stats at a glance.',
+  section_general_label: 'General',
+  section_general_desc: 'Inpage visibility + auto-save behavior.',
   section_inpage_label: 'General',
   section_inpage_desc: 'Inpage visibility + auto-save behavior.',
   section_about_label: 'About me',
