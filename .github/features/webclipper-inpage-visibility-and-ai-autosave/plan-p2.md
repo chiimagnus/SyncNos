@@ -1,73 +1,75 @@
 # Plan P2 - webclipper-inpage-visibility-and-ai-autosave
 
-**Goal:** 优化设置页信息架构，并给 inpage 按钮增加右键菜单，降低用户对“自动/展示范围”的误解成本。
+**Goal:** 优化设置页信息架构与交互（下拉靠右、改名为【通用】、拆分页面内按钮与自动保存），并在浏览器右键菜单提供快捷开关入口。
 
 **Non-goals:**
-- 不做即时生效（仍按当前“刷新后生效”的模型）。
-- 不引入复杂的站点级配置矩阵。
+- 不做“inpage 按钮右键弹自定义菜单”（优先走浏览器 context menu）。
+- 不做即时生效（仍保持“刷新后生效”的最简单模型）。
 
-**Approach:** 在保持底层存储键不变的前提下，重排设置页 UI：将原 `Inpage` 语义改为更通用的行为设置入口，并将“页面内按钮显示范围”和“AI 自动保存”拆成两个卡片；inpage 按钮增加 `contextmenu` 右键菜单，提供快捷切换。
+**Approach:** 设置页将原 `Inpage` section 改名为【通用】，内部拆分两张卡片：页面内按钮（显示范围三态）与自动保存（AI 聊天自动保存开关）。另外在 background 注册浏览器右键菜单项，读写同一组 `chrome.storage.local` 键。
 
 **Acceptance:**
-- 设置页侧边栏 `Inpage` 显示为 `General/通用`，描述同步调整。
-- “显示范围”选择控件与 label 同行右对齐展示。
-- inpage 按钮支持右键打开菜单，并可写入 `inpage_display_mode` / `ai_chat_auto_save_enabled`。
-- 通过 `npm --prefix webclipper run compile` 与 `npm --prefix webclipper run test`。
+- 设置页下拉控件与标题同排靠右。
+- Settings sidebar 中 section 文案显示为【通用】。
+- 浏览器右键菜单可快速切换显示范围三态与自动保存开关。
+- `npm --prefix webclipper run compile` 通过。
 
 ---
 
-## P2-T1 设置页改为通用分组并拆分卡片
+## P2-T1 设置页重构为【通用】并拆分卡片
 
 **Files:**
+- Modify: `webclipper/src/ui/settings/SettingsScene.tsx`
+- Add: `webclipper/src/ui/settings/sections/GeneralSection.tsx`
 - Modify: `webclipper/src/ui/settings/sections/InpageSection.tsx`
 - Modify: `webclipper/src/i18n/locales/en.ts`
 - Modify: `webclipper/src/i18n/locales/zh.ts`
+- Modify: `webclipper/tests/unit/settings-sections.test.ts` (如断言依赖 section label/desc)
+- Modify: `.github/features/webclipper-inpage-visibility-and-ai-autosave/todo.toml`
 
 **Step 1: 实现功能**
-- 侧边栏 label/desc 将 `section_inpage_label/desc` 改为通用语义（General/通用）。
-- `InpageSection` 内拆成两个 card：`Inpage Button`（显示范围）与 `Auto-save`（开关）。
-- “显示范围” select 改为同行右对齐布局（label 左、select 右）。
+- `section_inpage_label/desc` 改为【通用】语义（不改 section key，减少路由/测试波动）。
+- 新增 `GeneralSection`：包含两张 card：
+  - 页面内按钮：复用 `InpageSection` 仅渲染显示范围 select（下拉靠右）。
+  - 自动保存：新增 card（heading + checkbox + hint）。
 
 **Step 2: 验证**
 - Run: `npm --prefix webclipper run compile`
-- Expected: TypeScript compile 通过。
 
 **Step 3: 原子提交**
-- Run: `git add webclipper/src/ui/settings/sections/InpageSection.tsx webclipper/src/i18n/locales/en.ts webclipper/src/i18n/locales/zh.ts .github/features/webclipper-inpage-visibility-and-ai-autosave/todo.toml`
-- Run: `git commit -m "refactor: task4 - 重排通用设置卡片与布局"`
+- Run: `git commit -m "feat: task4 - 设置页改为通用并拆分按钮与自动保存"`
 
 ---
 
-## P2-T2 Inpage 按钮右键菜单（快速切换显示/自动保存）
+## P2-T2 浏览器右键菜单加入快捷设置
 
 **Files:**
-- Modify: `webclipper/src/ui/inpage/inpage-button-shadow.ts`
-- Modify: `webclipper/tests/smoke/inpage-button-click-combo.test.ts`
+- Modify: `webclipper/wxt.config.ts`（新增 `contextMenus` 权限）
+- Modify: `webclipper/src/entrypoints/background.ts`
+- Add: `webclipper/src/platform/context-menus/clipper-context-menu.ts`
 - Modify: `webclipper/src/i18n/locales/en.ts`
 - Modify: `webclipper/src/i18n/locales/zh.ts`
+- Modify: `webclipper/AGENTS.md`（补充“右键菜单快捷入口”）
+- Modify: `.github/features/webclipper-inpage-visibility-and-ai-autosave/todo.toml`
 
 **Step 1: 实现功能**
-- 监听 `contextmenu`，右键打开菜单（不影响单击保存/双击打开面板/连击彩蛋）。
-- 菜单支持：
-  - 快速切换 `inpage_display_mode`（supported/all/off，含旧键兼容读默认）
-  - 快速切换 `ai_chat_auto_save_enabled`
-- 菜单操作完成后展示 inpage tip 反馈（简短，提示“刷新后生效”）。
+- background 启动时注册 context menu：
+  - 显示范围：`supported/all/off`（radio）
+  - 自动保存：`ai_chat_auto_save_enabled`（checkbox）
+- 点击后写入 `chrome.storage.local` 同名键。
 
 **Step 2: 验证**
-- Run: `npm --prefix webclipper run test -- tests/smoke/inpage-button-click-combo.test.ts`
-- Expected: 通过。
+- Run: `npm --prefix webclipper run compile`
 
 **Step 3: 原子提交**
-- Run: `git add webclipper/src/ui/inpage/inpage-button-shadow.ts webclipper/tests/smoke/inpage-button-click-combo.test.ts webclipper/src/i18n/locales/en.ts webclipper/src/i18n/locales/zh.ts .github/features/webclipper-inpage-visibility-and-ai-autosave/todo.toml`
-- Run: `git commit -m "feat: task5 - Inpage按钮右键菜单快速设置"`
+- Run: `git commit -m "feat: task5 - 右键菜单提供inpage与自动保存快捷开关"`
 
 ---
 
 ## Phase Audit
 
 - Audit file: `audit-p2.md`
-- Rule: 完成本 phase 全部 tasks 后，`executing-plans` 必须自动进入该文件的审计闭环
 - Flow:
-  1. 先记录发现
-  2. 再修复问题
-  3. 再运行本 phase 验证命令
+  1. 记录发现
+  2. 修复
+  3. 运行 `npm --prefix webclipper run compile` / `test` / `build`
