@@ -65,12 +65,19 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
               <DetailHeaderActionBar
                 actions={chatWithActions}
                 buttonClassName={outlineButtonClass}
-                menuTriggerLabel="Chat with..."
-                menuTriggerTitle="Chat with..."
-                menuTriggerAriaLabel="Chat with"
-                menuAriaLabel="Chat with"
+                menuTriggerLabel={t('detailHeaderChatWithMenuLabel')}
+                menuTriggerTitle={t('detailHeaderChatWithMenuLabel')}
+                menuTriggerAriaLabel={t('detailHeaderChatWithMenuAria')}
+                menuAriaLabel={t('detailHeaderChatWithMenuAria')}
               />
-              <DetailHeaderActionBar actions={openActions} buttonClassName={outlineButtonClass} />
+              <DetailHeaderActionBar
+                actions={openActions}
+                buttonClassName={outlineButtonClass}
+                menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
+                menuTriggerTitle={t('detailHeaderOpenInMenuLabel')}
+                menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
+                menuAriaLabel={t('detailHeaderOpenInMenuAria')}
+              />
             </div>
           </header>
         ) : null}
