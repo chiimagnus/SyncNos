@@ -111,6 +111,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     insightLoading,
     insightError,
     hasLoadedInsight,
+    insightRange,
+    setInsightRange,
   } = useSettingsSceneController({ activeSection, focusKey });
 
   const detailMaxWidthClassName = activeSection === 'insight' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
@@ -232,6 +234,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           error={insightError}
           stats={insightStats}
           hasLoaded={hasLoadedInsight}
+          range={insightRange}
+          onChangeRange={setInsightRange}
         />
       ) : null}
 

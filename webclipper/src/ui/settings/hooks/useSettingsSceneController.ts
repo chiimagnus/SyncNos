@@ -18,7 +18,14 @@ import {
   resetChatWithSettings,
   saveChatWithSettings,
 } from '../../../integrations/chatwith/chatwith-settings';
-import { getInsightStats, type InsightStats } from '../sections/insight-stats';
+import {
+  buildInsightStats,
+  getInsightStatsSourceData,
+  getInsightTimeRangeWindow,
+  type InsightStats,
+  type InsightStatsSourceData,
+  type InsightTimeRange,
+} from '../sections/insight-stats';
 
 import {
   formatProgress,
@@ -126,6 +133,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [insightLoading, setInsightLoading] = useState(false);
   const [insightError, setInsightError] = useState('');
   const [hasLoadedInsight, setHasLoadedInsight] = useState(false);
+  const [insightRange, setInsightRange] = useState<InsightTimeRange>('7d');
+  const insightSourceDataRef = useRef<InsightStatsSourceData | null>(null);
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
@@ -479,9 +488,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setInsightLoading(true);
     setInsightError('');
 
-    void getInsightStats()
-      .then((stats) => {
-        setInsightStats(stats);
+    void getInsightStatsSourceData()
+      .then((data) => {
+        insightSourceDataRef.current = data;
+        const window = getInsightTimeRangeWindow(insightRange);
+        setInsightStats(buildInsightStats(data, window));
       })
       .catch((error) => {
         setInsightError(toErrorMessage(error, 'failed to load insight'));
@@ -490,7 +501,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setInsightLoading(false);
         setHasLoadedInsight(true);
       });
-  }, [activeSection, hasLoadedInsight, insightLoading]);
+  }, [activeSection, hasLoadedInsight, insightLoading, insightRange]);
+
+  useEffect(() => {
+    if (activeSection !== 'insight') return;
+    const data = insightSourceDataRef.current;
+    if (!data) return;
+
+    const window = getInsightTimeRangeWindow(insightRange);
+    setInsightStats(buildInsightStats(data, window));
+  }, [activeSection, insightRange]);
 
   const onResetChatWithSettings = useCallback(async () => {
     await runTask(async () => {
@@ -675,6 +695,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     insightLoading,
     insightError,
     hasLoadedInsight,
+    insightRange,
+    setInsightRange,
 
     chatWithPromptTemplate,
     setChatWithPromptTemplate,

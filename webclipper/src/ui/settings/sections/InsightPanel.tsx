@@ -9,10 +9,15 @@ import {
   type InsightStats,
   type InsightTopConversation,
 } from './insight-stats';
-import { cardClassName } from '../ui';
+import type { InsightTimeRange } from './insight-stats';
+import { cardClassName, selectClassName } from '../ui';
 
 function formatCount(value: number): string {
   return Number(value || 0).toLocaleString();
+}
+
+function stripTrailingLabelPunctuation(value: string): string {
+  return String(value || '').trim().replace(/[：:]\s*$/, '');
 }
 
 function DistributionChart(props: {
@@ -114,11 +119,28 @@ function TopConversationList(props: {
 
 export function InsightPanel(props: {
   stats: InsightStats;
+  range: InsightTimeRange;
+  onChangeRange: (next: InsightTimeRange) => void;
 }) {
-  const { stats } = props;
+  const { stats, range, onChangeRange } = props;
 
   return (
     <div className="tw-grid tw-gap-4">
+      <header className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightHeading')}</h2>
+        <select
+          className={selectClassName}
+          value={range}
+          onChange={(event) => onChangeRange(event.target.value as InsightTimeRange)}
+          aria-label="Time range"
+        >
+          <option value="all">所有数据</option>
+          <option value="today">{stripTrailingLabelPunctuation(t('todayLabel')) || 'Today'}</option>
+          <option value="7d">过去7天</option>
+          <option value="30d">过去30天</option>
+        </select>
+      </header>
+
       <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
           <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
