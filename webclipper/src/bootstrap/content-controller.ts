@@ -1,6 +1,8 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
 import { t } from '../i18n';
 
+const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
+
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
   onInvalidated?: (listener: (error: Error) => void) => () => void;
@@ -61,11 +63,39 @@ const EASTER_EGG_LINES = Object.freeze({
   7: ['Combo x7! Legendary paws.', 'Seven-hit streak. Animal boss mood.'],
 });
 
+const AUTO_SAVE_COLLECTOR_IDS = new Set([
+  'chatgpt',
+  'claude',
+  'gemini',
+  'deepseek',
+  'kimi',
+  'doubao',
+  'yuanbao',
+  'poe',
+  'notionai',
+  'zai',
+]);
+
 function pickLineByLevel(level: number): string {
   const lines = (EASTER_EGG_LINES as any)[level];
   if (!Array.isArray(lines) || !lines.length) return '';
   const index = Math.floor(Math.random() * lines.length);
   return lines[index] || lines[0] || '';
+}
+
+function readAiChatAutoSaveEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
+      const local = storageApi?.local;
+      if (!local?.get) return resolve(true);
+      local.get([STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED], (res: any) => {
+        resolve(res?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false);
+      });
+    } catch (_e) {
+      resolve(true);
+    }
+  });
 }
 
 export function createContentController(deps: Deps) {
@@ -153,6 +183,19 @@ export function createContentController(deps: Deps) {
     let stopped = false;
     let manualSaveInFlight = false;
     let observer: { start?: () => void; stop?: () => void } | null = null;
+    const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
+    const hasStorageGet = !!storageApi?.local?.get;
+    // Default to enabled when storage API is unavailable (e.g. tests).
+    // When storage is available, wait for the async read to avoid a "first tick" auto-save surprise for users who disabled it.
+    let aiChatAutoSaveEnabled: boolean | null = hasStorageGet ? null : true;
+
+    void readAiChatAutoSaveEnabled()
+      .then((enabled) => {
+        aiChatAutoSaveEnabled = enabled === true;
+      })
+      .catch(() => {
+        aiChatAutoSaveEnabled = true;
+      });
 
     function stop() {
       if (stopped) return;
@@ -229,6 +272,8 @@ export function createContentController(deps: Deps) {
           const collector = refreshInpageButton();
           if (!collector || typeof collector.capture !== 'function') return;
           if (collector.id === 'googleaistudio') return;
+          if (!AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
+          if (aiChatAutoSaveEnabled !== true) return;
 
           const snapshot = await Promise.resolve(collector.capture());
           if (!snapshot) return;

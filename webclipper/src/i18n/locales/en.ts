@@ -34,6 +34,8 @@ export const en = {
   inpageDisplayModeAll: 'On all sites',
   inpageDisplayModeOff: 'Off',
   inpageDisplayModeHint: 'Requires a page refresh to apply.',
+  aiChatAutoSaveLabel: 'Auto-save AI chats',
+  aiChatAutoSaveHint: 'Only applies to supported AI chat sites. Requires a refresh to apply.',
   inpageSupportedOnlyLabel: 'Only show Inpage button on supported sites',
   inpageSupportedOnlyHint: 'Non-supported sites require a refresh to apply.',
 
