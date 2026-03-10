@@ -36,10 +36,10 @@ note = "no code change (already done), compile passed"
 [[tasks]]
 id = "P2-T2"
 title = "浏览器右键菜单加入快捷设置"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t2"
-commit = ""
-note = ""
+commit = "feat: task5 - 右键菜单提供inpage与自动保存快捷开关"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T1"
