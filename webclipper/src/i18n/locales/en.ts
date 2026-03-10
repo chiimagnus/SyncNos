@@ -31,6 +31,7 @@ export const en = {
   inpageButtonHeading: 'Inpage Button',
   aiChatAutoSaveHeading: 'Auto-save',
   contextMenuRootTitle: 'SyncNos WebClipper',
+  contextMenuSaveCurrentPage: 'Save current page / AI chat',
   contextMenuInpageGroupTitle: 'Inpage Button',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
