@@ -45,7 +45,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         </div>
       </div>
 
-      <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
+      <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-justify-end tw-gap-2">
         <DetailHeaderActionBar
           actions={chatWithActions}
           buttonClassName={headerActionButtonClass}
