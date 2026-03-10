@@ -30,6 +30,8 @@ export const en = {
   // InpageSection
   inpageButtonHeading: 'Inpage Button',
   aiChatAutoSaveHeading: 'Auto-save',
+  contextMenuRootTitle: 'SyncNos WebClipper',
+  contextMenuInpageGroupTitle: 'Inpage Button',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
   inpageDisplayModeAll: 'On all sites',

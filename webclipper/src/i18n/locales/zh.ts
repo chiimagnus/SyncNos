@@ -32,6 +32,8 @@ export const zh: { [K in TranslationKey]: string } = {
   // InpageSection
   inpageButtonHeading: '页面内按钮',
   aiChatAutoSaveHeading: '自动保存',
+  contextMenuRootTitle: 'SyncNos WebClipper',
+  contextMenuInpageGroupTitle: '页面内按钮',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',
   inpageDisplayModeAll: '所有站点显示',

@@ -13,6 +13,7 @@ import { registerNotionSettingsHandlers } from '../sync/notion/settings-backgrou
 import { registerObsidianSettingsHandlers } from '../sync/obsidian/settings-background-handlers';
 import { onInstalled } from '../platform/runtime/runtime';
 import { openOrFocusExtensionAppTab } from '../platform/webext/extension-app';
+import { registerClipperContextMenu } from '../platform/context-menus/clipper-context-menu';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -56,6 +57,7 @@ export default defineBackground(() => {
   try {
     ensureDefaultNotionOAuthClientId().catch(() => {});
     setupNotionOAuthNavigationListener();
+    registerClipperContextMenu();
     onInstalled((details) => {
       ensureDefaultNotionOAuthClientId().catch(() => {});
       if (details?.reason !== 'install' && details?.reason !== 'update') return;

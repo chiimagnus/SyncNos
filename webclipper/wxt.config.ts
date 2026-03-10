@@ -11,6 +11,7 @@ export default defineConfig({
       'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
     permissions: [
       'storage',
+      'contextMenus',
       'tabs',
       'webNavigation',
       'activeTab',
