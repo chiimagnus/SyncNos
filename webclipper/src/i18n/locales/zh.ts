@@ -239,6 +239,20 @@ export const zh: { [K in TranslationKey]: string } = {
   insightOtherLabel: '其他',
   insightUnknownLabel: '未知',
   insightLoadFailed: '加载 About you 失败',
+  insightRangeAria: '时间范围',
+  insightRangeAll: '所有数据',
+  insightRangeToday: '今天',
+  insightRange7d: '过去7天',
+  insightRange30d: '过去30天',
+
+  // DetailHeaderActionBar / DetailNavigationHeader
+  detailHeaderChatWithMenuLabel: 'Chat with...',
+  detailHeaderChatWithMenuAria: 'Chat with',
+  detailHeaderOpenInMenuLabel: '打开到...',
+  detailHeaderOpenInMenuAria: '打开目标',
+  detailHeaderOpenInNotion: '在 Notion 中打开',
+  detailHeaderOpenInObsidian: '在 Obsidian 中打开',
+  detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
 
   // AboutSection
   aboutSectionAria: '关于 SyncNos WebClipper',

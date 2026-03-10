@@ -49,15 +49,19 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         <DetailHeaderActionBar
           actions={chatWithActions}
           buttonClassName={headerActionButtonClass}
-          menuTriggerLabel="Chat with..."
-          menuTriggerTitle="Chat with..."
-          menuTriggerAriaLabel="Chat with"
-          menuAriaLabel="Chat with"
+          menuTriggerLabel={t('detailHeaderChatWithMenuLabel')}
+          menuTriggerTitle={t('detailHeaderChatWithMenuLabel')}
+          menuTriggerAriaLabel={t('detailHeaderChatWithMenuAria')}
+          menuAriaLabel={t('detailHeaderChatWithMenuAria')}
           className="tw-flex tw-items-center tw-gap-2 md:tw-flex-wrap md:tw-justify-end"
         />
         <DetailHeaderActionBar
           actions={openActions}
           buttonClassName={headerActionButtonClass}
+          menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
+          menuTriggerTitle={t('detailHeaderOpenInMenuLabel')}
+          menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
+          menuAriaLabel={t('detailHeaderOpenInMenuAria')}
           className="tw-flex tw-items-center tw-gap-2 md:tw-flex-wrap md:tw-justify-end"
         />
       </div>

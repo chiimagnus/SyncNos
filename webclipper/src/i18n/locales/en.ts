@@ -239,6 +239,20 @@ export const en = {
   insightOtherLabel: 'Other',
   insightUnknownLabel: 'Unknown',
   insightLoadFailed: 'Failed to load about you',
+  insightRangeAria: 'Time range',
+  insightRangeAll: 'All time',
+  insightRangeToday: 'Today',
+  insightRange7d: 'Past 7 days',
+  insightRange30d: 'Past 30 days',
+
+  // DetailHeaderActionBar / DetailNavigationHeader
+  detailHeaderChatWithMenuLabel: 'Chat with...',
+  detailHeaderChatWithMenuAria: 'Chat with',
+  detailHeaderOpenInMenuLabel: 'Open in...',
+  detailHeaderOpenInMenuAria: 'Open destinations',
+  detailHeaderOpenInNotion: 'Open in Notion',
+  detailHeaderOpenInObsidian: 'Open in Obsidian',
+  detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
 
   // AboutSection
   aboutSectionAria: 'About SyncNos WebClipper',

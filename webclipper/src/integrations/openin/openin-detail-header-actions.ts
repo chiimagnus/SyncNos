@@ -1,4 +1,5 @@
 import type { Conversation } from '../../conversations/domain/models';
+import { t } from '../../i18n';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
 import {
   buildNotionOpenInAction,
@@ -11,9 +12,9 @@ import {
 } from './obsidian-open-target';
 
 export const DETAIL_HEADER_ACTION_LABELS = {
-  openInNotion: 'Open in Notion',
-  openInObsidian: 'Open in Obsidian',
-  obsidianApiNotConnected: 'Obsidian API not connected',
+  openInNotion: t('detailHeaderOpenInNotion'),
+  openInObsidian: t('detailHeaderOpenInObsidian'),
+  obsidianApiNotConnected: t('detailHeaderObsidianApiNotConnected'),
 } as const;
 
 export { buildNotionPageUrl, normalizeNotionPageId };
