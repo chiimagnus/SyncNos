@@ -81,6 +81,29 @@ async function captureActiveTabCurrentPage(): Promise<void> {
   await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.CAPTURE, payload: { source: 'contextmenu' } });
 }
 
+async function refreshSaveMenuTitle(api: any, tab: { id?: unknown; url?: unknown } | null): Promise<void> {
+  if (!api?.update) return;
+  const tabId = Number(tab?.id);
+  if (!Number.isFinite(tabId) || tabId <= 0) return;
+  if (!isHttpUrl(tab?.url)) return;
+
+  let title = t('contextMenuSaveCurrentPage');
+  try {
+    const response = await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE });
+    const ok = !!response && typeof response === 'object' && (response as any).ok === true;
+    const kind = ok ? String((response as any).data?.kind || '') : '';
+    if (kind === 'chat') title = t('contextMenuSaveCurrentAiChat');
+  } catch (_e) {
+    // ignore
+  }
+
+  try {
+    api.update(MENU_SAVE_CURRENT_PAGE_ID, { title });
+  } catch (_e) {
+    // ignore
+  }
+}
+
 async function createOrRefreshMenus(api: any) {
   if (!api?.create) return;
   const state = await readMenuState();
@@ -198,6 +221,20 @@ export function registerClipperContextMenu(): void {
       if (id === MENU_MODE_OFF_ID) {
         void storageSet({ [STORAGE_KEY_DISPLAY_MODE]: 'off' }).catch(() => {});
         return;
+      }
+    });
+  } catch (_e) {
+    // ignore
+  }
+
+  try {
+    api.onShown?.addListener?.((info: any, tab: any) => {
+      if (!info) return;
+      void refreshSaveMenuTitle(api, tab || null);
+      try {
+        api.refresh?.();
+      } catch (_e) {
+        // ignore
       }
     });
   } catch (_e) {
