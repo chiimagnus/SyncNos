@@ -14,8 +14,8 @@ export const zh: { [K in TranslationKey]: string } = {
   section_chat_with_desc: 'Prompt 模板与平台。',
   section_insight_label: 'About you',
   section_insight_desc: '一眼看到你的本地 clip 积累。',
-  section_inpage_label: '页面内按钮',
-  section_inpage_desc: '页面内按钮显示行为设置。',
+  section_inpage_label: '通用',
+  section_inpage_desc: '页面内按钮显示与自动保存设置。',
   section_about_label: 'About me',
   section_about_desc: '项目、作者与支持链接。',
   settingsTitle: '设置',
@@ -31,6 +31,7 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // InpageSection
   inpageButtonHeading: '页面内按钮',
+  aiChatAutoSaveHeading: '自动保存',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',
   inpageDisplayModeAll: '所有站点显示',

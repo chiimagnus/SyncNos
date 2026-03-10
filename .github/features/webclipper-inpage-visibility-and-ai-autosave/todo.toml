@@ -24,3 +24,19 @@ status = "completed"
 plan = "plan-p1.md#p1-t3"
 commit = "docs: task3 - 同步inpage与自动保存设置文档"
 note = "compile/test/build passed"
+
+[[tasks]]
+id = "P2-T1"
+title = "设置页改为通用分组并拆分卡片"
+status = "completed"
+plan = "plan-p2.md#p2-t1"
+commit = "refactor: task4 - 重排通用设置卡片与布局"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T2"
+title = "Inpage 按钮右键菜单（快速切换显示/自动保存）"
+status = "pending"
+plan = "plan-p2.md#p2-t2"
+commit = ""
+note = ""

@@ -12,8 +12,8 @@ export const en = {
   section_chat_with_desc: 'Prompt + platforms.',
   section_insight_label: 'About you',
   section_insight_desc: 'See your local clip stats at a glance.',
-  section_inpage_label: 'Inpage',
-  section_inpage_desc: 'Inpage button visibility behavior.',
+  section_inpage_label: 'General',
+  section_inpage_desc: 'Inpage visibility + auto-save behavior.',
   section_about_label: 'About me',
   section_about_desc: 'Project, author, and support links.',
   settingsTitle: 'Settings',
@@ -29,6 +29,7 @@ export const en = {
 
   // InpageSection
   inpageButtonHeading: 'Inpage Button',
+  aiChatAutoSaveHeading: 'Auto-save',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
   inpageDisplayModeAll: 'On all sites',
