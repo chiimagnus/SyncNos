@@ -241,7 +241,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'inpage' ? (
+      {activeSection === 'general' ? (
         <InpageSection
           busy={busy}
           displayMode={inpageDisplayMode}

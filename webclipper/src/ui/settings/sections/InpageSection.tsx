@@ -49,18 +49,20 @@ export function InpageSection(props: {
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
           {t('aiChatAutoSaveHint')}
         </div>
-        <div className="tw-mt-2 tw-flex tw-flex-wrap tw-gap-2">
-          {SUPPORTED_AI_CHAT_SITES.map((site) => (
-            <span
-              key={site.id}
-              className="tw-inline-flex tw-items-center tw-gap-1.5 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2.5 tw-py-1 tw-text-xs tw-font-bold tw-text-[var(--text)]"
-            >
-              <span className="tw-text-[var(--text)]">{site.name}</span>
-              <span className="tw-text-[var(--muted)]">
-                {Array.isArray(site.hosts) && site.hosts.length ? site.hosts[0] : site.id}
-              </span>
-            </span>
-          ))}
+        <div className="tw-mt-2.5 tw-grid tw-gap-2">
+          {SUPPORTED_AI_CHAT_SITES.map((site) => {
+            const hosts = Array.isArray(site.hosts) ? site.hosts.filter(Boolean) : [];
+            const hostLabel = hosts.length ? hosts.join(' / ') : site.id;
+            return (
+              <div
+                key={site.id}
+                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-3 tw-py-2"
+              >
+                <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{site.name}</div>
+                <div className="tw-truncate tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{hostLabel}</div>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>
