@@ -16,7 +16,7 @@ import { inpageTipApi } from '../ui/inpage/inpage-tip-shadow.ts';
 import { createRuntimeClient } from '../platform/runtime/client.ts';
 
 export default defineContentScript({
-  // Inpage visibility is controlled at runtime by `inpage_supported_only`.
+  // Inpage visibility is controlled at runtime by `inpage_display_mode` (and legacy `inpage_supported_only`).
   // This avoids browser-specific dynamic content-script registration support gaps.
   matches: ['http://*/*', 'https://*/*'],
   main() {

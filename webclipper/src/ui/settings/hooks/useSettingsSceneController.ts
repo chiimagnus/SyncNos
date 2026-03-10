@@ -76,6 +76,18 @@ export type UseSettingsSceneControllerArgs = {
   focusKey?: string;
 };
 
+type InpageDisplayMode = 'supported' | 'all' | 'off';
+
+function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
+  return null;
+}
+
+function inpageDisplayModeFromLegacySupportedOnly(value: unknown): InpageDisplayMode {
+  return value === true ? 'supported' : 'all';
+}
+
 export function useSettingsSceneController(args: UseSettingsSceneControllerArgs) {
   const { activeSection, focusKey = '' } = args;
 
@@ -119,7 +131,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [notionAiModelIndex, setNotionAiModelIndex] = useState<string>('');
 
   // Inpage
-  const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean>(false);
+  const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
 
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
@@ -176,6 +188,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'notion_parent_page_id',
           'notion_parent_page_title',
           'notion_ai_preferred_model_index',
+          'inpage_display_mode',
           'inpage_supported_only',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
@@ -193,7 +206,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
       setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || ''));
 
-      setInpageSupportedOnly(!!local?.inpage_supported_only);
+      const normalizedInpageMode = normalizeInpageDisplayMode(local?.inpage_display_mode);
+      setInpageDisplayMode(
+        normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only)
+      );
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
 
       const obsidianSettings = unwrap(obsidianRes);
@@ -425,11 +441,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     );
   }, [runTask]);
 
-  const onToggleInpageSupportedOnly = useCallback(
-    async (next: boolean) => {
+  const onChangeInpageDisplayMode = useCallback(
+    async (next: InpageDisplayMode) => {
       await runTask(async () => {
-        await storageSet({ inpage_supported_only: !!next });
-        setInpageSupportedOnly(!!next);
+        await storageSet({ inpage_display_mode: next });
+        setInpageDisplayMode(next);
       });
     },
     [runTask]
@@ -688,8 +704,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     importFromFile,
     handleBackupImportClick,
 
-    inpageSupportedOnly,
-    onToggleInpageSupportedOnly,
+    inpageDisplayMode,
+    onChangeInpageDisplayMode,
 
     insightStats,
     insightLoading,
