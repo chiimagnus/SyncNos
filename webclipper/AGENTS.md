@@ -41,7 +41,7 @@
 - AI 聊天自动保存开关：`ai_chat_auto_save_enabled`（`chrome.storage.local`，默认 `true`）。
   - 关闭后：不再对支持的 AI 聊天站点执行自动保存（仍可手动点击 inpage 按钮保存）。
   - 切换后对**新打开/刷新**的页面生效。
-- 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可快速切换 inpage 显示范围与 AI 自动保存开关。
+- 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
