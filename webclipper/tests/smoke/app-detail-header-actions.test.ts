@@ -46,6 +46,7 @@ vi.mock('../../src/i18n', () => ({
       noMessages: 'No messages',
       selectAConversation: 'Select a conversation',
       backButton: 'Back',
+      detailHeaderOpenInMenuAria: 'Open destinations',
       messageRoleFallback: 'message',
     };
     return labels[key] || key;

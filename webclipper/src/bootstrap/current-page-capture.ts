@@ -33,6 +33,7 @@ export type CurrentPageCaptureResult = {
   collectorId: string | null;
   conversationId: number | null;
   title?: string;
+  isNew?: boolean;
 };
 
 const CORE_MESSAGE_TYPES = Object.freeze({
@@ -56,6 +57,23 @@ function normalizeConversationId(value: unknown): number | null {
   if (!Number.isFinite(conversationId) || conversationId <= 0) return null;
   return conversationId;
 }
+
+function normalizeTitle(value: unknown): string {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function truncateForTip(title: string, maxChars: number): string {
+  const value = normalizeTitle(title);
+  const limit = Number.isFinite(Number(maxChars)) ? Math.max(1, Math.floor(Number(maxChars))) : 60;
+  if (!value) return '';
+  if (value.length <= limit) return value;
+  const sliceLen = Math.max(0, limit - 1);
+  return `${value.slice(0, sliceLen)}…`;
+}
+
+const TIP_TITLE_MAX_CHARS = 48;
 
 export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   const runtime = deps.runtime;
@@ -149,7 +167,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    return { conversationId: normalizeConversationId(conversation.id) };
+    const rawIsNew = (conversation as any)?.__isNew;
+    return {
+      conversationId: normalizeConversationId(conversation.id),
+      isNew: typeof rawIsNew === 'boolean' ? rawIsNew : undefined,
+    };
   }
 
   async function captureCurrentPage(input?: {
@@ -173,13 +195,20 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (!response?.ok) {
           throw new Error(response?.error?.message || t('captureFailedFallback'));
         }
-        report(t('saved'), 'default');
+        const title = normalizeTitle(response?.data?.title || '');
+        const isNew = response?.data?.isNew !== false;
+        const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
+        report(
+          title ? `${prefix}${truncateForTip(title, TIP_TITLE_MAX_CHARS)}` : (isNew ? t('saved') : t('updated')),
+          'default',
+        );
         return {
           kind: 'article',
           label: target.label,
           collectorId: target.collectorId,
           conversationId: normalizeConversationId(response?.data?.conversationId),
-          title: String(response?.data?.title || '').trim() || undefined,
+          title: title || undefined,
+          isNew,
         };
       }
 
@@ -199,13 +228,20 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         throw new Error(t('noVisibleConversationFound'));
       }
 
-      report(t('saved'), 'default');
+      const title = normalizeTitle(snapshot?.conversation?.title || '');
+      const isNew = saved.isNew !== false;
+      const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
+      report(
+        title ? `${prefix}${truncateForTip(title, TIP_TITLE_MAX_CHARS)}` : (isNew ? t('saved') : t('updated')),
+        'default',
+      );
       return {
         kind: 'chat',
         label: target.label,
         collectorId: target.collectorId,
         conversationId: normalizeConversationId(saved.conversationId),
-        title: String(snapshot?.conversation?.title || '').trim() || undefined,
+        title: title || undefined,
+        isNew,
       };
     } catch (error) {
       report(errorMessage(error, t('captureFailedFallback')), 'error');
