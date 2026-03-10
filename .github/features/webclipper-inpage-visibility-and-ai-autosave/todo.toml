@@ -12,10 +12,10 @@ note = "compile passed"
 [[tasks]]
 id = "P1-T2"
 title = "AI 聊天自动保存总开关（仅 chat collectors）"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t2"
-commit = ""
-note = ""
+commit = "feat: task2 - 增加AI聊天自动保存总开关"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T3"

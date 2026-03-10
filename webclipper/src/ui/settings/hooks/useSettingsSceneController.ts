@@ -132,6 +132,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   // Inpage
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
+  const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
 
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
@@ -190,6 +191,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'notion_ai_preferred_model_index',
           'inpage_display_mode',
           'inpage_supported_only',
+          'ai_chat_auto_save_enabled',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
@@ -210,6 +212,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setInpageDisplayMode(
         normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only)
       );
+      setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
 
       const obsidianSettings = unwrap(obsidianRes);
@@ -446,6 +449,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       await runTask(async () => {
         await storageSet({ inpage_display_mode: next });
         setInpageDisplayMode(next);
+      });
+    },
+    [runTask]
+  );
+
+  const onToggleAiChatAutoSaveEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        await storageSet({ ai_chat_auto_save_enabled: next === true });
+        setAiChatAutoSaveEnabled(next === true);
       });
     },
     [runTask]
@@ -706,6 +719,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     inpageDisplayMode,
     onChangeInpageDisplayMode,
+    aiChatAutoSaveEnabled,
+    onToggleAiChatAutoSaveEnabled,
 
     insightStats,
     insightLoading,

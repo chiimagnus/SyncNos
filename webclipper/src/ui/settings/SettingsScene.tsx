@@ -106,6 +106,8 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     inpageDisplayMode,
     onChangeInpageDisplayMode,
+    aiChatAutoSaveEnabled,
+    onToggleAiChatAutoSaveEnabled,
 
     insightStats,
     insightLoading,
@@ -245,6 +247,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           displayMode={inpageDisplayMode}
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);
+          }}
+          aiChatAutoSaveEnabled={aiChatAutoSaveEnabled}
+          onToggleAiChatAutoSaveEnabled={(next) => {
+            void onToggleAiChatAutoSaveEnabled(next);
           }}
         />
       ) : null}
