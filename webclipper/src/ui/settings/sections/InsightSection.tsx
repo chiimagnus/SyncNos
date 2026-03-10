@@ -1,5 +1,5 @@
 import { t } from '../../../i18n';
-import type { InsightStats } from './insight-stats';
+import type { InsightStats, InsightTimeRange } from './insight-stats';
 import { hasInsightData } from './insight-stats';
 import { InsightPanel } from './InsightPanel';
 import { cardClassName } from '../ui';
@@ -24,8 +24,10 @@ export function InsightSection(props: {
   error: string;
   stats: InsightStats | null;
   hasLoaded: boolean;
+  range: InsightTimeRange;
+  onChangeRange: (next: InsightTimeRange) => void;
 }) {
-  const { loading, error, stats, hasLoaded } = props;
+  const { loading, error, stats, hasLoaded, range, onChangeRange } = props;
 
   if (loading || !hasLoaded) {
     return <InsightStateCard title={t('insightLoadingTitle')} />;
@@ -39,5 +41,5 @@ export function InsightSection(props: {
     return <InsightStateCard title={t('insightEmptyTitle')} />;
   }
 
-  return <InsightPanel stats={stats} />;
+  return <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />;
 }
