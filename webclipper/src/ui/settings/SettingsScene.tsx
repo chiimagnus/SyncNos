@@ -104,8 +104,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     importFromFile,
     handleBackupImportClick,
 
-    inpageSupportedOnly,
-    onToggleInpageSupportedOnly,
+    inpageDisplayMode,
+    onChangeInpageDisplayMode,
 
     insightStats,
     insightLoading,
@@ -242,9 +242,9 @@ export function SettingsScene(props: SettingsSceneProps) {
       {activeSection === 'inpage' ? (
         <InpageSection
           busy={busy}
-          supportedOnly={inpageSupportedOnly}
-          onToggleSupportedOnly={(next) => {
-            void onToggleInpageSupportedOnly(next);
+          displayMode={inpageDisplayMode}
+          onChangeDisplayMode={(next) => {
+            void onChangeInpageDisplayMode(next);
           }}
         />
       ) : null}

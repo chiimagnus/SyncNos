@@ -29,6 +29,11 @@ export const en = {
 
   // InpageSection
   inpageButtonHeading: 'Inpage Button',
+  inpageDisplayModeLabel: 'Visibility',
+  inpageDisplayModeSupported: 'Only on supported sites',
+  inpageDisplayModeAll: 'On all sites',
+  inpageDisplayModeOff: 'Off',
+  inpageDisplayModeHint: 'Requires a page refresh to apply.',
   inpageSupportedOnlyLabel: 'Only show Inpage button on supported sites',
   inpageSupportedOnlyHint: 'Non-supported sites require a refresh to apply.',
 

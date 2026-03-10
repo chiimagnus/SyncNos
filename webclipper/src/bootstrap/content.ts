@@ -13,7 +13,20 @@ type StartContentBootstrapInput = {
   inpageButton?: { initRuntime?: (runtime: { getURL?: (path: string) => string } | null) => void };
 };
 
-const STORAGE_KEY = 'inpage_supported_only';
+const STORAGE_KEY_SUPPORTED_ONLY = 'inpage_supported_only';
+const STORAGE_KEY_DISPLAY_MODE = 'inpage_display_mode';
+
+type InpageDisplayMode = 'supported' | 'all' | 'off';
+
+function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
+  return null;
+}
+
+function displayModeFromLegacySupportedOnly(value: unknown): InpageDisplayMode {
+  return value === true ? 'supported' : 'all';
+}
 
 const SUPPORTED_HOST_SUFFIXES = Object.freeze([
   'chat.openai.com',
@@ -79,27 +92,34 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
 
   const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
 
-  function readSupportedOnly(): Promise<boolean> {
+  function readDisplayMode(): Promise<InpageDisplayMode> {
     return new Promise((resolve) => {
       try {
         const local = storageApi?.local;
-        if (!local?.get) return resolve(false);
-        local.get([STORAGE_KEY], (res: any) => resolve(res?.[STORAGE_KEY] === true));
+        if (!local?.get) return resolve('all');
+        local.get([STORAGE_KEY_DISPLAY_MODE, STORAGE_KEY_SUPPORTED_ONLY], (res: any) => {
+          const normalized = normalizeInpageDisplayMode(res?.[STORAGE_KEY_DISPLAY_MODE]);
+          if (normalized) return resolve(normalized);
+          return resolve(displayModeFromLegacySupportedOnly(res?.[STORAGE_KEY_SUPPORTED_ONLY]));
+        });
       } catch (_e) {
-        resolve(false);
+        resolve('all');
       }
     });
   }
 
-  function applySupportedOnly(supportedOnly: boolean) {
-    // supported sites always on (the setting means "supported sites only").
-    if (supportedHost) {
-      if (!active) startController();
+  function applyDisplayMode(mode: InpageDisplayMode) {
+    if (mode === 'off') {
+      if (active) stopController();
       return;
     }
 
-    if (supportedOnly) {
-      if (active) stopController();
+    if (mode === 'supported') {
+      if (supportedHost) {
+        if (!active) startController();
+      } else if (active) {
+        stopController();
+      }
       return;
     }
 
@@ -107,13 +127,9 @@ export function startContentBootstrap(input: StartContentBootstrapInput) {
   }
 
   // Initial start decision.
-  if (supportedHost) {
-    startController();
-  } else {
-    readSupportedOnly()
-      .then((supportedOnly) => applySupportedOnly(supportedOnly))
-      .catch(() => applySupportedOnly(false));
-  }
+  readDisplayMode()
+    .then((mode) => applyDisplayMode(mode))
+    .catch(() => applyDisplayMode('all'));
 
   return {
     stop() {

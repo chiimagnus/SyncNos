@@ -31,6 +31,11 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // InpageSection
   inpageButtonHeading: '页面内按钮',
+  inpageDisplayModeLabel: '显示范围',
+  inpageDisplayModeSupported: '仅在支持站点显示',
+  inpageDisplayModeAll: '所有站点显示',
+  inpageDisplayModeOff: '全部关闭',
+  inpageDisplayModeHint: '切换后需刷新页面以生效。',
   inpageSupportedOnlyLabel: '仅在支持站点显示 Inpage 按钮',
   inpageSupportedOnlyHint: '切换后需刷新页面以生效。',
 
