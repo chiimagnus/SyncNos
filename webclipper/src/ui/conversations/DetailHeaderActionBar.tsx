@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ExternalLink, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 
@@ -83,9 +84,17 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
+  const resolveActionIcon = (action: DetailHeaderAction) => {
+    if (action.slot === 'chat-with') return <Sparkles size={14} strokeWidth={2} aria-hidden="true" />;
+    if (action.provider === 'obsidian' && action.disabled) return <Link2Off size={14} strokeWidth={2} aria-hidden="true" />;
+    if (action.kind === 'external-link') return <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />;
+    return null;
+  };
+
   if (actions.length === 1) {
     const action = actions[0]!;
     const buttonLabel = labelOverride || action.label;
+    const icon = resolveActionIcon(action);
     return (
       <div className={className || 'tw-flex tw-items-center tw-gap-2'}>
         <button
@@ -100,7 +109,10 @@ export function DetailHeaderActionBar({
           aria-disabled={action.disabled ? 'true' : undefined}
           disabled={busy || !!action.disabled}
         >
-          {buttonLabel}
+          <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+            {icon}
+            <span className="tw-hidden md:tw-inline">{buttonLabel}</span>
+          </span>
         </button>
       </div>
     );
@@ -111,6 +123,7 @@ export function DetailHeaderActionBar({
   const resolvedMenuTriggerAriaLabel = String(menuTriggerAriaLabel || '').trim() || 'Open destinations';
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
   const triggerLabel = labelOverride || resolvedMenuTriggerLabel;
+  const primaryIcon = resolveActionIcon(actions[0]!);
 
   const menuButtonClass =
     'tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)]';
@@ -130,7 +143,10 @@ export function DetailHeaderActionBar({
           className={buttonClassName}
           disabled={busy}
         >
-          <span className="tw-leading-none">{triggerLabel}</span>
+          <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+            {primaryIcon}
+            <span className="tw-hidden md:tw-inline tw-leading-none">{triggerLabel}</span>
+          </span>
           <span
             className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
             aria-hidden="true"
