@@ -1,5 +1,4 @@
 import { CURRENT_PAGE_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-
 import type { CurrentPageCaptureService } from './current-page-capture';
 
 type ApiResponse<T> = {
@@ -7,6 +6,14 @@ type ApiResponse<T> = {
   data: T | null;
   error: { message: string; extra: unknown } | null;
 };
+
+type InpageTipApi = {
+  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'loading' | 'error' }) => void;
+};
+
+function normalizeTipKind(value: unknown): 'default' | 'loading' | 'error' {
+  return value === 'loading' || value === 'error' ? value : 'default';
+}
 
 function ok<T>(data: T): ApiResponse<T> {
   return { ok: true, data, error: null };
@@ -23,7 +30,10 @@ function err(message: unknown, extra?: unknown): ApiResponse<null> {
   };
 }
 
-export function registerCurrentPageCaptureContentHandlers(service: CurrentPageCaptureService) {
+export function registerCurrentPageCaptureContentHandlers(
+  service: CurrentPageCaptureService,
+  options?: { inpageTip?: InpageTipApi | null },
+) {
   const runtime = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
   const onMessage = runtime?.onMessage;
   if (!onMessage?.addListener) return () => {};
@@ -40,10 +50,26 @@ export function registerCurrentPageCaptureContentHandlers(service: CurrentPageCa
     }
 
     if (msg.type === CURRENT_PAGE_MESSAGE_TYPES.CAPTURE) {
+      const source = String(msg?.payload?.source || '').trim().toLowerCase();
+      const inpageTip = options?.inpageTip;
+      const showTip = source === 'contextmenu' && typeof inpageTip?.showSaveTip === 'function';
+
       Promise.resolve()
-        .then(() => service.captureCurrentPage())
+        .then(() =>
+          service.captureCurrentPage(
+            showTip
+              ? {
+                  onProgress: (progress) => {
+                    inpageTip?.showSaveTip?.(progress?.message, { kind: normalizeTipKind(progress?.kind) });
+                  },
+                }
+              : undefined,
+          ),
+        )
         .then((data) => sendResponse(ok(data)))
-        .catch((error) => sendResponse(err((error as any)?.message ?? error)));
+        .catch((error) => {
+          sendResponse(err((error as any)?.message ?? error));
+        });
       return true;
     }
 

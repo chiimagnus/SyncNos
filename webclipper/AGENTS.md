@@ -31,11 +31,17 @@
 - 对话删除必须显式二次确认，避免误删。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
 - inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。
-- inpage 显示范围开关：`inpage_supported_only`（`chrome.storage.local`）。
-  - 默认值 `false`：所有 `http(s)` 页面显示 inpage 按钮。
-  - 值为 `true`：仅在已支持 AI 站点 + Notion 页面显示 inpage 按钮（普通网页隐藏）。
+- inpage 显示范围设置：`inpage_display_mode`（`chrome.storage.local`）。
+  - 默认值 `all`：所有 `http(s)` 页面显示 inpage 按钮。
+  - `supported`：仅在已支持 AI 站点 + Notion 页面显示 inpage 按钮（普通网页隐藏）。
+  - `off`：所有站点隐藏 inpage 按钮（全局关闭）。
+  - 兼容：当 `inpage_display_mode` 不存在时，回退读取旧键 `inpage_supported_only`（`true -> supported`，否则 `all`）。
   - 切换后对**新打开/刷新**的页面生效（当前实现仅在 content script 启动时读取配置）。
-  - 该开关只影响 inpage 按钮显示，不影响 popup 中 `Fetch Current Page` 能力。
+  - 该设置只影响 inpage 按钮显示，不影响 popup/app 中 `Fetch Current Page` 能力。
+- AI 聊天自动保存开关：`ai_chat_auto_save_enabled`（`chrome.storage.local`，默认 `true`）。
+  - 关闭后：不再对支持的 AI 聊天站点执行自动保存（仍可手动点击 inpage 按钮保存）。
+  - 切换后对**新打开/刷新**的页面生效。
+- 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
@@ -99,8 +105,8 @@
   - `Chat with ChatGPT`（Phase 1）会把当前 detail 内容拼成 prompt 写入剪贴板，并跳转到 ChatGPT（后续迭代再做 DOM 自动注入与发送）。
   - `Open in Obsidian` 的文件打开只能走 Obsidian Local REST API 的 `POST /open/{filename}`；`obsidian://open` 只允许用于拉起桌面 App，再回到 REST API 完成目标文件打开。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
-  - popup 写入：`src/ui/popup/tabs/SettingsTab.tsx`（保存 `inpage_supported_only` 到 `chrome.storage.local`）。
-  - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_supported_only` 决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。
+  - settings 写入：`src/ui/settings/hooks/useSettingsSceneController.ts`（保存 `inpage_display_mode` / `ai_chat_auto_save_enabled` 到 `chrome.storage.local`，并兼容旧 `inpage_supported_only`）。
+  - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_display_mode`（及旧 `inpage_supported_only`）决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。
   - 当前实现仅在启动时读取配置，因此切换开关后需刷新页面生效。
 
 Phase 3（JS→TS）收口状态：

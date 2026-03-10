@@ -104,8 +104,10 @@ export function SettingsScene(props: SettingsSceneProps) {
     importFromFile,
     handleBackupImportClick,
 
-    inpageSupportedOnly,
-    onToggleInpageSupportedOnly,
+    inpageDisplayMode,
+    onChangeInpageDisplayMode,
+    aiChatAutoSaveEnabled,
+    onToggleAiChatAutoSaveEnabled,
 
     insightStats,
     insightLoading,
@@ -239,12 +241,16 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'inpage' ? (
+      {activeSection === 'general' ? (
         <InpageSection
           busy={busy}
-          supportedOnly={inpageSupportedOnly}
-          onToggleSupportedOnly={(next) => {
-            void onToggleInpageSupportedOnly(next);
+          displayMode={inpageDisplayMode}
+          onChangeDisplayMode={(next) => {
+            void onChangeInpageDisplayMode(next);
+          }}
+          aiChatAutoSaveEnabled={aiChatAutoSaveEnabled}
+          onToggleAiChatAutoSaveEnabled={(next) => {
+            void onToggleAiChatAutoSaveEnabled(next);
           }}
         />
       ) : null}

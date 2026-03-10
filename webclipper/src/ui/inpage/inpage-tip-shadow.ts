@@ -157,9 +157,19 @@ function setTextAndKind(el: HTMLElement, text: unknown, kind?: TipKind) {
 function positionBubble(el: HTMLElement) {
   if (!el || !(el as any).isConnected) return;
   const viewport = getViewport();
-  const anchorRect = getAnchorRect();
-  if (!anchorRect) return;
   const bubbleRect = el.getBoundingClientRect();
+  const anchorRect = getAnchorRect();
+  if (!anchorRect) {
+    const width = Math.max(1, Math.round((bubbleRect as any).width || 1));
+    const height = Math.max(1, Math.round((bubbleRect as any).height || 1));
+    const maxLeft = Math.max(VIEWPORT_PAD, viewport.width - width - VIEWPORT_PAD);
+    const maxTop = Math.max(VIEWPORT_PAD, viewport.height - height - VIEWPORT_PAD);
+
+    (el as any).dataset.placement = 'none';
+    setImportantStyle(el, 'left', `${Math.round(clamp(viewport.width - width - VIEWPORT_PAD, VIEWPORT_PAD, maxLeft))}px`);
+    setImportantStyle(el, 'top', `${Math.round(clamp(viewport.height - height - VIEWPORT_PAD, VIEWPORT_PAD, maxTop))}px`);
+    return;
+  }
   const placement = inferPlacement(anchorRect, viewport);
   const pos = computeBubblePosition(anchorRect, bubbleRect, viewport, placement);
 
