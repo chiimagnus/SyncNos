@@ -5,11 +5,11 @@ import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/ui/setting
 describe('settings section definitions', () => {
   it('keeps the flattened settings navigation order stable', () => {
     expect(SETTINGS_SECTIONS.map((section) => section.key)).toEqual([
+      'general',
+      'chat_with',
       'backup',
       'notion',
       'obsidian',
-      'chat_with',
-      'general',
       'insight',
       'about',
     ]);
@@ -22,8 +22,8 @@ describe('settings section definitions', () => {
         keys: group.sections.map((section) => section.key),
       }))
     ).toEqual([
+      { title: 'Features', keys: ['general', 'chat_with'] },
       { title: 'Data', keys: ['backup', 'notion', 'obsidian'] },
-      { title: 'Features', keys: ['chat_with', 'general'] },
       { title: 'About', keys: ['insight', 'about'] },
     ]);
   });
