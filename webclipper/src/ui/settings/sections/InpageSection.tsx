@@ -1,4 +1,5 @@
 import { t } from '../../../i18n';
+import { SUPPORTED_AI_CHAT_SITES } from '../../../collectors/ai-chat-sites';
 import { cardClassName, checkboxClassName, selectClassName } from '../ui';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
@@ -47,6 +48,19 @@ export function InpageSection(props: {
         </label>
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
           {t('aiChatAutoSaveHint')}
+        </div>
+        <div className="tw-mt-2 tw-flex tw-flex-wrap tw-gap-2">
+          {SUPPORTED_AI_CHAT_SITES.map((site) => (
+            <span
+              key={site.id}
+              className="tw-inline-flex tw-items-center tw-gap-1.5 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2.5 tw-py-1 tw-text-xs tw-font-bold tw-text-[var(--text)]"
+            >
+              <span className="tw-text-[var(--text)]">{site.name}</span>
+              <span className="tw-text-[var(--muted)]">
+                {Array.isArray(site.hosts) && site.hosts.length ? site.hosts[0] : site.id}
+              </span>
+            </span>
+          ))}
         </div>
       </section>
     </div>

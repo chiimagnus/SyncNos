@@ -1,5 +1,6 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
 import { t } from '../i18n';
+import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '../collectors/ai-chat-sites';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
@@ -62,19 +63,6 @@ const EASTER_EGG_LINES = Object.freeze({
   5: ['Combo x5! Beast mode on.', 'Five-hit streak. Zoomies unlocked.'],
   7: ['Combo x7! Legendary paws.', 'Seven-hit streak. Animal boss mood.'],
 });
-
-const AUTO_SAVE_COLLECTOR_IDS = new Set([
-  'chatgpt',
-  'claude',
-  'gemini',
-  'deepseek',
-  'kimi',
-  'doubao',
-  'yuanbao',
-  'poe',
-  'notionai',
-  'zai',
-]);
 
 function pickLineByLevel(level: number): string {
   const lines = (EASTER_EGG_LINES as any)[level];
@@ -272,7 +260,7 @@ export function createContentController(deps: Deps) {
           const collector = refreshInpageButton();
           if (!collector || typeof collector.capture !== 'function') return;
           if (collector.id === 'googleaistudio') return;
-          if (!AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
+          if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
           if (aiChatAutoSaveEnabled !== true) return;
 
           const snapshot = await Promise.resolve(collector.capture());
