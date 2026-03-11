@@ -10,6 +10,7 @@ import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';
 import { buttonDangerTintClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName, menuPopoverPanelClassName } from '../shared/button-styles';
+import { SelectMenu } from '../shared/SelectMenu';
 
 type SourceMeta = { key: string; label: string };
 
@@ -525,23 +526,24 @@ export function ConversationListPane({
               <span className="tw-sr-only">{t('selectAll')}</span>
             </label>
 
-            <select
-              id="sourceFilterSelect"
+            <SelectMenu<string>
+              buttonId="sourceFilterSelect"
+              className={hasSelection ? 'tw-hidden' : ''}
               value={filterKey}
-              onChange={(e) => onSetFilterKey(e.target.value)}
+              onChange={(next) => onSetFilterKey(next)}
               disabled={hasSelection}
-              className={[
-                'tw-h-8 tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-                hasSelection ? 'tw-hidden' : '',
+              ariaLabel={t('sourceFilterAria')}
+              side="top"
+              align="start"
+              minWidth={150}
+              buttonClassName={[
+                'tw-h-8 tw-w-full tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
+                'tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)]',
+                'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
               ].join(' ')}
-              aria-label={t('sourceFilterAria')}
-            >
-              {sourceOptions.map((opt) => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              options={sourceOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
+            />
 
             <div
               id="chatActionButtons"
