@@ -22,7 +22,7 @@ export function navIconButtonClassName(active: boolean): string {
       'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
       'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
     ].join(' ');
-  if (active) return `${base} tw-bg-[var(--bg-sunken)] tw-text-[var(--text-primary)]`;
+  if (active) return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)] hover:tw-bg-[var(--bg-sunken)]`;
   return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
@@ -34,7 +34,7 @@ export function navIconButtonSmClassName(active: boolean): string {
       'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
       'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
     ].join(' ');
-  if (active) return `${base} tw-bg-[var(--bg-sunken)] tw-text-[var(--text-primary)]`;
+  if (active) return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)] hover:tw-bg-[var(--bg-sunken)]`;
   return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
