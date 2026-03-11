@@ -82,6 +82,8 @@ function DistributionChart(props: {
           <Tooltip
             cursor={{ fill: 'color-mix(in srgb, var(--accent) 18%, transparent)' }}
             formatter={(value) => [formatCount(Number(value || 0)), t('insightTooltipClips')]}
+            itemStyle={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 800 }}
+            labelStyle={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700 }}
             contentStyle={{
               borderRadius: 12,
               border: '1px solid var(--border)',
