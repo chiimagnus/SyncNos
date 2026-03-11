@@ -26,7 +26,7 @@ function DistributionChart(props: {
 }) {
   const { items, emptyText } = props;
   if (!items.length) {
-    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">{emptyText}</div>;
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{emptyText}</div>;
   }
 
   const chartHeight = Math.max(212, items.length * 48);
@@ -65,23 +65,24 @@ function DistributionChart(props: {
             width={136}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: 'var(--text)', fontSize: 12, fontWeight: 700 }}
+            tick={{ fill: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}
           />
           <Tooltip
-            cursor={{ fill: 'rgba(217, 89, 38, 0.08)' }}
+            cursor={{ fill: 'color-mix(in srgb, var(--accent) 18%, transparent)' }}
             formatter={(value) => [formatCount(Number(value || 0)), t('insightTooltipClips')]}
             contentStyle={{
               borderRadius: 12,
               border: '1px solid var(--border)',
-              background: 'rgba(255, 247, 243, 0.98)',
-              boxShadow: 'var(--shadow)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
+              boxShadow: '0 12px 28px rgba(0, 0, 0, 0.18)',
             }}
           />
           <Bar dataKey="count" radius={[0, 10, 10, 0]} barSize={22}>
             {items.map((item) => (
               <Cell
                 key={item.label}
-                fill={item.label === INSIGHT_OTHER_LABEL ? 'var(--btn-bg-hover)' : 'var(--text)'}
+                fill={item.label === INSIGHT_OTHER_LABEL ? 'var(--text-secondary)' : 'var(--secondary)'}
               />
             ))}
           </Bar>
@@ -96,19 +97,19 @@ function TopConversationList(props: {
 }) {
   const { items } = props;
   if (!items.length) {
-    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">{t('insightTopConversationsEmpty')}</div>;
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightTopConversationsEmpty')}</div>;
   }
 
   return (
     <div className="tw-grid tw-gap-2.5">
       {items.map((item, index) => (
         <div key={item.conversationId} className="tw-grid tw-grid-cols-[auto_minmax(0,1fr)_auto] tw-items-start tw-gap-3">
-          <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{index + 1}.</div>
+          <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{index + 1}.</div>
           <div className="tw-min-w-0">
-            <div className="tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text)]">{item.title}</div>
-            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{item.source}</div>
+            <div className="tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text-primary)]">{item.title}</div>
+            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
           </div>
-          <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">
+          <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
             {formatCount(item.messageCount)} {t('insightTurnsUnit')}
           </div>
         </div>
@@ -127,7 +128,7 @@ export function InsightPanel(props: {
   return (
     <div className="tw-grid tw-gap-4">
       <header className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightHeading')}</h2>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightHeading')}</h2>
         <select
           className={selectClassName}
           value={range}
@@ -143,42 +144,42 @@ export function InsightPanel(props: {
 
       <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
+          <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
             {t('insightOverviewTotalClips')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.totalClips)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.totalClips)}</div>
         </div>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
+          <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
             {t('insightOverviewChatCount')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.chatCount)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.chatCount)}</div>
         </div>
         <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
+          <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
             {t('insightOverviewArticleCount')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.articleCount)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.articleCount)}</div>
         </div>
       </section>
 
       <div className="tw-grid tw-gap-4 lg:tw-grid-cols-2">
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightChatSectionTitle')}</h2>
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightChatSectionTitle')}</h2>
 
           <div className="tw-mt-4">
-            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text)]">{t('insightSourceDistributionTitle')}</div>
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightSourceDistributionTitle')}</div>
             <DistributionChart items={stats.chatSourceDistribution} emptyText={t('insightDistributionEmpty')} />
           </div>
 
           <div className="tw-mt-5">
             <div className="tw-mb-2 tw-flex tw-items-start tw-justify-between tw-gap-4">
-              <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{t('insightTopConversationsTitle')}</div>
+              <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightTopConversationsTitle')}</div>
               <div className="tw-text-right">
-                <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">
+                <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
                   {t('insightTotalMessagesLabel')}
                 </div>
-                <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[var(--text)]">{formatCount(stats.totalMessages)}</div>
+                <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.totalMessages)}</div>
               </div>
             </div>
             <TopConversationList items={stats.topConversations} />
@@ -186,9 +187,9 @@ export function InsightPanel(props: {
         </section>
 
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightArticlesSectionAria')}>
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('insightArticlesSectionTitle')}</h2>
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightArticlesSectionTitle')}</h2>
           <div className="tw-mt-4">
-            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text)]">{t('insightArticleDomainsTitle')}</div>
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightArticleDomainsTitle')}</div>
             <DistributionChart items={stats.articleDomainDistribution} emptyText={t('insightDistributionEmpty')} />
           </div>
         </section>

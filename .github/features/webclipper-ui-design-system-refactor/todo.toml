@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T6"
+current_task_id = "P2-T7"
 
 [[tasks]]
 id = "P1-T1"
@@ -100,10 +100,10 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T6"
 title = "About/Insight sections 适配 tokens"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t6"
-commit = ""
-note = ""
+commit = "refactor: task13 - About/Insight sections 迁移 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T7"
