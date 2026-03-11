@@ -52,7 +52,7 @@ export function BackupSection(props: {
 
   return (
     <section className={cardClassName} aria-label={t('databaseBackup')}>
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('databaseBackup')}</h2>
+      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('databaseBackup')}</h2>
 
       <div ref={backupImportRef} id="settings-backup-import" className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5">
         <button className={buttonClassName} onClick={onExport} disabled={busy}>
@@ -80,9 +80,9 @@ export function BackupSection(props: {
           }}
         />
       </div>
-      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('exportStatus')} {exportStatus}</div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('lastExport')} {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('importStatus')} {importStatus}</div>
+      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('exportStatus')} {exportStatus}</div>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('lastExport')} {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('importStatus')} {importStatus}</div>
       <div className="tw-mt-2.5">
         <ImportStatsList stats={importStats} />
       </div>

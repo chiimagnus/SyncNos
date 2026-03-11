@@ -13,7 +13,7 @@ export function NotionAISection(props: {
   return (
     <section className={cardClassName} aria-label={t('notionAI')}>
       <div className="tw-flex tw-items-center tw-gap-2">
-        <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('notionAI')}</h2>
+        <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('notionAI')}</h2>
       </div>
 
       <div className="tw-mt-3 tw-grid tw-gap-2">
@@ -52,7 +52,7 @@ export function NotionAISection(props: {
 
         <div aria-label={t('note')}>
           <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('notionAiModelNote')}
             </div>
           </SettingsFormRow>

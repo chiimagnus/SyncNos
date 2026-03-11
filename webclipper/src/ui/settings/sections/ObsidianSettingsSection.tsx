@@ -63,7 +63,7 @@ export function ObsidianSettingsSection(props: {
       <section className={cardClassName} aria-label={t('obsidianLocalRestApi')}>
         <div className="tw-flex tw-items-center tw-gap-2">
           <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
-          <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('obsidianLocalRestApi')}</h2>
+          <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('obsidianLocalRestApi')}</h2>
         </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
@@ -120,11 +120,11 @@ export function ObsidianSettingsSection(props: {
           </SettingsFormRow>
 
           <SettingsFormRow label={t('status')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{statusText}</div>
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{statusText}</div>
           </SettingsFormRow>
 
           <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('obsidianInstallNote')}{' '}
               <a
                 className="tw-underline hover:tw-opacity-80"
@@ -144,7 +144,7 @@ export function ObsidianSettingsSection(props: {
       </section>
 
       <section className={cardClassName} aria-label={t('obsidianPaths')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('obsidianPaths')}</h2>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('obsidianPaths')}</h2>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
           <SettingsFormRow label={t('aiChatsFolder')}>
@@ -176,7 +176,7 @@ export function ObsidianSettingsSection(props: {
           </SettingsFormRow>
 
           <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('obsidianPathsNote')}
             </div>
           </SettingsFormRow>

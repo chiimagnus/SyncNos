@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T5"
+current_task_id = "P2-T6"
 
 [[tasks]]
 id = "P1-T1"
@@ -92,10 +92,10 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T5"
 title = "Settings 表单型 sections 适配 tokens"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t5"
-commit = ""
-note = ""
+commit = "refactor: task12 - Settings 表单型 sections 迁移 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T6"
