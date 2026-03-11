@@ -12,6 +12,8 @@ import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-
 import { useThemeMode } from '../shared/hooks/useThemeMode';
 import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
+import { PopupNotionSyncNudgeDialog } from './PopupNotionSyncNudgeDialog';
+import { getPopupNotionSyncNudgeDismissed, setPopupNotionSyncNudgeDismissed } from './notion-sync-nudge-preference';
 
 export default function PopupShell() {
   return (
@@ -25,6 +27,8 @@ function PopupShellFrame() {
   useThemeMode();
   const [headerState, setHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
   const { refreshList, refreshActiveDetail } = useConversationsApp();
+  const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
+  const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
   const {
     buttonDisabled,
     buttonLabel,
@@ -43,7 +47,39 @@ function PopupShellFrame() {
   };
 
   const showListActions = headerState.mode !== 'detail';
-  const onPopupNotionSyncStarted = () => {};
+  const onPopupNotionSyncStarted = () => {
+    void (async () => {
+      const dismissed = await getPopupNotionSyncNudgeDismissed().catch(() => false);
+      if (dismissed) {
+        await openOrFocusExtensionAppTab({ route: '/' });
+        window.close();
+        return;
+      }
+      setNotionSyncNudgeDontShowAgain(false);
+      setNotionSyncNudgeOpen(true);
+    })();
+  };
+
+  const persistNudgeIfNeeded = async () => {
+    if (!notionSyncNudgeDontShowAgain) return;
+    await setPopupNotionSyncNudgeDismissed(true);
+  };
+
+  const onConfirmNotionSyncNudge = () => {
+    void (async () => {
+      setNotionSyncNudgeOpen(false);
+      await persistNudgeIfNeeded();
+      await openOrFocusExtensionAppTab({ route: '/' });
+      window.close();
+    })();
+  };
+
+  const onDismissNotionSyncNudge = () => {
+    void (async () => {
+      setNotionSyncNudgeOpen(false);
+      await persistNudgeIfNeeded();
+    })();
+  };
 
   return (
     <div
@@ -124,6 +160,14 @@ function PopupShellFrame() {
           <ChatsTab onPopupHeaderStateChange={setHeaderState} onPopupNotionSyncStarted={onPopupNotionSyncStarted} />
         </section>
       </main>
+
+      <PopupNotionSyncNudgeDialog
+        open={notionSyncNudgeOpen}
+        dontShowAgain={notionSyncNudgeDontShowAgain}
+        onDontShowAgainChange={setNotionSyncNudgeDontShowAgain}
+        onDismiss={onDismissNotionSyncNudge}
+        onConfirm={onConfirmNotionSyncNudge}
+      />
     </div>
   );
 }
