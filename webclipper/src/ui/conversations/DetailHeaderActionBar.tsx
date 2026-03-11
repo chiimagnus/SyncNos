@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
+import { buttonMenuItemClassName, menuPopoverPanelClassName } from '../shared/button-styles';
 
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
@@ -125,14 +126,7 @@ export function DetailHeaderActionBar({
   const triggerLabel = labelOverride || resolvedMenuTriggerLabel;
   const primaryIcon = resolveActionIcon(actions[0]!);
 
-  const menuButtonClass =
-    [
-      'tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2',
-      'tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]',
-      'tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)]',
-      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-      'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-    ].join(' ');
+  const menuButtonClass = buttonMenuItemClassName();
 
   return (
     <div ref={wrapRef} className={className || 'tw-flex tw-items-center tw-gap-2'}>
@@ -165,7 +159,7 @@ export function DetailHeaderActionBar({
           role="menu"
           aria-label={resolvedMenuAriaLabel}
           hidden={!menuOpen}
-          className="tw-absolute tw-right-0 tw-top-[calc(100%+8px)] tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5 tw-shadow-none"
+          className={['tw-absolute tw-right-0 tw-top-[calc(100%+8px)]', menuPopoverPanelClassName(170)].join(' ')}
         >
           {actions.map((action) => (
             <button

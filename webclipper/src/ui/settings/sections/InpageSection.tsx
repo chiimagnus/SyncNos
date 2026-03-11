@@ -6,14 +6,71 @@ type InpageDisplayMode = 'supported' | 'all' | 'off';
 
 export function InpageSection(props: {
   busy: boolean;
+  themeMode: 'system' | 'light' | 'dark';
+  onChangeThemeMode: (next: 'system' | 'light' | 'dark') => void;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
 }) {
-  const { busy, displayMode, onChangeDisplayMode, aiChatAutoSaveEnabled, onToggleAiChatAutoSaveEnabled } = props;
+  const { busy, themeMode, onChangeThemeMode, displayMode, onChangeDisplayMode, aiChatAutoSaveEnabled, onToggleAiChatAutoSaveEnabled } = props;
+
+  const themeModeButtonClassName = (active: boolean) =>
+    [
+      'tw-inline-flex tw-min-h-8 tw-items-center tw-justify-center tw-rounded-lg tw-px-3 tw-text-xs tw-font-extrabold',
+      'tw-transition-colors tw-duration-150',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+      'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
+      active
+        ? 'tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]'
+        : 'tw-bg-transparent tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-card)] hover:tw-text-[var(--text-primary)]',
+    ].join(' ');
+
   return (
     <div className="tw-grid tw-gap-4">
+      <section className={cardClassName} aria-label={t('appearanceHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('appearanceHeading')}</h2>
+        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+            <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('themeModeLabel')}</label>
+            <div
+              role="group"
+              aria-label={t('themeModeLabel')}
+              className="tw-inline-flex tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-1"
+            >
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onChangeThemeMode('system')}
+                className={themeModeButtonClassName(themeMode === 'system')}
+                aria-pressed={themeMode === 'system'}
+              >
+                {t('themeModeSystem')}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onChangeThemeMode('light')}
+                className={themeModeButtonClassName(themeMode === 'light')}
+                aria-pressed={themeMode === 'light'}
+              >
+                {t('themeModeLight')}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onChangeThemeMode('dark')}
+                className={themeModeButtonClassName(themeMode === 'dark')}
+                aria-pressed={themeMode === 'dark'}
+              >
+                {t('themeModeDark')}
+              </button>
+            </div>
+          </div>
+          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('themeModeHint')}</div>
+        </div>
+      </section>
+
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('inpageButtonHeading')}</h2>
         <div className="tw-mt-2.5 tw-grid tw-gap-1.5">

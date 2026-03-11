@@ -1,6 +1,6 @@
 import type { CollectorDefinition } from '../collector-contract.ts';
 import type { CollectorEnv } from '../collector-env.ts';
-import { appendImageMarkdown, conversationKeyFromLocation, extractImageUrlsFromElement } from '../collector-utils.ts';
+import { appendImageMarkdown, extractImageUrlsFromElement } from '../collector-utils.ts';
 import notionAiMarkdown from './notionai-markdown.ts';
 
 export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefinition {

@@ -168,3 +168,75 @@ status = "completed"
 plan = "plan-p3.md#p3-t7"
 commit = "chore: task21 - P3 验证通过（tokens 清理完成）"
 note = "compile/test/build passed; guards passed"
+
+[[tasks]]
+id = "P4-T1"
+title = "按钮样式盘点（清单与漂移点）"
+status = "completed"
+plan = "plan-p4.md#p4-t1"
+commit = "docs: task22 - 盘点 WebClipper 按钮样式来源"
+note = "done"
+
+[[tasks]]
+id = "P4-T2"
+title = "按钮样式统一收敛（shared helpers）"
+status = "completed"
+plan = "plan-p4.md#p4-t2"
+commit = "style: task23 - 收敛按钮样式到 shared helpers"
+note = "compile passed"
+
+[[tasks]]
+id = "P4-T3"
+title = "Phase 验证（compile/test/build）"
+status = "completed"
+plan = "plan-p4.md#p4-t3"
+commit = "chore: task24 - P4 验证通过（compile/test/build）"
+note = "compile/test/build passed"
+
+[[tasks]]
+id = "P5-T1"
+title = "统一 menu popover 面板容器样式（shared helper）"
+status = "completed"
+plan = "plan-p5.md#p5-t1"
+commit = "style: task25 - 统一 menu popover panel 样式"
+note = "compile passed"
+
+[[tasks]]
+id = "P5-T2"
+title = "Phase 验证（compile/test/build）"
+status = "completed"
+plan = "plan-p5.md#p5-t2"
+commit = "chore: task26 - P5 验证通过（compile/test/build）"
+note = "compile/test/build passed"
+
+[[tasks]]
+id = "P6-T1"
+title = "删除无引用的 UI 样式 helper"
+status = "completed"
+plan = "plan-p6.md#p6-t1"
+commit = "chore: task27 - 删除无引用的 nav helper"
+note = "compile passed"
+
+[[tasks]]
+id = "P6-T2"
+title = "Phase 验证（compile/test/build）"
+status = "completed"
+plan = "plan-p6.md#p6-t2"
+commit = "chore: task28 - P6 验证通过（compile/test/build）"
+note = "compile/test/build passed"
+
+[[tasks]]
+id = "P7-T1"
+title = "删除 tsc(noUnused*) 报告的 dead code"
+status = "completed"
+plan = "plan-p7.md#p7-t1"
+commit = "chore: task29 - 清理 tsc noUnused 报告"
+note = "tsc noUnused + compile passed"
+
+[[tasks]]
+id = "P7-T2"
+title = "Phase 验证（compile/test/build）"
+status = "completed"
+plan = "plan-p7.md#p7-t2"
+commit = "chore: task30 - P7 验证通过（compile/test/build）"
+note = "compile/test/build passed"

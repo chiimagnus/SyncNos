@@ -9,6 +9,7 @@ import { useConversationsApp, ConversationsProvider } from '../conversations/con
 import type { PopupHeaderState } from '../conversations/ConversationsScene';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-styles';
+import { useThemeMode } from '../shared/hooks/useThemeMode';
 import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
 
@@ -21,6 +22,7 @@ export default function PopupShell() {
 }
 
 function PopupShellFrame() {
+  useThemeMode();
   const [headerState, setHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
   const { refreshList, refreshActiveDetail } = useConversationsApp();
   const {

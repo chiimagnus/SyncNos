@@ -7,7 +7,7 @@ import { extractZipEntries } from '../../../sync/backup/zip-utils';
 import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
-import { getURL, send } from '../../../platform/runtime/runtime';
+import { send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
 import {
@@ -134,6 +134,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
 
+  // Appearance
+  const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
+
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
   const [chatWithMaxChars, setChatWithMaxChars] = useState<string>(String(DEFAULT_CHAT_WITH_MAX_CHARS));
@@ -192,6 +195,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'inpage_display_mode',
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
+          'ui_theme_mode',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
@@ -213,6 +217,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only)
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
+      const rawThemeMode = String(local?.ui_theme_mode || '').trim().toLowerCase();
+      setThemeMode(
+        rawThemeMode === 'light' || rawThemeMode === 'dark' || rawThemeMode === 'system'
+          ? (rawThemeMode as any)
+          : 'system'
+      );
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
 
       const obsidianSettings = unwrap(obsidianRes);
@@ -459,6 +469,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       await runTask(async () => {
         await storageSet({ ai_chat_auto_save_enabled: next === true });
         setAiChatAutoSaveEnabled(next === true);
+      });
+    },
+    [runTask]
+  );
+
+  const onChangeThemeMode = useCallback(
+    async (next: 'system' | 'light' | 'dark') => {
+      await runTask(async () => {
+        const normalized = next === 'light' || next === 'dark' || next === 'system' ? next : 'system';
+        await storageSet({ ui_theme_mode: normalized });
+        setThemeMode(normalized);
       });
     },
     [runTask]
@@ -721,6 +742,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onChangeInpageDisplayMode,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    themeMode,
+    onChangeThemeMode,
 
     insightStats,
     insightLoading,

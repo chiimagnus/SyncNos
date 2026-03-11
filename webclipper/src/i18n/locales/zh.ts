@@ -32,6 +32,12 @@ export const zh: { [K in TranslationKey]: string } = {
   localeChinese: '中文',
 
   // InpageSection
+  appearanceHeading: '外观',
+  themeModeLabel: '主题',
+  themeModeSystem: '系统',
+  themeModeLight: '明亮',
+  themeModeDark: '深色',
+  themeModeHint: '应用于 popup 与 app；系统模式会跟随系统外观设置。',
   inpageButtonHeading: '页面内按钮',
   aiChatAutoSaveHeading: '自动保存',
   contextMenuRootTitle: 'SyncNos WebClipper',

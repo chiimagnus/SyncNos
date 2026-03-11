@@ -16,10 +16,6 @@ function formatCount(value: number): string {
   return Number(value || 0).toLocaleString();
 }
 
-function stripTrailingLabelPunctuation(value: string): string {
-  return String(value || '').trim().replace(/[：:]\s*$/, '');
-}
-
 function DistributionChart(props: {
   items: InsightDistributionItem[];
   emptyText: string;

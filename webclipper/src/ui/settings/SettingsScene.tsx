@@ -4,6 +4,7 @@ import { getURL } from '../../platform/runtime/runtime';
 
 import { t } from '../../i18n';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
+import { buttonTintClassName } from '../shared/button-styles';
 
 import { useSettingsSceneController } from './hooks/useSettingsSceneController';
 import { SettingsSidebarNav } from './SettingsSidebarNav';
@@ -108,6 +109,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeInpageDisplayMode,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    themeMode,
+    onChangeThemeMode,
 
     insightStats,
     insightLoading,
@@ -244,6 +247,10 @@ export function SettingsScene(props: SettingsSceneProps) {
       {activeSection === 'general' ? (
         <InpageSection
           busy={busy}
+          themeMode={themeMode}
+          onChangeThemeMode={(next) => {
+            void onChangeThemeMode(next);
+          }}
           displayMode={inpageDisplayMode}
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);
@@ -276,7 +283,7 @@ export function SettingsScene(props: SettingsSceneProps) {
             <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
               <button
                 type="button"
-                className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                className={buttonTintClassName()}
                 onClick={() => setNarrowRoute('list')}
                 aria-label={t('backButton')}
               >
