@@ -1,0 +1,170 @@
+version = 1
+current_task_id = ""
+
+[[tasks]]
+id = "P1-T1"
+title = "设计系统 tokens（亮/暗模式）"
+status = "completed"
+plan = "plan-p1.md#p1-t1"
+commit = "refactor: task1 - 引入设计系统tokens（亮暗模式）"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T2"
+title = "Legacy tokens 兼容层（迁移期）"
+status = "completed"
+plan = "plan-p1.md#p1-t2"
+commit = "refactor: task2 - 为旧 tokens 增加迁移期 alias"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T3"
+title = "入口全局样式改为冷灰底座"
+status = "completed"
+plan = "plan-p1.md#p1-t3"
+commit = "refactor: task3 - 入口样式切换为冷灰底座"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T4"
+title = "按钮与焦点态（focus-ring）规范化"
+status = "completed"
+plan = "plan-p1.md#p1-t4"
+commit = "refactor: task4 - 统一按钮与 focus ring tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T5"
+title = "导航与 Tab 交互态规范化"
+status = "completed"
+plan = "plan-p1.md#p1-t5"
+commit = "refactor: task5 - 统一导航与 tab 交互态 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T6"
+title = "Inpage UI 样式接入 tokens"
+status = "completed"
+plan = "plan-p1.md#p1-t6"
+commit = "refactor: task6 - inpage UI 样式接入 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P1-T7"
+title = "Phase 验证（compile）"
+status = "completed"
+plan = "plan-p1.md#p1-t7"
+commit = "chore: task7 - P1 验证通过（compile）"
+note = "compile passed; manual smoke passed"
+
+[[tasks]]
+id = "P2-T1"
+title = "AppShell / App routes 适配四级 Surface"
+status = "completed"
+plan = "plan-p2.md#p2-t1"
+commit = "refactor: task8 - AppShell 适配四级 surface"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T2"
+title = "PopupShell / Popup tabs 适配四级 Surface"
+status = "completed"
+plan = "plan-p2.md#p2-t2"
+commit = "refactor: task9 - PopupShell 适配 tokens 与语义色"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T3"
+title = "Settings Scene/Sidebar 适配 tokens"
+status = "completed"
+plan = "plan-p2.md#p2-t3"
+commit = "refactor: task10 - Settings Scene/Sidebar 适配 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T4"
+title = "Settings 通用表单组件（FormRow 等）适配 tokens"
+status = "completed"
+plan = "plan-p2.md#p2-t4"
+commit = "refactor: task11 - Settings 通用表单组件迁移 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T5"
+title = "Settings 表单型 sections 适配 tokens"
+status = "completed"
+plan = "plan-p2.md#p2-t5"
+commit = "refactor: task12 - Settings 表单型 sections 迁移 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T6"
+title = "About/Insight sections 适配 tokens"
+status = "completed"
+plan = "plan-p2.md#p2-t6"
+commit = "refactor: task13 - About/Insight sections 迁移 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P2-T7"
+title = "Phase 验证（compile/test/build + light/dark 冒烟）"
+status = "completed"
+plan = "plan-p2.md#p2-t7"
+commit = "chore: task14 - P2 验证通过（compile/test/build）"
+note = "compile/test/build passed"
+
+[[tasks]]
+id = "P3-T1"
+title = "ConversationsScene 容器层级与 Surface 统一"
+status = "completed"
+plan = "plan-p3.md#p3-t1"
+commit = "refactor: task15 - ConversationsScene 统一 surface 层级"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T2"
+title = "ConversationListPane 列表与控制条样式重构"
+status = "completed"
+plan = "plan-p3.md#p3-t2"
+commit = "refactor: task16 - ConversationListPane 迁移 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T3"
+title = "ConversationDetailPane 详情页样式重构"
+status = "completed"
+plan = "plan-p3.md#p3-t3"
+commit = "refactor: task17 - DetailPane/MessageBubble 迁移 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T4"
+title = "Detail header（actions/nav）菜单与按钮样式重构"
+status = "completed"
+plan = "plan-p3.md#p3-t4"
+commit = "refactor: task18 - Detail header/actions 菜单迁移 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T5"
+title = "语义状态色（Notice/Badge/Bubble）全面替换"
+status = "completed"
+plan = "plan-p3.md#p3-t5"
+commit = "refactor: task19 - 语义状态色统一到 tokens"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T6"
+title = "清理 legacy tokens/硬编码色值 + 文档同步"
+status = "completed"
+plan = "plan-p3.md#p3-t6"
+commit = "refactor: task20 - 清理 legacy tokens 并同步文档"
+note = "compile passed"
+
+[[tasks]]
+id = "P3-T7"
+title = "Phase 验证（compile/test/build + grep 守门）"
+status = "completed"
+plan = "plan-p3.md#p3-t7"
+commit = "chore: task21 - P3 验证通过（tokens 清理完成）"
+note = "compile/test/build passed; guards passed"

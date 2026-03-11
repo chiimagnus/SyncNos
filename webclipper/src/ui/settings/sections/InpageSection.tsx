@@ -15,10 +15,10 @@ export function InpageSection(props: {
   return (
     <div className="tw-grid tw-gap-4">
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('inpageButtonHeading')}</h2>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('inpageButtonHeading')}</h2>
         <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <label className="tw-text-sm tw-font-semibold tw-text-[var(--muted)]">{t('inpageDisplayModeLabel')}</label>
+            <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('inpageDisplayModeLabel')}</label>
             <select
               value={displayMode}
               disabled={busy}
@@ -30,13 +30,13 @@ export function InpageSection(props: {
               <option value="off">{t('inpageDisplayModeOff')}</option>
             </select>
           </div>
-          <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('inpageDisplayModeHint')}</div>
+          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('inpageDisplayModeHint')}</div>
         </div>
       </section>
 
       <section className={cardClassName} aria-label={t('aiChatAutoSaveHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text)]">{t('aiChatAutoSaveHeading')}</h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--muted)]">
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('aiChatAutoSaveHeading')}</h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
           <input
             type="checkbox"
             checked={aiChatAutoSaveEnabled}
@@ -46,7 +46,7 @@ export function InpageSection(props: {
           />
           {t('aiChatAutoSaveLabel')}
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('aiChatAutoSaveHint')}
         </div>
         <div className="tw-mt-2.5 tw-grid tw-gap-2">
@@ -56,10 +56,10 @@ export function InpageSection(props: {
             return (
               <div
                 key={site.id}
-                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-3 tw-py-2"
+                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2"
               >
-                <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{site.name}</div>
-                <div className="tw-truncate tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{hostLabel}</div>
+                <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{site.name}</div>
+                <div className="tw-truncate tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{hostLabel}</div>
               </div>
             );
           })}

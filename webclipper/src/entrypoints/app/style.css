@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 * {
@@ -16,11 +16,13 @@ body {
   margin: 0;
   min-width: 320px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 88% -12%, rgba(244, 184, 158, 0.4), transparent 40%),
-    radial-gradient(circle at -10% 6%, rgba(255, 198, 173, 0.5), transparent 36%),
-    linear-gradient(180deg, #fffaf8, var(--bg));
-  color: var(--text);
+  background: var(--bg-primary);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-primary) 88%, var(--bg-sunken)),
+    var(--bg-primary)
+  );
+  color: var(--text-primary);
   font: 14px/1.5 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
 }
 
@@ -30,7 +32,7 @@ a {
 
 .route-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(217, 89, 38, 0.45) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 55%, transparent) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

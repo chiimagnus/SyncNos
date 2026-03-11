@@ -164,10 +164,10 @@ function AppShellFrame() {
     const renderSidebar = !isNarrow && !sidebarCollapsed;
 
     return (
-      <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg)]">
+      <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
         {renderSidebar ? (
           <aside
-            className="tw-relative tw-flex tw-flex-col tw-bg-[var(--panel)]/24 tw-p-0 tw-backdrop-blur-sm"
+            className="tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-sunken)] tw-p-0"
             style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
           >
             <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
@@ -178,7 +178,7 @@ function AppShellFrame() {
               onPointerDown={onResizePointerDown}
               className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-2 tw-cursor-col-resize tw-touch-none"
             >
-              <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border-strong)]/40 tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
+              <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border)] tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
             </div>
           </aside>
         ) : null}
@@ -188,7 +188,7 @@ function AppShellFrame() {
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className={['tw-absolute tw-left-3 tw-top-3 tw-z-10 tw-shadow-[var(--shadow)]', navIconButtonClassName(false)].join(' ')}
+              className={['tw-absolute tw-left-3 tw-top-3 tw-z-10', navIconButtonClassName(false)].join(' ')}
               aria-label={t('expandSidebar')}
             >
               <ExpandIcon />
@@ -204,7 +204,7 @@ function AppShellFrame() {
               aria-hidden={showSettingsSheet}
             >
               {location.pathname === '/' && narrowHeaderState.mode === 'detail' ? (
-                <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
+                <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2">
                   <DetailNavigationHeader
                     title={narrowHeaderState.title}
                     subtitle={narrowHeaderState.subtitle}
@@ -243,7 +243,7 @@ function AppShellFrame() {
           {showSettingsSheet ? (
             <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label={t('settingsDialogAria')}>
               <div
-                className="tw-absolute tw-inset-0 tw-bg-transparent"
+                className="tw-absolute tw-inset-0 tw-bg-[var(--bg-overlay)]"
                 role="presentation"
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -251,13 +251,13 @@ function AppShellFrame() {
                 }}
               />
               <div
-                className="tw-relative tw-z-10 tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1080px,calc(100vw-40px))] tw-overflow-hidden tw-rounded-3xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg)]/90 tw-shadow-[0_20px_60px_rgba(0,0,0,0.18)] tw-backdrop-blur-lg"
+                className="tw-relative tw-z-10 tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1080px,calc(100vw-40px))] tw-overflow-hidden tw-rounded-3xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]"
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
                   onClick={closeSettings}
-                  className="tw-absolute tw-right-1 tw-top-1 tw-z-20 tw-inline-flex tw-size-6 tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0 tw-text-[var(--muted)] tw-shadow-none tw-outline-none tw-ring-0 tw-transition-colors tw-duration-200 hover:tw-bg-[var(--panel-strong)] hover:tw-text-[var(--text)]"
+                  className="tw-absolute tw-right-1 tw-top-1 tw-z-20 tw-inline-flex tw-size-6 tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0 tw-text-[var(--text-secondary)] tw-shadow-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
                   aria-label={t('closeSettings')}
                 >
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">

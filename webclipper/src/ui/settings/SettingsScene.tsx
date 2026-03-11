@@ -271,18 +271,18 @@ export function SettingsScene(props: SettingsSceneProps) {
   if (isNarrow) {
     if (narrowRoute === 'detail') {
       return (
-        <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
-          <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--panel)]/60 tw-px-3 tw-py-2 tw-backdrop-blur-sm">
+        <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
+          <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2">
             <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
               <button
                 type="button"
-                className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/75 tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text)] tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)]"
+                className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
                 onClick={() => setNarrowRoute('list')}
                 aria-label={t('backButton')}
               >
                 {t('backButton')}
               </button>
-              <div className="tw-min-w-0 tw-flex-1 tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--muted)]">
+              <div className="tw-min-w-0 tw-flex-1 tw-text-center tw-text-xs tw-font-extrabold tw-text-[var(--text-secondary)]">
                 {activeSectionLabel}
               </div>
               <div className="tw-w-[74px]" aria-hidden="true" />
@@ -297,12 +297,12 @@ export function SettingsScene(props: SettingsSceneProps) {
     }
 
     return (
-      <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
+      <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
         <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-2">
           <nav className="tw-grid tw-gap-4" aria-label={t('settingsSectionsAria')}>
             {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
               <div key={groupIndex} className="tw-grid tw-gap-1.5">
-                <div className="tw-px-2 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.16em] tw-text-[var(--muted)] tw-opacity-65">
+                <div className="tw-px-2 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.16em] tw-text-[var(--text-secondary)] tw-opacity-65">
                   {group.title}
                 </div>
                 <div>
@@ -314,14 +314,22 @@ export function SettingsScene(props: SettingsSceneProps) {
                         type="button"
                         onClick={() => setActiveSection(section.key)}
                         className={[
-                          'tw-flex tw-w-full tw-appearance-none tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-xl tw-border-0 tw-px-3 tw-py-3 tw-text-left tw-shadow-none tw-transition-colors tw-duration-150',
+                          'tw-flex tw-w-full tw-appearance-none tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-xl tw-border tw-border-transparent tw-px-3 tw-py-3 tw-text-left tw-shadow-none tw-transition-colors tw-duration-150',
+                          'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
                           index === 0 ? '' : 'tw-mt-1',
-                          active ? 'tw-bg-[var(--btn-bg)]' : 'hover:tw-bg-white/48',
+                          active
+                            ? 'tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]'
+                            : 'tw-bg-[var(--bg-card)] hover:tw-bg-[var(--bg-sunken)]',
                         ].join(' ')}
                         aria-current={active ? 'page' : undefined}
                       >
-                        <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">{getSectionLabel(section.key)}</div>
-                        <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+                        <div className="tw-text-sm tw-font-black">{getSectionLabel(section.key)}</div>
+                        <div
+                          className={[
+                            'tw-text-[11px] tw-font-semibold tw-opacity-90',
+                            active ? 'tw-text-[var(--accent-foreground)]' : 'tw-text-[var(--text-secondary)]',
+                          ].join(' ')}
+                        >
                           {getSectionDescription(section.key)}
                         </div>
                       </button>
@@ -337,9 +345,11 @@ export function SettingsScene(props: SettingsSceneProps) {
   }
 
   return (
-    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0">
+    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
       <SettingsSidebarNav activeSection={activeSection} onSelectSection={setActiveSection} />
-      <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-p-4">{renderDetailContent()}</div>
+      <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-bg-[var(--bg-primary)] tw-p-4">
+        {renderDetailContent()}
+      </div>
     </div>
   );
 }

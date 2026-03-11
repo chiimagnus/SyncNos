@@ -6,6 +6,7 @@
 
 - 仓库级业务入口：[`../.github/deepwiki/business-context.md`](../.github/deepwiki/business-context.md)
 - WebClipper 模块页：[`../.github/deepwiki/modules/webclipper.md`](../.github/deepwiki/modules/webclipper.md)
+- UI 设计系统（tokens/surface/focus ring）：[`src/ui/AGENTS.md`](src/ui/AGENTS.md)（真源）+ [`src/ui/example.html`](src/ui/example.html)（示例）
 - 涉及运行时边界、消息流、存储、发布或排障时，再读：[`../.github/deepwiki/architecture.md`](../.github/deepwiki/architecture.md)、[`../.github/deepwiki/data-flow.md`](../.github/deepwiki/data-flow.md)、[`../.github/deepwiki/storage.md`](../.github/deepwiki/storage.md)、[`../.github/deepwiki/release.md`](../.github/deepwiki/release.md)、[`../.github/deepwiki/troubleshooting.md`](../.github/deepwiki/troubleshooting.md)
 
 ## 作用范围

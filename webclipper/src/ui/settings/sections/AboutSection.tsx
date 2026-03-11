@@ -24,8 +24,8 @@ export function AboutSection() {
         <div className="tw-flex tw-items-center tw-gap-3">
           <img className="tw-size-10 tw-rounded-2xl tw-object-contain" src={getURL('icons/icon-48.png' as any)} alt="" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
-            <div className="tw-text-base tw-font-black tw-text-[var(--text)]">SyncNos WebClipper</div>
-            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]" id="aboutVersion">
+            <div className="tw-text-base tw-font-black tw-text-[var(--text-primary)]">SyncNos WebClipper</div>
+            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]" id="aboutVersion">
               {version ? `${t('versionPrefix')} ${version}` : t('versionPrefix')}
             </div>
           </div>
@@ -63,9 +63,9 @@ export function AboutSection() {
         <div className="tw-flex tw-items-center tw-gap-3">
           <img className="tw-size-10 tw-rounded-2xl tw-object-cover" src={getURL('icons/author-avatar.png' as any)} alt="Chii Magnus avatar" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
-            <div className="tw-text-sm tw-font-black tw-text-[var(--text)]">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
-            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('authorTagline')}</div>
-            <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-break-words">
+            <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
+            <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('authorTagline')}</div>
+            <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-break-words">
               {t('angelsCta')}
             </div>
           </div>

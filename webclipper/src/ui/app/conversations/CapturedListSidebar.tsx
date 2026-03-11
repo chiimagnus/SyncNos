@@ -32,14 +32,14 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
-      <div className="tw-bg-[var(--panel)]/24 tw-backdrop-blur-sm">
+      <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             {logoUrl ? (
               <img src={logoUrl} alt="SyncNos" className="tw-size-8 tw-rounded-xl tw-object-contain" draggable={false} />
             ) : (
               <span
-                className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-bg-[var(--btn-bg)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text)]"
+                className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text-primary)]"
                 aria-hidden="true"
               >
                 SN
@@ -80,7 +80,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
         </div>
       </div>
 
-      <ConversationListPane suppressActiveRow={routerLocation.pathname === '/settings'} onOpenConversation={() => navigate('/')} />
+      <ConversationListPane onOpenConversation={() => navigate('/')} />
     </div>
   );
 }

@@ -41,7 +41,10 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
 
   return (
     <section>
-      <section className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/80 tw-p-3" aria-label={t('conversationDetailAria')}>
+      <section
+        className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3"
+        aria-label={t('conversationDetailAria')}
+      >
         {!hideHeader ? (
           <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
             <div className="tw-flex tw-min-w-0 tw-items-start tw-gap-2">
@@ -53,10 +56,10 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
               ) : null}
 
               <div className="tw-min-w-0">
-                <h2 className="tw-m-0 tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text)] tw-break-words [overflow-wrap:anywhere]">
+                <h2 className="tw-m-0 tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] tw-break-words [overflow-wrap:anywhere]">
                   {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
                 </h2>
-                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                   {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : t('selectConversationHint')}
                 </div>
               </div>
@@ -82,9 +85,9 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
           </header>
         ) : null}
 
-        {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{listError}</p> : null}
-        {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('loadingDots')}</p> : null}
-        {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--danger)]">{detailError}</p> : null}
+        {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
+        {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
+        {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
 
         {detail?.messages?.length ? (
           <div className="tw-mt-3 tw-grid tw-gap-2.5">
@@ -102,9 +105,9 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
             })}
           </div>
         ) : activeId ? (
-          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('noMessages')}</p>
+          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
         ) : (
-          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">{t('selectAConversation')}</p>
+          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('selectAConversation')}</p>
         )}
       </section>
     </section>

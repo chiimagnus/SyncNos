@@ -6,7 +6,7 @@ import { buttonClassName, cardClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 
 const textareaClassName =
-  'tw-min-h-[140px] tw-w-full tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white tw-px-2.5 tw-py-2 tw-text-sm tw-text-[var(--text)]';
+  'tw-min-h-[140px] tw-w-full tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-2 tw-text-sm tw-text-[var(--text-primary)] focus-visible:tw-border-[var(--focus-ring)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
 
 function makePlatformId(): string {
   const rand = Math.random().toString(16).slice(2, 10);
@@ -48,17 +48,17 @@ export function ChatWithAiSection(props: {
   return (
     <section className={cardClassName} aria-label={t('chatWithSectionTitle')}>
       <div className="tw-flex tw-items-center tw-gap-2">
-        <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text)]">
+        <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
           {t('chatWithSectionTitle')}
         </h2>
       </div>
-      <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+      <div className="tw-mt-1 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
         {t('chatWithSectionSubtitle')}
       </div>
 
       <div className="tw-mt-3 tw-grid tw-gap-2">
         <SettingsFormRow label={t('chatWithPromptTemplateLabel')} align="start">
-          <div className="tw-grid tw-gap-2">
+            <div className="tw-grid tw-gap-2">
             <textarea
               id="chatWithPromptTemplate"
               className={textareaClassName}
@@ -67,7 +67,7 @@ export function ChatWithAiSection(props: {
               onChange={(e) => onChangePromptTemplate(e.target.value)}
               aria-label={t('chatWithPromptTemplateAria')}
             />
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
               {t('chatWithPromptTemplateHint')}
             </div>
           </div>
@@ -88,7 +88,7 @@ export function ChatWithAiSection(props: {
               aria-label={t('chatWithMaxCharsAria')}
               className={`${textInputClassName} tw-w-[140px]`}
             />
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
               {t('chatWithMaxCharsHint')}
             </div>
           </div>
@@ -100,13 +100,13 @@ export function ChatWithAiSection(props: {
               <div className="tw-grid tw-gap-2">
                 {rows.map((p) => (
                   <div key={p.id} className="tw-flex tw-flex-wrap tw-items-center tw-gap-2">
-                    <label className="tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--muted)]">
+                    <label className="tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
                       <input
                         type="checkbox"
                         checked={!!p.enabled}
                         disabled={busy}
                         onChange={(e) => updatePlatform(p.id, { enabled: !!e.target.checked })}
-                        className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--text)]"
+                        className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--accent)]"
                       />
                       {t('chatWithPlatformsEnabled')}
                     </label>
@@ -139,7 +139,7 @@ export function ChatWithAiSection(props: {
                 ))}
               </div>
             ) : (
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">{t('chatWithNoPlatforms')}</div>
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('chatWithNoPlatforms')}</div>
             )}
 
             <div className="tw-flex tw-items-center tw-gap-2">

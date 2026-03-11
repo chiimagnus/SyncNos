@@ -1,11 +1,12 @@
 :root {
-  /* Popup UI is currently a light theme; force light form-control rendering in OS dark mode. */
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 body {
   margin: 0;
   overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 html,

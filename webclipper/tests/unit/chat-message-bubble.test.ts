@@ -11,18 +11,18 @@ function extractRootSectionClass(html: string) {
 }
 
 describe('ChatMessageBubble', () => {
-  it('renders user messages as green bubbles without white background conflicts', () => {
+  it('renders user messages with accent-tinted bubbles without card background conflicts', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown: 'hi' }));
     const cls = extractRootSectionClass(html);
-    expect(cls).toContain('tw-bg-[#69BB84]');
-    expect(cls).not.toContain('tw-bg-white');
+    expect(cls).toContain('tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))]');
+    expect(cls).not.toContain('tw-bg-[var(--bg-card)]');
   });
 
   it('normalizes legacy roles to user and assistant styles', () => {
     const userHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'Human', markdown: 'hi' }));
-    expect(extractRootSectionClass(userHtml)).toContain('tw-bg-[#69BB84]');
+    expect(extractRootSectionClass(userHtml)).toContain('tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))]');
 
     const assistantHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'model', markdown: 'hi' }));
-    expect(extractRootSectionClass(assistantHtml)).toContain('tw-bg-white');
+    expect(extractRootSectionClass(assistantHtml)).toContain('tw-bg-[var(--bg-card)]');
   });
 });

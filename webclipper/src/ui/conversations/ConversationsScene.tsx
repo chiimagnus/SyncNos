@@ -80,7 +80,7 @@ export function ConversationsScene({
   if (isNarrow) {
     if (narrowRoute === 'detail') {
       return (
-        <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">
+        <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
           <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
             {inlineNarrowDetailHeader ? <ConversationDetailPane onBack={returnToList} /> : <ConversationDetailPane hideHeader />}
           </div>
@@ -88,15 +88,19 @@ export function ConversationsScene({
       );
     }
 
-    return <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col">{list}</div>;
+    return (
+      <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
+        {list}
+      </div>
+    );
   }
 
   return (
-    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-white/70">
-      <aside className="tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--panel)]/55">
+    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
+      <aside className="tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
         {list}
       </aside>
-      <main className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
+      <main className="route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-primary)] tw-overflow-auto tw-overflow-x-hidden tw-p-3">
         <ConversationDetailPane />
       </main>
     </div>

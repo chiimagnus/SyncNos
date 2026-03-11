@@ -126,7 +126,13 @@ export function DetailHeaderActionBar({
   const primaryIcon = resolveActionIcon(actions[0]!);
 
   const menuButtonClass =
-    'tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)]';
+    [
+      'tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2',
+      'tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]',
+      'tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)]',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+      'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
+    ].join(' ');
 
   return (
     <div ref={wrapRef} className={className || 'tw-flex tw-items-center tw-gap-2'}>
@@ -148,7 +154,7 @@ export function DetailHeaderActionBar({
             <span className="tw-hidden md:tw-inline tw-leading-none">{triggerLabel}</span>
           </span>
           <span
-            className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
+            className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
             aria-hidden="true"
           >
             ▾
@@ -159,7 +165,7 @@ export function DetailHeaderActionBar({
           role="menu"
           aria-label={resolvedMenuAriaLabel}
           hidden={!menuOpen}
-          className="tw-absolute tw-right-0 tw-top-[calc(100%+8px)] tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-1.5 tw-shadow-[var(--shadow)]"
+          className="tw-absolute tw-right-0 tw-top-[calc(100%+8px)] tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5 tw-shadow-none"
         >
           {actions.map((action) => (
             <button

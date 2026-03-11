@@ -8,29 +8,50 @@ type ConversationSyncFeedbackNoticeProps = {
   onDismiss: () => void;
 };
 
+type NoticeTones = {
+  panel: string;
+  badge: string;
+  progress: string;
+};
+
+const NOTICE_TONE_CLASSES: Record<'info' | 'success' | 'warning' | 'error', NoticeTones> = {
+  info: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--info)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--info)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--info)]',
+  },
+  success: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--success)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--success)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--success)]',
+  },
+  warning: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--warning)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--warning)]',
+  },
+  error: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--error)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--error)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--error)]',
+  },
+};
+
+function makeToneClasses(colorToken: 'info' | 'success' | 'warning' | 'error'): NoticeTones {
+  return NOTICE_TONE_CLASSES[colorToken];
+}
+
 function toneClasses(phase: ConversationSyncFeedbackState['phase']) {
   if (phase === 'running') {
-    return {
-      panel: 'tw-border-[#bfdbfe] tw-bg-[#eff6ff] tw-text-[#1d4ed8]',
-      badge: 'tw-border-[#93c5fd] tw-bg-[#dbeafe] tw-text-[#1d4ed8]',
-    };
+    return makeToneClasses('info');
   }
   if (phase === 'success') {
-    return {
-      panel: 'tw-border-[#bbf7d0] tw-bg-[#f0fdf4] tw-text-[#166534]',
-      badge: 'tw-border-[#86efac] tw-bg-[#dcfce7] tw-text-[#166534]',
-    };
+    return makeToneClasses('success');
   }
   if (phase === 'partial-failed') {
-    return {
-      panel: 'tw-border-[#fde68a] tw-bg-[#fffbeb] tw-text-[#92400e]',
-      badge: 'tw-border-[#fcd34d] tw-bg-[#fef3c7] tw-text-[#92400e]',
-    };
+    return makeToneClasses('warning');
   }
-  return {
-    panel: 'tw-border-[#fecaca] tw-bg-[#fef2f2] tw-text-[#b91c1c]',
-    badge: 'tw-border-[#fca5a5] tw-bg-[#fee2e2] tw-text-[#b91c1c]',
-  };
+  return makeToneClasses('error');
 }
 
 function phaseLabel(phase: ConversationSyncFeedbackState['phase']) {
@@ -49,7 +70,7 @@ function conversationLabel(title: unknown, conversationId: unknown) {
 }
 
 function SummaryBody(props: {
-  tones: ReturnType<typeof toneClasses>;
+  tones: NoticeTones;
   provider: string;
   feedback: ConversationSyncFeedbackState;
   primaryMessage: string;
@@ -108,9 +129,9 @@ function SummaryBody(props: {
       ) : null}
 
       {feedback.total > 0 ? (
-        <div className="tw-mt-2 tw-h-1.5 tw-overflow-hidden tw-rounded-full tw-bg-white/60">
+        <div className="tw-mt-2 tw-h-1.5 tw-overflow-hidden tw-rounded-full tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))]">
           <div
-            className="tw-h-full tw-rounded-full tw-bg-current tw-transition-[width] tw-duration-300"
+            className={['tw-h-full tw-rounded-full tw-transition-[width] tw-duration-300', tones.progress].join(' ')}
             style={{ width: `${progressWidth}%` }}
           />
         </div>
@@ -129,7 +150,7 @@ function SummaryBody(props: {
       aria-expanded={detailsOpen}
       aria-haspopup="dialog"
       aria-label={`Open ${provider} ${t('syncDetails')}`}
-      className="tw-block tw-min-w-0 tw-flex-1 tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-text-inherit tw-shadow-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-current"
+      className="tw-block tw-min-w-0 tw-flex-1 tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-text-inherit tw-shadow-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
     >
       {content}
     </button>
@@ -201,7 +222,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
       id="conversationSyncFeedback"
       data-phase={feedback.phase}
       className={[
-        'tw-relative tw-mt-2 tw-rounded-2xl tw-border tw-px-3 tw-py-2.5 tw-shadow-[0_8px_24px_rgba(15,23,42,0.06)]',
+        'tw-relative tw-mt-2 tw-rounded-2xl tw-border tw-px-3 tw-py-2.5 tw-shadow-none',
         tones.panel,
       ].join(' ')}
       role={feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'alert' : 'status'}
@@ -226,7 +247,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           <button
             type="button"
             onClick={onDismiss}
-            className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-current/20 tw-bg-white/65 tw-text-[11px] tw-font-black tw-transition-colors tw-duration-150 hover:tw-bg-white"
+            className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-text-[var(--text-secondary)] tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
             aria-label={t('dismissSyncFeedback')}
           >
             ×
@@ -238,38 +259,38 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
         <div
           role="dialog"
           aria-label={`${provider} ${t('syncDetails')}`}
-          className="tw-absolute tw-bottom-[calc(100%+8px)] tw-left-0 tw-right-0 tw-z-30 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-3 tw-text-[var(--text)] tw-shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
+          className="tw-absolute tw-bottom-[calc(100%+8px)] tw-left-0 tw-right-0 tw-z-30 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 tw-text-[var(--text-primary)] tw-shadow-none"
         >
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
             <div className="tw-text-xs tw-font-extrabold">{provider} {t('syncDetails')}</div>
             <button
               type="button"
               onClick={() => setDetailsOpen(false)}
-              className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-white/65 tw-text-[11px] tw-font-black tw-transition-colors tw-duration-150 hover:tw-bg-white"
+              className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-text-[var(--text-secondary)] tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
               aria-label={`Close ${provider} ${t('syncDetails')}`}
             >
               ×
             </button>
           </div>
 
-          <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+          <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
             {feedback.message}
           </div>
 
           <div className="tw-mt-3 tw-max-h-[min(45vh,320px)] tw-space-y-2 tw-overflow-auto tw-pr-1">
             {warnings.length ? (
-              <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5">
-                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">{t('warningsHeading')}</div>
+              <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-p-2.5">
+                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">{t('warningsHeading')}</div>
                 <div className="tw-mt-2 tw-space-y-2">
                   {warnings.map((warning, index) => (
                     <div
                       key={`${warning?.conversationId || 'unknown'}-${warning?.code || 'warning'}-${index}`}
-                      className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
+                      className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-2.5"
                     >
-                      <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
+                      <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">
                         {conversationLabel(warning?.conversationTitle, warning?.conversationId)}
                       </div>
-                      <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                      <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                         {String(warning?.message || warning?.code || 'warning')}
                       </div>
                     </div>
@@ -281,12 +302,12 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
             {failures.map((failure, index) => (
               <div
                 key={`${failure.conversationId || 'unknown'}-${index}`}
-                className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-white/70 tw-p-2.5"
+                className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-p-2.5"
               >
-                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text)]">
+                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">
                   {conversationLabel(failure.conversationTitle, failure.conversationId)}
                 </div>
-                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                   {failure.error}
                 </div>
               </div>
