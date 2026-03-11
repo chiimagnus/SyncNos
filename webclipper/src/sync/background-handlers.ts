@@ -8,6 +8,9 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
 };
 
+let notionDetachedRun: Promise<unknown> | null = null;
+let obsidianDetachedRun: Promise<unknown> | null = null;
+
 type Deps = {
   getInstanceId: () => string;
   notionSyncOrchestrator: {
@@ -47,6 +50,10 @@ function normalizeIds(ids: unknown): number[] {
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     try {
+      if (notionDetachedRun) {
+        return router.err('sync already in progress', { code: 'sync_already_running' });
+      }
+
       const conversationIds = normalizeIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
@@ -64,8 +71,12 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       const parentPageId = String((res as any)?.notion_parent_page_id || '').trim();
       if (!parentPageId) return router.err('missing parentPageId');
 
-      void deps.notionSyncOrchestrator
-        .syncConversations({ conversationIds, instanceId })
+      const run = deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId });
+      notionDetachedRun = run;
+      void run
+        .finally(() => {
+          if (notionDetachedRun === run) notionDetachedRun = null;
+        })
         .catch(() => {});
       return router.ok({ started: true, provider: 'notion' });
     } catch (error) {
@@ -95,6 +106,10 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     try {
+      if (obsidianDetachedRun) {
+        return router.err('sync already in progress', { code: 'sync_already_running' });
+      }
+
       const conversationIds = normalizeIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
@@ -106,8 +121,12 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      void deps.obsidianSyncOrchestrator
-        .syncConversations({ conversationIds, forceFullConversationIds, instanceId })
+      const run = deps.obsidianSyncOrchestrator.syncConversations({ conversationIds, forceFullConversationIds, instanceId });
+      obsidianDetachedRun = run;
+      void run
+        .finally(() => {
+          if (obsidianDetachedRun === run) obsidianDetachedRun = null;
+        })
         .catch(() => {});
       return router.ok({ started: true, provider: 'obsidian' });
     } catch (error) {
