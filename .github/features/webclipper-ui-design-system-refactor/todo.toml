@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P1-T4"
+current_task_id = "P1-T5"
 
 [[tasks]]
 id = "P1-T1"
@@ -28,10 +28,10 @@ note = "compile passed"
 [[tasks]]
 id = "P1-T4"
 title = "按钮与焦点态（focus-ring）规范化"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t4"
-commit = ""
-note = ""
+commit = "refactor: task4 - 统一按钮与 focus ring tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T5"
