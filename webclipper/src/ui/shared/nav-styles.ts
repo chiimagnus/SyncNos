@@ -1,12 +1,16 @@
 export function navGroupTitleClassName(): string {
-  return 'tw-px-3 tw-pb-1.5 tw-text-[11px] tw-font-bold tw-text-[var(--muted)] tw-opacity-70';
+  return 'tw-px-3 tw-pb-1.5 tw-text-[11px] tw-font-bold tw-text-[var(--text-secondary)] tw-opacity-70';
 }
 
 export function navItemClassName(active: boolean): string {
   const base =
-    'tw-flex tw-min-h-9 tw-w-full tw-appearance-none tw-items-center tw-rounded-xl tw-border-0 tw-px-3 tw-text-left tw-shadow-none tw-transition-colors tw-duration-150';
-  if (active) return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
-  return `${base} tw-bg-transparent tw-text-[var(--muted)] hover:tw-bg-white/38 hover:tw-text-[var(--text)]`;
+    [
+      'tw-flex tw-min-h-9 tw-w-full tw-appearance-none tw-items-center tw-rounded-xl tw-border-0 tw-px-3 tw-text-left tw-shadow-none',
+      'tw-transition-colors tw-duration-150',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+    ].join(' ');
+  if (active) return `${base} tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]`;
+  return `${base} tw-bg-transparent tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
 export function navIconButtonClassName(active: boolean): string {
@@ -14,11 +18,11 @@ export function navIconButtonClassName(active: boolean): string {
     [
       'tw-inline-flex tw-size-9 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-p-0',
       'tw-shadow-none tw-transition-colors tw-duration-150',
-      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
-      'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+      'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
     ].join(' ');
-  if (active) return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
-  return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--muted)] hover:tw-bg-[var(--btn-bg-hover)] hover:tw-text-[var(--text)]`;
+  if (active) return `${base} tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]`;
+  return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
 export function navIconButtonSmClassName(active: boolean): string {
@@ -26,18 +30,19 @@ export function navIconButtonSmClassName(active: boolean): string {
     [
       'tw-inline-flex tw-size-8 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-p-0',
       'tw-shadow-none tw-transition-colors tw-duration-150',
-      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
-      'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+      'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
     ].join(' ');
-  if (active) return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--text)]`;
-  return `${base} tw-bg-[var(--btn-bg)] tw-text-[var(--muted)] hover:tw-bg-[var(--btn-bg-hover)] hover:tw-text-[var(--text)]`;
+  if (active) return `${base} tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]`;
+  return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
 export function navPillButtonClassName(): string {
   return [
-    'tw-inline-flex tw-h-8 tw-max-w-[168px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-bg-[var(--btn-bg)] tw-px-3',
-    'tw-text-[11px] tw-font-black tw-text-[var(--text)] tw-shadow-none tw-transition-colors tw-duration-150 hover:tw-bg-[var(--btn-bg-hover)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-bg-white/30 disabled:tw-text-[var(--muted)] disabled:tw-opacity-80',
+    'tw-inline-flex tw-h-8 tw-max-w-[168px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3',
+    'tw-text-[11px] tw-font-black tw-text-[var(--text-primary)] tw-shadow-none tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)]',
+    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
   ].join(' ');
 }
 
@@ -45,10 +50,10 @@ export function navMiniIconButtonClassName(disabled = false): string {
   const base =
     [
       'tw-inline-flex tw-size-[18px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0',
-      'tw-bg-[var(--btn-bg)] tw-text-[12px] tw-font-black tw-shadow-none',
+      'tw-bg-[var(--bg-card)] tw-text-[12px] tw-font-black tw-shadow-none',
       'tw-transition-colors tw-duration-150',
-      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
     ].join(' ');
-  if (disabled) return `${base} tw-cursor-not-allowed tw-opacity-40`;
-  return `${base} tw-text-[var(--muted)] hover:tw-bg-[var(--btn-bg-hover)] hover:tw-text-[var(--text)]`;
+  if (disabled) return `${base} tw-cursor-not-allowed tw-opacity-[0.38]`;
+  return `${base} tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }

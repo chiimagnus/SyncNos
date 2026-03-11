@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P1-T5"
+current_task_id = "P1-T6"
 
 [[tasks]]
 id = "P1-T1"
@@ -36,10 +36,10 @@ note = "compile passed"
 [[tasks]]
 id = "P1-T5"
 title = "导航与 Tab 交互态规范化"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t5"
-commit = ""
-note = ""
+commit = "refactor: task5 - 统一导航与 tab 交互态 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T6"
