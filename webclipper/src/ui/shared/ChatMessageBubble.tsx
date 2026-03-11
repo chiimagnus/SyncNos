@@ -34,7 +34,7 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
 
   const bubbleRoleClass =
     bubbleRole === 'user'
-      ? 'tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))] tw-border-[color-mix(in_srgb,var(--accent)_38%,var(--border))] tw-text-[var(--text-primary)]'
+      ? 'tw-bg-[color-mix(in_srgb,var(--secondary)_26%,var(--bg-card))] tw-border-[color-mix(in_srgb,var(--secondary)_52%,var(--border))] tw-text-[var(--text-primary)]'
       : bubbleRole === 'assistant'
         ? 'tw-bg-[var(--bg-card)] tw-border-[var(--border)] tw-text-[var(--text-primary)]'
         : 'tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
