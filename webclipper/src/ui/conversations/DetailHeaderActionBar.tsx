@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
-import { buttonMenuItemClassName, menuPopoverPanelClassName } from '../shared/button-styles';
+import { buttonMenuItemClassName } from '../shared/button-styles';
+import { MenuPopover } from '../shared/MenuPopover';
 
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
@@ -26,7 +27,6 @@ export function DetailHeaderActionBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [labelOverride, setLabelOverride] = useState<string>('');
-  const wrapRef = useRef<HTMLDivElement | null>(null);
   const labelResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTrigger = async (action: DetailHeaderAction) => {
@@ -60,28 +60,6 @@ export function DetailHeaderActionBar({
       labelResetTimerRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (wrapRef.current && target && !wrapRef.current.contains(target)) {
-        setMenuOpen(false);
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
-
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown, true);
-    };
-  }, [menuOpen]);
 
   if (!actions.length) return null;
 
@@ -129,56 +107,52 @@ export function DetailHeaderActionBar({
   const menuButtonClass = buttonMenuItemClassName();
 
   return (
-    <div ref={wrapRef} className={className || 'tw-flex tw-items-center tw-gap-2'}>
-      <div className="tw-relative">
-        <button
-          type="button"
-          title={resolvedMenuTriggerTitle}
-          aria-label={resolvedMenuTriggerAriaLabel}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={() => {
-            setMenuOpen((value) => !value);
-          }}
-          className={buttonClassName}
-          disabled={busy}
-        >
-          <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-            {primaryIcon}
-            <span className="tw-hidden md:tw-inline tw-leading-none">{triggerLabel}</span>
-          </span>
-          <span
-            className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-            aria-hidden="true"
+    <div className={className || 'tw-flex tw-items-center tw-gap-2'}>
+      <MenuPopover
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        disabled={busy}
+        ariaLabel={resolvedMenuAriaLabel}
+        side="bottom"
+        align="end"
+        panelMinWidth={170}
+        trigger={(triggerProps) => (
+          <button
+            {...triggerProps}
+            title={resolvedMenuTriggerTitle}
+            aria-label={resolvedMenuTriggerAriaLabel}
+            className={buttonClassName}
           >
-            ▾
-          </span>
-        </button>
-
-        <div
-          role="menu"
-          aria-label={resolvedMenuAriaLabel}
-          hidden={!menuOpen}
-          className={['tw-absolute tw-right-0 tw-top-[calc(100%+8px)]', menuPopoverPanelClassName(170)].join(' ')}
-        >
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              className={menuButtonClass}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                void handleTrigger(action);
-              }}
-              aria-disabled={action.disabled ? 'true' : undefined}
-              disabled={busy || !!action.disabled}
+            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+              {primaryIcon}
+              <span className="tw-hidden md:tw-inline tw-leading-none">{triggerLabel}</span>
+            </span>
+            <span
+              className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+              aria-hidden="true"
             >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      </div>
+              ▾
+            </span>
+          </button>
+        )}
+      >
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            className={menuButtonClass}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false);
+              void handleTrigger(action);
+            }}
+            aria-disabled={action.disabled ? 'true' : undefined}
+            disabled={busy || !!action.disabled}
+          >
+            {action.label}
+          </button>
+        ))}
+      </MenuPopover>
     </div>
   );
 }
