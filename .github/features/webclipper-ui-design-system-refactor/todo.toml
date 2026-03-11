@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T6"
+current_task_id = "P3-T7"
 
 [[tasks]]
 id = "P1-T1"
@@ -156,15 +156,15 @@ note = "compile passed"
 [[tasks]]
 id = "P3-T6"
 title = "清理 legacy tokens/硬编码色值 + 文档同步"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t6"
-commit = ""
-note = "cleanup legacy tokens"
+commit = "refactor: task20 - 清理 legacy tokens 并同步文档"
+note = "compile passed"
 
 [[tasks]]
 id = "P3-T7"
 title = "Phase 验证（compile/test/build + grep 守门）"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t7"
 commit = ""
-note = ""
+note = "phase verify"

@@ -4,13 +4,13 @@
   --bubble-shift-y: 0px;
   --bubble-surface-bg: rgba(24, 24, 26, 0.92);
   --bubble-surface-border: rgba(255, 255, 255, 0.18);
-  --bubble-surface-text: #ffffff;
+  --bubble-surface-text: rgb(255 255 255);
   --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 
-  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, #d69e2e));
-  --bubble-loading-border: color-mix(in srgb, var(--warning, #d69e2e) 72%, transparent);
-  --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, #e53e3e));
-  --bubble-error-border: color-mix(in srgb, var(--error, #e53e3e) 74%, transparent);
+  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, rgb(214 158 46)));
+  --bubble-loading-border: color-mix(in srgb, var(--warning, rgb(214 158 46)) 72%, transparent);
+  --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, rgb(229 62 62)));
+  --bubble-error-border: color-mix(in srgb, var(--error, rgb(229 62 62)) 74%, transparent);
 
   display: block;
   position: fixed;
@@ -24,13 +24,13 @@
   all: initial;
   --bubble-surface-bg: rgba(24, 24, 26, 0.92);
   --bubble-surface-border: rgba(255, 255, 255, 0.18);
-  --bubble-surface-text: #ffffff;
+  --bubble-surface-text: rgb(255 255 255);
   --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 
-  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, #d69e2e));
-  --bubble-loading-border: color-mix(in srgb, var(--warning, #d69e2e) 72%, transparent);
-  --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, #e53e3e));
-  --bubble-error-border: color-mix(in srgb, var(--error, #e53e3e) 74%, transparent);
+  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, rgb(214 158 46)));
+  --bubble-loading-border: color-mix(in srgb, var(--warning, rgb(214 158 46)) 72%, transparent);
+  --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, rgb(229 62 62)));
+  --bubble-error-border: color-mix(in srgb, var(--error, rgb(229 62 62)) 74%, transparent);
   box-sizing: border-box;
   display: block;
   max-width: min(300px, 100vw);

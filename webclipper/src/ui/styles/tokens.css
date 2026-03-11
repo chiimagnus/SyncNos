@@ -3,99 +3,75 @@
 
   /* ===== Design System Tokens (Light Mode) ===== */
   /* Surface */
-  --bg-primary: #f5f7fa;
-  --bg-sunken: #eceef2;
-  --bg-card: #ffffff;
+  --bg-primary: rgb(245 247 250);
+  --bg-sunken: rgb(236 238 242);
+  --bg-card: rgb(255 255 255);
   --bg-overlay: rgba(0, 0, 0, 0.45);
 
   /* Text */
-  --text-primary: #2c3038;
-  --text-secondary: #636b78;
+  --text-primary: rgb(44 48 56);
+  --text-secondary: rgb(99 107 120);
 
   /* Brand + On-Color */
-  --accent: #ffc6ad;
-  --accent-foreground: #2c3038;
+  --accent: rgb(255 198 173);
+  --accent-foreground: rgb(44 48 56);
   --accent-hover: rgba(255, 198, 173, 0.85);
-  --accent-active: #f0b89f;
-  --secondary: #7bc4a0;
-  --secondary-foreground: #1a2b22;
-  --tertiary: #e8c86a;
-  --tertiary-foreground: #2c3038;
+  --accent-active: rgb(240 184 159);
+  --secondary: rgb(123 196 160);
+  --secondary-foreground: rgb(26 43 34);
+  --tertiary: rgb(232 200 106);
+  --tertiary-foreground: rgb(44 48 56);
 
   /* Semantic + On-Color */
-  --error: #e53e3e;
-  --error-foreground: #ffffff;
-  --warning: #d69e2e;
-  --warning-foreground: #2c3038;
-  --success: #38a169;
-  --success-foreground: #ffffff;
-  --info: #3182ce;
-  --info-foreground: #ffffff;
+  --error: rgb(229 62 62);
+  --error-foreground: rgb(255 255 255);
+  --warning: rgb(214 158 46);
+  --warning-foreground: rgb(44 48 56);
+  --success: rgb(56 161 105);
+  --success-foreground: rgb(255 255 255);
+  --info: rgb(49 130 206);
+  --info-foreground: rgb(255 255 255);
 
   /* Utility */
-  --border: #d8dce2;
-  --focus-ring: #5b8def;
+  --border: rgb(216 220 226);
+  --focus-ring: rgb(91 141 239);
 }
 
 /* ===== Design System Tokens (Dark Mode) ===== */
 @media (prefers-color-scheme: dark) {
   :root {
     /* Surface */
-    --bg-primary: #1a1c20;
-    --bg-sunken: #141618;
-    --bg-card: #262830;
+    --bg-primary: rgb(26 28 32);
+    --bg-sunken: rgb(20 22 24);
+    --bg-card: rgb(38 40 48);
     --bg-overlay: rgba(0, 0, 0, 0.65);
 
     /* Text */
-    --text-primary: #dce0e8;
-    --text-secondary: #8b919a;
+    --text-primary: rgb(220 224 232);
+    --text-secondary: rgb(139 145 154);
 
     /* Brand + On-Color */
-    --accent: #ffd4c2;
-    --accent-foreground: #1a1c20;
+    --accent: rgb(255 212 194);
+    --accent-foreground: rgb(26 28 32);
     --accent-hover: rgba(255, 212, 194, 0.85);
-    --accent-active: #f0c6b4;
-    --secondary: #6aaf8e;
-    --secondary-foreground: #1a1c20;
-    --tertiary: #d4b85e;
-    --tertiary-foreground: #1a1c20;
+    --accent-active: rgb(240 198 180);
+    --secondary: rgb(106 175 142);
+    --secondary-foreground: rgb(26 28 32);
+    --tertiary: rgb(212 184 94);
+    --tertiary-foreground: rgb(26 28 32);
 
     /* Semantic + On-Color */
-    --error: #fc8181;
-    --error-foreground: #1a1c20;
-    --warning: #ecc94b;
-    --warning-foreground: #1a1c20;
-    --success: #68d391;
-    --success-foreground: #1a1c20;
-    --info: #63b3ed;
-    --info-foreground: #1a1c20;
+    --error: rgb(252 129 129);
+    --error-foreground: rgb(26 28 32);
+    --warning: rgb(236 201 75);
+    --warning-foreground: rgb(26 28 32);
+    --success: rgb(104 211 145);
+    --success-foreground: rgb(26 28 32);
+    --info: rgb(99 179 237);
+    --info-foreground: rgb(26 28 32);
 
     /* Utility */
-    --border: #363840;
-    --focus-ring: #7ba4f7;
+    --border: rgb(54 56 64);
+    --focus-ring: rgb(123 164 247);
   }
-}
-
-/* ===== Legacy Tokens Alias (migration only; remove in P3) ===== */
-:root {
-  --theme: var(--accent);
-  --text: var(--text-primary);
-  --muted: var(--text-secondary);
-  --bg: var(--bg-primary);
-
-  --panel: color-mix(in srgb, var(--bg-card) 72%, var(--bg-primary));
-  --panel-strong: color-mix(in srgb, var(--bg-card) 58%, var(--bg-sunken));
-  --btn-bg: color-mix(in srgb, var(--bg-sunken) 76%, var(--bg-card));
-  --btn-bg-hover: color-mix(in srgb, var(--bg-sunken) 58%, var(--bg-card));
-
-  --border-strong: color-mix(in srgb, var(--border) 62%, var(--text-primary));
-  --shadow: 0 8px 18px color-mix(in srgb, var(--bg-overlay) 62%, transparent);
-
-  --danger: var(--error);
-  --danger-bg: color-mix(in srgb, var(--error) 16%, var(--bg-card));
-  --warn-bg: color-mix(in srgb, var(--warning) 18%, var(--bg-card));
-
-  --wc-ok: var(--success);
-  --wc-ok-bg: color-mix(in srgb, var(--success) 16%, var(--bg-card));
-  --wc-ok-border: color-mix(in srgb, var(--success) 46%, var(--border));
 }
