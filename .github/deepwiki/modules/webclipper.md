@@ -15,6 +15,7 @@
 | `src/bootstrap/current-page-capture.ts` | 当前页抓取服务 | 统一判断当前标签页可否抓取，并区分 chat / article 两条手动抓取路径 |
 | `src/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击开 popup、article fetch、Google AI Studio 手动保存都在这里 |
 | `src/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
+| `src/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
 | `src/i18n/index.ts` | 扩展内 UI 文案入口 | 按 `navigator.language` 在英文 / 中文翻译表间切换 |
 | `src/collectors/` | 站点采集适配器 | 新 AI 站点通常从这里扩展 |
 | `src/conversations/data/storage-idb.ts` | 本地会话数据层 | 承载 IndexedDB 事实源 |
@@ -26,6 +27,9 @@
 | `src/ui/settings/sections/insight-stats.ts` | Insight 聚合引擎 | 从 IndexedDB 的 `conversations` + `messages` 现算本地 clip 统计 |
 | `src/ui/settings/sections/InsightSection.tsx` | Insight 状态容器 | 管理 loading / error / empty / populated 四类状态 |
 | `src/ui/settings/sections/InsightPanel.tsx` | Insight 统计视图 | 用 `recharts` 渲染来源分布、文章域名分布与 Top 3 conversation |
+| `src/ui/shared/hooks/useThemeMode.ts` | 主题模式应用 | 把 `ui_theme_mode` 转成 `data-theme` 覆盖，驱动 popup / app 同步换肤 |
+| `src/ui/conversations/ConversationListPane.tsx` | 列表筛选、批量动作与来源持久化 | 控制 `source filter`、today/total 统计、导出/同步/删除菜单 |
+| `src/ui/conversations/pending-open.ts` | 窄屏待打开会话桥接 | 让 Insight / 列表 / 路由在 narrow 模式下也能准确落到 detail |
 
 ## 运行时结构
 
@@ -73,18 +77,22 @@
 | UI 区域 | 主要实现 | 说明 |
 | --- | --- | --- |
 | 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `conversations-context.tsx`, `detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 打开目标解析逻辑 |
-| 设置页 | `SettingsScene.tsx`, `SettingsSidebarNav.tsx`, `types.ts` | 真实设置中枢，按 Data / Features / About 分组组织 Notion、Obsidian、Chat with AI、Insight、Inpage、Backup、About |
+| 设置页 | `SettingsScene.tsx`, `SettingsSidebarNav.tsx`, `types.ts` | 真实设置中枢，按 `Features / Data / About` 分组组织 `General`、`Chat with AI`、`Backup`、`Notion`、`Obsidian`、`Insight`、`About` |
 | Markdown 渲染 | `ui/shared/markdown.ts`, `ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
-| Chat with AI | `ChatWithAiSection.tsx`, `chatwith-settings.ts` | 管理 prompt 模板、平台列表、最大字符数，并把 article / conversation 渲染为可复制载荷 |
+| Chat with AI | `ChatWithAiSection.tsx`, `chatwith-settings.ts`, `chatwith-detail-header-actions.ts` | 管理 prompt 模板、平台列表、最大字符数，并把 article / conversation 渲染为可复制载荷，再从 detail header 触发复制 + 跳转 |
 | Insight | `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.ts` | 只读统计本地会话库，展示总 clips、chat/article 概览、来源分布、Top 3 最长对话与文章域名分布 |
 | i18n | `i18n/index.ts`, `i18n/locales/*.ts` | UI 文案自动根据浏览器语言在 `en` / `zh` 间切换 |
 | popup 打开 | `ui-background-handlers.ts` | 双击 inpage 按钮时尝试 `openPopup()`，失败则回退提示 |
 
 - Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, 以及 Obsidian 连接参数。
+- `General` 分区现在承接了原来分散的“外观 + inpage + 自动保存”设置：主题模式使用 `ui_theme_mode`（`system / light / dark`），并由 `useThemeMode()` 把结果应用到 popup / app 根节点。
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
+- detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
 - `useSettingsSceneController.ts` 只在 `activeSection === 'insight'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。
 - `SettingsScene.tsx` 会为 Insight 分区放宽 detail 宽度到 `1120px`，因为这一页需要容纳双栏图表与排行布局。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
+- `ConversationListPane.tsx` 会把来源筛选写入 `localStorage`（`webclipper_conversations_source_filter_key`），因此“为什么列表下次打开还停在 ChatGPT 过滤条件”是预期行为，不是脏状态。
+- `ConversationsScene.tsx` 在窄屏下采用 list/detail 双路由；如果某个入口（例如 Insight Top conversations）需要直接开 detail，会通过 `pending-open.ts` 把目标会话先写入 `sessionStorage`，再在 scene 初始化时消费。
 - detail header 右上角的会话级动作由 `detail-header-actions.ts` 统一解析；当前规则固定为：单目标直出按钮，Notion + Obsidian 双目标时显示菜单，popup 的旧 `More` 占位已经移除。
 - `Open in Obsidian` 的文件打开只走 Local REST API `POST /open/{filename}`；当 API 因 App 未启动不可达时，只用 `obsidian://open` 拉起桌面 App，随后再重试 REST API。
 - 文案国际化是运行时自动行为，不依赖用户手动切换设置：`i18n/index.ts` 只看 `navigator.language`，当前显式支持英文与中文两套 locale。
@@ -94,6 +102,7 @@
 - **改 inpage 体验**：先看 `content-controller.ts`, `bootstrap/content.ts`, `inpage-button-shadow.ts`, `inpage-tip-shadow.ts`。
 - **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
 - **改 Insight 统计 / 排行 / 图表**：先看 `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `useSettingsSceneController.ts`；这里决定 Top N、Other 分桶、空态 / 错误态和图表布局。
+- **改主题模式 / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `useThemeMode.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略状态来源。
 - **改 detail header 打开目标**：先看 `detail-header-actions.ts`, `detail-header-obsidian-target.ts`, `DetailHeaderActionBar.tsx`, `ConversationsScene.tsx`, `ConversationDetailPane.tsx`，不要在 popup / app JSX 里各自拼目标 URL，也不要把 Obsidian 文件打开退回到 URI file deep link。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
@@ -140,6 +149,10 @@
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
+- `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/conversations/ConversationsScene.tsx`
+- `webclipper/src/ui/conversations/pending-open.ts`
 - `webclipper/src/ui/popup/usePopupCurrentPageCapture.ts`
 - `webclipper/tests/smoke/background-router-current-page-capture.test.ts`
 - `webclipper/tests/smoke/detail-header-actions.test.ts`

@@ -8,7 +8,7 @@
 | 产品线 | 主目录 | 运行时 | 主要输入 | 主要输出 |
 | --- | --- | --- | --- | --- |
 | SyncNos App | `macOS/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
-| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、Settings Insight、本地导出、Notion 页面、Obsidian 文件 |
+| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、Settings Insight、主题/行为偏好、本地导出、Notion 页面、Obsidian 文件 |
 
 ## 顶层目录地图
 
@@ -31,6 +31,8 @@
 | App 根门控 | `macOS/SyncNos/Views/RootView.swift` | 按顺序切换 Onboarding → PayWall → MainListView | 它解释为什么主界面不是总能直接出现 |
 | 扩展后台入口 | `webclipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job | 它决定所有后台能力如何挂接 |
 | 扩展内容入口 | `webclipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、runtime observer、增量更新 | 它决定页面采集是如何启动的 |
+| 扩展设置入口 | `webclipper/src/ui/settings/SettingsScene.tsx` | 组织 `General / Chat with AI / Backup / Notion / Obsidian / Insight / About` 分区，并在窄屏下切换 list/detail 路由 | 它决定设置项如何被真正看见和进入 |
+| 扩展主题入口 | `webclipper/src/ui/shared/hooks/useThemeMode.ts` | 监听 `ui_theme_mode` 并把 light/dark/system 应用到根节点 `data-theme` | 它解释“为什么 popup 与 app 会同步切主题” |
 | WXT / manifest 入口 | `webclipper/wxt.config.ts` | 版本号、权限、host permissions、entrypointsDir | 它是发布版本和能力边界的代码事实源 |
 | 脚本入口 | `webclipper/package.json` | `dev`, `compile`, `test`, `build`, `check` | 它定义扩展侧默认验证顺序 |
 
@@ -40,10 +42,11 @@
 | --- | --- | --- | --- |
 | 阅读来源 | Apple Books、GoodLinks、WeRead、Dedao、聊天 OCR | SyncNos App | App 先做来源适配，再统一走 Notion 同步引擎 |
 | 页面来源 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai、普通网页 | WebClipper | 扩展先采集为本地会话，再派生到任意目标 |
-| 本地事实源 | SwiftData / UserDefaults / Keychain；IndexedDB / `chrome.storage.local` | 两条产品线各自维护 | 这是 debug、迁移、恢复、回归时最先要看的地方 |
+| 本地事实源 | SwiftData / UserDefaults / Keychain；IndexedDB / `chrome.storage.local` / `localStorage` / `sessionStorage` | 两条产品线各自维护 | 这是 debug、迁移、恢复、回归时最先要看的地方 |
 | 外部结果 | Notion 数据库 / 页面、Obsidian 文件、Markdown / Zip 导出、Release 附件 | App + WebClipper + GitHub Actions | 对用户可见，但不是所有情况下都等于事实源 |
 
 - WebClipper 的 Insight 统计面板是**本地会话库的只读视图**：它不生成新的导出产物，也不改变同步链路，而是把 `conversations + messages` 的累计结果变成可见的仪表盘。
+- WebClipper 的 `Chat with AI` 是**本地会话库派生出的 UI 动作**：它复用 detail 数据生成 payload，并把结果复制到剪贴板后跳转外部站点。
 
 ## 常用命令与工程入口
 

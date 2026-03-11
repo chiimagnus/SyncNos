@@ -85,14 +85,19 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
 
 1. 先确认职责边界：采集逻辑放 `collectors/content`，持久化与路由放 `background`，界面交互放 `popup` / `app`。
 2. 权限、content scripts、消息协议、构建产物变更要同时检查 `wxt` 入口、manifest 结果与 CI 脚本是否一致。
-3. 默认验证顺序使用：
+3. Settings / Conversations UI 改动时，不要只改单个组件；同时核对这些真源：
+   - `webclipper/src/ui/settings/types.ts`（section 分组与顺序）
+   - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`（`ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `chat_with_*`）
+   - `webclipper/src/ui/shared/hooks/useThemeMode.ts`（popup / app 主题应用）
+   - `webclipper/src/ui/conversations/ConversationListPane.tsx` / `pending-open.ts`（来源筛选持久化与窄屏 detail bridge）
+4. 默认验证顺序使用：
    - `npm --prefix webclipper run compile`
    - `npm --prefix webclipper run test`
    - `npm --prefix webclipper run build`
-4. 若改动涉及 Firefox、发布打包、manifest/content script 重写或产物完整性，再补：
+5. 若改动涉及 Firefox、发布打包、manifest/content script 重写或产物完整性，再补：
    - `npm --prefix webclipper run build:firefox`
    - `npm --prefix webclipper run check`
-5. 发布包与 AMO Source 包由 GitHub Actions 和 `.github/scripts/webclipper/*.mjs` 负责，本地以开发验证为主。
+6. 发布包与 AMO Source 包由 GitHub Actions 和 `.github/scripts/webclipper/*.mjs` 负责，本地以开发验证为主。
 
 ### 文档同步工作流
 
@@ -103,7 +108,10 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
    - `.github/deepwiki/business-context.md`
    - `macOS/SyncNos/AGENTS.md` 或 `webclipper/AGENTS.md`
    - `README.md`
-3. 未被明确要求时，不要查看或编辑国际化字段。
+3. 若 WebClipper 改动涉及设置结构、视觉 tokens、主题模式或共享按钮/导航样式，再同步：
+   - `webclipper/src/ui/AGENTS.md`
+   - `README.zh-CN.md`
+4. 未被明确要求时，不要查看或编辑国际化字段。
 
 ## 常用命令
 

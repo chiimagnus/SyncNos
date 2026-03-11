@@ -73,6 +73,7 @@ SyncNos has two parts:
 - Capture AI chats from supported sites into local browser storage.
 - Export selected conversations as Markdown (single merged file or multi-file zip).
 - Popup/App renders message Markdown in conversation detail view for readability.
+- `Chat with AI` detail actions: configure prompt template, max chars, and enabled platforms in Settings, then copy the rendered payload to clipboard and jump to the chosen AI site.
 - Sync selected conversations to Obsidian via `Obsidian Local REST API` (`http://127.0.0.1:27123`).
 - Database backup:
   - Export `*.zip` (`manifest.json` + `sources/conversations.csv` + `sources/...` + `config/storage-local.json`)
@@ -88,6 +89,9 @@ SyncNos has two parts:
   - Optional: only supported AI sites + Notion pages
   - Takes effect after page refresh
   - Does not affect `Fetch Current Page` in Settings
+- Theme mode in `Settings -> General`:
+  - `System` / `Light` / `Dark`
+  - Saved to local browser storage and applied to both popup and full-page app UI
 - Notion sync writes by kind:
   - Chats: `SyncNos-AI Chats`
   - Web articles: `SyncNos-Web Articles`

@@ -8,7 +8,8 @@
 | App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
 | App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
 | WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions |
-| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、inpage 开关、Chat with AI、自定义设置分区（含 Insight 导航）、Notion AI 模型偏好 |
+| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、`ui_theme_mode`、`inpage_display_mode`、`ai_chat_auto_save_enabled`、Chat with AI、Notion AI 模型偏好 |
+| WebClipper UI-only 状态 | `localStorage` / `sessionStorage` | 浏览器本地 Web Storage | 控制设置页当前 section、来源筛选、窄屏下待打开的 conversation |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
 
 ## macOS App 配置项
@@ -27,18 +28,23 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.2.2` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.2.4` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
-| `inpage_supported_only` | `chrome.storage.local`, `bootstrap/content.ts` | 默认按 `false` 处理 | 控制非支持站点是否也启动 inpage UI |
+| `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
+| `ai_chat_auto_save_enabled` | `chrome.storage.local` | 默认 `true` | 控制支持 AI 站点是否自动保存；关闭后仍可手动保存 |
+| `ui_theme_mode` | `chrome.storage.local`, `useThemeMode.ts` | 默认 `system` | 控制 popup / app 主题跟随系统，或强制 light / dark |
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, SettingsScene controller | 用户选择值 | 决定扩展 Notion 的写入根 |
 | `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
 | `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1` | `chatwith-settings.ts`, `chrome.storage.local` | 默认模板 + 平台清单 + `28000` | 控制 Chat with AI 的载荷模板、目标平台和截断长度 |
-| `webclipper_settings_active_section` | `ui/settings/types.ts`, `localStorage` | 默认 `backup`；支持 `backup / notion / obsidian / chat_with / insight / inpage / about` | 记住设置页当前选中的 sidebar 分组 / section |
+| `webclipper_settings_active_section` | `ui/settings/types.ts`, `localStorage` | 默认 `general`；支持 `general / chat_with / backup / notion / obsidian / insight / about` | 记住设置页当前选中的 sidebar 分组 / section |
+| `webclipper_conversations_source_filter_key` | `ConversationListPane.tsx`, `localStorage` | 默认 `all` | 记住会话列表来源筛选 |
+| `webclipper_pending_open_conversation_id` | `pending-open.ts`, `sessionStorage` | 临时值 | 在窄屏 list/detail 路由之间桥接待打开的会话 |
 | Insight 统计限制 | `ui/settings/sections/insight-stats.ts` | `INSIGHT_CHAT_SOURCE_LIMIT=4`, `INSIGHT_ARTICLE_DOMAIN_LIMIT=8`, `INSIGHT_TOP_CONVERSATION_LIMIT=3` | 控制平台来源排行、文章域名排行与 Top conversation 截断方式 |
 | Obsidian 设置 | `obsidian*` settings store | `apiBaseUrl`, `authHeaderName`, `chatFolder`, `articleFolder`, 可选 API Key | 控制扩展写入本地 vault |
 | 备份敏感键排除 | `backup-utils.ts` | 精确排除 `notion_oauth_token_v1`, `notion_oauth_client_secret`，且排除任何 `notion_oauth_token*` | 避免敏感信息进入备份 |
 
 - 扩展 UI 文案没有独立的“语言设置”键；`i18n/index.ts` 会按 `navigator.language` 自动在 `en` / `zh` 间切换。
+- 主题模式不是只靠 CSS 媒体查询：`useThemeMode()` 会监听 `chrome.storage.local` 的 `ui_theme_mode`，并把 `data-theme='light'/'dark'` 覆盖写到根节点；`system` 模式才回退到 `prefers-color-scheme`。
 - Insight 不写入新的 `chrome.storage.local` 键；统计只在用户打开 `Settings → Insight` 时从 IndexedDB 现算，失败时回到错误态或空态。
 
 ## 发布参数
@@ -62,7 +68,8 @@
 
 ## 常见误配
 - **改了 `wxt.config.ts` 的 `manifest.version` 却没对齐 tag**：CWS / AMO workflow 会直接报 `manifest version mismatch`。
-- **切了 `inpage_supported_only` 但当前页不变**：因为 content script 只在启动时读取该开关，必须刷新或新开页面。
+- **切了 `inpage_display_mode` 或 `ai_chat_auto_save_enabled` 但当前页不变**：因为 content script 只在启动时读取这些开关，必须刷新或新开页面。
+- **以为主题切到 light / dark 会只影响当前页面**：`ui_theme_mode` 写在 `chrome.storage.local`，popup 与 app 都会通过 `useThemeMode()` 一起响应。
 - **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
 - **Obsidian 使用了错误的 URL / header / API Key**：当前设计默认围绕 `http://127.0.0.1:27123` 与 `Authorization` 头工作。
 - **App 只改 UI 没考虑字体缩放或窗口模式**：新视图若没调用现有字体 / 窗口辅助能力，体验会与主窗口不一致。
@@ -71,7 +78,7 @@
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
-  version: '1.2.2',
+  version: '1.2.4',
   permissions: ['storage', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
@@ -85,6 +92,17 @@ static let notionWriteRequestsPerSecond: Int = 3
 static let requestTimeoutSeconds: TimeInterval = 120
 ```
 
+### 片段 3：主题模式通过存储键驱动 `data-theme` 覆盖，而不只是依赖系统暗色
+```ts
+export const THEME_MODE_STORAGE_KEY = 'ui_theme_mode';
+
+export function applyThemeMode(mode: ThemeMode) {
+  if (mode === 'dark') root.setAttribute('data-theme', 'dark');
+  else if (mode === 'light') root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+}
+```
+
 ## 来源引用（Source References）
 - `macOS/SyncNos/SyncNosApp.swift`
 - `macOS/SyncNos/AppDelegate.swift`
@@ -96,9 +114,12 @@ static let requestTimeoutSeconds: TimeInterval = 120
 - `webclipper/src/bootstrap/current-page-capture.ts`
 - `webclipper/src/i18n/index.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/ui/shared/hooks/useThemeMode.ts`
 - `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/conversations/pending-open.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
