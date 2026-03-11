@@ -695,7 +695,9 @@ export function ConversationListPane({
               <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
               <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
               <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
-              <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--info)]">{String(filteredItems.length)}</span>
+              <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
+                {String(filteredItems.length)}
+              </span>
             </div>
           </div>
 
