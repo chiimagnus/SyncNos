@@ -34,7 +34,7 @@
 
   /* Utility */
   --border: rgb(216 220 226);
-  --focus-ring: rgb(91 141 239);
+  --focus-ring: var(--accent);
 
   /* Component: chat bubbles */
   --bubble-user-bg: color-mix(in srgb, var(--secondary) 34%, var(--bg-card));
@@ -76,7 +76,6 @@
 
     /* Utility */
     --border: rgb(54 56 64);
-    --focus-ring: rgb(123 164 247);
 
   }
 }
@@ -117,7 +116,6 @@
 
   /* Utility */
   --border: rgb(216 220 226);
-  --focus-ring: rgb(91 141 239);
 
 }
 
@@ -156,6 +154,5 @@
 
   /* Utility */
   --border: rgb(54 56 64);
-  --focus-ring: rgb(123 164 247);
 
 }

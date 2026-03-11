@@ -67,7 +67,7 @@
 
 | **Token** | **色值** | **用途** |
 | --- | --- | --- |
-| **focus-ring** | `#5B8DEF` 聚焦蓝 | 键盘焦点环 2px outline + 2px offset（≥ 3:1 on bg-primary & bg-card，符合 WCAG 1.4.11） |
+| **focus-ring** | `#FFC6AD` 柔桃（accent） | 键盘焦点环 2px outline + 2px offset（≥ 3:1 on bg-primary & bg-card，符合 WCAG 1.4.11） |
 
 ## A5 · 暗色模式色板
 
@@ -111,7 +111,7 @@
 
 | **Token** | **色值** | **说明** |
 | --- | --- | --- |
-| **focus-ring** | `#7BA4F7` 提亮聚焦蓝 | ≥ 3:1 on bg-primary & bg-card |
+| **focus-ring** | `#FFD4C2` 柔桃（accent） | ≥ 3:1 on bg-primary & bg-card |
 
 ## A6 · 暗色模式实操规则
 
@@ -190,7 +190,7 @@
 
   /* Utility */
   --border: #D8DCE2;
-  --focus-ring: #5B8DEF;
+  --focus-ring: var(--accent);
 }
 
 /* ===== Dark Mode ===== */
@@ -228,7 +228,7 @@
 
     /* Utility */
     --border: #363840;
-    --focus-ring: #7BA4F7;
+    --focus-ring: var(--accent);
   }
 }
 ```
@@ -240,7 +240,7 @@
 | **hover** | accent + 透明度降 10% | `rgba(255,198,173,0.85)` | `rgba(255,212,194,0.85)` |
 | **active** | accent + 明度降 5% | `#F0B89F` | `#F0C6B4` |
 | **disabled** | 前景色 38% 透明度（M3 规范） | `rgba(44,48,56,0.38)` | `rgba(220,224,232,0.38)` |
-| **focus ring** | focus-ring + 2px outline + 2px offset | `#5B8DEF` | `#7BA4F7` |
+| **focus ring** | focus-ring + 2px outline + 2px offset | `#FFC6AD` | `#FFD4C2` |
 
 ## B3 · 插件 UI 与宣传图的差异
 
