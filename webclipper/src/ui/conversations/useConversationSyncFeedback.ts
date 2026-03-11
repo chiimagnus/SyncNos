@@ -410,9 +410,11 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
 
       const token = runTokenRef.current + 1;
       runTokenRef.current = token;
-      setActiveRun({ provider, token });
+      const nextRun: ActiveRun = { provider, token };
+      activeRunRef.current = nextRun;
+      setActiveRun(nextRun);
 
-      setFeedback({
+      const runningFeedback: ConversationSyncFeedbackState = {
         provider,
         phase: 'running',
         total: ids.length,
@@ -425,7 +427,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         message: buildRunningMessage(provider, 0, ids.length),
         updatedAt: Date.now(),
         summary: null,
-      });
+      };
+      feedbackRef.current = runningFeedback;
+      setFeedback(runningFeedback);
 
       try {
         if (provider === 'obsidian') {
