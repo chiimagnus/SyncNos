@@ -2,6 +2,7 @@ import { t } from '../../../i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '../../../collectors/ai-chat-sites';
 import { cardClassName, checkboxClassName, selectClassName } from '../ui';
 import { buttonTintClassName } from '../../shared/button-styles';
+import { SelectMenu } from '../../shared/SelectMenu';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
@@ -73,16 +74,19 @@ export function InpageSection(props: {
         <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
             <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('inpageDisplayModeLabel')}</label>
-            <select
+            <SelectMenu<InpageDisplayMode>
               value={displayMode}
+              onChange={onChangeDisplayMode}
               disabled={busy}
-              onChange={(e) => onChangeDisplayMode(e.target.value as InpageDisplayMode)}
-              className={`${selectClassName} tw-min-w-[180px]`}
-            >
-              <option value="supported">{t('inpageDisplayModeSupported')}</option>
-              <option value="all">{t('inpageDisplayModeAll')}</option>
-              <option value="off">{t('inpageDisplayModeOff')}</option>
-            </select>
+              ariaLabel={t('inpageDisplayModeLabel')}
+              minWidth={180}
+              buttonClassName={`${selectClassName} tw-min-w-[180px]`}
+              options={[
+                { value: 'supported', label: t('inpageDisplayModeSupported') },
+                { value: 'all', label: t('inpageDisplayModeAll') },
+                { value: 'off', label: t('inpageDisplayModeOff') },
+              ]}
+            />
           </div>
           <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('inpageDisplayModeHint')}</div>
         </div>
