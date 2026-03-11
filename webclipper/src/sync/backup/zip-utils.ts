@@ -124,7 +124,6 @@ async function decompressDeflateRaw(bytes: Uint8Array, expectedSize?: number) {
 
 // Minimal DEFLATE (raw) fallback implementation.
 // Adapted from foliojs/tiny-inflate (MIT). We only need raw deflate for zip method=8.
-const TINF_OK = 0;
 const TINF_DATA_ERROR = -3;
 
 function HuffmanTree(this: any, table: number[], lengths: number[], symbols: number[]) {

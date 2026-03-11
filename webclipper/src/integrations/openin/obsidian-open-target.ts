@@ -217,7 +217,6 @@ export async function resolveObsidianOpenTarget({
   const clientRes = await buildClient(services);
   const pathConfig = await services.settingsStore.getPathConfig();
   const folderByKindId = buildFolderByKindId(pathConfig);
-  const desiredFilePath = services.notePath.buildStableNotePath(conversation, { folderByKindId });
 
   if (!clientRes.ok) {
     return {

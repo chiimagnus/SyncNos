@@ -224,3 +224,19 @@ status = "completed"
 plan = "plan-p6.md#p6-t2"
 commit = "chore: task28 - P6 验证通过（compile/test/build）"
 note = "compile/test/build passed"
+
+[[tasks]]
+id = "P7-T1"
+title = "删除 tsc(noUnused*) 报告的 dead code"
+status = "completed"
+plan = "plan-p7.md#p7-t1"
+commit = "chore: task29 - 清理 tsc noUnused 报告"
+note = "tsc noUnused + compile passed"
+
+[[tasks]]
+id = "P7-T2"
+title = "Phase 验证（compile/test/build）"
+status = "pending"
+plan = "plan-p7.md#p7-t2"
+commit = ""
+note = ""

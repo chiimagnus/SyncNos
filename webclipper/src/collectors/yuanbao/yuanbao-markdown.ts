@@ -213,7 +213,7 @@ import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts'
     return parts.join("");
   }
 
-  function linkMarkdownFromSpan(node: any, text: any): any {
+  function linkMarkdownFromSpan(_node: any, text: any): any {
     const raw = String(text || "").trim();
     if (!raw) return "";
     if (/^https?:\/\//i.test(raw)) return `[${raw}](${raw})`;

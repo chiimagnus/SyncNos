@@ -7,7 +7,7 @@ import { extractZipEntries } from '../../../sync/backup/zip-utils';
 import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
-import { getURL, send } from '../../../platform/runtime/runtime';
+import { send } from '../../../platform/runtime/runtime';
 import { storageGet, storageSet } from '../../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
 import {

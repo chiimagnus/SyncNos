@@ -3,10 +3,7 @@ import { launchObsidianApp } from '../sync/obsidian/obsidian-app-launch';
 import type { DetailHeaderAction, DetailHeaderActionPort } from './detail-header-action-types';
 import { openExternalUrl } from './open-external-url';
 import { reportObsidianOpenError, waitForDelay } from './openin/obsidian-open-target';
-import {
-  DETAIL_HEADER_ACTION_LABELS,
-  resolveOpenInDetailHeaderActions,
-} from './openin/openin-detail-header-actions';
+import { resolveOpenInDetailHeaderActions } from './openin/openin-detail-header-actions';
 import { resolveChatWithDetailHeaderActions } from './chatwith/chatwith-detail-header-actions';
 
 export { DETAIL_HEADER_ACTION_LABELS } from './openin/openin-detail-header-actions';

@@ -19,15 +19,6 @@ const SIDEBAR_WIDTH_DEFAULT = 370;
 const SIDEBAR_WIDTH_MIN = 370;
 const SIDEBAR_WIDTH_MAX = 520;
 
-function CollapseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function ExpandIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
