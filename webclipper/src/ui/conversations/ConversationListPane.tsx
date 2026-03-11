@@ -9,7 +9,7 @@ import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';
-import { buttonDangerClassName, buttonTintClassName } from '../shared/button-styles';
+import { buttonDangerClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '../shared/button-styles';
 
 type SourceMeta = { key: string; label: string };
 
@@ -370,6 +370,7 @@ export function ConversationListPane({
   const effectiveActiveRowId = activeRowId != null ? activeRowId : activeId;
   const actionButton = buttonTintClassName();
   const dangerButton = buttonDangerClassName();
+  const menuItemButtonClassName = buttonMenuItemClassName();
 
   const syncMenuBaseLabel = (() => {
     const prefix = commonPrefix(String(t('obsidianSync') || ''), String(t('notionSync') || ''));
@@ -419,22 +420,6 @@ export function ConversationListPane({
               ? 'tw-size-4 tw-cursor-pointer tw-accent-[var(--accent-foreground)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
               : 'tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
 
-            const miniIconBase = [
-              'tw-inline-flex tw-size-[18px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent',
-              'tw-text-[12px] tw-font-black tw-shadow-none',
-              'tw-transition-colors tw-duration-150',
-              'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-            ].join(' ');
-            const miniIconClass = [
-              miniIconBase,
-              'tw-text-[currentColor] tw-opacity-80 hover:tw-opacity-100',
-              isActive ? 'hover:tw-bg-[var(--accent-hover)]' : 'hover:tw-bg-[var(--bg-card)]',
-            ].join(' ');
-            const miniIconDisabledClass = [
-              miniIconBase,
-              'tw-text-[currentColor] tw-opacity-[0.38] tw-cursor-not-allowed',
-            ].join(' ');
-
             return (
               <div
                 key={String((conversation as any).id)}
@@ -469,7 +454,7 @@ export function ConversationListPane({
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
                     <button
-                      className={miniIconClass}
+                      className={buttonMiniIconClassName(isActive)}
                       type="button"
                       aria-label={t('copyFullMarkdown')}
                       title={copiedId === id ? t('copied') : t('copyFullMarkdown')}
@@ -479,7 +464,7 @@ export function ConversationListPane({
                     </button>
 
                     <button
-                      className={safeUrl ? miniIconClass : miniIconDisabledClass}
+                      className={buttonMiniIconClassName(isActive, !safeUrl)}
                       type="button"
                       aria-label={t('openOriginalChat')}
                       title={safeUrl ? t('openChat') : t('noLinkAvailable')}
@@ -597,7 +582,7 @@ export function ConversationListPane({
                 >
                   <button
                     id="menuExportSingleMarkdown"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                    className={menuItemButtonClassName}
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -609,7 +594,7 @@ export function ConversationListPane({
                   </button>
                   <button
                     id="menuExportMultiMarkdown"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                    className={menuItemButtonClassName}
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -653,7 +638,7 @@ export function ConversationListPane({
                 >
                   <button
                     id="menuSyncToObsidian"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-[0.38] disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
+                    className={menuItemButtonClassName}
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -666,7 +651,7 @@ export function ConversationListPane({
                   </button>
                   <button
                     id="menuSyncToNotion"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-[0.38] disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
+                    className={menuItemButtonClassName}
                     type="button"
                     role="menuitem"
                     onClick={() => {

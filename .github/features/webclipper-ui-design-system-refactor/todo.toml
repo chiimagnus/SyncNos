@@ -180,10 +180,10 @@ note = "done"
 [[tasks]]
 id = "P4-T2"
 title = "按钮样式统一收敛（shared helpers）"
-status = "pending"
+status = "completed"
 plan = "plan-p4.md#p4-t2"
-commit = ""
-note = ""
+commit = "style: task23 - 收敛按钮样式到 shared helpers"
+note = "compile passed"
 
 [[tasks]]
 id = "P4-T3"

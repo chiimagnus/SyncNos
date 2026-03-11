@@ -9,6 +9,7 @@ import { ConversationsScene, type PopupHeaderState } from '../conversations/Conv
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { navIconButtonClassName } from '../shared/nav-styles';
+import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
 
@@ -259,7 +260,7 @@ function AppShellFrame() {
                 <button
                   type="button"
                   onClick={closeSettings}
-                  className="tw-absolute tw-right-1 tw-top-1 tw-z-20 tw-inline-flex tw-size-6 tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0 tw-text-[var(--text-secondary)] tw-shadow-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                  className={['tw-absolute tw-right-1 tw-top-1 tw-z-20', buttonIconCircleGhostClassName()].join(' ')}
                   aria-label={t('closeSettings')}
                 >
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">

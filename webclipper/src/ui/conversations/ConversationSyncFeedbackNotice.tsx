@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { t } from '../../i18n';
 import type { ConversationSyncFeedbackState } from './useConversationSyncFeedback';
+import { buttonIconCircleCardClassName } from '../shared/button-styles';
 
 type ConversationSyncFeedbackNoticeProps = {
   feedback: ConversationSyncFeedbackState;
@@ -198,6 +199,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   const canDismiss = feedback.phase !== 'running';
   const issueCount = failures.length + warnings.length;
   const canShowDetails = issueCount > 0;
+  const iconCircleButtonClassName = buttonIconCircleCardClassName();
   const liveMode = feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'assertive' : 'polite';
   const progressWidth = feedback.total > 0
     ? feedback.done <= 0
@@ -247,7 +249,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           <button
             type="button"
             onClick={onDismiss}
-            className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-text-[var(--text-secondary)] tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+            className={iconCircleButtonClassName}
             aria-label={t('dismissSyncFeedback')}
           >
             ×
@@ -261,17 +263,17 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           aria-label={`${provider} ${t('syncDetails')}`}
           className="tw-absolute tw-bottom-[calc(100%+8px)] tw-left-0 tw-right-0 tw-z-30 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 tw-text-[var(--text-primary)] tw-shadow-none"
         >
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <div className="tw-text-xs tw-font-extrabold">{provider} {t('syncDetails')}</div>
+            <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+              <div className="tw-text-xs tw-font-extrabold">{provider} {t('syncDetails')}</div>
             <button
               type="button"
               onClick={() => setDetailsOpen(false)}
-              className="tw-inline-flex tw-size-7 tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-text-[var(--text-secondary)] tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+              className={iconCircleButtonClassName}
               aria-label={`Close ${provider} ${t('syncDetails')}`}
             >
               ×
             </button>
-          </div>
+            </div>
 
           <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
             {feedback.message}
