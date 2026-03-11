@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T1"
+current_task_id = "P3-T2"
 
 [[tasks]]
 id = "P1-T1"
@@ -116,18 +116,18 @@ note = "compile/test/build passed"
 [[tasks]]
 id = "P3-T1"
 title = "ConversationsScene 容器层级与 Surface 统一"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t1"
-commit = ""
-note = "start p3"
+commit = "refactor: task15 - ConversationsScene 统一 surface 层级"
+note = "compile passed"
 
 [[tasks]]
 id = "P3-T2"
 title = "ConversationListPane 列表与控制条样式重构"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t2"
 commit = ""
-note = ""
+note = "migrate list pane"
 
 [[tasks]]
 id = "P3-T3"
