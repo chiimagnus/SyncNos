@@ -108,7 +108,7 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T7"
 title = "Phase 验证（compile/test/build + light/dark 冒烟）"
-status = "in_progress"
+status = "completed"
 plan = "plan-p2.md#p2-t7"
 commit = "chore: task14 - P2 验证通过（compile/test/build）"
 note = "compile/test/build passed"
@@ -116,10 +116,10 @@ note = "compile/test/build passed"
 [[tasks]]
 id = "P3-T1"
 title = "ConversationsScene 容器层级与 Surface 统一"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t1"
 commit = ""
-note = ""
+note = "start p3"
 
 [[tasks]]
 id = "P3-T2"

@@ -75,7 +75,7 @@ function DistributionChart(props: {
               border: '1px solid var(--border)',
               background: 'var(--bg-card)',
               color: 'var(--text-primary)',
-              boxShadow: '0 12px 28px rgba(0, 0, 0, 0.18)',
+              boxShadow: 'none',
             }}
           />
           <Bar dataKey="count" radius={[0, 10, 10, 0]} barSize={22}>

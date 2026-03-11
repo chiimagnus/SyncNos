@@ -324,7 +324,12 @@ export function SettingsScene(props: SettingsSceneProps) {
                         aria-current={active ? 'page' : undefined}
                       >
                         <div className="tw-text-sm tw-font-black">{getSectionLabel(section.key)}</div>
-                        <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+                        <div
+                          className={[
+                            'tw-text-[11px] tw-font-semibold tw-opacity-90',
+                            active ? 'tw-text-[var(--accent-foreground)]' : 'tw-text-[var(--text-secondary)]',
+                          ].join(' ')}
+                        >
                           {getSectionDescription(section.key)}
                         </div>
                       </button>
@@ -342,7 +347,7 @@ export function SettingsScene(props: SettingsSceneProps) {
   return (
     <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
       <SettingsSidebarNav activeSection={activeSection} onSelectSection={setActiveSection} />
-      <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-bg-[var(--bg-card)] tw-p-4">
+      <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-bg-[var(--bg-primary)] tw-p-4">
         {renderDetailContent()}
       </div>
     </div>

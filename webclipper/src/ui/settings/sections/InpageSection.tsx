@@ -56,7 +56,7 @@ export function InpageSection(props: {
             return (
               <div
                 key={site.id}
-                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2"
+                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2"
               >
                 <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{site.name}</div>
                 <div className="tw-truncate tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{hostLabel}</div>
