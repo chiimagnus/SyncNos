@@ -44,7 +44,7 @@ function PopupShellFrame() {
 
   return (
     <div
-      className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg)] tw-text-[var(--text)]"
+      className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]"
       style={{
         fontFamily:
           '"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",sans-serif',
@@ -53,7 +53,7 @@ function PopupShellFrame() {
       }}
     >
       {showListActions ? (
-        <header className="tw-bg-[var(--panel)]/24 tw-px-3 tw-py-2 tw-backdrop-blur-sm">
+        <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2">
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
             <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
               <img
@@ -92,7 +92,7 @@ function PopupShellFrame() {
       ) : null}
 
       {!showListActions && headerState.mode === 'detail' ? (
-        <header className="tw-border-b tw-border-[var(--border)]/60 tw-bg-[var(--panel)]/72 tw-px-3 tw-py-2 tw-backdrop-blur-md">
+        <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2">
           <DetailNavigationHeader
             title={headerState.title}
             subtitle={headerState.subtitle}
@@ -107,8 +107,8 @@ function PopupShellFrame() {
           className={[
             'tw-border-b tw-px-3 tw-py-2 tw-text-[11px] tw-font-semibold',
             status.kind === 'error'
-              ? 'tw-border-[#fecaca] tw-bg-[#fef2f2] tw-text-[#b91c1c]'
-              : 'tw-border-[#bbf7d0] tw-bg-[#f0fdf4] tw-text-[#166534]',
+              ? 'tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--error)]'
+              : 'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--success)]',
           ].join(' ')}
           role={status.kind === 'error' ? 'alert' : 'status'}
         >

@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T2"
+current_task_id = "P2-T3"
 
 [[tasks]]
 id = "P1-T1"
@@ -68,10 +68,10 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T2"
 title = "PopupShell / Popup tabs 适配四级 Surface"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t2"
-commit = ""
-note = ""
+commit = "refactor: task9 - PopupShell 适配 tokens 与语义色"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T3"
