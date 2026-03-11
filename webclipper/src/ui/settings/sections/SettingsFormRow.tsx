@@ -8,7 +8,7 @@ export function SettingsFormRow(props: { label: string; align?: RowAlign; childr
 
   return (
     <div className={`tw-grid tw-grid-cols-[110px_1fr] ${alignClass} tw-gap-3`}>
-      <div className="tw-text-xs tw-font-bold tw-text-[var(--muted)]">{label}</div>
+      <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">{label}</div>
       <div>{children}</div>
     </div>
   );

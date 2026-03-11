@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T4"
+current_task_id = "P2-T5"
 
 [[tasks]]
 id = "P1-T1"
@@ -84,10 +84,10 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T4"
 title = "Settings 通用表单组件（FormRow 等）适配 tokens"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t4"
-commit = ""
-note = ""
+commit = "refactor: task11 - Settings 通用表单组件迁移 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T5"
