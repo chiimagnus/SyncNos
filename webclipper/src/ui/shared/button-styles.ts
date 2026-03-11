@@ -52,7 +52,12 @@ export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
   const width = minWidth === 150 ? 'tw-min-w-[150px]' : 'tw-min-w-[170px]';
   return [
     width,
-    'tw-z-30 tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5 tw-shadow-none',
+    [
+      'tw-z-30 tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-p-1.5',
+      'tw-bg-[color-mix(in_srgb,var(--bg-card)_88%,transparent)]',
+      'tw-backdrop-blur-[10px] tw-backdrop-saturate-150',
+      'tw-shadow-[0_18px_48px_rgba(0,0,0,0.18)]',
+    ].join(' '),
   ].join(' ');
 }
 
