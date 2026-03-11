@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T7"
+current_task_id = "P3-T1"
 
 [[tasks]]
 id = "P1-T1"
@@ -108,10 +108,10 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T7"
 title = "Phase 验证（compile/test/build + light/dark 冒烟）"
-status = "pending"
+status = "in_progress"
 plan = "plan-p2.md#p2-t7"
-commit = ""
-note = ""
+commit = "chore: task14 - P2 验证通过（compile/test/build）"
+note = "compile/test/build passed"
 
 [[tasks]]
 id = "P3-T1"
