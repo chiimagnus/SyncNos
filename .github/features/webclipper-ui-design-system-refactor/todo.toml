@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P1-T3"
+current_task_id = "P1-T4"
 
 [[tasks]]
 id = "P1-T1"
@@ -20,10 +20,10 @@ note = "compile passed"
 [[tasks]]
 id = "P1-T3"
 title = "入口全局样式改为冷灰底座"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t3"
-commit = ""
-note = ""
+commit = "refactor: task3 - 入口样式切换为冷灰底座"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T4"
