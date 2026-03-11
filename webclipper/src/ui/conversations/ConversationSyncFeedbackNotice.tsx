@@ -14,21 +14,31 @@ type NoticeTones = {
   progress: string;
 };
 
+const NOTICE_TONE_CLASSES: Record<'info' | 'success' | 'warning' | 'error', NoticeTones> = {
+  info: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--info)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--info)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--info)]',
+  },
+  success: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--success)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--success)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--success)]',
+  },
+  warning: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--warning)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--warning)]',
+  },
+  error: {
+    panel: 'tw-border-[color-mix(in_srgb,var(--error)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge: 'tw-border-[color-mix(in_srgb,var(--error)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    progress: 'tw-bg-[var(--error)]',
+  },
+};
+
 function makeToneClasses(colorToken: 'info' | 'success' | 'warning' | 'error'): NoticeTones {
-  const token = `var(--${colorToken})`;
-  return {
-    panel: [
-      `tw-border-[color-mix(in_srgb,${token}_45%,var(--border))]`,
-      `tw-bg-[color-mix(in_srgb,${token}_10%,var(--bg-card))]`,
-      'tw-text-[var(--text-primary)]',
-    ].join(' '),
-    badge: [
-      `tw-border-[color-mix(in_srgb,${token}_70%,var(--border))]`,
-      `tw-bg-[color-mix(in_srgb,${token}_14%,var(--bg-card))]`,
-      'tw-text-[var(--text-primary)]',
-    ].join(' '),
-    progress: `tw-bg-[${token}]`,
-  };
+  return NOTICE_TONE_CLASSES[colorToken];
 }
 
 function toneClasses(phase: ConversationSyncFeedbackState['phase']) {
