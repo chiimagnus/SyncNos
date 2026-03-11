@@ -168,3 +168,27 @@ status = "completed"
 plan = "plan-p3.md#p3-t7"
 commit = "chore: task21 - P3 验证通过（tokens 清理完成）"
 note = "compile/test/build passed; guards passed"
+
+[[tasks]]
+id = "P4-T1"
+title = "按钮样式盘点（清单与漂移点）"
+status = "completed"
+plan = "plan-p4.md#p4-t1"
+commit = "docs: task22 - 盘点 WebClipper 按钮样式来源"
+note = "done"
+
+[[tasks]]
+id = "P4-T2"
+title = "按钮样式统一收敛（shared helpers）"
+status = "pending"
+plan = "plan-p4.md#p4-t2"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P4-T3"
+title = "Phase 验证（compile/test/build）"
+status = "pending"
+plan = "plan-p4.md#p4-t3"
+commit = ""
+note = ""
