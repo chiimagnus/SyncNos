@@ -9,7 +9,7 @@ import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';
-import { buttonDangerClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '../shared/button-styles';
+import { buttonDangerClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName, menuPopoverPanelClassName } from '../shared/button-styles';
 
 type SourceMeta = { key: string; label: string };
 
@@ -591,7 +591,7 @@ export function ConversationListPane({
                   role="menu"
                   aria-label={t('exportOptions')}
                   hidden={!exportOpen}
-                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[150px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5"
+                  className={['tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto', menuPopoverPanelClassName(150)].join(' ')}
                 >
                   <button
                     id="menuExportSingleMarkdown"
@@ -647,7 +647,7 @@ export function ConversationListPane({
                   role="menu"
                   aria-label={syncMenuBaseLabel}
                   hidden={!syncOpen}
-                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5"
+                  className={['tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto', menuPopoverPanelClassName(170)].join(' ')}
                 >
                   <button
                     id="menuSyncToObsidian"

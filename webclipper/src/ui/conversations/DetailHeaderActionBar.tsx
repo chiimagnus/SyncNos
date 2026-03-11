@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
-import { buttonMenuItemClassName } from '../shared/button-styles';
+import { buttonMenuItemClassName, menuPopoverPanelClassName } from '../shared/button-styles';
 
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
@@ -159,7 +159,7 @@ export function DetailHeaderActionBar({
           role="menu"
           aria-label={resolvedMenuAriaLabel}
           hidden={!menuOpen}
-          className="tw-absolute tw-right-0 tw-top-[calc(100%+8px)] tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5 tw-shadow-none"
+          className={['tw-absolute tw-right-0 tw-top-[calc(100%+8px)]', menuPopoverPanelClassName(170)].join(' ')}
         >
           {actions.map((action) => (
             <button

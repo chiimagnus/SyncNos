@@ -38,6 +38,14 @@ export function buttonMenuItemClassName(): string {
   ].join(' ');
 }
 
+export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
+  const width = minWidth === 150 ? 'tw-min-w-[150px]' : 'tw-min-w-[170px]';
+  return [
+    width,
+    'tw-z-30 tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5 tw-shadow-none',
+  ].join(' ');
+}
+
 export function buttonIconCircleCardClassName(): string {
   return [
     'tw-inline-flex tw-size-7 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]',

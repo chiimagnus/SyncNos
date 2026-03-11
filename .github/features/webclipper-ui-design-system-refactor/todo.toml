@@ -192,3 +192,19 @@ status = "completed"
 plan = "plan-p4.md#p4-t3"
 commit = "chore: task24 - P4 验证通过（compile/test/build）"
 note = "compile/test/build passed"
+
+[[tasks]]
+id = "P5-T1"
+title = "统一 menu popover 面板容器样式（shared helper）"
+status = "completed"
+plan = "plan-p5.md#p5-t1"
+commit = "style: task25 - 统一 menu popover panel 样式"
+note = "compile passed"
+
+[[tasks]]
+id = "P5-T2"
+title = "Phase 验证（compile/test/build）"
+status = "pending"
+plan = "plan-p5.md#p5-t2"
+commit = ""
+note = ""
