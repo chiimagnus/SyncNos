@@ -54,7 +54,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
                 backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
                 from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
               }}
-              className={({ isActive }) => navIconButtonClassName(isActive)}
+              className={navIconButtonClassName(false)}
             >
               <span className="tw-sr-only">{t('settingsLabel')}</span>
               <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />

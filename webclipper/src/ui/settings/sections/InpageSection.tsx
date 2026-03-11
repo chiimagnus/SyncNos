@@ -1,6 +1,7 @@
 import { t } from '../../../i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '../../../collectors/ai-chat-sites';
 import { cardClassName, checkboxClassName, selectClassName } from '../ui';
+import { buttonTintClassName } from '../../shared/button-styles';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
@@ -17,13 +18,9 @@ export function InpageSection(props: {
 
   const themeModeButtonClassName = (active: boolean) =>
     [
-      'tw-inline-flex tw-min-h-8 tw-items-center tw-justify-center tw-rounded-lg tw-px-3 tw-text-xs tw-font-extrabold',
-      'tw-transition-colors tw-duration-150',
-      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-      'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-      active
-        ? 'tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]'
-        : 'tw-bg-transparent tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-card)] hover:tw-text-[var(--text-primary)]',
+      buttonTintClassName(),
+      'tw-min-h-8 tw-rounded-lg',
+      active ? 'tw-bg-[var(--bg-sunken)]' : '',
     ].join(' ');
 
   return (
@@ -36,7 +33,7 @@ export function InpageSection(props: {
             <div
               role="group"
               aria-label={t('themeModeLabel')}
-              className="tw-inline-flex tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-1"
+              className="tw-inline-flex tw-items-center tw-gap-2"
             >
               <button
                 type="button"
