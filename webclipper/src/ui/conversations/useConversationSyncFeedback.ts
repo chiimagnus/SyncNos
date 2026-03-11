@@ -11,6 +11,7 @@ import {
 import { SYNC_JOB_STORAGE_KEYS } from '../../sync/sync-job-store';
 import { storageOnChanged } from '../../platform/storage/local';
 import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '../../sync/models';
+import type { SyncStartAck } from '../../sync/repo';
 import { primeObsidianAppForSync } from './obsidian-sync-launch';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
@@ -35,8 +36,8 @@ type UseConversationSyncFeedbackDeps = {
   clearObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
   getNotionSyncJobStatus?: () => Promise<SyncJobStatusResponse>;
   getObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
-  syncNotionConversations?: (conversationIds: number[]) => Promise<SyncRunSummary>;
-  syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncRunSummary>;
+  syncNotionConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
+  syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
 };
 
 type ActiveRun = {
@@ -415,21 +416,16 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           await primeObsidianAppForSync();
         }
 
-        const summary = provider === 'notion'
+        const ack = provider === 'notion'
           ? await syncNotionConversations(ids)
           : await syncObsidianConversations(ids);
-        if (disposedRef.current) return summary;
-        runTokenRef.current += 1;
-        setActiveRun((current) => (current?.token === token ? null : current));
-        setFeedback(toTerminalFeedback(summary, ids.length));
+        if (disposedRef.current) return ack;
         await refreshFromBackground(provider);
-        return summary;
+        return ack;
       } catch (error) {
         if (disposedRef.current) throw error;
 
         if (errorCode(error) === 'sync_already_running') {
-          runTokenRef.current += 1;
-          setActiveRun((current) => (current?.token === token ? null : current));
           await refreshFromBackground(provider);
           return null;
         }
