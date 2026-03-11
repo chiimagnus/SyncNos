@@ -46,15 +46,3 @@ export function navPillButtonClassName(): string {
     'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
   ].join(' ');
 }
-
-export function navMiniIconButtonClassName(disabled = false): string {
-  const base =
-    [
-      'tw-inline-flex tw-size-[18px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0',
-      'tw-bg-[var(--bg-card)] tw-text-[12px] tw-font-black tw-shadow-none',
-      'tw-transition-colors tw-duration-150',
-      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    ].join(' ');
-  if (disabled) return `${base} tw-cursor-not-allowed tw-opacity-[0.38]`;
-  return `${base} tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
-}

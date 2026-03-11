@@ -25,7 +25,6 @@
 - `navItemClassName(active)`：sidebar item（对齐 `webclipper/src/ui/example.html` 的 hover/active）
 - `navIconButtonClassName(active)` / `navIconButtonSmClassName(active)`：方形圆角 icon button（两种尺寸）
 - `navPillButtonClassName()`：header pill button（popup 顶部）
-- `navMiniIconButtonClassName(disabled)`：mini icon button（当前未被调用）
 
 ### C. Settings 封装（复用入口）
 
@@ -74,4 +73,3 @@
 
 - shared helpers 逐步建立后（`button-styles.ts` / `nav-styles.ts`），部分组件仍保留了早期“组件内联 className”的实现；
 - menu / close / mini icon 这类“非典型常规按钮”缺少明确的 shared helper，所以在多个组件里出现了相似但不完全一致的写法。
-

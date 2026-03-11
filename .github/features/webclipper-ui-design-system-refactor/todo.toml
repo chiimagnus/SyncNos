@@ -208,3 +208,19 @@ status = "completed"
 plan = "plan-p5.md#p5-t2"
 commit = "chore: task26 - P5 验证通过（compile/test/build）"
 note = "compile/test/build passed"
+
+[[tasks]]
+id = "P6-T1"
+title = "删除无引用的 UI 样式 helper"
+status = "completed"
+plan = "plan-p6.md#p6-t1"
+commit = "chore: task27 - 删除无引用的 nav helper"
+note = "compile passed"
+
+[[tasks]]
+id = "P6-T2"
+title = "Phase 验证（compile/test/build）"
+status = "pending"
+plan = "plan-p6.md#p6-t2"
+commit = ""
+note = ""
