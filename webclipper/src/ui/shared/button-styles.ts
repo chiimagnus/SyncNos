@@ -56,6 +56,12 @@ export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
   ].join(' ');
 }
 
+export function menuChevronClassName(): string {
+  return [
+    'tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]',
+  ].join(' ');
+}
+
 export function buttonIconCircleCardClassName(): string {
   return [
     'tw-inline-flex tw-size-7 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]',
