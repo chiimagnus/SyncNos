@@ -8,6 +8,7 @@ import type { DetailHeaderAction } from '../../integrations/detail-header-action
 import { ConversationDetailPane } from './ConversationDetailPane';
 import { ConversationListPane } from './ConversationListPane';
 import { useConversationsApp } from './conversations-context';
+import { consumePendingOpenConversationId } from './pending-open';
 
 type NarrowRoute = 'list' | 'detail';
 
@@ -33,12 +34,20 @@ export function ConversationsScene({
   inlineNarrowDetailHeader = false,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId, selectedConversation, detailHeaderActions } = useConversationsApp();
+  const { activeId, selectedConversation, detailHeaderActions, setActiveId } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const { route: narrowRoute, openDetail, returnToList, listRestoreKey } = useNarrowListDetailRoute({
     isNarrow,
     defaultRoute: defaultNarrowRoute,
   });
+
+  useEffect(() => {
+    if (!isNarrow) return;
+    const id = consumePendingOpenConversationId();
+    if (!id) return;
+    setActiveId(id);
+    openDetail();
+  }, [isNarrow, openDetail, setActiveId]);
 
   useEffect(() => {
     if (!onPopupHeaderStateChange) return;
