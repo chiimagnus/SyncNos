@@ -15,6 +15,7 @@ import { cardClassName, selectClassName } from '../ui';
 import { useConversationsApp } from '../../conversations/conversations-context';
 import { setPendingOpenConversationId } from '../../conversations/pending-open';
 import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
+import { SelectMenu } from '../../shared/SelectMenu';
 
 const CHART_BASE_COLOR = 'var(--accent)';
 
@@ -188,17 +189,18 @@ export function InsightPanel(props: {
     <div className="tw-grid tw-gap-4">
       <header className="tw-flex tw-items-center tw-justify-between tw-gap-3">
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightHeading')}</h2>
-        <select
-          className={selectClassName}
+        <SelectMenu<InsightTimeRange>
           value={range}
-          onChange={(event) => onChangeRange(event.target.value as InsightTimeRange)}
-          aria-label={t('insightRangeAria')}
-        >
-          <option value="all">{t('insightRangeAll')}</option>
-          <option value="today">{t('insightRangeToday')}</option>
-          <option value="7d">{t('insightRange7d')}</option>
-          <option value="30d">{t('insightRange30d')}</option>
-        </select>
+          onChange={onChangeRange}
+          ariaLabel={t('insightRangeAria')}
+          buttonClassName={selectClassName}
+          options={[
+            { value: 'all', label: t('insightRangeAll') },
+            { value: 'today', label: t('insightRangeToday') },
+            { value: '7d', label: t('insightRange7d') },
+            { value: '30d', label: t('insightRange30d') },
+          ]}
+        />
       </header>
 
       <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>

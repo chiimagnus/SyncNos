@@ -30,6 +30,7 @@
 - 备份导入入口统一在 `Settings -> App Settings`（含 Firefox popup）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 - 对话删除必须显式二次确认，避免误删。
+- 外观主题使用 `ui_theme_mode`（`system / light / dark`）持久化到 `chrome.storage.local`；popup 与 app 统一通过 `src/ui/shared/hooks/useThemeMode.ts` 应用 `data-theme` 覆盖，禁止在单个页面里偷偷做另一套主题切换状态。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
 - inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。
 - inpage 显示范围设置：`inpage_display_mode`（`chrome.storage.local`）。
@@ -43,6 +44,11 @@
   - 关闭后：不再对支持的 AI 聊天站点执行自动保存（仍可手动点击 inpage 按钮保存）。
   - 切换后对**新打开/刷新**的页面生效。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
+- Settings section 分组真源在 `src/ui/settings/types.ts`：
+  - `Features`: `general`, `chat_with`
+  - `Data`: `backup`, `notion`, `obsidian`
+  - `About`: `insight`, `about`
+- `Chat with AI` 不只是设置页配置：detail header 会根据启用的平台动态显示 `Chat with <platform>` 动作；动作会先复制 payload，再跳转到目标站点。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
@@ -101,10 +107,15 @@
   - background 侧通过 `scriptingExecuteScript`（`src/platform/webext/scripting.ts`）注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
+- **UI：主题模式（共享）**：`src/ui/shared/hooks/useThemeMode.ts`
+  - popup 与 app 都通过同一个 hook 监听 `ui_theme_mode`，并把 `light / dark / system` 应用到根节点 `data-theme`；token 真源在 `src/ui/styles/tokens.css`。
 - **会话详情头部打开目标（共享协议）**：`src/ui/conversations/detail-header-actions.ts` + `src/ui/conversations/DetailHeaderActionBar.tsx`
   - popup 与 app 的 detail header 都应消费同一套 action resolver；当前规则为：单目标直出按钮，双目标显示菜单。
-  - `Chat with ChatGPT`（Phase 1）会把当前 detail 内容拼成 prompt 写入剪贴板，并跳转到 ChatGPT（后续迭代再做 DOM 自动注入与发送）。
+  - `Chat with AI` 会根据设置里启用的平台动态生成一个或多个动作；每个动作都会把当前 detail 内容拼成 prompt 写入剪贴板，再跳转到对应平台（当前仍不做 DOM 自动注入与发送）。
   - `Open in Obsidian` 的文件打开只能走 Obsidian Local REST API 的 `POST /open/{filename}`；`obsidian://open` 只允许用于拉起桌面 App，再回到 REST API 完成目标文件打开。
+- **会话列表 UI-only 状态**：`src/ui/conversations/ConversationListPane.tsx` + `src/ui/conversations/pending-open.ts`
+  - 来源筛选保存在 `localStorage`（`webclipper_conversations_source_filter_key`），只影响列表视图。
+  - 窄屏下从 Insight / 其他入口跳详情时，目标 `conversationId` 通过 `sessionStorage` (`webclipper_pending_open_conversation_id`) 做一次性桥接。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
   - settings 写入：`src/ui/settings/hooks/useSettingsSceneController.ts`（保存 `inpage_display_mode` / `ai_chat_auto_save_enabled` 到 `chrome.storage.local`，并兼容旧 `inpage_supported_only`）。
   - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_display_mode`（及旧 `inpage_supported_only`）决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。

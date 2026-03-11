@@ -3,7 +3,9 @@
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
 - **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
-- **近期关键变化**：WebClipper 的 Settings 现在包含只读的 Insight 仪表盘，用本地 IndexedDB 现算 clips 总量、AI 对话 / 网页文章分布、Top 3 conversation 与来源结构。
+- **近期关键变化**：WebClipper 的 Settings 现在明确拆成 `Features / Data / About` 三组：`General` 负责 `theme mode + inpage display mode + AI auto-save`，`Chat with AI` 负责模板与平台清单，`Insight` 继续保持只读本地统计面板。
+- **详情页动作变化**：Conversation detail header 现在会根据启用的平台动态暴露多个 `Chat with <platform>` 动作；动作会先把渲染后的 payload 复制到剪贴板，再跳转目标 AI 站点。
+- **移动/窄屏行为变化**：会话列表来源筛选会写入 `localStorage`；从 Insight / 列表跳详情时，窄屏路由通过 `sessionStorage` bridge 把目标会话带到 detail 页。
 - **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
@@ -61,6 +63,9 @@
 | App 为什么会先出现引导或付费墙？ | [business-context.md](business-context.md) | [modules/syncnos-app.md](modules/syncnos-app.md) |
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
 | WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
+| WebClipper 的主题模式、inpage 开关和 AI 自动保存配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
+| `Chat with AI` 是怎么从详情页触发的、模板和平台存在哪？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
+| 为什么窄屏下从 Insight 点进对话能直接打开 detail？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [architecture.md](architecture.md) |
 | 我应该改哪个目录？ | [overview.md](overview.md) | [architecture.md](architecture.md), `modules/` |
 | 某个数据源 / collector / sync job 影响哪些系统？ | [architecture.md](architecture.md) | [data-flow.md](data-flow.md), [troubleshooting.md](troubleshooting.md) |
 | 怎样验证发布不会炸？ | [release.md](release.md) | [configuration.md](configuration.md), [testing.md](testing.md) |

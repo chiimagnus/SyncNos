@@ -45,11 +45,13 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | collectors | `src/collectors/` | 站点识别、DOM 抽取、消息标准化 | `register-all.ts`, 各站点 collector |
 | conversations | `src/conversations/` | IndexedDB CRUD、本地事实源、UI 读取面 | `storage-idb.ts`, background handlers |
 | sync | `src/sync/` | Notion / Obsidian / 备份的编排层 | `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
-| ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层 | `ConversationsScene.tsx`, `SettingsScene.tsx` |
+| ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层，以及主题模式、窄屏 list/detail 路由和会话级动作解析 | `ConversationsScene.tsx`, `SettingsScene.tsx`, `useThemeMode.ts`, `pending-open.ts` |
 | messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts` |
 
 - `content.ts` 把 content runtime 组装成“collectors registry + controller + inpage button/tip + runtime observer + incremental updater + notionAiModelPicker”的组合体。
 - `background.ts` 则把 conversation handlers、article fetch、Notion / Obsidian settings handlers、sync handlers、UI handlers 一次性挂到 router 上，并在实例切换时终止其他 background 实例遗留的 sync job。
+- `SettingsScene.tsx + useSettingsSceneController.ts` 共同承担 WebClipper 的“设置组合根”职责：一方面把 `chrome.storage.local` 里的 theme / inpage / chat-with / Notion / Obsidian 设置喂给 UI，另一方面只在进入 `insight` 分区时懒加载本地统计。
+- `ConversationsScene.tsx + pending-open.ts` 共同承担窄屏下的 list/detail bridge：当用户从 Insight 排行或其他路由跳到对话详情时，会先把目标 `conversationId` 写入 `sessionStorage`，再由 scene 消费并切进 detail。
 
 ## 关键契约
 
@@ -60,6 +62,8 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | `Notification.Name` 常量 | `macOS/SyncNos/Models/Core/NotificationNames.swift` | App 视图、ViewModel、Service | 统一同步、搜索、窗口、IAP、登录等事件 |
 | `message-contracts.ts` | `webclipper/src/platform/messaging/message-contracts.ts` | content / background / popup / app | 把扩展功能拆成 CORE / NOTION / OBSIDIAN / ARTICLE / UI 五类消息 |
 | `conversation-kinds.ts` | `webclipper/src/protocols/conversation-kinds.ts` | Notion / Obsidian orchestrator | 决定 chat/article 的 DB、folder 与重建规则 |
+| `chatwith-settings.ts` | `webclipper/src/integrations/chatwith/chatwith-settings.ts` | detail header、SettingsScene controller、backup tests | 统一 `Chat with AI` 的模板、平台列表、字符截断与存储键 |
+| `useThemeMode.ts` | `webclipper/src/ui/shared/hooks/useThemeMode.ts` | popup/app 壳层、SettingsScene | 统一 `ui_theme_mode` → `data-theme` 的主题应用逻辑 |
 | Zip v2 备份契约 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | 备份与恢复流程 | 约束 manifest、CSV、分源 JSON、storage-local.json 的结构 |
 
 ## 图表
@@ -101,6 +105,7 @@ flowchart TB
 - **App 门控热点**：`RootView.swift`、`OnboardingViewModel.swift`、`IAPService.swift`、`PayWallViewModel.swift`。
 - **扩展采集热点**：`content.ts`、`bootstrap/content-controller.ts`、`collectors/`、`article-fetch.ts`。
 - **扩展同步热点**：`storage-idb.ts`、`schema.ts`、`notion-sync-orchestrator.ts`、`obsidian-sync-orchestrator.ts`、`conversation-kinds.ts`。
+- **扩展设置 / 主题 / 会话 UI 热点**：`SettingsScene.tsx`、`useSettingsSceneController.ts`、`useThemeMode.ts`、`ConversationListPane.tsx`、`ConversationsScene.tsx`、`pending-open.ts`、`detail-header-actions.ts`。
 - **发布热点**：`wxt.config.ts`、`package.json`、`.github/workflows/webclipper-*.yml`、`.github/scripts/webclipper/*.mjs`。
 
 ## 来源引用（Source References）

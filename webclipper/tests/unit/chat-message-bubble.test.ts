@@ -11,16 +11,16 @@ function extractRootSectionClass(html: string) {
 }
 
 describe('ChatMessageBubble', () => {
-  it('renders user messages with accent-tinted bubbles without card background conflicts', () => {
+  it('renders user messages with green-tinted bubbles without card background conflicts', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown: 'hi' }));
     const cls = extractRootSectionClass(html);
-    expect(cls).toContain('tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))]');
+    expect(cls).toContain('tw-bg-[var(--bubble-user-bg)]');
     expect(cls).not.toContain('tw-bg-[var(--bg-card)]');
   });
 
   it('normalizes legacy roles to user and assistant styles', () => {
     const userHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'Human', markdown: 'hi' }));
-    expect(extractRootSectionClass(userHtml)).toContain('tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))]');
+    expect(extractRootSectionClass(userHtml)).toContain('tw-bg-[var(--bubble-user-bg)]');
 
     const assistantHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'model', markdown: 'hi' }));
     expect(extractRootSectionClass(assistantHtml)).toContain('tw-bg-[var(--bg-card)]');

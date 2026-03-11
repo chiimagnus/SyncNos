@@ -9,7 +9,9 @@ import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';
-import { buttonDangerTintClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName, menuPopoverPanelClassName } from '../shared/button-styles';
+import { buttonDangerTintClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '../shared/button-styles';
+import { MenuPopover } from '../shared/MenuPopover';
+import { SelectMenu } from '../shared/SelectMenu';
 
 type SourceMeta = { key: string; label: string };
 
@@ -158,9 +160,7 @@ export function ConversationListPane({
   const [filterKey, setFilterKey] = useState<string>('all');
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const exportWrapRef = useRef<HTMLDivElement | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
-  const syncWrapRef = useRef<HTMLDivElement | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -246,28 +246,6 @@ export function ConversationListPane({
       copiedTimerRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (!exportOpen) return;
-      const wrap = exportWrapRef.current;
-      const target = e.target as any;
-      if (!wrap || !target || !wrap.contains(target)) setExportOpen(false);
-    };
-    document.addEventListener('click', onDocClick, true);
-    return () => document.removeEventListener('click', onDocClick, true);
-  }, [exportOpen]);
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (!syncOpen) return;
-      const wrap = syncWrapRef.current;
-      const target = e.target as any;
-      if (!wrap || !target || !wrap.contains(target)) setSyncOpen(false);
-    };
-    document.addEventListener('click', onDocClick, true);
-    return () => document.removeEventListener('click', onDocClick, true);
-  }, [syncOpen]);
 
   useEffect(() => {
     if (hasSelection) return;
@@ -525,23 +503,24 @@ export function ConversationListPane({
               <span className="tw-sr-only">{t('selectAll')}</span>
             </label>
 
-            <select
-              id="sourceFilterSelect"
+            <SelectMenu<string>
+              buttonId="sourceFilterSelect"
+              className={hasSelection ? 'tw-hidden' : ''}
               value={filterKey}
-              onChange={(e) => onSetFilterKey(e.target.value)}
+              onChange={(next) => onSetFilterKey(next)}
               disabled={hasSelection}
-              className={[
-                'tw-h-8 tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-                hasSelection ? 'tw-hidden' : '',
+              ariaLabel={t('sourceFilterAria')}
+              side="top"
+              align="start"
+              minWidth={150}
+              buttonClassName={[
+                'tw-h-8 tw-w-full tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
+                'tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)]',
+                'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
               ].join(' ')}
-              aria-label={t('sourceFilterAria')}
-            >
-              {sourceOptions.map((opt) => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              options={sourceOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
+            />
 
             <div
               id="chatActionButtons"
@@ -564,119 +543,99 @@ export function ConversationListPane({
                   {t('deleteButton')}
                 </button>
 
-              <div ref={exportWrapRef} className="tw-relative">
+              <MenuPopover
+                open={exportOpen}
+                onOpenChange={setExportOpen}
+                disabled={!hasSelection || actionBusy}
+                ariaLabel={t('exportOptions')}
+                side="top"
+                align="end"
+                panelMinWidth={150}
+                trigger={(triggerProps) => (
+                  <button {...triggerProps} id="btnExport" className={actionButton}>
+                    <span className="tw-leading-none">{t('exportButton')}</span>
+                    <span
+                      className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                      aria-hidden="true"
+                    >
+                      ▾
+                    </span>
+                  </button>
+                )}
+              >
                 <button
-                  id="btnExport"
+                  id="menuExportSingleMarkdown"
+                  className={menuItemButtonClassName}
                   type="button"
-                  className={actionButton}
-                  aria-haspopup="menu"
-                  aria-expanded={exportOpen}
+                  role="menuitem"
                   onClick={() => {
-                    if (!hasSelection || actionBusy) return;
-                    setExportOpen((v) => !v);
+                    setExportOpen(false);
+                    void exportSelectedMarkdown({ mergeSingle: true });
                   }}
-                  disabled={!hasSelection || actionBusy}
                 >
-                  <span className="tw-leading-none">{t('exportButton')}</span>
-                  <span
-                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-                    aria-hidden="true"
-                  >
-                    ▾
-                  </span>
+                  {t('singleMarkdown')}
                 </button>
-
-                <div
-                  id="exportMenu"
-                  role="menu"
-                  aria-label={t('exportOptions')}
-                  hidden={!exportOpen}
-                  className={['tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto', menuPopoverPanelClassName(150)].join(' ')}
-                >
-                  <button
-                    id="menuExportSingleMarkdown"
-                    className={menuItemButtonClassName}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setExportOpen(false);
-                      void exportSelectedMarkdown({ mergeSingle: true });
-                    }}
-                  >
-                    {t('singleMarkdown')}
-                  </button>
-                  <button
-                    id="menuExportMultiMarkdown"
-                    className={menuItemButtonClassName}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setExportOpen(false);
-                      void exportSelectedMarkdown({ mergeSingle: false });
-                    }}
-                  >
-                    {t('multiMarkdown')}
-                  </button>
-                </div>
-              </div>
-
-              <div ref={syncWrapRef} className="tw-relative">
                 <button
-                  id="btnSyncTo"
+                  id="menuExportMultiMarkdown"
+                  className={menuItemButtonClassName}
                   type="button"
-                  className={actionButton}
-                  aria-haspopup="menu"
-                  aria-expanded={syncOpen}
+                  role="menuitem"
                   onClick={() => {
-                    if (!hasSelection || exporting || deleting) return;
-                    setSyncOpen((v) => !v);
+                    setExportOpen(false);
+                    void exportSelectedMarkdown({ mergeSingle: false });
                   }}
-                  disabled={!hasSelection || exporting || deleting}
                 >
-                  <span className="tw-leading-none">{syncMenuButtonLabel}</span>
-                  <span
-                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-                    aria-hidden="true"
-                  >
-                    ▾
-                  </span>
+                  {t('multiMarkdown')}
                 </button>
+              </MenuPopover>
 
-                <div
-                  id="syncToMenu"
-                  role="menu"
-                  aria-label={syncMenuBaseLabel}
-                  hidden={!syncOpen}
-                  className={['tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto', menuPopoverPanelClassName(170)].join(' ')}
+              <MenuPopover
+                open={syncOpen}
+                onOpenChange={setSyncOpen}
+                disabled={!hasSelection || exporting || deleting}
+                ariaLabel={syncMenuBaseLabel}
+                side="top"
+                align="end"
+                panelMinWidth={170}
+                trigger={(triggerProps) => (
+                  <button {...triggerProps} id="btnSyncTo" className={actionButton}>
+                    <span className="tw-leading-none">{syncMenuButtonLabel}</span>
+                    <span
+                      className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                      aria-hidden="true"
+                    >
+                      ▾
+                    </span>
+                  </button>
+                )}
+              >
+                <button
+                  id="menuSyncToObsidian"
+                  className={menuItemButtonClassName}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setSyncOpen(false);
+                    void syncSelectedObsidian().catch(() => {});
+                  }}
+                  disabled={actionBusy || syncingObsidian}
                 >
-                  <button
-                    id="menuSyncToObsidian"
-                    className={menuItemButtonClassName}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setSyncOpen(false);
-                      void syncSelectedObsidian().catch(() => {});
-                    }}
-                    disabled={actionBusy || syncingObsidian}
-                  >
-                    {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
-                  </button>
-                  <button
-                    id="menuSyncToNotion"
-                    className={menuItemButtonClassName}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setSyncOpen(false);
-                      void syncSelectedNotion().catch(() => {});
-                    }}
-                    disabled={actionBusy || syncingNotion}
-                  >
-                    {syncingNotion ? t('notionSyncing') : t('notionSync')}
-                  </button>
-                </div>
-              </div>
+                  {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
+                </button>
+                <button
+                  id="menuSyncToNotion"
+                  className={menuItemButtonClassName}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setSyncOpen(false);
+                    void syncSelectedNotion().catch(() => {});
+                  }}
+                  disabled={actionBusy || syncingNotion}
+                >
+                  {syncingNotion ? t('notionSyncing') : t('notionSync')}
+                </button>
+              </MenuPopover>
             </div>
 
             <div className="tw-flex-1 tw-min-w-0" aria-hidden="true" />

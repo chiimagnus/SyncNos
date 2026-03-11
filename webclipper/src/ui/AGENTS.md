@@ -67,7 +67,7 @@
 
 | **Token** | **色值** | **用途** |
 | --- | --- | --- |
-| **focus-ring** | `#5B8DEF` 聚焦蓝 | 键盘焦点环 2px outline + 2px offset（≥ 3:1 on bg-primary & bg-card，符合 WCAG 1.4.11） |
+| **focus-ring** | `#FFC6AD` 柔桃（accent） | 键盘焦点环 2px outline + 2px offset（≥ 3:1 on bg-primary & bg-card，符合 WCAG 1.4.11） |
 
 ## A5 · 暗色模式色板
 
@@ -111,7 +111,7 @@
 
 | **Token** | **色值** | **说明** |
 | --- | --- | --- |
-| **focus-ring** | `#7BA4F7` 提亮聚焦蓝 | ≥ 3:1 on bg-primary & bg-card |
+| **focus-ring** | `#FFD4C2` 柔桃（accent） | ≥ 3:1 on bg-primary & bg-card |
 
 ## A6 · 暗色模式实操规则
 
@@ -190,7 +190,7 @@
 
   /* Utility */
   --border: #D8DCE2;
-  --focus-ring: #5B8DEF;
+  --focus-ring: var(--accent);
 }
 
 /* ===== Dark Mode ===== */
@@ -228,7 +228,7 @@
 
     /* Utility */
     --border: #363840;
-    --focus-ring: #7BA4F7;
+    --focus-ring: var(--accent);
   }
 }
 ```
@@ -240,7 +240,7 @@
 | **hover** | accent + 透明度降 10% | `rgba(255,198,173,0.85)` | `rgba(255,212,194,0.85)` |
 | **active** | accent + 明度降 5% | `#F0B89F` | `#F0C6B4` |
 | **disabled** | 前景色 38% 透明度（M3 规范） | `rgba(44,48,56,0.38)` | `rgba(220,224,232,0.38)` |
-| **focus ring** | focus-ring + 2px outline + 2px offset | `#5B8DEF` | `#7BA4F7` |
+| **focus ring** | focus-ring + 2px outline + 2px offset | `#FFC6AD` | `#FFD4C2` |
 
 ## B3 · 插件 UI 与宣传图的差异
 
@@ -250,12 +250,19 @@
 | **渐变** | 背景微渐变提升质感 | 纯色即可，渐变在小面板上感知不到 |
 | **交互状态** | 无 | 需要 hover / active / disabled / focus 状态 |
 | **无障碍** | 装饰文字可稍放松 | 所有功能文字必须过 WCAG AA（4.5:1） |
-| **主题切换** | 亮暗各出一版截图 | 跟随系统 `prefers-color-scheme` 自动切换 |
+| **主题切换** | 亮暗各出一版截图 | 默认跟随系统；运行时也支持通过 `ui_theme_mode` 强制 `light / dark` |
 
 ## B4 · 暗色模式工程注意事项
 
 1. **阴影换微光** — 亮色模式 `box-shadow` 做投影，暗色模式改用极细亮边（1px `rgba(255,255,255,0.06)`）
 2. **层级靠 Surface 梯度** — `bg-sunken`（#141618）→ `bg-primary`（#1A1C20）→ `bg-card`（#262830），逐级提亮
 3. **语义色用暗色版** — `--error` 在暗色下自动切为 `#FC8181`，不要硬编码亮色值
-4. **跟随系统** — 使用 `prefers-color-scheme: dark` 媒体查询自动切换，不要手动 toggle（除非后续加用户偏好设置）
+4. **系统优先，但允许手动覆盖** — `tokens.css` 仍保留 `prefers-color-scheme: dark` 作为默认暗色来源；当 `ui_theme_mode` 写入 `chrome.storage.local` 时，由 `useThemeMode()` 给根节点加 `data-theme='light'/'dark'` 覆盖系统主题
 5. **On-Color 一致性** — 按钮文字永远用 `var(--accent-foreground)` 而不是硬编码黑/白，确保主题切换时自动适配
+
+### B4.1 · 主题实现边界
+
+- **默认行为**：没有手动偏好时，主题仍跟随系统 `prefers-color-scheme`
+- **手动覆盖行为**：当 `ui_theme_mode = light / dark` 时，根节点会出现 `:root[data-theme='light'/'dark']`，优先级高于媒体查询
+- **实现真源**：`src/ui/shared/hooks/useThemeMode.ts` + `src/ui/styles/tokens.css`
+- **工程约束**：新增组件必须同时兼容媒体查询和 `:root[data-theme='light'/'dark']`，不要把主题状态私有化到某个页面组件

@@ -34,14 +34,15 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
 
   const bubbleRoleClass =
     bubbleRole === 'user'
-      ? 'tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))] tw-border-[color-mix(in_srgb,var(--accent)_38%,var(--border))] tw-text-[var(--text-primary)]'
+      ? 'tw-bg-[var(--bubble-user-bg)] tw-border-[var(--bubble-user-border)] tw-text-[var(--secondary-foreground)]'
       : bubbleRole === 'assistant'
         ? 'tw-bg-[var(--bg-card)] tw-border-[var(--border)] tw-text-[var(--text-primary)]'
         : 'tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
 
   const headerBase = 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-1.5';
-  const headerLeftClass = 'tw-text-[11px] tw-font-[760] tw-text-[var(--text-secondary)]';
-  const headerRightClass = 'tw-text-[11px] tw-font-[650] tw-text-[var(--text-secondary)]';
+  const headerToneClass = bubbleRole === 'user' ? 'tw-text-[var(--secondary-foreground)] tw-opacity-70' : 'tw-text-[var(--text-secondary)]';
+  const headerLeftClass = `tw-text-[11px] tw-font-[760] ${headerToneClass}`;
+  const headerRightClass = `tw-text-[11px] tw-font-[650] ${headerToneClass}`;
 
   // Tailwind-only Markdown styling (no global CSS selectors).
   const mdClass =

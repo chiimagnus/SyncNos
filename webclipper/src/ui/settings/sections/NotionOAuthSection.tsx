@@ -2,6 +2,7 @@ import type { NotionPageOption } from '../utils';
 import { t } from '../../../i18n';
 import { buttonClassName, cardClassName, selectClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
+import { SelectMenu } from '../../shared/SelectMenu';
 
 export function NotionOAuthSection(props: {
   busy: boolean;
@@ -49,20 +50,31 @@ export function NotionOAuthSection(props: {
       <div className="tw-mt-3" aria-label={t('parentPage')}>
         <SettingsFormRow label={t('parentPage')}>
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-            <select
-              id="notionPages"
-              className={`${selectClassName} tw-w-full`}
-              value={notionParentPageId}
+            <SelectMenu<string>
+              buttonId="notionPages"
+              className="tw-flex-1 tw-min-w-0"
+              buttonClassName={`${selectClassName} tw-w-full`}
+              value={String(notionParentPageId || '')}
               disabled={busy || !notionConnected}
-              onChange={(e) => onSaveNotionParentPage(e.target.value)}
-            >
-              {notionPageOptions.length ? null : <option value="">{notionConnected ? t('clickRefresh') : t('connectNotionFirst')}</option>}
-              {notionPageOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
+              ariaLabel={t('parentPage')}
+              maxHeight={320}
+              onChange={(next) => onSaveNotionParentPage(next)}
+              options={[
+                {
+                  value: '',
+                  label: notionConnected
+                    ? notionPageOptions.length
+                      ? t('parentPage')
+                      : t('clickRefresh')
+                    : t('connectNotionFirst'),
+                  disabled: true,
+                },
+                ...notionPageOptions.map((p) => ({
+                  value: p.id,
+                  label: p.title,
+                })),
+              ]}
+            />
             <button
               type="button"
               title={t('refresh')}

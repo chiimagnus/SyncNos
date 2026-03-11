@@ -8,15 +8,6 @@ import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
 
-function formatTime(ts?: number) {
-  if (!ts) return '';
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return String(ts);
-  }
-}
-
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
@@ -42,7 +33,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   return (
     <section>
       <section
-        className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3"
+        className="tw-flex tw-flex-col"
         aria-label={t('conversationDetailAria')}
       >
         {!hideHeader ? (
@@ -98,7 +89,6 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                   key={String((m as any).id)}
                   role={(m as any).role}
                   headerLeft={String((m as any).role || t('messageRoleFallback'))}
-                  headerRight={formatTime((m as any).updatedAt)}
                   markdown={text}
                 />
               );
