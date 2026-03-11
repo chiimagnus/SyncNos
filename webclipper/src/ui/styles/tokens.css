@@ -94,3 +94,26 @@
     --focus-ring: #7ba4f7;
   }
 }
+
+/* ===== Legacy Tokens Alias (migration only; remove in P3) ===== */
+:root {
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --bg: var(--bg-primary);
+
+  --panel: color-mix(in srgb, var(--bg-card) 72%, var(--bg-primary));
+  --panel-strong: color-mix(in srgb, var(--bg-card) 58%, var(--bg-sunken));
+  --btn-bg: color-mix(in srgb, var(--bg-sunken) 76%, var(--bg-card));
+  --btn-bg-hover: color-mix(in srgb, var(--bg-sunken) 58%, var(--bg-card));
+
+  --border-strong: color-mix(in srgb, var(--border) 62%, var(--text-primary));
+  --shadow: 0 8px 18px color-mix(in srgb, var(--bg-overlay) 62%, transparent);
+
+  --danger: var(--error);
+  --danger-bg: color-mix(in srgb, var(--error) 16%, var(--bg-card));
+  --warn-bg: color-mix(in srgb, var(--warning) 18%, var(--bg-card));
+
+  --wc-ok: var(--success);
+  --wc-ok-bg: color-mix(in srgb, var(--success) 16%, var(--bg-card));
+  --wc-ok-border: color-mix(in srgb, var(--success) 46%, var(--border));
+}

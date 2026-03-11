@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P1-T2"
+current_task_id = "P1-T3"
 
 [[tasks]]
 id = "P1-T1"
@@ -12,10 +12,10 @@ note = "compile passed"
 [[tasks]]
 id = "P1-T2"
 title = "Legacy tokens 兼容层（迁移期）"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t2"
-commit = ""
-note = ""
+commit = "refactor: task2 - 为旧 tokens 增加迁移期 alias"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T3"
