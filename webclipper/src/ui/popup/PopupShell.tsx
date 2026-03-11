@@ -43,6 +43,7 @@ function PopupShellFrame() {
   };
 
   const showListActions = headerState.mode !== 'detail';
+  const onPopupNotionSyncStarted = () => {};
 
   return (
     <div
@@ -120,7 +121,7 @@ function PopupShellFrame() {
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label={t('chatsAria')}>
-          <ChatsTab onPopupHeaderStateChange={setHeaderState} />
+          <ChatsTab onPopupHeaderStateChange={setHeaderState} onPopupNotionSyncStarted={onPopupNotionSyncStarted} />
         </section>
       </main>
     </div>

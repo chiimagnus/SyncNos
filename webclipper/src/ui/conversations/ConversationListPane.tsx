@@ -125,6 +125,7 @@ async function copyTextToClipboard(text: string) {
 export type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
   activeRowId?: number | null;
+  onPopupNotionSyncStarted?: () => void;
   initialScrollTop?: number;
   scrollRestoreKey?: number;
   onListScrollTopChange?: (scrollTop: number) => void;
@@ -133,6 +134,7 @@ export type ConversationListPaneProps = {
 export function ConversationListPane({
   onOpenConversation,
   activeRowId,
+  onPopupNotionSyncStarted,
   initialScrollTop = 0,
   scrollRestoreKey = 0,
   onListScrollTopChange,
@@ -630,6 +632,7 @@ export function ConversationListPane({
                   onClick={() => {
                     setSyncOpen(false);
                     void syncSelectedNotion().catch(() => {});
+                    onPopupNotionSyncStarted?.();
                   }}
                   disabled={actionBusy || syncingNotion}
                 >
