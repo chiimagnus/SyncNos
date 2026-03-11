@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T3"
+current_task_id = "P3-T4"
 
 [[tasks]]
 id = "P1-T1"
@@ -132,18 +132,18 @@ note = "compile passed"
 [[tasks]]
 id = "P3-T3"
 title = "ConversationDetailPane 详情页样式重构"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t3"
-commit = ""
-note = "migrate detail pane"
+commit = "refactor: task17 - DetailPane/MessageBubble 迁移 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P3-T4"
 title = "Detail header（actions/nav）菜单与按钮样式重构"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t4"
 commit = ""
-note = ""
+note = "migrate detail header"
 
 [[tasks]]
 id = "P3-T5"

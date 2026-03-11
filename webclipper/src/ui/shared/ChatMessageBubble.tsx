@@ -30,25 +30,18 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
 
   const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
 
-  const bubbleBase =
-    'tw-min-w-0 tw-border tw-rounded-[10px] tw-p-2 tw-shadow-[0_1px_0_rgba(217,89,38,0.06)]';
+  const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[10px] tw-p-2 tw-shadow-none';
 
   const bubbleRoleClass =
     bubbleRole === 'user'
-      ? 'tw-bg-[#69BB84] tw-border-[rgba(14,52,32,0.28)] tw-text-[#0e3420]'
+      ? 'tw-bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))] tw-border-[color-mix(in_srgb,var(--accent)_38%,var(--border))] tw-text-[var(--text-primary)]'
       : bubbleRole === 'assistant'
-        ? 'tw-bg-white tw-border-[var(--border)] tw-text-[var(--text)]'
-        : 'tw-bg-[#fffaf7] tw-border-[var(--border)] tw-text-[var(--text)]';
+        ? 'tw-bg-[var(--bg-card)] tw-border-[var(--border)] tw-text-[var(--text-primary)]'
+        : 'tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
 
   const headerBase = 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-1.5';
-  const headerLeftClass =
-    bubbleRole === 'user'
-      ? 'tw-text-[11px] tw-font-[760] tw-text-[#124629]'
-      : 'tw-text-[11px] tw-font-[760] tw-text-[var(--muted)]';
-  const headerRightClass =
-    bubbleRole === 'user'
-      ? 'tw-text-[11px] tw-font-[650] tw-text-[rgba(18,70,41,0.8)]'
-      : 'tw-text-[11px] tw-font-[650] tw-text-[var(--muted)]';
+  const headerLeftClass = 'tw-text-[11px] tw-font-[760] tw-text-[var(--text-secondary)]';
+  const headerRightClass = 'tw-text-[11px] tw-font-[650] tw-text-[var(--text-secondary)]';
 
   // Tailwind-only Markdown styling (no global CSS selectors).
   const mdClass =
@@ -72,26 +65,27 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_ol]:tw-mt-0 [&_ol]:tw-mb-2 [&_ol]:tw-pl-5 [&_ol]:tw-list-decimal',
       '[&_ul>li+li]:tw-mt-1 [&_ol>li+li]:tw-mt-1',
 
-      '[&_blockquote]:tw-mt-0 [&_blockquote]:tw-mb-2 [&_blockquote]:tw-px-[9px] [&_blockquote]:tw-py-[6px] [&_blockquote]:tw-border-l-[3px] [&_blockquote]:tw-border-l-[rgba(217,89,38,0.35)] [&_blockquote]:tw-bg-[rgba(255,241,234,0.75)] [&_blockquote]:tw-text-[var(--muted)]',
+      '[&_blockquote]:tw-mt-0 [&_blockquote]:tw-mb-2 [&_blockquote]:tw-px-[9px] [&_blockquote]:tw-py-[6px] [&_blockquote]:tw-border-l-[3px] [&_blockquote]:tw-border-l-[var(--border)] [&_blockquote]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] [&_blockquote]:tw-text-[var(--text-secondary)]',
 
-      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[rgba(217,89,38,0.12)] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
+      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
 
-      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[rgba(217,89,38,0.2)] [&_pre]:tw-bg-[rgba(255,241,234,0.62)] [&_pre]:tw-overflow-auto',
+      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[var(--border)] [&_pre]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] [&_pre]:tw-overflow-auto',
       '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-leading-[1.45]',
 
       // Tables can be wider than the viewport; let the table itself scroll instead of the whole bubble.
       '[&_table]:tw-block [&_table]:tw-overflow-x-auto [&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
-      '[&_th]:tw-border [&_th]:tw-border-[rgba(217,89,38,0.2)] [&_th]:tw-px-[6px] [&_th]:tw-py-[4px] [&_th]:tw-align-top [&_th]:tw-text-[12px] [&_th]:tw-font-[700]',
-      '[&_td]:tw-border [&_td]:tw-border-[rgba(217,89,38,0.2)] [&_td]:tw-px-[6px] [&_td]:tw-py-[4px] [&_td]:tw-align-top [&_td]:tw-text-[12px]',
-      '[&_thead_th]:tw-bg-[rgba(255,241,234,0.75)]',
+      '[&_th]:tw-border [&_th]:tw-border-[var(--border)] [&_th]:tw-px-[6px] [&_th]:tw-py-[4px] [&_th]:tw-align-top [&_th]:tw-text-[12px] [&_th]:tw-font-[700]',
+      '[&_td]:tw-border [&_td]:tw-border-[var(--border)] [&_td]:tw-px-[6px] [&_td]:tw-py-[4px] [&_td]:tw-align-top [&_td]:tw-text-[12px]',
+      '[&_thead_th]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))]',
 
       // Images: never overflow the bubble, and avoid giant original-size rendering.
       '[&_img]:tw-block [&_img]:tw-h-auto [&_img]:tw-object-contain',
       // "Small image" policy: cap both width and height, but never overflow the bubble.
       '[&_img]:tw-max-w-[min(360px,100%)] [&_img]:tw-max-h-[240px]',
-      '[&_img]:tw-rounded-[10px] [&_img]:tw-border [&_img]:tw-border-[rgba(217,89,38,0.18)]',
+      '[&_img]:tw-rounded-[10px] [&_img]:tw-border [&_img]:tw-border-[var(--border)]',
 
-      '[&_a]:tw-text-[#2563eb] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
+      '[&_a]:tw-text-[var(--info)] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
+      '[&_a:focus-visible]:tw-outline [&_a:focus-visible]:tw-outline-2 [&_a:focus-visible]:tw-outline-offset-2 [&_a:focus-visible]:tw-outline-[var(--focus-ring)]',
     ].join(' ') + (className ? ` ${className}` : '');
 
   return (
