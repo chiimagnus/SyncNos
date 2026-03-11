@@ -6,7 +6,7 @@ export default defineConfig({
   entrypointsDir: 'src/entrypoints',
   manifest: {
     name: 'SyncNos-AI+Web Clipper',
-    version: '1.2.4',
+    version: '1.3.0',
     description:
       'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
     permissions: [
