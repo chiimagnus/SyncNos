@@ -1,16 +1,20 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 
 import { t } from '../../../i18n';
 import { Bar, BarChart, Cell, Tooltip, XAxis, YAxis } from 'recharts';
 
 import {
-  INSIGHT_OTHER_LABEL,
   type InsightDistributionItem,
   type InsightStats,
   type InsightTopConversation,
 } from './insight-stats';
 import type { InsightTimeRange } from './insight-stats';
 import { cardClassName, selectClassName } from '../ui';
+import { useConversationsApp } from '../../conversations/conversations-context';
+import { setPendingOpenConversationId } from '../../conversations/pending-open';
+import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
 
 const CHART_BASE_COLOR = 'var(--accent)';
 
@@ -105,8 +109,10 @@ function DistributionChart(props: {
 
 function TopConversationList(props: {
   items: InsightTopConversation[];
+  linkTo: string;
+  onOpenConversation: (conversationId: number) => void;
 }) {
-  const { items } = props;
+  const { items, linkTo, onOpenConversation } = props;
   if (!items.length) {
     return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightTopConversationsEmpty')}</div>;
   }
@@ -124,7 +130,26 @@ function TopConversationList(props: {
         <div key={item.conversationId} className="tw-grid tw-grid-cols-[auto_minmax(0,1fr)_auto] tw-items-start tw-gap-3">
           <div className={['tw-text-sm tw-font-black', rankToneClassName(index)].join(' ')}>{index + 1}.</div>
           <div className="tw-min-w-0">
-            <div className="tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text-primary)]">{item.title}</div>
+            <Link
+              to={linkTo}
+              replace
+              className={[
+                'tw-group tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-text-left',
+                'tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text-primary)]',
+                'hover:tw-opacity-85',
+                'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+              ].join(' ')}
+              title={item.title}
+              aria-label={item.title}
+              onClick={(event) => {
+                if (event.defaultPrevented) return;
+                if (event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+                onOpenConversation(item.conversationId);
+              }}
+            >
+              <span className="tw-min-w-0 tw-truncate tw-underline-offset-2 group-hover:tw-underline">{item.title}</span>
+              <ChevronRight size={14} strokeWidth={2} aria-hidden="true" className="tw-shrink-0 tw-text-[var(--text-secondary)] tw-opacity-70 group-hover:tw-opacity-100" />
+            </Link>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
           </div>
           <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
@@ -142,6 +167,22 @@ export function InsightPanel(props: {
   onChangeRange: (next: InsightTimeRange) => void;
 }) {
   const { stats, range, onChangeRange } = props;
+  const { setActiveId, clearSelected } = useConversationsApp();
+  const isNarrow = useIsNarrowScreen();
+  const routerLocation = useLocation();
+  const linkTo = useMemo(() => {
+    const state: any = (routerLocation as any)?.state ?? {};
+    const from = String(state?.from || '').trim();
+    return from || '/';
+  }, [routerLocation]);
+
+  const openConversation = (conversationId: number) => {
+    const safeId = Number(conversationId);
+    if (!Number.isFinite(safeId) || safeId <= 0) return;
+    clearSelected();
+    setActiveId(safeId);
+    if (isNarrow) setPendingOpenConversationId(safeId);
+  };
 
   return (
     <div className="tw-grid tw-gap-4">
@@ -222,7 +263,7 @@ export function InsightPanel(props: {
                 <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalMessages)}</div>
               </div>
             </div>
-            <TopConversationList items={stats.topConversations} />
+            <TopConversationList items={stats.topConversations} linkTo={linkTo} onOpenConversation={openConversation} />
           </div>
         </section>
 
