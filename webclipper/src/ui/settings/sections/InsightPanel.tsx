@@ -12,8 +12,24 @@ import {
 import type { InsightTimeRange } from './insight-stats';
 import { cardClassName, selectClassName } from '../ui';
 
+const CHART_BASE_COLOR = 'var(--accent)';
+
 function formatCount(value: number): string {
   return Number(value || 0).toLocaleString();
+}
+
+function getOrangeBarFill(index: number, total: number): string {
+  const safeTotal = Math.max(1, Math.floor(total || 0));
+  if (safeTotal <= 1) return CHART_BASE_COLOR;
+
+  const safeIndex = Math.min(Math.max(0, Math.floor(index || 0)), safeTotal - 1);
+  const t = safeTotal === 1 ? 0 : safeIndex / (safeTotal - 1);
+
+  // Top to bottom: stronger -> lighter tint towards card background.
+  // Keep the tail visible on light mode (bg-card is near white).
+  const colorPercent = Math.round(92 - t * 44); // 92% -> 48%
+  const clamped = Math.min(94, Math.max(42, colorPercent));
+  return `color-mix(in srgb, ${CHART_BASE_COLOR} ${clamped}%, var(--bg-card))`;
 }
 
 function DistributionChart(props: {
@@ -75,11 +91,8 @@ function DistributionChart(props: {
             }}
           />
           <Bar dataKey="count" radius={[0, 10, 10, 0]} barSize={22}>
-            {items.map((item) => (
-              <Cell
-                key={item.label}
-                fill={item.label === INSIGHT_OTHER_LABEL ? 'var(--text-secondary)' : 'var(--secondary)'}
-              />
+            {items.map((item, index) => (
+              <Cell key={item.label} fill={getOrangeBarFill(index, items.length)} />
             ))}
           </Bar>
         </BarChart>
