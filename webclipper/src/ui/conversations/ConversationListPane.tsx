@@ -15,6 +15,23 @@ type SourceMeta = { key: string; label: string };
 
 const SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
 
+function commonPrefix(a: string, b: string) {
+  const left = String(a || '');
+  const right = String(b || '');
+  const limit = Math.min(left.length, right.length);
+  let i = 0;
+  for (; i < limit; i += 1) {
+    if (left[i] !== right[i]) break;
+  }
+  return left.slice(0, i);
+}
+
+function normalizeSyncMenuLabel(text: string) {
+  const raw = String(text || '');
+  const trimmedRight = raw.replace(/[\s:：·•\-–—]+$/g, '').trimEnd();
+  return trimmedRight || raw.trim();
+}
+
 function formatTime(ts?: number) {
   if (!ts) return '';
   try {
@@ -144,6 +161,8 @@ export function ConversationListPane({
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const syncWrapRef = useRef<HTMLDivElement | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -220,7 +239,8 @@ export function ConversationListPane({
   }, [indeterminate]);
 
   const hasSelection = selectedIds.length > 0;
-  const busy = exporting || syncingNotion || syncingObsidian || deleting;
+  const actionBusy = exporting || deleting;
+  const syncingAny = syncingNotion || syncingObsidian;
 
   useEffect(() => {
     return () => {
@@ -241,9 +261,27 @@ export function ConversationListPane({
   }, [exportOpen]);
 
   useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!syncOpen) return;
+      const wrap = syncWrapRef.current;
+      const target = e.target as any;
+      if (!wrap || !target || !wrap.contains(target)) setSyncOpen(false);
+    };
+    document.addEventListener('click', onDocClick, true);
+    return () => document.removeEventListener('click', onDocClick, true);
+  }, [syncOpen]);
+
+  useEffect(() => {
     if (hasSelection) return;
     setDeleteConfirmOpen(false);
+    setExportOpen(false);
+    setSyncOpen(false);
   }, [hasSelection]);
+
+  useEffect(() => {
+    if (!syncingAny) return;
+    setDeleteConfirmOpen(false);
+  }, [syncingAny]);
 
   useEffect(() => {
     if (!deleteConfirmOpen) return;
@@ -278,6 +316,7 @@ export function ConversationListPane({
     setFilterKey(next);
     clearSelected();
     setExportOpen(false);
+    setSyncOpen(false);
     try {
       localStorage.setItem(SOURCE_FILTER_STORAGE_KEY, next);
     } catch (_e) {
@@ -333,6 +372,19 @@ export function ConversationListPane({
   const effectiveActiveRowId = activeRowId != null ? activeRowId : activeId;
   const actionButton = buttonTintClassName();
   const dangerButton = buttonDangerClassName();
+
+  const syncMenuBaseLabel = (() => {
+    const prefix = commonPrefix(String(t('obsidianSync') || ''), String(t('notionSync') || ''));
+    const normalized = normalizeSyncMenuLabel(prefix);
+    if (normalized.length >= 2) return normalized;
+    return 'Sync to';
+  })();
+
+  const syncMenuButtonLabel = syncingNotion
+    ? t('notionSyncing')
+    : syncingObsidian
+      ? t('obsidianSyncing')
+      : syncMenuBaseLabel;
 
   const onConfirmDelete = async () => {
     await deleteSelected();
@@ -484,16 +536,16 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <button
-                id="btnDelete"
-                type="button"
-                className={dangerButton}
-                title={t('deleteButton')}
-                onClick={() => setDeleteConfirmOpen(true)}
-                disabled={!hasSelection || busy}
-              >
-                {t('deleteButton')}
-              </button>
+                <button
+                  id="btnDelete"
+                  type="button"
+                  className={dangerButton}
+                  title={t('deleteButton')}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  disabled={!hasSelection || actionBusy || syncingAny}
+                >
+                  {t('deleteButton')}
+                </button>
 
               <div ref={exportWrapRef} className="tw-relative">
                 <button
@@ -503,10 +555,10 @@ export function ConversationListPane({
                   aria-haspopup="menu"
                   aria-expanded={exportOpen}
                   onClick={() => {
-                    if (!hasSelection || busy) return;
+                    if (!hasSelection || actionBusy) return;
                     setExportOpen((v) => !v);
                   }}
-                  disabled={!hasSelection || exporting || busy}
+                  disabled={!hasSelection || actionBusy}
                 >
                   <span className="tw-leading-none">{t('exportButton')}</span>
                   <span
@@ -551,22 +603,63 @@ export function ConversationListPane({
                 </div>
               </div>
 
-              <button
-                type="button"
-                className={actionButton}
-                onClick={() => syncSelectedObsidian().catch(() => {})}
-                disabled={!hasSelection || busy}
-              >
-                {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
-              </button>
-              <button
-                type="button"
-                className={actionButton}
-                onClick={() => syncSelectedNotion().catch(() => {})}
-                disabled={!hasSelection || busy}
-              >
-                {syncingNotion ? t('notionSyncing') : t('notionSync')}
-              </button>
+              <div ref={syncWrapRef} className="tw-relative">
+                <button
+                  id="btnSyncTo"
+                  type="button"
+                  className={actionButton}
+                  aria-haspopup="menu"
+                  aria-expanded={syncOpen}
+                  onClick={() => {
+                    if (!hasSelection || exporting || deleting) return;
+                    setSyncOpen((v) => !v);
+                  }}
+                  disabled={!hasSelection || exporting || deleting}
+                >
+                  <span className="tw-leading-none">{syncMenuButtonLabel}</span>
+                  <span
+                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                </button>
+
+                <div
+                  id="syncToMenu"
+                  role="menu"
+                  aria-label={syncMenuBaseLabel}
+                  hidden={!syncOpen}
+                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-1.5 tw-shadow-[var(--shadow)]"
+                >
+                  <button
+                    id="menuSyncToObsidian"
+                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)] disabled:tw-opacity-50 disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setSyncOpen(false);
+                      void syncSelectedObsidian().catch(() => {});
+                    }}
+                    disabled={actionBusy || syncingObsidian}
+                  >
+                    {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
+                  </button>
+                  <button
+                    id="menuSyncToNotion"
+                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)] disabled:tw-opacity-50 disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setSyncOpen(false);
+                      void syncSelectedNotion().catch(() => {});
+                    }}
+                    disabled={actionBusy || syncingNotion}
+                  >
+                    {syncingNotion ? t('notionSyncing') : t('notionSync')}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="tw-flex-1 tw-min-w-0" aria-hidden="true" />
@@ -610,7 +703,7 @@ export function ConversationListPane({
                 type="button"
                 className={actionButton}
                 onClick={() => setDeleteConfirmOpen(false)}
-                disabled={deleting}
+                disabled={deleting || syncingAny}
               >
                 {t('cancelButton')}
               </button>
@@ -620,7 +713,7 @@ export function ConversationListPane({
                 onClick={() => {
                   void onConfirmDelete();
                 }}
-                disabled={deleting}
+                disabled={deleting || syncingAny}
               >
                 {deleting ? t('deletingDots') : t('deleteButton')}
               </button>
