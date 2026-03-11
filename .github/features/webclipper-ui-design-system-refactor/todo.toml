@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T3"
+current_task_id = "P2-T4"
 
 [[tasks]]
 id = "P1-T1"
@@ -76,10 +76,10 @@ note = "compile passed"
 [[tasks]]
 id = "P2-T3"
 title = "Settings Scene/Sidebar 适配 tokens"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t3"
-commit = ""
-note = ""
+commit = "refactor: task10 - Settings Scene/Sidebar 适配 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T4"

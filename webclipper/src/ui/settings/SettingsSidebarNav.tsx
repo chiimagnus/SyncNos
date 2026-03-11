@@ -14,7 +14,7 @@ export function SettingsSidebarNav(props: {
   const { activeSection, onSelectSection } = props;
 
   return (
-    <aside className="tw-w-[220px] tw-shrink-0 tw-bg-[var(--panel)]/24">
+    <aside className="tw-w-[220px] tw-shrink-0 tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
       <nav className="tw-p-3 tw-pb-4" aria-label={t('settingsSectionsAria')}>
         <div className="tw-flex tw-flex-col tw-gap-4">
           {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
