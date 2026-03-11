@@ -35,6 +35,10 @@
   /* Utility */
   --border: rgb(216 220 226);
   --focus-ring: rgb(91 141 239);
+
+  /* Component: chat bubbles */
+  --bubble-user-bg: color-mix(in srgb, var(--secondary) 34%, var(--bg-card));
+  --bubble-user-border: color-mix(in srgb, var(--secondary) 62%, var(--border));
 }
 
 /* ===== Design System Tokens (Dark Mode) ===== */
@@ -73,6 +77,10 @@
     /* Utility */
     --border: rgb(54 56 64);
     --focus-ring: rgb(123 164 247);
+
+    /* Component: chat bubbles */
+    --bubble-user-bg: color-mix(in srgb, var(--secondary) 22%, var(--bg-card));
+    --bubble-user-border: color-mix(in srgb, var(--secondary) 48%, var(--border));
   }
 }
 
@@ -113,6 +121,10 @@
   /* Utility */
   --border: rgb(216 220 226);
   --focus-ring: rgb(91 141 239);
+
+  /* Component: chat bubbles */
+  --bubble-user-bg: color-mix(in srgb, var(--secondary) 34%, var(--bg-card));
+  --bubble-user-border: color-mix(in srgb, var(--secondary) 62%, var(--border));
 }
 
 :root[data-theme='dark'] {
@@ -151,4 +163,8 @@
   /* Utility */
   --border: rgb(54 56 64);
   --focus-ring: rgb(123 164 247);
+
+  /* Component: chat bubbles */
+  --bubble-user-bg: color-mix(in srgb, var(--secondary) 22%, var(--bg-card));
+  --bubble-user-border: color-mix(in srgb, var(--secondary) 48%, var(--border));
 }
