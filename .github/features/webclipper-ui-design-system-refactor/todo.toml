@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T4"
+current_task_id = "P3-T5"
 
 [[tasks]]
 id = "P1-T1"
@@ -140,18 +140,18 @@ note = "compile passed"
 [[tasks]]
 id = "P3-T4"
 title = "Detail header（actions/nav）菜单与按钮样式重构"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t4"
-commit = ""
-note = "migrate detail header"
+commit = "refactor: task18 - Detail header/actions 菜单迁移 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P3-T5"
 title = "语义状态色（Notice/Badge/Bubble）全面替换"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t5"
 commit = ""
-note = ""
+note = "unify semantic status"
 
 [[tasks]]
 id = "P3-T6"

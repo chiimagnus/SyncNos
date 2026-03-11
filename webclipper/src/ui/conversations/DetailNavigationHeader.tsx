@@ -34,11 +34,11 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         </button>
 
         <div className="tw-min-w-0 tw-flex-1">
-          <div className="tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em] tw-text-[var(--text)]">
+          <div className="tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
             {title}
           </div>
           {subtitle ? (
-            <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--muted)] tw-opacity-90">
+            <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
               {subtitle}
             </div>
           ) : null}
