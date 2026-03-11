@@ -18,7 +18,9 @@ export type SelectMenuProps<T extends string> = {
   ariaLabel: string;
   minWidth?: number;
   maxHeight?: number;
+  className?: string;
   buttonClassName?: string;
+  buttonId?: string;
   side?: 'top' | 'bottom';
   align?: 'start' | 'end';
 };
@@ -65,7 +67,9 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     ariaLabel,
     minWidth,
     maxHeight,
+    className,
     buttonClassName,
+    buttonId,
     side = 'bottom',
     align = 'end',
   } = props;
@@ -192,10 +196,12 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
       align={align}
       panelMinWidth={minWidth}
       panelMaxHeight={maxHeight}
+      className={className}
       trigger={(triggerProps) => (
         <button
           {...triggerProps}
           ref={triggerRef}
+          id={buttonId}
           className={['tw-inline-flex tw-items-center tw-justify-between tw-gap-2', triggerButtonClassName].join(' ')}
           aria-label={ariaLabel}
           onKeyDown={onTriggerKeyDown}
