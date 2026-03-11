@@ -50,6 +50,7 @@ function applyButtonHostLayoutStyles(el: HTMLElement) {
   setImportantStyle(el, 'background', 'transparent');
   setImportantStyle(el, 'cursor', 'pointer');
   setImportantStyle(el, 'user-select', 'none');
+  setImportantStyle(el, 'touch-action', 'none');
   setImportantStyle(el, 'box-shadow', 'none');
   setImportantStyle(el, 'isolation', 'isolate');
 }
@@ -273,6 +274,7 @@ function ensureInpageButton({
 
   let dragging = false;
   let moved = false;
+  let activePointerId: number | null = null;
   let startX = 0;
   let startY = 0;
   let startLeft = 0;
@@ -348,15 +350,27 @@ function ensureInpageButton({
 
   btn.addEventListener('click', onClickCapture, true);
 
+  const stopEvent = (event: Event) => {
+    try {
+      (event as any).preventDefault?.();
+      (event as any).stopPropagation?.();
+    } catch (_e) {
+      // ignore
+    }
+  };
+
   const onPointerDown = (e: PointerEvent) => {
-    if ((e as any).button !== 0) return;
+    if ((e as any).button != null && (e as any).button !== 0) return;
+    stopEvent(e);
     dragging = true;
     moved = false;
+    activePointerId = e.pointerId;
     startX = e.clientX;
     startY = e.clientY;
     const rect = btn.getBoundingClientRect();
     startLeft = rect.left;
     startTop = rect.top;
+    btn.classList.add('is-dragging');
     try {
       (btn as any).setPointerCapture?.(e.pointerId);
     } catch (_e) {
@@ -366,6 +380,8 @@ function ensureInpageButton({
 
   const onPointerMove = (e: PointerEvent) => {
     if (!dragging) return;
+    if (activePointerId != null && e.pointerId !== activePointerId) return;
+    stopEvent(e);
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     if (Math.abs(dx) + Math.abs(dy) >= 3) moved = true;
@@ -376,7 +392,11 @@ function ensureInpageButton({
 
   const onPointerUp = (e: PointerEvent) => {
     if (!dragging) return;
+    if (activePointerId != null && e.pointerId !== activePointerId) return;
+    stopEvent(e);
     dragging = false;
+    activePointerId = null;
+    btn.classList.remove('is-dragging');
     try {
       (btn as any).releasePointerCapture?.(e.pointerId);
     } catch (_e) {
@@ -392,9 +412,9 @@ function ensureInpageButton({
   };
 
   btn.addEventListener('pointerdown', onPointerDown);
-  btn.addEventListener('pointermove', onPointerMove);
-  btn.addEventListener('pointerup', onPointerUp);
-  btn.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('pointermove', onPointerMove, true);
+  window.addEventListener('pointerup', onPointerUp, true);
+  window.addEventListener('pointercancel', onPointerUp, true);
 
   document.documentElement.appendChild(btn);
 
@@ -450,9 +470,9 @@ function ensureInpageButton({
     window.removeEventListener('resize', onResize);
     btn.removeEventListener('click', onClickCapture, true);
     btn.removeEventListener('pointerdown', onPointerDown);
-    btn.removeEventListener('pointermove', onPointerMove);
-    btn.removeEventListener('pointerup', onPointerUp);
-    btn.removeEventListener('pointercancel', onPointerUp);
+    window.removeEventListener('pointermove', onPointerMove, true);
+    window.removeEventListener('pointerup', onPointerUp, true);
+    window.removeEventListener('pointercancel', onPointerUp, true);
   };
 }
 
