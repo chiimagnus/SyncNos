@@ -28,17 +28,17 @@ export function useDismissableLayer(options: UseDismissableLayerOptions) {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       if (event.key !== 'Escape') return;
       event.preventDefault();
       onDismissRef.current();
     };
 
     document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('keydown', onKeyDown, false);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('keydown', onKeyDown, false);
     };
   }, [open, containerRef]);
 }
-
