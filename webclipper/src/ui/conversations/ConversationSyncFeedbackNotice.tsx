@@ -162,10 +162,34 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   const { feedback, onDismiss } = props;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const prevProviderRef = useRef<ConversationSyncFeedbackState['provider']>(feedback.provider);
+  const prevPhaseRef = useRef<ConversationSyncFeedbackState['phase']>(feedback.phase);
+
+  const failures = Array.isArray(feedback.failures) ? feedback.failures : [];
+  const warnings = Array.isArray(feedback.warnings) ? feedback.warnings : [];
+  const issueCount = failures.length + warnings.length;
+  const canShowDetails = issueCount > 0;
 
   useEffect(() => {
-    setDetailsOpen(false);
-  }, [feedback.provider, feedback.phase, feedback.updatedAt]);
+    const prevProvider = prevProviderRef.current;
+    const prevPhase = prevPhaseRef.current;
+    prevProviderRef.current = feedback.provider;
+    prevPhaseRef.current = feedback.phase;
+
+    if (prevProvider !== feedback.provider) {
+      setDetailsOpen(false);
+      return;
+    }
+
+    // Close details when a new run starts, so we don't keep an old "open" state
+    // and surprise-open later when new issues appear.
+    if (feedback.phase === 'running' && prevPhase !== 'running') {
+      setDetailsOpen(false);
+      return;
+    }
+
+    if (!canShowDetails) setDetailsOpen(false);
+  }, [canShowDetails, feedback.phase, feedback.provider]);
 
   useEffect(() => {
     if (!detailsOpen) return;
@@ -193,12 +217,8 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   if (feedback.phase === 'idle' || !feedback.provider) return null;
 
   const tones = toneClasses(feedback.phase);
-  const failures = Array.isArray(feedback.failures) ? feedback.failures : [];
-  const warnings = Array.isArray(feedback.warnings) ? feedback.warnings : [];
   const provider = feedback.provider === 'notion' ? 'Notion' : 'Obsidian';
   const canDismiss = feedback.phase !== 'running';
-  const issueCount = failures.length + warnings.length;
-  const canShowDetails = issueCount > 0;
   const iconCircleButtonClassName = buttonIconCircleCardClassName();
   const liveMode = feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'assertive' : 'polite';
   const progressWidth = feedback.total > 0
