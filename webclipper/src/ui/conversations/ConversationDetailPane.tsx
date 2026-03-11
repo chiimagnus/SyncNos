@@ -42,7 +42,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   return (
     <section>
       <section
-        className="tw-flex tw-flex-col tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3"
+        className="tw-flex tw-flex-col"
         aria-label={t('conversationDetailAria')}
       >
         {!hideHeader ? (
