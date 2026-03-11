@@ -58,7 +58,7 @@ export function buttonIconCircleGhostClassName(): string {
   ].join(' ');
 }
 
-export function buttonMiniIconClassName(active: boolean, disabled = false): string {
+export function buttonMiniIconClassName(active: boolean): string {
   const base = [
     'tw-inline-flex tw-size-[18px] tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent',
     'tw-text-[12px] tw-font-black tw-shadow-none',
@@ -66,8 +66,11 @@ export function buttonMiniIconClassName(active: boolean, disabled = false): stri
     'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
   ].join(' ');
 
-  if (disabled) return `${base} tw-cursor-not-allowed tw-text-[currentColor] tw-opacity-[0.38]`;
-
   const hoverBg = active ? 'hover:tw-bg-[var(--accent-hover)]' : 'hover:tw-bg-[var(--bg-card)]';
-  return `${base} tw-text-[currentColor] tw-opacity-80 hover:tw-opacity-100 ${hoverBg}`;
+  return [
+    base,
+    'tw-text-[currentColor] tw-opacity-80 hover:tw-opacity-100',
+    hoverBg,
+    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38] disabled:hover:tw-bg-transparent disabled:hover:tw-opacity-[0.38]',
+  ].join(' ');
 }

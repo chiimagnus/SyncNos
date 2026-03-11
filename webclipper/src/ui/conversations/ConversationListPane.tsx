@@ -322,6 +322,13 @@ export function ConversationListPane({
     }
   };
 
+  const activateRow = (conversationId: number) => {
+    onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
+    const id = Number(conversationId);
+    setActiveId(id);
+    onOpenConversation?.(id);
+  };
+
   const onRowClick = (e: React.MouseEvent, conversationId: number) => {
     if (!e || e.button !== 0) return;
     const target = e.target as any;
@@ -330,10 +337,15 @@ export function ConversationListPane({
       if (target.closest('button')) return;
       if (target.closest('a')) return;
     }
-    onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
-    const id = Number(conversationId);
-    setActiveId(id);
-    onOpenConversation?.(id);
+    activateRow(conversationId);
+  };
+
+  const onRowKeyDown = (e: React.KeyboardEvent, conversationId: number) => {
+    if (!e) return;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation();
+    activateRow(conversationId);
   };
 
   const onCopyConversation = async (conversation: Conversation, e: React.MouseEvent) => {
@@ -427,6 +439,7 @@ export function ConversationListPane({
                 data-conversation-id={String((conversation as any).id)}
                 aria-label={formatConversationTitle((conversation as any).title)}
                 onClick={(e) => onRowClick(e, id)}
+                onKeyDown={(e) => onRowKeyDown(e, id)}
                 role="button"
                 tabIndex={0}
               >
@@ -464,7 +477,7 @@ export function ConversationListPane({
                     </button>
 
                     <button
-                      className={buttonMiniIconClassName(isActive, !safeUrl)}
+                      className={buttonMiniIconClassName(isActive)}
                       type="button"
                       aria-label={t('openOriginalChat')}
                       title={safeUrl ? t('openChat') : t('noLinkAvailable')}

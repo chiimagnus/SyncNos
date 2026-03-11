@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { t } from '../../../i18n';
 import type { ChatWithAiPlatform } from '../../../integrations/chatwith/chatwith-settings';
-import { buttonClassName, cardClassName, textInputClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 
 const textareaClassName =
@@ -106,7 +106,7 @@ export function ChatWithAiSection(props: {
                         checked={!!p.enabled}
                         disabled={busy}
                         onChange={(e) => updatePlatform(p.id, { enabled: !!e.target.checked })}
-                        className="tw-size-[18px] tw-cursor-pointer tw-accent-[var(--accent)]"
+                        className={checkboxClassName}
                       />
                       {t('chatWithPlatformsEnabled')}
                     </label>
