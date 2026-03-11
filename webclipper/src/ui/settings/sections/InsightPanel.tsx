@@ -96,11 +96,18 @@ function TopConversationList(props: {
     return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightTopConversationsEmpty')}</div>;
   }
 
+  const rankToneClassName = (index: number) => {
+    if (index === 0) return 'tw-text-[#FFA500]';
+    if (index === 1) return 'tw-text-[var(--info)]';
+    if (index === 2) return 'tw-text-[var(--secondary)]';
+    return 'tw-text-[var(--text-primary)]';
+  };
+
   return (
     <div className="tw-grid tw-gap-2.5">
       {items.map((item, index) => (
         <div key={item.conversationId} className="tw-grid tw-grid-cols-[auto_minmax(0,1fr)_auto] tw-items-start tw-gap-3">
-          <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{index + 1}.</div>
+          <div className={['tw-text-sm tw-font-black', rankToneClassName(index)].join(' ')}>{index + 1}.</div>
           <div className="tw-min-w-0">
             <div className="tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text-primary)]">{item.title}</div>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
@@ -139,23 +146,47 @@ export function InsightPanel(props: {
       </header>
 
       <section className="tw-grid tw-gap-3 md:tw-grid-cols-3" aria-label={t('insightOverviewAria')}>
-        <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+        <div
+          className={[
+            cardClassName,
+            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-border-[color-mix(in_srgb,#FFA500_32%,var(--border))]',
+            'tw-bg-[color-mix(in_srgb,#FFA500_10%,var(--bg-card))]',
+          ].join(' ')}
+        >
+          <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+            <span className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[#FFA500]" aria-hidden="true" />
             {t('insightOverviewTotalClips')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.totalClips)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalClips)}</div>
         </div>
-        <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+        <div
+          className={[
+            cardClassName,
+            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-border-[color-mix(in_srgb,var(--info)_34%,var(--border))]',
+            'tw-bg-[color-mix(in_srgb,var(--info)_10%,var(--bg-card))]',
+          ].join(' ')}
+        >
+          <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+            <span className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--info)]" aria-hidden="true" />
             {t('insightOverviewChatCount')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.chatCount)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--info)]">{formatCount(stats.chatCount)}</div>
         </div>
-        <div className={`${cardClassName} tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between`}>
-          <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+        <div
+          className={[
+            cardClassName,
+            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-border-[color-mix(in_srgb,var(--secondary)_34%,var(--border))]',
+            'tw-bg-[color-mix(in_srgb,var(--secondary)_10%,var(--bg-card))]',
+          ].join(' ')}
+        >
+          <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+            <span className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--secondary)]" aria-hidden="true" />
             {t('insightOverviewArticleCount')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.articleCount)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--secondary)]">{formatCount(stats.articleCount)}</div>
         </div>
       </section>
 
@@ -172,10 +203,8 @@ export function InsightPanel(props: {
             <div className="tw-mb-2 tw-flex tw-items-start tw-justify-between tw-gap-4">
               <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightTopConversationsTitle')}</div>
               <div className="tw-text-right">
-                <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
-                  {t('insightTotalMessagesLabel')}
-                </div>
-                <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[var(--text-primary)]">{formatCount(stats.totalMessages)}</div>
+                <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">{t('insightTotalMessagesLabel')}</div>
+                <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalMessages)}</div>
               </div>
             </div>
             <TopConversationList items={stats.topConversations} />
