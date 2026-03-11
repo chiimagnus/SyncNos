@@ -37,8 +37,8 @@
   --focus-ring: var(--accent);
 
   /* Component: chat bubbles */
-  --bubble-user-bg: color-mix(in srgb, var(--secondary) 34%, var(--bg-card));
-  --bubble-user-border: color-mix(in srgb, var(--secondary) 62%, var(--border));
+  --bubble-user-bg: var(--secondary);
+  --bubble-user-border: color-mix(in srgb, var(--secondary) 78%, var(--border));
 }
 
 /* ===== Design System Tokens (Dark Mode) ===== */
