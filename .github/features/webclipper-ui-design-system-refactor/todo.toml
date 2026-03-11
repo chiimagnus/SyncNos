@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P8-T2"
+current_task_id = "P9-T1"
 
 [[tasks]]
 id = "P1-T1"
@@ -260,10 +260,10 @@ note = "compile/test/build passed"
 [[tasks]]
 id = "P9-T1"
 title = "统一所有删除按钮为凹陷反馈（danger surface）"
-status = "pending"
+status = "completed"
 plan = "plan-p9.md#p9-t1"
-commit = ""
-note = ""
+commit = "style: task33 - 统一所有删除按钮凹陷反馈"
+note = "compile passed"
 
 [[tasks]]
 id = "P9-T2"

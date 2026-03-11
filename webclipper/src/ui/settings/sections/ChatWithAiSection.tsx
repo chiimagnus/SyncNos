@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { t } from '../../../i18n';
 import type { ChatWithAiPlatform } from '../../../integrations/chatwith/chatwith-settings';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName, dangerButtonClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 
 const textareaClassName =
@@ -128,7 +128,7 @@ export function ChatWithAiSection(props: {
                     />
                     <button
                       type="button"
-                      className={buttonClassName}
+                      className={dangerButtonClassName}
                       disabled={busy}
                       onClick={() => removePlatform(p.id)}
                       aria-label={`${t('chatWithDeletePlatformAriaPrefix')} ${p.id}`}
