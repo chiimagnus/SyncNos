@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P2-T1"
+current_task_id = "P2-T2"
 
 [[tasks]]
 id = "P1-T1"
@@ -60,10 +60,10 @@ note = "compile passed; manual smoke passed"
 [[tasks]]
 id = "P2-T1"
 title = "AppShell / App routes 适配四级 Surface"
-status = "pending"
+status = "completed"
 plan = "plan-p2.md#p2-t1"
-commit = ""
-note = ""
+commit = "refactor: task8 - AppShell 适配四级 surface"
+note = "compile passed"
 
 [[tasks]]
 id = "P2-T2"
