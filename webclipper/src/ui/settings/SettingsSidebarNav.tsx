@@ -15,7 +15,7 @@ export function SettingsSidebarNav(props: {
 
   return (
     <aside className="tw-w-[220px] tw-shrink-0 tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
-      <nav className="tw-p-3 tw-pb-4" aria-label={t('settingsSectionsAria')}>
+      <nav className="tw-px-4 tw-py-5" aria-label={t('settingsSectionsAria')}>
         <div className="tw-flex tw-flex-col tw-gap-4">
           {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
             <div
@@ -37,7 +37,7 @@ export function SettingsSidebarNav(props: {
                     className={navItemClassName(active)}
                     aria-current={active ? 'page' : undefined}
                   >
-                    <div className="tw-truncate tw-text-[13px] tw-font-black tw-leading-5">{label}</div>
+                    <div className="tw-truncate tw-leading-5">{label}</div>
                   </button>
                 );
               })}

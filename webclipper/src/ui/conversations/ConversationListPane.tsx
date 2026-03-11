@@ -8,7 +8,7 @@ import { tabsCreate } from '../../platform/webext/tabs';
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
-import { navMiniIconButtonClassName } from '../shared/nav-styles';
+import { navItemClassName } from '../shared/nav-styles';
 import { buttonDangerClassName, buttonTintClassName } from '../shared/button-styles';
 
 type SourceMeta = { key: string; label: string };
@@ -396,7 +396,7 @@ export function ConversationListPane({
         className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden"
         onScroll={() => onListScrollTopChange?.(scrollRef.current?.scrollTop || 0)}
       >
-        <div className="tw-grid tw-gap-2 tw-px-3 tw-py-3">
+        <div className="tw-grid tw-gap-1 tw-px-4 tw-py-4">
           {filteredItems.length ? null : (
             <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('noConversations')}
@@ -410,11 +410,30 @@ export function ConversationListPane({
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
-            const rowBase =
-              'tw-group tw-relative tw-flex tw-cursor-pointer tw-gap-2.5 tw-rounded-xl tw-border tw-border-transparent tw-bg-transparent tw-p-3 tw-transition-colors tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
-            const rowClass = isActive
-              ? `${rowBase} tw-border-[var(--border)] tw-bg-[var(--bg-card)]`
-              : `${rowBase} hover:tw-bg-[var(--bg-card)]`;
+            const rowClass = [
+              navItemClassName(isActive),
+              'tw-group tw-relative tw-items-start tw-gap-2.5',
+            ].join(' ');
+
+            const checkboxInputClass = isActive
+              ? 'tw-size-4 tw-cursor-pointer tw-accent-[var(--accent-foreground)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
+              : 'tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
+
+            const miniIconBase = [
+              'tw-inline-flex tw-size-[18px] tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent',
+              'tw-text-[12px] tw-font-black tw-shadow-none',
+              'tw-transition-colors tw-duration-150',
+              'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+            ].join(' ');
+            const miniIconClass = [
+              miniIconBase,
+              'tw-text-[currentColor] tw-opacity-80 hover:tw-opacity-100',
+              isActive ? 'hover:tw-bg-[var(--accent-hover)]' : 'hover:tw-bg-[var(--bg-card)]',
+            ].join(' ');
+            const miniIconDisabledClass = [
+              miniIconBase,
+              'tw-text-[currentColor] tw-opacity-[0.38] tw-cursor-not-allowed',
+            ].join(' ');
 
             return (
               <div
@@ -426,25 +445,19 @@ export function ConversationListPane({
                 role="button"
                 tabIndex={0}
               >
-                {isActive ? (
-                  <span
-                    aria-hidden="true"
-                    className="tw-absolute tw-left-0 tw-top-2 tw-h-[calc(100%-16px)] tw-w-1 tw-rounded-r-full tw-bg-[var(--accent)]"
-                  />
-                ) : null}
-                <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--text-secondary)]">
+                <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-inherit tw-opacity-80">
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleSelected(id)}
                     aria-label={t('selectLabel')}
-                    className="tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                    className={checkboxInputClass}
                   />
                 </label>
 
                 <div className="tw-min-w-0 tw-flex-1">
                   <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-text-ellipsis tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">
+                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-text-ellipsis tw-font-semibold tw-leading-5">
                       {formatConversationTitle((conversation as any).title)}
                     </div>
                     {hasWarningFlags(conversation as any) ? (
@@ -454,9 +467,9 @@ export function ConversationListPane({
                     ) : null}
                   </div>
 
-                  <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                  <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
                     <button
-                      className={navMiniIconButtonClassName(false)}
+                      className={miniIconClass}
                       type="button"
                       aria-label={t('copyFullMarkdown')}
                       title={copiedId === id ? t('copied') : t('copyFullMarkdown')}
@@ -466,7 +479,7 @@ export function ConversationListPane({
                     </button>
 
                     <button
-                      className={navMiniIconButtonClassName(!safeUrl)}
+                      className={safeUrl ? miniIconClass : miniIconDisabledClass}
                       type="button"
                       aria-label={t('openOriginalChat')}
                       title={safeUrl ? t('openChat') : t('noLinkAvailable')}
@@ -486,7 +499,7 @@ export function ConversationListPane({
                     </span>
 
                     {(conversation as any).lastCapturedAt ? (
-                      <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+                      <span className="tw-text-[11px] tw-font-semibold">
                         {formatTime((conversation as any).lastCapturedAt)}
                       </span>
                     ) : null}
