@@ -1,13 +1,13 @@
 version = 1
-current_task_id = ""
+current_task_id = "P1-T2"
 
 [[tasks]]
 id = "P1-T1"
 title = "设计系统 tokens（亮/暗模式）"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t1"
-commit = ""
-note = ""
+commit = "refactor: task1 - 引入设计系统tokens（亮暗模式）"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T2"
@@ -168,4 +168,3 @@ status = "pending"
 plan = "plan-p3.md#p3-t7"
 commit = ""
 note = ""
-

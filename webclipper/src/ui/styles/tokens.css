@@ -1,11 +1,48 @@
 :root {
+  color-scheme: light dark;
+
+  /* ===== Design System Tokens (Light Mode) ===== */
+  /* Surface */
+  --bg-primary: #f5f7fa;
+  --bg-sunken: #eceef2;
+  --bg-card: #ffffff;
+  --bg-overlay: rgba(0, 0, 0, 0.45);
+
+  /* Text */
+  --text-primary: #2c3038;
+  --text-secondary: #636b78;
+
+  /* Brand + On-Color */
+  --accent: #ffc6ad;
+  --accent-foreground: #2c3038;
+  --accent-hover: rgba(255, 198, 173, 0.85);
+  --accent-active: #f0b89f;
+  --secondary: #7bc4a0;
+  --secondary-foreground: #1a2b22;
+  --tertiary: #e8c86a;
+  --tertiary-foreground: #2c3038;
+
+  /* Semantic + On-Color */
+  --error: #e53e3e;
+  --error-foreground: #ffffff;
+  --warning: #d69e2e;
+  --warning-foreground: #2c3038;
+  --success: #38a169;
+  --success-foreground: #ffffff;
+  --info: #3182ce;
+  --info-foreground: #ffffff;
+
+  /* Utility */
+  --border: #d8dce2;
+  --focus-ring: #5b8def;
+
+  /* ===== Legacy Tokens (migration, will be aliased in P1-T2) ===== */
   --theme: #ffc6ad;
   --text: #d95926;
   --muted: #b85e3a;
   --bg: #fff7f3;
   --panel: #fff1ea;
   --panel-strong: #ffe7dc;
-  --border: #f4b89e;
   --border-strong: #e8916f;
   --btn-bg: #ffe6da;
   --btn-bg-hover: #ffd8c4;
@@ -17,4 +54,43 @@
   --wc-ok: #1f9d55;
   --wc-ok-bg: rgba(31, 157, 85, 0.14);
   --wc-ok-border: rgba(31, 157, 85, 0.38);
+}
+
+/* ===== Design System Tokens (Dark Mode) ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Surface */
+    --bg-primary: #1a1c20;
+    --bg-sunken: #141618;
+    --bg-card: #262830;
+    --bg-overlay: rgba(0, 0, 0, 0.65);
+
+    /* Text */
+    --text-primary: #dce0e8;
+    --text-secondary: #8b919a;
+
+    /* Brand + On-Color */
+    --accent: #ffd4c2;
+    --accent-foreground: #1a1c20;
+    --accent-hover: rgba(255, 212, 194, 0.85);
+    --accent-active: #f0c6b4;
+    --secondary: #6aaf8e;
+    --secondary-foreground: #1a1c20;
+    --tertiary: #d4b85e;
+    --tertiary-foreground: #1a1c20;
+
+    /* Semantic + On-Color */
+    --error: #fc8181;
+    --error-foreground: #1a1c20;
+    --warning: #ecc94b;
+    --warning-foreground: #1a1c20;
+    --success: #68d391;
+    --success-foreground: #1a1c20;
+    --info: #63b3ed;
+    --info-foreground: #1a1c20;
+
+    /* Utility */
+    --border: #363840;
+    --focus-ring: #7ba4f7;
+  }
 }
