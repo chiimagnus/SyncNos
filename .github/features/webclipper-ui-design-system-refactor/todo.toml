@@ -1,5 +1,5 @@
 version = 1
-current_task_id = ""
+current_task_id = "P8-T1"
 
 [[tasks]]
 id = "P1-T1"
@@ -240,3 +240,19 @@ status = "completed"
 plan = "plan-p7.md#p7-t2"
 commit = "chore: task30 - P7 验证通过（compile/test/build）"
 note = "compile/test/build passed"
+
+[[tasks]]
+id = "P8-T1"
+title = "删除按钮：增加凸起/凹陷反馈（danger surface）"
+status = "completed"
+plan = "plan-p8.md#p8-t1"
+commit = "style: task31 - 删除按钮增加凹陷反馈"
+note = "compile passed"
+
+[[tasks]]
+id = "P8-T2"
+title = "Phase 验证（compile/test/build）"
+status = "pending"
+plan = "plan-p8.md#p8-t2"
+commit = ""
+note = ""

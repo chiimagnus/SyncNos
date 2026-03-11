@@ -28,6 +28,16 @@ export function buttonDangerClassName(): string {
   ].join(' ');
 }
 
+export function buttonDangerTintClassName(): string {
+  return [
+    'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3',
+    'tw-border-[color-mix(in_srgb,var(--error)_55%,var(--border))] tw-bg-[var(--bg-card)] tw-text-xs tw-font-extrabold tw-text-[var(--error)] tw-shadow-none',
+    'tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] active:tw-bg-[var(--bg-sunken)]',
+    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
+  ].join(' ');
+}
+
 export function buttonMenuItemClassName(): string {
   return [
     'tw-w-full tw-cursor-pointer tw-appearance-none tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2',

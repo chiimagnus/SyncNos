@@ -9,7 +9,7 @@ import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';
-import { buttonDangerClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName, menuPopoverPanelClassName } from '../shared/button-styles';
+import { buttonDangerClassName, buttonDangerTintClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName, menuPopoverPanelClassName } from '../shared/button-styles';
 
 type SourceMeta = { key: string; label: string };
 
@@ -381,7 +381,8 @@ export function ConversationListPane({
 
   const effectiveActiveRowId = activeRowId != null ? activeRowId : activeId;
   const actionButton = buttonTintClassName();
-  const dangerButton = buttonDangerClassName();
+  const dangerFilledButton = buttonDangerClassName();
+  const dangerSurfaceButton = buttonDangerTintClassName();
   const menuItemButtonClassName = buttonMenuItemClassName();
 
   const syncMenuBaseLabel = (() => {
@@ -556,7 +557,7 @@ export function ConversationListPane({
                 <button
                   id="btnDelete"
                   type="button"
-                  className={dangerButton}
+                  className={dangerSurfaceButton}
                   title={t('deleteButton')}
                   onClick={() => setDeleteConfirmOpen(true)}
                   disabled={!hasSelection || actionBusy || syncingAny}
@@ -726,7 +727,7 @@ export function ConversationListPane({
               </button>
               <button
                 type="button"
-                className={dangerButton}
+                className={dangerFilledButton}
                 onClick={() => {
                   void onConfirmDelete();
                 }}
