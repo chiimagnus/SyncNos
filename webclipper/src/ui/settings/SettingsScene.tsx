@@ -108,6 +108,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeInpageDisplayMode,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    themeMode,
+    onChangeThemeMode,
 
     insightStats,
     insightLoading,
@@ -244,6 +246,10 @@ export function SettingsScene(props: SettingsSceneProps) {
       {activeSection === 'general' ? (
         <InpageSection
           busy={busy}
+          themeMode={themeMode}
+          onChangeThemeMode={(next) => {
+            void onChangeThemeMode(next);
+          }}
           displayMode={inpageDisplayMode}
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);

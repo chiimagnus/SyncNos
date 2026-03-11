@@ -30,6 +30,12 @@ export const en = {
   localeChinese: 'Chinese',
 
   // InpageSection
+  appearanceHeading: 'Appearance',
+  themeModeLabel: 'Theme',
+  themeModeSystem: 'System',
+  themeModeLight: 'Light',
+  themeModeDark: 'Dark',
+  themeModeHint: 'Applies to popup and app. System follows your OS setting.',
   inpageButtonHeading: 'Inpage Button',
   aiChatAutoSaveHeading: 'Auto-save',
   contextMenuRootTitle: 'SyncNos WebClipper',

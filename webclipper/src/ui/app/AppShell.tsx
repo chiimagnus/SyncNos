@@ -10,6 +10,7 @@ import { ConversationDetailPane } from '../conversations/ConversationDetailPane'
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { navIconButtonClassName } from '../shared/nav-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
+import { useThemeMode } from '../shared/hooks/useThemeMode';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_KEY = 'webclipper_app_sidebar_width';
@@ -130,6 +131,7 @@ export default function AppShell() {
   };
 
 function AppShellFrame() {
+    useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
