@@ -284,6 +284,16 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const [activeRun, setActiveRun] = useState<ActiveRun | null>(null);
   const disposedRef = useRef(false);
   const runTokenRef = useRef(0);
+  const activeRunRef = useRef<ActiveRun | null>(null);
+  const feedbackRef = useRef<ConversationSyncFeedbackState>(IDLE_FEEDBACK);
+
+  useEffect(() => {
+    activeRunRef.current = activeRun;
+  }, [activeRun]);
+
+  useEffect(() => {
+    feedbackRef.current = feedback;
+  }, [feedback]);
 
   const refreshFromBackground = useCallback(
     async (preferredProvider?: SyncProvider | null) => {
@@ -301,12 +311,18 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           runTokenRef.current = token;
           return { provider: job.provider, token };
         });
+      } else if (job) {
+        runTokenRef.current += 1;
+        setActiveRun(null);
+      } else if (activeRunRef.current && feedbackRef.current.phase === 'running') {
+        // Keep polling/feedback when a transient status read returns no job.
       } else {
         runTokenRef.current += 1;
         setActiveRun(null);
       }
       setFeedback((current) => {
         if (job) return toFeedbackFromJob(job);
+        if (current.phase === 'running') return current;
         if (current.phase === 'failed' && current.summary == null) return current;
         return IDLE_FEEDBACK;
       });
