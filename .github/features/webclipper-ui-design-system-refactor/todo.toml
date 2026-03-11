@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T7"
+current_task_id = ""
 
 [[tasks]]
 id = "P1-T1"
@@ -164,7 +164,7 @@ note = "compile passed"
 [[tasks]]
 id = "P3-T7"
 title = "Phase 验证（compile/test/build + grep 守门）"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t7"
-commit = ""
-note = "phase verify"
+commit = "chore: task21 - P3 验证通过（tokens 清理完成）"
+note = "compile/test/build passed; guards passed"
