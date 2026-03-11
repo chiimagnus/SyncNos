@@ -1,4 +1,6 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
+import { storageGet } from '../platform/storage/local';
+import { getNotionOAuthToken } from './notion/auth/token-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -31,14 +33,41 @@ function toSyncErrorResponse(router: AnyRouter, error: unknown) {
   return router.err(message);
 }
 
+function normalizeIds(ids: unknown): number[] {
+  if (!Array.isArray(ids)) return [];
+  return Array.from(
+    new Set(
+      ids
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x) && x > 0),
+    ),
+  );
+}
+
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     try {
-      const data = await deps.notionSyncOrchestrator.syncConversations({
-        conversationIds: msg?.conversationIds,
-        instanceId: deps.getInstanceId(),
-      });
-      return router.ok(data);
+      const conversationIds = normalizeIds(msg?.conversationIds);
+      if (!conversationIds.length) return router.err('no conversationIds');
+
+      const instanceId = deps.getInstanceId();
+      const status = await deps.notionSyncOrchestrator.getSyncJobStatus({ instanceId });
+      const currentJob = (status as any)?.job;
+      if (currentJob?.status === 'running') {
+        return router.err('sync already in progress', { code: 'sync_already_running' });
+      }
+
+      const token = await getNotionOAuthToken().catch(() => null);
+      if (!token?.accessToken) return router.err('notion not connected');
+
+      const res = await storageGet(['notion_parent_page_id']).catch(() => ({}));
+      const parentPageId = String((res as any)?.notion_parent_page_id || '').trim();
+      if (!parentPageId) return router.err('missing parentPageId');
+
+      void deps.notionSyncOrchestrator
+        .syncConversations({ conversationIds, instanceId })
+        .catch(() => {});
+      return router.ok({ started: true, provider: 'notion' });
     } catch (error) {
       return toSyncErrorResponse(router, error);
     }
@@ -66,12 +95,21 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     try {
-      const data = await deps.obsidianSyncOrchestrator.syncConversations({
-        conversationIds: msg?.conversationIds,
-        forceFullConversationIds: msg?.forceFullConversationIds,
-        instanceId: deps.getInstanceId(),
-      });
-      return router.ok(data);
+      const conversationIds = normalizeIds(msg?.conversationIds);
+      if (!conversationIds.length) return router.err('no conversationIds');
+
+      const forceFullConversationIds = normalizeIds(msg?.forceFullConversationIds);
+      const instanceId = deps.getInstanceId();
+      const status = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId });
+      const currentJob = (status as any)?.job;
+      if (currentJob?.status === 'running') {
+        return router.err('sync already in progress', { code: 'sync_already_running' });
+      }
+
+      void deps.obsidianSyncOrchestrator
+        .syncConversations({ conversationIds, forceFullConversationIds, instanceId })
+        .catch(() => {});
+      return router.ok({ started: true, provider: 'obsidian' });
     } catch (error) {
       return toSyncErrorResponse(router, error);
     }
