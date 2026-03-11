@@ -22,6 +22,15 @@
 
 .webclipper-inpage-bubble__surface {
   all: initial;
+  --bubble-surface-bg: rgba(24, 24, 26, 0.92);
+  --bubble-surface-border: rgba(255, 255, 255, 0.18);
+  --bubble-surface-text: #ffffff;
+  --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+
+  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, #d69e2e));
+  --bubble-loading-border: color-mix(in srgb, var(--warning, #d69e2e) 72%, transparent);
+  --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, #e53e3e));
+  --bubble-error-border: color-mix(in srgb, var(--error, #e53e3e) 74%, transparent);
   box-sizing: border-box;
   display: block;
   max-width: min(300px, 100vw);
