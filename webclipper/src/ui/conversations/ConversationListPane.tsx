@@ -239,7 +239,8 @@ export function ConversationListPane({
   }, [indeterminate]);
 
   const hasSelection = selectedIds.length > 0;
-  const busy = exporting || syncingNotion || syncingObsidian || deleting;
+  const actionBusy = exporting || deleting;
+  const syncingAny = syncingNotion || syncingObsidian;
 
   useEffect(() => {
     return () => {
@@ -276,6 +277,11 @@ export function ConversationListPane({
     setExportOpen(false);
     setSyncOpen(false);
   }, [hasSelection]);
+
+  useEffect(() => {
+    if (!syncingAny) return;
+    setDeleteConfirmOpen(false);
+  }, [syncingAny]);
 
   useEffect(() => {
     if (!deleteConfirmOpen) return;
@@ -530,16 +536,16 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <button
-                id="btnDelete"
-                type="button"
-                className={dangerButton}
-                title={t('deleteButton')}
-                onClick={() => setDeleteConfirmOpen(true)}
-                disabled={!hasSelection || busy}
-              >
-                {t('deleteButton')}
-              </button>
+                <button
+                  id="btnDelete"
+                  type="button"
+                  className={dangerButton}
+                  title={t('deleteButton')}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  disabled={!hasSelection || actionBusy || syncingAny}
+                >
+                  {t('deleteButton')}
+                </button>
 
               <div ref={exportWrapRef} className="tw-relative">
                 <button
@@ -549,10 +555,10 @@ export function ConversationListPane({
                   aria-haspopup="menu"
                   aria-expanded={exportOpen}
                   onClick={() => {
-                    if (!hasSelection || busy) return;
+                    if (!hasSelection || actionBusy) return;
                     setExportOpen((v) => !v);
                   }}
-                  disabled={!hasSelection || exporting || busy}
+                  disabled={!hasSelection || actionBusy}
                 >
                   <span className="tw-leading-none">{t('exportButton')}</span>
                   <span
@@ -635,7 +641,7 @@ export function ConversationListPane({
                       setSyncOpen(false);
                       void syncSelectedObsidian().catch(() => {});
                     }}
-                    disabled={busy}
+                    disabled={actionBusy || syncingObsidian}
                   >
                     {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
                   </button>
@@ -648,7 +654,7 @@ export function ConversationListPane({
                       setSyncOpen(false);
                       void syncSelectedNotion().catch(() => {});
                     }}
-                    disabled={busy}
+                    disabled={actionBusy || syncingNotion}
                   >
                     {syncingNotion ? t('notionSyncing') : t('notionSync')}
                   </button>
@@ -697,7 +703,7 @@ export function ConversationListPane({
                 type="button"
                 className={actionButton}
                 onClick={() => setDeleteConfirmOpen(false)}
-                disabled={deleting}
+                disabled={deleting || syncingAny}
               >
                 {t('cancelButton')}
               </button>
@@ -707,7 +713,7 @@ export function ConversationListPane({
                 onClick={() => {
                   void onConfirmDelete();
                 }}
-                disabled={deleting}
+                disabled={deleting || syncingAny}
               >
                 {deleting ? t('deletingDots') : t('deleteButton')}
               </button>
