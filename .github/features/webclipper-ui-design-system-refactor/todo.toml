@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T5"
+current_task_id = "P3-T6"
 
 [[tasks]]
 id = "P1-T1"
@@ -148,18 +148,18 @@ note = "compile passed"
 [[tasks]]
 id = "P3-T5"
 title = "语义状态色（Notice/Badge/Bubble）全面替换"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t5"
-commit = ""
-note = "unify semantic status"
+commit = "refactor: task19 - 语义状态色统一到 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P3-T6"
 title = "清理 legacy tokens/硬编码色值 + 文档同步"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t6"
 commit = ""
-note = ""
+note = "cleanup legacy tokens"
 
 [[tasks]]
 id = "P3-T7"
