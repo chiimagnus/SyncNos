@@ -8,7 +8,15 @@ import { NOTION_SYNC_JOB_KEY } from '../../src/sync/notion/notion-sync-job-store
 import { notionFetch } from '../../src/sync/notion/notion-api.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
-  const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
+  const store: Record<string, unknown> = {
+    notion_parent_page_id: parentPageId,
+    notion_oauth_token_v1: {
+      accessToken: 't',
+      workspaceId: 'w',
+      workspaceName: 'ws',
+      createdAt: Date.now(),
+    },
+  };
   const removed: string[][] = [];
   return {
     storage: {
@@ -49,6 +57,7 @@ function createInMemoryJobStore() {
     },
     isRunningJob: (value: any) => !!value && value.status === 'running',
     abortRunningJobIfFromOtherInstance: async () => job,
+    __getJob: () => job,
   };
 }
 
@@ -70,6 +79,11 @@ async function waitFor(predicate: () => boolean, label: string) {
   throw new Error(`timed out waiting for ${label}`);
 }
 
+async function waitForJobDone(jobStore: { __getJob: () => any }, label = 'sync job done') {
+  await waitFor(() => jobStore.__getJob()?.status === 'done', label);
+  return jobStore.__getJob();
+}
+
 function createDelayedJobStore() {
   let job: any = null;
   const runningCounts: number[] = [];
@@ -89,6 +103,7 @@ function createDelayedJobStore() {
     },
     isRunningJob: (value: any) => !!value && value.status === 'running',
     abortRunningJobIfFromOtherInstance: async () => job,
+    __getJob: () => job,
   };
 }
 
@@ -137,6 +152,13 @@ function createRouter({
   return router;
 }
 
+async function startNotionSync(router: any, jobStore: { __getJob: () => any }, conversationIds: number[]) {
+  const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds });
+  expect(res.ok).toBe(true);
+  expect(res.data?.started).toBe(true);
+  return await waitForJobDone(jobStore);
+}
+
 describe('background-router notion sync', () => {
   it('disconnect clears notion token and cached notion routing keys', async () => {
     const chromeMock = mockChromeStorage();
@@ -179,6 +201,7 @@ describe('background-router notion sync', () => {
   it('recreates page when existing page is missing', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -209,14 +232,17 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
     const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(res.ok).toBe(true);
-    expect(res.data.okCount).toBe(1);
-    expect(res.data.results[0].mode).toBe('created');
+    expect(res.data?.started).toBe(true);
+
+    const job = await waitForJobDone(jobStore);
+    expect(job.okCount).toBe(1);
+    expect(job.perConversation[0].mode).toBe('created');
     expect(calls.some((c) => c.op === 'setPageId' && c.pageId === 'p_new')).toBe(true);
     expect(calls.some((c) => c.op === 'append' && c.pageId === 'p_new')).toBe(true);
     expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
@@ -225,6 +251,7 @@ describe('background-router notion sync', () => {
   it('appends only new messages when cursor matches', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     let blocksFromCount = 0;
     const router = createRouter({
@@ -258,13 +285,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('appended');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('appended');
     expect(blocksFromCount).toBe(1);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
@@ -273,6 +299,7 @@ describe('background-router notion sync', () => {
   it('updates page properties without rebuilding body when article content is unchanged', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -338,13 +365,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('updated_properties');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('updated_properties');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
@@ -354,6 +380,7 @@ describe('background-router notion sync', () => {
   it('updates notion page title for chats without rebuilding when only metadata changed', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -415,13 +442,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('updated_properties');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('updated_properties');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
@@ -430,6 +456,7 @@ describe('background-router notion sync', () => {
   it('does not rebuild when messageKey drifts but sequence cursor matches', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     let blocksFromCount = 0;
     const router = createRouter({
@@ -463,13 +490,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('appended');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('appended');
     expect(blocksFromCount).toBe(1);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
@@ -478,6 +504,7 @@ describe('background-router notion sync', () => {
   it('keeps no_changes when neither body nor page properties changed', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -543,13 +570,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('no_changes');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('no_changes');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(false);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(false);
@@ -558,6 +584,7 @@ describe('background-router notion sync', () => {
 
   it('processes conversations with limited concurrency and keeps result order stable', async () => {
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
     const blockers = new Map<number, ReturnType<typeof deferred<void>>>([
       [1, deferred<void>()],
       [2, deferred<void>()],
@@ -607,11 +634,13 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const syncPromise = router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2, 3] });
+    const startRes = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2, 3] });
+    expect(startRes.ok).toBe(true);
+    expect(startRes.data?.started).toBe(true);
 
     await waitFor(() => started.length === 2, 'two active conversations');
     expect(started).toEqual([1, 2]);
@@ -623,11 +652,10 @@ describe('background-router notion sync', () => {
     blockers.get(2)!.resolve();
     blockers.get(3)!.resolve();
 
-    const res = await syncPromise;
-    expect(res.ok).toBe(true);
+    const job = await waitForJobDone(jobStore);
     expect(maxActive).toBe(2);
-    expect(res.data.results.map((row: any) => row.conversationId)).toEqual([1, 2, 3]);
-    expect(res.data.results.every((row: any) => row.ok)).toBe(true);
+    expect(job.perConversation.map((row: any) => row.conversationId)).toEqual([1, 2, 3]);
+    expect(job.perConversation.every((row: any) => row.ok)).toBe(true);
   });
 
   it('keeps running job progress monotonic when concurrent workers write status updates', async () => {
@@ -690,6 +718,7 @@ describe('background-router notion sync', () => {
   it('rebuilds when cursor is missing but page exists', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -713,13 +742,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('rebuilt');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('rebuilt');
     expect(calls.some((c) => c.op === 'clear')).toBe(true);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
@@ -760,17 +788,24 @@ describe('background-router notion sync', () => {
 
     const syncRes = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
     expect(syncRes.ok).toBe(true);
+    expect(syncRes.data?.started).toBe(true);
+
+    await waitFor(() => !!jobStore.__getJob(), 'job to appear');
 
     const jobRes = await router.__handleMessageForTests({ type: 'getNotionSyncJobStatus' });
     expect(jobRes.ok).toBe(true);
     expect(jobRes.data.job).toBeTruthy();
-    expect(jobRes.data.job.status).toBe('done');
+    await waitForJobDone(jobStore);
+    const doneRes = await router.__handleMessageForTests({ type: 'getNotionSyncJobStatus' });
+    expect(doneRes.ok).toBe(true);
+    expect(doneRes.data.job.status).toBe('done');
     expect(Array.isArray(jobRes.data.job.perConversation)).toBe(true);
   });
 
   it('upgrades external image blocks to file_upload before append', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     let appendedBlocks: any[] = [];
     const router = createRouter({
@@ -819,12 +854,11 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
+    await startNotionSync(router, jobStore, [1]);
     expect(calls.some((c) => c.op === 'append' && c.pageId === 'p_new')).toBe(true);
     expect(appendedBlocks[0]?.image?.type).toBe('file_upload');
     expect(appendedBlocks[0]?.image?.file_upload?.id).toBe('u1');
@@ -832,6 +866,7 @@ describe('background-router notion sync', () => {
 
   it('returns warning when image upload upgrade keeps external images', async () => {
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     let appendedBlocks: any[] = [];
     const router = createRouter({
@@ -874,18 +909,18 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
+    const job = await startNotionSync(router, jobStore, [1]);
     expect(appendedBlocks[0]?.image?.type).toBe('external');
-    expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+    expect(job.perConversation[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
   });
 
   it('preserves warnings when a later Notion step fails', async () => {
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -925,15 +960,14 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.failCount).toBe(1);
-    expect(res.data.results[0].ok).toBe(false);
-    expect(res.data.results[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.failCount).toBe(1);
+    expect(job.perConversation[0].ok).toBe(false);
+    expect(job.perConversation[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
   });
 
   it('recovers once by clearing cached database id when create page returns database object_not_found', async () => {
@@ -941,6 +975,7 @@ describe('background-router notion sync', () => {
     const ensureCalls: string[] = [];
     let clearCacheCalls = 0;
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -983,13 +1018,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.results[0].mode).toBe('created');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.perConversation[0].mode).toBe('created');
     expect(createCalls).toEqual(['db_stale', 'db_new']);
     expect(ensureCalls).toEqual(['db_stale', 'db_new']);
     expect(clearCacheCalls).toBe(1);
@@ -999,6 +1033,7 @@ describe('background-router notion sync', () => {
     const createCalls: string[] = [];
     const ensureCalls: string[] = [];
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -1041,13 +1076,12 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2] });
-    expect(res.ok).toBe(true);
-    expect(res.data.okCount).toBe(2);
+    const job = await startNotionSync(router, jobStore, [1, 2]);
+    expect(job.okCount).toBe(2);
     expect(createCalls).toEqual(['db_stale', 'db_stale', 'db_new', 'db_new']);
     expect(ensureCalls).toEqual(['db_stale', 'db_new']);
   });
@@ -1096,6 +1130,7 @@ describe('background-router notion sync', () => {
 
   it('preserves raw notion validation errors in per-conversation failures', async () => {
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -1127,20 +1162,20 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.failCount).toBe(1);
-    expect(res.data.results[0].error).toBe(
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.failCount).toBe(1);
+    expect(job.perConversation[0].error).toBe(
       'body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`.',
     );
   });
 
   it('preserves raw notion service unavailable errors in per-conversation failures', async () => {
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -1172,18 +1207,18 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.failCount).toBe(1);
-    expect(res.data.results[0].error).toBe('temporarily unavailable');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.failCount).toBe(1);
+    expect(job.perConversation[0].error).toBe('temporarily unavailable');
   });
 
   it('preserves raw notion rate limit errors and keeps retry hints', async () => {
     const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
 
     const router = createRouter({
       chromeMock,
@@ -1216,14 +1251,13 @@ describe('background-router notion sync', () => {
           isPageUsableForDatabase: () => false,
           pageBelongsToDatabase: () => false,
         },
-        jobStore: createInMemoryJobStore(),
+        jobStore,
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data.failCount).toBe(1);
-    expect(res.data.results[0].error).toBe('Too many requests Retry in about 14s.');
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.failCount).toBe(1);
+    expect(job.perConversation[0].error).toBe('Too many requests Retry in about 14s.');
   });
 
   it('parses structured error metadata from Notion API responses', async () => {
