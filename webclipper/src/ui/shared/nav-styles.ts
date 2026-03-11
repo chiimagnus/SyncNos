@@ -17,24 +17,24 @@ export function navItemClassName(active: boolean): string {
 export function navIconButtonClassName(active: boolean): string {
   const base =
     [
-      'tw-inline-flex tw-size-9 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-p-0',
-      'tw-shadow-none tw-transition-colors tw-duration-150',
+      'tw-inline-flex tw-size-9 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-p-0',
+      'tw-shadow-none tw-transition-colors tw-duration-200',
       'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
       'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
     ].join(' ');
-  if (active) return `${base} tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]`;
+  if (active) return `${base} tw-bg-[var(--bg-sunken)] tw-text-[var(--text-primary)]`;
   return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
 export function navIconButtonSmClassName(active: boolean): string {
   const base =
     [
-      'tw-inline-flex tw-size-8 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border-0 tw-p-0',
-      'tw-shadow-none tw-transition-colors tw-duration-150',
+      'tw-inline-flex tw-size-8 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-lg tw-border tw-border-[var(--border)] tw-p-0',
+      'tw-shadow-none tw-transition-colors tw-duration-200',
       'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
       'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
     ].join(' ');
-  if (active) return `${base} tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]`;
+  if (active) return `${base} tw-bg-[var(--bg-sunken)] tw-text-[var(--text-primary)]`;
   return `${base} tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]`;
 }
 
