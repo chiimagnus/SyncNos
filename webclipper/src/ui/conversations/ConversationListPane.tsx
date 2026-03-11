@@ -123,7 +123,6 @@ async function copyTextToClipboard(text: string) {
 export type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
   activeRowId?: number | null;
-  suppressActiveRow?: boolean;
   initialScrollTop?: number;
   scrollRestoreKey?: number;
   onListScrollTopChange?: (scrollTop: number) => void;
@@ -132,7 +131,6 @@ export type ConversationListPaneProps = {
 export function ConversationListPane({
   onOpenConversation,
   activeRowId,
-  suppressActiveRow,
   initialScrollTop = 0,
   scrollRestoreKey = 0,
   onListScrollTopChange,
@@ -410,7 +408,7 @@ export function ConversationListPane({
             const checked = selectedIds.includes(id);
             const { key: sourceKey, label: sourceLabel } = getSourceMeta((conversation as any).source);
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
-            const isActive = !suppressActiveRow && Number(id) === Number(effectiveActiveRowId);
+            const isActive = Number(id) === Number(effectiveActiveRowId);
 
             const rowBase =
               'tw-group tw-relative tw-flex tw-cursor-pointer tw-gap-2.5 tw-rounded-xl tw-border tw-border-transparent tw-bg-transparent tw-p-3 tw-transition-colors tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';

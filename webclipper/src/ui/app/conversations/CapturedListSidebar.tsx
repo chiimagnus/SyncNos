@@ -80,7 +80,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
         </div>
       </div>
 
-      <ConversationListPane suppressActiveRow={routerLocation.pathname === '/settings'} onOpenConversation={() => navigate('/')} />
+      <ConversationListPane onOpenConversation={() => navigate('/')} />
     </div>
   );
 }
