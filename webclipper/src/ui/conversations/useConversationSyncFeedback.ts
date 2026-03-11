@@ -388,7 +388,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   }, [clearNotionSyncJobStatus, clearObsidianSyncStatus, feedback, refreshFromBackground]);
 
   const startSync = useCallback(
-    async (provider: SyncProvider, conversationIds: number[]) => {
+    async (provider: SyncProvider, conversationIds: number[]): Promise<SyncStartAck | null> => {
       const ids = normalizeIds(conversationIds);
       if (!ids.length) return null;
 
