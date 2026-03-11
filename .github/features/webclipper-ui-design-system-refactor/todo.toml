@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P3-T2"
+current_task_id = "P3-T3"
 
 [[tasks]]
 id = "P1-T1"
@@ -124,18 +124,18 @@ note = "compile passed"
 [[tasks]]
 id = "P3-T2"
 title = "ConversationListPane 列表与控制条样式重构"
-status = "in_progress"
+status = "completed"
 plan = "plan-p3.md#p3-t2"
-commit = ""
-note = "migrate list pane"
+commit = "refactor: task16 - ConversationListPane 迁移 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P3-T3"
 title = "ConversationDetailPane 详情页样式重构"
-status = "pending"
+status = "in_progress"
 plan = "plan-p3.md#p3-t3"
 commit = ""
-note = ""
+note = "migrate detail pane"
 
 [[tasks]]
 id = "P3-T4"

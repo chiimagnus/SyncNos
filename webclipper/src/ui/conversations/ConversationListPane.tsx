@@ -73,19 +73,19 @@ function getSourceMeta(raw: unknown): SourceMeta {
 function sourceTagToneClass(key: string) {
   const safe = String(key || '').trim().toLowerCase();
   const map: Record<string, string> = {
-    chatgpt: 'tw-border-[#bae6fd] tw-bg-[#e0f2fe] tw-text-[#075985]',
-    claude: 'tw-border-[#ddd6fe] tw-bg-[#ede9fe] tw-text-[#5b21b6]',
-    deepseek: 'tw-border-[#bbf7d0] tw-bg-[#dcfce7] tw-text-[#166534]',
-    notionai: 'tw-border-[#fed7aa] tw-bg-[#ffedd5] tw-text-[#9a3412]',
-    gemini: 'tw-border-[#c7d2fe] tw-bg-[#e0e7ff] tw-text-[#3730a3]',
-    googleaistudio: 'tw-border-[#c7d2fe] tw-bg-[#e0e7ff] tw-text-[#3730a3]',
-    kimi: 'tw-border-[#fecaca] tw-bg-[#fee2e2] tw-text-[#991b1b]',
-    doubao: 'tw-border-[#e9d5ff] tw-bg-[#f3e8ff] tw-text-[#6b21a8]',
-    yuanbao: 'tw-border-[#fef08a] tw-bg-[#fef9c3] tw-text-[#854d0e]',
-    poe: 'tw-border-[#a7f3d0] tw-bg-[#d1fae5] tw-text-[#065f46]',
-    zai: 'tw-border-[#bfdbfe] tw-bg-[#dbeafe] tw-text-[#1e40af]',
-    web: 'tw-border-[#e5e7eb] tw-bg-[#f3f4f6] tw-text-[#374151]',
-    unknown: 'tw-border-[#e5e7eb] tw-bg-[#f3f4f6] tw-text-[#374151]',
+    chatgpt: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    claude: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    deepseek: 'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    notionai: 'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    gemini: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    googleaistudio: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    kimi: 'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    doubao: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    yuanbao: 'tw-border-[var(--tertiary)] tw-bg-[color-mix(in_srgb,var(--tertiary)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    poe: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    zai: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    web: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
+    unknown: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
   };
   return map[safe] || map.unknown;
 }
@@ -400,7 +400,7 @@ export function ConversationListPane({
       >
         <div className="tw-grid tw-gap-2 tw-px-3 tw-py-3">
           {filteredItems.length ? null : (
-            <div className="tw-rounded-xl tw-bg-[var(--panel)]/45 tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('noConversations')}
             </div>
           )}
@@ -413,8 +413,10 @@ export function ConversationListPane({
             const isActive = !suppressActiveRow && Number(id) === Number(effectiveActiveRowId);
 
             const rowBase =
-              'tw-group tw-relative tw-flex tw-cursor-pointer tw-gap-2.5 tw-rounded-xl tw-bg-white/26 tw-p-3 tw-transition-colors tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]';
-            const rowClass = isActive ? `${rowBase} tw-bg-[var(--btn-bg)]` : `${rowBase} hover:tw-bg-white/34`;
+              'tw-group tw-relative tw-flex tw-cursor-pointer tw-gap-2.5 tw-rounded-xl tw-border tw-border-transparent tw-bg-transparent tw-p-3 tw-transition-colors tw-duration-150 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';
+            const rowClass = isActive
+              ? `${rowBase} tw-border-[var(--border)] tw-bg-[var(--bg-card)]`
+              : `${rowBase} hover:tw-bg-[var(--bg-card)]`;
 
             return (
               <div
@@ -429,26 +431,32 @@ export function ConversationListPane({
                 {isActive ? (
                   <span
                     aria-hidden="true"
-                    className="tw-absolute tw-left-0 tw-top-2 tw-h-[calc(100%-16px)] tw-w-1 tw-rounded-r-full tw-bg-[var(--text)]/85"
+                    className="tw-absolute tw-left-0 tw-top-2 tw-h-[calc(100%-16px)] tw-w-1 tw-rounded-r-full tw-bg-[var(--accent)]"
                   />
                 ) : null}
-                <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--muted)]">
-                  <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} aria-label={t('selectLabel')} />
+                <label className="tw-mt-0.5 tw-inline-flex tw-items-start tw-text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleSelected(id)}
+                    aria-label={t('selectLabel')}
+                    className="tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                  />
                 </label>
 
                 <div className="tw-min-w-0 tw-flex-1">
                   <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-text-ellipsis tw-text-sm tw-font-extrabold tw-text-[var(--text)]">
+                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-text-ellipsis tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">
                       {formatConversationTitle((conversation as any).title)}
                     </div>
                     {hasWarningFlags(conversation as any) ? (
-                      <span className="tw-inline-flex tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--warn-bg)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--muted)]">
+                      <span className="tw-inline-flex tw-rounded-full tw-border tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_18%,var(--bg-card))] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--text-primary)]">
                         {t('warningBadge')}
                       </span>
                     ) : null}
                   </div>
 
-                  <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+                  <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
                     <button
                       className={navMiniIconButtonClassName(false)}
                       type="button"
@@ -480,7 +488,7 @@ export function ConversationListPane({
                     </span>
 
                     {(conversation as any).lastCapturedAt ? (
-                      <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">
+                      <span className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                         {formatTime((conversation as any).lastCapturedAt)}
                       </span>
                     ) : null}
@@ -492,10 +500,10 @@ export function ConversationListPane({
         </div>
       </div>
 
-      <div className="tw-border-t tw-border-[var(--border)]/70 tw-bg-[var(--panel)]/70 tw-backdrop-blur-md">
+      <div className="tw-border-t tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
         <div className="tw-px-3 tw-py-2">
           <div className={['tw-flex tw-min-h-9 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
-            <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--muted)]" aria-label={t('selectAll')}>
+            <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]" aria-label={t('selectAll')}>
               <input
                 ref={selectAllRef}
                 id="chkSelectAll"
@@ -503,7 +511,7 @@ export function ConversationListPane({
                 aria-label={t('selectAll')}
                 checked={allSelected}
                 onChange={() => toggleAll(visibleIds)}
-                className="tw-size-4 tw-cursor-pointer tw-accent-[var(--text)]"
+                className="tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
               />
               <span className="tw-sr-only">{t('selectAll')}</span>
             </label>
@@ -514,7 +522,7 @@ export function ConversationListPane({
               onChange={(e) => onSetFilterKey(e.target.value)}
               disabled={hasSelection}
               className={[
-                'tw-h-8 tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-white/70 tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-border-[var(--border-strong)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--text)]',
+                'tw-h-8 tw-max-w-[112px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
                 hasSelection ? 'tw-hidden' : '',
               ].join(' ')}
               aria-label={t('sourceFilterAria')}
@@ -562,7 +570,7 @@ export function ConversationListPane({
                 >
                   <span className="tw-leading-none">{t('exportButton')}</span>
                   <span
-                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
+                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
                     aria-hidden="true"
                   >
                     ▾
@@ -574,11 +582,11 @@ export function ConversationListPane({
                   role="menu"
                   aria-label={t('exportOptions')}
                   hidden={!exportOpen}
-                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[150px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-1.5 tw-shadow-[var(--shadow)]"
+                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[150px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5"
                 >
                   <button
                     id="menuExportSingleMarkdown"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)]"
+                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -590,7 +598,7 @@ export function ConversationListPane({
                   </button>
                   <button
                     id="menuExportMultiMarkdown"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)]"
+                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -618,7 +626,7 @@ export function ConversationListPane({
                 >
                   <span className="tw-leading-none">{syncMenuButtonLabel}</span>
                   <span
-                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--muted)]"
+                    className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
                     aria-hidden="true"
                   >
                     ▾
@@ -630,11 +638,11 @@ export function ConversationListPane({
                   role="menu"
                   aria-label={syncMenuBaseLabel}
                   hidden={!syncOpen}
-                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-1.5 tw-shadow-[var(--shadow)]"
+                  className="tw-absolute tw-right-0 tw-bottom-[calc(100%+8px)] tw-top-auto tw-z-30 tw-min-w-[170px] tw-rounded-[14px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-1.5"
                 >
                   <button
                     id="menuSyncToObsidian"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)] disabled:tw-opacity-50 disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
+                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-[0.38] disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -647,7 +655,7 @@ export function ConversationListPane({
                   </button>
                   <button
                     id="menuSyncToNotion"
-                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--btn-bg)] disabled:tw-opacity-50 disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
+                    className="tw-w-full tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2 tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-[0.38] disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent"
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -674,11 +682,11 @@ export function ConversationListPane({
                   : 'tw-max-w-[320px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-1 tw-py-0',
               ].join(' ')}
             >
-              <span className="tw-text-[var(--muted)]">{t('todayLabel')}</span>
-              <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--wc-ok)]">{String(todayCount)}</span>
-              <span className="tw-text-[rgba(184,94,58,0.7)]">·</span>
-              <span className="tw-text-[var(--muted)]">{t('totalLabel')}</span>
-              <span className="tw-text-[30px] tw-font-extrabold tw-text-[#2563eb]">{String(filteredItems.length)}</span>
+              <span className="tw-text-[var(--text-secondary)]">{t('todayLabel')}</span>
+              <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
+              <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
+              <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
+              <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--info)]">{String(filteredItems.length)}</span>
             </div>
           </div>
 
@@ -687,15 +695,15 @@ export function ConversationListPane({
       </div>
 
       {deleteConfirmOpen ? (
-        <div className="tw-fixed tw-inset-0 tw-z-40 tw-flex tw-items-center tw-justify-center tw-bg-black/30 tw-p-4">
+        <div className="tw-fixed tw-inset-0 tw-z-40 tw-flex tw-items-center tw-justify-center tw-bg-[var(--bg-overlay)] tw-p-4">
           <div
             role="dialog"
             aria-modal="true"
             aria-label={t('deleteConfirmDialogAria')}
-            className="tw-w-full tw-max-w-[340px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--panel)] tw-p-4 tw-shadow-[var(--shadow)]"
+            className="tw-w-full tw-max-w-[340px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-4"
           >
-            <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text)]">{t('deleteConfirmTitle')}</div>
-            <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--muted)]">
+            <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">{t('deleteConfirmTitle')}</div>
+            <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('deleteConfirmBody')}
             </div>
             <div className="tw-mt-3 tw-flex tw-justify-end tw-gap-2">
