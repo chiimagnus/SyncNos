@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
@@ -30,6 +30,29 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   const { refreshList, loadingList } = useConversationsApp();
 
+  const state: any = (routerLocation as any)?.state ?? {};
+  const settingsOpen = routerLocation.pathname === '/settings';
+
+  const closeSettings = () => {
+    const from = String(state?.from || '').trim();
+    if (from) navigate(from, { replace: true });
+    else navigate('/', { replace: true });
+  };
+
+  const openSettings = () => {
+    if (settingsOpen) {
+      closeSettings();
+      return;
+    }
+
+    navigate('/settings', {
+      state: {
+        backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+        from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
+      },
+    });
+  };
+
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
       <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
@@ -48,17 +71,16 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
           </div>
 
           <div className="tw-flex tw-items-center tw-gap-2">
-            <NavLink
-              to="/settings"
-              state={{
-                backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
-                from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
-              }}
+            <button
+              type="button"
+              onClick={openSettings}
               className={navIconButtonClassName(false)}
+              aria-label={t('openSettingsAria')}
+              title={t('openSettings')}
             >
               <span className="tw-sr-only">{t('settingsLabel')}</span>
-              <SettingsIcon size={16} strokeWidth={2} aria-hidden="true" />
-            </NavLink>
+              <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
+            </button>
 
             <button
               type="button"
