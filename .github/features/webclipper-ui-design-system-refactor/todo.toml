@@ -1,5 +1,5 @@
 version = 1
-current_task_id = "P1-T6"
+current_task_id = "P1-T7"
 
 [[tasks]]
 id = "P1-T1"
@@ -44,10 +44,10 @@ note = "compile passed"
 [[tasks]]
 id = "P1-T6"
 title = "Inpage UI 样式接入 tokens"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t6"
-commit = ""
-note = ""
+commit = "refactor: task6 - inpage UI 样式接入 tokens"
+note = "compile passed"
 
 [[tasks]]
 id = "P1-T7"
