@@ -112,6 +112,10 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
 - 打开工程：`open macOS/SyncNos.xcodeproj`
 - Debug 构建：`xcodebuild -project macOS/SyncNos.xcodeproj -scheme SyncNos -configuration Debug build`
 
+### Git Hooks（阻止 Copilot 写入作者/合作者）
+
+- 启用仓库 hooks：`git config core.hooksPath .githooks`
+
 ### WebClipper 开发与验证
 
 - 安装依赖：`npm --prefix webclipper install`

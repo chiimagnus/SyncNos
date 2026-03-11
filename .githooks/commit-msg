@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+message_file="${1:-}"
+if [[ -z "${message_file}" || ! -f "${message_file}" ]]; then
+  echo "[commit-msg] missing commit message file path" >&2
+  exit 2
+fi
+
+python3 - "${message_file}" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8", errors="replace")
+
+lines = text.splitlines()
+filtered = []
+changed = False
+
+for line in lines:
+    if re.match(r"(?i)^co-authored-by:\s*.*\bcopilot\b", line):
+        changed = True
+        continue
+    if re.match(r"(?i)^co-authored-by:\s*.*\bgithub\s+copilot\b", line):
+        changed = True
+        continue
+    filtered.append(line)
+
+if not changed:
+    sys.exit(0)
+
+out = "\n".join(filtered).rstrip() + "\n"
+path.write_text(out, encoding="utf-8")
+PY

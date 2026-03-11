@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+author_ident="$(git var GIT_AUTHOR_IDENT 2>/dev/null || true)"
+committer_ident="$(git var GIT_COMMITTER_IDENT 2>/dev/null || true)"
+
+if echo "${author_ident}" | rg -qi "\\bcopilot\\b|copilot@" ; then
+  echo "[pre-commit] blocked: commit author looks like Copilot" >&2
+  echo "[pre-commit] author: ${author_ident}" >&2
+  echo "[pre-commit] fix: ensure your git author is you (e.g. set user.name/user.email, and avoid --author=Copilot)" >&2
+  exit 1
+fi
+
+if echo "${committer_ident}" | rg -qi "\\bcopilot\\b|copilot@" ; then
+  echo "[pre-commit] blocked: commit committer looks like Copilot" >&2
+  echo "[pre-commit] committer: ${committer_ident}" >&2
+  exit 1
+fi
+
+exit 0
