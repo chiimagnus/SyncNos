@@ -14,6 +14,7 @@
   font: 12px/1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   cursor: pointer;
   user-select: none;
+  touch-action: none;
   box-shadow: none;
   isolation: isolate;
   transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
@@ -22,6 +23,15 @@
 .webclipper-inpage-btn:hover {
   transform: translateY(-1px);
   filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18));
+}
+
+.webclipper-inpage-btn.is-dragging {
+  transition: none;
+}
+
+.webclipper-inpage-btn.is-dragging:hover {
+  transform: none;
+  filter: none;
 }
 
 .webclipper-inpage-btn:focus-visible {
