@@ -663,7 +663,7 @@ export function ConversationListPane({
             </div>
           </div>
 
-          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} />
+          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onOpenConversation={onOpenConversation} />
         </div>
       </div>
 

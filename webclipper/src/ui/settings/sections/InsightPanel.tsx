@@ -13,9 +13,9 @@ import {
 import type { InsightTimeRange } from './insight-stats';
 import { cardClassName, selectClassName } from '../ui';
 import { useConversationsApp } from '../../conversations/conversations-context';
-import { setPendingOpenConversationId } from '../../conversations/pending-open';
 import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '../../shared/SelectMenu';
+import { openConversation as openConversationInApp } from '../../conversations/open-conversation';
 
 const CHART_BASE_COLOR = 'var(--accent)';
 
@@ -177,12 +177,8 @@ export function InsightPanel(props: {
     return from || '/';
   }, [routerLocation]);
 
-  const openConversation = (conversationId: number) => {
-    const safeId = Number(conversationId);
-    if (!Number.isFinite(safeId) || safeId <= 0) return;
-    clearSelected();
-    setActiveId(safeId);
-    if (isNarrow) setPendingOpenConversationId(safeId);
+  const onOpenConversation = (conversationId: number) => {
+    openConversationInApp(conversationId, { clearSelected, setActiveId, isNarrow });
   };
 
   return (
@@ -265,7 +261,7 @@ export function InsightPanel(props: {
                 <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalMessages)}</div>
               </div>
             </div>
-            <TopConversationList items={stats.topConversations} linkTo={linkTo} onOpenConversation={openConversation} />
+            <TopConversationList items={stats.topConversations} linkTo={linkTo} onOpenConversation={onOpenConversation} />
           </div>
         </section>
 

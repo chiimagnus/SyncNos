@@ -55,7 +55,7 @@ export function PopupNotionSyncNudgeDialog(props: PopupNotionSyncNudgeDialogProp
             className="tw-mt-0.5 tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
             aria-label="后续不再弹出此提示"
           />
-          <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]">后续不再弹出此 alert 弹窗</span>
+          <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]">后续不再弹出此提示弹窗</span>
         </label>
 
         <div className="tw-mt-4 tw-flex tw-justify-end tw-gap-2">

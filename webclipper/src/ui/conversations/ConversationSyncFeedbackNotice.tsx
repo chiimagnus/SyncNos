@@ -3,10 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../../i18n';
 import type { ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 import { buttonIconCircleCardClassName } from '../shared/button-styles';
+import { useConversationsApp } from './conversations-context';
+import { openConversation } from './open-conversation';
 
 type ConversationSyncFeedbackNoticeProps = {
   feedback: ConversationSyncFeedbackState;
   onDismiss: () => void;
+  onOpenConversation?: (conversationId: number) => void;
 };
 
 type NoticeTones = {
@@ -74,27 +77,33 @@ function SummaryBody(props: {
   tones: NoticeTones;
   provider: string;
   feedback: ConversationSyncFeedbackState;
-  primaryMessage: string;
+  message: string;
   showRunningStageDetail: boolean;
   currentStageLabel: string;
+  currentConversationId: number | null;
+  currentConversationLabel: string;
   progressWidth: number;
   issueCount: number;
   detailsOpen: boolean;
   canShowDetails: boolean;
   onToggleDetails: () => void;
+  onJumpToConversation?: (conversationId: number) => void;
 }) {
   const {
     tones,
     provider,
     feedback,
-    primaryMessage,
+    message,
     showRunningStageDetail,
     currentStageLabel,
+    currentConversationId,
+    currentConversationLabel,
     progressWidth,
     issueCount,
     detailsOpen,
     canShowDetails,
     onToggleDetails,
+    onJumpToConversation,
   } = props;
 
   const content = (
@@ -115,13 +124,50 @@ function SummaryBody(props: {
           </span>
         ) : null}
         {canShowDetails ? (
-          <span className="tw-text-[11px] tw-font-semibold tw-opacity-75">
+          <button
+            type="button"
+            onClick={onToggleDetails}
+            aria-expanded={detailsOpen}
+            aria-haspopup="dialog"
+            aria-label={`Open ${provider} ${t('syncDetails')}`}
+            className={[
+              'tw-inline-flex tw-items-center tw-text-[11px] tw-font-semibold tw-opacity-80 hover:tw-opacity-100',
+              'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-inherit tw-shadow-none',
+              'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+            ].join(' ')}
+          >
             {issueCount} {issueCount === 1 ? t('issuesSingular') : t('issuesPlural')} · {detailsOpen ? t('hideDetails') : t('viewDetails')}
-          </span>
+          </button>
         ) : null}
       </div>
 
-      <div className="tw-mt-1 tw-text-xs tw-font-semibold">{primaryMessage}</div>
+      <div className="tw-mt-1 tw-text-xs tw-font-semibold">
+        {feedback.phase === 'running' && currentConversationLabel ? (
+          <span>
+            {t('currentPrefix')}{' '}
+            {onJumpToConversation && currentConversationId && currentConversationId > 0 ? (
+              <button
+                type="button"
+                onClick={() => onJumpToConversation(currentConversationId)}
+                className={[
+                  'tw-inline-flex tw-max-w-full tw-items-baseline tw-text-left tw-font-bold tw-text-inherit',
+                  'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
+                  'hover:tw-underline tw-underline-offset-2',
+                  'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                ].join(' ')}
+                title={currentConversationLabel}
+                aria-label={currentConversationLabel}
+              >
+                <span className="tw-min-w-0 tw-truncate">{currentConversationLabel}</span>
+              </button>
+            ) : (
+              <span title={currentConversationLabel}>{currentConversationLabel}</span>
+            )}
+          </span>
+        ) : (
+          message
+        )}
+      </div>
 
       {showRunningStageDetail ? (
         <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-opacity-75">
@@ -140,26 +186,12 @@ function SummaryBody(props: {
     </>
   );
 
-  if (!canShowDetails) {
-    return <div className="tw-min-w-0 tw-flex-1">{content}</div>;
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onToggleDetails}
-      aria-expanded={detailsOpen}
-      aria-haspopup="dialog"
-      aria-label={`Open ${provider} ${t('syncDetails')}`}
-      className="tw-block tw-min-w-0 tw-flex-1 tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-text-inherit tw-shadow-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
-    >
-      {content}
-    </button>
-  );
+  return <div className="tw-min-w-0 tw-flex-1">{content}</div>;
 }
 
 export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNoticeProps) {
-  const { feedback, onDismiss } = props;
+  const { feedback, onDismiss, onOpenConversation } = props;
+  const { setActiveId, clearSelected } = useConversationsApp();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const prevProviderRef = useRef<ConversationSyncFeedbackState['provider']>(feedback.provider);
@@ -229,7 +261,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   const currentItemLabel = feedback.currentConversationTitle.trim()
     || (feedback.currentConversationId ? `${t('conversationLabel')} #${feedback.currentConversationId}` : '');
   const currentStageLabel = feedback.currentStage.trim();
-  const primaryMessage = feedback.phase === 'running'
+  const message = feedback.phase === 'running'
     ? currentItemLabel
       ? `${t('currentPrefix')} ${currentItemLabel}`
       : currentStageLabel
@@ -237,6 +269,11 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
         : feedback.message
     : feedback.message;
   const showRunningStageDetail = feedback.phase === 'running' && !!currentItemLabel && !!currentStageLabel;
+
+  const onJumpToConversation = (conversationId: unknown) => {
+    const id = openConversation(conversationId, { clearSelected, setActiveId, onOpenConversation });
+    if (id) setDetailsOpen(false);
+  };
 
   return (
     <div
@@ -255,14 +292,17 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           tones={tones}
           provider={provider}
           feedback={feedback}
-          primaryMessage={primaryMessage}
+          message={message}
           showRunningStageDetail={showRunningStageDetail}
           currentStageLabel={currentStageLabel}
+          currentConversationId={feedback.currentConversationId}
+          currentConversationLabel={currentItemLabel}
           progressWidth={progressWidth}
           issueCount={issueCount}
           detailsOpen={detailsOpen}
           canShowDetails={canShowDetails}
           onToggleDetails={() => setDetailsOpen((open) => !open)}
+          onJumpToConversation={(conversationId) => onJumpToConversation(conversationId)}
         />
 
         {canDismiss ? (
@@ -309,9 +349,26 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                       key={`${warning?.conversationId || 'unknown'}-${warning?.code || 'warning'}-${index}`}
                       className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-2.5"
                     >
-                      <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">
-                        {conversationLabel(warning?.conversationTitle, warning?.conversationId)}
-                      </div>
+                      {Number(warning?.conversationId) > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => onJumpToConversation(warning?.conversationId)}
+                          className={[
+                            'tw-w-full tw-text-left tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]',
+                            'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
+                            'hover:tw-underline tw-underline-offset-2',
+                            'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                          ].join(' ')}
+                          title={conversationLabel(warning?.conversationTitle, warning?.conversationId)}
+                          aria-label={conversationLabel(warning?.conversationTitle, warning?.conversationId)}
+                        >
+                          {conversationLabel(warning?.conversationTitle, warning?.conversationId)}
+                        </button>
+                      ) : (
+                        <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">
+                          {conversationLabel(warning?.conversationTitle, warning?.conversationId)}
+                        </div>
+                      )}
                       <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                         {String(warning?.message || warning?.code || 'warning')}
                       </div>
@@ -326,9 +383,26 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                 key={`${failure.conversationId || 'unknown'}-${index}`}
                 className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-p-2.5"
               >
-                <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">
-                  {conversationLabel(failure.conversationTitle, failure.conversationId)}
-                </div>
+                {Number(failure.conversationId) > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onJumpToConversation(failure.conversationId)}
+                    className={[
+                      'tw-w-full tw-text-left tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]',
+                      'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
+                      'hover:tw-underline tw-underline-offset-2',
+                      'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                    ].join(' ')}
+                    title={conversationLabel(failure.conversationTitle, failure.conversationId)}
+                    aria-label={conversationLabel(failure.conversationTitle, failure.conversationId)}
+                  >
+                    {conversationLabel(failure.conversationTitle, failure.conversationId)}
+                  </button>
+                ) : (
+                  <div className="tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]">
+                    {conversationLabel(failure.conversationTitle, failure.conversationId)}
+                  </div>
+                )}
                 <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                   {failure.error}
                 </div>
