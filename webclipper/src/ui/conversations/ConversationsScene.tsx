@@ -27,6 +27,7 @@ export type ConversationsSceneProps = {
   onPopupHeaderStateChange?: (state: PopupHeaderState) => void;
   inlineNarrowDetailHeader?: boolean;
   onPopupNotionSyncStarted?: () => void;
+  onOpenInsightsSection?: () => void;
 };
 
 export function ConversationsScene({
@@ -34,6 +35,7 @@ export function ConversationsScene({
   onPopupHeaderStateChange,
   inlineNarrowDetailHeader = false,
   onPopupNotionSyncStarted,
+  onOpenInsightsSection,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const { activeId, selectedConversation, detailHeaderActions, setActiveId } = useConversationsApp();
@@ -86,6 +88,7 @@ export function ConversationsScene({
       onOpenConversation={() => {
         openDetail();
       }}
+      onOpenInsightsSection={onOpenInsightsSection}
     />
   );
 

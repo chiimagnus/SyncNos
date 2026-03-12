@@ -124,6 +124,7 @@ async function copyTextToClipboard(text: string) {
 
 export type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
+  onOpenInsightsSection?: () => void;
   activeRowId?: number | null;
   onPopupNotionSyncStarted?: () => void;
   initialScrollTop?: number;
@@ -133,6 +134,7 @@ export type ConversationListPaneProps = {
 
 export function ConversationListPane({
   onOpenConversation,
+  onOpenInsightsSection,
   activeRowId,
   onPopupNotionSyncStarted,
   initialScrollTop = 0,
@@ -643,24 +645,53 @@ export function ConversationListPane({
 
             <div className="tw-flex-1 tw-min-w-0" aria-hidden="true" />
 
-            <div
-              id="stats"
-              className={[
-                'tw-flex tw-flex-none tw-items-end tw-gap-0.5 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--text-secondary)]',
-                'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
-                hasSelection
-                  ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none'
-                  : 'tw-max-w-[320px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-1 tw-py-0',
-              ].join(' ')}
-            >
-              <span className="tw-text-[var(--text-secondary)]">{t('todayLabel')}</span>
-              <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
-              <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
-              <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
-              <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                {String(filteredItems.length)}
-              </span>
-            </div>
+            {onOpenInsightsSection ? (
+              <button
+                type="button"
+                id="stats"
+                aria-label={t('section_insight_label')}
+                title={t('section_insight_label')}
+                onClick={() => onOpenInsightsSection()}
+                disabled={hasSelection}
+                className={[
+                  'tw-flex tw-flex-none tw-items-end tw-gap-0.5 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--text-secondary)]',
+                  'tw-appearance-none tw-bg-transparent tw-border-0',
+                  'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                  'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
+                  hasSelection
+                    ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none'
+                    : 'tw-max-w-[320px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-1 tw-py-0',
+                  hasSelection ? 'tw-cursor-default' : 'tw-cursor-pointer hover:tw-opacity-90',
+                ].join(' ')}
+              >
+                <span className="tw-text-[var(--text-secondary)]">{t('todayLabel')}</span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
+                <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
+                <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
+                  {String(filteredItems.length)}
+                </span>
+              </button>
+            ) : (
+              <div
+                id="stats"
+                className={[
+                  'tw-flex tw-flex-none tw-items-end tw-gap-0.5 tw-whitespace-nowrap tw-overflow-hidden tw-text-[14px] tw-font-semibold tw-leading-none tw-text-[var(--text-secondary)]',
+                  'tw-transition-[max-width,opacity,transform,padding] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
+                  hasSelection
+                    ? 'tw-max-w-0 tw-opacity-0 -tw-translate-x-2 tw-scale-[0.98] tw-p-0 tw-pointer-events-none'
+                    : 'tw-max-w-[320px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-px-1 tw-py-0',
+                ].join(' ')}
+              >
+                <span className="tw-text-[var(--text-secondary)]">{t('todayLabel')}</span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
+                <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
+                <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
+                  {String(filteredItems.length)}
+                </span>
+              </div>
+            )}
           </div>
 
           <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onOpenConversation={onOpenConversation} />
