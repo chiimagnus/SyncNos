@@ -73,6 +73,147 @@ function texFromCommonDataAttrs(el: any): string {
   return '';
 }
 
+function parseKatexTopEm(style: string): number | null {
+  const m = String(style || '').match(/top\s*:\s*(-?\d+(?:\.\d+)?)em/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function texFromKatexHtmlFallback(container: any): string {
+  try {
+    if (!container || typeof container.querySelector !== 'function') return '';
+    const katexHtml = container.classList?.contains?.('katex-html')
+      ? container
+      : container.querySelector('.katex-html');
+    if (!katexHtml) return '';
+
+    function isIgnorableClassName(cls: string): boolean {
+      const c = cls.toLowerCase();
+      return (
+        c.includes('strut')
+        || c.includes('pstrut')
+        || c.includes('vlist-s')
+        || c.includes('frac-line')
+        || c.includes('delimsizing')
+      );
+    }
+
+    function texFromMsupsub(msupsub: any): string {
+      const vlistT = msupsub && typeof msupsub.querySelector === 'function' ? msupsub.querySelector('.vlist-t') : null;
+      const hasVlistT2 = !!(vlistT && vlistT.classList && vlistT.classList.contains('vlist-t2'));
+
+      const vlist = msupsub && typeof msupsub.querySelector === 'function' ? msupsub.querySelector('.vlist') : null;
+      if (!vlist) return '';
+
+      const items: Array<{ top: number; text: string }> = [];
+      const children = Array.from(vlist.children || []) as any[];
+      for (const child of children) {
+        const style = readAttr(child, 'style');
+        if (!style || !style.includes('top:')) continue;
+        if (child.querySelector && child.querySelector('.frac-line')) continue;
+        const top = parseKatexTopEm(style);
+        if (top == null) continue;
+        const text = normalizeTeX(child.textContent || '');
+        if (!text) continue;
+        items.push({ top, text });
+      }
+      if (!items.length) return '';
+
+      const wrap = (v: string) => `{${normalizeTeX(v)}}`;
+
+      // KaTeX's internal layout uses smaller `top` (more negative) for superscripts.
+      items.sort((a, b) => a.top - b.top);
+
+      let sup = '';
+      let sub = '';
+      if (items.length === 1) {
+        if (hasVlistT2) sub = items[0].text;
+        else sup = items[0].text;
+      } else {
+        sup = items[0].text;
+        sub = items[items.length - 1].text;
+      }
+
+      let out = '';
+      if (sub) out += `_${wrap(sub)}`;
+      if (sup) out += `^${wrap(sup)}`;
+      return out;
+    }
+
+    function texFromMfrac(mfrac: any): string {
+      const vlist = mfrac && typeof mfrac.querySelector === 'function' ? mfrac.querySelector('.vlist') : null;
+      if (!vlist) return '';
+
+      const items: Array<{ top: number; text: string }> = [];
+      const children = Array.from(vlist.children || []) as any[];
+      for (const child of children) {
+        const style = readAttr(child, 'style');
+        if (!style || !style.includes('top:')) continue;
+        if (child.querySelector && child.querySelector('.frac-line')) continue;
+        const top = parseKatexTopEm(style);
+        if (top == null) continue;
+        const text = normalizeTeX(child.textContent || '');
+        if (!text) continue;
+        items.push({ top, text });
+      }
+      if (items.length < 2) return '';
+
+      // Numerator is placed higher (smaller top), denominator lower (larger top).
+      items.sort((a, b) => a.top - b.top);
+      const numerator = items[0].text;
+      const denominator = items[items.length - 1].text;
+      return `\\frac{${numerator}}{${denominator}}`;
+    }
+
+    function toTeXFromNodeList(nodeList: any): string {
+      const parts: string[] = [];
+      const nodes = Array.from(nodeList || []) as any[];
+
+      for (const node of nodes) {
+        if (!node) continue;
+        const nodeType = Number(node.nodeType || 0);
+        if (nodeType === 3) {
+          const text = normalizeTeX(node.nodeValue || '');
+          if (text) parts.push(text);
+          continue;
+        }
+        if (nodeType !== 1) continue;
+
+        const el = node as any;
+        const cls = String(el.className || '').trim();
+        if (cls && isIgnorableClassName(cls)) continue;
+
+        const classLower = cls.toLowerCase();
+        if (classLower.includes('mspace')) continue;
+
+        if (classLower.includes('msupsub')) {
+          const suffix = texFromMsupsub(el);
+          if (suffix && parts.length) parts[parts.length - 1] = `${parts[parts.length - 1]}${suffix}`;
+          else if (suffix) parts.push(suffix);
+          continue;
+        }
+
+        if (classLower.includes('mfrac')) {
+          const frac = texFromMfrac(el);
+          if (frac) parts.push(frac);
+          continue;
+        }
+
+        const inner = toTeXFromNodeList(el.childNodes || []);
+        if (inner) parts.push(inner);
+      }
+
+      return parts.join('');
+    }
+
+    const tex = normalizeTeX(toTeXFromNodeList(katexHtml.childNodes || []));
+    return tex;
+  } catch (_e) {
+    return '';
+  }
+}
+
 function bestEffortTextFormula(el: any): string {
   const raw = el && typeof el.textContent === 'string' ? el.textContent : '';
   return normalizeTeX(raw);
@@ -137,6 +278,9 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
 
     const fromAttrs = texFromCommonDataAttrs(node);
     if (fromAttrs) return { tex: fromAttrs, display, hasTeX: isLikelyTeX(fromAttrs) };
+
+    const fromKatexHtml = texFromKatexHtmlFallback(node);
+    if (fromKatexHtml) return { tex: fromKatexHtml, display, hasTeX: isLikelyTeX(fromKatexHtml) };
 
     const visible = bestEffortTextFormula(node);
     return { tex: visible, display, hasTeX: false };
@@ -238,6 +382,16 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
       const cls = String(el && el.className ? el.className : '').toLowerCase();
       const display = cls.includes('katex-display') || cls.includes('math-block');
       const wrapped = wrapTeX(fromAttrs, display);
+      if (replaceWithText(el, wrapped)) replacedCount += 1;
+      continue;
+    }
+
+    // KaTeX without MathML annotations: try to recover TeX from `katex-html` layout.
+    const fromKatexHtml = texFromKatexHtmlFallback(el);
+    if (fromKatexHtml && isLikelyTeX(fromKatexHtml)) {
+      const cls = String(el && el.className ? el.className : '').toLowerCase();
+      const display = cls.includes('katex-display') || cls.includes('math-block');
+      const wrapped = wrapTeX(fromKatexHtml, display);
       if (replaceWithText(el, wrapped)) replacedCount += 1;
       continue;
     }
