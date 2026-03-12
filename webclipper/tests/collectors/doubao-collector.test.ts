@@ -60,7 +60,7 @@ describe("doubao-collector", () => {
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = createDoubaoCollectorDef(env).collector.capture() as any;
+    const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
@@ -102,11 +102,53 @@ describe("doubao-collector", () => {
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = createDef(env).collector.capture() as any;
+    const snap = (await Promise.resolve(createDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe("assistant");
     expect(snap.messages[0].contentText).toBe("plain answer");
     expect(snap.messages[0].contentMarkdown).toBe("plain answer");
+  });
+
+  it("inlines blob: uploaded images as data:image urls", async () => {
+    const blobUrl = "blob:https://www.doubao.com/ee26c19d-9884-4cd8-8bcf-6b7ba6436f0f";
+    const data = new Uint8Array([0, 1, 2, 3, 4, 5]);
+
+    const html = `
+      <main data-testid="message_list">
+        <div data-testid="union_message">
+          <div data-testid="send_message">
+            <div data-testid="message_text_content">解释图片</div>
+            <img decoding="async" width="1080" height="1352" src="${blobUrl}">
+          </div>
+          <div data-testid="receive_message">
+            <div data-testid="message_text_content">好的</div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const dom = setupDoubaoDom(html, "https://www.doubao.com/chat/blob001");
+    (dom.window as any).fetch = vi.fn(async (url: string) => {
+      if (url !== blobUrl) return { ok: false, blob: async () => new dom.window.Blob() };
+      return {
+        ok: true,
+        blob: async () => new dom.window.Blob([data], { type: "image/png" }),
+      };
+    });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(2);
+    const user = snap.messages.find((m: { role: string }) => m.role === "user");
+    expect(user).toBeTruthy();
+    expect(user.contentMarkdown).toContain("![](data:image/png");
   });
 });
