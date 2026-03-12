@@ -84,6 +84,9 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       // "Small image" policy: cap both width and height, but never overflow the bubble.
       '[&_img]:tw-max-w-[min(360px,100%)] [&_img]:tw-max-h-[240px]',
       '[&_img]:tw-rounded-[10px] [&_img]:tw-border [&_img]:tw-border-[var(--border)]',
+      // When images fail to load, show an explicit link below the image to keep it discoverable.
+      '[&_.syncnos-md-image]:tw-inline-block [&_.syncnos-md-image]:tw-max-w-full',
+      '[&_.syncnos-md-image-link]:tw-mt-1 [&_.syncnos-md-image-link]:tw-text-[11px] [&_.syncnos-md-image-link]:tw-text-[var(--text-secondary)]',
 
       '[&_a]:tw-text-[var(--info)] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
       '[&_a:focus-visible]:tw-outline [&_a:focus-visible]:tw-outline-2 [&_a:focus-visible]:tw-outline-offset-2 [&_a:focus-visible]:tw-outline-[var(--focus-ring)]',
