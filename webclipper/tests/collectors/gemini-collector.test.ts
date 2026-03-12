@@ -10,6 +10,50 @@ function setupGeminiDom(html: string, url: string) {
 }
 
 describe("gemini-collector", () => {
+  it("filters out visually hidden speaker labels (cross-language)", async () => {
+    const html = `
+      <div id="chat-history">
+        <div class="conversation-container">
+          <user-query>
+            <div class="query-text">
+              <span class="cdk-visually-hidden">你说</span>
+              <div role="status" class="stopped-draft-message gds-body-l gds-italic ng-star-inserted" hidden="">你已让系统停止这条回答</div>
+              <p class="query-text-line">你好</p>
+            </div>
+          </user-query>
+          <model-response>
+            <div class="model-response-text">
+              <h2 class="cdk-visually-hidden ng-star-inserted">Gemini 说</h2>
+              <p>世界</p>
+            </div>
+          </model-response>
+        </div>
+      </div>
+    `;
+    const dom = setupGeminiDom(html, "https://gemini.google.com/app/hidden001");
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture()) as any;
+    expect(snap).toBeTruthy();
+
+    const user = snap.messages.find((m: { role: string }) => m.role === "user");
+    expect(user).toBeTruthy();
+    expect(user.contentText).toContain("你好");
+    expect(user.contentText).not.toContain("你说");
+    expect(user.contentText).not.toContain("你已让系统停止这条回答");
+
+    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistant).toBeTruthy();
+    expect(assistant.contentText).toContain("世界");
+    expect(assistant.contentText).not.toContain("Gemini 说");
+  });
+
   it("prefers conversation title from latest DOM marker", async () => {
     const html = `
       <div class="center-section">
