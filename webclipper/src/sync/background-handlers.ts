@@ -49,6 +49,10 @@ function normalizeIds(ids: unknown): number[] {
 
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
+    let lock: Promise<unknown> | null = null;
+    const releaseLock = () => {
+      if (lock && notionDetachedRun === lock) notionDetachedRun = null;
+    };
     try {
       if (notionDetachedRun) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
@@ -57,19 +61,30 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       const conversationIds = normalizeIds(msg?.conversationIds);
       if (!conversationIds.length) return router.err('no conversationIds');
 
+      // Acquire the lock before any async work, so concurrent requests can't race past the check.
+      lock = Promise.resolve();
+      notionDetachedRun = lock;
+
       const instanceId = deps.getInstanceId();
       const status = await deps.notionSyncOrchestrator.getSyncJobStatus({ instanceId });
       const currentJob = (status as any)?.job;
       if (currentJob?.status === 'running') {
+        releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
       const token = await getNotionOAuthToken().catch(() => null);
-      if (!token?.accessToken) return router.err('notion not connected');
+      if (!token?.accessToken) {
+        releaseLock();
+        return router.err('notion not connected');
+      }
 
       const res = await storageGet(['notion_parent_page_id']).catch(() => ({}));
       const parentPageId = String((res as any)?.notion_parent_page_id || '').trim();
-      if (!parentPageId) return router.err('missing parentPageId');
+      if (!parentPageId) {
+        releaseLock();
+        return router.err('missing parentPageId');
+      }
 
       const run = deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId });
       notionDetachedRun = run;
@@ -80,6 +95,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         .catch(() => {});
       return router.ok({ started: true, provider: 'notion' });
     } catch (error) {
+      releaseLock();
       return toSyncErrorResponse(router, error);
     }
   });
@@ -105,6 +121,10 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
+    let lock: Promise<unknown> | null = null;
+    const releaseLock = () => {
+      if (lock && obsidianDetachedRun === lock) obsidianDetachedRun = null;
+    };
     try {
       if (obsidianDetachedRun) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
@@ -114,10 +134,16 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (!conversationIds.length) return router.err('no conversationIds');
 
       const forceFullConversationIds = normalizeIds(msg?.forceFullConversationIds);
+
+      // Acquire the lock before any async work, so concurrent requests can't race past the check.
+      lock = Promise.resolve();
+      obsidianDetachedRun = lock;
+
       const instanceId = deps.getInstanceId();
       const status = await deps.obsidianSyncOrchestrator.getSyncStatus({ instanceId });
       const currentJob = (status as any)?.job;
       if (currentJob?.status === 'running') {
+        releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
@@ -130,6 +156,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         .catch(() => {});
       return router.ok({ started: true, provider: 'obsidian' });
     } catch (error) {
+      releaseLock();
       return toSyncErrorResponse(router, error);
     }
   });
