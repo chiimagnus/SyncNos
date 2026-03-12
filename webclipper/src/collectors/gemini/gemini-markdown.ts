@@ -248,7 +248,13 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
     function renderNode(node: any, ctx: any): any {
       if (!node) return "";
       if (node.nodeType === TEXT_NODE) {
-        return node.nodeValue ? String(node.nodeValue) : "";
+        const raw = node.nodeValue ? String(node.nodeValue) : "";
+        if (!raw) return "";
+        // HTML source often contains indentation newlines between inline nodes (especially in Angular templates).
+        // Treat those as regular spaces to avoid forcing line breaks in Markdown output.
+        if (raw.includes("\n") || raw.includes("\r")) return raw.replace(/\s+/g, " ");
+        if (/^\s+$/.test(raw)) return " ";
+        return raw;
       }
       if (node.nodeType !== ELEMENT_NODE) return "";
 
@@ -272,13 +278,13 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
       }
 
       if (tag === "code") return wrapInlineCode(String(node.textContent || ""));
-      if (tag === "strong" || tag === "b") return `**${renderChildren(node, ctx)}**`;
-      if (tag === "em" || tag === "i") return `*${renderChildren(node, ctx)}*`;
-      if (tag === "del" || tag === "s") return `~~${renderChildren(node, ctx)}~~`;
+      if (tag === "strong" || tag === "b") return `**${normalizeInline(renderChildren(node, ctx))}**`;
+      if (tag === "em" || tag === "i") return `*${normalizeInline(renderChildren(node, ctx))}*`;
+      if (tag === "del" || tag === "s") return `~~${normalizeInline(renderChildren(node, ctx))}~~`;
 
       if (tag === "a") {
         const href = node.getAttribute ? String(node.getAttribute("href") || "") : "";
-        const text = normalizeMarkdown(renderChildren(node, ctx));
+        const text = normalizeInline(renderChildren(node, ctx));
         if (href && /^https?:\/\//i.test(href)) return `[${text || href}](${href})`;
         return text;
       }

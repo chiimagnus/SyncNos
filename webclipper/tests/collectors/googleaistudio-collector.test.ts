@@ -158,6 +158,94 @@ describe('googleaistudio-collector', () => {
     expect(assistant.contentMarkdown).not.toContain('```');
   });
 
+  it('keeps ms-katex inline formulas inline (no forced line breaks)', async () => {
+    const dom = setupDom('', 'https://aistudio.google.com/app/abc123');
+    const d = dom.window.document;
+
+    const session = d.createElement('div');
+    session.className = 'chat-session-content';
+    d.body.appendChild(session);
+
+    const turn = d.createElement('ms-chat-turn');
+    turn.setAttribute('id', 'turn-a1');
+    session.appendChild(turn);
+
+    const turnContainer = d.createElement('div');
+    turnContainer.className = 'chat-turn-container render model';
+    turn.appendChild(turnContainer);
+
+    const vs = d.createElement('div');
+    vs.className = 'virtual-scroll-container model-prompt-container';
+    vs.setAttribute('data-turn-role', 'Model');
+    turnContainer.appendChild(vs);
+
+    const content = d.createElement('div');
+    content.className = 'turn-content';
+    vs.appendChild(content);
+
+    const ul = d.createElement('ul');
+    const li = d.createElement('li');
+    const p = d.createElement('p');
+    const strong = d.createElement('strong');
+
+    function createInlineKatex(tex: string) {
+      const msKatex = d.createElement('ms-katex');
+      msKatex.className = 'inline';
+      const pre = d.createElement('pre');
+      const code = d.createElement('code');
+      code.className = 'rendered';
+      const spanKatex = d.createElement('span');
+      spanKatex.className = 'katex';
+      const spanMathml = d.createElement('span');
+      spanMathml.className = 'katex-mathml';
+      const ann = d.createElement('annotation');
+      ann.setAttribute('encoding', 'application/x-tex');
+      ann.textContent = tex;
+      spanMathml.appendChild(ann);
+      spanKatex.appendChild(spanMathml);
+      code.appendChild(spanKatex);
+      pre.appendChild(code);
+      msKatex.appendChild(pre);
+      return msKatex;
+    }
+
+    strong.appendChild(createInlineKatex('e'));
+    const span1 = d.createElement('span');
+    span1.textContent = ' (自然对数的底数)';
+    strong.appendChild(span1);
+
+    p.appendChild(strong);
+    const text1 = d.createElement('span');
+    text1.textContent = '：状态转移矩阵（';
+    p.appendChild(text1);
+    p.appendChild(createInlineKatex('e^{At}'));
+    const text2 = d.createElement('span');
+    text2.textContent = '）的物理基石。';
+    p.appendChild(text2);
+
+    li.appendChild(p);
+    ul.appendChild(li);
+    content.appendChild(ul);
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    const assistant = snap.messages[0];
+    expect(assistant.role).toBe('assistant');
+    expect(assistant.contentMarkdown).toContain('$e$');
+    expect(assistant.contentMarkdown).toContain('$e^{At}$');
+    expect(assistant.contentMarkdown).not.toContain('$$e$$');
+    expect(assistant.contentMarkdown).not.toContain('$$e^{At}$$');
+    expect(assistant.contentMarkdown).not.toContain('```');
+  });
+
   it('inlines blob: image urls as data: urls', async () => {
     const html = `
       <div class="chat-session-content">
