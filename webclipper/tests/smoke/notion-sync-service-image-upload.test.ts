@@ -163,4 +163,74 @@ describe('notion-sync-service image uploads', () => {
     expect(out[0]?.image?.external?.url).toContain('/image/attachment%3A');
     expect(calls.map((c) => c.op)).toEqual(['createExternalURLUpload']);
   });
+
+  it('upgrades data:image urls via byte upload (no fetch)', async () => {
+    const calls: any[] = [];
+    filesApi = {
+      createExternalURLUpload: async () => {
+        throw new Error('should not be called');
+      },
+      createFileUpload: async ({ filename, contentType }: any) => {
+        calls.push({ op: 'createFileUpload', filename, contentType });
+        return { id: 'u_data_1' };
+      },
+      sendFileUpload: async ({ id, bytes, filename, contentType }: any) => {
+        calls.push({ op: 'sendFileUpload', id, byteLength: bytes.byteLength, filename, contentType });
+        return { id };
+      },
+      waitUntilUploaded: async ({ id }: any) => {
+        calls.push({ op: 'waitUntilUploaded', id });
+        return { id, status: 'uploaded' };
+      },
+      retrieveUpload: async () => ({ id: 'u_data_1', status: 'uploaded' }),
+    };
+
+    const blocks = [
+      {
+        object: 'block',
+        type: 'image',
+        image: { type: 'external', external: { url: 'data:image/png;base64,iVBORw0KGgo=' } },
+      },
+    ];
+
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    expect(out[0]?.image?.type).toBe('file_upload');
+    expect(out[0]?.image?.file_upload?.id).toBe('u_data_1');
+    expect(calls.map((c) => c.op)).toEqual(['createFileUpload', 'sendFileUpload', 'waitUntilUploaded']);
+  });
+
+  it('replaces data:image urls with placeholder paragraph when upload fails', async () => {
+    const calls: any[] = [];
+    filesApi = {
+      createExternalURLUpload: async () => {
+        throw new Error('should not be called');
+      },
+      createFileUpload: async () => {
+        calls.push({ op: 'createFileUpload' });
+        throw new Error('nope');
+      },
+      sendFileUpload: async () => {
+        calls.push({ op: 'sendFileUpload' });
+        throw new Error('nope');
+      },
+      waitUntilUploaded: async () => {
+        calls.push({ op: 'waitUntilUploaded' });
+        throw new Error('nope');
+      },
+      retrieveUpload: async () => ({ id: 'u_data_2', status: 'failed' }),
+    };
+
+    const blocks = [
+      {
+        object: 'block',
+        type: 'image',
+        image: { type: 'external', external: { url: 'data:image/png;base64,iVBORw0KGgo=' } },
+      },
+    ];
+
+    const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
+    expect(out[0]?.type).toBe('paragraph');
+    expect(String(out[0]?.paragraph?.rich_text?.[0]?.text?.content || '')).toContain('Image omitted');
+    expect(calls.map((c) => c.op)).toEqual(['createFileUpload']);
+  });
 });
