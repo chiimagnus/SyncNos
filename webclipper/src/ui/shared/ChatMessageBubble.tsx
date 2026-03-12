@@ -66,7 +66,11 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_ol]:tw-mt-0 [&_ol]:tw-mb-2 [&_ol]:tw-pl-5 [&_ol]:tw-list-decimal',
       '[&_ul>li+li]:tw-mt-1 [&_ol>li+li]:tw-mt-1',
 
-      '[&_blockquote]:tw-mt-0 [&_blockquote]:tw-mb-2 [&_blockquote]:tw-px-[9px] [&_blockquote]:tw-py-[6px] [&_blockquote]:tw-border-l-[3px] [&_blockquote]:tw-border-l-[var(--border)] [&_blockquote]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] [&_blockquote]:tw-text-[var(--text-secondary)]',
+      // Blockquotes: render as a clean "vertical bar" quote (like Notion),
+      // and do not rely on Tailwind preflight (preflight is disabled in this repo).
+      '[&_blockquote]:tw-relative [&_blockquote]:tw-mt-0 [&_blockquote]:tw-mb-2 [&_blockquote]:tw-mx-0 [&_blockquote]:tw-pl-5 [&_blockquote]:tw-pr-0 [&_blockquote]:tw-py-0 [&_blockquote]:tw-bg-transparent [&_blockquote]:tw-text-[var(--text-primary)]',
+      '[&_blockquote]:before:tw-content-[""] [&_blockquote]:before:tw-absolute [&_blockquote]:before:tw-left-0 [&_blockquote]:before:tw-top-1 [&_blockquote]:before:tw-bottom-1 [&_blockquote]:before:tw-w-1 [&_blockquote]:before:tw-rounded-full [&_blockquote]:before:tw-bg-[color-mix(in_srgb,var(--text-secondary)_40%,transparent)]',
+      '[&_blockquote_blockquote]:tw-mt-2 [&_blockquote_blockquote]:tw-mb-0 [&_blockquote_blockquote]:before:tw-bg-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]',
 
       '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
 
