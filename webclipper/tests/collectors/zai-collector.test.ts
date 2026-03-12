@@ -31,6 +31,39 @@ function createCollector() {
 }
 
 describe("zai-collector", () => {
+  it("captures user uploaded images from attachment card", async () => {
+    const html = `
+      <div id="message-u1" class="user-message">
+        <div class="chat-user markdown-prose">
+          <div class="flex overflow-x-auto flex-col flex-wrap gap-1 justify-end mt-2.5 mb-1 w-full">
+            <div class="self-end">
+              <button class="not-prose" type="button">
+                <img
+                  src="https://z-cdn-media.chatglm.cn/files/dd5bd44e-1d27-4ff6-9966-c82967dead55.jpg?auth_key=abc"
+                  alt="1.jpg"
+                  data-cy="image"
+                />
+              </button>
+            </div>
+          </div>
+          <div class="relative w-full">
+            <div class="whitespace-pre-wrap">这是什么？</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv-img1" });
+    setupDom(dom);
+    const collector = createCollector();
+    const snap = collector.capture() as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("user");
+    expect(snap.messages[0].contentMarkdown).toContain("这是什么？");
+    expect(snap.messages[0].contentMarkdown).toContain("![](https://z-cdn-media.chatglm.cn/files/");
+  });
+
   it("ignores thinking-chain-container content", async () => {
 
     const html = `

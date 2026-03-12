@@ -10,6 +10,44 @@ function setupKimiDom(html: string, url: string) {
 }
 
 describe("kimi-collector", () => {
+  it("captures user uploaded images from attachment list", () => {
+    const html = `
+      <main class="chat-content">
+        <div class="chat-content-item chat-content-item-user">
+          <div class="attachment-list">
+            <div class="attachment-list-image single">
+              <div class="image-thumbnail large success">
+                <span class="image-wrapper image-detail">
+                  <img class="image-main is-cover" alt="" src="https://www.kimi.com/apiv2-files/sign-obj/kimi-fs/files/blob/abc?filename=1.jpg&sig=xxx&t=t">
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="segment-content">
+            <div class="segment-content-box">
+              <div class="user-content">这是什么</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const dom = setupKimiDom(html, "https://kimi.com/chat/img001");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = createKimiCollectorDef(env).collector.capture() as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("user");
+    expect(snap.messages[0].contentMarkdown).toContain("这是什么");
+    expect(snap.messages[0].contentMarkdown).toContain("![](https://www.kimi.com/apiv2-files/sign-obj/");
+  });
+
   it("extracts assistant contentMarkdown from semantic markdown DOM", async () => {
     const html = `
       <main class="chat-content">

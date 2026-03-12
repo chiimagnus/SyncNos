@@ -61,11 +61,18 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
 
       let text = "";
       let imageScopes: any[] = [item];
+      const attachmentRoots: any[] = [];
+      item.querySelectorAll?.(".attachment-list, .attachment-list-image, .attachment-list-file").forEach((el: any) => {
+        attachmentRoots.push(el);
+      });
       if (isUser) {
         const partsEls: any[] = Array.from(item.querySelectorAll(".user-content")) as any[];
         const parts = partsEls.map((el: any) => env.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
         text = env.normalize.normalizeText(parts.join("\n\n"));
-        imageScopes = partsEls.length ? partsEls : [item];
+        // User-uploaded images are rendered in the attachment list, not inside `.user-content`.
+        // Include attachment roots to avoid missing images.
+        imageScopes = [...partsEls, ...attachmentRoots].filter(Boolean);
+        if (!imageScopes.length) imageScopes = [item];
       } else {
         const candidates: any[] = [];
         item.querySelectorAll(".markdown-container, .editor-content").forEach((el: any) => {
@@ -103,7 +110,7 @@ export function createKimiCollectorDef(env: CollectorEnv): CollectorDefinition {
           ? kimiMarkdown.normalizeMarkdown(joinedMarkdown)
           : joinedMarkdown;
 
-        imageScopes = uniq.length ? uniq : [item];
+        imageScopes = [...(uniq.length ? uniq : [item]), ...attachmentRoots].filter(Boolean);
       }
 
       const imageUrls = mergeImageUrls(imageScopes);

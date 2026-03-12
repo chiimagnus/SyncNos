@@ -120,7 +120,11 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
       const imageScope = (() => {
         if (!w || !w.querySelector) return w;
-        if (role === "user") return w.querySelector(".whitespace-pre-wrap") || w.querySelector(".chat-user") || w;
+        if (role === "user") {
+          // User-uploaded images live in a "not-prose" attachment card above the text bubble.
+          // Keep the scope at `.chat-user`/wrapper so we don't miss those `<img>` nodes.
+          return w.querySelector(".chat-user") || w;
+        }
         return w.querySelector("#response-content-container") || w.querySelector(".markdown-prose") || w.querySelector(".chat-assistant") || w;
       })();
       const imageUrls = extractImageUrlsFromElement(imageScope || w);
