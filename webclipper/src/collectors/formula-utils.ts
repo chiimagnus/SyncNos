@@ -295,7 +295,6 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
   let replacedCount = 0;
   for (const pre of preList) {
     if (!pre || !pre.parentNode) continue;
-    if (pre.querySelector && pre.querySelector('code')) continue;
     let hasMath = false;
     try {
       hasMath = !!pre.querySelector(".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex");
@@ -303,6 +302,19 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
       hasMath = false;
     }
     if (!hasMath) continue;
+
+    // Some sites wrap formulas as `<pre><code>...katex...</code></pre>` even though it's not a code block.
+    // Treat it as a display formula unless it clearly looks like a language-highlighted code fence.
+    try {
+      const codeEl = pre.querySelector ? pre.querySelector('code') : null;
+      if (codeEl && codeEl.getAttribute) {
+        const className = String(codeEl.getAttribute('class') || '');
+        const looksLikeCodeFence = /(^|\s)(language|lang)-[a-z0-9_#+.-]+/i.test(className);
+        if (looksLikeCodeFence) continue;
+      }
+    } catch (_e) {
+      // ignore
+    }
 
     const extracted = extractTeXFromContainer(pre);
     const wrapped = extracted.hasTeX ? wrapTeX(extracted.tex, true) : `\n\n${normalizeTeX(extracted.tex)}\n\n`;

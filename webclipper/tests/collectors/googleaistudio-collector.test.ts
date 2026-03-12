@@ -121,6 +121,43 @@ describe('googleaistudio-collector', () => {
     expect(assistant.contentMarkdown).toContain('稳定控制');
   });
 
+  it('does not wrap KaTeX formulas in code fences when they are inside pre>code', async () => {
+    const html = `
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-a1">
+          <div class="chat-turn-container render model">
+            <div class="virtual-scroll-container model-prompt-container" data-turn-role="Model">
+              <div class="turn-content">
+                <pre>
+                  <code>
+                    <span class="katex-display">
+                      <annotation encoding="application/x-tex">e^{i\\pi}+1=0</annotation>
+                    </span>
+                  </code>
+                </pre>
+              </div>
+            </div>
+          </div>
+        </ms-chat-turn>
+      </div>
+    `;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    const assistant = snap.messages[0];
+    expect(assistant.role).toBe('assistant');
+    expect(assistant.contentMarkdown).toContain('$$e^{i\\pi}+1=0$$');
+    expect(assistant.contentMarkdown).not.toContain('```');
+  });
+
   it('inlines blob: image urls as data: urls', async () => {
     const html = `
       <div class="chat-session-content">
