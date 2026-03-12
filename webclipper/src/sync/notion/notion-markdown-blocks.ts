@@ -353,6 +353,12 @@
       return /^https?:\/\//i.test(String(url || "").trim());
     }
 
+    function isDataImageUrl(url) {
+      const text = String(url || "").trim();
+      if (!text) return false;
+      return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(text);
+    }
+
     function startsWithFence(line) {
       return String(line || "").trimStart().startsWith("```");
     }
@@ -390,7 +396,7 @@
       const m = trimmed.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)\s*$/);
       if (!m) return null;
       const url = String(m[2] || "").trim();
-      if (!isHttpUrl(url)) return null;
+      if (!isHttpUrl(url) && !isDataImageUrl(url)) return null;
       return { url, alt: String(m[1] || "") };
     }
 

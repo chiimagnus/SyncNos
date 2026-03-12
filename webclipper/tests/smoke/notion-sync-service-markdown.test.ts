@@ -118,6 +118,23 @@ describe("notion-sync-service markdown", () => {
     expect(img?.image?.external?.url).toBe("https://example.com/a.png");
   });
 
+  it("converts data:image markdown to notion image blocks (upgradeable)", async () => {
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
+
+    const md = [
+      "Hello",
+      "",
+      "![](data:image/png;base64,iVBORw0KGgo=)",
+      "",
+      "World"
+    ].join("\n");
+    const blocks = notionSyncService.markdownToNotionBlocks(md);
+    const img = blocks.find((b: any) => b && b.type === "image");
+    expect(img?.image?.type).toBe("external");
+    expect(String(img?.image?.external?.url || "")).toContain("data:image/png;base64,");
+  });
+
   it("messagesToBlocks uses markdown when present (notionai)", async () => {
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();

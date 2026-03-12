@@ -3,6 +3,68 @@ import notionFilesApi from './notion-files-api.ts';
 
   const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
+  function isDataImageUrl(url) {
+    const text = String(url || "").trim();
+    if (!text) return false;
+    return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(text);
+  }
+
+  function guessExtensionFromContentType(contentType) {
+    const ct = String(contentType || "").trim().toLowerCase();
+    if (ct === "image/png") return "png";
+    if (ct === "image/jpeg") return "jpg";
+    if (ct === "image/webp") return "webp";
+    if (ct === "image/gif") return "gif";
+    if (ct === "image/svg+xml") return "svg";
+    return "jpg";
+  }
+
+  function parseDataImageUrl(dataUrl) {
+    const src = String(dataUrl || "").trim();
+    const m = src.match(/^data:(image\/[a-z0-9.+-]+)(?:;charset=[a-z0-9._-]+)?;base64,(.*)$/i);
+    if (!m) throw new Error("invalid data image url");
+    const contentType = String(m[1] || "").trim().toLowerCase();
+    if (!contentType || !contentType.startsWith("image/")) throw new Error("invalid data image content type");
+    const payload = String(m[2] || "").trim();
+    if (!payload) throw new Error("empty data image payload");
+    const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+    const approxBytes = Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
+    if (approxBytes > MAX_IMAGE_BYTES) throw new Error(`image too large: ${approxBytes}`);
+
+    function base64ToBytes(b64) {
+      const raw = String(b64 || "");
+      if (!raw) return new Uint8Array();
+      if (typeof atob === "function") {
+        const bin = atob(raw);
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+        return out;
+      }
+      if (typeof Buffer !== "undefined") {
+        try {
+          const buf = Buffer.from(raw, "base64");
+          return new Uint8Array(buf);
+        } catch (_e) {
+          return new Uint8Array();
+        }
+      }
+      return new Uint8Array();
+    }
+
+    const bytes = base64ToBytes(payload);
+    if (!bytes.byteLength) throw new Error("data image decoded empty");
+    return { bytes, contentType };
+  }
+
+  function paragraphBlock(text) {
+    const content = String(text || "").trim();
+    return {
+      object: "block",
+      type: "paragraph",
+      paragraph: { rich_text: [{ type: "text", text: { content: content || "[Image omitted]" } }] }
+    };
+  }
+
   function sanitizeUrlForLog(url) {
     try {
       const u = new URL(String(url || ""));
@@ -121,11 +183,38 @@ function guessFilenameFromUrl(url) {
     return ready && ready.id ? String(ready.id).trim() : fileId;
   }
 
+  async function uploadFromDataUrl(files, accessToken, dataUrl) {
+    const parsed = parseDataImageUrl(dataUrl);
+    const bytes = parsed.bytes;
+    const contentType = parsed.contentType || "application/octet-stream";
+    if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${bytes.byteLength}`);
+
+    const ext = guessExtensionFromContentType(contentType);
+    const filename = `image.${ext}`;
+    const up = await files.createFileUpload({
+      accessToken,
+      filename,
+      contentType
+    });
+    const fileId = up && up.id ? String(up.id).trim() : "";
+    if (!fileId) throw new Error("missing file upload id");
+    await files.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
+    const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
+    return ready && ready.id ? String(ready.id).trim() : fileId;
+  }
+
   async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
     const list = Array.isArray(blocks) ? blocks : [];
     if (!list.length) return [];
       const files = getNotionFilesApi();
-    if (!canUpgrade(files)) return list;
+    if (!canUpgrade(files)) {
+      return list.map((b) => {
+        if (!b || b.type !== "image" || !b.image || b.image.type !== "external") return b;
+        const url = b.image && b.image.external && b.image.external.url ? String(b.image.external.url).trim() : "";
+        if (url && isDataImageUrl(url)) return paragraphBlock("[Image omitted: inline image data URL not supported]");
+        return b;
+      });
+    }
 
     const cache = new Map();
     const out = [];
@@ -143,6 +232,21 @@ function guessFilenameFromUrl(url) {
 
       let uploadId = cache.get(url) || "";
       if (!uploadId) {
+        if (isDataImageUrl(url)) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            uploadId = await uploadFromDataUrl(files, accessToken, url);
+            if (uploadId) cache.set(url, uploadId);
+          } catch (e) {
+            const msg = e && e.message ? String(e.message) : String(e);
+            try {
+              console.warn("[NotionImageUpload] data_url upload failed:", msg);
+            } catch (_e2) {
+              // ignore
+            }
+            uploadId = "";
+          }
+        } else {
         try {
           // eslint-disable-next-line no-await-in-loop
           uploadId = await uploadFromExternalUrl(files, accessToken, url);
@@ -169,10 +273,12 @@ function guessFilenameFromUrl(url) {
             uploadId = "";
           }
         }
+        }
       }
 
       if (!uploadId) {
-        out.push(b);
+        if (isDataImageUrl(url)) out.push(paragraphBlock("[Image omitted: inline image upload failed]"));
+        else out.push(b);
         continue;
       }
 
