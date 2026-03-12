@@ -48,7 +48,7 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = createGoogleAiStudioCollectorDef(env).collector.capture() as any;
+    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.source).toBe('googleaistudio');
     expect(snap.messages.length).toBe(2);
@@ -64,5 +64,44 @@ describe('googleaistudio-collector', () => {
     expect(assistant.contentMarkdown).toContain('[link](https://example.com)');
     expect(assistant.contentMarkdown).toContain('```swift');
     expect(assistant.contentMarkdown).toContain('print("hi")');
+  });
+
+  it('inlines blob: image urls as data: urls', async () => {
+    const html = `
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-u1">
+          <div class="chat-turn-container render user">
+            <div class="virtual-scroll-container user-prompt-container" data-turn-role="User">
+              <div class="turn-content">
+                hello
+                <img alt="image.png" src="blob:https://aistudio.google.com/fake-blob-id" />
+              </div>
+            </div>
+          </div>
+        </ms-chat-turn>
+      </div>
+    `;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]); // PNG signature
+    const pngBlob = new (dom.window as any).Blob([pngBytes], { type: 'image/png' });
+
+    (dom.window as any).fetch = async () => ({
+      ok: true,
+      blob: async () => pngBlob,
+    });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    const user = snap.messages.find((m: { role: string }) => m.role === 'user');
+    expect(user).toBeTruthy();
+    expect(user.contentMarkdown).toContain('![](data:image/png;base64,');
   });
 });

@@ -20,6 +20,12 @@ function isHttpUrl(url: unknown): boolean {
   return /^https?:\/\//i.test(text);
 }
 
+function isDataImageUrl(url: unknown): boolean {
+  const text = String(url || '').trim();
+  if (!text) return false;
+  return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
+}
+
 function parseSrcset(srcset: unknown): Array<{ url: string; score: number }> {
   const raw = String(srcset || '').trim();
   if (!raw) return [];
@@ -79,12 +85,16 @@ export function extractImageUrlsFromElement(element: ParentNode | null): string[
   return output;
 }
 
-export function appendImageMarkdown(markdown: unknown, imageUrls: unknown[]): string {
+export function appendImageMarkdown(
+  markdown: unknown,
+  imageUrls: unknown[],
+  options?: { allowDataImageUrls?: boolean },
+): string {
   const base = String(markdown || '').trimEnd();
   const urls = Array.isArray(imageUrls)
     ? imageUrls.map((url) => String(url || '').trim()).filter(Boolean)
     : [];
-  const normalized = urls.filter((url) => isHttpUrl(url));
+  const normalized = urls.filter((url) => isHttpUrl(url) || (options?.allowDataImageUrls ? isDataImageUrl(url) : false));
   if (!normalized.length) return base;
 
   const lines: string[] = [];
