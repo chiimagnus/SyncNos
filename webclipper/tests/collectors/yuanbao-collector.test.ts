@@ -125,4 +125,44 @@ describe("yuanbao-collector", () => {
     expect(snap.messages[0].contentText).toBe("plain answer");
     expect(snap.messages[0].contentMarkdown).toBe("plain answer");
   });
+
+  it("captures multimodal image urls from the message bubble", async () => {
+    const html = `
+      <main class="agent-chat__list__content">
+        <div class="agent-chat__list__item agent-chat__list__item--human">
+          <div class="agent-chat__bubble agent-chat__bubble--human agent-chat__conv--human agent-chat__conv--human-multimodal">
+            <div class="agent-chat__bubble__prefix">
+              <div class="hyc-component-multi-modal">
+                <div class="hyc-component-multi-modal__item hyc-component-multi-modal__text">
+                  <div class="hyc-content-text">这是什么？</div>
+                </div>
+                <div class="hyc-component-multi-modal__item hyc-component-multi-modal__image">
+                  <div class="hyc-content-img hyc-content-img--multi" data-index="1">
+                    <img src="https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be" draggable="false" alt="">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="agent-chat__bubble__content">
+              <div class="hyc-content-text">这是什么？</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/multimodal");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("user");
+    expect(snap.messages[0].contentText).toContain("这是什么？");
+    expect(snap.messages[0].contentMarkdown).toContain("![](https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be)");
+  });
 });
