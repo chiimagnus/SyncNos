@@ -72,9 +72,12 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_blockquote]:before:tw-content-[""] [&_blockquote]:before:tw-absolute [&_blockquote]:before:tw-left-0 [&_blockquote]:before:tw-top-1 [&_blockquote]:before:tw-bottom-1 [&_blockquote]:before:tw-w-1 [&_blockquote]:before:tw-rounded-full [&_blockquote]:before:tw-bg-[color-mix(in_srgb,var(--text-secondary)_40%,transparent)]',
       '[&_blockquote_blockquote]:tw-mt-2 [&_blockquote_blockquote]:tw-mb-0 [&_blockquote_blockquote]:before:tw-bg-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]',
 
-      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
+      // Inline code: avoid "too black" chips in dark mode (preflight is disabled).
+      // Use currentColor-based translucent background so it adapts to both bubble variants.
+      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,currentColor_12%,transparent)] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
 
-      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[var(--border)] [&_pre]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] [&_pre]:tw-overflow-auto',
+      // Code blocks: keep contrast high in both light/dark bubbles (avoid near-black background).
+      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[var(--border)] [&_pre]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_pre]:tw-overflow-auto',
       '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-leading-[1.45]',
 
       // Tables can be wider than the viewport; let the table itself scroll instead of the whole bubble.
@@ -95,9 +98,18 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       // KaTeX blocks: prevent overflow and keep spacing consistent with other blocks.
       '[&_.syncnos-math-block]:tw-my-2 [&_.syncnos-math-block]:tw-overflow-x-auto [&_.syncnos-math-block]:tw-max-w-full',
 
+      // Links: keep a stable cue (underline) while ensuring readability on the green bubble too.
       '[&_a]:tw-text-[var(--info)] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
       '[&_a:focus-visible]:tw-outline [&_a:focus-visible]:tw-outline-2 [&_a:focus-visible]:tw-outline-offset-2 [&_a:focus-visible]:tw-outline-[var(--focus-ring)]',
     ].join(' ') + (className ? ` ${className}` : '');
+
+  const mdRoleOverrides =
+    bubbleRole === 'user'
+      ? [
+          // On the green bubble, the default info-blue can be low-contrast; inherit bubble text color instead.
+          '[&_a]:tw-text-[inherit]',
+        ].join(' ')
+      : '';
 
   return (
     <section className={[bubbleBase, bubbleRoleClass].join(' ')}>
@@ -107,7 +119,7 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <div className={mdClass} dangerouslySetInnerHTML={{ __html: html }} />
+      <div className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')} dangerouslySetInnerHTML={{ __html: html }} />
     </section>
   );
 }
