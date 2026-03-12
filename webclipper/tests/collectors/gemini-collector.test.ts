@@ -74,6 +74,9 @@ describe("gemini-collector", () => {
             <div class="markdown markdown-main-panel preserve-whitespaces-in-response" inline-copy-host id="model-response-message-contentr_xxx" aria-busy="false">
               <h2>Section</h2>
               <p><strong>Bold</strong> and <a href="https://example.com">link</a>.</p>
+              <div class="math-block" data-math="S = \\sum_{i=1}^{n} x_i">
+                <span class="katex-display"><span class="katex"><span class="katex-html" aria-hidden="true">ignored</span></span></span>
+              </div>
               <ul><li><p>Item A</p></li><li><p>Item B</p></li></ul>
               <blockquote><p>Quoted text</p></blockquote>
               <table>
@@ -105,6 +108,7 @@ describe("gemini-collector", () => {
     expect(assistant.contentMarkdown).toContain("## Section");
     expect(assistant.contentMarkdown).toContain("**Bold**");
     expect(assistant.contentMarkdown).toContain("[link](https://example.com)");
+    expect(assistant.contentMarkdown).toContain("$$S = \\sum_{i=1}^{n} x_i$$");
     expect(assistant.contentMarkdown).toContain("- Item A");
     expect(assistant.contentMarkdown).toContain("> Quoted text");
     expect(assistant.contentMarkdown).toContain("| A | B |");

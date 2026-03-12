@@ -165,4 +165,46 @@ describe("yuanbao-collector", () => {
     expect(snap.messages[0].contentText).toContain("这是什么？");
     expect(snap.messages[0].contentMarkdown).toContain("![](https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be)");
   });
+
+  it("wraps katex formulas as $...$ (best-effort)", async () => {
+    const html = `
+      <main class="agent-chat__list__content">
+        <div class="agent-chat__list__item agent-chat__list__item--ai">
+          <div class="agent-chat__speech-text">
+            <div class="hyc-content-md">
+              <div class="hyc-common-markdown hyc-common-markdown-style">
+                <div class="ybc-p">
+                  公式：
+                  <span class="ybc-markdown-katex">
+                    <span class="katex">
+                      <span class="katex-html" aria-hidden="true">
+                        <span class="base"><span class="mord mathnormal">E</span><span class="mrel">=</span></span>
+                        <span class="base">
+                          <span class="mord mathnormal">m</span>
+                          <span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span style="top:-3.063em;"><span class="mord mtight">2</span></span></span></span></span></span></span>
+                        </span>
+                      </span>
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/formula");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("assistant");
+    expect(snap.messages[0].contentMarkdown).toMatch(/\$E\s*=\s*m\s*c\s*2\$/);
+  });
 });

@@ -6,6 +6,7 @@ import {
   extractImageUrlsFromElement,
   inEditMode as inEditModeUtil,
 } from '../collector-utils.ts';
+import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
 
 export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {
@@ -47,14 +48,36 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     const parts: any[] = [];
     const children: any[] = Array.from(container.children || []) as any[];
     if (!children.length) {
-      return env.normalize.normalizeText(container.innerText || container.textContent || "");
+      return env.normalize.normalizeText(extractTextWithMath(container));
     }
     for (const child of children) {
       if (isThinkingBlock(child)) continue;
-      const t = env.normalize.normalizeText(child.innerText || child.textContent || "");
+      const t = env.normalize.normalizeText(extractTextWithMath(child));
       if (t) parts.push(t);
     }
     return env.normalize.normalizeText(parts.join("\n\n"));
+  }
+
+  function extractTextWithMath(node: any): any {
+    if (!node) return "";
+    const hasQuery = !!(node && typeof node.querySelector === "function");
+    const hasClone = !!(node && typeof node.cloneNode === "function");
+    let hasMath = false;
+    if (hasQuery) {
+      try {
+        hasMath = !!node.querySelector(".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex");
+      } catch (_e) {
+        hasMath = false;
+      }
+    }
+    if (!hasMath || !hasClone) return node.innerText || node.textContent || "";
+    try {
+      const cloned = node.cloneNode(true);
+      replaceMathElementsWithLatexText(cloned);
+      return cloned.innerText || cloned.textContent || "";
+    } catch (_e) {
+      return node.innerText || node.textContent || "";
+    }
   }
 
   function collectMessages(): any {

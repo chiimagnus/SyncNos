@@ -1,4 +1,5 @@
 import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts';
+import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
 
   function removeThinkingNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;
@@ -239,6 +240,7 @@ import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts'
     try {
       const cloned = content.cloneNode(true);
       removeThinkingNodes(cloned);
+      replaceMathElementsWithLatexText(cloned);
       removeNonContentNodes(cloned);
       const md = htmlToMarkdown(cloned);
       return md || "";
@@ -255,6 +257,7 @@ import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts'
     try {
       const cloned = content.cloneNode(true);
       removeThinkingNodes(cloned);
+      replaceMathElementsWithLatexText(cloned);
       removeNonContentNodes(cloned);
       node = cloned;
     } catch (_e) {
