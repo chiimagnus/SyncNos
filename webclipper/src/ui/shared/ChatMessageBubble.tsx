@@ -106,9 +106,12 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
   const mdRoleOverrides =
     bubbleRole === 'user'
       ? [
-          // On the green bubble, keep links clearly "blue" with higher contrast than the default.
-          '[&_a]:tw-text-[color-mix(in_srgb,var(--info)_88%,var(--secondary-foreground))]',
-          '[&_a]:tw-font-semibold',
+          // On the green bubble, keep links clearly "blue" and readable in both light/dark modes:
+          // - Light mode: mix with dark `--text-primary` to deepen the blue.
+          // - Dark mode: mix with light `--text-primary` to brighten the blue.
+          '[&_a]:tw-text-[color-mix(in_srgb,var(--info)_76%,var(--text-primary))]',
+          '[&_a]:tw-font-semibold [&_a]:tw-underline-offset-[2px] [&_a]:tw-decoration-2',
+          '[&_a]:tw-decoration-[color-mix(in_srgb,var(--info)_62%,var(--text-primary))]',
         ].join(' ')
       : '';
 
