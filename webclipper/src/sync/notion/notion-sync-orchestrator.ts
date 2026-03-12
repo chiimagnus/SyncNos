@@ -240,6 +240,20 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return count;
   }
 
+  function countInlineImageOmittedPlaceholders(blocks) {
+    const list = Array.isArray(blocks) ? blocks : [];
+    let count = 0;
+    for (const b of list) {
+      if (!b || b.type !== "paragraph" || !b.paragraph) continue;
+      const rt = Array.isArray(b.paragraph.rich_text) ? b.paragraph.rich_text : [];
+      const text = rt
+        .map((x) => (x && x.type === "text" && x.text && x.text.content ? String(x.text.content) : ""))
+        .join("");
+      if (text.includes("[Image omitted: inline image")) count += 1;
+    }
+    return count;
+  }
+
   async function buildBlocksForSync({ notionSyncService, accessToken, source, messagesList }) {
     const warnings = [];
     let blocks = notionSyncService.messagesToBlocks(messagesList, { source });
@@ -263,6 +277,15 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
         code: "notion_image_upload_degraded",
         message: `Some images could not be uploaded to Notion and were kept as external URLs (${externalAfter}/${externalBefore}).`,
         extra: { externalAfter, externalBefore },
+      });
+    }
+
+    const inlineOmitted = countInlineImageOmittedPlaceholders(blocks);
+    if (inlineOmitted > 0) {
+      warnings.push({
+        code: "notion_inline_image_upload_failed",
+        message: `Some inline images could not be uploaded to Notion and were replaced with placeholder text (${inlineOmitted}).`,
+        extra: { count: inlineOmitted },
       });
     }
 

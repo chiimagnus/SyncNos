@@ -10,6 +10,7 @@ import geminiMarkdown from '../gemini/gemini-markdown.ts';
 
 let manualTurnCache: Map<string, any> | null = null;
 let manualCacheConversationKey: string = '';
+let manualCacheWarningFlags: string[] = [];
 
 function sleep(ms: any): any {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -406,6 +407,7 @@ async function prepareManualCapture(options: any = {}): Promise<any> {
   manualCacheConversationKey = conversationKey;
   manualTurnCache = new Map<string, any>();
   const ctx = createInlineImageContext();
+  manualCacheWarningFlags = [];
 
   const bottomTurn = turns[turns.length - 1] || null;
 
@@ -445,6 +447,8 @@ async function prepareManualCapture(options: any = {}): Promise<any> {
     if (turnId) manualTurnCache.set(turnId, msg);
   }
 
+  manualCacheWarningFlags = Array.from(ctx.warningFlags);
+
   try {
     (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });
   } catch (_e) {
@@ -471,8 +475,10 @@ async function capture(options: any = {}): Promise<any> {
       if (hit) messages.push(hit);
     }
     messages = messages.map((m, idx) => ({ ...m, sequence: idx, updatedAt: Date.now() }));
+    for (const flag of manualCacheWarningFlags || []) ctx.warningFlags.add(String(flag));
     manualTurnCache = null;
     manualCacheConversationKey = '';
+    manualCacheWarningFlags = [];
   } else {
     messages = await collectMessages(ctx);
   }

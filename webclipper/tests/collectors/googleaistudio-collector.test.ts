@@ -104,4 +104,43 @@ describe('googleaistudio-collector', () => {
     expect(user).toBeTruthy();
     expect(user.contentMarkdown).toContain('![](data:image/png;base64,');
   });
+
+  it('preserves inline image warningFlags in manual capture flow', async () => {
+    const html = `
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-u1">
+          <div class="chat-turn-container render user">
+            <div class="virtual-scroll-container user-prompt-container" data-turn-role="User">
+              <div class="turn-content">
+                hello
+                <img alt="image.png" src="blob:https://aistudio.google.com/too-large" />
+              </div>
+            </div>
+          </div>
+        </ms-chat-turn>
+      </div>
+    `;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const tooLarge = new Uint8Array(2_000_001);
+    const bigBlob = new (dom.window as any).Blob([tooLarge], { type: 'image/png' });
+
+    (dom.window as any).fetch = async () => ({
+      ok: true,
+      blob: async () => bigBlob,
+    });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const def = createGoogleAiStudioCollectorDef(env) as any;
+    await Promise.resolve(def.collector.prepareManualCapture({ settleMs: 0 }));
+    const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    expect(Array.isArray(snap.conversation.warningFlags)).toBe(true);
+    expect(snap.conversation.warningFlags).toContain('inline_images_single_too_large');
+  });
 });
