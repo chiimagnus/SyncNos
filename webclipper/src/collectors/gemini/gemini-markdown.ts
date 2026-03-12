@@ -19,7 +19,7 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
   function removeNonContentNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;
 
-    container.querySelectorAll(".table-footer, .cdk-visually-hidden, [hide-from-message-actions], [aria-hidden='true']").forEach((el: any) => {
+    container.querySelectorAll(".table-footer, .cdk-visually-hidden, [hidden], [hide-from-message-actions], [aria-hidden='true']").forEach((el: any) => {
       try {
         el.remove();
       } catch (_e) {

@@ -17,6 +17,7 @@ describe("gemini-collector", () => {
           <user-query>
             <div class="query-text">
               <span class="cdk-visually-hidden">你说</span>
+              <div role="status" class="stopped-draft-message gds-body-l gds-italic ng-star-inserted" hidden="">你已让系统停止这条回答</div>
               <p class="query-text-line">你好</p>
             </div>
           </user-query>
@@ -45,6 +46,7 @@ describe("gemini-collector", () => {
     expect(user).toBeTruthy();
     expect(user.contentText).toContain("你好");
     expect(user.contentText).not.toContain("你说");
+    expect(user.contentText).not.toContain("你已让系统停止这条回答");
 
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
     expect(assistant).toBeTruthy();

@@ -85,7 +85,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       if (cloned && typeof cloned.querySelectorAll === "function") {
         cloned
           .querySelectorAll(
-            ".cdk-visually-hidden, .table-footer, [hide-from-message-actions], [aria-hidden='true'], svg, path, textarea, input, select, option, script, style, button"
+            ".cdk-visually-hidden, .table-footer, [hidden], [hide-from-message-actions], [aria-hidden='true'], svg, path, textarea, input, select, option, script, style, button"
           )
           .forEach((el: any) => {
             try {
