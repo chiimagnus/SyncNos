@@ -46,6 +46,11 @@ function PopupShellFrame() {
     window.close();
   };
 
+  const onOpenInsightSettings = async () => {
+    await openOrFocusExtensionAppTab({ route: '/settings?section=insight' });
+    window.close();
+  };
+
   const showListActions = headerState.mode !== 'detail';
   const onPopupNotionSyncStarted = () => {
     void (async () => {
@@ -157,7 +162,13 @@ function PopupShellFrame() {
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label={t('chatsAria')}>
-          <ChatsTab onPopupHeaderStateChange={setHeaderState} onPopupNotionSyncStarted={onPopupNotionSyncStarted} />
+          <ChatsTab
+            onPopupHeaderStateChange={setHeaderState}
+            onPopupNotionSyncStarted={onPopupNotionSyncStarted}
+            onOpenInsightsSection={() => {
+              void onOpenInsightSettings().catch(() => {});
+            }}
+          />
         </section>
       </main>
 

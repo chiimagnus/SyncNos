@@ -210,7 +210,15 @@ function AppShellFrame() {
 
               <div className="tw-min-h-0 tw-flex-1">
                 <Routes location={routesLocation}>
-                  <Route path="/" element={<ConversationsScene onPopupHeaderStateChange={setNarrowHeaderState} />} />
+                  <Route
+                    path="/"
+                    element={
+                      <ConversationsScene
+                        onPopupHeaderStateChange={setNarrowHeaderState}
+                        onOpenInsightsSection={() => navigate('/settings?section=insight')}
+                      />
+                    }
+                  />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/sync" element={<Navigate to="/settings" replace />} />
                   <Route path="/backup" element={<Navigate to="/settings" replace />} />
