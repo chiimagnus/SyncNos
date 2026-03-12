@@ -315,7 +315,8 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         runTokenRef.current += 1;
         setActiveRun(null);
       } else if (activeRunRef.current && feedbackRef.current.phase === 'running') {
-        // Keep polling/feedback when a transient status read returns no job.
+        // Preserve the current running state when a transient status read returns no job,
+        // allowing the polling loop and storage change refreshes to continue without interruption.
       } else {
         runTokenRef.current += 1;
         setActiveRun(null);

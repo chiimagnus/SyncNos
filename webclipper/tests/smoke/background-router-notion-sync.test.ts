@@ -795,10 +795,13 @@ describe('background-router notion sync', () => {
     const jobRes = await router.__handleMessageForTests({ type: 'getNotionSyncJobStatus' });
     expect(jobRes.ok).toBe(true);
     expect(jobRes.data.job).toBeTruthy();
+    const jobId = jobRes.data.job.id;
+    expect(jobId).toBeTruthy();
     await waitForJobDone(jobStore);
     const doneRes = await router.__handleMessageForTests({ type: 'getNotionSyncJobStatus' });
     expect(doneRes.ok).toBe(true);
     expect(doneRes.data.job.status).toBe('done');
+    expect(doneRes.data.job.id).toBe(jobId);
     expect(Array.isArray(jobRes.data.job.perConversation)).toBe(true);
   });
 

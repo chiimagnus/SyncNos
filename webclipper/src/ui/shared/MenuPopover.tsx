@@ -96,8 +96,8 @@ export function MenuPopover(props: MenuPopoverProps) {
   }, [panelMaxHeight, panelMinWidth]);
 
   const backdropStyle = useMemo(() => {
-    const { overflowY, overscrollBehavior, ...rest } = panelStyle;
-    return rest;
+    const { overflowY, overscrollBehavior, ...backdropStyleProps } = panelStyle;
+    return backdropStyleProps;
   }, [panelStyle]);
 
   return (
