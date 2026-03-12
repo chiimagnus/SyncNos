@@ -53,6 +53,20 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
     });
   };
 
+  const openInsightSettings = () => {
+    if (settingsOpen) {
+      navigate('/settings?section=insight', { replace: true, state: routerLocation.state });
+      return;
+    }
+
+    navigate('/settings?section=insight', {
+      state: {
+        backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+        from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
+      },
+    });
+  };
+
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
       <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
@@ -102,7 +116,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
         </div>
       </div>
 
-      <ConversationListPane onOpenConversation={() => navigate('/')} />
+      <ConversationListPane onOpenConversation={() => navigate('/')} onOpenInsightsSection={openInsightSettings} />
     </div>
   );
 }
