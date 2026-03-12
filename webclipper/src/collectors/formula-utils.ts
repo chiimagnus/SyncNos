@@ -6,6 +6,9 @@ function normalizeTeX(value: unknown): string {
   // Keep backslashes and braces; only normalize whitespace and remove ZWSP.
   return String(value || '')
     .replace(/\u200b/g, '')
+    // KaTeX does not support rendering some raw Unicode math symbols in strict mode.
+    // Prefer their TeX command equivalents to avoid runtime warnings.
+    .replace(/□/g, '\\Box')
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -57,11 +57,15 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
   }
 
   if (renderMath) {
+    const sanitizeTeXForKatex = (tex: string): string => {
+      return String(tex || '').replace(/□/g, '\\Box');
+    };
+
     const renderKatex = (tex: string, displayMode: boolean): string => {
-      const raw = String(tex || '').trim();
+      const raw = sanitizeTeXForKatex(String(tex || '').trim());
       if (!raw) return '';
       try {
-        return katex.renderToString(raw, { displayMode, throwOnError: false });
+        return katex.renderToString(raw, { displayMode, throwOnError: false, strict: 'ignore' });
       } catch (_e) {
         return `<code>${inst.utils.escapeHtml(raw)}</code>`;
       }
