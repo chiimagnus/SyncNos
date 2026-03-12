@@ -47,4 +47,17 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('<img');
     expect(html).not.toContain('syncnos-md-image-link');
   });
+
+  it('renders inline math with KaTeX', () => {
+    const md = createMarkdownRenderer();
+    const html = md.render('x = $E=mc^2$');
+    expect(html).toContain('katex');
+  });
+
+  it('renders block math with KaTeX', () => {
+    const md = createMarkdownRenderer();
+    const html = md.render('$$E=mc^2$$');
+    expect(html).toContain('syncnos-math-block');
+    expect(html).toContain('katex');
+  });
 });

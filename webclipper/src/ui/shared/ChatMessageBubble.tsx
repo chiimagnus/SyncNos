@@ -88,6 +88,9 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_.syncnos-md-image]:tw-inline-block [&_.syncnos-md-image]:tw-max-w-full',
       '[&_.syncnos-md-image-link]:tw-mt-1 [&_.syncnos-md-image-link]:tw-text-[11px] [&_.syncnos-md-image-link]:tw-text-[var(--text-secondary)]',
 
+      // KaTeX blocks: prevent overflow and keep spacing consistent with other blocks.
+      '[&_.syncnos-math-block]:tw-my-2 [&_.syncnos-math-block]:tw-overflow-x-auto [&_.syncnos-math-block]:tw-max-w-full',
+
       '[&_a]:tw-text-[var(--info)] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
       '[&_a:focus-visible]:tw-outline [&_a:focus-visible]:tw-outline-2 [&_a:focus-visible]:tw-outline-offset-2 [&_a:focus-visible]:tw-outline-[var(--focus-ring)]',
     ].join(' ') + (className ? ` ${className}` : '');
