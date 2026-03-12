@@ -1,4 +1,5 @@
 import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts';
+import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
 
   function isThinkingLabelText(text: any): any {
     const raw = String(text || "").trim();
@@ -246,6 +247,7 @@ import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts'
       return null;
     }
     if (!cloned) return null;
+    replaceMathElementsWithLatexText(cloned);
     removeNonContentNodes(cloned);
     if (role === "assistant") removeThinkingNodes(cloned);
     return cloned;

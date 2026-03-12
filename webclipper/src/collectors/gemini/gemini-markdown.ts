@@ -1,4 +1,5 @@
 import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts';
+import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
 
   function normalizeMarkdown(markdown: any): any {
     const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -98,6 +99,7 @@ import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts'
 
     try {
       const cloned = root.cloneNode(true);
+      replaceMathElementsWithLatexText(cloned);
       removeNonContentNodes(cloned);
       return cloned;
     } catch (_e) {

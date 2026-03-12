@@ -165,4 +165,96 @@ describe("yuanbao-collector", () => {
     expect(snap.messages[0].contentText).toContain("这是什么？");
     expect(snap.messages[0].contentMarkdown).toContain("![](https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be)");
   });
+
+  it("captures display formulas wrapped in <pre> (katex) as $$...$$ instead of a code fence", async () => {
+    const html = `
+      <main class="agent-chat__list__content">
+        <div class="agent-chat__list__item agent-chat__list__item--ai">
+          <div class="agent-chat__speech-text">
+            <div class="hyc-content-md">
+              <div class="hyc-common-markdown hyc-common-markdown-style">
+                <div class="ybc-p">考虑一个复杂公式：</div>
+                <pre class="ybc-pre-component">
+                  <span class="ybc-markdown-katex">
+                    <span class="katex-display">
+                      <span class="katex">
+                        <span class="katex-mathml">
+                          <math>
+                            <semantics>
+                              <mrow></mrow>
+                              <annotation encoding="application/x-tex">E=mc^2</annotation>
+                            </semantics>
+                          </math>
+                        </span>
+                        <span class="katex-html" aria-hidden="true">ignored</span>
+                      </span>
+                    </span>
+                  </span>
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/formula");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("assistant");
+    expect(snap.messages[0].contentMarkdown).toContain("$$E=mc^2$$");
+    expect(snap.messages[0].contentMarkdown).not.toContain("```");
+  });
+
+  it("recovers fraction/sup/sub structure from KaTeX HTML when MathML annotation is missing", async () => {
+    const katexMod = await import("katex");
+    const katexAny: any = (katexMod as any).default || katexMod;
+    const rendered = String(
+      katexAny.renderToString("\\frac{1}{2} g_{\\mu\\nu} m^2", { displayMode: true, output: "html" })
+    );
+
+    const katexDom = new JSDOM(`<body>${rendered}</body>`, { url: "https://yuanbao.tencent.com/chat/a/katex" });
+    katexDom.window.document.querySelectorAll(".katex-mathml").forEach((el) => el.remove());
+    const stripped = katexDom.window.document.body.innerHTML;
+
+    const html = `
+      <main class="agent-chat__list__content">
+        <div class="agent-chat__list__item agent-chat__list__item--ai">
+          <div class="agent-chat__speech-text">
+            <div class="hyc-content-md">
+              <div class="hyc-common-markdown hyc-common-markdown-style">
+                <pre class="ybc-pre-component">
+                  <span class="ybc-markdown-katex">${stripped}</span>
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/formula-no-mathml");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("assistant");
+    expect(snap.messages[0].contentMarkdown).toContain("$$");
+    expect(snap.messages[0].contentMarkdown).toContain("\\frac{1}{2}");
+    expect(snap.messages[0].contentMarkdown).toContain("g_{");
+    expect(snap.messages[0].contentMarkdown).toContain("m^{2}");
+    expect(snap.messages[0].contentMarkdown).not.toContain("```");
+  });
 });

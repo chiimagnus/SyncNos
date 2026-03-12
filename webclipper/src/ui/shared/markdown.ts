@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import katex from 'katex';
 
 export type MarkdownRendererOptions = {
   /**
@@ -6,10 +7,16 @@ export type MarkdownRendererOptions = {
    * Defaults to true to keep popup/app behavior consistent.
    */
   openLinksInNewTab?: boolean;
+  /**
+   * If true, render `$...$` and `$$...$$` using KaTeX.
+   * Defaults to true.
+   */
+  renderMath?: boolean;
 };
 
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
   const openLinksInNewTab = options.openLinksInNewTab ?? true;
+  const renderMath = options.renderMath ?? true;
   const inst = new MarkdownIt({
     html: false,
     breaks: true,
@@ -47,6 +54,118 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     inst.enable(['table']);
   } catch (_e) {
     // ignore
+  }
+
+  if (renderMath) {
+    const renderKatex = (tex: string, displayMode: boolean): string => {
+      const raw = String(tex || '').trim();
+      if (!raw) return '';
+      try {
+        return katex.renderToString(raw, { displayMode, throwOnError: false });
+      } catch (_e) {
+        return `<code>${inst.utils.escapeHtml(raw)}</code>`;
+      }
+    };
+
+    inst.block.ruler.before('fence', 'syncnos_math_block', (state, startLine, endLine, silent) => {
+      const start = state.bMarks[startLine] + state.tShift[startLine];
+      const max = state.eMarks[startLine];
+      const firstLine = state.src.slice(start, max);
+      const trimmed = firstLine.trim();
+      if (!trimmed.startsWith('$$')) return false;
+
+      // Single-line: $$...$$
+      if (trimmed.length >= 4 && trimmed.endsWith('$$') && trimmed !== '$$') {
+        if (silent) return true;
+        const token = state.push('math_block', 'div', 0);
+        token.block = true;
+        token.content = trimmed.slice(2, -2).trim();
+        token.map = [startLine, startLine + 1];
+        state.line = startLine + 1;
+        return true;
+      }
+
+      // Multi-line:
+      // $$
+      // ...
+      // $$
+      if (trimmed !== '$$') return false;
+      let nextLine = startLine + 1;
+      const lines: string[] = [];
+      while (nextLine < endLine) {
+        const lineStart = state.bMarks[nextLine] + state.tShift[nextLine];
+        const lineMax = state.eMarks[nextLine];
+        const lineText = state.src.slice(lineStart, lineMax);
+        const lineTrim = lineText.trim();
+        if (lineTrim === '$$') break;
+        lines.push(lineText);
+        nextLine += 1;
+      }
+      if (nextLine >= endLine) return false;
+      if (silent) return true;
+
+      const token = state.push('math_block', 'div', 0);
+      token.block = true;
+      token.content = lines.join('\n').trim();
+      token.map = [startLine, nextLine + 1];
+      state.line = nextLine + 1;
+      return true;
+    });
+
+    inst.inline.ruler.before('escape', 'syncnos_math_inline', (state, silent) => {
+      const pos = state.pos;
+      const src = state.src;
+      if (src.charCodeAt(pos) !== 0x24 /* $ */) return false;
+
+      const isDouble = src.charCodeAt(pos + 1) === 0x24;
+      const openerLen = isDouble ? 2 : 1;
+      const closer = isDouble ? '$$' : '$';
+      const start = pos + openerLen;
+
+      // Reject whitespace right after opening delimiter for inline math.
+      if (!isDouble) {
+        const nextCh = src[start] || '';
+        if (!nextCh || /\s/.test(nextCh)) return false;
+      }
+
+      let end = start;
+      while (end < src.length) {
+        end = src.indexOf(closer, end);
+        if (end === -1) return false;
+        // Ignore escaped \$.
+        if (src[end - 1] === '\\') {
+          end += 1;
+          continue;
+        }
+        break;
+      }
+
+      const content = src.slice(start, end);
+      if (!content.trim()) return false;
+      if (!isDouble && /\s$/.test(content)) return false;
+      if (content.includes('\n')) return false;
+
+      if (silent) return true;
+
+      const token = state.push('math_inline', 'span', 0);
+      token.content = content.trim();
+      (token as any).meta = { displayMode: isDouble };
+      state.pos = end + openerLen;
+      return true;
+    });
+
+    inst.renderer.rules.math_inline = (tokens, idx) => {
+      const token: any = tokens[idx];
+      const displayMode = !!(token && token.meta && token.meta.displayMode);
+      return renderKatex(String(token.content || ''), displayMode);
+    };
+
+    inst.renderer.rules.math_block = (tokens, idx) => {
+      const token: any = tokens[idx];
+      const html = renderKatex(String(token.content || ''), true);
+      if (!html) return '';
+      return `<div class="syncnos-math-block">${html}</div>\n`;
+    };
   }
 
   const defaultImageRender =
