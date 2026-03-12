@@ -66,7 +66,8 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
       const text = role === "assistant" && typeof yuanbaoMarkdown.extractAssistantText === "function"
         ? (yuanbaoMarkdown.extractAssistantText(tEl) || fallbackText)
         : fallbackText;
-      const imageUrls = extractImageUrlsFromElement(tEl || el);
+      const imageRoot = el.querySelector?.(".agent-chat__bubble") || el;
+      const imageUrls = extractImageUrlsFromElement(imageRoot);
       if (!text && !imageUrls.length) continue;
       const contentText = text || "";
       const baseMarkdown = role === "assistant" && typeof yuanbaoMarkdown.extractAssistantMarkdown === "function"
