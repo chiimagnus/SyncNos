@@ -199,7 +199,7 @@ struct ChatDetailView: View {
                 case .success(let url):
                     DIContainer.shared.loggerService.info("[Chats] Exported to: \(url.path)")
                 case .failure(let error):
-                    listViewModel.errorMessage = "Export failed: \(error.localizedDescription)"
+                    listViewModel.errorMessage = String(format: String(localized: "Export failed: %@"), error.localizedDescription)
                 }
                 exportDocument = nil
             }
@@ -235,7 +235,7 @@ struct ChatDetailView: View {
                         }
                     case .failure(let error):
                         guard !isUserCancelled(error) else { return }
-                        listViewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+                        listViewModel.errorMessage = String(format: String(localized: "Import failed: %@"), error.localizedDescription)
                     }
 
                 case .conversationFile:
@@ -671,7 +671,7 @@ struct ChatDetailView: View {
         Task { @MainActor in
             guard let content = await listViewModel.exportAllMessages(contact.contactId, format: format),
                   !content.isEmpty else {
-                listViewModel.errorMessage = "Export failed: Unable to get message content"
+                listViewModel.errorMessage = String(localized: "Export failed: Unable to get message content")
                 return
             }
             
@@ -752,7 +752,7 @@ struct ChatDetailView: View {
                 do {
                     try await listViewModel.importConversation(from: fileUrl, appendTo: contact.contactId)
                 } catch {
-                    listViewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+                    listViewModel.errorMessage = String(format: String(localized: "Import failed: %@"), error.localizedDescription)
                 }
             }
         }
