@@ -4,6 +4,13 @@ export default defineConfig({
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],
   entrypointsDir: 'src/entrypoints',
+  vite: () => ({
+    build: {
+      // KaTeX/Recharts can legitimately push some chunks beyond Vite's default 500kB warning threshold.
+      // Keep the warning signal meaningful by using a higher, extension-appropriate limit.
+      chunkSizeWarningLimit: 2000,
+    },
+  }),
   manifest: {
     name: 'SyncNos-AI+Web Clipper',
     version: '1.3.0',
