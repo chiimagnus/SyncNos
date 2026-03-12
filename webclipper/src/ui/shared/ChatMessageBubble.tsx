@@ -106,8 +106,9 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
   const mdRoleOverrides =
     bubbleRole === 'user'
       ? [
-          // On the green bubble, the default info-blue can be low-contrast; inherit bubble text color instead.
-          '[&_a]:tw-text-[inherit]',
+          // On the green bubble, keep links clearly "blue" with higher contrast than the default.
+          '[&_a]:tw-text-[color-mix(in_srgb,var(--info)_88%,var(--secondary-foreground))]',
+          '[&_a]:tw-font-semibold',
         ].join(' ')
       : '';
 
