@@ -3,6 +3,16 @@ import { registerObsidianSettingsHandlers } from "../../src/sync/obsidian/settin
 import { registerSyncHandlers } from "../../src/sync/background-handlers";
 import { createBackgroundRouter } from "../../src/platform/messaging/background-router";
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("background-router obsidian sync routes", () => {
   it("delegates settings get/save and orchestrator actions", async () => {
     const calls: any = {
@@ -13,6 +23,7 @@ describe("background-router obsidian sync routes", () => {
     };
 
     const store: Record<string, unknown> = {};
+    const syncBlocker = deferred<any>();
 
     // @ts-expect-error test global
     globalThis.chrome = {
@@ -65,12 +76,10 @@ describe("background-router obsidian sync routes", () => {
           return { job: null, instanceId };
         },
         async syncConversations(payload: any) {
-          if (calls.syncMode === 'already-running') {
-            const error = new Error('sync already in progress') as Error & { code?: string };
-            error.code = 'sync_already_running';
-            throw error;
-          }
           calls.syncConversations = payload;
+          if (calls.syncMode === 'long-running') {
+            return await syncBlocker.promise;
+          }
           return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
         },
       },
@@ -107,12 +116,19 @@ describe("background-router obsidian sync routes", () => {
       forceFullConversationIds: [2]
     });
     expect(syncRes.ok).toBe(true);
+    expect(syncRes.data?.started).toBe(true);
     expect(Array.isArray(calls.syncConversations?.conversationIds)).toBe(true);
     expect(calls.syncConversations?.conversationIds).toEqual([1, 2]);
     expect(calls.syncConversations?.forceFullConversationIds).toEqual([2]);
     expect(typeof calls.syncConversations?.instanceId).toBe("string");
 
-    calls.syncMode = 'already-running';
+    calls.syncMode = 'long-running';
+    const firstRun = router.__handleMessageForTests({
+      type: "obsidianSyncConversations",
+      conversationIds: [1],
+    });
+    expect((await firstRun).ok).toBe(true);
+
     const conflictRes = await router.__handleMessageForTests({
       type: "obsidianSyncConversations",
       conversationIds: [1],
@@ -120,5 +136,7 @@ describe("background-router obsidian sync routes", () => {
     expect(conflictRes.ok).toBe(false);
     expect(conflictRes.error?.message).toBe('sync already in progress');
     expect(conflictRes.error?.extra?.code).toBe('sync_already_running');
+
+    syncBlocker.resolve({ okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload: calls.syncConversations });
   });
 });

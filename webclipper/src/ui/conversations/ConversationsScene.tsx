@@ -26,12 +26,14 @@ export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
   onPopupHeaderStateChange?: (state: PopupHeaderState) => void;
   inlineNarrowDetailHeader?: boolean;
+  onPopupNotionSyncStarted?: () => void;
 };
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
   onPopupHeaderStateChange,
   inlineNarrowDetailHeader = false,
+  onPopupNotionSyncStarted,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const { activeId, selectedConversation, detailHeaderActions, setActiveId } = useConversationsApp();
@@ -80,6 +82,7 @@ export function ConversationsScene({
       initialScrollTop={listScrollTop}
       scrollRestoreKey={listRestoreKey}
       onListScrollTopChange={setListScrollTop}
+      onPopupNotionSyncStarted={onPopupNotionSyncStarted}
       onOpenConversation={() => {
         openDetail();
       }}

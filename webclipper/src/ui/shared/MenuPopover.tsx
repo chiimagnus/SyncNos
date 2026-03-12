@@ -69,6 +69,13 @@ export function MenuPopover(props: MenuPopoverProps) {
     return ['tw-absolute', alignClass, sideClass].join(' ');
   }, [align, side]);
 
+  const backdropOriginClassName = useMemo(() => {
+    if (side === 'top') {
+      return align === 'start' ? 'tw-origin-bottom-left' : 'tw-origin-bottom-right';
+    }
+    return align === 'start' ? 'tw-origin-top-left' : 'tw-origin-top-right';
+  }, [align, side]);
+
   const basePanelClassName = useMemo(() => {
     const inferredMinWidth = typeof panelMinWidth === 'number' && Number.isFinite(panelMinWidth) ? panelMinWidth : 170;
     const minWidthPreset: 150 | 170 = inferredMinWidth <= 150 ? 150 : 170;
@@ -88,6 +95,11 @@ export function MenuPopover(props: MenuPopoverProps) {
     return style;
   }, [panelMaxHeight, panelMinWidth]);
 
+  const backdropStyle = useMemo(() => {
+    const { overflowY, overscrollBehavior, ...backdropStyleProps } = panelStyle;
+    return backdropStyleProps;
+  }, [panelStyle]);
+
   return (
     <div ref={containerRef} className={['tw-relative', className || ''].join(' ').trim()}>
       {trigger({
@@ -98,10 +110,25 @@ export function MenuPopover(props: MenuPopoverProps) {
         onClick: () => onOpenChange(!open),
       })}
 
+      {open ? (
+        <div
+          aria-hidden="true"
+          className={[
+            panelPosClassName,
+            backdropOriginClassName,
+            'tw-z-20 tw-pointer-events-none tw-rounded-[18px]',
+            'tw-bg-[color-mix(in_srgb,var(--bg-card)_55%,transparent)]',
+            'tw-backdrop-blur-[16px] tw-backdrop-saturate-150',
+            'tw-scale-[1.06]',
+            'tw-shadow-[0_14px_40px_rgba(0,0,0,0.16)]',
+          ].join(' ')}
+          style={backdropStyle}
+        />
+      ) : null}
+
       <div role="menu" aria-label={ariaLabel} hidden={!open} className={basePanelClassName} style={panelStyle}>
         {children}
       </div>
     </div>
   );
 }
-
