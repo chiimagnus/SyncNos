@@ -177,9 +177,26 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
       const depth = (ctx && Number.isFinite(ctx.listDepth)) ? ctx.listDepth : 0;
       const indent = "  ".repeat(Math.max(0, depth));
       const items: any[] = [];
-      const children: any[] = listEl && listEl.children ? (Array.from(listEl.children) as any[]) : [];
-      for (const child of children) {
-        if (!child || String(child.tagName || "").toLowerCase() !== "li") continue;
+
+      const listItems: any[] = [];
+      if (listEl && typeof listEl.querySelectorAll === "function" && typeof listEl.closest === "function") {
+        const allLis = Array.from(listEl.querySelectorAll("li")) as any[];
+        for (const li of allLis) {
+          try {
+            if (li && typeof li.closest === "function" && li.closest("ul,ol") === listEl) listItems.push(li);
+          } catch (_e) {
+            // ignore
+          }
+        }
+      } else {
+        const children: any[] = listEl && listEl.children ? (Array.from(listEl.children) as any[]) : [];
+        for (const child of children) {
+          if (!child || String(child.tagName || "").toLowerCase() !== "li") continue;
+          listItems.push(child);
+        }
+      }
+
+      for (const child of listItems) {
         const childCtx = { ...ctx, listDepth: depth + 1 };
         const body = normalizeMarkdown(renderChildren(child, childCtx)).replace(/\n{2,}/g, "\n");
         const bullet = ordered ? "1." : "-";

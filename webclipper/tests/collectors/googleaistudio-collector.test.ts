@@ -66,6 +66,61 @@ describe('googleaistudio-collector', () => {
     expect(assistant.contentMarkdown).toContain('print("hi")');
   });
 
+  it('captures list items wrapped by ms-cmark-node in assistant markdown', async () => {
+    const html = `
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-a1">
+          <div class="chat-turn-container render model">
+            <div class="virtual-scroll-container model-prompt-container" data-turn-role="Model">
+              <div class="turn-content">
+                <h2>1. 论文标题和摘要</h2>
+                <ul>
+                  <ms-cmark-node class="cmark-node v3-font-body">
+                    <li>
+                      <p>
+                        <ms-cmark-node>
+                          <strong><ms-cmark-node><span>研究对象</span></ms-cmark-node></strong>
+                          <span>：全尺寸双足人形机器人（以 CASIA Q5 为验证平台）。</span>
+                        </ms-cmark-node>
+                      </p>
+                    </li>
+                    <li>
+                      <p>
+                        <ms-cmark-node>
+                          <strong><ms-cmark-node><span>核心问题</span></ms-cmark-node></strong>
+                          <span>：在未知且动态变化的外部负载下如何稳定控制。</span>
+                        </ms-cmark-node>
+                      </p>
+                    </li>
+                  </ms-cmark-node>
+                </ul>
+                <h2>2. 引言 (Introduction)</h2>
+              </div>
+            </div>
+          </div>
+        </ms-chat-turn>
+      </div>
+    `;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    const assistant = snap.messages[0];
+    expect(assistant.role).toBe('assistant');
+    expect(assistant.contentMarkdown).toContain('## 1. 论文标题和摘要');
+    expect(assistant.contentMarkdown).toContain('研究对象');
+    expect(assistant.contentMarkdown).toContain('CASIA Q5');
+    expect(assistant.contentMarkdown).toContain('核心问题');
+    expect(assistant.contentMarkdown).toContain('稳定控制');
+  });
+
   it('inlines blob: image urls as data: urls', async () => {
     const html = `
       <div class="chat-session-content">
