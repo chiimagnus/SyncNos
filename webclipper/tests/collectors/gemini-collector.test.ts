@@ -36,7 +36,7 @@ describe("gemini-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = createGeminiCollectorDef(env).collector.capture() as any;
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture()) as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe("DOM Title");
   });
@@ -60,7 +60,7 @@ describe("gemini-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = createGeminiCollectorDef(env).collector.capture() as any;
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture()) as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe("Gemini Page Title");
   });
@@ -100,7 +100,7 @@ describe("gemini-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = createGeminiCollectorDef(env).collector.capture() as any;
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture()) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
@@ -138,11 +138,51 @@ describe("gemini-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = createDef(env).collector.capture() as any;
+    const snap = await Promise.resolve(createDef(env).collector.capture()) as any;
     expect(snap).toBeTruthy();
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
     expect(assistant).toBeTruthy();
     expect(assistant.contentText).toBe("plain answer");
     expect(assistant.contentMarkdown).toBe("plain answer");
+  });
+
+  it("inlines blob: uploaded images as data:image urls", async () => {
+    const blobUrl = "blob:https://gemini.google.com/42056040-2bdc-4af6-b583-dd8f79be7801";
+    const data = new Uint8Array([0, 1, 2, 3, 4, 5]);
+
+    const html = `
+      <div id="chat-history">
+        <div class="conversation-container">
+          <user-query>
+            <div class="query-text">看这张图</div>
+            <img data-test-id="uploaded-img" alt="所上传图片的预览图" class="preview-image" src="${blobUrl}">
+          </user-query>
+          <model-response><div class="model-response-text">好的</div></model-response>
+        </div>
+      </div>
+    `;
+    const dom = setupGeminiDom(html, "https://gemini.google.com/app/blob001");
+
+    (dom.window as any).fetch = vi.fn(async (url: string) => {
+      if (url !== blobUrl) return { ok: false, blob: async () => new dom.window.Blob() };
+      return {
+        ok: true,
+        blob: async () => new dom.window.Blob([data], { type: "image/png" }),
+      };
+    });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture()) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(2);
+    const user = snap.messages.find((m: { role: string }) => m.role === "user");
+    expect(user).toBeTruthy();
+    expect(user.contentMarkdown).toContain("![](data:image/png");
   });
 });
