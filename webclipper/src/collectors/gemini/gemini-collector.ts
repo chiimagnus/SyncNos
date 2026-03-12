@@ -75,11 +75,10 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       const text = geminiMarkdown.extractAssistantText(node);
       if (text) return text;
     }
-    const raw = node ? (node.innerText || node.textContent || "") : "";
-    return env.normalize.normalizeText(raw);
+    return extractTextExcludingNonContent(node);
   }
 
-  function extractUserText(node: any): string {
+  function extractTextExcludingNonContent(node: any): string {
     if (!node) return "";
     try {
       const cloned = node.cloneNode ? node.cloneNode(true) : null;
@@ -277,7 +276,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       const userRoot = b.querySelector("user-query") || b.querySelector("[data-test-id='user-message']") || null;
       if (userRoot) {
         const userTextEl = userRoot.querySelector ? (userRoot.querySelector(".query-text") || userRoot) : userRoot;
-        const text = extractUserText(userTextEl);
+        const text = extractTextExcludingNonContent(userTextEl);
         const imageUrls = await extractImageUrlsIncludingBlobImages(userRoot, ctx);
         if (text || imageUrls.length) {
           const contentText = text || "";

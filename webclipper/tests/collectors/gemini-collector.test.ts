@@ -22,7 +22,7 @@ describe("gemini-collector", () => {
           </user-query>
           <model-response>
             <div class="model-response-text">
-              <span class="cdk-visually-hidden">Gemini说</span>
+              <h2 class="cdk-visually-hidden ng-star-inserted">Gemini 说</h2>
               <p>世界</p>
             </div>
           </model-response>
@@ -49,7 +49,7 @@ describe("gemini-collector", () => {
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
     expect(assistant).toBeTruthy();
     expect(assistant.contentText).toContain("世界");
-    expect(assistant.contentText).not.toContain("Gemini说");
+    expect(assistant.contentText).not.toContain("Gemini 说");
   });
 
   it("prefers conversation title from latest DOM marker", async () => {
