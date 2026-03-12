@@ -79,6 +79,31 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return env.normalize.normalizeText(raw);
   }
 
+  function extractUserText(node: any): string {
+    if (!node) return "";
+    try {
+      const cloned = node.cloneNode ? node.cloneNode(true) : null;
+      if (cloned && typeof cloned.querySelectorAll === "function") {
+        cloned
+          .querySelectorAll(
+            ".cdk-visually-hidden, .table-footer, [hide-from-message-actions], [aria-hidden='true'], svg, path, textarea, input, select, option, script, style, button"
+          )
+          .forEach((el: any) => {
+            try {
+              el.remove();
+            } catch (_e) {
+              // ignore
+            }
+          });
+      }
+      const raw = cloned ? ((cloned as any).innerText || (cloned as any).textContent || "") : (node.innerText || node.textContent || "");
+      return env.normalize.normalizeText(raw);
+    } catch (_e) {
+      const raw = node ? (node.innerText || node.textContent || "") : "";
+      return env.normalize.normalizeText(raw);
+    }
+  }
+
   type InlineImageContext = {
     blobUrlCache: Map<string, { dataUrl: string; bytes: number }>;
     inlinedCount: number;
@@ -252,7 +277,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       const userRoot = b.querySelector("user-query") || b.querySelector("[data-test-id='user-message']") || null;
       if (userRoot) {
         const userTextEl = userRoot.querySelector ? (userRoot.querySelector(".query-text") || userRoot) : userRoot;
-        const text = env.normalize.normalizeText((userTextEl as any).innerText || (userTextEl as any).textContent || "");
+        const text = extractUserText(userTextEl);
         const imageUrls = await extractImageUrlsIncludingBlobImages(userRoot, ctx);
         if (text || imageUrls.length) {
           const contentText = text || "";
