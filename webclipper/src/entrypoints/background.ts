@@ -21,7 +21,7 @@ function getBackgroundInstanceId(): string {
   return backgroundInstanceId;
 }
 
-async function openAboutSectionAfterInstallOrUpdate(): Promise<void> {
+async function openAboutSectionAfterInstall(): Promise<void> {
   await openOrFocusExtensionAppTab({ route: '/settings?section=about' });
 }
 
@@ -60,8 +60,9 @@ export default defineBackground(() => {
     registerClipperContextMenu();
     onInstalled((details) => {
       ensureDefaultNotionOAuthClientId().catch(() => {});
-      if (details?.reason !== 'install' && details?.reason !== 'update') return;
-      openAboutSectionAfterInstallOrUpdate().catch(() => {});
+      // Do not auto-open tabs after extension updates.
+      if (details?.reason !== 'install') return;
+      openAboutSectionAfterInstall().catch(() => {});
     });
   } catch (_e) {
     // ignore
