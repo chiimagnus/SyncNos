@@ -40,11 +40,11 @@ final class GoodLinksSettingsViewModel: ObservableObject {
         } else {
             DIContainer.shared.autoSyncService.stop()
         }
-        message = "Settings saved"
+        message = String(localized: "Settings saved")
         Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
-                if message == "Settings saved" { message = nil }
+                if message == String(localized: "Settings saved") { message = nil }
             }
         }
     }

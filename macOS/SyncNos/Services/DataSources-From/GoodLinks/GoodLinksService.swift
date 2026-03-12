@@ -163,8 +163,8 @@ public struct GoodLinksPicker {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = "Choose"
-        panel.message = "请选择 GoodLinks 的共享容器目录 (group.com.ngocluu.goodlinks) 或其 Data 路径"
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: "Please choose the GoodLinks shared container directory (group.com.ngocluu.goodlinks) or its Data path")
 
         // 使用用户的真实 home 目录，而不是沙盒容器路径
         // NSHomeDirectory() 在沙盒应用中会返回应用容器路径，所以我们需要使用 pw_dir

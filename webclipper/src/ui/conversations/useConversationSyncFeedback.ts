@@ -13,6 +13,7 @@ import { storageOnChanged } from '../../platform/storage/local';
 import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '../../sync/models';
 import type { SyncStartAck } from '../../sync/repo';
 import { primeObsidianAppForSync } from './obsidian-sync-launch';
+import { t } from '../../i18n';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
 
@@ -61,7 +62,7 @@ const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
 };
 
 function providerLabel(provider: SyncProvider) {
-  return provider === 'notion' ? 'Notion' : 'Obsidian';
+  return provider === 'notion' ? t('providerNotion') : t('providerObsidian');
 }
 
 function normalizeIds(ids: number[]) {
@@ -109,22 +110,22 @@ function toWarningSummariesFromRows(rows: unknown): SyncWarningSummary[] {
 
 function buildRunningMessage(provider: SyncProvider, done: number, total: number) {
   const label = providerLabel(provider);
-  if (total > 0) return `${label} syncing ${Math.min(done, total)}/${total}`;
-  return `${label} syncing`;
+  if (total > 0) return `${label} · ${t('phaseRunning')} ${Math.min(done, total)}/${total}`;
+  return `${label} · ${t('phaseRunning')}`;
 }
 
 function buildFinishedMessage(summary: SyncRunSummary, total: number) {
   const label = providerLabel(summary.provider);
   const safeTotal = Math.max(total, summary.results.length, summary.okCount + summary.failCount);
-  if (summary.failCount <= 0) return `${label} sync completed (${summary.okCount}/${safeTotal})`;
-  if (summary.okCount > 0) return `${label} sync partially failed (${summary.failCount}/${safeTotal} failed)`;
-  return `${label} sync failed (${summary.failCount}/${safeTotal})`;
+  if (summary.failCount <= 0) return `${label} · ${t('phaseSuccess')} (${summary.okCount}/${safeTotal})`;
+  if (summary.okCount > 0) return `${label} · ${t('phasePartialFailed')} (${summary.failCount}/${safeTotal})`;
+  return `${label} · ${t('phaseFailed')} (${summary.failCount}/${safeTotal})`;
 }
 
 function buildAbortedMessage(job: SyncJobSnapshot) {
   const label = providerLabel(job.provider);
   const reason = String(job.abortedReason || '').trim();
-  return reason ? `${label} sync stopped: ${reason}` : `${label} sync stopped`;
+  return reason ? `${label} · ${t('syncStopped')}: ${reason}` : `${label} · ${t('syncStopped')}`;
 }
 
 function toFailureSummaries(summary: SyncRunSummary) {
@@ -171,7 +172,7 @@ function toTerminalFeedback(summary: SyncRunSummary, total: number): Conversatio
 function toErrorMessage(provider: SyncProvider, error: unknown) {
   const label = providerLabel(provider);
   const text = error instanceof Error ? error.message : String(error || '').trim();
-  return text ? `${label} sync failed: ${text}` : `${label} sync failed`;
+  return text ? `${label} · ${t('phaseFailed')}: ${text}` : `${label} · ${t('phaseFailed')}`;
 }
 
 function toSummaryFromJob(job: SyncJobSnapshot): SyncRunSummary | null {
@@ -421,8 +422,8 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         total: ids.length,
         done: 0,
         currentConversationId: ids[0] || null,
-        currentConversationTitle: ids.length ? `Conversation #${ids[0]}` : '',
-        currentStage: 'Preparing queue',
+        currentConversationTitle: '',
+        currentStage: 'preparing_queue',
         failures: [],
         warnings: [],
         message: buildRunningMessage(provider, 0, ids.length),

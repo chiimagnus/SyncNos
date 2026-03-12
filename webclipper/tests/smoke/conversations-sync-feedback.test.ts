@@ -3,6 +3,7 @@ import { JSDOM } from 'jsdom';
 import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
+import { t } from '../../src/i18n';
 import { ConversationsProvider } from '../../src/ui/conversations/conversations-context';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
@@ -184,7 +185,7 @@ describe('Conversations sync feedback', () => {
       conversationIds: [11, 22],
       currentConversationId: 22,
       currentConversationTitle: 'Current sync target',
-      currentStage: 'Uploading message blocks',
+      currentStage: 'uploading_message_blocks',
       okCount: 1,
       failCount: 0,
       perConversation: [{ conversationId: 11, ok: true, mode: 'appended', appended: 3, error: '', at: Date.now() }],
@@ -210,9 +211,11 @@ describe('Conversations sync feedback', () => {
     const runningNotice = document.getElementById('conversationSyncFeedback');
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
-    expect(runningNotice?.textContent).toContain('Current: Current sync target');
-    expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
-    expect(runningNotice?.textContent).not.toContain('Notion syncing 1/2');
+    expect(runningNotice?.textContent).toContain(t('currentPrefix'));
+    expect(runningNotice?.textContent).toContain('Current sync target');
+    expect(runningNotice?.textContent).toContain(t('stagePrefix'));
+    expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
+    expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
 
     getNotionSyncJobStatus.mockResolvedValue({
       provider: 'notion',
@@ -254,7 +257,9 @@ describe('Conversations sync feedback', () => {
     const successNotice = document.getElementById('conversationSyncFeedback');
     expect(successNotice).toBeTruthy();
     expect(successNotice?.getAttribute('data-phase')).toBe('success');
-    expect(successNotice?.textContent).toContain('Notion sync completed (2/2)');
+    expect(successNotice?.textContent).toContain(t('providerNotion'));
+    expect(successNotice?.textContent).toContain(t('phaseSuccess'));
+    expect(successNotice?.textContent).toContain('2/2');
   });
 
   it('hydrates an existing running notion job on mount', async () => {
@@ -264,9 +269,11 @@ describe('Conversations sync feedback', () => {
     const runningNotice = document.getElementById('conversationSyncFeedback');
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
-    expect(runningNotice?.textContent).toContain('Current: Current sync target');
-    expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
-    expect(runningNotice?.textContent).not.toContain('Notion syncing 1/2');
+    expect(runningNotice?.textContent).toContain(t('currentPrefix'));
+    expect(runningNotice?.textContent).toContain('Current sync target');
+    expect(runningNotice?.textContent).toContain(t('stagePrefix'));
+    expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
+    expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
 
     const notionButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim().startsWith('Notion')) as HTMLButtonElement | undefined;
     expect(notionButton?.disabled).toBe(true);
@@ -288,9 +295,11 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice).toBeTruthy();
     expect(runningNotice?.getAttribute('data-phase')).toBe('running');
     expect(runningNotice?.textContent).not.toContain('sync already in progress');
-    expect(runningNotice?.textContent).toContain('Current: Current sync target');
-    expect(runningNotice?.textContent).toContain('Stage: Uploading message blocks');
-    expect(runningNotice?.textContent).not.toContain('Notion syncing 1/2');
+    expect(runningNotice?.textContent).toContain(t('currentPrefix'));
+    expect(runningNotice?.textContent).toContain('Current sync target');
+    expect(runningNotice?.textContent).toContain(t('stagePrefix'));
+    expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
+    expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
   });
 
   it('hydrates persisted terminal feedback and clears the persisted job on dismiss', async () => {
@@ -325,7 +334,9 @@ describe('Conversations sync feedback', () => {
     const failureNotice = document.getElementById('conversationSyncFeedback');
     expect(failureNotice).toBeTruthy();
     expect(failureNotice?.getAttribute('data-phase')).toBe('failed');
-    expect(failureNotice?.textContent).toContain('Notion sync failed (1/1)');
+    expect(failureNotice?.textContent).toContain(t('providerNotion'));
+    expect(failureNotice?.textContent).toContain(t('phaseFailed'));
+    expect(failureNotice?.textContent).toContain('1/1');
     expect(failureNotice?.textContent).not.toContain('missing parentPageId');
 
     clickOpenDetailsButton();
@@ -404,7 +415,9 @@ describe('Conversations sync feedback', () => {
     const failureNotice = document.getElementById('conversationSyncFeedback');
     expect(failureNotice).toBeTruthy();
     expect(failureNotice?.getAttribute('data-phase')).toBe('failed');
-    expect(failureNotice?.textContent).toContain('Notion sync failed: notion not connected');
+    expect(failureNotice?.textContent).toContain(t('providerNotion'));
+    expect(failureNotice?.textContent).toContain(t('phaseFailed'));
+    expect(failureNotice?.textContent).toContain('notion not connected');
     expect(failureNotice?.textContent).not.toContain('0/1');
     expect(failureNotice?.textContent).not.toContain('#?:');
     expect(alertSpy).not.toHaveBeenCalled();

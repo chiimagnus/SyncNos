@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
+import { t } from '../../i18n';
 import { buttonMenuItemClassName } from '../shared/button-styles';
 import { MenuPopover } from '../shared/MenuPopover';
 
@@ -43,7 +44,7 @@ export function DetailHeaderActionBar({
       }
     } catch (error) {
       const message =
-        error instanceof Error && error.message ? error.message : String(error || 'Action failed.');
+        error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
       if (typeof globalThis.window?.alert === 'function') {
         globalThis.window.alert(message);
       } else {

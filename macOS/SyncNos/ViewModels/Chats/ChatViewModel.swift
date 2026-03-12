@@ -119,7 +119,7 @@ final class ChatViewModel: ObservableObject {
             logger.info("[ChatsV2] Loaded \(cachedContacts.count) conversations from cache (messages lazy-loaded)")
         } catch {
             logger.error("[ChatsV2] Failed to load from cache: \(error)")
-            errorMessage = "加载缓存失败: \(error.localizedDescription)"
+            errorMessage = String(format: String(localized: "Cache loading failed: %@"), error.localizedDescription)
         }
     }
 
@@ -155,7 +155,7 @@ final class ChatViewModel: ObservableObject {
     /// 向指定对话追加截图
     func addScreenshots(to contactId: UUID, urls: [URL]) async {
         guard paginationStates[contactId] != nil else {
-            errorMessage = "对话不存在"
+            errorMessage = String(localized: "Conversation does not exist")
             return
         }
 
@@ -171,7 +171,7 @@ final class ChatViewModel: ObservableObject {
     /// 向指定对话追加截图（来自拖拽/剪贴板等“内存数据”，无需落盘）
     func addScreenshotData(to contactId: UUID, imageDatas: [Data]) async {
         guard paginationStates[contactId] != nil else {
-            errorMessage = "对话不存在"
+            errorMessage = String(localized: "Conversation does not exist")
             return
         }
 
@@ -301,7 +301,7 @@ final class ChatViewModel: ObservableObject {
             guard !Task.isCancelled, paginationLoadTokens[contactId] == token else { return }
             state.isLoadingMore = false
             paginationStates[contactId] = state
-            errorMessage = "加载消息失败: \(error.localizedDescription)"
+            errorMessage = String(format: String(localized: "Failed to load messages: %@"), error.localizedDescription)
         }
     }
     
@@ -375,7 +375,7 @@ final class ChatViewModel: ObservableObject {
             return ChatExporter.export(messages: allMessages, contactName: contactName, format: format)
         } catch {
             logger.error("[ChatsV2] Failed to fetch all messages for export: \(error)")
-            errorMessage = "Export failed: \(error.localizedDescription)"
+            errorMessage = String(format: String(localized: "Export failed: %@"), error.localizedDescription)
             return nil
         }
     }
@@ -590,7 +590,7 @@ final class ChatViewModel: ObservableObject {
                 logger.info("[ChatsV2] Deleted message: \(messageId)")
             } catch {
                 logger.error("[ChatsV2] Failed to delete message: \(error)")
-                errorMessage = "删除消息失败: \(error.localizedDescription)"
+                errorMessage = String(format: String(localized: "Delete message failed: %@"), error.localizedDescription)
             }
         }
     }
@@ -608,7 +608,7 @@ final class ChatViewModel: ObservableObject {
         }
 
         guard let image = NSImage(contentsOf: url) else {
-            errorMessage = "无法加载图片: \(url.lastPathComponent)"
+            errorMessage = String(format: String(localized: "Failed to load image: %@"), url.lastPathComponent)
             return
         }
         
@@ -621,7 +621,7 @@ final class ChatViewModel: ObservableObject {
     
     private func importScreenshotToConversation(contactId: UUID, imageData: Data) async {
         guard let image = NSImage(data: imageData) else {
-            errorMessage = "无法处理拖入的图片"
+            errorMessage = String(localized: "Unable to process dropped image")
             return
         }
         

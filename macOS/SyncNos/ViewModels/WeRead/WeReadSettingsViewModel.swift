@@ -68,11 +68,11 @@ final class WeReadSettingsViewModel: ObservableObject {
             autoSyncService.stop()
         }
 
-        message = "Settings saved"
+        message = String(localized: "Settings saved")
         Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
-                if self.message == "Settings saved" {
+                if self.message == String(localized: "Settings saved") {
                     self.message = nil
                 }
             }

@@ -986,11 +986,11 @@ private final class PassthroughScrollWKWebView: WKWebView {
 
         let refreshItem = findReloadMenuItem(in: menu)
         if let refreshItem {
-            refreshItem.title = "仅刷新当前渲染"
+            refreshItem.title = String(localized: "Refresh current render only")
         }
 
         let refetchItem = NSMenuItem(
-            title: "重新抓取正文",
+            title: String(localized: "Refetch article content"),
             action: #selector(handleRefetchRequested),
             keyEquivalent: ""
         )
@@ -1003,7 +1003,7 @@ private final class PassthroughScrollWKWebView: WKWebView {
         } else {
             // 未能识别出“重新载入”项：提供一个明确的“仅刷新当前渲染”
             let refreshOnly = NSMenuItem(
-                title: "仅刷新当前渲染",
+                title: String(localized: "Refresh current render only"),
                 action: #selector(handleRefreshRenderRequested),
                 keyEquivalent: ""
             )

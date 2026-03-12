@@ -56,18 +56,18 @@ function getSourceMeta(raw: unknown): SourceMeta {
   if (!text) return { key: 'unknown', label: '' };
   const normalized = text.toLowerCase().replace(/[\s_-]+/g, '');
   const map: Record<string, SourceMeta> = {
-    chatgpt: { key: 'chatgpt', label: 'ChatGPT' },
-    claude: { key: 'claude', label: 'Claude' },
-    deepseek: { key: 'deepseek', label: 'DeepSeek' },
-    notionai: { key: 'notionai', label: 'Notion AI' },
-    gemini: { key: 'gemini', label: 'Gemini' },
-    googleaistudio: { key: 'googleaistudio', label: 'Google AI Studio' },
-    kimi: { key: 'kimi', label: 'Kimi' },
-    doubao: { key: 'doubao', label: 'Doubao' },
-    yuanbao: { key: 'yuanbao', label: 'Yuanbao' },
-    poe: { key: 'poe', label: 'Poe' },
-    zai: { key: 'zai', label: 'z.ai' },
-    web: { key: 'web', label: 'Web' },
+    chatgpt: { key: 'chatgpt', label: t('sourceChatgpt') },
+    claude: { key: 'claude', label: t('sourceClaude') },
+    deepseek: { key: 'deepseek', label: t('sourceDeepseek') },
+    notionai: { key: 'notionai', label: t('sourceNotionai') },
+    gemini: { key: 'gemini', label: t('sourceGemini') },
+    googleaistudio: { key: 'googleaistudio', label: t('sourceGoogleAiStudio') },
+    kimi: { key: 'kimi', label: t('sourceKimi') },
+    doubao: { key: 'doubao', label: t('sourceDoubao') },
+    yuanbao: { key: 'yuanbao', label: t('sourceYuanbao') },
+    poe: { key: 'poe', label: t('sourcePoe') },
+    zai: { key: 'zai', label: t('sourceZai') },
+    web: { key: 'web', label: t('sourceWeb') },
   };
   return map[normalized] || { key: 'unknown', label: text };
 }
@@ -343,7 +343,7 @@ export function ConversationListPane({
         copiedTimerRef.current = null;
       }, 1100);
     } catch (err) {
-      alert((err as any)?.message ?? 'Copy failed.');
+      alert((err as any)?.message ?? t('copyFailed'));
     }
   };
 
@@ -368,7 +368,7 @@ export function ConversationListPane({
     const prefix = commonPrefix(String(t('obsidianSync') || ''), String(t('notionSync') || ''));
     const normalized = normalizeSyncMenuLabel(prefix);
     if (normalized.length >= 2) return normalized;
-    return 'Sync to';
+    return t('syncTo');
   })();
 
   const syncMenuButtonLabel = syncingNotion

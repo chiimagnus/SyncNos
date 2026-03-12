@@ -53,36 +53,31 @@ final class NotionIntegrationViewModel: ObservableObject {
         notionConfig.notionPageId = trimmed
         notionPageIdInput = trimmed
     }
+
+    private func showTransientMessage(_ text: String, clearAfter nanoseconds: UInt64) {
+        message = text
+        Task {
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            await MainActor.run {
+                if self.message == text {
+                    self.message = nil
+                }
+            }
+        }
+    }
     
     func saveCredentials() {
         notionConfig.notionKey = notionKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
         notionConfig.notionPageId = notionPageIdInput.trimmingCharacters(in: .whitespacesAndNewlines)
         // Per-source DB IDs are managed in their respective settings pages
         // Provide immediate feedback to the UI
-        message = "Credentials saved"
-        // Clear feedback after 2 seconds
-        Task {
-            try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-            await MainActor.run {
-                if message == "Credentials saved" {
-                    message = nil
-                }
-            }
-        }
+        showTransientMessage(String(localized: "Credentials saved"), clearAfter: 2 * 1_000_000_000)
     }
 
     func saveSyncMode() {
         let trimmed = syncMode.trimmingCharacters(in: .whitespacesAndNewlines)
         notionConfig.syncMode = trimmed.isEmpty ? "single" : trimmed
-        message = "Sync mode saved: \(notionConfig.syncMode ?? "single")"
-        Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            await MainActor.run {
-                if message?.starts(with: "Sync mode saved") == true {
-                    message = nil
-                }
-            }
-        }
+        showTransientMessage(String(localized: "Sync mode saved"), clearAfter: 1_000_000_000)
     }
     
     /// 启动 OAuth 授权流程
@@ -96,6 +91,13 @@ final class NotionIntegrationViewModel: ObservableObject {
         Task {
             do {
                 let tokenResponse = try await oauthService.performFullAuthorization()
+                let successMessage = tokenResponse.workspaceName.map {
+                    String(format: String(localized: "Authorized workspace: %@"), $0)
+                } ?? String(localized: "Authorization successful")
+                let fullMessage =
+                    notionConfig.notionPageId == nil
+                    ? successMessage + "\n" + String(localized: "Please select a page ID from your Notion workspace")
+                    : successMessage
                 
                 // 保存 OAuth token 和 workspace 信息
                 await MainActor.run {
@@ -105,19 +107,13 @@ final class NotionIntegrationViewModel: ObservableObject {
                     
                     self.isOAuthAuthorized = true
                     self.workspaceName = tokenResponse.workspaceName
-                    self.message = tokenResponse.workspaceName.map { "Authorized workspace: \($0)" } ?? "Authorization successful"
-                    
-                    // 如果用户还没有设置 pageId，尝试获取用户可访问的页面列表
-                    // 注意：这需要额外的 API 调用，暂时先提示用户手动设置
-                    if self.notionConfig.notionPageId == nil {
-                        self.message = (self.message ?? "") + "\nPlease select a page ID from your Notion workspace"
-                    }
+                    self.message = fullMessage
                 }
                 
                 // 清除消息
                 try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
                 await MainActor.run {
-                    if self.message?.contains("Authorized") == true {
+                    if self.message == fullMessage {
                         self.message = nil
                     }
                 }
@@ -141,22 +137,13 @@ final class NotionIntegrationViewModel: ObservableObject {
         notionConfig.notionWorkspaceName = nil
         isOAuthAuthorized = false
         workspaceName = nil
-        message = "OAuth authorization revoked"
-        
-        Task {
-            try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-            await MainActor.run {
-                if message == "OAuth authorization revoked" {
-                    message = nil
-                }
-            }
-        }
+        showTransientMessage(String(localized: "OAuth authorization revoked"), clearAfter: 2 * 1_000_000_000)
     }
 
     // MARK: - Parent page listing
     func loadAccessiblePagesIfNeeded(force: Bool = false) {
         guard isOAuthAuthorized || !(notionConfig.effectiveToken ?? "").isEmpty else {
-            errorMessage = "Please authorize with Notion first"
+            errorMessage = String(localized: "Please authorize with Notion first")
             return
         }
         if !force && !availablePages.isEmpty { return }
@@ -187,25 +174,20 @@ final class NotionIntegrationViewModel: ObservableObject {
     func selectPage(_ page: NotionPageSummary) {
         notionConfig.notionPageId = page.id
         notionPageIdInput = page.id
-        message = "Selected page: \(page.iconEmoji ?? "") \(page.title)"
-        // Auto-clear tip
-        Task {
-            try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-            await MainActor.run { if self.message?.hasPrefix("Selected page:") == true { self.message = nil } }
-        }
+        let parts = [page.iconEmoji ?? "", page.title].filter { !$0.isEmpty }
+        let pageDescription = parts.joined(separator: " ")
+        showTransientMessage(
+            String(format: String(localized: "Selected page: %@"), pageDescription),
+            clearAfter: 2 * 1_000_000_000
+        )
     }
 
     // MARK: - Link Opening Preference
     func saveOpenLinkPreference() {
         notionConfig.openNotionLinksInBrowser = openNotionLinksInBrowser
-        message = openNotionLinksInBrowser ? "Links will open in browser" : "Links will try to open in Notion app"
-        Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            await MainActor.run {
-                if message?.hasPrefix("Links will") == true {
-                    message = nil
-                }
-            }
-        }
+        let nextMessage = openNotionLinksInBrowser
+            ? String(localized: "Links will open in browser")
+            : String(localized: "Links will try to open in Notion app")
+        showTransientMessage(nextMessage, clearAfter: 1_000_000_000)
     }
 }

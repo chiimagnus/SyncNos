@@ -159,7 +159,7 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
   function toCurrentConversationTitle(convo, id) {
     const title = convo && convo.title ? String(convo.title).trim() : "";
     if (title) return title;
-    return `Conversation #${Number(id) || "?"}`;
+    return "";
   }
 
   function readRichText(items) {
@@ -435,17 +435,17 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
     await writeRunningJob({
       currentConversationId: ids[0] || undefined,
-      currentStage: ids.length ? "Preparing queue" : ""
+      currentStage: ids.length ? "preparing_queue" : ""
     });
 
     async function processConversation(id, index) {
       const trace = createConversationTrace(id);
       const warnings: any[] = [];
-      let conversationTitle = `Conversation #${id}`;
+      let conversationTitle = "";
       await writeRunningJob({
         currentConversationId: id,
         currentConversationTitle: conversationTitle,
-        currentStage: "Loading conversation"
+        currentStage: "loading_conversation"
       });
 
       try {
@@ -457,7 +457,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         await writeRunningJob({
           currentConversationId: id,
           currentConversationTitle: (conversationTitle = toCurrentConversationTitle(convo, id)),
-          currentStage: "Preparing sync"
+          currentStage: "preparing_sync"
         });
         if (!convo) {
           setResultAt(index, { conversationId: id, conversationTitle, ok: false, error: "conversation not found" });
@@ -477,7 +477,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         await writeRunningJob({
           currentConversationId: id,
           currentConversationTitle: toCurrentConversationTitle(convo, id),
-          currentStage: "Ensuring database"
+          currentStage: "ensuring_database"
         });
 
         trace.mark("ensure database");
@@ -497,7 +497,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "Checking destination page"
+            currentStage: "checking_destination_page"
           });
           trace.mark("check destination page");
           try {
@@ -518,7 +518,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "Creating destination page"
+            currentStage: "creating_destination_page"
           });
           trace.mark("create destination page");
           try {
@@ -535,7 +535,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Rebuilding database"
+              currentStage: "rebuilding_database"
             });
             trace.mark("rebuild database");
             // Rebuild once per storage key and share the recovery across concurrent conversations.
@@ -546,7 +546,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Creating destination page"
+              currentStage: "creating_destination_page"
             });
             trace.mark("create destination page");
             // eslint-disable-next-line no-await-in-loop
@@ -564,7 +564,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "Uploading message blocks"
+            currentStage: "uploading_message_blocks"
           });
           trace.mark("build blocks");
           // eslint-disable-next-line no-await-in-loop
@@ -586,7 +586,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Saving sync cursor"
+              currentStage: "saving_sync_cursor"
             });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
@@ -620,7 +620,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "Rebuilding destination page"
+            currentStage: "rebuilding_destination_page"
           });
           trace.mark("rebuild page properties");
           // eslint-disable-next-line no-await-in-loop
@@ -651,7 +651,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Saving sync cursor"
+              currentStage: "saving_sync_cursor"
             });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
@@ -671,7 +671,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "Appending new messages"
+            currentStage: "appending_new_messages"
           });
           trace.mark("update page properties");
           // eslint-disable-next-line no-await-in-loop
@@ -699,7 +699,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Saving sync cursor"
+              currentStage: "saving_sync_cursor"
             });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
@@ -722,7 +722,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Updating page properties"
+              currentStage: "updating_page_properties"
             });
             trace.mark("update page properties");
             // eslint-disable-next-line no-await-in-loop
@@ -735,7 +735,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             await writeRunningJob({
               currentConversationId: id,
               currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "Saving sync cursor"
+              currentStage: "saving_sync_cursor"
             });
           }
           const nextCursor = lastMessageCursor(messages);
@@ -764,7 +764,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         await writeRunningJob({
           currentConversationId: id,
           currentConversationTitle: undefined,
-          currentStage: "Finishing current item"
+          currentStage: "finishing_current_item"
         });
       } catch (_e) {
         // ignore

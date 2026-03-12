@@ -491,7 +491,7 @@ private struct OCRDebugSheet: View {
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = "Select an image to test OCR recognition"
+        panel.message = String(localized: "Select an image to test OCR recognition")
         
         if panel.runModal() == .OK, let url = panel.url {
             loadImage(from: url)
@@ -528,7 +528,7 @@ private struct OCRDebugSheet: View {
     
     private func loadImage(from url: URL) {
         guard let image = NSImage(contentsOf: url) else {
-            errorMessage = "Failed to load image from: \(url.lastPathComponent)"
+            errorMessage = String(format: String(localized: "Failed to load image from: %@"), url.lastPathComponent)
             return
         }
         
@@ -622,4 +622,3 @@ private struct StatRow: View {
         .font(.caption)
     }
 }
-

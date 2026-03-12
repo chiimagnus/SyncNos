@@ -10,8 +10,8 @@ public struct AppleBooksPicker {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = "Choose"
-        panel.message = "Please choose the Apple Books container directory (com.apple.iBooksX) or its Data/Documents path"
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: "Please choose the Apple Books container directory (com.apple.iBooksX) or its Data/Documents path")
 
         let home = NSHomeDirectory()
         let defaultContainer = "\(home)/Library/Containers/com.apple.iBooksX"

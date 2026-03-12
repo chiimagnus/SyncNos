@@ -38,6 +38,7 @@ import {
   type NotionPageOption,
 } from '../utils';
 import type { SettingsSectionKey } from '../types';
+import { t } from '../../../i18n';
 
 function isFirefoxFamilyBrowser() {
   try {
@@ -116,11 +117,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianApiKeyMasked, setObsidianApiKeyMasked] = useState<string>('');
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
-  const [obsidianStatus, setObsidianStatus] = useState<string>('Idle');
+  const [obsidianStatus, setObsidianStatus] = useState<string>(t('statusIdle'));
 
   // Backup
-  const [exportStatus, setExportStatus] = useState<string>('Idle');
-  const [importStatus, setImportStatus] = useState<string>('Ready');
+  const [exportStatus, setExportStatus] = useState<string>(t('statusIdle'));
+  const [importStatus, setImportStatus] = useState<string>(t('statusReady'));
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -233,7 +234,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setObsidianChatFolder(String(obsidianSettings?.chatFolder || ''));
       setObsidianArticleFolder(String(obsidianSettings?.articleFolder || ''));
       setObsidianApiKeyDraft('');
-      setObsidianStatus('Idle');
+      setObsidianStatus(t('statusIdle'));
 
       const chatWith = await loadChatWithSettings();
       setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
@@ -388,7 +389,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async ({ includeApiKey }: { includeApiKey?: boolean } = {}) => {
       if (busy) return;
 
-      setObsidianStatus('Saving…');
+      setObsidianStatus(t('statusSaving'));
       const ok = await runTask(
         async () => {
           const payload: any = {
@@ -416,12 +417,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         {
           fallbackMessage: 'failed',
           onError: () => {
-            setObsidianStatus('Error');
+            setObsidianStatus(t('statusError'));
           },
         }
       );
 
-      if (ok) setObsidianStatus('Saved');
+      if (ok) setObsidianStatus(t('statusSaved'));
     },
     [
       busy,
@@ -435,7 +436,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   );
 
   const onTestObsidianConnection = useCallback(async () => {
-    setObsidianStatus('Testing…');
+    setObsidianStatus(t('statusTesting'));
 
     await runTask(
       async () => {
@@ -443,12 +444,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const data = unwrap(response);
         const ok = data && data.ok === true;
         const message = data && data.message ? String(data.message) : '';
-        setObsidianStatus(ok ? `OK ✓ ${message}`.trim() : `Error: ${message || 'failed'}`);
+        setObsidianStatus(
+          ok
+            ? `${t('statusOk')} ✓ ${message}`.trim()
+            : `${t('statusError')}: ${message || t('phaseFailed')}`
+        );
       },
       {
         fallbackMessage: 'failed',
         onError: (message) => {
-          setObsidianStatus(`Error: ${message}`);
+          setObsidianStatus(`${t('statusError')}: ${message}`);
         },
       }
     );
@@ -545,7 +550,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setInsightStats(buildInsightStats(data, window));
       })
       .catch((error) => {
-        setInsightError(toErrorMessage(error, 'failed to load insight'));
+        setInsightError(toErrorMessage(error, t('insightLoadFailed')));
       })
       .finally(() => {
         setInsightLoading(false);
@@ -572,7 +577,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const handleBackupExport = useCallback(async () => {
     if (busy) return;
 
-    setExportStatus('Exporting…');
+    setExportStatus(t('backupExporting'));
     await runTask(
       async () => {
         const result = await exportBackupZipV2();
@@ -582,14 +587,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         anchor.download = result.filename;
         anchor.click();
 
-        setExportStatus(`Exported (${result.counts.conversations} convos, ${result.counts.messages} msgs)`);
+        setExportStatus(
+          `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages})`
+        );
         setLastBackupExportAt(Date.parse(result.exportedAt) || Date.now());
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       },
       {
         fallbackMessage: 'export failed',
         onError: (message) => {
-          setExportStatus(`Error: ${message}`);
+          setExportStatus(`${t('statusError')}: ${message}`);
         },
       }
     );
@@ -600,7 +607,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (busy) return;
 
       setImportStats(null);
-      setImportStatus(`Importing: ${file.name}`);
+      setImportStatus(`${t('backupImportingFile')}: ${file.name}`);
 
       await runTask(
         async () => {
@@ -623,12 +630,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           }
 
           setImportStats(stats);
-          setImportStatus('Imported ✓');
+          setImportStatus(t('backupImported'));
         },
         {
           fallbackMessage: 'import failed',
           onError: (message) => {
-            setImportStatus(`Error: ${message}`);
+            setImportStatus(`${t('statusError')}: ${message}`);
           },
         }
       );
@@ -654,7 +661,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       return;
     }
 
-    setImportStatus('Firefox kernel detected: import in App Settings');
+    setImportStatus(t('backupImportInAppFirefox'));
     await openExtensionAppSettings();
 
     try {
@@ -669,14 +676,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const notionStatusText = useMemo(() => {
-    if (notionConnected == null) return 'unknown';
+    if (notionConnected == null) return t('statusUnknown');
     if (notionConnected) {
       const workspace = String(notionWorkspaceName || '').trim();
-      return workspace ? `Connected ✅ (${workspace})` : 'Connected ✅';
+      return workspace ? `${t('statusConnected')} ✅ (${workspace})` : `${t('statusConnected')} ✅`;
     }
-    if (notionLastError) return 'Error';
-    if (notionPendingState) return 'Waiting…';
-    return 'Not connected';
+    if (notionLastError) return t('statusError');
+    if (notionPendingState) return t('statusWaiting');
+    return t('statusNotConnected');
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
 
   useEffect(() => {
