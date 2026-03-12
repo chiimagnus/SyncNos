@@ -34,6 +34,13 @@ function texFromAnnotation(el: any): string {
   return normalizeTeX(raw);
 }
 
+function texFromContainerAnnotations(container: any): string {
+  if (!container || typeof container.querySelector !== 'function') return '';
+  const ann = container.querySelector('annotation[encoding="application/x-tex"]');
+  const raw = ann ? String(ann.textContent || '').trim() : '';
+  return normalizeTeX(raw);
+}
+
 function texFromMathScript(el: any): { tex: string; display: boolean } | null {
   if (!el) return null;
   const tag = String(el.tagName || '').toLowerCase();
@@ -97,6 +104,64 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
 
   const root = container as any;
 
+  function wrapTeX(tex: string, display: boolean): string {
+    const normalized = normalizeTeX(tex);
+    if (!normalized) return '';
+    if (!isLikelyTeX(normalized)) return normalized;
+    return display ? `\n\n$$${normalized}$$\n\n` : `$${normalized}$`;
+  }
+
+  function extractTeXFromContainer(node: any): { tex: string; display: boolean; hasTeX: boolean } {
+    const hasQuery = !!(node && typeof node.querySelector === 'function');
+    const tag = String(node && node.tagName ? node.tagName : '').toLowerCase();
+    const cls = String(node && node.className ? node.className : '').toLowerCase();
+
+    let display = tag === 'pre' || cls.includes('katex-display') || cls.includes('math-block');
+
+    if (hasQuery) {
+      const mathBlock = node.querySelector('.math-block[data-math]');
+      if (mathBlock) {
+        const found = texFromDataMath(mathBlock);
+        if (found && found.tex) return { tex: found.tex, display: true, hasTeX: isLikelyTeX(found.tex) };
+      }
+
+      const script = node.querySelector("script[type^='math/tex']");
+      if (script) {
+        const found = texFromMathScript(script);
+        if (found && found.tex) return { tex: found.tex, display: found.display || display, hasTeX: isLikelyTeX(found.tex) };
+      }
+
+      const ann = texFromContainerAnnotations(node);
+      if (ann) return { tex: ann, display, hasTeX: isLikelyTeX(ann) };
+    }
+
+    const fromAttrs = texFromCommonDataAttrs(node);
+    if (fromAttrs) return { tex: fromAttrs, display, hasTeX: isLikelyTeX(fromAttrs) };
+
+    const visible = bestEffortTextFormula(node);
+    return { tex: visible, display, hasTeX: false };
+  }
+
+  // Some sites (e.g. Yuanbao) wrap display formulas inside a `<pre>` container (not code).
+  // If we leave it as `<pre>`, most html-to-markdown converters will mistakenly emit a code fence.
+  const preList = Array.from(root.querySelectorAll('pre')) as any[];
+  let replacedCount = 0;
+  for (const pre of preList) {
+    if (!pre || !pre.parentNode) continue;
+    if (pre.querySelector && pre.querySelector('code')) continue;
+    let hasMath = false;
+    try {
+      hasMath = !!pre.querySelector(".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex");
+    } catch (_e) {
+      hasMath = false;
+    }
+    if (!hasMath) continue;
+
+    const extracted = extractTeXFromContainer(pre);
+    const wrapped = extracted.hasTeX ? wrapTeX(extracted.tex, true) : `\n\n${normalizeTeX(extracted.tex)}\n\n`;
+    if (replaceWithText(pre, wrapped)) replacedCount += 1;
+  }
+
   // Prefer outermost containers to avoid double replacements.
   const selectors = [
     '.math-block[data-math]',
@@ -121,7 +186,7 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
     }
   }
 
-  if (!nodes.length) return { replacedCount: 0 };
+  if (!nodes.length) return { replacedCount };
 
   function depthOf(el: any): number {
     let depth = 0;
@@ -136,8 +201,6 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
 
   nodes.sort((a, b) => depthOf(a) - depthOf(b));
 
-  let replacedCount = 0;
-
   for (const el of nodes) {
     if (!el) continue;
 
@@ -146,15 +209,15 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
 
     const fromScript = texFromMathScript(el);
     if (fromScript) {
-      const wrapped = fromScript.display ? `\n\n$$${fromScript.tex}$$\n\n` : `$${fromScript.tex}$`;
+      const wrapped = wrapTeX(fromScript.tex, fromScript.display);
       if (replaceWithText(el, wrapped)) replacedCount += 1;
       continue;
     }
 
     // Gemini uses `.math-block[data-math]` (KaTeX HTML is aria-hidden and can be removed).
     const fromDataMath = texFromDataMath(el);
-    if (fromDataMath && isLikelyTeX(fromDataMath.tex)) {
-      const wrapped = fromDataMath.display ? `\n\n$$${fromDataMath.tex}$$\n\n` : `$${fromDataMath.tex}$`;
+    if (fromDataMath && fromDataMath.tex) {
+      const wrapped = wrapTeX(fromDataMath.tex, fromDataMath.display);
       if (replaceWithText(el, wrapped)) replacedCount += 1;
       continue;
     }
@@ -164,17 +227,17 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
     if (ann) {
       const cls = String(el && el.className ? el.className : '').toLowerCase();
       const display = cls.includes('katex-display') || cls.includes('math-block');
-      const wrapped = display ? `\n\n$$${ann}$$\n\n` : `$${ann}$`;
+      const wrapped = wrapTeX(ann, display);
       if (replaceWithText(el, wrapped)) replacedCount += 1;
       continue;
     }
 
     // Some sites store original TeX in data attributes.
     const fromAttrs = texFromCommonDataAttrs(el);
-    if (fromAttrs && isLikelyTeX(fromAttrs)) {
+    if (fromAttrs) {
       const cls = String(el && el.className ? el.className : '').toLowerCase();
       const display = cls.includes('katex-display') || cls.includes('math-block');
-      const wrapped = display ? `\n\n$$${fromAttrs}$$\n\n` : `$${fromAttrs}$`;
+      const wrapped = wrapTeX(fromAttrs, display);
       if (replaceWithText(el, wrapped)) replacedCount += 1;
       continue;
     }
@@ -190,8 +253,9 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
     const visible = bestEffortTextFormula(el);
     if (!visible) continue;
     const display = cls.includes('katex-display') || cls.includes('math-block');
-    const wrapped = display ? `\n\n$$${visible}$$\n\n` : `$${visible}$`;
-    if (replaceWithText(el, wrapped)) replacedCount += 1;
+    // Do NOT wrap non-TeX visible strings with `$`/`$$` (most renderers treat it as TeX and will fail).
+    const content = display ? `\n\n${visible}\n\n` : visible;
+    if (replaceWithText(el, content)) replacedCount += 1;
   }
 
   return { replacedCount };
