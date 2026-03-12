@@ -290,9 +290,45 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
       }
 
       if (tag === "img") {
-        const src = node.getAttribute ? String(node.getAttribute("src") || "").trim() : "";
-        if (/^https?:\/\//i.test(src)) return `![](${src})`;
-        return "";
+        const isHttp = (url: string) => /^https?:\/\//i.test(String(url || "").trim());
+        const isLikelyRenderable = (url: string) => {
+          const text = String(url || "").trim();
+          if (!isHttp(text)) return false;
+          try {
+            const u = new URL(text);
+            if (u.hostname === "lh3.googleusercontent.com" && /^\/gg\//i.test(u.pathname)) {
+              const hasHint = u.pathname.includes("=") || !!u.search;
+              if (!hasHint) return false;
+            }
+          } catch (_e) {
+            return false;
+          }
+          return true;
+        };
+
+        const candidates: string[] = [];
+        const current = typeof (node as any).currentSrc === "string" ? String((node as any).currentSrc).trim() : "";
+        if (current) candidates.push(current);
+
+        const srcsetRaw = node.getAttribute ? String(node.getAttribute("srcset") || "").trim() : "";
+        if (srcsetRaw) {
+          const items = srcsetRaw
+            .split(",")
+            .map((s: any) => String(s || "").trim())
+            .filter(Boolean)
+            .map((item: any) => String(item.split(/\s+/)[0] || "").trim())
+            .filter(Boolean);
+          // Prefer the last one (usually the largest).
+          for (const item of items.slice().reverse()) candidates.push(item);
+        }
+
+        const srcProp = typeof (node as any).src === "string" ? String((node as any).src).trim() : "";
+        if (srcProp) candidates.push(srcProp);
+        const srcAttr = node.getAttribute ? String(node.getAttribute("src") || "").trim() : "";
+        if (srcAttr) candidates.push(srcAttr);
+
+        const picked = candidates.find((u: any) => isLikelyRenderable(String(u || ""))) || "";
+        return picked ? `![](${picked})` : "";
       }
 
       if (/^h[1-6]$/.test(tag)) {

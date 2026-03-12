@@ -53,21 +53,42 @@ function parseSrcset(srcset: unknown): Array<{ url: string; score: number }> {
   return output;
 }
 
+function isLikelyRenderableHttpImageUrl(url: string): boolean {
+  const text = String(url || '').trim();
+  if (!isHttpUrl(text)) return false;
+  try {
+    const u = new URL(text);
+    // Some Gemini image links on Googleusercontent require sizing / transformation hints.
+    // When they are missing, the URL may return a 400 page instead of an image.
+    if (u.hostname === 'lh3.googleusercontent.com' && /^\/gg\//i.test(u.pathname)) {
+      const hasTransformHint = u.pathname.includes('=') || !!u.search;
+      if (!hasTransformHint) return false;
+    }
+  } catch (_e) {
+    // If URL parsing fails, treat it as not renderable (caller will fallback to other candidates).
+    return false;
+  }
+  return true;
+}
+
 function bestImageUrl(image: any): string {
   if (!image) return '';
   const current = image.currentSrc ? String(image.currentSrc).trim() : '';
-  if (isHttpUrl(current)) return current;
+  if (isLikelyRenderableHttpImageUrl(current)) return current;
 
   const srcset = image.getAttribute ? image.getAttribute('srcset') : '';
   const fromSrcset = parseSrcset(srcset);
-  if (fromSrcset.length) return fromSrcset[0].url;
+  if (fromSrcset.length) {
+    const candidate = fromSrcset[0].url;
+    if (isLikelyRenderableHttpImageUrl(candidate)) return candidate;
+  }
 
   const src = image.src
     ? String(image.src).trim()
     : image.getAttribute
       ? String(image.getAttribute('src') || '').trim()
       : '';
-  if (isHttpUrl(src)) return src;
+  if (isLikelyRenderableHttpImageUrl(src)) return src;
   return '';
 }
 
@@ -99,7 +120,11 @@ export function appendImageMarkdown(
 
   const lines: string[] = [];
   for (const url of normalized) {
-    if (base && base.includes(url)) continue;
+    if (base) {
+      const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const imageRe = new RegExp(`!\\[[^\\]]*\\]\\(\\s*<?${escaped}>?(?:\\s+\\"[^\\"]*\\")?\\s*\\)`, 'i');
+      if (imageRe.test(base)) continue;
+    }
     lines.push(`![](${url})`);
   }
   if (!lines.length) return base;
