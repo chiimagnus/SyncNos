@@ -5,6 +5,7 @@ import type { ConversationSyncFeedbackState } from './useConversationSyncFeedbac
 import { buttonIconCircleCardClassName } from '../shared/button-styles';
 import { useConversationsApp } from './conversations-context';
 import { openConversation } from './open-conversation';
+import type { TranslationKey } from '../../i18n/locales/en';
 
 type ConversationSyncFeedbackNoticeProps = {
   feedback: ConversationSyncFeedbackState;
@@ -64,6 +65,32 @@ function phaseLabel(phase: ConversationSyncFeedbackState['phase']) {
   if (phase === 'partial-failed') return t('phasePartialFailed');
   if (phase === 'failed') return t('phaseFailed');
   return '';
+}
+
+const SYNC_STAGE_LABEL_KEYS: Record<string, TranslationKey> = {
+  preparing_queue: 'syncStagePreparingQueue',
+  loading_conversation: 'syncStageLoadingConversation',
+  preparing_sync: 'syncStagePreparingSync',
+  ensuring_database: 'syncStageEnsuringDatabase',
+  checking_destination_page: 'syncStageCheckingDestinationPage',
+  creating_destination_page: 'syncStageCreatingDestinationPage',
+  rebuilding_database: 'syncStageRebuildingDatabase',
+  uploading_message_blocks: 'syncStageUploadingMessageBlocks',
+  saving_sync_cursor: 'syncStageSavingSyncCursor',
+  rebuilding_destination_page: 'syncStageRebuildingDestinationPage',
+  appending_new_messages: 'syncStageAppendingNewMessages',
+  updating_page_properties: 'syncStageUpdatingPageProperties',
+  finishing_current_item: 'syncStageFinishingCurrentItem',
+  renaming_note: 'syncStageRenamingNote',
+  writing_full_note: 'syncStageWritingFullNote',
+  deleting_old_note_path: 'syncStageDeletingOldNotePath',
+  falling_back_to_full_rebuild: 'syncStageFallingBackToFullRebuild',
+  updating_sync_metadata: 'syncStageUpdatingSyncMetadata',
+};
+
+function translateSyncStage(stage: string) {
+  const key = SYNC_STAGE_LABEL_KEYS[String(stage || '').trim()];
+  return key ? t(key) : stage;
 }
 
 function conversationLabel(title: unknown, conversationId: unknown) {
@@ -249,7 +276,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   if (feedback.phase === 'idle' || !feedback.provider) return null;
 
   const tones = toneClasses(feedback.phase);
-  const provider = feedback.provider === 'notion' ? 'Notion' : 'Obsidian';
+  const provider = feedback.provider === 'notion' ? t('providerNotion') : t('providerObsidian');
   const canDismiss = feedback.phase !== 'running';
   const iconCircleButtonClassName = buttonIconCircleCardClassName();
   const liveMode = feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'assertive' : 'polite';
@@ -260,7 +287,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
     : 0;
   const currentItemLabel = feedback.currentConversationTitle.trim()
     || (feedback.currentConversationId ? `${t('conversationLabel')} #${feedback.currentConversationId}` : '');
-  const currentStageLabel = feedback.currentStage.trim();
+  const currentStageLabel = translateSyncStage(feedback.currentStage.trim());
   const message = feedback.phase === 'running'
     ? currentItemLabel
       ? `${t('currentPrefix')} ${currentItemLabel}`

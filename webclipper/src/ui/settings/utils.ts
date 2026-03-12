@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+
 export type ApiError = { message: string; extra: unknown } | null;
 export type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
 
@@ -21,8 +23,16 @@ export function formatProgress(p: { total: number; done: number; stage?: string 
   const safeTotal = Math.max(0, Number(p.total) || 0);
   const safeDone = Math.min(safeTotal || 0, Math.max(0, Number(p.done) || 0));
   const pct = safeTotal ? Math.floor((safeDone / safeTotal) * 100) : 0;
-  const labelStage = p.stage ? ` ${p.stage}` : '';
-  return { pct, text: `Importing… ${pct}% (${safeDone}/${safeTotal})${labelStage}`.trim() };
+  const stageLabels: Record<string, string> = {
+    conversations: t('importStageConversations'),
+    messages: t('importStageMessages'),
+    mappings: t('importStageMappings'),
+    settings: t('importStageSettings'),
+  };
+  const rawStage = String(p.stage || '').trim();
+  const stageLabel = rawStage ? stageLabels[rawStage] || rawStage : '';
+  const labelStage = stageLabel ? ` ${stageLabel}` : '';
+  return { pct, text: `${t('importingDots')} ${pct}% (${safeDone}/${safeTotal})${labelStage}`.trim() };
 }
 
 export async function isZipFile(file: File) {
@@ -133,4 +143,3 @@ export function openHttpUrl(url: string) {
     return false;
   }
 }
-

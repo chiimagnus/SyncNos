@@ -101,18 +101,18 @@ export async function importBackupLegacyJsonMerge(
     const { t, stores: s } = tx(db, ['conversations'], 'readwrite');
     const idx = s.conversations.index('by_source_conversationKey');
 
-    progress.stage = 'Conversations';
+    progress.stage = 'conversations';
     report();
     for (let i = 0; i < backupConversations.length; i += 1) {
       const incoming = backupConversations[i];
       if (!incoming) {
-        bump(1, 'Conversations');
+        bump(1, 'conversations');
         continue;
       }
       const source = incoming.source ? String(incoming.source) : '';
       const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
       if (!source || !conversationKey) {
-        bump(1, 'Conversations');
+        bump(1, 'conversations');
         continue;
       }
 
@@ -133,7 +133,7 @@ export async function importBackupLegacyJsonMerge(
         uniqueToLocalId.set(`${source}||${conversationKey}`, Number(id));
       }
 
-      bump(1, 'Conversations');
+      bump(1, 'conversations');
     }
 
     await txDone(t);
@@ -144,26 +144,26 @@ export async function importBackupLegacyJsonMerge(
     const { t, stores: s } = tx(db, ['messages'], 'readwrite');
     const idx = s.messages.index('by_conversationId_messageKey');
 
-    progress.stage = 'Messages';
+    progress.stage = 'messages';
     report();
     for (let i = 0; i < backupMessages.length; i += 1) {
       const incoming = backupMessages[i];
       if (!incoming) {
-        bump(1, 'Messages');
+        bump(1, 'messages');
         continue;
       }
       const backupConversationId = Number(incoming.conversationId);
       const messageKey = incoming.messageKey ? String(incoming.messageKey) : '';
       if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
         stats.messagesSkipped += 1;
-        bump(1, 'Messages');
+        bump(1, 'messages');
         continue;
       }
       const uk = backupConvoIdToUnique.get(backupConversationId) || '';
       const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
       if (!localConversationId) {
         stats.messagesSkipped += 1;
-        bump(1, 'Messages');
+        bump(1, 'messages');
         continue;
       }
 
@@ -186,7 +186,7 @@ export async function importBackupLegacyJsonMerge(
       }
 
       if (i % 25 === 0) report();
-      bump(1, 'Messages');
+      bump(1, 'messages');
     }
 
     await txDone(t);
@@ -198,18 +198,18 @@ export async function importBackupLegacyJsonMerge(
     const idx = s.sync_mappings.index('by_source_conversationKey');
     const convoIdx = s.conversations.index('by_source_conversationKey');
 
-    progress.stage = 'Mappings';
+    progress.stage = 'mappings';
     report();
     for (let i = 0; i < backupMappings.length; i += 1) {
       const incoming = backupMappings[i];
       if (!incoming) {
-        bump(1, 'Mappings');
+        bump(1, 'mappings');
         continue;
       }
       const source = incoming.source ? String(incoming.source) : '';
       const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : '';
       if (!source || !conversationKey) {
-        bump(1, 'Mappings');
+        bump(1, 'mappings');
         continue;
       }
 
@@ -239,19 +239,19 @@ export async function importBackupLegacyJsonMerge(
         }
       }
 
-      bump(1, 'Mappings');
+      bump(1, 'mappings');
     }
 
     await txDone(t);
   }
 
   // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
-  progress.stage = 'Settings';
+  progress.stage = 'settings';
   report();
   if (settingsKeys.length) {
     await storageSet(filteredSettings);
     stats.settingsApplied = settingsKeys.length;
-    bump(settingsKeys.length, 'Settings');
+    bump(settingsKeys.length, 'settings');
   }
 
   return stats;

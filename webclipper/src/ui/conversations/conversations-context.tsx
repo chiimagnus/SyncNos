@@ -7,6 +7,7 @@ import { createZipBlob } from '../../sync/backup/zip-utils';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
+import { t } from '../../i18n';
 import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 
 type ConversationsAppState = {
@@ -88,7 +89,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         return null;
       });
     } catch (e) {
-      setListError((e as any)?.message ?? String(e ?? 'failed'));
+      setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
     } finally {
       setLoadingList(false);
     }
@@ -111,7 +112,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       const d = await loadDetailFor(id);
       setDetail(d);
     } catch (e) {
-      setDetailError((e as any)?.message ?? String(e ?? 'failed'));
+      setDetailError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
       setDetail(null);
     } finally {
       setLoadingDetail(false);
@@ -210,7 +211,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch (e) {
-        alert((e as any)?.message ?? String(e ?? 'export failed'));
+        alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
       } finally {
         setExporting(false);
       }
@@ -241,7 +242,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       await refreshList();
       await refreshActiveDetail();
     } catch (e) {
-      alert((e as any)?.message ?? String(e ?? 'failed'));
+      alert((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
     } finally {
       setDeleting(false);
     }

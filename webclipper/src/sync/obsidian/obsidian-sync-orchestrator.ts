@@ -88,7 +88,7 @@ function buildAlreadyRunningError() {
 function toCurrentConversationTitle(convo: any, conversationId: number) {
   const title = safeString(convo && convo.title);
   if (title) return title;
-  return `Conversation #${Number(conversationId) || '?'}`;
+  return '';
 }
 
 function pickLocalCursor(messages: any[]) {
@@ -477,7 +477,7 @@ async function syncConversations({
 
   await persistCurrentJob({
     currentConversationId: ids[0] || undefined,
-    currentStage: ids.length ? 'Preparing queue' : '',
+    currentStage: ids.length ? 'preparing_queue' : '',
   });
 
   const results: any[] = [];
@@ -487,8 +487,8 @@ async function syncConversations({
     try {
       await persistCurrentJob({
         currentConversationId: conversationId,
-        currentConversationTitle: `Conversation #${conversationId}`,
-        currentStage: 'Loading conversation',
+        currentConversationTitle: '',
+        currentStage: 'loading_conversation',
       });
       const decision: any = await decideSyncModeForConversation({
         conversationId,
@@ -498,7 +498,7 @@ async function syncConversations({
         await persistCurrentJob({
           currentConversationId: conversationId,
           currentConversationTitle: toCurrentConversationTitle((decision as any).convo, conversationId),
-          currentStage: 'Finishing current item',
+          currentStage: 'finishing_current_item',
         });
         row = decision.row;
       } else if (decision && decision.mode && decision.conversationId) {
@@ -526,7 +526,7 @@ async function syncConversations({
           await persistCurrentJob({
             currentConversationId: conversationId,
             currentConversationTitle: currentTitle,
-            currentStage: decision.mode === 'full_rebuild_rename' ? 'Renaming note' : 'Writing full note',
+            currentStage: decision.mode === 'full_rebuild_rename' ? 'renaming_note' : 'writing_full_note',
           });
           const syncnosObject = metaMod.buildSyncnosObject({
             conversation: decision.convo,
@@ -554,7 +554,7 @@ async function syncConversations({
               await persistCurrentJob({
                 currentConversationId: conversationId,
                 currentConversationTitle: currentTitle,
-                currentStage: 'Deleting old note path',
+                currentStage: 'deleting_old_note_path',
               });
               const delRes = await client.deleteVaultFile(deleteAfter);
               if (!delRes || !delRes.ok) {
@@ -594,7 +594,7 @@ async function syncConversations({
           await persistCurrentJob({
             currentConversationId: conversationId,
             currentConversationTitle: currentTitle,
-            currentStage: 'Appending new messages',
+            currentStage: 'appending_new_messages',
           });
           const chunk = writer.buildIncrementalAppendMarkdown({ newMessages: decision.newMessages });
           const patchRes = await writer.appendUnderMessagesHeading({
@@ -634,7 +634,7 @@ async function syncConversations({
             await persistCurrentJob({
               currentConversationId: conversationId,
               currentConversationTitle: currentTitle,
-              currentStage: 'Falling back to full rebuild',
+              currentStage: 'falling_back_to_full_rebuild',
             });
             const syncnosObject = metaMod.buildSyncnosObject({
               conversation: decision.convo,
@@ -671,7 +671,7 @@ async function syncConversations({
             await persistCurrentJob({
               currentConversationId: conversationId,
               currentConversationTitle: currentTitle,
-              currentStage: 'Updating sync metadata',
+              currentStage: 'updating_sync_metadata',
             });
             const syncnosObject = metaMod.buildSyncnosObject({
               conversation: decision.convo,
@@ -722,7 +722,7 @@ async function syncConversations({
       } else {
         row = buildPerConversationResult({
           conversationId,
-          conversationTitle: `Conversation #${conversationId}`,
+          conversationTitle: '',
           ok: false,
           mode: 'failed',
           appended: 0,
@@ -733,7 +733,7 @@ async function syncConversations({
     } catch (e: any) {
       row = buildPerConversationResult({
         conversationId,
-        conversationTitle: `Conversation #${conversationId}`,
+        conversationTitle: '',
         ok: false,
         mode: 'failed',
         appended: 0,
@@ -748,7 +748,7 @@ async function syncConversations({
     await persistCurrentJob({
       currentConversationId: conversationId,
       currentConversationTitle: undefined,
-      currentStage: 'Finishing current item',
+      currentStage: 'finishing_current_item',
     });
   }
 
