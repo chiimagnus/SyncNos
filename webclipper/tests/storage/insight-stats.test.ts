@@ -170,6 +170,50 @@ describe("insight stats", () => {
     ]);
   });
 
+  it("normalizes article domains to registrable domains", async () => {
+    await seedConversation({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article-sspai-www",
+      title: "SSPai www",
+      url: "https://www.sspai.com/post/1",
+      lastCapturedAt: 1,
+    });
+    await seedConversation({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article-sspai-root",
+      title: "SSPai root",
+      url: "https://sspai.com/post/2",
+      lastCapturedAt: 2,
+    });
+    await seedConversation({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article-dedao-m",
+      title: "Dedao mobile",
+      url: "https://m.dedao.cn/xxx",
+      lastCapturedAt: 3,
+    });
+    await seedConversation({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article-github-io",
+      title: "GitHub Pages",
+      url: "https://foo.github.io/bar",
+      lastCapturedAt: 4,
+    });
+
+    const stats = await getInsightStats();
+
+    expect(stats.articleCount).toBe(4);
+    expect(stats.articleDomainDistribution).toEqual([
+      { label: "sspai.com", count: 2 },
+      { label: "dedao.cn", count: 1 },
+      { label: "foo.github.io", count: 1 },
+    ]);
+  });
+
   it("keeps total clips aligned with recognized chat and article rows only", async () => {
     await seedConversation({
       sourceType: "chat",
@@ -220,7 +264,7 @@ describe("insight stats", () => {
         source: "web",
         conversationKey: `article-tail-${index}`,
         title: `Article ${index}`,
-        url: `https://domain-${index}.example.com/post`,
+        url: `https://domain-${index}.example-${index}.com/post`,
         lastCapturedAt: index,
       });
     }
