@@ -330,6 +330,7 @@ export const zh: { [K in TranslationKey]: string } = {
   syncTo: '同步到',
   syncAllProvidersDisabledMenuItem: '您已关闭所有同步选项，可以前往设置面板开启',
   syncProviderDisabled: '您已关闭该同步选项。',
+  syncGoToSettings: '打开设置',
   copyFailed: '复制失败。',
   syncStagePreparingQueue: '准备队列',
   syncStageLoadingConversation: '正在加载对话',
