@@ -96,7 +96,7 @@ describe("article-fetch-service", () => {
     expect(Array.isArray(messages)).toBe(true);
     expect(messages[0]).toMatchObject({
       messageKey: "article_body",
-      role: "assistant",
+      role: "article",
       sequence: 1,
       contentText: "Hello world article text.",
       contentMarkdown: "## Heading\n\n![img](https://example.com/a.png)\n\nHello world article text."

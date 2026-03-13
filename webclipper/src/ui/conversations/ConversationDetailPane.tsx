@@ -29,6 +29,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
 
   const outlineButtonClass = buttonTintClassName();
+  const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
 
   return (
     <section>
@@ -87,8 +88,8 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
               return (
                 <ChatMessageBubble
                   key={String((m as any).id)}
-                  role={(m as any).role}
-                  headerLeft={String((m as any).role || t('messageRoleFallback'))}
+                  role={isArticle ? undefined : (m as any).role}
+                  headerLeft={isArticle ? undefined : String((m as any).role || t('messageRoleFallback'))}
                   markdown={text}
                 />
               );
