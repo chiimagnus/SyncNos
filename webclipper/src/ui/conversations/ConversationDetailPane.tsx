@@ -38,8 +38,8 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
         aria-label={t('conversationDetailAria')}
       >
         {!hideHeader ? (
-          <header className="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
-            <div className="tw-flex tw-min-w-0 tw-items-start tw-gap-2">
+          <header className="tw-flex tw-flex-nowrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
+            <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-start tw-gap-2">
               {onBack ? (
                 <button type="button" onClick={onBack} className={navIconButtonSmClassName(false)} aria-label={t('backButton')}>
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
@@ -47,16 +47,16 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 </button>
               ) : null}
 
-              <div className="tw-min-w-0">
-                <h2 className="tw-m-0 tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] tw-break-words [overflow-wrap:anywhere]">
+              <div className="tw-min-w-0 tw-flex-1">
+                <h2 className="tw-m-0 tw-block tw-min-w-0 tw-truncate tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
                   {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
                 </h2>
-                <div className="tw-mt-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+                <div className="tw-mt-1 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                   {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : t('selectConversationHint')}
                 </div>
               </div>
             </div>
-            <div className="tw-flex tw-items-center tw-gap-2">
+            <div className="tw-flex tw-shrink-0 tw-flex-nowrap tw-items-center tw-gap-2">
               <DetailHeaderActionBar
                 actions={chatWithActions}
                 buttonClassName={outlineButtonClass}
