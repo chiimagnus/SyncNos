@@ -4,6 +4,7 @@ import type { Conversation, ConversationDetail } from '../../conversations/domai
 import { buildConversationBasename } from '../../conversations/domain/file-naming';
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { createZipBlob } from '../../sync/backup/zip-utils';
+import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
@@ -181,7 +182,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
         if (!selectedConversations.length) return;
 
-        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const stamp = buildLocalTimestampForFilename();
         const files: Array<{ name: string; data: string }> = [];
 
         if (mergeSingle) {

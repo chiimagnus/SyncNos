@@ -3,6 +3,7 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import type { Conversation } from '../../conversations/domain/models';
 import { getConversationDetail } from '../../conversations/client/repo';
+import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 
 export async function buildConversationsMarkdownZipExport({
   conversations,
@@ -15,7 +16,7 @@ export async function buildConversationsMarkdownZipExport({
   const ids = list.map((c) => Number(c.id)).filter((x) => Number.isFinite(x) && x > 0);
   if (!ids.length) throw new Error('No conversations selected');
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = buildLocalTimestampForFilename();
   const files: Array<{ name: string; data: string }> = [];
 
   if (mergeSingle) {
