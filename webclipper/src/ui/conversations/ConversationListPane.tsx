@@ -690,7 +690,7 @@ export function ConversationListPane({
                 minWidth={160}
                 maxHeight={320}
                 buttonClassName={[
-                  'tw-h-8 tw-w-[148px] tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
+                  'tw-h-8 tw-w-[128px] tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
                   'tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)]',
                   'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
                   'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
