@@ -54,6 +54,9 @@ export function SettingsScene(props: SettingsSceneProps) {
   const {
     busy,
 
+    notionSyncEnabled,
+    onToggleNotionSyncEnabled,
+
     notionConnected,
     pollingNotion,
     loadingNotionPages,
@@ -76,6 +79,9 @@ export function SettingsScene(props: SettingsSceneProps) {
     chatWithPlatforms,
     setChatWithPlatforms,
     onResetChatWithSettings,
+
+    obsidianSyncEnabled,
+    onToggleObsidianSyncEnabled,
 
     obsidianApiBaseUrl,
     setObsidianApiBaseUrl,

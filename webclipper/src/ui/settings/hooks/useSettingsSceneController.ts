@@ -8,8 +8,9 @@ import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
 import { send } from '../../../platform/runtime/runtime';
-import { storageGet, storageSet } from '../../../platform/storage/local';
+import { storageGet, storageOnChanged, storageSet } from '../../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
+import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '../../../sync/sync-provider-gate';
 import {
   DEFAULT_CHAT_WITH_MAX_CHARS,
   DEFAULT_CHAT_WITH_PLATFORMS,
@@ -39,6 +40,9 @@ import {
 } from '../utils';
 import type { SettingsSectionKey } from '../types';
 import { t } from '../../../i18n';
+
+const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
+const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
 
 function isFirefoxFamilyBrowser() {
   try {
@@ -108,6 +112,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [loadingNotionPages, setLoadingNotionPages] = useState(false);
   const [pollingNotion, setPollingNotion] = useState(false);
   const notionPagesAutoLoadRef = useRef(false);
+  const [notionSyncEnabled, setNotionSyncEnabled] = useState(true);
 
   // Obsidian
   const [obsidianApiBaseUrl, setObsidianApiBaseUrl] = useState<string>('');
@@ -118,6 +123,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
   const [obsidianStatus, setObsidianStatus] = useState<string>(t('statusIdle'));
+  const [obsidianSyncEnabled, setObsidianSyncEnabled] = useState(true);
 
   // Backup
   const [exportStatus, setExportStatus] = useState<string>(t('statusIdle'));
@@ -193,6 +199,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'notion_parent_page_id',
           'notion_parent_page_title',
           'notion_ai_preferred_model_index',
+          NOTION_SYNC_PROVIDER_ENABLED_KEY,
+          OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
           'inpage_display_mode',
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
@@ -212,6 +220,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setNotionParentPageId(String(local?.notion_parent_page_id || ''));
       setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
       setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || ''));
+      setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
+      setObsidianSyncEnabled(local?.[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY] !== false);
 
       const normalizedInpageMode = normalizeInpageDisplayMode(local?.inpage_display_mode);
       setInpageDisplayMode(
@@ -247,6 +257,22 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    return storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      if (!changes || typeof changes !== 'object') return;
+
+      if (Object.prototype.hasOwnProperty.call(changes, NOTION_SYNC_PROVIDER_ENABLED_KEY)) {
+        const nextValue = changes[NOTION_SYNC_PROVIDER_ENABLED_KEY]?.newValue;
+        setNotionSyncEnabled(nextValue !== false);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY)) {
+        const nextValue = changes[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY]?.newValue;
+        setObsidianSyncEnabled(nextValue !== false);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!pollingNotion) return;
@@ -310,6 +336,32 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setPollingNotion(true);
     });
   }, [notionClientId, refresh, runTask]);
+
+  const onToggleNotionSyncEnabled = useCallback(
+    async (enabled: boolean) => {
+      await runTask(
+        async () => {
+          await setSyncProviderEnabled('notion', enabled);
+          setNotionSyncEnabled(enabled);
+        },
+        { fallbackMessage: 'save notion sync enabled failed' },
+      );
+    },
+    [runTask],
+  );
+
+  const onToggleObsidianSyncEnabled = useCallback(
+    async (enabled: boolean) => {
+      await runTask(
+        async () => {
+          await setSyncProviderEnabled('obsidian', enabled);
+          setObsidianSyncEnabled(enabled);
+        },
+        { fallbackMessage: 'save obsidian sync enabled failed' },
+      );
+    },
+    [runTask],
+  );
 
   const onLoadNotionPages = useCallback(async () => {
     setLoadingNotionPages(true);
@@ -702,6 +754,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     busy,
     error,
 
+    notionSyncEnabled,
+    onToggleNotionSyncEnabled,
+
     notionConnected,
     pollingNotion,
     loadingNotionPages,
@@ -716,6 +771,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onSaveNotionAiModelIndex,
     onResetNotionAiModelIndex,
     notionAiRef,
+
+    obsidianSyncEnabled,
+    onToggleObsidianSyncEnabled,
 
     obsidianApiBaseUrl,
     setObsidianApiBaseUrl,
