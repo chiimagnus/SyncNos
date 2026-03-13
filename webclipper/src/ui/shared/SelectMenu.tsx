@@ -61,6 +61,27 @@ function moveEnabledIndex<T extends string>(options: Array<SelectMenuOption<T>>,
   return from;
 }
 
+function findNearestClippingRect(el: HTMLElement | null): DOMRect | null {
+  if (!el) return null;
+  let current = el.parentElement;
+  while (current) {
+    try {
+      const style = window.getComputedStyle(current);
+      const overflowY = style.overflowY || style.overflow;
+      if (overflowY && overflowY !== 'visible') {
+        if (typeof current.getBoundingClientRect === 'function') {
+          const rect = current.getBoundingClientRect();
+          if (rect && Number.isFinite(rect.height) && rect.height > 0) return rect;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
 export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
   const {
     value,
@@ -139,12 +160,13 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     const rect = el.getBoundingClientRect();
     const gap = 8;
     const margin = 14;
+    const clipRect = findNearestClippingRect(el);
 
     const available = side === 'top'
-      ? rect.top - gap - margin
-      : window.innerHeight - rect.bottom - gap - margin;
+      ? rect.top - (clipRect?.top ?? 0) - gap - margin
+      : (clipRect?.bottom ?? window.innerHeight) - rect.bottom - gap - margin;
 
-    const next = Math.floor(Math.max(160, Number.isFinite(available) ? available : 160));
+    const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 160));
     return next;
   }, [adaptiveMaxHeight, maxHeight, open, side]);
 
