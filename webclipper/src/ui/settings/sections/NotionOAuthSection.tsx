@@ -1,11 +1,12 @@
 import type { NotionPageOption } from '../utils';
 import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, selectClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName, selectClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 import { SelectMenu } from '../../shared/SelectMenu';
 
 export function NotionOAuthSection(props: {
   busy: boolean;
+  syncEnabled: boolean;
   notionStatusText: string;
   notionConnected: boolean;
   pollingNotion: boolean;
@@ -13,12 +14,14 @@ export function NotionOAuthSection(props: {
   notionParentPageId: string;
   notionPageOptions: NotionPageOption[];
   notionLogoUrl: string;
+  onToggleSyncEnabled: (enabled: boolean) => void;
   onConnectOrDisconnect: () => void;
   onSaveNotionParentPage: (id: string) => void;
   onLoadNotionPages: () => void;
 }) {
   const {
     busy,
+    syncEnabled,
     notionStatusText,
     notionConnected,
     pollingNotion,
@@ -26,6 +29,7 @@ export function NotionOAuthSection(props: {
     notionParentPageId,
     notionPageOptions,
     notionLogoUrl,
+    onToggleSyncEnabled,
     onConnectOrDisconnect,
     onSaveNotionParentPage,
     onLoadNotionPages,
@@ -42,6 +46,15 @@ export function NotionOAuthSection(props: {
           </span>
           <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{notionStatusText}</span>
         </div>
+        <input
+          id="notionSyncEnabledToggle"
+          type="checkbox"
+          className={checkboxClassName}
+          checked={syncEnabled}
+          disabled={busy}
+          aria-label={`${t('syncTo')} ${t('providerNotion')}`}
+          onChange={(e) => onToggleSyncEnabled(e.target.checked)}
+        />
         <button onClick={onConnectOrDisconnect} disabled={busy} type="button" className={buttonClassName}>
           {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
         </button>

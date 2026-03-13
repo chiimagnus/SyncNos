@@ -134,6 +134,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         <>
           <NotionOAuthSection
             busy={busy}
+            syncEnabled={notionSyncEnabled}
             notionStatusText={notionStatusText}
             notionConnected={!!notionConnected}
             pollingNotion={pollingNotion}
@@ -141,6 +142,9 @@ export function SettingsScene(props: SettingsSceneProps) {
             notionParentPageId={notionParentPageId}
             notionPageOptions={notionPageOptions}
             notionLogoUrl={getURL('icons/notion.svg' as any)}
+            onToggleSyncEnabled={(enabled) => {
+              void onToggleNotionSyncEnabled(enabled);
+            }}
             onConnectOrDisconnect={() => {
               void onNotionConnectOrDisconnect();
             }}
