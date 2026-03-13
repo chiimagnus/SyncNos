@@ -73,6 +73,7 @@ SyncNos has two parts:
 - Capture AI chats from supported sites into local browser storage.
 - Export selected conversations as Markdown (single merged file or multi-file zip).
 - Popup/App renders message Markdown in conversation detail view for readability.
+- Footer `today/total` stats in the conversation list can be clicked to jump straight to `Settings -> Insight`.
 - `Chat with AI` detail actions: configure prompt template, max chars, and enabled platforms in Settings, then copy the rendered payload to clipboard and jump to the chosen AI site.
 - Sync selected conversations to Obsidian via `Obsidian Local REST API` (`http://127.0.0.1:27123`).
 - Database backup:
@@ -89,6 +90,9 @@ SyncNos has two parts:
   - Optional: only supported AI sites + Notion pages
   - Takes effect after page refresh
   - Does not affect `Fetch Current Page` in Settings
+- Install/update behavior:
+  - First install opens `Settings -> About`
+  - Extension updates no longer auto-open Settings tabs
 - Theme mode in `Settings -> General`:
   - `System` / `Light` / `Dark`
   - Saved to local browser storage and applied to both popup and full-page app UI
@@ -99,6 +103,7 @@ SyncNos has two parts:
 - If `contentMarkdown` exists, render as Notion blocks (headings/lists/quotes/code blocks); otherwise fallback to plain text.
 - Notion AI: optionally auto-select preferred model when current mode is **Auto**.
 - Google AI Studio collector handles virtualized chat turns for manual save and filters non-message chunks.
+- Recent collector hardening: Gemini filters hidden speaker/status labels and keeps uploaded blob images; Kimi/z.ai capture user-uploaded attachment images reliably.
 
 ### Supported Sites
 

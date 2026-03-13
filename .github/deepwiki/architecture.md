@@ -49,9 +49,10 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts` |
 
 - `content.ts` 把 content runtime 组装成“collectors registry + controller + inpage button/tip + runtime observer + incremental updater + notionAiModelPicker”的组合体。
-- `background.ts` 则把 conversation handlers、article fetch、Notion / Obsidian settings handlers、sync handlers、UI handlers 一次性挂到 router 上，并在实例切换时终止其他 background 实例遗留的 sync job。
+- `background.ts` 则把 conversation handlers、article fetch、Notion / Obsidian settings handlers、sync handlers、UI handlers 一次性挂到 router 上，并在实例切换时终止其他 background 实例遗留的 sync job；`onInstalled` 只在首次安装时打开 About，更新不自动弹设置。
 - `SettingsScene.tsx + useSettingsSceneController.ts` 共同承担 WebClipper 的“设置组合根”职责：一方面把 `chrome.storage.local` 里的 theme / inpage / chat-with / Notion / Obsidian 设置喂给 UI，另一方面只在进入 `insight` 分区时懒加载本地统计。
 - `ConversationsScene.tsx + pending-open.ts` 共同承担窄屏下的 list/detail bridge：当用户从 Insight 排行或其他路由跳到对话详情时，会先把目标 `conversationId` 写入 `sessionStorage`，再由 scene 消费并切进 detail。
+- `ConversationListPane.tsx` 通过 `onOpenInsightsSection` 把列表底部统计组件连接到 popup/app 路由壳层：popup 打开 `'/settings?section=insight'`，app 在 HashRouter 内导航同一参数。
 
 ## 关键契约
 
@@ -122,6 +123,9 @@ flowchart TB
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/bootstrap/content.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/popup/PopupShell.tsx`
+- `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/protocols/conversation-kinds.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`

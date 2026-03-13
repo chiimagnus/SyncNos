@@ -26,9 +26,10 @@
 
 ### 1. 支持 AI 对话页面
 1. `content.ts` 在所有 `http(s)` 页面注入内容脚本。
-2. `bootstrap/content.ts` 先判断当前 host 是否属于支持站点；非支持站点是否显示 inpage UI 还取决于 `inpage_supported_only`。
+2. `bootstrap/content.ts` 先判断当前 host 是否属于支持站点；非支持站点是否显示 inpage UI 还取决于 `inpage_display_mode`（并兼容旧 `inpage_supported_only`）。
 3. collectors registry 识别具体站点，把 DOM 统一为 `conversation + messages`。
 4. background conversation handlers 把快照写入 IndexedDB；UI 通过相同存储读会话列表与详情。
+- Gemini 采集链会主动过滤 `.cdk-visually-hidden` 与 `[hidden]` 里的噪音文案，并把 blob 上传图内联为 `data:image/*`；Kimi 与 z.ai 则扩大附件卡片抓图范围，减少“消息有图但落库丢图”。
 
 ### 2. 普通网页文章
 1. 用户手动触发“保存当前页”或网页端保存按钮。
@@ -101,6 +102,9 @@ flowchart LR
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/bootstrap/content.ts`
 - `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/collectors/gemini/gemini-collector.ts`
+- `webclipper/src/collectors/kimi/kimi-collector.ts`
+- `webclipper/src/collectors/zai/zai-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
 - `webclipper/src/conversations/data/storage-idb.ts`

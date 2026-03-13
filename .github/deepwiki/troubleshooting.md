@@ -8,9 +8,11 @@
 | Apple Books / GoodLinks 没读到内容 | 目录授权 / 来源库 | `macOS/SyncNos/AGENTS.md`, 来源服务 | 先确认 macOS 目录权限和来源数据库路径 |
 | WeRead / Dedao 登录态失效 | Keychain Cookie / SiteLogins | `SiteLoginsStore.swift` | 看 cookieHeader 是否还能匹配目标域名 |
 | 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
-| WebClipper 页面内按钮没出现 | content script / `inpage_supported_only` / 不支持页面 | `content.ts`, `bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
+| WebClipper 页面内按钮没出现 | content script / `inpage_display_mode` / 不支持页面 | `content.ts`, `bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
 | Google AI Studio 自动保存不完整 | collector 虚拟化渲染 | `googleaistudio-collector.ts`, `content-controller.ts` | 该来源更依赖手动保存 |
 | 网页文章抓取失败 | `Readability` / 页面正文不足 | `article-fetch.ts` | 常见报错是 `No article content detected` |
+| 升级扩展后没有自动跳设置页 | `onInstalled` 行为策略 | `background.ts` | 当前仅首次安装自动打开 About，更新不会自动弹页 |
+| 列表底部统计点击无响应 | popup/app 路由桥接 | `ConversationListPane.tsx`, `PopupShell.tsx`, `AppShell.tsx` | 需确认 `onOpenInsightsSection` 已绑定且目标为 `section=insight` |
 | Obsidian `Test` 失败或 `Failed to fetch` | Local REST API 设置 | `LocalRestAPI.zh.md`, `SettingsScene` | 重点核对 `http://127.0.0.1:27123`、Insecure HTTP、API Key |
 | 发布 workflow 报版本不匹配 | tag / manifest version | `wxt.config.ts`, release workflows | 校对 `manifest.version == tag 去掉 v` |
 
@@ -44,7 +46,7 @@
 ## WebClipper：常见问题
 
 ### 1. inpage 按钮不显示或设置没生效
-- content script 会对所有 `http(s)` 页面注入，但是否真正启动 controller 还受 `SUPPORTED_HOST_SUFFIXES` 与 `inpage_supported_only` 控制。
+- content script 会对所有 `http(s)` 页面注入，但是否真正启动 controller 还受 `SUPPORTED_HOST_SUFFIXES` 与 `inpage_display_mode`（兼容旧 `inpage_supported_only`）控制。
 - 如果用户刚切换了设置，当前页面不会热更新；必须刷新或新开页面。
 - 双击保存按钮会尝试 `openPopup()`；若浏览器不支持，UI 会退回提示“点击工具栏图标打开 panel”。
 
@@ -103,6 +105,10 @@
 - `macOS/SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
 - `webclipper/src/bootstrap/content.ts`
 - `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/entrypoints/background.ts`
+- `webclipper/src/ui/popup/PopupShell.tsx`
+- `webclipper/src/ui/app/AppShell.tsx`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/platform/idb/schema.ts`

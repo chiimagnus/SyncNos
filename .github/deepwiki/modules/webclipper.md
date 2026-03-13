@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | `src/entrypoints/background.ts` | 后台 service worker 入口 | 注册 router、handlers、OAuth listener、sync orchestrators |
 | `src/entrypoints/content.ts` | 内容脚本入口 | 组装 collectors registry、inpage UI、runtime observer |
-| `src/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_supported_only` 与支持站点如何影响 UI 启动 |
+| `src/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_display_mode`（兼容旧 `inpage_supported_only`）与支持站点如何影响 UI 启动 |
 | `src/bootstrap/current-page-capture.ts` | 当前页抓取服务 | 统一判断当前标签页可否抓取，并区分 chat / article 两条手动抓取路径 |
 | `src/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击开 popup、article fetch、Google AI Studio 手动保存都在这里 |
 | `src/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
@@ -48,13 +48,14 @@
 | --- | --- | --- |
 | AI 对话站点 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai | 通过 collectors registry 统一注册 |
 | 普通网页文章 | 任意 `http(s)` 页面 | 手动抓取时注入 `readability.js` 提取正文 |
-| inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_supported_only` 控制 | 单击保存、双击开 popup、多击彩蛋提示 |
+| inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击开 popup、多击彩蛋提示 |
 | Popup 当前页抓取 | `usePopupCurrentPageCapture.ts` + `current-page-capture.ts` | 先判断当前页可抓取，再用统一按钮触发 chat / article 抓取 |
 
-- `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_supported_only` 后决定是否启动。
+- `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
+- 最近 collector 稳定性修复把 Gemini 的隐藏说话人/隐藏状态文案从正文提取里剔除，并补齐 Kimi 与 z.ai 用户上传附件图片抓取，减少“文本被噪音污染”与“附件图丢失”。
 
 ## 本地数据与同步结构
 
@@ -92,10 +93,12 @@
 - `SettingsScene.tsx` 会为 Insight 分区放宽 detail 宽度到 `1120px`，因为这一页需要容纳双栏图表与排行布局。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
 - `ConversationListPane.tsx` 会把来源筛选写入 `localStorage`（`webclipper_conversations_source_filter_key`），因此“为什么列表下次打开还停在 ChatGPT 过滤条件”是预期行为，不是脏状态。
+- `ConversationListPane.tsx` 底部 `today / total` 统计在提供 `onOpenInsightsSection` 回调时会变成可点击入口：popup 会跳 `'/settings?section=insight'`，app 会在 HashRouter 内导航到同一路由。
 - `ConversationsScene.tsx` 在窄屏下采用 list/detail 双路由；如果某个入口（例如 Insight Top conversations）需要直接开 detail，会通过 `pending-open.ts` 把目标会话先写入 `sessionStorage`，再在 scene 初始化时消费。
 - detail header 右上角的会话级动作由 `detail-header-actions.ts` 统一解析；当前规则固定为：单目标直出按钮，Notion + Obsidian 双目标时显示菜单，popup 的旧 `More` 占位已经移除。
 - `Open in Obsidian` 的文件打开只走 Local REST API `POST /open/{filename}`；当 API 因 App 未启动不可达时，只用 `obsidian://open` 拉起桌面 App，随后再重试 REST API。
 - 文案国际化是运行时自动行为，不依赖用户手动切换设置：`i18n/index.ts` 只看 `navigator.language`，当前显式支持英文与中文两套 locale。
+- `background.ts` 现在只在首次安装时自动打开 About 分区（`/settings?section=about`）；扩展更新后不再自动弹出设置页。
 
 ## 修改热点与扩展点
 - **新增支持站点**：先改 `collectors/` 和 `register-all.ts`，不要把站点判断散落到 popup 或 background。
@@ -129,6 +132,9 @@
 - `webclipper/src/bootstrap/current-page-capture.ts`
 - `webclipper/src/bootstrap/content-controller.ts`
 - `webclipper/src/collectors/register-all.ts`
+- `webclipper/src/collectors/gemini/gemini-collector.ts`
+- `webclipper/src/collectors/kimi/kimi-collector.ts`
+- `webclipper/src/collectors/zai/zai-collector.ts`
 - `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
@@ -150,11 +156,17 @@
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/app/AppShell.tsx`
+- `webclipper/src/ui/app/conversations/CapturedListSidebar.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/conversations/ConversationsScene.tsx`
 - `webclipper/src/ui/conversations/pending-open.ts`
+- `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/popup/usePopupCurrentPageCapture.ts`
 - `webclipper/tests/smoke/background-router-current-page-capture.test.ts`
+- `webclipper/tests/collectors/gemini-collector.test.ts`
+- `webclipper/tests/collectors/kimi-collector.test.ts`
+- `webclipper/tests/collectors/zai-collector.test.ts`
 - `webclipper/tests/smoke/detail-header-actions.test.ts`
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
 - `webclipper/tests/storage/insight-stats.test.ts`

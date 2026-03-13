@@ -73,6 +73,7 @@ SyncNos 由两部分组成：
 - 抓取支持网站的 AI 聊天并保存到浏览器本地存储。
 - 导出所选对话为 Markdown（单文件合并或多文件 zip 导出）。
 - Popup/App 的对话详情支持消息 Markdown 渲染，便于阅读。
+- 会话列表底部 `today/total` 统计可点击，直接跳转到 `Settings -> Insight`。
 - `Chat with AI` 详情动作：可在设置里配置 prompt 模板、最大字符数和启用平台，然后把渲染后的内容复制到剪贴板并跳转到目标 AI 站点。
 - 通过 `Obsidian Local REST API` 同步到 Obsidian（`http://127.0.0.1:27123`）。
 - 数据库备份：
@@ -89,6 +90,9 @@ SyncNos 由两部分组成：
   - 可切换为仅在支持 AI 站点 + Notion 页面显示
   - 切换后对新打开/刷新页面生效
   - 不影响 Settings 中的 `Fetch Current Page`
+- 安装/升级行为：
+  - 首次安装会自动打开 `Settings -> About`
+  - 扩展升级后不再自动弹出设置页
 - `Settings -> General` 支持主题模式：
   - `System` / `Light` / `Dark`
   - 写入浏览器本地存储，并同时作用于 popup 与完整 App 页面
@@ -99,6 +103,7 @@ SyncNos 由两部分组成：
 - 消息存在 `contentMarkdown` 时优先渲染为 Notion blocks（标题/列表/引用/代码块等），否则回退纯文本。
 - Notion AI：可选“自动点选偏好模型”（仅在当前为 **Auto** 时生效）。
 - Google AI Studio 采集器支持虚拟列表对话补抓（手动保存）并过滤非消息片段。
+- 近期采集稳定性增强：Gemini 会过滤隐藏说话人/状态文案并保留 blob 上传图；Kimi 与 z.ai 会稳定抓取用户上传附件图片。
 
 ### 支持站点
 

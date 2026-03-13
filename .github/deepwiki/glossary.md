@@ -2,7 +2,7 @@
 
 ## 使用说明
 - 本页按“仓库级 → App → WebClipper → 同步 / 存储 → 发布”分组，确保同一个词在不同页面里不会被误解。
-- 如果你在其他页面看到 `Parent Page`、`cursor`、`conversation kind`、`EnsureCache`、`inpage_supported_only` 等词，建议先回到这里校准语义。
+- 如果你在其他页面看到 `Parent Page`、`cursor`、`conversation kind`、`EnsureCache`、`inpage_display_mode` 等词，建议先回到这里校准语义。
 
 ## 仓库级术语
 
@@ -35,7 +35,7 @@
 | app | 扩展内部完整页面 UI | `src/entrypoints/app/` |
 | conversation kind | WebClipper 会话分类，目前主要是 `chat` 与 `article` | `conversation-kinds.ts` |
 | `article_body` | article 会话的正文消息 key | `article-fetch.ts` |
-| `inpage_supported_only` | 控制非支持站点是否也启动 inpage UI 的开关 | `bootstrap/content.ts`, Settings |
+| `inpage_display_mode` | 控制 inpage UI 显示范围的开关（`supported / all / off`，并兼容旧 `inpage_supported_only`） | `bootstrap/content.ts`, Settings |
 
 ## 同步与存储术语
 

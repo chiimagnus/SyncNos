@@ -34,8 +34,8 @@
 
 | 版本面 | 当前值 | 用途 | 备注 |
 | --- | --- | --- | --- |
-| `package.json` version | `0.14.6` | npm 包层面的版本语义 | workflow 不用它校验 tag |
-| `wxt.config.ts` manifest version | `1.2.4` | 浏览器扩展 manifest 版本 | 这是商店发布的事实源 |
+| `package.json` version | `2003.08.20` | npm 包层面的版本语义 | workflow 不用它校验 tag |
+| `wxt.config.ts` manifest version | `1.3.1` | 浏览器扩展 manifest 版本 | 这是商店发布的事实源 |
 
 ## 打包脚本职责
 

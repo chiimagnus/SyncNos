@@ -28,8 +28,9 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.2.4` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.3.1` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
+| 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
 | `ai_chat_auto_save_enabled` | `chrome.storage.local` | 默认 `true` | 控制支持 AI 站点是否自动保存；关闭后仍可手动保存 |
 | `ui_theme_mode` | `chrome.storage.local`, `useThemeMode.ts` | 默认 `system` | 控制 popup / app 主题跟随系统，或强制 light / dark |
@@ -62,12 +63,13 @@
 | 面 | 真实配置 | 安全意图 | 备注 |
 | --- | --- | --- | --- |
 | 扩展权限 | `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 尽量只保留采集与本地保存所需能力 | 新增权限必须解释原因 |
-| 扩展 host permissions | 支持站点 + Notion + `http://*/*` + `https://*/*` | 允许 content script 在运行时自行判断是否激活 | UI 级别再由 `inpage_supported_only` 做 gating |
+| 扩展 host permissions | 支持站点 + Notion + `http://*/*` + `https://*/*` | 允许 content script 在运行时自行判断是否激活 | UI 级别由 `inpage_display_mode` 做 gating（并兼容回读旧 `inpage_supported_only`） |
 | App 敏感存储 | Keychain / 加密服务 | 避免站点 Cookie、加密密钥、试用期关键数据明文落盘 | `SiteLoginsStore`, `EncryptionService`, `IAPService` |
 | 备份导入导出 | denylist + 前缀过滤 | 防止 OAuth token 跟随备份扩散 | Zip v2 仍保留非敏感运行设置 |
 
 ## 常见误配
 - **改了 `wxt.config.ts` 的 `manifest.version` 却没对齐 tag**：CWS / AMO workflow 会直接报 `manifest version mismatch`。
+- **以为扩展升级后会自动打开设置页**：`background.ts` 仅在首次安装（`details.reason === 'install'`）自动打开 About；更新不会自动弹出设置页。
 - **切了 `inpage_display_mode` 或 `ai_chat_auto_save_enabled` 但当前页不变**：因为 content script 只在启动时读取这些开关，必须刷新或新开页面。
 - **以为主题切到 light / dark 会只影响当前页面**：`ui_theme_mode` 写在 `chrome.storage.local`，popup 与 app 都会通过 `useThemeMode()` 一起响应。
 - **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
@@ -78,7 +80,7 @@
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
-  version: '1.2.4',
+  version: '1.3.1',
   permissions: ['storage', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
@@ -110,6 +112,7 @@ export function applyThemeMode(mode: ThemeMode) {
 - `macOS/SyncNos/Info.plist`
 - `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
 - `webclipper/wxt.config.ts`
+- `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/bootstrap/content.ts`
 - `webclipper/src/bootstrap/current-page-capture.ts`
 - `webclipper/src/i18n/index.ts`

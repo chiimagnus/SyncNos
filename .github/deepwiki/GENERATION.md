@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `b8465e7905d876cc714fd8a014f7166fe4be49f1` |
-| Branch name | `crh2` |
-| Generation timestamp | `2026-03-11 23:55:12 CST` |
+| Commit hash | `dc4d4368549bfd5a22c55048375eb9e13335bed6` |
+| Branch name | `main` |
+| Generation timestamp | `2026-03-13 14:52:20 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental refresh |
@@ -40,15 +40,15 @@
 - `assets/repository-flow-01.svg` (existing asset, sourced from `macOS/Resource/flows.svg`)
 
 ## What Changed In This Update
-- 刷新生成元数据时间戳到当前更新批次，并保持当前 `HEAD`（`b8465e79`）与分支名 `crh2` 一致。
-- 为 `INDEX.md`、`business-context.md`、`overview.md`、`modules/webclipper.md`、`architecture.md` 补充当前分支上的 WebClipper UI / Settings 演进：`General` 分区、手动主题模式、`Chat with AI` 详情头动作、会话来源筛选持久化与窄屏 detail bridge。
-- 为 `configuration.md`、`storage.md`、`testing.md` 刷新实际配置键与验证口径：`manifest.version = 1.2.4`、`ui_theme_mode`、`inpage_display_mode`、`ai_chat_auto_save_enabled`、`webclipper_settings_active_section` 默认分组、`webclipper_conversations_source_filter_key` 与 `webclipper_pending_open_conversation_id`。
-- 为 `workflow.md`、`release.md` 修正当前 release 事实：商店 workflow 继续以 `webclipper/wxt.config.ts` 的 `manifest.version` 为 tag 校验真源，而不是 `webclipper/package.json`。
-- 同步仓库级与 UI 级文档，使 `README*`、`AGENTS.md`、`webclipper/AGENTS.md`、`webclipper/src/ui/AGENTS.md` 与 deepwiki 对齐，避免“代码已支持手动主题，但设计文档仍声称只能跟随系统”这类陈旧描述继续扩散。
+- 刷新生成元数据到 `main` 分支当前 `HEAD`（`dc4d4368`），并更新本次增量覆盖说明。
+- 为 `INDEX.md`、`business-context.md`、`overview.md`、`architecture.md`、`modules/webclipper.md` 补充当前版本的关键行为：`v1.3.1` 版本事实源、列表统计直达 Insight、安装/升级打开设置策略、近期 collector 稳定性修复（Gemini/Kimi/z.ai）。
+- 为 `configuration.md`、`dependencies.md`、`release.md`、`testing.md` 刷新版本与验证口径：`manifest.version = 1.3.1`、`package.json version = 2003.08.20`、商店 tag 校验规则、collector 回归测试入口。
+- 为 `data-flow.md`、`troubleshooting.md`、`glossary.md` 统一 `inpage_display_mode` 术语，并保留旧键 `inpage_supported_only` 的兼容说明，避免新旧文档语义冲突。
+- 同步相关仓库级文档：`README.md`、`README.zh-CN.md`、`webclipper/AGENTS.md`，保证用户入口文档与 deepwiki 的行为描述一致。
 
 ## Coverage Notes
-- 当前 deepwiki 已覆盖仓库级入口、双产品线模块、配置、测试、存储、发布与排障，并把 WebClipper 的 Insight 统计视图接入到业务入口层和工程入口层。
-- 本次增量刷新重点是“设置分组 / 主题模式 / Chat with AI / 窄屏路由桥接 / 本地 UI 状态存储”与既有 Insight 文档的并轨，未新增页面文件，继续保持稳定文件名并在既有页面追加证据。
+- 当前 deepwiki 已覆盖仓库级入口、双产品线模块、配置、测试、存储、发布与排障，并持续把 WebClipper 的 Insight 统计能力串入业务入口层和工程入口层。
+- 本次增量刷新重点是“版本事实更新 + 列表统计跳转 Insight + 安装/升级行为 + collector 稳定性修复 + 术语统一（inpage_display_mode）”，未新增页面文件，继续保持稳定文件名并在既有页面追加证据。
 - 仍保留的显式 Coverage Gaps：App Store 提交流程没有仓库内自动化证据；OCR 与键盘焦点专项文档尚未继续拆成 deepwiki 独立子页。
 
 ## Audit Basis
@@ -58,8 +58,8 @@
 | 仓库级语义 | `README.md`, `AGENTS.md`, `macOS/SyncNos/AGENTS.md`, `webclipper/AGENTS.md` |
 | App 入口与主流程 | `macOS/SyncNos/SyncNosApp.swift`, `macOS/SyncNos/AppDelegate.swift`, `macOS/SyncNos/Views/RootView.swift` |
 | App 服务与存储 | `DIContainer.swift`, `NotionSyncEngine.swift`, `IAPService.swift`, `SiteLoginsStore.swift`, `ChatCacheService.swift`, `WebArticleCacheService.swift` |
-| WebClipper 运行时与数据 | `background.ts`, `content.ts`, `bootstrap/content.ts`, `current-page-capture.ts`, `message-contracts.ts`, `schema.ts`, `storage-idb.ts`, `pending-open.ts` |
-| WebClipper 采集、设置与同步 | `register-all.ts`, `googleaistudio-collector.ts`, `article-fetch.ts`, `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.ts`, `i18n/index.ts`, `SettingsSidebarNav.tsx`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.ts`, `ConversationListPane.tsx`, `ConversationsScene.tsx`, `useThemeMode.ts`, `conversation-kinds.ts`, `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
+| WebClipper 运行时与数据 | `background.ts`, `content.ts`, `bootstrap/content.ts`, `current-page-capture.ts`, `message-contracts.ts`, `schema.ts`, `storage-idb.ts`, `pending-open.ts`, `PopupShell.tsx`, `AppShell.tsx`, `CapturedListSidebar.tsx` |
+| WebClipper 采集、设置与同步 | `register-all.ts`, `gemini-collector.ts`, `kimi-collector.ts`, `zai-collector.ts`, `googleaistudio-collector.ts`, `article-fetch.ts`, `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.ts`, `i18n/index.ts`, `SettingsSidebarNav.tsx`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.ts`, `ConversationListPane.tsx`, `ConversationsScene.tsx`, `useThemeMode.ts`, `conversation-kinds.ts`, `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*`, `tests/collectors/*` |
 | 发布与打包 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` |
 
 ## Notes For Next Update

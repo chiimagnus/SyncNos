@@ -29,7 +29,7 @@
 | App 启动入口 | `macOS/SyncNos/SyncNosApp.swift` | 启动 IAP、预热缓存、决定是否启动自动同步、定义主窗口 / 设置 / 日志窗口 | 它决定用户一启动 App 会发生什么 |
 | App 生命周期入口 | `macOS/SyncNos/AppDelegate.swift` | 菜单栏 / Dock 模式、同步中退出保护、Dock reopen、OAuth URL scheme 兜底 | 它决定 AppKit 层的行为边界 |
 | App 根门控 | `macOS/SyncNos/Views/RootView.swift` | 按顺序切换 Onboarding → PayWall → MainListView | 它解释为什么主界面不是总能直接出现 |
-| 扩展后台入口 | `webclipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job | 它决定所有后台能力如何挂接 |
+| 扩展后台入口 | `webclipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job；仅首次安装自动打开 About 分区 | 它决定所有后台能力如何挂接，以及安装/升级时是否主动打断用户 |
 | 扩展内容入口 | `webclipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、runtime observer、增量更新 | 它决定页面采集是如何启动的 |
 | 扩展设置入口 | `webclipper/src/ui/settings/SettingsScene.tsx` | 组织 `General / Chat with AI / Backup / Notion / Obsidian / Insight / About` 分区，并在窄屏下切换 list/detail 路由 | 它决定设置项如何被真正看见和进入 |
 | 扩展主题入口 | `webclipper/src/ui/shared/hooks/useThemeMode.ts` | 监听 `ui_theme_mode` 并把 light/dark/system 应用到根节点 `data-theme` | 它解释“为什么 popup 与 app 会同步切主题” |
@@ -47,6 +47,7 @@
 
 - WebClipper 的 Insight 统计面板是**本地会话库的只读视图**：它不生成新的导出产物，也不改变同步链路，而是把 `conversations + messages` 的累计结果变成可见的仪表盘。
 - WebClipper 的 `Chat with AI` 是**本地会话库派生出的 UI 动作**：它复用 detail 数据生成 payload，并把结果复制到剪贴板后跳转外部站点。
+- WebClipper 的会话列表底部 `today / total` 统计在 popup 与 app 中都可作为快捷入口跳到 Insight 分区，便于把列表与统计面板连成同一条导航路径。
 
 ## 常用命令与工程入口
 
@@ -97,6 +98,9 @@ flowchart LR
 - `webclipper/wxt.config.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/entrypoints/content.ts`
+- `webclipper/src/ui/popup/PopupShell.tsx`
+- `webclipper/src/ui/app/AppShell.tsx`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `.github/workflows/release.yml`

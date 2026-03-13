@@ -40,7 +40,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 4. 后续 Notion / Obsidian / 备份 / 导出都把 article 当作与 chat 并列的一种会话类型处理。
 
 ### 旅程 4：用户在 Settings 里查看自己的本地积累到底有多大
-1. 用户进入 WebClipper 的 `Settings → Insight`。
+1. 用户可以直接进入 WebClipper 的 `Settings → Insight`，也可以从会话列表底部 `today/total` 统计点击跳转到该分区。
 2. 设置控制器仅在第一次进入该 section 时调用 `getInsightStats()`，从 IndexedDB 的 `conversations` 与 `messages` 现算本地统计。
 3. 仪表盘把结果展示为总 clips、AI Conversations、Web Articles、来源分布、文章域名分布和 Top 3 longest conversations。
 4. 这个视图是**只读的**：它帮助用户“看见积累”，但不会写回新缓存、不会发网络请求，也不会改变 Notion / Obsidian 的同步状态。
@@ -61,6 +61,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | **Insight 只读，不成为新事实源** | WebClipper Settings | 统计页如果写回缓存或引入额外 schema，会把“观察数据”变成“业务状态” | `Settings → Insight` 每次只读聚合 `conversations` / `messages`，失败时显示错误或空态 |
 | **Chat with AI 是“复制 + 跳转”，不是后台代聊** | detail header + settings | 这样才能保持用户对 prompt 与目标平台的控制权，也避免扩展暗中持有额外会话状态 | 没有 detail messages、平台未启用或 URL 无效时，动作直接不出现 |
 | **主题默认跟随系统，但允许手动覆盖** | `ui_theme_mode` + `useThemeMode()` | 现在 WebClipper 不再只依赖 `prefers-color-scheme`；用户可以在 Settings 里强制 light / dark | popup 与 app 会监听 `chrome.storage.local` 变化并应用 `data-theme` 覆盖 |
+| **升级不应打断当前会话** | `background.ts` 的 `onInstalled` 行为 | 扩展升级后自动弹设置页会打断正在进行的阅读/对话流程 | 当前仅首次安装自动打开 About；更新保持静默 |
 | **敏感信息尽量不出本机** | App Keychain、扩展备份 | 站点 Cookie、加密密钥、Notion OAuth token 都不能随意进备份或明文落盘 | 备份显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret` |
 | **采集站点 ≠ UI 一定显示** | WebClipper inpage 逻辑 | 扩展虽然对所有 `http(s)` 注入 content script，但 inpage 按钮是否启动还受 `inpage_display_mode` 控制 | 切换该设置后必须刷新或新开页面；旧 `inpage_supported_only` 只做兼容回读 |
 | **并非所有站点都适合自动增量采集** | Google AI Studio collector | 虚拟列表会导致自动采集只看到可见消息 | 该来源保留“手动保存优先”的策略 |
@@ -115,5 +116,9 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
 - `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/entrypoints/background.ts`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/popup/PopupShell.tsx`
+- `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/conversations/ConversationsScene.tsx`
 - `webclipper/src/sync/backup/backup-utils.ts`

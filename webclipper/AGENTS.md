@@ -43,12 +43,14 @@
 - AI 聊天自动保存开关：`ai_chat_auto_save_enabled`（`chrome.storage.local`，默认 `true`）。
   - 关闭后：不再对支持的 AI 聊天站点执行自动保存（仍可手动点击 inpage 按钮保存）。
   - 切换后对**新打开/刷新**的页面生效。
+- 安装后引导策略：`src/entrypoints/background.ts` 仅在 `details.reason === 'install'` 时自动打开 `Settings -> About`；扩展更新后不再自动弹出设置页。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
 - Settings section 分组真源在 `src/ui/settings/types.ts`：
   - `Features`: `general`, `chat_with`
   - `Data`: `backup`, `notion`, `obsidian`
   - `About`: `insight`, `about`
 - `Chat with AI` 不只是设置页配置：detail header 会根据启用的平台动态显示 `Chat with <platform>` 动作；动作会先复制 payload，再跳转到目标站点。
+- 会话列表底部 `today/total` 统计在 popup/app 中可作为 Insight 快捷入口：通过 `onOpenInsightsSection` 跳到 `Settings?section=insight`。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
@@ -116,6 +118,7 @@
 - **会话列表 UI-only 状态**：`src/ui/conversations/ConversationListPane.tsx` + `src/ui/conversations/pending-open.ts`
   - 来源筛选保存在 `localStorage`（`webclipper_conversations_source_filter_key`），只影响列表视图。
   - 窄屏下从 Insight / 其他入口跳详情时，目标 `conversationId` 通过 `sessionStorage` (`webclipper_pending_open_conversation_id`) 做一次性桥接。
+  - 底部统计组件在有 `onOpenInsightsSection` 回调时可点击跳转到 Insight 分区；若无回调则回退为纯展示态。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
   - settings 写入：`src/ui/settings/hooks/useSettingsSceneController.ts`（保存 `inpage_display_mode` / `ai_chat_auto_save_enabled` 到 `chrome.storage.local`，并兼容旧 `inpage_supported_only`）。
   - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_display_mode`（及旧 `inpage_supported_only`）决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。
