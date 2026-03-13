@@ -18,6 +18,7 @@ export type SelectMenuProps<T extends string> = {
   ariaLabel: string;
   minWidth?: number;
   maxHeight?: number;
+  adaptiveMaxHeight?: boolean;
   className?: string;
   buttonClassName?: string;
   triggerLabelClassName?: string;
@@ -69,6 +70,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     ariaLabel,
     minWidth,
     maxHeight,
+    adaptiveMaxHeight = false,
     className,
     buttonClassName,
     triggerLabelClassName,
@@ -127,6 +129,24 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
   const resolvedTriggerLayoutClassName = chevronOverlay
     ? 'tw-relative tw-inline-flex tw-items-center'
     : 'tw-inline-flex tw-items-center tw-justify-between tw-gap-2';
+
+  const resolvedPanelMaxHeight = useMemo(() => {
+    if (!adaptiveMaxHeight) return maxHeight;
+    if (!open) return maxHeight;
+    const el = triggerRef.current;
+    if (!el || typeof el.getBoundingClientRect !== 'function') return maxHeight;
+
+    const rect = el.getBoundingClientRect();
+    const gap = 8;
+    const margin = 14;
+
+    const available = side === 'top'
+      ? rect.top - gap - margin
+      : window.innerHeight - rect.bottom - gap - margin;
+
+    const next = Math.floor(Math.max(160, Number.isFinite(available) ? available : 160));
+    return next;
+  }, [adaptiveMaxHeight, maxHeight, open, side]);
 
   const closeAndRestoreFocus = () => {
     setOpen(false);
@@ -206,7 +226,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
       side={side}
       align={align}
       panelMinWidth={minWidth}
-      panelMaxHeight={maxHeight}
+      panelMaxHeight={resolvedPanelMaxHeight}
       className={className}
       trigger={(triggerProps) => (
         <button
