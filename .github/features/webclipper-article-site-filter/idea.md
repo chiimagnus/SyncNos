@@ -19,7 +19,7 @@ AI chat 已经天然按平台（source）可筛；Web articles 需要一个**零
    - UI 放置在列表底部工具条中，紧挨现有 `Source` 下拉。
    - 仅当 `Source = web` 时显示 `Site` 下拉；切走 `web` 立即隐藏。
 3. 默认值与持久化策略：
-   - `Site` 不做持久化：每次切到 `Source = web` 都回到 `All`。
+   - `Site` 记住上次选择（localStorage 持久化）；下次切到 `Source = web` 自动恢复。
 4. Insight 的“域名分布”按同一规则归并：
    - 复用同一个 domain util，把 Insight 的 article domain 分布从 `URL.hostname` 改为“可注册域名”归并后的口径（保持 Unknown 聚合逻辑）。
 
