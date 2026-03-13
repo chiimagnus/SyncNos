@@ -141,23 +141,6 @@ function AppShellFrame() {
       else navigate('/', { replace: true });
     };
 
-    const openProviderSettings = (section: string) => {
-      const safeSection = String(section || '').trim().toLowerCase() || 'notion';
-      const route = `/settings?section=${encodeURIComponent(safeSection)}`;
-
-      if (location.pathname === '/settings') {
-        navigate(route, { replace: true, state: location.state });
-        return;
-      }
-
-      navigate(route, {
-        state: {
-          backgroundLocation: { pathname: location.pathname, search: location.search, hash: location.hash },
-          from: `${location.pathname || '/'}${location.search || ''}`,
-        },
-      });
-    };
-
     useEffect(() => {
       if (!showSettingsSheet) return;
       const onKey = (e: KeyboardEvent) => {
@@ -233,7 +216,6 @@ function AppShellFrame() {
                       <ConversationsScene
                         onPopupHeaderStateChange={setNarrowHeaderState}
                         onOpenInsightsSection={() => navigate('/settings?section=insight')}
-                        onOpenSettingsSection={openProviderSettings}
                       />
                     }
                   />
