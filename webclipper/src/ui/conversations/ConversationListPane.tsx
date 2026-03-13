@@ -213,13 +213,21 @@ export function ConversationListPane({
   const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>(['obsidian', 'notion']);
 
   const sourceOptions = useMemo(() => {
-    const map = new Map<string, { key: string; label: string }>();
+    const map = new Map<string, { key: string; label: string; count: number }>();
     for (const c of items) {
       const meta = getSourceMeta((c as any).source);
       if (!meta.key) continue;
-      map.set(meta.key, { key: meta.key, label: meta.label || meta.key });
+      const prev = map.get(meta.key);
+      if (prev) {
+        prev.count += 1;
+        continue;
+      }
+      map.set(meta.key, { key: meta.key, label: meta.label || meta.key, count: 1 });
     }
-    const opts = Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+    const opts = Array.from(map.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
     return [{ key: 'all', label: t('allFilter') }, ...opts];
   }, [items]);
 
