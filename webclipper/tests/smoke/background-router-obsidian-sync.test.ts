@@ -85,6 +85,18 @@ describe("background-router obsidian sync routes", () => {
       },
     });
 
+    store['webclipper_sync_provider_obsidian_enabled'] = false;
+    const disabledRes = await router.__handleMessageForTests({
+      type: "obsidianSyncConversations",
+      conversationIds: [1],
+    });
+    expect(disabledRes.ok).toBe(false);
+    expect(disabledRes.error?.message).toBe('sync provider disabled');
+    expect(disabledRes.error?.extra?.code).toBe('sync_provider_disabled');
+    expect(disabledRes.error?.extra?.provider).toBe('obsidian');
+    expect(calls.syncConversations).toBe(null);
+    delete store['webclipper_sync_provider_obsidian_enabled'];
+
     const getRes = await router.__handleMessageForTests({ type: "obsidianGetSettings" });
     expect(getRes.ok).toBe(true);
     expect(getRes.data?.apiBaseUrl).toContain("http://127.0.0.1:27123");
