@@ -5,6 +5,7 @@ import { formatConversationMarkdown } from '../../conversations/domain/markdown'
 import { getConversationDetail } from '../../conversations/client/repo';
 import { tabsCreate } from '../../platform/webext/tabs';
 import { storageOnChanged } from '../../platform/storage/local';
+import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
 
 import { t, formatConversationTitle } from '../../i18n';
 import type { SyncProvider } from '../../sync/models';
@@ -132,6 +133,7 @@ async function copyTextToClipboard(text: string) {
 export type ConversationListPaneProps = {
   onOpenConversation?: (conversationId: number) => void;
   onOpenInsightsSection?: () => void;
+  onOpenSettingsSection?: (section: string) => void;
   activeRowId?: number | null;
   onPopupNotionSyncStarted?: () => void;
   initialScrollTop?: number;
@@ -142,6 +144,7 @@ export type ConversationListPaneProps = {
 export function ConversationListPane({
   onOpenConversation,
   onOpenInsightsSection,
+  onOpenSettingsSection,
   activeRowId,
   onPopupNotionSyncStarted,
   initialScrollTop = 0,
@@ -706,6 +709,31 @@ export function ConversationListPane({
                       disabled={actionBusy || syncingNotion}
                     >
                       {syncingNotion ? t('notionSyncing') : t('notionSync')}
+                    </button>
+                  ) : null}
+                  {enabledSyncProviders.length === 0 ? (
+                    <button
+                      id="menuSyncProvidersDisabled"
+                      className={menuItemButtonClassName}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSyncOpen(false);
+                        const section = 'notion';
+                        if (onOpenSettingsSection) {
+                          onOpenSettingsSection(section);
+                        } else {
+                          void openOrFocusExtensionAppTab({ route: `/settings?section=${section}` });
+                        }
+                        try {
+                          window.close();
+                        } catch (_e) {
+                          // ignore
+                        }
+                      }}
+                      disabled={exporting || deleting}
+                    >
+                      {t('syncAllProvidersDisabledMenuItem')}
                     </button>
                   ) : null}
                 </MenuPopover>

@@ -67,6 +67,21 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
     });
   };
 
+  const openProviderSettings = (section: string) => {
+    const safeSection = String(section || '').trim().toLowerCase() || 'notion';
+    const route = `/settings?section=${encodeURIComponent(safeSection)}`;
+    if (settingsOpen) {
+      navigate(route, { replace: true, state: routerLocation.state });
+      return;
+    }
+    navigate(route, {
+      state: {
+        backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+        from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
+      },
+    });
+  };
+
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
       <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
@@ -116,7 +131,11 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
         </div>
       </div>
 
-      <ConversationListPane onOpenConversation={() => navigate('/')} onOpenInsightsSection={openInsightSettings} />
+      <ConversationListPane
+        onOpenConversation={() => navigate('/')}
+        onOpenInsightsSection={openInsightSettings}
+        onOpenSettingsSection={openProviderSettings}
+      />
     </div>
   );
 }

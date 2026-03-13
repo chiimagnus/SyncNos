@@ -329,6 +329,7 @@ export const en = {
   obsidianSyncEnabledHint: 'Obsidian sync is disabled. You can re-enable it anytime in Settings.',
   syncStopped: 'Sync stopped',
   syncTo: 'Sync to',
+  syncAllProvidersDisabledMenuItem: 'All sync providers are disabled. Open Settings to enable.',
   copyFailed: 'Copy failed.',
   syncStagePreparingQueue: 'Preparing queue',
   syncStageLoadingConversation: 'Loading conversation',
