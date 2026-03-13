@@ -408,6 +408,7 @@ export function ConversationListPane({
     setFilterKey(next);
     setSiteFilterKey(SITE_FILTER_ALL_KEY);
     clearSelected();
+    setDeleteConfirmOpen(false);
     setExportOpen(false);
     setSyncOpen(false);
     try {
@@ -421,6 +422,7 @@ export function ConversationListPane({
     const next = String(key || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
     setSiteFilterKey(next);
     clearSelected();
+    setDeleteConfirmOpen(false);
     setExportOpen(false);
     setSyncOpen(false);
   };
