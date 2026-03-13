@@ -63,7 +63,7 @@ export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
 
 export function menuChevronClassName(): string {
   return [
-    'tw-ml-1 tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]',
+    'tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]',
   ].join(' ');
 }
 

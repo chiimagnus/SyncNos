@@ -700,6 +700,7 @@ export function ConversationListPane({
               align="start"
               minWidth={150}
               maxHeight={320}
+              chevronOverlay
               triggerLabelClassName="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-whitespace-nowrap tw-text-left"
               buttonClassName={[
                 'tw-h-8 tw-w-[80px] tw-shrink-0 tw-rounded-lg tw-border tw-px-2',
@@ -726,6 +727,7 @@ export function ConversationListPane({
                 align="start"
                 minWidth={160}
                 maxHeight={320}
+                chevronOverlay
                 triggerLabelClassName="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-whitespace-nowrap tw-text-left"
                 buttonClassName={[
                   'tw-h-8 tw-w-[80px] tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
