@@ -108,6 +108,12 @@ export const zh: { [K in TranslationKey]: string } = {
   authorTagline: '时光机创造者~',
   angelsCta: '快来看看吧！这是可爱的天使赞助者们',
   angelsLinkLabel: 'SyncNos 天使赞助者们',
+  supportHeading: '支持',
+  supportIntro: 'SyncNos 是一个人用心做的项目。',
+  supportAskPrefix: '如果你想赞助我，有一个小小的请求：',
+  supportAskEmphasis: '别只给钱——留下一句话吧。',
+  supportAskSuffix: ' 说说你为什么用 SyncNos，讲个故事，或者就一句“加油”都好。',
+  supportWhy: '让我继续做下去的，不是钱，是知道有人在乎。把我们连在一起的，是情感，不是交易。',
 
   // ConversationListPane
   allFilter: '全部',
@@ -357,4 +363,5 @@ export const zh: { [K in TranslationKey]: string } = {
   linksAria: '链接',
   authorSectionAria: '作者',
   donateSectionAria: '赞赏二维码',
+  supportSectionAria: '支持 SyncNos WebClipper',
 };

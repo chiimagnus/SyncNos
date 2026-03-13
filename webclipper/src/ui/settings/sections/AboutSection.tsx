@@ -101,8 +101,27 @@ export function AboutSection() {
         </div>
       </section>
 
-      <section className={cardClassName} aria-label={t('donateSectionAria')}>
-        <img className="tw-w-full tw-rounded-2xl tw-object-cover" src={getURL('icons/buymeacoffee1.jpg' as any)} alt="Chii Magnus donate QR code" draggable={false} />
+      <section className={cardClassName} aria-label={t('supportSectionAria')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('supportHeading')}</h2>
+
+        <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-leading-6 tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('supportIntro')}
+        </p>
+        <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-leading-6 tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('supportAskPrefix')}
+          <strong className="tw-text-[var(--text-primary)]">{t('supportAskEmphasis')}</strong>
+          {t('supportAskSuffix')}
+        </p>
+        <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-leading-6 tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('supportWhy')}
+        </p>
+
+        <img
+          className="tw-mt-3 tw-w-full tw-rounded-2xl tw-object-cover"
+          src={getURL('icons/buymeacoffee1.jpg' as any)}
+          alt={t('donateSectionAria')}
+          draggable={false}
+        />
       </section>
     </>
   );
