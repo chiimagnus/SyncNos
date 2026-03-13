@@ -564,6 +564,8 @@ export function ConversationListPane({
     setDeleteConfirmOpen(false);
   };
 
+  const sourceFilterActive = String(filterKey || 'all').trim().toLowerCase() !== 'all';
+
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
       <div
@@ -700,8 +702,12 @@ export function ConversationListPane({
               maxHeight={320}
               triggerLabelClassName="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-whitespace-nowrap tw-text-left"
               buttonClassName={[
-                'tw-h-8 tw-w-[80px] tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
-                'tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)]',
+                'tw-h-8 tw-w-[80px] tw-shrink-0 tw-rounded-lg tw-border tw-px-2',
+                sourceFilterActive
+                  ? 'tw-border-[var(--accent)] tw-bg-[var(--accent)] hover:tw-bg-[var(--accent-hover)] active:tw-bg-[var(--accent-active)]'
+                  : 'tw-border-[var(--border)] tw-bg-[var(--bg-card)] hover:tw-bg-[var(--bg-primary)]',
+                'tw-text-xs tw-font-semibold tw-outline-none tw-transition-colors tw-duration-200',
+                sourceFilterActive ? 'tw-text-[var(--accent-foreground)]' : 'tw-text-[var(--text-primary)]',
                 'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
                 'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
               ].join(' ')}
