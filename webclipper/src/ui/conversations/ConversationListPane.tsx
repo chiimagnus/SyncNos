@@ -16,10 +16,19 @@ import { navItemClassName } from '../shared/nav-styles';
 import { buttonDangerTintClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '../shared/button-styles';
 import { MenuPopover } from '../shared/MenuPopover';
 import { SelectMenu } from '../shared/SelectMenu';
+import { parseRegistrableDomainFromUrl } from '../shared/domain';
 
 type SourceMeta = { key: string; label: string };
 
 const SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
+const SITE_FILTER_ALL_KEY = 'all';
+const SITE_FILTER_UNKNOWN_KEY = 'unknown';
+
+function toSiteFilterKey(domain: string) {
+  const safe = String(domain || '').trim().toLowerCase();
+  if (!safe) return SITE_FILTER_UNKNOWN_KEY;
+  return `domain:${safe}`;
+}
 
 function commonPrefix(a: string, b: string) {
   const left = String(a || '');
@@ -53,6 +62,10 @@ function isSameLocalDay(a: Date, b: Date) {
 
 function hasWarningFlags(conversation: Conversation) {
   return Array.isArray((conversation as any).warningFlags) && ((conversation as any).warningFlags as any[]).length > 0;
+}
+
+function isArticleConversation(conversation: Conversation): boolean {
+  return String((conversation as any)?.sourceType || '').trim().toLowerCase() === 'article';
 }
 
 function getSourceMeta(raw: unknown): SourceMeta {
@@ -227,6 +240,35 @@ export function ConversationListPane({
     if (key === 'all') return items;
     return items.filter((c) => getSourceMeta((c as any).source).key === key);
   }, [filterKey, items]);
+
+  const siteOptions = useMemo(() => {
+    const key = String(filterKey || 'all').trim().toLowerCase() || 'all';
+    if (key !== 'web') return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }];
+
+    const domainCounts = new Map<string, number>();
+    let unknownCount = 0;
+
+    for (const conversation of filteredItems) {
+      if (!isArticleConversation(conversation as any)) continue;
+      const domain = parseRegistrableDomainFromUrl((conversation as any).url);
+      if (!domain) {
+        unknownCount += 1;
+        continue;
+      }
+      domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
+    }
+
+    const domains = Array.from(domainCounts.entries())
+      .map(([domain, count]) => ({ key: toSiteFilterKey(domain), label: domain, count }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return String(a.label || '').localeCompare(String(b.label || ''));
+      });
+
+    const out: Array<{ key: string; label: string }> = [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }, ...domains];
+    if (unknownCount > 0) out.push({ key: SITE_FILTER_UNKNOWN_KEY, label: t('insightUnknownLabel') });
+    return out;
+  }, [filterKey, filteredItems]);
 
   const todayCount = useMemo(() => {
     const now = new Date();
