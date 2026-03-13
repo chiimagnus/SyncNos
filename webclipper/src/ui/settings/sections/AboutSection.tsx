@@ -52,7 +52,7 @@ export function AboutSection() {
             id="btnAboutChangelog"
             className={buttonClassName}
             type="button"
-            onClick={() => openUrl('https://github.com/chiimagnus/SyncNos/releases').catch(() => {})}
+            onClick={() => openUrl('https://chiimagnus.notion.site/syncnos-changelog').catch(() => {})}
           >
             {t('changelog')}
           </button>
