@@ -422,4 +422,26 @@ describe('Conversations sync feedback', () => {
     expect(failureNotice?.textContent).not.toContain('#?:');
     expect(alertSpy).not.toHaveBeenCalled();
   });
+
+  it('localizes sync_provider_disabled failures', async () => {
+    const error: any = new Error('sync provider disabled');
+    error.extra = { code: 'sync_provider_disabled', provider: 'notion' };
+    syncNotionConversations.mockRejectedValue(error);
+
+    await renderPane();
+    selectFirstConversation();
+    clickNotionButton();
+
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    const failureNotice = document.getElementById('conversationSyncFeedback');
+    expect(failureNotice).toBeTruthy();
+    expect(failureNotice?.getAttribute('data-phase')).toBe('failed');
+    expect(failureNotice?.textContent).toContain(t('providerNotion'));
+    expect(failureNotice?.textContent).toContain(t('phaseFailed'));
+    expect(failureNotice?.textContent).toContain(t('syncProviderDisabled'));
+    expect(failureNotice?.textContent).not.toContain('sync provider disabled');
+  });
 });

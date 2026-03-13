@@ -329,6 +329,7 @@ export const zh: { [K in TranslationKey]: string } = {
   syncStopped: '同步已停止',
   syncTo: '同步到',
   syncAllProvidersDisabledMenuItem: '您已关闭所有同步选项，可以前往设置面板开启',
+  syncProviderDisabled: '您已关闭该同步选项。',
   copyFailed: '复制失败。',
   syncStagePreparingQueue: '准备队列',
   syncStageLoadingConversation: '正在加载对话',

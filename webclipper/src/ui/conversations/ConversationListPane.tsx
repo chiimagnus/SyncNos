@@ -256,24 +256,34 @@ export function ConversationListPane({
   const syncingAny = syncingNotion || syncingObsidian;
 
   useEffect(() => {
-    void getEnabledSyncProviders()
-      .then((providers) => setEnabledSyncProviders(providers as SyncProvider[]))
-      .catch(() => {});
+    let disposed = false;
+    const load = async () => {
+      const providers = await getEnabledSyncProviders().catch(() => null);
+      if (disposed || !providers) return;
+      const next = providers as SyncProvider[];
+      setEnabledSyncProviders((current) => {
+        if (current.length === next.length && current.every((value, idx) => value === next[idx])) return current;
+        return next;
+      });
+    };
+    void load();
 
     const notionKey = syncProviderEnabledStorageKey('notion');
     const obsidianKey = syncProviderEnabledStorageKey('obsidian');
-    return storageOnChanged((changes: any, areaName: string) => {
+    const unsubscribe = storageOnChanged((changes: any, areaName: string) => {
       if (areaName !== 'local') return;
       if (!changes || typeof changes !== 'object') return;
       if (
         Object.prototype.hasOwnProperty.call(changes, notionKey) ||
         Object.prototype.hasOwnProperty.call(changes, obsidianKey)
       ) {
-        void getEnabledSyncProviders()
-          .then((providers) => setEnabledSyncProviders(providers as SyncProvider[]))
-          .catch(() => {});
+        void load();
       }
     });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

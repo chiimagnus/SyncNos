@@ -330,6 +330,7 @@ export const en = {
   syncStopped: 'Sync stopped',
   syncTo: 'Sync to',
   syncAllProvidersDisabledMenuItem: 'All sync providers are disabled. Open Settings to enable.',
+  syncProviderDisabled: 'This sync option is disabled.',
   copyFailed: 'Copy failed.',
   syncStagePreparingQueue: 'Preparing queue',
   syncStageLoadingConversation: 'Loading conversation',
