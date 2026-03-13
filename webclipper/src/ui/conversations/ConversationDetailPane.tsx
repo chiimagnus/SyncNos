@@ -89,7 +89,6 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 <ChatMessageBubble
                   key={String((m as any).id)}
                   role={isArticle ? undefined : (m as any).role}
-                  headerLeft={isArticle ? undefined : String((m as any).role || t('messageRoleFallback'))}
                   markdown={text}
                 />
               );
