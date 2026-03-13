@@ -233,22 +233,25 @@ export function ConversationListPane({
   }, [items]);
 
   useEffect(() => {
+    let nextFilterKey = 'all';
     try {
-      const raw = String(localStorage.getItem(SOURCE_FILTER_STORAGE_KEY) || '').trim();
-      if (raw) {
-        setFilterKey(raw.toLowerCase());
-      }
+      const raw = String(localStorage.getItem(SOURCE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
+      if (raw) nextFilterKey = raw;
     } catch (_e) {
       // ignore
     }
 
-    // Backward compat: older app stored filter under this key.
-    try {
-      const v = String(localStorage.getItem('webclipper_app_source_filter_key') || 'all').trim().toLowerCase() || 'all';
-      setFilterKey(v);
-    } catch (_e) {
-      // ignore
+    if (!nextFilterKey || nextFilterKey === 'all') {
+      // Backward compat: older app stored filter under this key.
+      try {
+        const v = String(localStorage.getItem('webclipper_app_source_filter_key') || '').trim().toLowerCase();
+        if (v) nextFilterKey = v;
+      } catch (_e) {
+        // ignore
+      }
     }
+
+    setFilterKey(nextFilterKey || 'all');
 
     try {
       const raw = String(localStorage.getItem(SITE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
@@ -462,12 +465,13 @@ export function ConversationListPane({
   useEffect(() => {
     const sourceKey = String(filterKey || 'all').trim().toLowerCase() || 'all';
     if (sourceKey !== 'web') return;
+    if (siteOptions.length <= 1) return;
 
     const current = String(siteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
     if (current === SITE_FILTER_ALL_KEY) return;
     if (siteOptionKeys.has(current)) return;
     setSiteFilterKey(SITE_FILTER_ALL_KEY);
-  }, [filterKey, siteFilterKey, siteOptionKeys]);
+  }, [filterKey, siteFilterKey, siteOptionKeys, siteOptions.length]);
 
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
