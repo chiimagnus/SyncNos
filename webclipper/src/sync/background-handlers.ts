@@ -1,6 +1,7 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
 import { storageGet } from '../platform/storage/local';
 import { getNotionOAuthToken } from './notion/auth/token-store';
+import { ensureSyncProviderEnabled } from './sync-provider-gate';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -54,6 +55,9 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (lock && notionDetachedRun === lock) notionDetachedRun = null;
     };
     try {
+      const gateError = await ensureSyncProviderEnabled('notion');
+      if (gateError) return router.err('sync provider disabled', gateError);
+
       if (notionDetachedRun) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
@@ -126,6 +130,9 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (lock && obsidianDetachedRun === lock) obsidianDetachedRun = null;
     };
     try {
+      const gateError = await ensureSyncProviderEnabled('obsidian');
+      if (gateError) return router.err('sync provider disabled', gateError);
+
       if (obsidianDetachedRun) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
