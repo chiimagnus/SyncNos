@@ -4,6 +4,23 @@
 
 ## Findings
 
+- `webclipper/src/ui/settings/sections/insight-stats.ts`：`articleDomainDistribution` 已改为复用 `webclipper/src/ui/shared/domain.ts` 的 `parseRegistrableDomainFromUrl(...)`（解析失败仍归入 `INSIGHT_UNKNOWN_DOMAIN_LABEL`），与列表 site filter 同口径。
+- `webclipper/tests/storage/insight-stats.test.ts`：
+  - 覆盖 `www.`/`m.` 前缀归并与 `github.io`。
+  - long-tail 的 `Other` bucket 用“不同可注册域名”构造，避免因归并导致的用例失真。
+- 已知边界：domain 归并为启发式白名单（非 PSL 全量），少数冷门后缀可能仍不准，但符合约束“够用优先”。
+
+## Fixes
+
+- 无。
+
+## Verification
+
+- Run: `npm --prefix webclipper run compile`
+- Run: `npm --prefix webclipper run test`
+
+## Findings
+
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
   - article domain 分布已从 `URL.hostname` 口径切换为复用 `webclipper/src/ui/shared/domain.ts` 的“可注册域名”归并口径（解析失败仍归入 `INSIGHT_UNKNOWN_DOMAIN_LABEL`）。
 - `webclipper/tests/storage/insight-stats.test.ts`
