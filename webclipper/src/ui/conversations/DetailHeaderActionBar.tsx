@@ -91,7 +91,7 @@ export function DetailHeaderActionBar({
         >
           <span className="tw-inline-flex tw-items-center tw-gap-1.5">
             {icon}
-            <span className="tw-hidden md:tw-inline">{buttonLabel}</span>
+            <span className="tw-hidden md:tw-inline tw-whitespace-nowrap">{buttonLabel}</span>
           </span>
         </button>
       </div>
@@ -126,7 +126,7 @@ export function DetailHeaderActionBar({
           >
             <span className="tw-inline-flex tw-items-center tw-gap-1.5">
               {primaryIcon}
-              <span className="tw-hidden md:tw-inline tw-leading-none">{triggerLabel}</span>
+              <span className="tw-hidden md:tw-inline tw-whitespace-nowrap tw-leading-none">{triggerLabel}</span>
             </span>
             <span
               className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
