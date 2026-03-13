@@ -5,7 +5,7 @@
 一款聚焦「阅读高亮与 AI 对话沉淀」的同步工具集。  
 支持将多源内容整理后同步到 Notion，同时提供 WebClipper 浏览器扩展。
 
-[SyncNos Angels](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
+[SyncNos天使赞助者们😍](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
 
 [![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
 [![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total?label=Release%20Downloads&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
