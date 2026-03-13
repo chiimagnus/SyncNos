@@ -46,18 +46,30 @@ export function NotionOAuthSection(props: {
           </span>
           <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{notionStatusText}</span>
         </div>
-        <input
-          id="notionSyncEnabledToggle"
-          type="checkbox"
-          className={checkboxClassName}
-          checked={syncEnabled}
-          disabled={busy}
-          aria-label={`${t('syncTo')} ${t('providerNotion')}`}
-          onChange={(e) => onToggleSyncEnabled(e.target.checked)}
-        />
         <button onClick={onConnectOrDisconnect} disabled={busy} type="button" className={buttonClassName}>
           {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
         </button>
+      </div>
+
+      <div className="tw-mt-3" aria-label={t('notionSyncEnabledLabel')}>
+        <SettingsFormRow label={t('notionSyncEnabledLabel')}>
+          <input
+            id="notionSyncEnabledToggle"
+            type="checkbox"
+            className={checkboxClassName}
+            checked={syncEnabled}
+            disabled={busy}
+            aria-label={t('notionSyncEnabledLabel')}
+            onChange={(e) => onToggleSyncEnabled(e.target.checked)}
+          />
+        </SettingsFormRow>
+        {!syncEnabled ? (
+          <div className="tw-mt-2">
+            <SettingsFormRow label="" align="start">
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('notionSyncEnabledHint')}</div>
+            </SettingsFormRow>
+          </div>
+        ) : null}
       </div>
 
       <div className="tw-mt-3" aria-label={t('parentPage')}>

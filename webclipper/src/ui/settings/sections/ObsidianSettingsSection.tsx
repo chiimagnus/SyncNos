@@ -68,18 +68,27 @@ export function ObsidianSettingsSection(props: {
         <div className="tw-flex tw-items-center tw-gap-2">
           <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
           <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('obsidianLocalRestApi')}</h2>
-          <input
-            id="obsidianSyncEnabledToggle"
-            type="checkbox"
-            className={checkboxClassName}
-            checked={syncEnabled}
-            disabled={busy}
-            aria-label={`${t('syncTo')} ${t('providerObsidian')}`}
-            onChange={(e) => onToggleSyncEnabled(e.target.checked)}
-          />
         </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
+          <SettingsFormRow label={t('obsidianSyncEnabledLabel')}>
+            <input
+              id="obsidianSyncEnabledToggle"
+              type="checkbox"
+              className={checkboxClassName}
+              checked={syncEnabled}
+              disabled={busy}
+              aria-label={t('obsidianSyncEnabledLabel')}
+              onChange={(e) => onToggleSyncEnabled(e.target.checked)}
+            />
+          </SettingsFormRow>
+
+          {!syncEnabled ? (
+            <SettingsFormRow label="" align="start">
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('obsidianSyncEnabledHint')}</div>
+            </SettingsFormRow>
+          ) : null}
+
           <SettingsFormRow label={t('baseUrl')}>
             <input
               value={apiBaseUrl}
