@@ -688,6 +688,7 @@ export function ConversationListPane({
                 side="top"
                 align="start"
                 minWidth={160}
+                maxHeight={320}
                 buttonClassName={[
                   'tw-h-8 tw-w-full tw-max-w-[148px] tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2',
                   'tw-text-xs tw-font-semibold tw-text-[var(--text-primary)] tw-outline-none tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-primary)]',
