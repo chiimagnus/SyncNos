@@ -5,7 +5,9 @@ function safeString(value: unknown): string {
 function normalizeHostname(value: string): string {
   const raw = safeString(value).toLowerCase();
   if (!raw) return '';
-  return raw.endsWith('.') ? raw.slice(0, -1) : raw;
+  const trimmedDot = raw.endsWith('.') ? raw.slice(0, -1) : raw;
+  if (trimmedDot.startsWith('[') && trimmedDot.endsWith(']')) return trimmedDot.slice(1, -1);
+  return trimmedDot;
 }
 
 function isIPv4(hostname: string): boolean {
@@ -94,4 +96,3 @@ export function parseRegistrableDomainFromUrl(url: unknown): string {
   if (!hostname) return '';
   return toRegistrableDomain(hostname);
 }
-

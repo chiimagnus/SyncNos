@@ -4,6 +4,26 @@
 
 ## Findings
 
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
+  - `Site` 二级筛选仅在 `Source=web` 时显示；切换 `Source/Site` 会清空 selection 并关闭相关菜单，符合“零学习成本”目标。
+  - 站点 options 的域名项按 count desc 排序；`Unknown` 仅在确实存在解析失败时出现。
+  - 注意：当前实现把 `Unknown` 固定追加在末尾（不参与 count 排序）。该行为可接受（Unknown 不是站点），暂不调整。
+- `webclipper/src/ui/shared/domain.ts`
+  - “够用优先”的归并规则满足需求（剥离 `www/m/mobile/amp`，多级后缀白名单 `com.cn/co.uk/github.io` 等，`localhost/IP` 直出，非法 URL 返回空）。
+- `webclipper/tests/unit/domain.test.ts`
+  - 已覆盖核心路径，但缺少对 `co.uk`/`com.cn`、链式前缀剥离（`www.m.*`）、IPv6 URL 的回归用例。
+
+## Fixes
+
+- 补齐 `domain.test.ts` 的归并用例：`co.uk`、`com.cn`、`www.m.*`、`http://[::1]/`。
+
+## Verification
+
+- Run: `npm --prefix webclipper run compile`
+- Run: `npm --prefix webclipper run test`
+
+## Findings
+
 ### ✅ ConversationListPane：二级 site filter 行为基本满足需求
 
 - 仅在 `Source = web` 时渲染 site 下拉：`webclipper/src/ui/conversations/ConversationListPane.tsx`（`siteFilterSelect` 条件渲染）。
@@ -31,4 +51,3 @@
 
 1. 增补 `domain.test.ts` 用例覆盖 `co.uk` / `com.cn` / 多前缀剥离 / IPv6（建议作为后续 audit fix 或并入 P2 测试增强）。
 2. 若后续要把 Insight 统计口径也切到 registrable domain（已纳入 P2），建议顺手复用同一 util，并在 `insight-stats.test.ts` 增补 `www`/`m` 场景，避免口径漂移回归。
-
