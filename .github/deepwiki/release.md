@@ -7,7 +7,8 @@
 | --- | --- | --- | --- |
 | GitHub Release | Release 页面与附件链接 | `.github/workflows/release.yml` | 自动 |
 | Chrome Web Store | Chrome zip 上传 / 发布 | `.github/workflows/webclipper-cws-publish.yml` | 自动 |
-| Edge | Edge zip 作为 Release 附件 | `.github/workflows/webclipper-release.yml` | 自动构建、手动分发 |
+| Edge Add-ons | Edge zip 上传 / 发布 | `.github/workflows/webclipper-edge-publish.yml` | 自动 |
+| Edge（手动分发） | Edge zip 作为 Release 附件 | `.github/workflows/webclipper-release.yml` | 自动构建 |
 | Firefox AMO | XPI + reviewer source zip | `.github/workflows/webclipper-amo-publish.yml` | 自动 |
 | macOS App Store | App Store 页面链接 | `README.md`, `release.yml` body | 仓库内未显式自动化 |
 
@@ -19,6 +20,7 @@
 | `webclipper-release.yml` | `push tags: v*` / `workflow_dispatch` | 安装依赖、构建 Chrome / Edge / Firefox 资产并上传到 Release | zip / xpi 附件 |
 | `webclipper-amo-publish.yml` | `push tags: v*` / `workflow_dispatch` | 校验 manifest 版本、构建 XPI、打包 source zip、调用 AMO API | Firefox 商店版本 |
 | `webclipper-cws-publish.yml` | `push tags: v*` / `workflow_dispatch` | 校验 manifest 版本、构建 Chrome zip、上传 CWS | Chrome 商店版本 |
+| `webclipper-edge-publish.yml` | `push tags: v*` / `workflow_dispatch` | 校验 manifest 版本、构建 Edge zip、上传/发布 Edge Add-ons | Edge 商店版本 |
 
 - `release.yml` **不负责构建 WebClipper**，它只负责 Release 页面与静态链接体。
 - 真正的渠道资产由 `webclipper-release.yml` 和 `.github/scripts/webclipper/*.mjs` 生成。
@@ -44,6 +46,7 @@
 | `package-release-assets.mjs` | `.github/scripts/webclipper/` | `--target`, `--out`, `--zip`, `--zip-name` 等参数 | Chrome / Edge zip、Firefox xpi、对应 dist 目录 |
 | `package-amo-source.mjs` | `.github/scripts/webclipper/` | WebClipper 源码、根 `LICENSE`、必要脚本 | reviewer-friendly `SyncNos-WebClipper-amo-source.zip` |
 | `publish-amo.mjs` | `.github/scripts/webclipper/` | `AMO_JWT_*`, `AMO_ADDON_ID`, XPI 路径、source zip 路径 | AMO 上传、轮询、创建版本 |
+| `publish-edge.mjs` | `.github/scripts/webclipper/` | `EDGE_ADDONS_*`, Edge zip 路径、publish 开关 | Edge Add-ons 上传/发布、轮询操作状态 |
 
 | 脚本细节 | 说明 |
 | --- | --- |

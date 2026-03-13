@@ -1,0 +1,101 @@
+name: WebClipper Publish to Edge Add-ons
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name (e.g. v0.14.5). Required for manual runs."
+        required: true
+        type: string
+      publish:
+        description: "Whether to publish after upload (true/false)."
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish_edge_addons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve publish option
+        id: publish
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            publish="$(jq -r '.inputs.publish // "true"' "$GITHUB_EVENT_PATH")"
+          else
+            publish="true"
+          fi
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: webclipper/package-lock.json
+
+      - name: Install WebClipper deps
+        run: npm ci --prefix webclipper
+
+      - name: Verify manifest version matches tag
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          const path = "webclipper/wxt.config.ts";
+          const tagName = process.env.TAG_NAME;
+          const tagVersion = String(tagName || "").replace(/^v/, "");
+          const source = fs.readFileSync(path, "utf8");
+          const m = source.match(/version:\s*['"]([^'"]+)['"]/);
+          if (!m || !m[1]) throw new Error("wxt.config.ts missing manifest.version");
+          const manifestVersion = String(m[1]).trim();
+          if (manifestVersion !== tagVersion) {
+            throw new Error(`manifest version mismatch: wxt=${manifestVersion} tag=${tagVersion}`);
+          }
+          console.log(`[ok] manifest version: ${manifestVersion}`);
+          NODE
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+
+      - name: Build Edge zip
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=edge \
+            --out=dist-edge \
+            --zip \
+            --zip-name="SyncNos-WebClipper-edge-${{ steps.tag.outputs.name }}.zip"
+
+      # Required secrets:
+      # - EDGE_ADDONS_CLIENT_ID
+      # - EDGE_ADDONS_API_KEY
+      # - EDGE_ADDONS_PRODUCT_ID
+      - name: Upload/Publish to Edge Add-ons
+        run: node .github/scripts/webclipper/publish-edge.mjs
+        env:
+          EDGE_ADDONS_CLIENT_ID: ${{ secrets.EDGE_ADDONS_CLIENT_ID }}
+          EDGE_ADDONS_API_KEY: ${{ secrets.EDGE_ADDONS_API_KEY }}
+          EDGE_ADDONS_PRODUCT_ID: ${{ secrets.EDGE_ADDONS_PRODUCT_ID }}
+          EDGE_ZIP_PATH: webclipper/SyncNos-WebClipper-edge-${{ steps.tag.outputs.name }}.zip
+          EDGE_ADDONS_PUBLISH: ${{ steps.publish.outputs.publish }}
+
