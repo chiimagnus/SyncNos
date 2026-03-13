@@ -511,7 +511,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   await syncConversationMessages(Number((conversation as any).id), [
     {
       messageKey: 'article_body',
-      role: 'assistant',
+      role: 'article',
       contentText: body,
       contentMarkdown: markdown,
       sequence: 1,
