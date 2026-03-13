@@ -4,8 +4,11 @@ import type { Conversation } from '../../conversations/domain/models';
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { getConversationDetail } from '../../conversations/client/repo';
 import { tabsCreate } from '../../platform/webext/tabs';
+import { storageOnChanged } from '../../platform/storage/local';
 
 import { t, formatConversationTitle } from '../../i18n';
+import type { SyncProvider } from '../../sync/models';
+import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '../../sync/sync-provider-gate';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';
@@ -99,6 +102,10 @@ function sanitizeHttpUrl(url: unknown) {
   return '';
 }
 
+function providerButtonLabel(provider: SyncProvider) {
+  return provider === 'notion' ? t('providerNotion') : t('providerObsidian');
+}
+
 async function copyTextToClipboard(text: string) {
   const raw = String(text || '');
   try {
@@ -170,6 +177,7 @@ export function ConversationListPane({
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
+  const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>(['obsidian', 'notion']);
 
   const sourceOptions = useMemo(() => {
     const map = new Map<string, { key: string; label: string }>();
@@ -243,6 +251,27 @@ export function ConversationListPane({
   const hasSelection = selectedIds.length > 0;
   const actionBusy = exporting || deleting;
   const syncingAny = syncingNotion || syncingObsidian;
+
+  useEffect(() => {
+    void getEnabledSyncProviders()
+      .then((providers) => setEnabledSyncProviders(providers as SyncProvider[]))
+      .catch(() => {});
+
+    const notionKey = syncProviderEnabledStorageKey('notion');
+    const obsidianKey = syncProviderEnabledStorageKey('obsidian');
+    return storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      if (!changes || typeof changes !== 'object') return;
+      if (
+        Object.prototype.hasOwnProperty.call(changes, notionKey) ||
+        Object.prototype.hasOwnProperty.call(changes, obsidianKey)
+      ) {
+        void getEnabledSyncProviders()
+          .then((providers) => setEnabledSyncProviders(providers as SyncProvider[]))
+          .catch(() => {});
+      }
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -378,6 +407,17 @@ export function ConversationListPane({
     : syncingObsidian
       ? t('obsidianSyncing')
       : syncMenuBaseLabel;
+
+  const singleSyncProvider = enabledSyncProviders.length === 1 ? enabledSyncProviders[0] : null;
+  const singleSyncLabel = singleSyncProvider
+    ? singleSyncProvider === 'notion'
+      ? syncingNotion
+        ? t('notionSyncing')
+        : providerButtonLabel(singleSyncProvider)
+      : syncingObsidian
+        ? t('obsidianSyncing')
+        : providerButtonLabel(singleSyncProvider)
+    : '';
 
   const onConfirmDelete = async () => {
     await deleteSelected();
@@ -593,54 +633,83 @@ export function ConversationListPane({
                 </button>
               </MenuPopover>
 
-              <MenuPopover
-                open={syncOpen}
-                onOpenChange={setSyncOpen}
-                disabled={!hasSelection || exporting || deleting}
-                ariaLabel={syncMenuBaseLabel}
-                side="top"
-                align="end"
-                panelMinWidth={170}
-                trigger={(triggerProps) => (
-                  <button {...triggerProps} id="btnSyncTo" className={actionButton}>
-                    <span className="tw-leading-none">{syncMenuButtonLabel}</span>
-                    <span
-                      className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-                      aria-hidden="true"
-                    >
-                      ▾
-                    </span>
-                  </button>
-                )}
-              >
+              {singleSyncProvider ? (
                 <button
-                  id="menuSyncToObsidian"
-                  className={menuItemButtonClassName}
+                  id="btnSyncProvider"
+                  className={actionButton}
                   type="button"
-                  role="menuitem"
+                  disabled={
+                    !hasSelection ||
+                    exporting ||
+                    deleting ||
+                    actionBusy ||
+                    (singleSyncProvider === 'notion' ? syncingNotion : syncingObsidian)
+                  }
                   onClick={() => {
-                    setSyncOpen(false);
-                    void syncSelectedObsidian().catch(() => {});
-                  }}
-                  disabled={actionBusy || syncingObsidian}
-                >
-                  {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
-                </button>
-                <button
-                  id="menuSyncToNotion"
-                  className={menuItemButtonClassName}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setSyncOpen(false);
+                    if (singleSyncProvider === 'obsidian') {
+                      void syncSelectedObsidian().catch(() => {});
+                      return;
+                    }
                     void syncSelectedNotion().catch(() => {});
                     onPopupNotionSyncStarted?.();
                   }}
-                  disabled={actionBusy || syncingNotion}
                 >
-                  {syncingNotion ? t('notionSyncing') : t('notionSync')}
+                  <span className="tw-leading-none">{singleSyncLabel}</span>
                 </button>
-              </MenuPopover>
+              ) : (
+                <MenuPopover
+                  open={syncOpen}
+                  onOpenChange={setSyncOpen}
+                  disabled={enabledSyncProviders.length === 0 ? exporting || deleting : !hasSelection || exporting || deleting}
+                  ariaLabel={syncMenuBaseLabel}
+                  side="top"
+                  align="end"
+                  panelMinWidth={170}
+                  trigger={(triggerProps) => (
+                    <button {...triggerProps} id="btnSyncTo" className={actionButton}>
+                      <span className="tw-leading-none">{syncMenuButtonLabel}</span>
+                      <span
+                        className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                        aria-hidden="true"
+                      >
+                        ▾
+                      </span>
+                    </button>
+                  )}
+                >
+                  {enabledSyncProviders.includes('obsidian') ? (
+                    <button
+                      id="menuSyncToObsidian"
+                      className={menuItemButtonClassName}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSyncOpen(false);
+                        void syncSelectedObsidian().catch(() => {});
+                      }}
+                      disabled={actionBusy || syncingObsidian}
+                    >
+                      {syncingObsidian ? t('obsidianSyncing') : t('obsidianSync')}
+                    </button>
+                  ) : null}
+                  {enabledSyncProviders.includes('notion') ? (
+                    <button
+                      id="menuSyncToNotion"
+                      className={menuItemButtonClassName}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSyncOpen(false);
+                        void syncSelectedNotion().catch(() => {});
+                        onPopupNotionSyncStarted?.();
+                      }}
+                      disabled={actionBusy || syncingNotion}
+                    >
+                      {syncingNotion ? t('notionSyncing') : t('notionSync')}
+                    </button>
+                  ) : null}
+                </MenuPopover>
+              )}
             </div>
 
             <div className="tw-flex-1 tw-min-w-0" aria-hidden="true" />
