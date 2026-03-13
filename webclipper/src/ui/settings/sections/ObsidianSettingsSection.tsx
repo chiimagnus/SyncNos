@@ -1,11 +1,12 @@
 import type { KeyboardEvent } from 'react';
 
 import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, textInputClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
   busy: boolean;
+  syncEnabled: boolean;
   apiBaseUrl: string;
   authHeaderName: string;
   apiKeyDraft: string;
@@ -20,6 +21,7 @@ export function ObsidianSettingsSection(props: {
   onChangeApiKeyDraft: (v: string) => void;
   onChangeChatFolder: (v: string) => void;
   onChangeArticleFolder: (v: string) => void;
+  onToggleSyncEnabled: (enabled: boolean) => void;
   onSave: () => void;
   onSaveApiKey: () => void;
   onTest: () => void;
@@ -27,6 +29,7 @@ export function ObsidianSettingsSection(props: {
 }) {
   const {
     busy,
+    syncEnabled,
     apiBaseUrl,
     authHeaderName,
     apiKeyDraft,
@@ -41,6 +44,7 @@ export function ObsidianSettingsSection(props: {
     onChangeApiKeyDraft,
     onChangeChatFolder,
     onChangeArticleFolder,
+    onToggleSyncEnabled,
     onSave,
     onSaveApiKey,
     onTest,
@@ -67,6 +71,24 @@ export function ObsidianSettingsSection(props: {
         </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
+          <SettingsFormRow label={t('obsidianSyncEnabledLabel')}>
+            <input
+              id="obsidianSyncEnabledToggle"
+              type="checkbox"
+              className={checkboxClassName}
+              checked={syncEnabled}
+              disabled={busy}
+              aria-label={t('obsidianSyncEnabledLabel')}
+              onChange={(e) => onToggleSyncEnabled(e.target.checked)}
+            />
+          </SettingsFormRow>
+
+          {!syncEnabled ? (
+            <SettingsFormRow label="" align="start">
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('obsidianSyncEnabledHint')}</div>
+            </SettingsFormRow>
+          ) : null}
+
           <SettingsFormRow label={t('baseUrl')}>
             <input
               value={apiBaseUrl}

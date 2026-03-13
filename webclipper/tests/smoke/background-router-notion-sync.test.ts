@@ -1131,6 +1131,43 @@ describe('background-router notion sync', () => {
     expect(res.error?.extra?.code).toBe('sync_already_running');
   });
 
+  it('returns structured provider-disabled sync error metadata', async () => {
+    const chromeMock = mockChromeStorage();
+    chromeMock.__store['webclipper_sync_provider_notion_enabled'] = false;
+
+    const router = createBackgroundRouter({
+      fallback: (msg: any) => ({
+        ok: false,
+        data: null,
+        error: { message: `unknown message type: ${msg?.type}`, extra: null },
+      }),
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    registerSyncHandlers(router as any, {
+      getInstanceId: () => instanceId,
+      notionSyncOrchestrator: {
+        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+        getSyncJobStatus: async () => ({ job: null, instanceId }),
+        clearSyncJobStatus: async () => ({ job: null, instanceId }),
+      },
+      obsidianSyncOrchestrator: {
+        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+        getSyncStatus: async () => ({ job: null, instanceId }),
+        clearSyncStatus: async () => ({ job: null, instanceId }),
+      },
+    });
+
+    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toBe('sync provider disabled');
+    expect(res.error?.extra?.code).toBe('sync_provider_disabled');
+    expect(res.error?.extra?.provider).toBe('notion');
+  });
+
   it('preserves raw notion validation errors in per-conversation failures', async () => {
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();

@@ -16,9 +16,13 @@
 
 </div>
 
-## 支持项目
+## 支持
 
-如果 SyncNos 对你有帮助，欢迎支持项目的持续维护与迭代：
+SyncNos 是一个人用心做的项目。
+
+如果你想赞助我，有一个小小的请求：**别只给钱——留句话吧。** 说说你为什么用 SyncNos，讲个故事，或者就一句“加油”都好。
+
+让我继续做下去的，不是钱，是知道有人在乎。把我们连在一起的，是情感，不是交易。
 
 <img src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="180" />
 

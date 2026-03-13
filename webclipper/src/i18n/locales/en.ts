@@ -108,6 +108,13 @@ export const en = {
   authorTagline: 'Time Machine Creator~',
   angelsCta: 'Come take a look! Here are our lovely angel sponsors',
   angelsLinkLabel: 'SyncNos Angels Sponsors',
+  supportHeading: 'Support',
+  supportIntro: 'SyncNos is built by one person with care.',
+  supportAskPrefix: "If you'd like to sponsor, I have one small ask: ",
+  supportAskEmphasis: "don't just send money — leave a message with it.",
+  supportAskSuffix: ' A word about why you use SyncNos, a story, even just a "hi" is enough.',
+  supportWhy:
+    "It's not the money that keeps me going. It's knowing someone out there cares. That connection is what makes open source worth it.",
 
   // ConversationListPane
   allFilter: 'All',
@@ -316,8 +323,15 @@ export const en = {
   sourceWeb: 'Web',
   providerNotion: 'Notion',
   providerObsidian: 'Obsidian',
+  notionSyncEnabledLabel: 'Sync to Notion',
+  notionSyncEnabledHint: 'Notion sync is disabled. You can re-enable it anytime in Settings.',
+  obsidianSyncEnabledLabel: 'Sync to Obsidian',
+  obsidianSyncEnabledHint: 'Obsidian sync is disabled. You can re-enable it anytime in Settings.',
   syncStopped: 'Sync stopped',
   syncTo: 'Sync to',
+  syncAllProvidersDisabledMenuItem: 'All sync providers are disabled. Open Settings to enable.',
+  syncProviderDisabled: 'This sync option is disabled.',
+  syncGoToSettings: 'Open Settings',
   copyFailed: 'Copy failed.',
   syncStagePreparingQueue: 'Preparing queue',
   syncStageLoadingConversation: 'Loading conversation',
@@ -353,6 +367,7 @@ export const en = {
   linksAria: 'Links',
   authorSectionAria: 'Author',
   donateSectionAria: 'Donate QR code',
+  supportSectionAria: 'Support SyncNos WebClipper',
 } as const;
 
 export type TranslationKey = keyof typeof en;

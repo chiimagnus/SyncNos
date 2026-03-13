@@ -1,6 +1,7 @@
 import type { Conversation } from '../../conversations/domain/models';
 import { t } from '../../i18n';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
+import { isSyncProviderEnabled } from '../../sync/sync-provider-gate';
 import {
   buildNotionOpenInAction,
   buildNotionPageUrl,
@@ -70,12 +71,21 @@ export async function resolveOpenInDetailHeaderActions({
 }): Promise<DetailHeaderAction[]> {
   const actions: DetailHeaderAction[] = [];
 
-  const notionAction = buildNotionOpenInAction({ conversation, port, labels: DETAIL_HEADER_ACTION_LABELS });
-  if (notionAction) actions.push(notionAction);
+  const [notionEnabled, obsidianEnabled] = await Promise.all([
+    isSyncProviderEnabled('notion').catch(() => true),
+    isSyncProviderEnabled('obsidian').catch(() => true),
+  ]);
+
+  if (notionEnabled) {
+    const notionAction = buildNotionOpenInAction({ conversation, port, labels: DETAIL_HEADER_ACTION_LABELS });
+    if (notionAction) actions.push(notionAction);
+  }
 
   try {
-    const obsidianAction = await buildObsidianOpenInAction({ conversation, port });
-    if (obsidianAction) actions.push(obsidianAction);
+    if (obsidianEnabled) {
+      const obsidianAction = await buildObsidianOpenInAction({ conversation, port });
+      if (obsidianAction) actions.push(obsidianAction);
+    }
   } catch (_error) {
     // Preserve already-resolved actions such as Notion even if the Obsidian capability probe fails.
   }

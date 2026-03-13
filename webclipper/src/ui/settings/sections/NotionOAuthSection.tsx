@@ -1,11 +1,12 @@
 import type { NotionPageOption } from '../utils';
 import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, selectClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName, selectClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 import { SelectMenu } from '../../shared/SelectMenu';
 
 export function NotionOAuthSection(props: {
   busy: boolean;
+  syncEnabled: boolean;
   notionStatusText: string;
   notionConnected: boolean;
   pollingNotion: boolean;
@@ -13,12 +14,14 @@ export function NotionOAuthSection(props: {
   notionParentPageId: string;
   notionPageOptions: NotionPageOption[];
   notionLogoUrl: string;
+  onToggleSyncEnabled: (enabled: boolean) => void;
   onConnectOrDisconnect: () => void;
   onSaveNotionParentPage: (id: string) => void;
   onLoadNotionPages: () => void;
 }) {
   const {
     busy,
+    syncEnabled,
     notionStatusText,
     notionConnected,
     pollingNotion,
@@ -26,6 +29,7 @@ export function NotionOAuthSection(props: {
     notionParentPageId,
     notionPageOptions,
     notionLogoUrl,
+    onToggleSyncEnabled,
     onConnectOrDisconnect,
     onSaveNotionParentPage,
     onLoadNotionPages,
@@ -45,6 +49,27 @@ export function NotionOAuthSection(props: {
         <button onClick={onConnectOrDisconnect} disabled={busy} type="button" className={buttonClassName}>
           {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
         </button>
+      </div>
+
+      <div className="tw-mt-3" aria-label={t('notionSyncEnabledLabel')}>
+        <SettingsFormRow label={t('notionSyncEnabledLabel')}>
+          <input
+            id="notionSyncEnabledToggle"
+            type="checkbox"
+            className={checkboxClassName}
+            checked={syncEnabled}
+            disabled={busy}
+            aria-label={t('notionSyncEnabledLabel')}
+            onChange={(e) => onToggleSyncEnabled(e.target.checked)}
+          />
+        </SettingsFormRow>
+        {!syncEnabled ? (
+          <div className="tw-mt-2">
+            <SettingsFormRow label="" align="start">
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('notionSyncEnabledHint')}</div>
+            </SettingsFormRow>
+          </div>
+        ) : null}
       </div>
 
       <div className="tw-mt-3" aria-label={t('parentPage')}>

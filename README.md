@@ -18,7 +18,11 @@ It consolidates multi-source content to Notion and provides a WebClipper browser
 
 ## Support
 
-If SyncNos helps you, consider supporting ongoing maintenance and development:
+SyncNos is built by one person with care.
+
+If you'd like to sponsor, I have one small ask: **don't just send money — leave a message with it.** A word about why you use SyncNos, a story, even just a "hi" is enough.
+
+It's not the money that keeps me going. It's knowing someone out there cares. That connection is what makes open source worth it.
 
 <img src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="180" />
 

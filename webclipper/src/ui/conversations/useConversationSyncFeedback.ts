@@ -447,10 +447,21 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       } catch (error) {
         if (disposedRef.current) throw error;
 
-        if (errorCode(error) === 'sync_already_running') {
+        const code = errorCode(error);
+        if (code === 'sync_already_running') {
           await refreshFromBackground(provider);
           return null;
         }
+
+        const disabledByGate = code === 'sync_provider_disabled';
+        const failureText = disabledByGate
+          ? t('syncProviderDisabled')
+          : error instanceof Error
+            ? error.message
+            : String(error || 'sync failed');
+        const message = disabledByGate
+          ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
+          : toErrorMessage(provider, error);
 
         runTokenRef.current += 1;
         setActiveRun((current) => (current?.token === token ? null : current));
@@ -462,9 +473,9 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           currentConversationId: null,
           currentConversationTitle: '',
           currentStage: '',
-          failures: [{ conversationId: 0, error: error instanceof Error ? error.message : String(error || 'sync failed') }],
+          failures: [{ conversationId: 0, error: failureText }],
           warnings: [],
-          message: toErrorMessage(provider, error),
+          message,
           updatedAt: Date.now(),
           summary: null,
         });
