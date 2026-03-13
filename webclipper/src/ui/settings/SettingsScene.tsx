@@ -190,6 +190,7 @@ export function SettingsScene(props: SettingsSceneProps) {
       {activeSection === 'obsidian' ? (
         <ObsidianSettingsSection
           busy={busy}
+          syncEnabled={obsidianSyncEnabled}
           apiBaseUrl={obsidianApiBaseUrl}
           authHeaderName={obsidianAuthHeaderName}
           apiKeyDraft={obsidianApiKeyDraft}
@@ -204,6 +205,9 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeApiKeyDraft={setObsidianApiKeyDraft}
           onChangeChatFolder={setObsidianChatFolder}
           onChangeArticleFolder={setObsidianArticleFolder}
+          onToggleSyncEnabled={(enabled) => {
+            void onToggleObsidianSyncEnabled(enabled);
+          }}
           onSave={() => {
             void onSaveObsidianSettings();
           }}

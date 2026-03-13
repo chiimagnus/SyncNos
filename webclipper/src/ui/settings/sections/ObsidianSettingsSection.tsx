@@ -1,11 +1,12 @@
 import type { KeyboardEvent } from 'react';
 
 import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, textInputClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
   busy: boolean;
+  syncEnabled: boolean;
   apiBaseUrl: string;
   authHeaderName: string;
   apiKeyDraft: string;
@@ -20,6 +21,7 @@ export function ObsidianSettingsSection(props: {
   onChangeApiKeyDraft: (v: string) => void;
   onChangeChatFolder: (v: string) => void;
   onChangeArticleFolder: (v: string) => void;
+  onToggleSyncEnabled: (enabled: boolean) => void;
   onSave: () => void;
   onSaveApiKey: () => void;
   onTest: () => void;
@@ -27,6 +29,7 @@ export function ObsidianSettingsSection(props: {
 }) {
   const {
     busy,
+    syncEnabled,
     apiBaseUrl,
     authHeaderName,
     apiKeyDraft,
@@ -41,6 +44,7 @@ export function ObsidianSettingsSection(props: {
     onChangeApiKeyDraft,
     onChangeChatFolder,
     onChangeArticleFolder,
+    onToggleSyncEnabled,
     onSave,
     onSaveApiKey,
     onTest,
@@ -64,6 +68,15 @@ export function ObsidianSettingsSection(props: {
         <div className="tw-flex tw-items-center tw-gap-2">
           <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
           <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('obsidianLocalRestApi')}</h2>
+          <input
+            id="obsidianSyncEnabledToggle"
+            type="checkbox"
+            className={checkboxClassName}
+            checked={syncEnabled}
+            disabled={busy}
+            aria-label={`${t('syncTo')} ${t('providerObsidian')}`}
+            onChange={(e) => onToggleSyncEnabled(e.target.checked)}
+          />
         </div>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
