@@ -20,6 +20,7 @@ export type SelectMenuProps<T extends string> = {
   maxHeight?: number;
   className?: string;
   buttonClassName?: string;
+  triggerLabelClassName?: string;
   buttonId?: string;
   side?: 'top' | 'bottom';
   align?: 'start' | 'end';
@@ -69,6 +70,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     maxHeight,
     className,
     buttonClassName,
+    triggerLabelClassName,
     buttonId,
     side = 'bottom',
     align = 'end',
@@ -116,6 +118,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
   const menuItemButtonClassName = buttonMenuItemClassName();
   const triggerButtonClassName = buttonClassName || buttonTintClassName();
   const chevronClassName = menuChevronClassName();
+  const resolvedTriggerLabelClassName = triggerLabelClassName || 'tw-min-w-0 tw-flex-1 tw-truncate tw-text-left';
 
   const closeAndRestoreFocus = () => {
     setOpen(false);
@@ -206,7 +209,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
           aria-label={ariaLabel}
           onKeyDown={onTriggerKeyDown}
         >
-          <span className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-left">{triggerLabel}</span>
+          <span className={resolvedTriggerLabelClassName}>{triggerLabel}</span>
           <span className={chevronClassName} aria-hidden="true">
             ▾
           </span>

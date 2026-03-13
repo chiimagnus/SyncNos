@@ -1,6 +1,7 @@
 import { formatConversationTitle, t } from '../../../i18n';
 import { openDb } from '../../../platform/idb/schema';
 import type { Conversation } from '../../../conversations/domain/models';
+import { parseRegistrableDomainFromUrl } from '../../shared/domain';
 
 type MessageCountByConversation = Map<number, number>;
 
@@ -95,13 +96,8 @@ function buildDistribution(
 }
 
 function parseHostname(value: unknown): string {
-  const raw = safeString(value);
-  if (!raw) return INSIGHT_UNKNOWN_DOMAIN_LABEL;
-  try {
-    return new URL(raw).hostname || INSIGHT_UNKNOWN_DOMAIN_LABEL;
-  } catch (_error) {
-    return INSIGHT_UNKNOWN_DOMAIN_LABEL;
-  }
+  const domain = parseRegistrableDomainFromUrl(value);
+  return domain || INSIGHT_UNKNOWN_DOMAIN_LABEL;
 }
 
 async function readAllConversations(
