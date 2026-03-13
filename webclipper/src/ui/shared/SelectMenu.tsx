@@ -21,6 +21,7 @@ export type SelectMenuProps<T extends string> = {
   className?: string;
   buttonClassName?: string;
   triggerLabelClassName?: string;
+  chevronOverlay?: boolean;
   buttonId?: string;
   side?: 'top' | 'bottom';
   align?: 'start' | 'end';
@@ -71,6 +72,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     className,
     buttonClassName,
     triggerLabelClassName,
+    chevronOverlay = false,
     buttonId,
     side = 'bottom',
     align = 'end',
@@ -119,6 +121,12 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
   const triggerButtonClassName = buttonClassName || buttonTintClassName();
   const chevronClassName = menuChevronClassName();
   const resolvedTriggerLabelClassName = triggerLabelClassName || 'tw-min-w-0 tw-flex-1 tw-truncate tw-text-left';
+  const resolvedChevronClassName = chevronOverlay
+    ? ['tw-absolute tw-right-2 tw-top-1/2 -tw-translate-y-1/2 tw-bg-transparent tw-pointer-events-none', chevronClassName].join(' ')
+    : ['tw-ml-1', chevronClassName].join(' ');
+  const resolvedTriggerLayoutClassName = chevronOverlay
+    ? 'tw-relative tw-inline-flex tw-items-center'
+    : 'tw-inline-flex tw-items-center tw-justify-between tw-gap-2';
 
   const closeAndRestoreFocus = () => {
     setOpen(false);
@@ -205,12 +213,12 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
           {...triggerProps}
           ref={triggerRef}
           id={buttonId}
-          className={['tw-inline-flex tw-items-center tw-justify-between tw-gap-2', triggerButtonClassName].join(' ')}
+          className={[resolvedTriggerLayoutClassName, triggerButtonClassName].join(' ')}
           aria-label={ariaLabel}
           onKeyDown={onTriggerKeyDown}
         >
           <span className={resolvedTriggerLabelClassName}>{triggerLabel}</span>
-          <span className={chevronClassName} aria-hidden="true">
+          <span className={resolvedChevronClassName} aria-hidden="true">
             ▾
           </span>
         </button>
