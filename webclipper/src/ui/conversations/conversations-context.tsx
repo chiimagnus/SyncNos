@@ -192,7 +192,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
             const d = await getConversationDetail(Number(c.id));
             docs.push(formatConversationMarkdown(c, d.messages || []));
           }
-          files.push({ name: `webclipper-export-${stamp}.md`, data: docs.join('\n---\n\n') });
+          files.push({ name: `SyncNos-md-${stamp}.md`, data: docs.join('\n---\n\n') });
         } else {
           for (const c of selectedConversations) {
             // eslint-disable-next-line no-await-in-loop
@@ -208,7 +208,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `webclipper-export-${stamp}.zip`;
+        a.download = `SyncNos-md-${stamp}.zip`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch (e) {

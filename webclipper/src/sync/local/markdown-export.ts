@@ -27,7 +27,7 @@ export async function buildConversationsMarkdownZipExport({
       docs.push(formatConversationMarkdown(c, d.messages || []));
     }
     const text = docs.join('\n---\n\n');
-    files.push({ name: `webclipper-export-${stamp}.md`, data: text });
+    files.push({ name: `SyncNos-md-${stamp}.md`, data: text });
   } else {
     for (const c of list) {
       // eslint-disable-next-line no-await-in-loop
@@ -40,5 +40,5 @@ export async function buildConversationsMarkdownZipExport({
   }
 
   const zipBlob = await createZipBlob(files);
-  return { zipBlob, filename: `webclipper-export-${stamp}.zip` };
+  return { zipBlob, filename: `SyncNos-md-${stamp}.zip` };
 }
