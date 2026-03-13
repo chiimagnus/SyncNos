@@ -107,6 +107,15 @@ function providerButtonLabel(provider: SyncProvider) {
   return provider === 'notion' ? t('providerNotion') : t('providerObsidian');
 }
 
+function isPopupUi() {
+  try {
+    const p = String(globalThis.location?.pathname || '').toLowerCase();
+    return p.includes('popup.html');
+  } catch (_e) {
+    return false;
+  }
+}
+
 async function copyTextToClipboard(text: string) {
   const raw = String(text || '');
   try {
@@ -735,10 +744,12 @@ export function ConversationListPane({
                         } else {
                           await openOrFocusExtensionAppTab({ route: `/settings?section=${section}` }).catch(() => null);
                         }
-                        try {
-                          window.close();
-                        } catch (_e) {
-                          // ignore
+                        if (isPopupUi()) {
+                          try {
+                            window.close();
+                          } catch (_e) {
+                            // ignore
+                          }
                         }
                       }}
                       disabled={exporting || deleting}
