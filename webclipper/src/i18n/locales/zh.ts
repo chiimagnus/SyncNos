@@ -243,7 +243,7 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // ChatWithAiSection
   chatWithSectionTitle: 'Chat with AI',
-  chatWithSectionSubtitle: '修改会自动保存。',
+  chatWithSectionSubtitle: '生成的内容会自动复制到剪贴板，并在新标签页打开所选 AI 平台；粘贴到输入框发送即可。',
   chatWithPromptTemplateLabel: 'Prompt 模板',
   chatWithPromptTemplateAria: 'Prompt 模板',
   chatWithPromptTemplateHint:

@@ -244,7 +244,7 @@ export const en = {
 
   // ChatWithAiSection
   chatWithSectionTitle: 'Chat with AI',
-  chatWithSectionSubtitle: 'Changes are saved automatically.',
+  chatWithSectionSubtitle: 'The generated prompt is copied to your clipboard and the selected AI site is opened in a new tab. Paste it into the chat box to send.',
   chatWithPromptTemplateLabel: 'Prompt template',
   chatWithPromptTemplateAria: 'Prompt template',
   chatWithPromptTemplateHint:
