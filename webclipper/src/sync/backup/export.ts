@@ -241,7 +241,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   });
 
   const stamp = buildLocalTimestampForFilename();
-  const filename = `webclipper-db-backup-${stamp}.zip`;
+  const filename = `SyncNos-${stamp}.zip`;
   const blob = await createZipBlob(files);
 
   try {
