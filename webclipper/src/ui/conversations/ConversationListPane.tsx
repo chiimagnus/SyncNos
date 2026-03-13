@@ -21,6 +21,7 @@ import { parseRegistrableDomainFromUrl } from '../shared/domain';
 type SourceMeta = { key: string; label: string };
 
 const SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
+const SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
 
@@ -236,7 +237,6 @@ export function ConversationListPane({
       const raw = String(localStorage.getItem(SOURCE_FILTER_STORAGE_KEY) || '').trim();
       if (raw) {
         setFilterKey(raw.toLowerCase());
-        return;
       }
     } catch (_e) {
       // ignore
@@ -246,6 +246,13 @@ export function ConversationListPane({
     try {
       const v = String(localStorage.getItem('webclipper_app_source_filter_key') || 'all').trim().toLowerCase() || 'all';
       setFilterKey(v);
+    } catch (_e) {
+      // ignore
+    }
+
+    try {
+      const raw = String(localStorage.getItem(SITE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
+      if (raw) setSiteFilterKey(raw);
     } catch (_e) {
       // ignore
     }
@@ -414,7 +421,6 @@ export function ConversationListPane({
   const onSetFilterKey = (key: string) => {
     const next = String(key || 'all').trim().toLowerCase() || 'all';
     setFilterKey(next);
-    setSiteFilterKey(SITE_FILTER_ALL_KEY);
     clearSelected();
     setDeleteConfirmOpen(false);
     setExportOpen(false);
@@ -423,6 +429,14 @@ export function ConversationListPane({
       localStorage.setItem(SOURCE_FILTER_STORAGE_KEY, next);
     } catch (_e) {
       // ignore
+    }
+
+    if (next !== 'web') return;
+    try {
+      const raw = String(localStorage.getItem(SITE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
+      setSiteFilterKey(raw || SITE_FILTER_ALL_KEY);
+    } catch (_e) {
+      setSiteFilterKey(SITE_FILTER_ALL_KEY);
     }
   };
 
@@ -433,14 +447,17 @@ export function ConversationListPane({
     setDeleteConfirmOpen(false);
     setExportOpen(false);
     setSyncOpen(false);
-  };
 
-  useEffect(() => {
-    const sourceKey = String(filterKey || 'all').trim().toLowerCase() || 'all';
-    if (sourceKey === 'web') return;
-    if (siteFilterKey === SITE_FILTER_ALL_KEY) return;
-    setSiteFilterKey(SITE_FILTER_ALL_KEY);
-  }, [filterKey, siteFilterKey]);
+    try {
+      if (next === SITE_FILTER_ALL_KEY) {
+        localStorage.removeItem(SITE_FILTER_STORAGE_KEY);
+      } else {
+        localStorage.setItem(SITE_FILTER_STORAGE_KEY, next);
+      }
+    } catch (_e) {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     const sourceKey = String(filterKey || 'all').trim().toLowerCase() || 'all';
