@@ -727,13 +727,13 @@ export function ConversationListPane({
                       className={menuItemButtonClassName}
                       type="button"
                       role="menuitem"
-                      onClick={() => {
+                      onClick={async () => {
                         setSyncOpen(false);
                         const section = 'notion';
                         if (onOpenSettingsSection) {
                           onOpenSettingsSection(section);
                         } else {
-                          void openOrFocusExtensionAppTab({ route: `/settings?section=${section}` });
+                          await openOrFocusExtensionAppTab({ route: `/settings?section=${section}` }).catch(() => null);
                         }
                         try {
                           window.close();
