@@ -241,7 +241,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   });
 
   const stamp = buildLocalTimestampForFilename();
-  const filename = `SyncNos-${stamp}.zip`;
+  const filename = `SyncNos-Backup-${stamp}.zip`;
   const blob = await createZipBlob(files);
 
   try {
