@@ -4,6 +4,7 @@ import type { Conversation, ConversationDetail } from '../../conversations/domai
 import { buildConversationBasename } from '../../conversations/domain/file-naming';
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { createZipBlob } from '../../sync/backup/zip-utils';
+import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
@@ -181,7 +182,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
         if (!selectedConversations.length) return;
 
-        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const stamp = buildLocalTimestampForFilename();
         const files: Array<{ name: string; data: string }> = [];
 
         if (mergeSingle) {
@@ -191,7 +192,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
             const d = await getConversationDetail(Number(c.id));
             docs.push(formatConversationMarkdown(c, d.messages || []));
           }
-          files.push({ name: `webclipper-export-${stamp}.md`, data: docs.join('\n---\n\n') });
+          files.push({ name: `SyncNos-md-${stamp}.md`, data: docs.join('\n---\n\n') });
         } else {
           for (const c of selectedConversations) {
             // eslint-disable-next-line no-await-in-loop
@@ -207,7 +208,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `webclipper-export-${stamp}.zip`;
+        a.download = `SyncNos-md-${stamp}.zip`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch (e) {

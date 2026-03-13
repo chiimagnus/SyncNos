@@ -9,6 +9,7 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
 import { DB_NAME, DB_VERSION } from '../../platform/idb/schema.ts';
+import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 
 type AnyRecord = Record<string, any>;
 
@@ -239,8 +240,8 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     lastModified: exportedAt,
   });
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `webclipper-db-backup-${stamp}.zip`;
+  const stamp = buildLocalTimestampForFilename();
+  const filename = `SyncNos-Backup-${stamp}.zip`;
   const blob = await createZipBlob(files);
 
   try {

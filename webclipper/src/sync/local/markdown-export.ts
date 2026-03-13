@@ -3,6 +3,7 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import type { Conversation } from '../../conversations/domain/models';
 import { getConversationDetail } from '../../conversations/client/repo';
+import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 
 export async function buildConversationsMarkdownZipExport({
   conversations,
@@ -15,7 +16,7 @@ export async function buildConversationsMarkdownZipExport({
   const ids = list.map((c) => Number(c.id)).filter((x) => Number.isFinite(x) && x > 0);
   if (!ids.length) throw new Error('No conversations selected');
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = buildLocalTimestampForFilename();
   const files: Array<{ name: string; data: string }> = [];
 
   if (mergeSingle) {
@@ -26,7 +27,7 @@ export async function buildConversationsMarkdownZipExport({
       docs.push(formatConversationMarkdown(c, d.messages || []));
     }
     const text = docs.join('\n---\n\n');
-    files.push({ name: `webclipper-export-${stamp}.md`, data: text });
+    files.push({ name: `SyncNos-md-${stamp}.md`, data: text });
   } else {
     for (const c of list) {
       // eslint-disable-next-line no-await-in-loop
@@ -39,5 +40,5 @@ export async function buildConversationsMarkdownZipExport({
   }
 
   const zipBlob = await createZipBlob(files);
-  return { zipBlob, filename: `webclipper-export-${stamp}.zip` };
+  return { zipBlob, filename: `SyncNos-md-${stamp}.zip` };
 }
