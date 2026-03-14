@@ -196,6 +196,8 @@ export function ConversationListPane({
     listSiteFilterKey,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
+    pendingListLocateId,
+    consumeListLocate,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
@@ -391,6 +393,40 @@ export function ConversationListPane({
     const nextTop = Math.max(0, Number(initialScrollTop) || 0);
     el.scrollTop = nextTop;
   }, [initialScrollTop, scrollRestoreKey]);
+
+  useEffect(() => {
+    const id = Number(pendingListLocateId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const locate = () => {
+      if (cancelled) return;
+
+      const container = scrollRef.current;
+      const selector = `[data-conversation-id="${id}"]`;
+      const row = container ? (container.querySelector(selector) as HTMLElement | null) : null;
+      if (row) {
+        row.scrollIntoView({ block: 'nearest' });
+        consumeListLocate();
+        return;
+      }
+
+      attempts += 1;
+      if (attempts >= 2) {
+        consumeListLocate();
+        return;
+      }
+
+      requestAnimationFrame(locate);
+    };
+
+    locate();
+    return () => {
+      cancelled = true;
+    };
+  }, [consumeListLocate, pendingListLocateId]);
 
   const onSetFilterKey = (key: string) => {
     const next = String(key || 'all').trim().toLowerCase() || 'all';
