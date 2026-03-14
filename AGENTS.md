@@ -52,7 +52,7 @@ npm --prefix webclipper run build            # 构建 WebClipper Chrome 产物
 | SwiftData 后台服务 | `macOS/SyncNos/Services/AGENTS.md` |
 | 动态字体 | `macOS/SyncNos/Services/Core/AGENTS.md` |
 | OCR 技术 | `macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md` |
-| 键盘导航 | `.github/docs/键盘导航与焦点管理技术文档（全项目）.md` |
+| 键盘导航 | `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md` |
 | WebClipper 扩展 | `webclipper/AGENTS.md` |
 
 ## 开发指南
@@ -139,6 +139,7 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
 - Chrome/Firefox 发布产物打包：`node .github/scripts/webclipper/package-release-assets.mjs`
 - AMO Source 包：`node .github/scripts/webclipper/package-amo-source.mjs`
 - AMO 发布：`node .github/scripts/webclipper/publish-amo.mjs`
+- Edge 发布：`node .github/scripts/webclipper/publish-edge.mjs`
 
 ## 测试
 

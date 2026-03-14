@@ -58,7 +58,7 @@
 
 | 检查项 | 先看哪里 | 期望 |
 | --- | --- | --- |
-| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | tag 去掉 `v` 后与 `1.3.1` 对齐 |
+| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | tag 去掉 `v` 后与 `1.3.2` 对齐 |
 | Chrome / Firefox 构建均可通过 | `package.json` scripts | `build` / `build:firefox` 成功 |
 | dist 引用完整 | `check-dist.mjs` | `npm run check` 通过 |
 | AMO / CWS 凭据 | workflow secrets | 发布 workflow 不因凭据缺失失败 |
@@ -83,7 +83,7 @@
 - `AGENTS.md`
 - `macOS/SyncNos/AGENTS.md`
 - `macOS/SyncNos/Views/RootView.swift`
-- `.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
+- `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md`
 - `webclipper/package.json`
 - `webclipper/tests`
 - `webclipper/tests/unit/notion-sync-cursor.test.ts`

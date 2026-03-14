@@ -108,4 +108,4 @@
 - `macOS/SyncNos/ViewModels/Search/GlobalSearchViewModel.swift`
 - `macOS/SyncNos/ViewModels/Settings/OnboardingViewModel.swift`
 - `macOS/SyncNos/ViewModels/Account/PayWallViewModel.swift`
-- `.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
+- `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md`

@@ -63,14 +63,14 @@
 | 项 | 当前值 | 来源 | 为什么重要 |
 | --- | --- | --- | --- |
 | WebClipper `package.json` 版本 | `2003.08.20` | `webclipper/package.json` | 表示 npm 包层面的版本语义 |
-| WebClipper manifest 版本 | `1.3.1` | `webclipper/wxt.config.ts` | CWS / AMO workflow 直接拿它和 tag 对齐 |
+| WebClipper manifest 版本 | `1.3.2` | `webclipper/wxt.config.ts` | CWS / AMO / Edge workflow 直接拿它和 tag 对齐 |
 | Manifest 模式 | `3` | `wxt.config.ts` | 决定扩展是 MV3 架构 |
 | Swift tools version | `6.0` | `macOS/Packages/MenuBarDockKit/Package.swift` | 说明本地 SwiftPM 包按 Swift 6 维护 |
 | App 平台 | macOS 14.0+ | `Package.swift`, 仓库文档 | SwiftUI + SwiftData + AppKit 组合的最低运行环境 |
 | CI Node 版本 | `20` | `webclipper-*.yml` | 统一打包与发布环境 |
 
 - **重要区分**：WebClipper 发布 workflow 只强制校验 `wxt.config.ts` 的 `manifest.version` 与 `v*` tag 是否一致，不会校验 `package.json` 的 `version`。
-- **权限边界**：扩展 manifest 使用 `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting`，并配合广泛 `host_permissions` 覆盖支持站点与普通网页；UI 是否真正启动仍受运行时 gating 控制。
+- **权限边界**：扩展 manifest 使用 `storage`, `contextMenus`, `tabs`, `webNavigation`, `activeTab`, `scripting`，并配合广泛 `host_permissions` 覆盖支持站点与普通网页；UI 是否真正启动仍受运行时 gating 控制。
 
 ## 修改依赖时最应该注意什么
 
@@ -78,7 +78,7 @@
 | --- | --- | --- |
 | App 新服务或新来源 | `macOS/SyncNos/AGENTS.md`, `DIContainer.swift` | 协议、注入、Service / ViewModel 边界 |
 | 扩展新增依赖 / 构建插件 | `package.json`, `wxt.config.ts`, workflow | 构建、本地验证、CI 环境 |
-| 发布版本调整 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | manifest version 与 tag |
+| 发布版本调整 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | manifest version 与 tag |
 | 新增权限或 host 权限 | `wxt.config.ts`, `bootstrap/content.ts` | manifest、运行时 gating、文档 |
 
 ## 来源引用（Source References）

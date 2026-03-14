@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `84560453d43ba77fdeec48971b6c28dcb888a837` |
+| Commit hash | `f817e4a8894274d9155521f9b4c63a74c2a147b1` |
 | Branch name | `main` |
-| Generation timestamp | `2026-03-14 20:04:12 CST` |
+| Generation timestamp | `2026-03-15 01:45:30 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental refresh |
@@ -42,15 +42,17 @@
 - `assets/setting-screenshots.png` (existing screenshot asset, used in README / deepwiki)
 
 ## What Changed In This Update
-- 刷新生成元数据到 `main` 分支当前 `HEAD`（`84560453`），并更新本次增量覆盖说明。
-- 为 `INDEX.md`、`business-context.md`、`architecture.md`、`data-flow.md`、`configuration.md`、`storage.md`、`modules/webclipper.md` 增量同步 WebClipper 新行为：detail header 新增 `tools` 槽位与 `cache-images` 动作、`BACKFILL_CONVERSATION_IMAGES` 回填链路、`ai_chat_cache_images_enabled` 设置键。
-- 为 `testing.md`、`troubleshooting.md`、`workflow.md`、`glossary.md` 补充对应验证与排障语义：区分 `open / chat-with / tools` 三槽位，明确 chat/article 动作显隐边界与手工回填路径。
-- 同步相关执行与用户文档：`AGENTS.md`、`webclipper/AGENTS.md`、`webclipper/src/ui/AGENTS.md`、`README.md`、`README.zh-CN.md`，确保仓库入口文档、执行规范与用户能力说明一致。
-- 本次未新增页面文件，继续保持稳定文件名并在既有页面追加证据。
+- 刷新生成元数据到 `main` 分支当前 `HEAD`（`f817e4a8`），并更新本次增量覆盖说明。
+- 更新 deepwiki 中的 WebClipper 版本事实：`INDEX.md`、`configuration.md`、`dependencies.md`、`release.md`、`testing.md` 已统一对齐 `manifest.version = 1.3.2`。
+- 同步 deepwiki 中的发布链路清单：`overview.md`、`workflow.md`、`release.md`、`dependencies.md`、`troubleshooting.md` 已显式纳入 `webclipper-edge-publish.yml` 与 `publish-edge.mjs` 相关事实。
+- 同步 deepwiki 与仓库入口文档中的专项文档路径：把失效旧路径统一修正为 `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md`。
+- 同步权限事实：文档中的扩展权限说明与示例片段已纳入 `contextMenus`，与 `wxt.config.ts` 当前声明一致。
+- 同步相关执行文档：更新 `AGENTS.md` 与 `webclipper/AGENTS.md`，确保仓库入口、发布脚本说明与产品线执行文档保持一致。
+- 本次未新增页面文件，继续保持稳定文件名并在既有页面做增量修正。
 
 ## Coverage Notes
 - 当前 deepwiki 已覆盖仓库级入口、双产品线模块、配置、测试、存储、发布与排障，并持续把 WebClipper 的 Insight 统计能力串入业务入口层和工程入口层。
-- 本次增量刷新重点是“会话详情头动作三槽位 + 图片缓存回填链路（`cache-images`）+ 配置键 `ai_chat_cache_images_enabled`”，并把该行为同步到业务入口、架构、数据流、配置、测试、排障与执行文档链路。
+- 本次增量刷新重点是“版本事实与文档路径纠偏”：manifest 版本对齐 `1.3.2`、专项文档路径对齐真实目录、权限声明补齐 `contextMenus`。
 - 仍保留的显式 Coverage Gaps：App Store 提交流程没有仓库内自动化证据；OCR 与键盘焦点专项文档尚未继续拆成 deepwiki 独立子页。
 
 ## Audit Basis

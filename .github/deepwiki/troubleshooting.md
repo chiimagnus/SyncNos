@@ -80,7 +80,7 @@
 
 | 症状 | 首查位置 | 说明 |
 | --- | --- | --- |
-| `manifest version mismatch` | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 商店 workflow 用 `manifest.version` 而不是 `package.json` version |
+| `manifest version mismatch` | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 商店 workflow 用 `manifest.version` 而不是 `package.json` version |
 | `npm run build` 通过但 `npm run check` 失败 | `package.json`, `.github/scripts/webclipper/check-dist.mjs` | `check` 比 `build` 额外校验 dist 完整性 |
 | Firefox AMO 校验报 background / gecko 问题 | `package-release-assets.mjs` | 检查 Firefox manifest patch 是否生效 |
 | 发布 workflow 报 secrets 缺失 | 对应 workflow / publish 脚本 | 检查 AMO / CWS secrets 是否存在 |

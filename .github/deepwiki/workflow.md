@@ -60,6 +60,7 @@
 | `webclipper-release.yml` | `v*` tag / `workflow_dispatch` | 构建 Chrome / Edge / Firefox 资产并上传 Release | zip / xpi 附件 |
 | `webclipper-amo-publish.yml` | `v*` tag / `workflow_dispatch` | 校验 manifest 版本、构建 XPI、打包 source zip、发布 AMO | Firefox 商店版本 |
 | `webclipper-cws-publish.yml` | `v*` tag / `workflow_dispatch` | 校验 manifest 版本、构建 Chrome zip、上传 CWS | Chrome 商店版本 |
+| `webclipper-edge-publish.yml` | `v*` tag / `workflow_dispatch` | 校验 manifest 版本、构建 Edge zip、上传/发布 Edge Add-ons | Edge 商店版本 |
 
 ## 常见决策点
 - **是否需要改仓库级文档**：只要共享业务规则、主入口、验证顺序、发布链路或产品语义变了，就不应只改某个子目录里的说明。
@@ -86,4 +87,6 @@
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
+- `.github/workflows/webclipper-edge-publish.yml`
 - `.github/scripts/webclipper/package-release-assets.mjs`
+- `.github/scripts/webclipper/publish-edge.mjs`

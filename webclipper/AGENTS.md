@@ -27,7 +27,7 @@
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
 - 备份 Zip v2 结构固定为 `manifest.json + sources/conversations.csv + sources/... + config/storage-local.json`。
 - 备份 `chrome.storage.local` 默认采用“全量非敏感键”策略；敏感键（`notion_oauth_token*`、`notion_oauth_client_secret`）必须排除。
-- 备份导入入口统一在 `Settings -> App Settings`（含 Firefox popup）。
+- 备份导入入口统一在 `Settings -> Data -> Backup`（含 Firefox popup）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 - 对话删除必须显式二次确认，避免误删。
 - 外观主题使用 `ui_theme_mode`（`system / light / dark`）持久化到 `chrome.storage.local`；popup 与 app 统一通过 `src/ui/shared/hooks/useThemeMode.ts` 应用 `data-theme` 覆盖，禁止在单个页面里偷偷做另一套主题切换状态。

@@ -30,14 +30,14 @@
 | 规则 | 位置 | 为什么存在 | 失败表现 |
 | --- | --- | --- | --- |
 | tag 必须匹配 `v*` | 所有 release workflows | 用 Git tag 作为版本与触发器 | workflow 不触发或需手动指定 tag |
-| `wxt.config.ts` 的 `manifest.version` 必须等于 tag 去掉 `v` | `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 防止商店产物与代码版本错位 | `manifest version mismatch` |
+| `wxt.config.ts` 的 `manifest.version` 必须等于 tag 去掉 `v` | `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 防止商店产物与代码版本错位 | `manifest version mismatch` |
 | Node 固定为 `20` | 所有 WebClipper release workflows | 保持依赖安装与构建环境一致 | 构建或上传行为不一致 |
 | Firefox gecko id / strict_min_version 由脚本补丁 | `package-release-assets.mjs` | 满足 AMO validator 要求 | AMO 校验报 background / gecko 相关错误 |
 
 | 版本面 | 当前值 | 用途 | 备注 |
 | --- | --- | --- | --- |
 | `package.json` version | `2003.08.20` | npm 包层面的版本语义 | workflow 不用它校验 tag |
-| `wxt.config.ts` manifest version | `1.3.1` | 浏览器扩展 manifest 版本 | 这是商店发布的事实源 |
+| `wxt.config.ts` manifest version | `1.3.2` | 浏览器扩展 manifest 版本 | 这是商店发布的事实源 |
 
 ## 打包脚本职责
 
@@ -69,7 +69,7 @@
 
 | 失败点 | 首查位置 | 现象 | 优先排查 |
 | --- | --- | --- | --- |
-| manifest 版本与 tag 不一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 校验阶段直接失败 | 检查 `manifest.version` |
+| manifest 版本与 tag 不一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 校验阶段直接失败 | 检查 `manifest.version` |
 | AMO 凭据缺失 | `publish-amo.mjs` | `missing env` 或 API 请求失败 | 检查 `AMO_JWT_ISSUER`, `AMO_JWT_SECRET`, `AMO_ADDON_ID` |
 | AMO listed 元数据缺失（summary） | AMO Developer Hub / `publish-amo.mjs` | `Add-on metadata is required ... ['summary']` | 在 AMO 后台补 summary，或在 workflow vars 提供 `AMO_ADDON_SUMMARY` |
 | CWS 凭据缺失 | `webclipper-cws-publish.yml` | 上传 action 失败 | 检查 CWS secrets |
@@ -89,6 +89,8 @@
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
+- `.github/workflows/webclipper-edge-publish.yml`
 - `.github/scripts/webclipper/package-release-assets.mjs`
 - `.github/scripts/webclipper/package-amo-source.mjs`
 - `.github/scripts/webclipper/publish-amo.mjs`
+- `.github/scripts/webclipper/publish-edge.mjs`

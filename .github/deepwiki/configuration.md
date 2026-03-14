@@ -28,7 +28,7 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.3.1` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.3.2` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
 | 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
@@ -59,13 +59,13 @@
 | WebClipper CI Node 版本 | `webclipper-*.yml` | `20` | 保持构建与发布一致 |
 | CWS `publish_target` | `webclipper-cws-publish.yml` | `default` / `trustedTesters` | 控制 Chrome Web Store 发布范围 |
 | AMO channel | `webclipper-amo-publish.yml` | `listed` | 控制 Firefox 商店提交通道 |
-| 版本一致性规则 | `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | `tag 去掉 v == manifest.version` | 阻止错误版本发布 |
+| 版本一致性规则 | `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | `tag 去掉 v == manifest.version` | 阻止错误版本发布 |
 
 ## 权限与安全边界
 
 | 面 | 真实配置 | 安全意图 | 备注 |
 | --- | --- | --- | --- |
-| 扩展权限 | `storage`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 尽量只保留采集与本地保存所需能力 | 新增权限必须解释原因 |
+| 扩展权限 | `storage`, `contextMenus`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 尽量只保留采集与本地保存所需能力 | 新增权限必须解释原因 |
 | 扩展 host permissions | 支持站点 + Notion + `http://*/*` + `https://*/*` | 允许 content script 在运行时自行判断是否激活 | UI 级别由 `inpage_display_mode` 做 gating（并兼容回读旧 `inpage_supported_only`） |
 | App 敏感存储 | Keychain / 加密服务 | 避免站点 Cookie、加密密钥、试用期关键数据明文落盘 | `SiteLoginsStore`, `EncryptionService`, `IAPService` |
 | 备份导入导出 | denylist + 前缀过滤 | 防止 OAuth token 跟随备份扩散 | Zip v2 仍保留非敏感运行设置 |
@@ -85,8 +85,8 @@
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
-  version: '1.3.1',
-  permissions: ['storage', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
+  version: '1.3.2',
+  permissions: ['storage', 'contextMenus', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
 ```

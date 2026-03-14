@@ -3,7 +3,7 @@
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
 - **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
-- **近期关键变化（v1.3.1）**：WebClipper 版本事实源更新到 `wxt.config.ts` 的 `manifest.version = 1.3.1`；商店 workflow 仍以它和 tag 对齐。
+- **近期关键变化（v1.3.2）**：WebClipper 版本事实源更新到 `wxt.config.ts` 的 `manifest.version = 1.3.2`；商店 workflow 仍以它和 tag 对齐。
 - **列表统计交互变化**：会话列表底部的 `today / total` 统计在 popup 与 app 中都可作为入口，直接跳到 `Settings?section=insight`。
 - **安装/升级行为变化**：扩展仅在首次安装自动打开 About 分区；升级后不再自动打开设置页，避免打断现有工作流。
 - **采集稳定性变化**：Gemini 进一步过滤隐藏说话人/状态文案并增强 blob 图片内联；Kimi 与 z.ai 补齐用户上传附件图片抓取范围。
@@ -79,7 +79,7 @@
 
 ## Coverage Gaps
 - **App Store 交付链路**：仓库中能看到 App Store 链接，但没有公开的 App Store 提交 workflow 或脚本；deepwiki 明确把它视为“仓库外渠道信息”。
-- **OCR 与键盘焦点专项文档**：仓库已有 `.github/docs/键盘导航与焦点管理技术文档（全项目）.md` 与 `macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
+- **OCR 与键盘焦点专项文档**：仓库已有 `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md` 与 `macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
 - **集成专题页**：当前 Notion / Obsidian / collectors 仍主要分布在 `architecture.md`、`data-flow.md` 与 `modules/` 页面；如果未来这些区域继续膨胀，适合再拆专题页。
 
 ## Generation Metadata
