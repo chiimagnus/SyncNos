@@ -309,6 +309,13 @@ export const zh: { [K in TranslationKey]: string } = {
   detailHeaderOpenInNotion: '在 Notion 中打开',
   detailHeaderOpenInObsidian: '在 Obsidian 中打开',
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
+  detailHeaderCacheImagesLabel: '缓存图片',
+  detailHeaderCacheImagesSuccess: '图片已缓存。',
+  detailHeaderCacheImagesUpdatedMessages: '更新消息数：',
+  detailHeaderCacheImagesDownloaded: '下载',
+  detailHeaderCacheImagesCacheHits: '命中缓存',
+  detailHeaderCacheImagesNoop: '没有可缓存的图片。',
+  detailHeaderCacheImagesFailed: '缓存图片失败',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',

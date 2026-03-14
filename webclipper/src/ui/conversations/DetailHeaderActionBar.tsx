@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ExternalLink, Link2Off, Sparkles } from 'lucide-react';
+import { BookOpen, ExternalLink, FileText, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { t } from '../../i18n';
@@ -67,6 +67,8 @@ export function DetailHeaderActionBar({
   const resolveActionIcon = (action: DetailHeaderAction) => {
     if (action.slot === 'chat-with') return <Sparkles size={14} strokeWidth={2} aria-hidden="true" />;
     if (action.provider === 'obsidian' && action.disabled) return <Link2Off size={14} strokeWidth={2} aria-hidden="true" />;
+    if (action.kind === 'open-target' && action.provider === 'obsidian') return <BookOpen size={14} strokeWidth={2} aria-hidden="true" />;
+    if (action.kind === 'open-target' && action.provider === 'notion') return <FileText size={14} strokeWidth={2} aria-hidden="true" />;
     if (action.kind === 'external-link') return <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />;
     return null;
   };

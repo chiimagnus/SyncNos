@@ -310,6 +310,13 @@ export const en = {
   detailHeaderOpenInNotion: 'Open in Notion',
   detailHeaderOpenInObsidian: 'Open in Obsidian',
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
+  detailHeaderCacheImagesLabel: 'Cache images',
+  detailHeaderCacheImagesSuccess: 'Images cached.',
+  detailHeaderCacheImagesUpdatedMessages: 'Updated messages:',
+  detailHeaderCacheImagesDownloaded: 'downloaded',
+  detailHeaderCacheImagesCacheHits: 'cache hits',
+  detailHeaderCacheImagesNoop: 'No images to cache.',
+  detailHeaderCacheImagesFailed: 'Cache images failed',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ImageDown } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
@@ -42,7 +42,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
         aria-label={t('conversationDetailAria')}
       >
         {!hideHeader ? (
-          <header className="tw-flex tw-flex-nowrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
+          <header className="tw-flex tw-flex-col tw-items-stretch tw-gap-2 tw-border-b tw-border-[var(--border)] tw-pb-2 md:tw-flex-row md:tw-items-start md:tw-justify-between md:tw-gap-3">
             <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-start tw-gap-2">
               {onBack ? (
                 <button type="button" onClick={onBack} className={navIconButtonSmClassName(false)} aria-label={t('backButton')}>
@@ -60,12 +60,14 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 </div>
               </div>
             </div>
-            <div className="tw-flex tw-shrink-0 tw-flex-nowrap tw-items-center tw-gap-2">
+            <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">
               {!isArticle && selected ? (
                 <button
                   type="button"
                   disabled={backfillBusy}
                   className={outlineButtonClass}
+                  title={t('detailHeaderCacheImagesLabel')}
+                  aria-label={t('detailHeaderCacheImagesLabel')}
                   onClick={() => {
                     if (backfillBusy) return;
                     setBackfillBusy(true);
@@ -76,20 +78,29 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                         const updated = Number(res?.updatedMessages) || 0;
                         const downloaded = Number(res?.downloadedCount) || 0;
                         const fromCache = Number(res?.fromCacheCount) || 0;
-                        alert(
-                          updated
-                            ? `Images cached. Updated messages: ${updated} (downloaded: ${downloaded}, cache hits: ${fromCache})`
-                            : 'No images to cache.',
-                        );
+                        if (!updated) {
+                          alert(t('detailHeaderCacheImagesNoop'));
+                        } else {
+                          const parts = [
+                            t('detailHeaderCacheImagesSuccess'),
+                            `${t('detailHeaderCacheImagesUpdatedMessages')} ${updated}`,
+                            `(${t('detailHeaderCacheImagesDownloaded')}: ${downloaded}, ${t('detailHeaderCacheImagesCacheHits')}: ${fromCache})`,
+                          ];
+                          alert(parts.filter(Boolean).join(' ').trim());
+                        }
                       } catch (e) {
-                        alert((e as any)?.message ?? String(e ?? 'Cache images failed'));
+                        const fallback = t('detailHeaderCacheImagesFailed');
+                        alert((e as any)?.message ?? String(e ?? fallback));
                       } finally {
                         setBackfillBusy(false);
                       }
                     })();
                   }}
                 >
-                  Cache images
+                  <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+                    <ImageDown size={14} strokeWidth={2} aria-hidden="true" />
+                    <span className="tw-hidden md:tw-inline tw-whitespace-nowrap">{t('detailHeaderCacheImagesLabel')}</span>
+                  </span>
                 </button>
               ) : null}
               <DetailHeaderActionBar
