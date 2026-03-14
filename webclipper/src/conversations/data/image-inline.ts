@@ -92,6 +92,7 @@ const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)
 function extractHttpImageUrlsFromMarkdown(markdown: string): string[] {
   const raw = String(markdown || '');
   if (!raw) return [];
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
   const seen = new Set<string>();
   const output: string[] = [];
   let match: RegExpExecArray | null = null;
@@ -108,6 +109,7 @@ function extractHttpImageUrlsFromMarkdown(markdown: string): string[] {
 
 function replaceMarkdownImageUrls(markdown: string, replacements: Map<string, string>): string {
   if (!replacements.size) return markdown;
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
   return String(markdown || '').replace(MARKDOWN_IMAGE_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
     const alt = altRaw ? String(altRaw) : '';
     const urlPart = urlPartRaw ? String(urlPartRaw) : '';

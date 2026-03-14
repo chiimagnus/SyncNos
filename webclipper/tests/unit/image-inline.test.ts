@@ -43,11 +43,13 @@ describe("image-inline", () => {
 
     const messages1 = [
       { messageKey: "m1", contentMarkdown: "![](https://example.com/a.png)", role: "assistant", sequence: 1 },
+      { messageKey: "m2", contentMarkdown: "![](https://example.com/b.png)", role: "assistant", sequence: 2 },
     ];
     const r1 = await inlineChatImagesInMessages({ conversationId: 1, messages: messages1 });
-    expect(r1.downloadedCount).toBe(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(r1.downloadedCount).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(messages1[0].contentMarkdown)).toMatch(/^!\[\]\(data:image\/png;base64,/);
+    expect(String(messages1[1].contentMarkdown)).toMatch(/^!\[\]\(data:image\/png;base64,/);
 
     // Simulate a new capture of the same message still referencing the same url.
     const messages2 = [
@@ -56,8 +58,7 @@ describe("image-inline", () => {
     const r2 = await inlineChatImagesInMessages({ conversationId: 1, messages: messages2 });
     expect(r2.fromCacheCount).toBe(1);
     expect(r2.downloadedCount).toBe(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(messages2[0].contentMarkdown)).toMatch(/^!\[\]\(data:image\/png;base64,/);
   });
 });
-
