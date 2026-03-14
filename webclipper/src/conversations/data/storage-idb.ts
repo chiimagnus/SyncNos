@@ -466,25 +466,27 @@ export async function getMessagesByConversationId(
 
 export async function deleteConversationsByIds(
   conversationIds: any[],
-): Promise<{ deletedConversations: number; deletedMessages: number; deletedMappings: number }> {
+): Promise<{ deletedConversations: number; deletedMessages: number; deletedMappings: number; deletedImageCache: number }> {
   const ids = Array.isArray(conversationIds)
     ? conversationIds
         .map((x) => Number(x))
         .filter((x) => Number.isFinite(x) && x > 0)
     : [];
   if (!ids.length) {
-    return { deletedConversations: 0, deletedMessages: 0, deletedMappings: 0 };
+    return { deletedConversations: 0, deletedMessages: 0, deletedMappings: 0, deletedImageCache: 0 };
   }
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings'], 'readwrite');
+  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
 
   let deletedConversations = 0;
   let deletedMessages = 0;
   let deletedMappings = 0;
+  let deletedImageCache = 0;
 
   const msgIdx = stores.messages.index('by_conversationId_sequence');
   const mappingIdx = stores.sync_mappings.index('by_source_conversationKey');
+  const imageCacheIdx = stores.image_cache.index('by_conversationId');
 
   for (const id of ids) {
     // eslint-disable-next-line no-await-in-loop
@@ -525,10 +527,26 @@ export async function deleteConversationsByIds(
 
     await reqToPromise(stores.conversations.delete(id));
     deletedConversations += 1;
+
+    // Delete cached images under this conversation.
+    const imgRange = IDBKeyRange.only(id);
+    const imgCursorReq = imageCacheIdx.openCursor(imgRange);
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise<void>((resolve, reject) => {
+      imgCursorReq.onerror = () =>
+        reject(imgCursorReq.error || new Error('cursor failed'));
+      imgCursorReq.onsuccess = () => {
+        const cursor = imgCursorReq.result;
+        if (!cursor) return resolve();
+        cursor.delete();
+        deletedImageCache += 1;
+        cursor.continue();
+      };
+    });
   }
 
   await txDone(t);
-  return { deletedConversations, deletedMessages, deletedMappings };
+  return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
 }
 
 export async function getConversationById(conversationId: number): Promise<Conversation | null> {
