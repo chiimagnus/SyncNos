@@ -1,4 +1,5 @@
 import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
+import { storageGet } from '../../platform/storage/local';
 import {
   deleteConversationsByIds,
   getConversationDetail,
@@ -9,6 +10,7 @@ import {
   writeConversationMessagesSnapshot,
   writeConversationSnapshot,
 } from '../data/write';
+import { inlineChatImagesInMessages } from '../data/image-inline';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -49,7 +51,36 @@ export function registerConversationHandlers(router: AnyRouter) {
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const mode = String(msg?.mode || '').trim().toLowerCase() === 'incremental' ? 'incremental' : 'snapshot';
     const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
-    const res = await writeConversationMessagesSnapshot(conversationId, msg.messages, { mode, diff });
+
+    let messages = Array.isArray(msg.messages) ? msg.messages : [];
+    try {
+      const sourceType = String(msg?.conversationSourceType || '').trim().toLowerCase() || 'chat';
+      if (sourceType !== 'article') {
+        const local = await storageGet(['ai_chat_cache_images_enabled']);
+        const enabled = local?.ai_chat_cache_images_enabled === true;
+        if (enabled) {
+          const keys =
+            mode === 'incremental' && diff
+              ? new Set(
+                  [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
+                    .map((x) => String(x || '').trim())
+                    .filter(Boolean),
+                )
+              : null;
+          const inlined = await inlineChatImagesInMessages({
+            conversationId,
+            conversationUrl: String(msg?.conversationUrl || ''),
+            messages,
+            onlyMessageKeys: keys,
+          });
+          messages = inlined.messages;
+        }
+      }
+    } catch (_e) {
+      // never block capture on image inline failures
+    }
+
+    const res = await writeConversationMessagesSnapshot(conversationId, messages, { mode, diff });
     router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
       reason: 'upsert',
       conversationId,

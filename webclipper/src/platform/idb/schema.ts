@@ -1,5 +1,5 @@
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -828,6 +828,24 @@ function ensureSyncMappingsStore(db: IDBDatabase, tx: IDBTransaction | null): vo
   }
 }
 
+function ensureImageCacheStore(db: IDBDatabase, tx: IDBTransaction | null): void {
+  if (!db.objectStoreNames.contains('image_cache')) {
+    const store = db.createObjectStore('image_cache', { keyPath: 'id', autoIncrement: true });
+    store.createIndex('by_conversationId_url', ['conversationId', 'url'], { unique: true });
+    store.createIndex('by_conversationId', 'conversationId', { unique: false });
+    return;
+  }
+
+  if (!tx) return;
+  const store = tx.objectStore('image_cache');
+  if (!store.indexNames.contains('by_conversationId_url')) {
+    store.createIndex('by_conversationId_url', ['conversationId', 'url'], { unique: true });
+  }
+  if (!store.indexNames.contains('by_conversationId')) {
+    store.createIndex('by_conversationId', 'conversationId', { unique: false });
+  }
+}
+
 function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   const db = request.result;
   const tx = request.transaction;
@@ -835,6 +853,7 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureConversationsStore(db, tx);
   ensureMessagesStore(db, tx);
   ensureSyncMappingsStore(db, tx);
+  ensureImageCacheStore(db, tx);
 
   if (tx && oldVersion < 2) {
     try {
