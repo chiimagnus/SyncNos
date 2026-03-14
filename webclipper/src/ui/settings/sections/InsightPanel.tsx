@@ -16,6 +16,7 @@ import { useConversationsApp } from '../../conversations/conversations-context';
 import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '../../shared/SelectMenu';
 import { openConversation as openConversationInApp } from '../../conversations/open-conversation';
+import { buildConversationRouteFromLoc, encodeConversationLoc } from '../../../shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';
 
@@ -110,10 +111,10 @@ function DistributionChart(props: {
 
 function TopConversationList(props: {
   items: InsightTopConversation[];
-  linkTo: string;
+  getLinkTo: (conversationId: number) => string;
   onOpenConversation: (conversationId: number) => void;
 }) {
-  const { items, linkTo, onOpenConversation } = props;
+  const { items, getLinkTo, onOpenConversation } = props;
   if (!items.length) {
     return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightTopConversationsEmpty')}</div>;
   }
@@ -132,7 +133,7 @@ function TopConversationList(props: {
           <div className={['tw-text-sm tw-font-black', rankToneClassName(index)].join(' ')}>{index + 1}.</div>
           <div className="tw-min-w-0">
             <Link
-              to={linkTo}
+              to={getLinkTo(item.conversationId)}
               replace
               className={[
                 'tw-group tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-text-left',
@@ -168,17 +169,37 @@ export function InsightPanel(props: {
   onChangeRange: (next: InsightTimeRange) => void;
 }) {
   const { stats, range, onChangeRange } = props;
-  const { setActiveId, clearSelected } = useConversationsApp();
+  const { items, openConversationExternalById, clearSelected } = useConversationsApp();
   const isNarrow = useIsNarrowScreen();
   const routerLocation = useLocation();
-  const linkTo = useMemo(() => {
+  const fallbackTo = useMemo(() => {
     const state: any = (routerLocation as any)?.state ?? {};
     const from = String(state?.from || '').trim();
     return from || '/';
   }, [routerLocation]);
 
+  const routeByConversationId = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const conversation of items) {
+      const id = Number((conversation as any).id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const loc = encodeConversationLoc({
+        source: String((conversation as any).source || ''),
+        conversationKey: String((conversation as any).conversationKey || ''),
+      });
+      map.set(id, buildConversationRouteFromLoc(loc));
+    }
+    return map;
+  }, [items]);
+
+  const getLinkTo = (conversationId: number) => routeByConversationId.get(Number(conversationId)) || fallbackTo;
+
   const onOpenConversation = (conversationId: number) => {
-    openConversationInApp(conversationId, { clearSelected, setActiveId, isNarrow });
+    openConversationInApp(conversationId, {
+      clearSelected,
+      isNarrow,
+      setActiveId: (id) => openConversationExternalById(Number(id)),
+    });
   };
 
   return (
@@ -261,7 +282,7 @@ export function InsightPanel(props: {
                 <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalMessages)}</div>
               </div>
             </div>
-            <TopConversationList items={stats.topConversations} linkTo={linkTo} onOpenConversation={onOpenConversation} />
+            <TopConversationList items={stats.topConversations} getLinkTo={getLinkTo} onOpenConversation={onOpenConversation} />
           </div>
         </section>
 
