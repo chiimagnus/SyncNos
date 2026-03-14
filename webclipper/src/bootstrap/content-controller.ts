@@ -1,8 +1,10 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
 import { t } from '../i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '../collectors/ai-chat-sites';
+import { inlineSameOriginImagesInSnapshot } from './image-inline';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
+const STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED = 'ai_chat_cache_images_enabled';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -82,6 +84,21 @@ function readAiChatAutoSaveEnabled(): Promise<boolean> {
       });
     } catch (_e) {
       resolve(true);
+    }
+  });
+}
+
+function readAiChatCacheImagesEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
+      const local = storageApi?.local;
+      if (!local?.get) return resolve(false);
+      local.get([STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED], (res: any) => {
+        resolve(res?.[STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED] === true);
+      });
+    } catch (_e) {
+      resolve(false);
     }
   });
 }
@@ -180,9 +197,12 @@ export function createContentController(deps: Deps) {
     let observer: { start?: () => void; stop?: () => void } | null = null;
     const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
     const hasStorageGet = !!storageApi?.local?.get;
+    const hasStorageChanged = !!storageApi?.onChanged?.addListener;
     // Default to enabled when storage API is unavailable (e.g. tests).
     // When storage is available, wait for the async read to avoid a "first tick" auto-save surprise for users who disabled it.
     let aiChatAutoSaveEnabled: boolean | null = hasStorageGet ? null : true;
+    let aiChatCacheImagesEnabled: boolean | null = hasStorageGet ? null : false;
+    const urlCache = new Map<string, string>();
 
     void readAiChatAutoSaveEnabled()
       .then((enabled) => {
@@ -192,11 +212,46 @@ export function createContentController(deps: Deps) {
         aiChatAutoSaveEnabled = true;
       });
 
+    void readAiChatCacheImagesEnabled()
+      .then((enabled) => {
+        aiChatCacheImagesEnabled = enabled === true;
+      })
+      .catch(() => {
+        aiChatCacheImagesEnabled = false;
+      });
+
+    const handleStorageChange = (changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      const autoSaveChange = changes?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED];
+      if (autoSaveChange && typeof autoSaveChange.newValue === 'boolean') {
+        aiChatAutoSaveEnabled = autoSaveChange.newValue !== false;
+      }
+      const cacheImagesChange = changes?.[STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED];
+      if (cacheImagesChange && typeof cacheImagesChange.newValue === 'boolean') {
+        aiChatCacheImagesEnabled = cacheImagesChange.newValue === true;
+      }
+    };
+
+    if (hasStorageChanged) {
+      try {
+        storageApi.onChanged.addListener(handleStorageChange);
+      } catch (_e) {
+        // ignore
+      }
+    }
+
     function stop() {
       if (stopped) return;
       stopped = true;
       inpageButton?.cleanupButtons?.('');
       observer?.stop?.();
+      if (hasStorageChanged) {
+        try {
+          storageApi.onChanged.removeListener(handleStorageChange);
+        } catch (_e) {
+          // ignore
+        }
+      }
     }
 
     runtime?.onInvalidated?.(() => stop());
@@ -275,6 +330,26 @@ export function createContentController(deps: Deps) {
 
           const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
           if (!incremental || !incremental.changed) return;
+
+          if (aiChatCacheImagesEnabled === true) {
+            try {
+              const keys = new Set(
+                [
+                  ...(Array.isArray(incremental.diff?.added) ? incremental.diff.added : []),
+                  ...(Array.isArray(incremental.diff?.updated) ? incremental.diff.updated : []),
+                ]
+                  .map((x: any) => String(x || '').trim())
+                  .filter(Boolean),
+              );
+              await inlineSameOriginImagesInSnapshot({
+                snapshot: incremental.snapshot,
+                onlyMessageKeys: keys.size ? keys : null,
+                urlCache,
+              });
+            } catch (_e) {
+              // never block auto-save on image inline failures
+            }
+          }
 
           const saved = await saveSnapshot(incremental.snapshot, { mode: 'incremental', diff: incremental.diff });
           if (saved) showInpageTip(t('saved'), 'ok');

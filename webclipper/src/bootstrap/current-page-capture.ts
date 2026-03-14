@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import { inlineSameOriginImagesInSnapshot } from './image-inline';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -40,6 +41,23 @@ const CORE_MESSAGE_TYPES = Object.freeze({
   UPSERT_CONVERSATION: 'upsertConversation',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
 });
+
+const STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED = 'ai_chat_cache_images_enabled';
+
+function readAiChatCacheImagesEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
+      const local = storageApi?.local;
+      if (!local?.get) return resolve(false);
+      local.get([STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED], (res: any) => {
+        resolve(res?.[STORAGE_KEY_AI_CHAT_CACHE_IMAGES_ENABLED] === true);
+      });
+    } catch (_e) {
+      resolve(false);
+    }
+  });
+}
 
 const ARTICLE_MESSAGE_TYPES = Object.freeze({
   FETCH_ACTIVE_TAB: 'fetchActiveTabArticle',
@@ -156,6 +174,16 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     });
     if (!conversationRes?.ok) {
       throw new Error(conversationRes?.error?.message || 'upsertConversation failed');
+    }
+
+    try {
+      const enabled = await readAiChatCacheImagesEnabled();
+      const sourceType = String(snapshot?.conversation?.sourceType || '').trim().toLowerCase() || 'chat';
+      if (enabled && sourceType !== 'article') {
+        await inlineSameOriginImagesInSnapshot({ snapshot });
+      }
+    } catch (_e) {
+      // never block capture on inline failures
     }
 
     const conversation = conversationRes.data;
