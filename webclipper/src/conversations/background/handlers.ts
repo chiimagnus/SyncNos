@@ -47,7 +47,9 @@ export function registerConversationHandlers(router: AnyRouter) {
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const res = await writeConversationMessagesSnapshot(conversationId, msg.messages);
+    const mode = String(msg?.mode || '').trim().toLowerCase() === 'incremental' ? 'incremental' : 'snapshot';
+    const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
+    const res = await writeConversationMessagesSnapshot(conversationId, msg.messages, { mode, diff });
     router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
       reason: 'upsert',
       conversationId,

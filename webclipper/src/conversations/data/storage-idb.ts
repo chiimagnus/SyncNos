@@ -303,10 +303,78 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
+  options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
 ): Promise<{ upserted: number; deleted: number }> {
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readwrite');
   const idx = stores.messages.index('by_conversationId_messageKey');
+
+  const mode = options?.mode === 'incremental' ? 'incremental' : 'snapshot';
+  const diff = options?.diff || null;
+
+  const normalizeKeys = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return value.map((x) => String(x || '').trim()).filter(Boolean);
+  };
+
+  if (mode === 'incremental' && diff) {
+    const byKey = new Map<string, any>();
+    for (const m of messages || []) {
+      const key = m && m.messageKey ? String(m.messageKey).trim() : '';
+      if (!key) continue;
+      byKey.set(key, m);
+    }
+
+    const upsertKeys = Array.from(
+      new Set([...normalizeKeys(diff.added), ...normalizeKeys(diff.updated)]),
+    );
+    const removedKeys = normalizeKeys(diff.removed);
+
+    let upserted = 0;
+    for (const key of upsertKeys) {
+      const m = byKey.get(key);
+      if (!m) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+      const incomingMarkdown =
+        m.contentMarkdown && String(m.contentMarkdown).trim()
+          ? String(m.contentMarkdown)
+          : '';
+      const baseRecord = {
+        conversationId,
+        messageKey: key,
+        role: m.role || 'assistant',
+        contentText: m.contentText || '',
+        contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || '' : ''),
+        sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
+        updatedAt: m.updatedAt || Date.now(),
+      };
+      const record: any = withOptionalId(existing && existing.id, baseRecord);
+      if (existing) {
+        // eslint-disable-next-line no-await-in-loop
+        await reqToPromise(stores.messages.put(record));
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        const id = await reqToPromise(stores.messages.add(record));
+        record.id = id as any;
+      }
+      upserted += 1;
+    }
+
+    let deleted = 0;
+    for (const key of removedKeys) {
+      // eslint-disable-next-line no-await-in-loop
+      const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+      const id = Number(existing && existing.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await reqToPromise(stores.messages.delete(id));
+      deleted += 1;
+    }
+
+    await txDone(t);
+    return { upserted, deleted };
+  }
 
   const presentKeys = new Set<string>();
   let upserted = 0;

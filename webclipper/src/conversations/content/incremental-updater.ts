@@ -8,20 +8,18 @@ const state = {
   lastMessageFingerprints: new Map<string, string>(),
 };
 
-function ensureMessageKey(message: any, sequence: number): string {
-  if (message && message.messageKey) return message.messageKey;
+function makeStableAutoSaveMessageKey(message: any, sequence: number): string {
   const normalize = normalizeApi;
-  if (normalize && typeof normalize.makeFallbackMessageKey === 'function') {
-    return normalize.makeFallbackMessageKey({
-      role: message && message.role,
-      contentText: message && message.contentText,
-      sequence,
-    });
-  }
-  return `fallback_${sequence || 0}`;
+  const role = (message && message.role) || 'assistant';
+  const base = `${role}|${sequence || 0}`;
+  const hash =
+    normalize && typeof normalize.fnv1a32 === 'function'
+      ? normalize.fnv1a32(base)
+      : base;
+  return `autosave_${hash}`;
 }
 
-function messageFingerprint(message: any, sequence: number) {
+function messageFingerprint(message: any, sequence: number, key: string) {
   const normalize = normalizeApi;
   const role = (message && message.role) || 'assistant';
   const text =
@@ -41,7 +39,6 @@ function messageFingerprint(message: any, sequence: number) {
     normalize && typeof normalize.fnv1a32 === 'function'
       ? normalize.fnv1a32(hashBase)
       : hashBase;
-  const key = ensureMessageKey(message, sequence);
   return { key, fp: `${key}:${hash}` };
 }
 
@@ -70,6 +67,7 @@ export function computeIncremental(snapshot: any) {
   const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
   const nextKeys: string[] = [];
   const nextFingerprints = new Map<string, string>();
+  const usedKeys = new Set<string>();
   const added: string[] = [];
   const updated: string[] = [];
 
@@ -77,8 +75,16 @@ export function computeIncremental(snapshot: any) {
     const message = messages[index];
     if (!message) continue;
 
-    const { key, fp } = messageFingerprint(message, index);
+    let key = message && message.messageKey ? String(message.messageKey) : '';
+    if (!key && conversationKey && conversationKey === state.lastConversationKey) {
+      const candidate = state.lastMessageKeys[index] ? String(state.lastMessageKeys[index]) : '';
+      if (candidate && !usedKeys.has(candidate)) key = candidate;
+    }
+    if (!key) key = makeStableAutoSaveMessageKey(message, index);
+    usedKeys.add(key);
     message.messageKey = key;
+
+    const { fp } = messageFingerprint(message, index, key);
     nextKeys.push(key);
     nextFingerprints.set(key, fp);
 

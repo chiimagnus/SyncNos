@@ -162,6 +162,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId: conversation.id,
       messages: snapshot.messages || [],
+      mode: 'snapshot',
+      diff: null,
+      conversationSourceType: snapshot?.conversation?.sourceType || 'chat',
+      conversationUrl: snapshot?.conversation?.url || '',
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
