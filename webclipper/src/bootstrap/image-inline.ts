@@ -150,92 +150,65 @@ async function downloadAsDataUrlSameOriginViaImageElement(input: {
     return { ok: false, reason: 'no_dom' };
   }
 
-  async function loadImage(url: string, options?: { crossOrigin?: 'anonymous' | null }): Promise<any> {
-    const loadPromise = new Promise<any>((resolve, reject) => {
-      try {
-        const img = new ImageCtor();
-        try {
-          img.decoding = 'async';
-        } catch (_e) {
-          // ignore
-        }
-        if (options?.crossOrigin) {
-          try {
-            img.crossOrigin = options.crossOrigin;
-          } catch (_e) {
-            // ignore
-          }
-        }
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('image_load_failed'));
-        img.src = url;
-      } catch (_e) {
-        reject(new Error('image_ctor_failed'));
-      }
-    });
-    return await withTimeout(loadPromise, input.timeoutMs || 10_000, 'image_timeout');
-  }
-
-  async function tryCanvas(img: any): Promise<{ ok: true; dataUrl: string; byteSize: number } | { ok: false; reason: string }> {
-    const width = Number(img?.naturalWidth || img?.width || 0);
-    const height = Number(img?.naturalHeight || img?.height || 0);
-    if (!width || !height) return { ok: false, reason: 'empty' };
-
+  const loadPromise = new Promise<any>((resolve, reject) => {
     try {
-      const canvas = doc.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext && canvas.getContext('2d');
-      if (!ctx || typeof ctx.drawImage !== 'function') return { ok: false, reason: 'canvas_failed' };
-      ctx.drawImage(img, 0, 0);
-
-      const blob = await canvasToPngBlob(canvas);
-      if (!blob) return { ok: false, reason: 'to_blob_failed' };
-      if ((blob.size || 0) > input.maxBytes) return { ok: false, reason: 'too_large' };
-
-      const buffer = await blob.arrayBuffer();
-      const byteSize = buffer.byteLength || 0;
-      if (!byteSize) return { ok: false, reason: 'empty' };
-      if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
-
-      const base64 = arrayBufferToBase64(buffer);
-      const dataUrl = `data:image/png;base64,${base64}`;
-      const computedSize = byteSizeFromDataUrl(dataUrl) || byteSize;
-      if (computedSize > input.maxBytes) return { ok: false, reason: 'too_large' };
-      return { ok: true, dataUrl, byteSize: computedSize };
+      const img = new ImageCtor();
+      try {
+        img.decoding = 'async';
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        // Reduce referrer-related auth issues; cookies still apply for same-origin.
+        img.referrerPolicy = 'no-referrer';
+      } catch (_e) {
+        // ignore
+      }
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('image_load_failed'));
+      img.src = safeUrl;
     } catch (_e) {
-      return { ok: false, reason: 'canvas_tainted' };
+      reject(new Error('image_ctor_failed'));
     }
-  }
+  });
 
   let img: any = null;
   try {
-    img = await loadImage(safeUrl);
+    img = await withTimeout(loadPromise, input.timeoutMs || 10_000, 'image_timeout');
   } catch (e: any) {
     const msg = String(e?.message || '');
     return { ok: false, reason: msg === 'image_load_failed' ? 'image_load_failed' : msg === 'image_timeout' ? 'timeout' : 'image_failed' };
   }
 
-  const first = await tryCanvas(img);
-  if (first.ok) return first;
-  if (first.reason !== 'canvas_tainted' && first.reason !== 'to_blob_failed') return first;
+  const width = Number(img?.naturalWidth || img?.width || 0);
+  const height = Number(img?.naturalHeight || img?.height || 0);
+  if (!width || !height) return { ok: false, reason: 'empty' };
 
-  // Common for ChatGPT estuary: same-origin URL redirects to cross-origin blob URL.
-  // First load (with cookies) succeeds, but canvas becomes tainted. Retry with CORS-enabled image load
-  // against the final URL to regain canvas read access when the CDN allows CORS.
-  const redirected = String(img?.currentSrc || '').trim();
-  if (!isHttpUrl(redirected) || redirected === safeUrl) return { ok: false, reason: first.reason === 'to_blob_failed' ? 'to_blob_failed' : 'canvas_tainted' };
-
-  let redirectedImg: any = null;
   try {
-    redirectedImg = await loadImage(redirected, { crossOrigin: 'anonymous' });
-  } catch (_e) {
-    return { ok: false, reason: first.reason === 'to_blob_failed' ? 'to_blob_failed' : 'canvas_tainted' };
-  }
+    const canvas = doc.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx || typeof ctx.drawImage !== 'function') return { ok: false, reason: 'canvas_failed' };
+    ctx.drawImage(img, 0, 0);
 
-  const second = await tryCanvas(redirectedImg);
-  if (second.ok) return second;
-  return { ok: false, reason: first.reason === 'to_blob_failed' ? 'to_blob_failed' : 'canvas_tainted' };
+    const blob = await canvasToPngBlob(canvas);
+    if (!blob) return { ok: false, reason: 'to_blob_failed' };
+    if ((blob.size || 0) > input.maxBytes) return { ok: false, reason: 'too_large' };
+
+    const buffer = await blob.arrayBuffer();
+    const byteSize = buffer.byteLength || 0;
+    if (!byteSize) return { ok: false, reason: 'empty' };
+    if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
+
+    const base64 = arrayBufferToBase64(buffer);
+    const dataUrl = `data:image/png;base64,${base64}`;
+    const computedSize = byteSizeFromDataUrl(dataUrl) || byteSize;
+    if (computedSize > input.maxBytes) return { ok: false, reason: 'too_large' };
+    return { ok: true, dataUrl, byteSize: computedSize };
+  } catch (_e) {
+    return { ok: false, reason: 'canvas_tainted' };
+  }
 }
 
 async function downloadAsDataUrlSameOriginViaFetch(input: {
