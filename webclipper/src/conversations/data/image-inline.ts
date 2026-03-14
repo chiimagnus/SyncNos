@@ -32,6 +32,18 @@ async function openDb(): Promise<IDBDatabase> {
   return openingDb;
 }
 
+export async function __closeDbForTests(): Promise<void> {
+  try {
+    const db = cachedDb || (openingDb ? await openingDb : null);
+    db?.close?.();
+  } catch (_e) {
+    // ignore
+  } finally {
+    cachedDb = null;
+    openingDb = null;
+  }
+}
+
 function tx(
   db: IDBDatabase,
   storeNames: string[],
@@ -122,7 +134,13 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     const chunk = bytes.subarray(offset, offset + chunkSize);
     binary += String.fromCharCode(...chunk);
   }
-  return btoa(binary);
+  const btoaFn = (globalThis as any).btoa as ((input: string) => string) | undefined;
+  if (typeof btoaFn === 'function') return btoaFn(binary);
+  const bufferApi = (globalThis as any).Buffer as any;
+  if (bufferApi && typeof bufferApi.from === 'function') {
+    return bufferApi.from(binary, 'binary').toString('base64');
+  }
+  throw new Error('base64 encoder unavailable');
 }
 
 async function getCachedDataUrl(conversationId: number, url: string): Promise<ImageCacheRow | null> {

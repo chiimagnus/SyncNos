@@ -80,6 +80,40 @@ describe("conversations storage-idb", () => {
     expect(after.map((m) => m.messageKey)).toEqual(["m1"]);
   });
 
+  it("syncs messages incrementally without snapshot cleanup", async () => {
+    const convo = await upsertConversation({ sourceType: "chat", source: "debug", conversationKey: "k1", title: "A", lastCapturedAt: 1 });
+    const id = Number(convo.id);
+
+    await syncConversationMessages(id, [
+      { messageKey: "m1", role: "user", contentText: "u", sequence: 1, updatedAt: 1 },
+      { messageKey: "m2", role: "assistant", contentText: "a", sequence: 2, updatedAt: 2 },
+    ]);
+
+    // Incremental update only provides m1 (e.g. partial render) and does not mark m2 as removed:
+    // m2 should remain.
+    const res1 = await syncConversationMessages(
+      id,
+      [{ messageKey: "m1", role: "user", contentText: "u2", sequence: 1, updatedAt: 3 }],
+      { mode: "incremental", diff: { added: [], updated: ["m1"], removed: [] } },
+    );
+    expect(res1.upserted).toBe(1);
+    expect(res1.deleted).toBe(0);
+    const after1 = await getMessagesByConversationId(id);
+    expect(after1.map((m) => m.messageKey)).toEqual(["m1", "m2"]);
+    expect(after1.find((m) => m.messageKey === "m1")?.contentText).toBe("u2");
+
+    // Incremental delete removes only explicitly removed keys.
+    const res2 = await syncConversationMessages(
+      id,
+      [{ messageKey: "m1", role: "user", contentText: "u3", sequence: 1, updatedAt: 4 }],
+      { mode: "incremental", diff: { added: [], updated: ["m1"], removed: ["m2"] } },
+    );
+    expect(res2.upserted).toBe(1);
+    expect(res2.deleted).toBe(1);
+    const after2 = await getMessagesByConversationId(id);
+    expect(after2.map((m) => m.messageKey)).toEqual(["m1"]);
+  });
+
   it("deletes conversations, messages, and sync mappings", async () => {
     const convo = await upsertConversation({ sourceType: "chat", source: "debug", conversationKey: "k1", title: "A", lastCapturedAt: 1 });
     const id = Number(convo.id);
