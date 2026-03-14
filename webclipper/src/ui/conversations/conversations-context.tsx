@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
 import { buildConversationBasename } from '../../conversations/domain/file-naming';
@@ -11,6 +11,41 @@ import type { DetailHeaderAction } from '../../integrations/detail-header-action
 import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
 import { t } from '../../i18n';
 import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
+
+const LIST_SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
+const LIST_SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
+const LIST_SITE_FILTER_ALL_KEY = 'all';
+
+function readLocalStorageValue(key: string): string {
+  try {
+    return String(localStorage.getItem(key) || '');
+  } catch (_e) {
+    return '';
+  }
+}
+
+function writeLocalStorageValue(key: string, value: string | null) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch (_e) {
+    // ignore
+  }
+}
+
+function readInitialListSourceFilterKey(): string {
+  const raw = readLocalStorageValue(LIST_SOURCE_FILTER_STORAGE_KEY).trim().toLowerCase();
+  if (raw) return raw;
+
+  // Backward compat: older app stored filter under this key.
+  const legacy = readLocalStorageValue('webclipper_app_source_filter_key').trim().toLowerCase();
+  return legacy || 'all';
+}
+
+function readInitialListSiteFilterKey(): string {
+  const raw = readLocalStorageValue(LIST_SITE_FILTER_STORAGE_KEY).trim().toLowerCase();
+  return raw || LIST_SITE_FILTER_ALL_KEY;
+}
 
 type ConversationsAppState = {
   loadingList: boolean;
@@ -32,6 +67,16 @@ type ConversationsAppState = {
   syncingNotion: boolean;
   syncingObsidian: boolean;
   deleting: boolean;
+
+  listSourceFilterKey: string;
+  listSiteFilterKey: string;
+  setListSourceFilterKeyPersistent: (next: string) => void;
+  setListSiteFilterKeyPersistent: (next: string) => void;
+
+  pendingListLocateId: number | null;
+  requestListLocate: (conversationId: number) => void;
+  consumeListLocate: () => number | null;
+  openConversationExternalById: (conversationId: number) => void;
 
   refreshList: () => Promise<void>;
   refreshActiveDetail: () => Promise<void>;
@@ -65,6 +110,11 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
 
+  const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
+  const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
+  const [pendingListLocateId, setPendingListLocateId] = useState<number | null>(null);
+  const pendingListLocateIdRef = useRef<number | null>(null);
+
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { feedback: syncFeedback, clearFeedback: clearSyncFeedback, startSync, syncingNotion, syncingObsidian } = useConversationSyncFeedback();
@@ -74,6 +124,44 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     [items, activeId],
   );
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
+
+  const setListSourceFilterKeyPersistent = useCallback((next: string) => {
+    const value = String(next || 'all').trim().toLowerCase() || 'all';
+    setListSourceFilterKey(value);
+    writeLocalStorageValue(LIST_SOURCE_FILTER_STORAGE_KEY, value);
+  }, []);
+
+  const setListSiteFilterKeyPersistent = useCallback((next: string) => {
+    const value = String(next || LIST_SITE_FILTER_ALL_KEY).trim().toLowerCase() || LIST_SITE_FILTER_ALL_KEY;
+    setListSiteFilterKey(value);
+    writeLocalStorageValue(LIST_SITE_FILTER_STORAGE_KEY, value === LIST_SITE_FILTER_ALL_KEY ? null : value);
+  }, []);
+
+  const requestListLocate = useCallback((conversationId: number) => {
+    const id = Number(conversationId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    pendingListLocateIdRef.current = id;
+    setPendingListLocateId(id);
+  }, []);
+
+  const consumeListLocate = useCallback(() => {
+    const id = pendingListLocateIdRef.current;
+    pendingListLocateIdRef.current = null;
+    setPendingListLocateId(null);
+    return Number.isFinite(Number(id)) ? (id as number) : null;
+  }, []);
+
+  const openConversationExternalById = useCallback(
+    (conversationId: number) => {
+      const id = Number(conversationId);
+      if (!Number.isFinite(id) || id <= 0) return;
+      setListSourceFilterKeyPersistent('all');
+      setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
+      setActiveId(id);
+      requestListLocate(id);
+    },
+    [requestListLocate, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
+  );
 
   const refreshList = useCallback(async () => {
     setLoadingList(true);
@@ -306,6 +394,14 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     syncingNotion,
     syncingObsidian,
     deleting,
+    listSourceFilterKey,
+    listSiteFilterKey,
+    setListSourceFilterKeyPersistent,
+    setListSiteFilterKeyPersistent,
+    pendingListLocateId,
+    requestListLocate,
+    consumeListLocate,
+    openConversationExternalById,
     refreshList,
     refreshActiveDetail,
     setActiveId,

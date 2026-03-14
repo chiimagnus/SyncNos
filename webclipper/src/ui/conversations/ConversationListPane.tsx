@@ -20,8 +20,6 @@ import { parseHostnameFromUrl } from '../shared/domain';
 
 type SourceMeta = { key: string; label: string };
 
-const SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
-const SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
 
@@ -189,11 +187,18 @@ export function ConversationListPane({
     toggleSelected,
     setActiveId,
     clearSelected,
+    openConversationExternalById,
     exporting,
     syncFeedback,
     syncingNotion,
     syncingObsidian,
     deleting,
+    listSourceFilterKey,
+    listSiteFilterKey,
+    setListSourceFilterKeyPersistent,
+    setListSiteFilterKeyPersistent,
+    pendingListLocateId,
+    consumeListLocate,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
@@ -201,8 +206,6 @@ export function ConversationListPane({
     deleteSelected,
   } = useConversationsApp();
 
-  const [filterKey, setFilterKey] = useState<string>('all');
-  const [siteFilterKey, setSiteFilterKey] = useState<string>(SITE_FILTER_ALL_KEY);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
@@ -232,43 +235,14 @@ export function ConversationListPane({
     return [{ key: 'all', label: t('allFilter') }, ...opts];
   }, [items]);
 
-  useEffect(() => {
-    let nextFilterKey = 'all';
-    try {
-      const raw = String(localStorage.getItem(SOURCE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
-      if (raw) nextFilterKey = raw;
-    } catch (_e) {
-      // ignore
-    }
-
-    if (!nextFilterKey || nextFilterKey === 'all') {
-      // Backward compat: older app stored filter under this key.
-      try {
-        const v = String(localStorage.getItem('webclipper_app_source_filter_key') || '').trim().toLowerCase();
-        if (v) nextFilterKey = v;
-      } catch (_e) {
-        // ignore
-      }
-    }
-
-    setFilterKey(nextFilterKey || 'all');
-
-    try {
-      const raw = String(localStorage.getItem(SITE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
-      if (raw) setSiteFilterKey(raw);
-    } catch (_e) {
-      // ignore
-    }
-  }, []);
-
   const sourceFilteredItems = useMemo(() => {
-    const key = String(filterKey || 'all').trim().toLowerCase() || 'all';
+    const key = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
     if (key === 'all') return items;
     return items.filter((c) => getSourceMeta((c as any).source).key === key);
-  }, [filterKey, items]);
+  }, [items, listSourceFilterKey]);
 
   const siteOptions = useMemo(() => {
-    const key = String(filterKey || 'all').trim().toLowerCase() || 'all';
+    const key = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
     if (key !== 'web') return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }];
 
     const domainCounts = new Map<string, number>();
@@ -294,18 +268,18 @@ export function ConversationListPane({
     const out: Array<{ key: string; label: string }> = [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }, ...domains];
     if (unknownCount > 0) out.push({ key: SITE_FILTER_UNKNOWN_KEY, label: t('insightUnknownLabel') });
     return out;
-  }, [filterKey, sourceFilteredItems]);
+  }, [listSourceFilterKey, sourceFilteredItems]);
 
   const siteOptionKeys = useMemo(() => new Set(siteOptions.map((opt) => String(opt.key || ''))), [siteOptions]);
 
   const filteredItems = useMemo(() => {
-    const sourceKey = String(filterKey || 'all').trim().toLowerCase() || 'all';
+    const sourceKey = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
     if (sourceKey !== 'web') return sourceFilteredItems;
 
-    const key = String(siteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
+    const key = String(listSiteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
     if (key === SITE_FILTER_ALL_KEY) return sourceFilteredItems;
     return sourceFilteredItems.filter((conversation) => getConversationSiteFilterKey(conversation as any) === key);
-  }, [filterKey, siteFilterKey, sourceFilteredItems]);
+  }, [listSiteFilterKey, listSourceFilterKey, sourceFilteredItems]);
 
   const todayCount = useMemo(() => {
     const now = new Date();
@@ -421,57 +395,68 @@ export function ConversationListPane({
     el.scrollTop = nextTop;
   }, [initialScrollTop, scrollRestoreKey]);
 
+  useEffect(() => {
+    const id = Number(pendingListLocateId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const locate = () => {
+      if (cancelled) return;
+
+      const container = scrollRef.current;
+      const selector = `[data-conversation-id="${id}"]`;
+      const row = container ? (container.querySelector(selector) as HTMLElement | null) : null;
+      if (row) {
+        row.scrollIntoView({ block: 'nearest' });
+        consumeListLocate();
+        return;
+      }
+
+      attempts += 1;
+      if (attempts >= 2) {
+        consumeListLocate();
+        return;
+      }
+
+      requestAnimationFrame(locate);
+    };
+
+    locate();
+    return () => {
+      cancelled = true;
+    };
+  }, [consumeListLocate, pendingListLocateId]);
+
   const onSetFilterKey = (key: string) => {
     const next = String(key || 'all').trim().toLowerCase() || 'all';
-    setFilterKey(next);
+    setListSourceFilterKeyPersistent(next);
     clearSelected();
     setDeleteConfirmOpen(false);
     setExportOpen(false);
     setSyncOpen(false);
-    try {
-      localStorage.setItem(SOURCE_FILTER_STORAGE_KEY, next);
-    } catch (_e) {
-      // ignore
-    }
-
-    if (next !== 'web') return;
-    try {
-      const raw = String(localStorage.getItem(SITE_FILTER_STORAGE_KEY) || '').trim().toLowerCase();
-      setSiteFilterKey(raw || SITE_FILTER_ALL_KEY);
-    } catch (_e) {
-      setSiteFilterKey(SITE_FILTER_ALL_KEY);
-    }
   };
 
   const onSetSiteFilterKey = (key: string) => {
     const next = String(key || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
-    setSiteFilterKey(next);
+    setListSiteFilterKeyPersistent(next);
     clearSelected();
     setDeleteConfirmOpen(false);
     setExportOpen(false);
     setSyncOpen(false);
-
-    try {
-      if (next === SITE_FILTER_ALL_KEY) {
-        localStorage.removeItem(SITE_FILTER_STORAGE_KEY);
-      } else {
-        localStorage.setItem(SITE_FILTER_STORAGE_KEY, next);
-      }
-    } catch (_e) {
-      // ignore
-    }
   };
 
   useEffect(() => {
-    const sourceKey = String(filterKey || 'all').trim().toLowerCase() || 'all';
+    const sourceKey = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
     if (sourceKey !== 'web') return;
     if (siteOptions.length <= 1) return;
 
-    const current = String(siteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
+    const current = String(listSiteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
     if (current === SITE_FILTER_ALL_KEY) return;
     if (siteOptionKeys.has(current)) return;
-    setSiteFilterKey(SITE_FILTER_ALL_KEY);
-  }, [filterKey, siteFilterKey, siteOptionKeys, siteOptions.length]);
+    setListSiteFilterKeyPersistent(SITE_FILTER_ALL_KEY);
+  }, [listSiteFilterKey, listSourceFilterKey, setListSiteFilterKeyPersistent, siteOptionKeys, siteOptions.length]);
 
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
@@ -559,12 +544,20 @@ export function ConversationListPane({
         : providerButtonLabel(singleSyncProvider)
     : '';
 
+  const onNoticeJumpToConversation = (conversationId: number) => {
+    const id = Number(conversationId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    clearSelected();
+    openConversationExternalById(id);
+    onOpenConversation?.(id);
+  };
+
   const onConfirmDelete = async () => {
     await deleteSelected();
     setDeleteConfirmOpen(false);
   };
 
-  const sourceFilterActive = String(filterKey || 'all').trim().toLowerCase() !== 'all';
+  const sourceFilterActive = String(listSourceFilterKey || 'all').trim().toLowerCase() !== 'all';
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
@@ -692,7 +685,7 @@ export function ConversationListPane({
             <SelectMenu<string>
               buttonId="sourceFilterSelect"
               className={hasSelection ? 'tw-hidden' : ''}
-              value={filterKey}
+              value={listSourceFilterKey}
               onChange={(next) => onSetFilterKey(next)}
               disabled={hasSelection}
               ariaLabel={t('sourceFilterAria')}
@@ -715,11 +708,11 @@ export function ConversationListPane({
               options={sourceOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
             />
 
-            {String(filterKey || 'all').trim().toLowerCase() === 'web' ? (
+            {String(listSourceFilterKey || 'all').trim().toLowerCase() === 'web' ? (
               <SelectMenu<string>
                 buttonId="siteFilterSelect"
                 className={hasSelection ? 'tw-hidden' : ''}
-                value={siteFilterKey}
+                value={listSiteFilterKey}
                 onChange={(next) => onSetSiteFilterKey(next)}
                 disabled={hasSelection}
                 ariaLabel={t('insightArticleDomainsTitle')}
@@ -963,7 +956,7 @@ export function ConversationListPane({
             )}
           </div>
 
-          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onOpenConversation={onOpenConversation} />
+          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onJumpToConversation={onNoticeJumpToConversation} />
         </div>
       </div>
 

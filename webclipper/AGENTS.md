@@ -124,9 +124,18 @@
   - `cache-images` 由 `conversations-context.tsx` 注入到 `tools` 槽位，触发后调用 `BACKFILL_CONVERSATION_IMAGES` 回填历史消息图片并刷新 detail。
   - `Open in Obsidian` 的文件打开只能走 Obsidian Local REST API 的 `POST /open/{filename}`；`obsidian://open` 只允许用于拉起桌面 App，再回到 REST API 完成目标文件打开。
 - **会话列表 UI-only 状态**：`src/ui/conversations/ConversationListPane.tsx` + `src/ui/conversations/pending-open.ts`
-  - 来源筛选保存在 `localStorage`（`webclipper_conversations_source_filter_key`），只影响列表视图。
+  - 来源/站点筛选是 UI-only 状态，保存在 conversations context（`src/ui/conversations/conversations-context.tsx`），并持久化到 `localStorage`：
+    - source：`webclipper_conversations_source_filter_key`（backward compat：`webclipper_app_source_filter_key`）
+    - site：`webclipper_conversations_site_filter_key`（`all` 时清理 key）
   - `sourceFilterSelect` / `siteFilterSelect` 使用 `SelectMenu` 的 `adaptiveMaxHeight`，由 `findNearestClippingRect()` + `side` 计算动态 `panelMaxHeight`，不再硬编码 `320px`。
-  - 窄屏下从 Insight / 其他入口跳详情时，目标 `conversationId` 通过 `sessionStorage` (`webclipper_pending_open_conversation_id`) 做一次性桥接。
+  - deep link contract：`/?loc=<base64url(source||conversationKey)>`（codec：`src/shared/conversation-loc.ts`；`source` 统一小写；base64url 无 padding）。
+  - app 中会话选中态与 URL 双向同步：`src/ui/app/AppShell.tsx` 在根路由下用 `replace` 维持 `?loc=` 与 active 会话一致（便于直接复制地址栏）。
+  - external jump（“定位必达”）统一入口：`openConversationExternalById(conversationId)`（`src/ui/conversations/conversations-context.tsx`）
+    - 持久覆盖筛选：source=`all`、site=`all`（不恢复旧筛选）
+    - 触发 list/sidebar 一次性定位滚动：context 设置 `pendingListLocateId`，`ConversationListPane` 消费并对目标行 `scrollIntoView({ block: 'nearest' })`（找不到时允许一次 rAF 重试，随后消费避免卡死）
+    - list 行点击不会触发该滚动（仅 external jump 才会）
+  - `loc` 无效/找不到会话时：回退到默认会话/空态，不 crash、不白屏。
+  - 窄屏下从 Insight / notice 等入口“跳详情”时，目标 `conversationId` 通过 `sessionStorage` (`webclipper_pending_open_conversation_id`) 做一次性桥接（`openConversation(...)` + `ConversationsScene` 消费）。
   - 底部统计组件在有 `onOpenInsightsSection` 回调时可点击跳转到 Insight 分区；若无回调则回退为纯展示态。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
   - settings 写入：`src/ui/settings/hooks/useSettingsSceneController.ts`（保存 `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` 到 `chrome.storage.local`，并兼容旧 `inpage_supported_only`）。

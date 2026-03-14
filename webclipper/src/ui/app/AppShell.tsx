@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '../../i18n';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
-import { ConversationsProvider } from '../conversations/conversations-context';
+import { ConversationsProvider, useConversationsApp } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
@@ -11,6 +11,7 @@ import { navIconButtonClassName } from '../shared/nav-styles';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
+import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conversation-loc';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
@@ -51,6 +52,9 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
+    const { items, openConversationExternalById, selectedConversation } = useConversationsApp();
+    const lastInternalLocRef = useRef<string | null>(null);
+    const processedLocRef = useRef<string | null>(null);
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
@@ -77,6 +81,54 @@ export default function AppShell() {
       return () => document.removeEventListener('keydown', onKey, true);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showSettingsSheet]);
+
+    useEffect(() => {
+      if (location.pathname !== '/') return;
+
+      const search = String(location.search || '');
+      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+      const loc = params.get('loc');
+      if (loc && lastInternalLocRef.current && loc === lastInternalLocRef.current) {
+        lastInternalLocRef.current = null;
+        processedLocRef.current = loc;
+        return;
+      }
+      if (!loc || processedLocRef.current === loc) return;
+
+      const decoded = decodeConversationLoc(loc);
+      if (!decoded) {
+        processedLocRef.current = loc;
+        return;
+      }
+
+      const found = items.find(
+        (x) => String(x.source || '').trim().toLowerCase() === decoded.source && String(x.conversationKey || '').trim() === decoded.conversationKey,
+      );
+      if (!found) {
+        if (items.length) processedLocRef.current = loc;
+        return;
+      }
+      processedLocRef.current = loc;
+      openConversationExternalById(Number(found.id));
+    }, [items, location.pathname, location.search, openConversationExternalById]);
+
+    useEffect(() => {
+      if (location.pathname !== '/') return;
+      if (!selectedConversation) return;
+
+      const nextLoc = encodeConversationLoc({
+        source: selectedConversation.source,
+        conversationKey: selectedConversation.conversationKey,
+      });
+
+      const params = new URLSearchParams(String(location.search || ''));
+      const currentLoc = params.get('loc');
+      if (currentLoc === nextLoc) return;
+
+      params.set('loc', nextLoc);
+      lastInternalLocRef.current = nextLoc;
+      navigate({ pathname: '/', search: `?${params.toString()}` }, { replace: true });
+    }, [location.pathname, location.search, navigate, selectedConversation]);
 
     const renderSidebar = !isNarrow && !sidebarCollapsed;
 
