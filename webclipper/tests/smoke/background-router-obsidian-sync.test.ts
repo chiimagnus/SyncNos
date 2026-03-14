@@ -18,6 +18,7 @@ describe("background-router obsidian sync routes", () => {
     const calls: any = {
       testConnection: 0,
       syncPreflight: 0,
+      syncPreflightMode: 'ok',
       getSyncStatus: 0,
       syncConversations: null,
       syncMode: 'success',
@@ -71,6 +72,9 @@ describe("background-router obsidian sync routes", () => {
       obsidianSyncOrchestrator: {
         async testConnection({ instanceId }: any) {
           calls.syncPreflight += 1;
+          if (calls.syncPreflightMode === 'network_error') {
+            return { ok: false, error: { code: 'network_error', message: 'Failed to fetch' }, instanceId };
+          }
           return { ok: true, instanceId };
         },
         async getSyncStatus({ instanceId }: any) {
@@ -138,6 +142,21 @@ describe("background-router obsidian sync routes", () => {
     expect(calls.syncConversations?.conversationIds).toEqual([1, 2]);
     expect(calls.syncConversations?.forceFullConversationIds).toEqual([2]);
     expect(typeof calls.syncConversations?.instanceId).toBe("string");
+
+    calls.syncConversations = null;
+    calls.syncPreflightMode = 'network_error';
+    const preflightFailRes = await router.__handleMessageForTests({
+      type: "obsidianSyncConversations",
+      conversationIds: [3],
+    });
+    expect(preflightFailRes.ok).toBe(false);
+    expect(String(preflightFailRes.error?.message || '')).toContain('Open Obsidian');
+    expect(String(preflightFailRes.error?.message || '')).toContain('Failed to fetch');
+    expect(preflightFailRes.error?.extra?.provider).toBe('obsidian');
+    expect(preflightFailRes.error?.extra?.stage).toBe('preflight');
+    expect(preflightFailRes.error?.extra?.code).toBe('network_error');
+    expect(calls.syncConversations).toBe(null);
+    calls.syncPreflightMode = 'ok';
 
     calls.syncMode = 'long-running';
     const firstRun = router.__handleMessageForTests({
