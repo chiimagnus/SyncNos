@@ -11,6 +11,7 @@ import {
   writeConversationSnapshot,
 } from '../data/write';
 import { inlineChatImagesInMessages } from '../data/image-inline';
+import { backfillConversationImages } from './image-backfill-job';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -81,6 +82,18 @@ export function registerConversationHandlers(router: AnyRouter) {
     }
 
     const res = await writeConversationMessagesSnapshot(conversationId, messages, { mode, diff });
+    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+      reason: 'upsert',
+      conversationId,
+    });
+    return router.ok(res);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, async (msg) => {
+    const conversationId = Number(msg.conversationId);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
+    const conversationUrl = String(msg?.conversationUrl || '').trim();
+    const res = await backfillConversationImages({ conversationId, conversationUrl });
     router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
       reason: 'upsert',
       conversationId,

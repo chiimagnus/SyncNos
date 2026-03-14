@@ -34,3 +34,13 @@ export async function deleteConversations(conversationIds: number[]): Promise<un
   const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, { conversationIds: ids });
   return unwrap(res);
 }
+
+export async function backfillConversationImages(conversationId: number, conversationUrl?: string): Promise<any> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error("invalid conversationId");
+  const res = await send<ApiResponse<any>>(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, {
+    conversationId: id,
+    conversationUrl: String(conversationUrl || ""),
+  });
+  return unwrap(res);
+}

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
+import { backfillConversationImages } from '../../conversations/client/repo';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
@@ -22,6 +24,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
     detailError,
     detail,
     detailHeaderActions,
+    refreshActiveDetail,
   } = useConversationsApp();
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
@@ -30,6 +33,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
 
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
+  const [backfillBusy, setBackfillBusy] = useState(false);
 
   return (
     <section>
@@ -57,6 +61,37 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
               </div>
             </div>
             <div className="tw-flex tw-shrink-0 tw-flex-nowrap tw-items-center tw-gap-2">
+              {!isArticle && selected ? (
+                <button
+                  type="button"
+                  disabled={backfillBusy}
+                  className={outlineButtonClass}
+                  onClick={() => {
+                    if (backfillBusy) return;
+                    setBackfillBusy(true);
+                    void (async () => {
+                      try {
+                        const res = await backfillConversationImages(Number((selected as any).id), String((selected as any).url || ''));
+                        await refreshActiveDetail();
+                        const updated = Number(res?.updatedMessages) || 0;
+                        const downloaded = Number(res?.downloadedCount) || 0;
+                        const fromCache = Number(res?.fromCacheCount) || 0;
+                        alert(
+                          updated
+                            ? `Images cached. Updated messages: ${updated} (downloaded: ${downloaded}, cache hits: ${fromCache})`
+                            : 'No images to cache.',
+                        );
+                      } catch (e) {
+                        alert((e as any)?.message ?? String(e ?? 'Cache images failed'));
+                      } finally {
+                        setBackfillBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  Cache images
+                </button>
+              ) : null}
               <DetailHeaderActionBar
                 actions={chatWithActions}
                 buttonClassName={outlineButtonClass}
