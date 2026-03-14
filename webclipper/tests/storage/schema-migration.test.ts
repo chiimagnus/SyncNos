@@ -174,6 +174,36 @@ describe("storage schema migration (v2 NotionAI thread id)", () => {
   });
 });
 
+describe("storage schema migration (v6 strip article description)", () => {
+  it("removes legacy conversation.description fields during upgrade", async () => {
+    const db1 = await openV1Db();
+    const t1 = db1.transaction(["conversations"], "readwrite");
+    const convStore = t1.objectStore("conversations");
+
+    await reqToPromise<number>(convStore.add({
+      sourceType: "article",
+      source: "web",
+      conversationKey: "article:https://example.com/a",
+      title: "t",
+      url: "https://example.com/a",
+      description: "should be removed",
+      warningFlags: [],
+      lastCapturedAt: 1
+    }));
+    await txDone(t1);
+    db1.close();
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(["conversations"], "readonly");
+    const convs = await reqToPromise<any[]>(t2.objectStore("conversations").getAll());
+    await txDone(t2);
+    db2.close();
+
+    expect(convs.length).toBe(1);
+    expect(Object.prototype.hasOwnProperty.call(convs[0], "description")).toBe(false);
+  });
+});
+
 describe("storage schema migration (v4 legacy article rows)", () => {
   it("rewrites legacy article source/key/url to canonical web article values", async () => {
     const db1 = await openV1Db();

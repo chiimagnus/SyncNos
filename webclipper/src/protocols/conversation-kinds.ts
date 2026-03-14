@@ -179,12 +179,10 @@ const articleKind: ConversationKindDefinition = {
         URL: { url: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
-        Description: { rich_text: {} },
       },
       ensureSchemaPatch: {
         Author: { rich_text: {} },
         Published: { rich_text: {} },
-        Description: { rich_text: {} },
       },
     },
     pageSpec: {
@@ -196,7 +194,6 @@ const articleKind: ConversationKindDefinition = {
           Date: asDate(data.lastCapturedAt),
           Author: asRichText(data.author),
           Published: asRichText(data.publishedAt),
-          Description: asRichText(data.description),
         };
       },
       buildUpdateProperties(conversation) {
@@ -206,7 +203,6 @@ const articleKind: ConversationKindDefinition = {
           URL: asUrl(data.url),
           Author: asRichText(data.author),
           Published: asRichText(data.publishedAt),
-          Description: asRichText(data.description),
         };
       },
       shouldRebuild({ messages, mapping }) {

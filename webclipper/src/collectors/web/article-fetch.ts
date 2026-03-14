@@ -61,12 +61,6 @@ function fallbackTitle(url: string, tabTitle: unknown) {
   }
 }
 
-function fallbackDescription(text: unknown) {
-  const content = normalizeText(text);
-  if (!content) return '';
-  return content.length > 220 ? `${content.slice(0, 220)}...` : content;
-}
-
 async function resolveTargetTab(tabId?: number) {
   if (Number.isFinite(Number(tabId)) && Number(tabId) > 0) {
     const tab = await tabsGet(Number(tabId));
@@ -474,7 +468,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const title = normalizeText(extracted.title || '') || fallbackTitle(normalizedUrl, tab.title || '');
   const author = normalizeText(extracted.author || '');
   const publishedAt = normalizeText(extracted.publishedAt || '');
-  const description = normalizeText(extracted.excerpt || '') || fallbackDescription(textContent);
   const warningFlags = Array.isArray(extracted.warningFlags)
     ? extracted.warningFlags.map((item: any) => String(item || '').trim()).filter(Boolean)
     : [];
@@ -501,7 +494,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     url: normalizedUrl,
     author,
     publishedAt,
-    description,
     warningFlags,
     lastCapturedAt: capturedAt,
   });
@@ -526,7 +518,6 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     title,
     author,
     publishedAt,
-    description,
     warningFlags,
     wordCount: countWords(body),
     lastCapturedAt: capturedAt,

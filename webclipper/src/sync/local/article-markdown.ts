@@ -13,7 +13,6 @@ function formatArticleMarkdown({
   if (c.author) lines.push(`- Author: ${c.author}`);
   if (c.publishedAt) lines.push(`- Published: ${c.publishedAt}`);
   if (c.url) lines.push(`- URL: ${c.url}`);
-  if (c.description) lines.push(`- Description: ${c.description}`);
   lines.push('');
   lines.push('## Content');
   lines.push('');

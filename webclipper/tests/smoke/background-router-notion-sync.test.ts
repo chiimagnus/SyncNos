@@ -313,7 +313,6 @@ describe('background-router notion sync', () => {
               sourceType: 'article',
               title: 'Updated article title',
               url: 'https://x/article',
-              description: 'new description only',
               notionPageId: 'p1',
             },
             mapping: {
@@ -346,7 +345,6 @@ describe('background-router notion sync', () => {
               URL: { url: 'https://x/article' },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
-              Description: { rich_text: [{ plain_text: 'old description' }] },
             },
           }),
           updatePageProperties: async (_t: string, req: any) => {
@@ -518,7 +516,6 @@ describe('background-router notion sync', () => {
               sourceType: 'article',
               title: 'Same article title',
               url: 'https://x/article',
-              description: 'same description',
               notionPageId: 'p1',
             },
             mapping: {
@@ -551,7 +548,6 @@ describe('background-router notion sync', () => {
               URL: { url: 'https://x/article' },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
-              Description: { rich_text: [{ plain_text: 'same description' }] },
             },
           }),
           updatePageProperties: async (_t: string, req: any) => {
