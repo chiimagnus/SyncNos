@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '../../i18n';
 import Settings from './routes/Settings';
@@ -14,10 +13,7 @@ import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
-const SIDEBAR_WIDTH_KEY = 'webclipper_app_sidebar_width';
 const SIDEBAR_WIDTH_DEFAULT = 370;
-const SIDEBAR_WIDTH_MIN = 370;
-const SIDEBAR_WIDTH_MAX = 520;
 
 function ExpandIcon() {
   return (
@@ -30,28 +26,11 @@ function ExpandIcon() {
 
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_WIDTH_DEFAULT);
-  const sidebarWidthRef = useRef<number>(SIDEBAR_WIDTH_DEFAULT);
-  const resizingRef = useRef(false);
-  const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
-
-  useEffect(() => {
-    sidebarWidthRef.current = sidebarWidth;
-  }, [sidebarWidth]);
 
   useEffect(() => {
     try {
       const v = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
       if (v === '1') setSidebarCollapsed(true);
-    } catch (_e) {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      const raw = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
-      if (Number.isFinite(raw) && raw >= SIDEBAR_WIDTH_MIN && raw <= SIDEBAR_WIDTH_MAX) setSidebarWidth(raw);
     } catch (_e) {
       // ignore
     }
@@ -66,63 +45,7 @@ export default function AppShell() {
     }
   };
 
-  const clampSidebarWidth = (next: number) => {
-    const maxByViewport = typeof window !== 'undefined' && window.innerWidth ? Math.max(SIDEBAR_WIDTH_MIN, window.innerWidth - 320) : SIDEBAR_WIDTH_MAX;
-    const max = Math.min(SIDEBAR_WIDTH_MAX, maxByViewport);
-    return Math.max(SIDEBAR_WIDTH_MIN, Math.min(max, Math.round(next)));
-  };
-
-  const persistSidebarWidth = (next: number) => {
-    try {
-      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next));
-    } catch (_e) {
-      // ignore
-    }
-  };
-
-  const onResizePointerDown = (e: ReactPointerEvent) => {
-    if (e.button !== 0) return;
-    if (sidebarCollapsed) return;
-    resizingRef.current = true;
-    resizeStartRef.current = { x: e.clientX, width: sidebarWidth };
-
-    try {
-      (e.currentTarget as any)?.setPointerCapture?.(e.pointerId);
-    } catch (_e) {
-      // ignore
-    }
-
-    const prevCursor = document.body.style.cursor;
-    const prevUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    const onMove = (ev: PointerEvent) => {
-      if (!resizingRef.current) return;
-      const start = resizeStartRef.current;
-      if (!start) return;
-      const dx = ev.clientX - start.x;
-      setSidebarWidth(clampSidebarWidth(start.width + dx));
-    };
-
-    const onUp = () => {
-      if (!resizingRef.current) return;
-      resizingRef.current = false;
-      resizeStartRef.current = null;
-      document.body.style.cursor = prevCursor;
-      document.body.style.userSelect = prevUserSelect;
-      persistSidebarWidth(clampSidebarWidth(sidebarWidthRef.current));
-      window.removeEventListener('pointermove', onMove, true);
-      window.removeEventListener('pointerup', onUp, true);
-      window.removeEventListener('pointercancel', onUp, true);
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-function AppShellFrame() {
+  function AppShellFrame() {
     useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const isNarrow = useIsNarrowScreen();
@@ -162,18 +85,9 @@ function AppShellFrame() {
         {renderSidebar ? (
           <aside
             className="tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-sunken)] tw-p-0"
-            style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
+            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
           >
             <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-
-            <div
-              role="separator"
-              aria-label={t('resizeSidebar')}
-              onPointerDown={onResizePointerDown}
-              className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-2 tw-cursor-col-resize tw-touch-none"
-            >
-              <div className="tw-absolute tw-right-0 tw-top-0 tw-h-full tw-w-px tw-bg-[var(--border)] tw-opacity-0 tw-transition-opacity tw-duration-150 hover:tw-opacity-100" />
-            </div>
           </aside>
         ) : null}
 

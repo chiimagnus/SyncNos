@@ -619,7 +619,7 @@ export function ConversationListPane({
 
                 <div className="tw-min-w-0 tw-flex-1">
                   <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-font-semibold tw-leading-5 tw-break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:5]">
+                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-font-semibold tw-leading-5 tw-break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
                       {formatConversationTitle((conversation as any).title)}
                     </div>
                     {hasWarningFlags(conversation as any) ? (
