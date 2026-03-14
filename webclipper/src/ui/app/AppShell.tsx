@@ -52,7 +52,7 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
-    const { items, activeId, selectedConversation, setActiveId } = useConversationsApp();
+    const { items, activeId, openConversationExternalById, selectedConversation } = useConversationsApp();
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
@@ -95,8 +95,8 @@ export default function AppShell() {
       if (!found) return;
       if (Number(found.id) === Number(activeId)) return;
 
-      setActiveId(Number(found.id));
-    }, [activeId, items, location.pathname, location.search, setActiveId]);
+      openConversationExternalById(Number(found.id));
+    }, [activeId, items, location.pathname, location.search, openConversationExternalById]);
 
     useEffect(() => {
       if (location.pathname !== '/') return;

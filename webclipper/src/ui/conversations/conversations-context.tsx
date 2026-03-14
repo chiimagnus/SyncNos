@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
 import { buildConversationBasename } from '../../conversations/domain/file-naming';
@@ -73,6 +73,11 @@ type ConversationsAppState = {
   setListSourceFilterKeyPersistent: (next: string) => void;
   setListSiteFilterKeyPersistent: (next: string) => void;
 
+  pendingListLocateId: number | null;
+  requestListLocate: (conversationId: number) => void;
+  consumeListLocate: () => number | null;
+  openConversationExternalById: (conversationId: number) => void;
+
   refreshList: () => Promise<void>;
   refreshActiveDetail: () => Promise<void>;
   setActiveId: (id: number | null) => void;
@@ -107,6 +112,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
+  const [pendingListLocateId, setPendingListLocateId] = useState<number | null>(null);
+  const pendingListLocateIdRef = useRef<number | null>(null);
 
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -129,6 +136,32 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     setListSiteFilterKey(value);
     writeLocalStorageValue(LIST_SITE_FILTER_STORAGE_KEY, value === LIST_SITE_FILTER_ALL_KEY ? null : value);
   }, []);
+
+  const requestListLocate = useCallback((conversationId: number) => {
+    const id = Number(conversationId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    pendingListLocateIdRef.current = id;
+    setPendingListLocateId(id);
+  }, []);
+
+  const consumeListLocate = useCallback(() => {
+    const id = pendingListLocateIdRef.current;
+    pendingListLocateIdRef.current = null;
+    setPendingListLocateId(null);
+    return Number.isFinite(Number(id)) ? (id as number) : null;
+  }, []);
+
+  const openConversationExternalById = useCallback(
+    (conversationId: number) => {
+      const id = Number(conversationId);
+      if (!Number.isFinite(id) || id <= 0) return;
+      setListSourceFilterKeyPersistent('all');
+      setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
+      setActiveId(id);
+      requestListLocate(id);
+    },
+    [requestListLocate, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
+  );
 
   const refreshList = useCallback(async () => {
     setLoadingList(true);
@@ -365,6 +398,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     listSiteFilterKey,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
+    pendingListLocateId,
+    requestListLocate,
+    consumeListLocate,
+    openConversationExternalById,
     refreshList,
     refreshActiveDetail,
     setActiveId,
