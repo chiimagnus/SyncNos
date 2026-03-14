@@ -87,11 +87,12 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
 2. 权限、content scripts、消息协议、构建产物变更要同时检查 `wxt` 入口、manifest 结果与 CI 脚本是否一致。
 3. Settings / Conversations UI 改动时，不要只改单个组件；同时核对这些真源：
    - `webclipper/src/ui/settings/types.ts`（section 分组与顺序）
-   - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`（`ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `chat_with_*`）
+   - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`（`ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / `chat_with_*`）
    - `webclipper/src/ui/shared/hooks/useThemeMode.ts`（popup / app 主题应用）
    - `webclipper/src/ui/shared/SelectMenu.tsx`（source/site 筛选菜单的 `adaptiveMaxHeight` 与可视区域计算）
    - `webclipper/src/ui/popup/PopupShell.tsx` / `webclipper/src/ui/app/AppShell.tsx`（列表统计跳转 Insight 的路由入口）
    - `webclipper/src/ui/conversations/ConversationListPane.tsx` / `pending-open.ts`（来源筛选持久化与窄屏 detail bridge）
+   - `webclipper/src/ui/conversations/conversations-context.tsx` / `DetailHeaderActionBar.tsx` / `DetailNavigationHeader.tsx`（详情头 `open / chat-with / tools` 槽位分发与窄屏一致性）
 4. 默认验证顺序使用：
    - `npm --prefix webclipper run compile`
    - `npm --prefix webclipper run test`

@@ -39,7 +39,7 @@
 | 3 | 默认按 `compile` → `test` → `build` 验证 | 先查类型，再查逻辑，再查产物 |
 | 4 | 涉及 Firefox / 商店发布 / manifest 重写时补 `build:firefox` 和 `check` | 防止渠道特定错误 |
 | 5 | collector 改动要同时考虑自动采集、手动保存、popup 列表和同步下游 | 采集不是孤立层 |
-| 6 | Settings / Conversations UI 改动要同时检查 `types.ts`、`useSettingsSceneController.ts`、`useThemeMode.ts`、`SelectMenu.tsx`、`PopupShell.tsx` / `AppShell.tsx`、`ConversationListPane.tsx` / `ConversationsScene.tsx` | 这些文件共同定义设置分组、主题应用、下拉可视高度策略、Insight 跳转入口、筛选持久化与窄屏路由桥接 |
+| 6 | Settings / Conversations UI 改动要同时检查 `types.ts`、`useSettingsSceneController.ts`、`useThemeMode.ts`、`SelectMenu.tsx`、`PopupShell.tsx` / `AppShell.tsx`、`ConversationListPane.tsx` / `ConversationsScene.tsx`、`conversations-context.tsx`、`DetailHeaderActionBar.tsx` / `DetailNavigationHeader.tsx` | 这些文件共同定义设置分组与关键存储键（含 `ai_chat_cache_images_enabled`）、主题应用、详情头动作槽位、下拉可视高度策略、Insight 跳转入口、筛选持久化与窄屏路由桥接 |
 
 ## Deepwiki / 文档维护工作流
 
@@ -67,6 +67,7 @@
 - **是否需要新增权限**：WebClipper 默认强调最小权限 + 运行时 gating；新增权限前要能解释为什么现有权限无法满足需求。
 - **是否需要调整模块边界**：App 保持 `Views → ViewModels → Services → Models`；扩展保持 collectors / conversations / sync / ui 的清晰拆分。
 - **是否应该继续硬编码下拉高度**：如果菜单位于底部条、滚动容器或窄视口，优先沿用 `SelectMenu` 的 `adaptiveMaxHeight`，不要回退固定 `maxHeight`。
+- **是否只在一个 header 改了动作按钮**：会话详情动作必须同时校验主详情页与窄屏 `DetailNavigationHeader`，并遵守 `open / chat-with / tools` 槽位约束，避免 popup/app 行为分叉。
 
 ## 来源引用（Source References）
 - `AGENTS.md`
@@ -76,6 +77,10 @@
 - `webclipper/AGENTS.md`
 - `webclipper/package.json`
 - `webclipper/wxt.config.ts`
+- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
+- `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`

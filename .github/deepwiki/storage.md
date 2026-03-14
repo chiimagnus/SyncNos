@@ -9,7 +9,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | UserDefaults | SyncNos App | macOS 偏好 | onboarding、自动同步、IAP 状态、提醒态、试用期辅助信息 | `SyncNosApp.swift`, `IAPService.swift` |
 | Keychain | SyncNos App | 系统安全存储 | 站点 Cookie、加密密钥、首次启动 / 设备指纹备份、Notion OAuth 相关敏感信息 | `SiteLoginsStore.swift`, `EncryptionService.swift`, `IAPService.swift` |
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings | `schema.ts`, `storage-idb.ts` |
-| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | SettingsScene controller、settings stores |
+| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | SettingsScene controller、settings stores |
 | `localStorage` | WebClipper | 本地 Web Storage | 设置页当前 section、会话来源筛选、App sidebar UI 偏好 | `types.ts`, `ConversationListPane.tsx`, `AppShell.tsx` |
 | `sessionStorage` | WebClipper | 本地 Web Storage | 窄屏 list/detail 路由中的待打开 conversation | `pending-open.ts` |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、manifest | `backup/export.ts`, `backup/import.ts` |
@@ -50,12 +50,13 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | `conversations` | object store | `sourceType`, `source`, `conversationKey`, `title`, `url`, `lastCapturedAt`, `notionPageId` 等 | 列表、详情、同步入口 |
 | `messages` | object store | `conversationId`, `messageKey`, `contentText`, `contentMarkdown`, `sequence`, `updatedAt` | 生成 Markdown / blocks / note 内容 |
 | `sync_mappings` | object store | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt`, `updatedAt` | 决定是否能增量同步 |
-| `chrome.storage.local` | KV | `inpage_display_mode`, `ai_chat_auto_save_enabled`, `ui_theme_mode`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
+| `chrome.storage.local` | KV | `inpage_display_mode`, `ai_chat_auto_save_enabled`, `ai_chat_cache_images_enabled`, `ui_theme_mode`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
 
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
 - `schema.ts` 的 v2 迁移专门处理 NotionAI thread，把 legacy conversation key 重写为 stable key，并同步迁移 mapping。
 - `schema.ts` 的 v4 迁移会归并 legacy article conversations，把 URL 规范化为 canonical key，减少当前页抓取、article 导入与历史数据升级后的重复会话。
+- `ai_chat_cache_images_enabled` 打开后，background 会在 chat 消息写入时尝试图片内联；对历史消息的补齐由 detail tools 的 `cache-images`（`BACKFILL_CONVERSATION_IMAGES`）触发。
 
 ## WebClipper：UI-only 状态存储
 
@@ -150,6 +151,10 @@ private var currentContentVersion: Int {
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/conversations/pending-open.ts`

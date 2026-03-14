@@ -41,15 +41,15 @@
 | `tests/collectors/gemini-collector.test.ts` | 过滤隐藏说话人 / 状态文案、blob 上传图片内联 | 防止 Gemini 页面结构变化把噪音文案或上传图片误写入正文 |
 | `tests/collectors/kimi-collector.test.ts`, `tests/collectors/zai-collector.test.ts` | 用户上传附件卡片图片抓取 | 防止附件图片只出现在页面而未进入本地会话 markdown |
 | `tests/smoke/background-router-current-page-capture.test.ts` | popup 当前页抓取与 background relay | 保证当前页抓取不会只在 UI 上“看起来能点” |
-| `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI 详情头动作解析（含 clipboard + external jump） | 直接影响用户最常点击的打开 / 跳转入口 |
+| `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI 详情头动作解析（含 clipboard + external jump） | 覆盖 `open` / `chat-with` 主路径，保证详情头动作协议不回退 |
 | `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（`Features = general + chat_with`，`About = insight + about`） | 防止 Settings 导航回退或新分区被错误挪位 |
 
 ## 手动冒烟建议
 1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
 2. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开 popup、多击提示、popup 列表刷新。
 3. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
-4. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save` 保存与刷新行为。
-5. **WebClipper（Chat with AI）**：在 article 或 chat detail 中验证启用平台是否出现在 header；点击后应先复制 payload，再打开目标站点；长内容应按 `maxChars` 截断。
+4. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save / AI chat cache images` 设置行为。
+5. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
 6. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。
 7. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
 8. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
@@ -76,6 +76,7 @@
 ## 备注
 - 本次 deepwiki 更新本身是文档改动，验证重点是“事实是否与源码 / 配置 / workflow 对齐”，而不是重新引入额外测试工具。
 - `SelectMenu` 的 `adaptiveMaxHeight` / `findNearestClippingRect()` 当前主要依赖 UI 冒烟验证；如果该逻辑扩展到更多入口，建议补组件级测试覆盖 `top/bottom + clipping parent` 场景。
+- `cache-images` 目前仍以手工冒烟为主（仓库内暂未发现专门单测）；若后续继续演进，建议补 `background handler + image-backfill-job + action slot` 联动测试。
 - 需要真的跑代码时，优先遵循仓库已有的命令，不新增新的 lint / test 系统。
 
 ## 来源引用（Source References）
@@ -98,6 +99,11 @@
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`
 - `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
+- `webclipper/src/integrations/detail-header-action-types.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

@@ -10,6 +10,7 @@
 | 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
 | WebClipper 页面内按钮没出现 | content script / `inpage_display_mode` / 不支持页面 | `content.ts`, `bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
 | WebClipper 底部 `source/site` 筛选下拉出现多余滚动条或被裁切 | `SelectMenu` 自适应高度 / 容器裁剪边界 | `ConversationListPane.tsx`, `SelectMenu.tsx` | 检查 `adaptiveMaxHeight`、`side` 与 `findNearestClippingRect()` 是否生效 |
+| Chat 会话图片一直是外链 / 缓存图片按钮无效 | `ai_chat_cache_images_enabled` / detail tools / backfill job | `useSettingsSceneController.ts`, `conversations-context.tsx`, `image-backfill-job.ts` | 先确认是 chat 会话，再看开关、路由消息和回填计数 |
 | Google AI Studio 自动保存不完整 | collector 虚拟化渲染 | `googleaistudio-collector.ts`, `content-controller.ts` | 该来源更依赖手动保存 |
 | 网页文章抓取失败 | `Readability` / 页面正文不足 | `article-fetch.ts` | 常见报错是 `No article content detected` |
 | 升级扩展后没有自动跳设置页 | `onInstalled` 行为策略 | `background.ts` | 当前仅首次安装自动打开 About，更新不会自动弹页 |
@@ -69,6 +70,12 @@
 - `SelectMenu` 展开时会调用 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再结合 `side='top'|'bottom'` 计算可用高度；在 popup 底部区域、窄视口或字体缩放变化时，菜单高度动态变化是预期行为。
 - 如果出现明显裁切，先排查调用方是否误把 `adaptiveMaxHeight` 去掉，或 `MenuPopover` 的 `panelMaxHeight` 被覆盖。
 
+### 6. Chat 会话图片缓存没有按预期生效
+- 先确认你操作的是 **chat** 会话：article 不会显示 `cache-images` 工具动作，这是设计行为。
+- `ai_chat_cache_images_enabled` 主要影响后续采集写入；如果是历史会话，需要在 detail header 手动触发 `cache-images` 才会回填。
+- 触发后若提示 `updatedMessages = 0`，通常代表消息里没有可下载图片链接，或链接已失效。
+- 如果点击后直接报错，优先检查 `BACKFILL_CONVERSATION_IMAGES` 消息路由是否注册、`conversationId` 是否有效，以及 background 是否成功广播 `conversationsChanged`。
+
 ## 构建与发布问题
 
 | 症状 | 首查位置 | 说明 |
@@ -86,6 +93,7 @@
 | 重新登录 WeRead / Dedao / GoodLinks | Cookie Header 失效 | `SiteLoginsStore` 会把新 cookie 写回统一 store |
 | 刷新页面 / 新开页面 | inpage 设置刚修改 | 当前实现不做热更新 |
 | 手动保存 Google AI Studio | 自动保存不完整 | 让 collector 先滚动并缓存完整 turns |
+| 在 chat detail 手动触发 `cache-images` | 历史消息图片仍是外链 | 只对 chat 生效；完成后应看到更新计数并自动刷新 detail |
 | 重跑 `compile → test → build`（必要时再 `build:firefox`, `check`） | 扩展构建 / 发布问题 | 先分离类型、逻辑、产物问题 |
 | 回看 `storage.md` 确认事实源 | 备份 / mapping / 迁移问题 | 避免把外部产物误当本地事实源 |
 
@@ -100,6 +108,9 @@
 | `webclipper/src/bootstrap/content.ts` | inpage gating、支持站点判断 | 为什么按钮出现 / 不出现最先看这里 |
 | `webclipper/src/bootstrap/content-controller.ts` | 单击 / 双击 / 手动保存 / article fetch | 页面交互实际入口 |
 | `webclipper/src/ui/shared/SelectMenu.tsx` | 下拉菜单高度、键盘导航、裁剪容器计算 | source/site 过滤菜单异常优先看这里 |
+| `webclipper/src/ui/conversations/conversations-context.tsx` | detail tools 动作显隐与回调 | `cache-images` 是否被注入、是否触发 refresh 的第一现场 |
+| `webclipper/src/conversations/background/handlers.ts` | 消息路由与图片内联开关 | 看 `ai_chat_cache_images_enabled` 读取与 `BACKFILL_CONVERSATION_IMAGES` 注册 |
+| `webclipper/src/conversations/background/image-backfill-job.ts` | 历史消息图片回填 | 看 `updatedMessages / downloadedCount / fromCacheCount` 的真实来源 |
 | `webclipper/src/platform/idb/schema.ts` | 升级后数据异常 | IndexedDB 版本迁移都在这里 |
 | `webclipper/tests/storage/schema-migration.test.ts` | 迁移行为核对 | 最能确认“这是预期迁移还是新 bug” |
 | `.github/workflows/webclipper-*.yml` | 发布失败 | 版本校验、secrets、构建顺序的真实来源 |
@@ -116,7 +127,11 @@
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/platform/idb/schema.ts`

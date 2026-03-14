@@ -28,8 +28,10 @@
 1. `content.ts` 在所有 `http(s)` 页面注入内容脚本。
 2. `bootstrap/content.ts` 先判断当前 host 是否属于支持站点；非支持站点是否显示 inpage UI 还取决于 `inpage_display_mode`（并兼容旧 `inpage_supported_only`）。
 3. collectors registry 识别具体站点，把 DOM 统一为 `conversation + messages`。
-4. background conversation handlers 把快照写入 IndexedDB；UI 通过相同存储读会话列表与详情。
+4. background conversation handlers 处理 `SYNC_CONVERSATION_MESSAGES`，并把快照写入 IndexedDB；UI 通过相同存储读会话列表与详情。
+5. 当 `ai_chat_cache_images_enabled = true` 且 `sourceType !== 'article'` 时，handler 会在写入前尝试把消息图片内联到 `contentMarkdown`（失败不阻塞主链路）。
 - Gemini 采集链会主动过滤 `.cdk-visually-hidden` 与 `[hidden]` 里的噪音文案，并把 blob 上传图内联为 `data:image/*`；Kimi 与 z.ai 则扩大附件卡片抓图范围，减少“消息有图但落库丢图”。
+- 图片内联失败会被记录并继续写入消息：设计目标是“先保证会话可保存”，而不是因为图片链路失败导致整条采集失败。
 
 ### 2. 普通网页文章
 1. 用户手动触发“保存当前页”或网页端保存按钮。
@@ -40,6 +42,12 @@
 ### 3. 为什么有些来源不自动增量保存
 - Google AI Studio 使用虚拟化渲染；自动 observer 常常只能看到当前可见 turns，容易覆盖历史，因此该来源保留“手动保存优先”的策略。
 - inpage 单击触发保存，双击尝试打开 popup，多击只触发彩蛋提示，不直接改变数据链路。
+
+### 4. 会话详情里的手动图片补全（cache-images）
+1. 用户在 chat detail header 触发 `cache-images` 工具动作（article 不显示该动作）。
+2. 前端通过 `BACKFILL_CONVERSATION_IMAGES` 消息调用 background job，并附带 `conversationId` 与 `conversationUrl`。
+3. `image-backfill-job.ts` 读取该会话全部消息，复用 `inlineChatImagesInMessages()` 重新内联图片，并用 incremental diff 回写仅变化的消息。
+4. 完成后 background 广播 `conversationsChanged`，前端刷新 detail，并向用户反馈 `updatedMessages / downloadedCount / fromCacheCount`。
 
 ## WebClipper：从本地会话到外部目标
 
@@ -61,7 +69,8 @@
 | App 已同步高亮映射 | `synced-highlights.store` | Notion 子项映射 | 避免重复遍历 Notion children |
 | WebClipper `sync_mappings` | IndexedDB | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt` | 决定 Notion / Obsidian 是否可增量追加 |
 | WebClipper conversation | IndexedDB | `sourceType`, `source`, `conversationKey`, `lastCapturedAt` | UI 排序、导出、同步、备份的基础 |
-| WebClipper message | IndexedDB | `messageKey`, `sequence`, `updatedAt`, `contentMarkdown` | 生成 Notion blocks / Markdown / Obsidian 内容 |
+| WebClipper message | IndexedDB | `messageKey`, `sequence`, `updatedAt`, `contentMarkdown` | 生成 Notion blocks / Markdown / Obsidian 内容；图片可在实时采集或 backfill 时内联更新 |
+| WebClipper 图片缓存开关 | `chrome.storage.local` | `ai_chat_cache_images_enabled` | 控制 chat 消息图片内联策略；历史消息需手动触发 backfill |
 
 ## 图表
 ![SyncNos 双产品线输出流程图](assets/repository-flow-01.svg)
@@ -89,6 +98,7 @@ flowchart LR
 | Parent Page / token 缺失 | App / WebClipper Notion 同步前 | 直接阻止写入或报错 | 回到配置页补齐授权与 Parent Page |
 | 登录态过期 | App 在线来源 | WeRead / Dedao 无法抓取 | 重新登录并更新 `SiteLoginsStore` |
 | article 抽取失败 | WebClipper article fetch | `No article content detected` | 检查页面是否有足够正文或改用支持站点保存 |
+| 缓存图片按钮不可见或“点了没变化” | WebClipper detail tools / backfill job | article 会话无按钮，或回填结果 `updatedMessages=0` | 先确认是 chat 会话，再检查消息里是否存在可下载图片链接 |
 | cursor 缺失或不匹配 | WebClipper Notion / Obsidian | 从 append 退回 rebuild | 检查本地 mapping 和目标文件 / 页面状态 |
 | Obsidian PATCH 失败 | Obsidian orchestrator | 增量追加失败 | orchestrator 自动回退 full rebuild |
 | 发布版本不一致 | workflow | `manifest version mismatch` | 检查 `wxt.config.ts` 与 tag |
@@ -102,12 +112,17 @@ flowchart LR
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/bootstrap/content.ts`
 - `webclipper/src/bootstrap/content-controller.ts`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/conversations/client/repo.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/collectors/gemini/gemini-collector.ts`
 - `webclipper/src/collectors/kimi/kimi-collector.ts`
 - `webclipper/src/collectors/zai/zai-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
 - `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/protocols/conversation-kinds.ts`
 - `webclipper/src/sync/notion/notion-sync-orchestrator.ts`
 - `webclipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`

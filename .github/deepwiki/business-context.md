@@ -47,9 +47,10 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 
 ### 旅程 5：用户从详情页把本地内容带去别的 AI 平台继续聊
 1. 用户在 popup / app 的 conversation detail 中打开某条 article 或 chat。
-2. detail header 会先解析现有目标：Notion / Obsidian 属于“Open in”，而 `Chat with AI` 会根据设置里启用的平台生成一个或多个动作。
-3. 动作触发时，扩展先把 conversation/article 渲染成模板化 payload，按 `maxChars` 截断后写入剪贴板。
+2. detail header 会按槽位解析动作：Notion / Obsidian 属于 `Open in`，`Chat with AI` 属于 `chat-with`，chat 还可能出现 `cache-images` 工具动作。
+3. `Chat with AI` 触发时，扩展先把 conversation/article 渲染成模板化 payload，按 `maxChars` 截断后写入剪贴板。
 4. 完成复制后再跳转到目标 AI 平台首页，例如 `ChatGPT`；因此它是“复制 + 跳转”的本地辅助流，而不是后台帮用户提交 prompt。
+5. 当用户触发 `cache-images` 时，扩展会在本地回填历史消息中的图片内容，并刷新 detail，但不会自动发起 Notion / Obsidian 同步。
 
 ## 改变行为的业务规则
 
@@ -60,6 +61,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | **WebClipper 本地优先** | 扩展数据层 | Notion / Obsidian / 导出都不是事实源，事实源是本地 IndexedDB | 删除、迁移、备份和重建都先围绕本地会话库发生 |
 | **Insight 只读，不成为新事实源** | WebClipper Settings | 统计页如果写回缓存或引入额外 schema，会把“观察数据”变成“业务状态” | `Settings → Insight` 每次只读聚合 `conversations` / `messages`，失败时显示错误或空态 |
 | **Chat with AI 是“复制 + 跳转”，不是后台代聊** | detail header + settings | 这样才能保持用户对 prompt 与目标平台的控制权，也避免扩展暗中持有额外会话状态 | 没有 detail messages、平台未启用或 URL 无效时，动作直接不出现 |
+| **图片缓存是“可选增强”，不是采集成功前提** | `ai_chat_cache_images_enabled` + detail tools | 用户希望“离线可读”时可开启，但不应因图片链路失败影响文本采集 | 实时采集里的图片内联失败不会阻断保存；历史会话可手动触发 `cache-images` 回填 |
 | **主题默认跟随系统，但允许手动覆盖** | `ui_theme_mode` + `useThemeMode()` | 现在 WebClipper 不再只依赖 `prefers-color-scheme`；用户可以在 Settings 里强制 light / dark | popup 与 app 会监听 `chrome.storage.local` 变化并应用 `data-theme` 覆盖 |
 | **升级不应打断当前会话** | `background.ts` 的 `onInstalled` 行为 | 扩展升级后自动弹设置页会打断正在进行的阅读/对话流程 | 当前仅首次安装自动打开 About；更新保持静默 |
 | **敏感信息尽量不出本机** | App Keychain、扩展备份 | 站点 Cookie、加密密钥、Notion OAuth token 都不能随意进备份或明文落盘 | 备份显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret` |
@@ -87,7 +89,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | 要改 App 的启动、同步、缓存、IAP 或搜索 | [modules/syncnos-app.md](modules/syncnos-app.md) | 它覆盖 `SyncNosApp`、`RootView`、`DIContainer`、`NotionSyncEngine` 等核心结构。 |
 | 要改扩展的采集、同步、设置或备份 | [modules/webclipper.md](modules/webclipper.md) | 它覆盖 background/content/popup/app、collectors、IndexedDB、sync orchestrators。 |
 | 要改扩展的本地统计、Settings Insight 或分布图 | [modules/webclipper.md](modules/webclipper.md), [storage.md](storage.md), [testing.md](testing.md) | 这些页面一起回答“统计从哪来、限制是什么、改完怎么验证”。 |
-| 要改扩展的主题模式、Settings 分组或会话详情 `Chat with AI` | [modules/webclipper.md](modules/webclipper.md), [configuration.md](configuration.md) | 这些页面一起覆盖设置键、UI 路由、detail header 动作与共享状态。 |
+| 要改扩展的主题模式、Settings 分组、`ai_chat_cache_images_enabled` 或会话详情动作 | [modules/webclipper.md](modules/webclipper.md), [configuration.md](configuration.md), [data-flow.md](data-flow.md) | 这些页面一起覆盖设置键、UI 路由、detail header 三槽位动作、图片回填链路与共享状态。 |
 | 要查为什么配置没生效或发布失败 | [configuration.md](configuration.md), [release.md](release.md), [troubleshooting.md](troubleshooting.md) | 这些页面最接近真实错误发生点。 |
 
 ## 业务上最容易误判的点
@@ -95,6 +97,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - **WebClipper 的“同步”不是采集本身。** 采集先把内容落进本地库，同步只是本地库派生出的后续动作。
 - **Insight 里的 clip 数量代表本地 IndexedDB 会话数，而不是 Notion 里已经存在的页面数。** 如果用户删了本地会话、没同步某些会话，或 Notion 侧做了手工变更，两边数字本来就可能不同。
 - **`Chat with AI` 不是“扩展替你把 prompt 发到目标模型”。** 它只负责在本地把 payload 组装好、复制到剪贴板并打开目标网站；后续提交仍由用户在目标站点完成。
+- **`cache-images` 不是“打开开关就自动补齐全部历史图片”。** `ai_chat_cache_images_enabled` 主要影响后续采集；历史会话要在 detail 里手动触发工具动作回填。
 - **“能抓到内容”和“能稳定增量同步”不是一个问题。** 例如 Google AI Studio 因虚拟化列表而更依赖手动保存；article 会话则由 `updatedAt` 决定是否重建目标内容。
 
 ## 来源引用（Source References）
@@ -110,6 +113,12 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/bootstrap/content-controller.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
+- `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`

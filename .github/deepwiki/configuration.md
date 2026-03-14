@@ -8,7 +8,7 @@
 | App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
 | App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
 | WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions |
-| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、`ui_theme_mode`、`inpage_display_mode`、`ai_chat_auto_save_enabled`、Chat with AI、Notion AI 模型偏好 |
+| WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、`ui_theme_mode`、`inpage_display_mode`、`ai_chat_auto_save_enabled`、`ai_chat_cache_images_enabled`、Chat with AI、Notion AI 模型偏好 |
 | WebClipper UI-only 状态 | `localStorage` / `sessionStorage` | 浏览器本地 Web Storage | 控制设置页当前 section、来源筛选、窄屏下待打开的 conversation |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
 
@@ -34,6 +34,7 @@
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
 | `SelectMenu.adaptiveMaxHeight` | `ui/shared/SelectMenu.tsx`, `ConversationListPane.tsx` | 默认 `false`；source/site 筛选启用为 `true` | 在菜单展开时基于最近可裁剪容器动态计算 `panelMaxHeight`，减少多余滚动条与裁切 |
 | `ai_chat_auto_save_enabled` | `chrome.storage.local` | 默认 `true` | 控制支持 AI 站点是否自动保存；关闭后仍可手动保存 |
+| `ai_chat_cache_images_enabled` | `chrome.storage.local`, `conversations/background/handlers.ts` | 默认 `false` | 控制 chat 消息采集时是否尝试图片内联；历史会话可通过 detail header 的 `cache-images` 手动回填 |
 | `ui_theme_mode` | `chrome.storage.local`, `useThemeMode.ts` | 默认 `system` | 控制 popup / app 主题跟随系统，或强制 light / dark |
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, SettingsScene controller | 用户选择值 | 决定扩展 Notion 的写入根 |
 | `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
@@ -48,6 +49,7 @@
 - 扩展 UI 文案没有独立的“语言设置”键；`i18n/index.ts` 会按 `navigator.language` 自动在 `en` / `zh` 间切换。
 - 主题模式不是只靠 CSS 媒体查询：`useThemeMode()` 会监听 `chrome.storage.local` 的 `ui_theme_mode`，并把 `data-theme='light'/'dark'` 覆盖写到根节点；`system` 模式才回退到 `prefers-color-scheme`。
 - Insight 不写入新的 `chrome.storage.local` 键；统计只在用户打开 `Settings → Insight` 时从 IndexedDB 现算，失败时回到错误态或空态。
+- `ai_chat_cache_images_enabled` 只影响 `sourceType='chat'` 的消息内联，article 流程不受影响；它也不会回写新的设置键到 Insight 或列表筛选状态。
 
 ## 发布参数
 
@@ -72,6 +74,7 @@
 - **改了 `wxt.config.ts` 的 `manifest.version` 却没对齐 tag**：CWS / AMO workflow 会直接报 `manifest version mismatch`。
 - **以为扩展升级后会自动打开设置页**：`background.ts` 仅在首次安装（`details.reason === 'install'`）自动打开 About；更新不会自动弹出设置页。
 - **切了 `inpage_display_mode` 或 `ai_chat_auto_save_enabled` 但当前页不变**：因为 content script 只在启动时读取这些开关，必须刷新或新开页面。
+- **打开 `ai_chat_cache_images_enabled` 后旧会话图片仍是外链**：该开关主要影响后续采集写入；历史消息需要在 detail 里手动触发 `cache-images` 才会回填。
 - **以为筛选下拉高度不再固定 `320px` 是样式异常**：`source/site` 筛选菜单现在显式启用 `adaptiveMaxHeight`，会随可视区域动态变化，这是预期行为。
 - **以为主题切到 light / dark 会只影响当前页面**：`ui_theme_mode` 写在 `chrome.storage.local`，popup 与 app 都会通过 `useThemeMode()` 一起响应。
 - **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
@@ -129,6 +132,9 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 - `webclipper/src/bootstrap/current-page-capture.ts`
 - `webclipper/src/i18n/index.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
 - `webclipper/src/ui/settings/types.ts`
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`

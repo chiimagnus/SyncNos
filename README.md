@@ -59,7 +59,7 @@ Save AI chats and web articles from supported sites: local storage, export, back
 - **Readable**: Popup/App renders message Markdown for easier reading and editing.
 - **Portable**: export Markdown (single file or zip), and backup/restore the database.
 - **Syncable**: sync conversations to Notion (OAuth), or to Obsidian via Obsidian Local REST API.
-- **Controllable**: configurable theme mode, Inpage button visibility, and install/update behaviors.
+- **Controllable**: configurable theme mode, Inpage button visibility, install/update behaviors, and optional AI chat image caching (including on-demand re-cache in detail view).
 
 ### Supported Sites
 

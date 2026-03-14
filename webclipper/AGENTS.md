@@ -43,6 +43,10 @@
 - AI 聊天自动保存开关：`ai_chat_auto_save_enabled`（`chrome.storage.local`，默认 `true`）。
   - 关闭后：不再对支持的 AI 聊天站点执行自动保存（仍可手动点击 inpage 按钮保存）。
   - 切换后对**新打开/刷新**的页面生效。
+- AI 对话图片缓存开关：`ai_chat_cache_images_enabled`（`chrome.storage.local`，默认 `false`，beta）。
+  - 开启后：对 `sourceType='chat'` 的后续采集尝试内联图片，失败不阻塞保存主链路。
+  - 历史会话不会自动补齐；需在 detail header 手动触发 `cache-images` 工具动作回填。
+  - `article` 会话不显示该工具动作。
 - 安装后引导策略：`src/entrypoints/background.ts` 仅在 `details.reason === 'install'` 时自动打开 `Settings -> About`；扩展更新后不再自动弹出设置页。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
 - Settings section 分组真源在 `src/ui/settings/types.ts`：
@@ -50,6 +54,7 @@
   - `Data`: `backup`, `notion`, `obsidian`
   - `About`: `insight`, `about`
 - `Chat with AI` 不只是设置页配置：detail header 会根据启用的平台动态显示 `Chat with <platform>` 动作；动作会先复制 payload，再跳转到目标站点。
+- detail header 现在有 `open / chat-with / tools` 三个槽位：其中 `tools` 槽位可承载 `cache-images`（仅 chat 可见），popup/app 窄屏头部与主详情页共用同一套槽位分发规则。
 - 会话列表底部 `today/total` 统计在 popup/app 中可作为 Insight 快捷入口：通过 `onOpenInsightsSection` 跳到 `Settings?section=insight`。
 - 会话列表底部 `source/site` 筛选菜单统一使用 `SelectMenu` 的 `adaptiveMaxHeight`；菜单展开时会按最近可裁剪容器动态计算可用高度，避免固定 `maxHeight` 导致的多余滚动条或裁切。
 
@@ -112,9 +117,11 @@
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
 - **UI：主题模式（共享）**：`src/ui/shared/hooks/useThemeMode.ts`
   - popup 与 app 都通过同一个 hook 监听 `ui_theme_mode`，并把 `light / dark / system` 应用到根节点 `data-theme`；token 真源在 `src/ui/styles/tokens.css`。
-- **会话详情头部打开目标（共享协议）**：`src/ui/conversations/detail-header-actions.ts` + `src/ui/conversations/DetailHeaderActionBar.tsx`
-  - popup 与 app 的 detail header 都应消费同一套 action resolver；当前规则为：单目标直出按钮，双目标显示菜单。
+- **会话详情头部动作（共享协议）**：`src/integrations/detail-header-actions.ts` + `src/integrations/detail-header-action-types.ts` + `src/ui/conversations/DetailHeaderActionBar.tsx`
+  - popup 与 app 的主详情页、窄屏 `DetailNavigationHeader` 都应消费同一套 action resolver，并按 `open / chat-with / tools` 槽位分发。
+  - 槽位内规则：单动作直出按钮，多动作显示菜单；不要在 popup/app 各自写一套“按钮数量判断”逻辑。
   - `Chat with AI` 会根据设置里启用的平台动态生成一个或多个动作；每个动作都会把当前 detail 内容拼成 prompt 写入剪贴板，再跳转到对应平台（当前仍不做 DOM 自动注入与发送）。
+  - `cache-images` 由 `conversations-context.tsx` 注入到 `tools` 槽位，触发后调用 `BACKFILL_CONVERSATION_IMAGES` 回填历史消息图片并刷新 detail。
   - `Open in Obsidian` 的文件打开只能走 Obsidian Local REST API 的 `POST /open/{filename}`；`obsidian://open` 只允许用于拉起桌面 App，再回到 REST API 完成目标文件打开。
 - **会话列表 UI-only 状态**：`src/ui/conversations/ConversationListPane.tsx` + `src/ui/conversations/pending-open.ts`
   - 来源筛选保存在 `localStorage`（`webclipper_conversations_source_filter_key`），只影响列表视图。
@@ -122,9 +129,9 @@
   - 窄屏下从 Insight / 其他入口跳详情时，目标 `conversationId` 通过 `sessionStorage` (`webclipper_pending_open_conversation_id`) 做一次性桥接。
   - 底部统计组件在有 `onOpenInsightsSection` 回调时可点击跳转到 Insight 分区；若无回调则回退为纯展示态。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
-  - settings 写入：`src/ui/settings/hooks/useSettingsSceneController.ts`（保存 `inpage_display_mode` / `ai_chat_auto_save_enabled` 到 `chrome.storage.local`，并兼容旧 `inpage_supported_only`）。
+  - settings 写入：`src/ui/settings/hooks/useSettingsSceneController.ts`（保存 `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` 到 `chrome.storage.local`，并兼容旧 `inpage_supported_only`）。
   - content script 统一匹配所有 `http(s)` 页面，在运行时读取 `inpage_display_mode`（及旧 `inpage_supported_only`）决定是否启动 inpage controller（避免依赖动态注册 content scripts 的浏览器兼容差异）。
-  - 当前实现仅在启动时读取配置，因此切换开关后需刷新页面生效。
+  - `inpage_display_mode` / `ai_chat_auto_save_enabled` 仍以页面启动时读取为主，切换后通常要刷新页面；`ai_chat_cache_images_enabled` 在 background 消息处理时读取，主要影响后续采集与手动 backfill，不要求重开当前页面。
 
 Phase 3（JS→TS）收口状态：
 - `src` 运行时代码已收敛为 TS 主实现（入口文件也已迁入 `src/entrypoints/`）。

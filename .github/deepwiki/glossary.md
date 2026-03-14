@@ -36,6 +36,9 @@
 | conversation kind | WebClipper 会话分类，目前主要是 `chat` 与 `article` | `conversation-kinds.ts` |
 | `article_body` | article 会话的正文消息 key | `article-fetch.ts` |
 | `inpage_display_mode` | 控制 inpage UI 显示范围的开关（`supported / all / off`，并兼容旧 `inpage_supported_only`） | `bootstrap/content.ts`, Settings |
+| `ai_chat_cache_images_enabled` | 控制 chat 消息采集时是否尝试图片内联的设置键 | `useSettingsSceneController.ts`, `conversations/background/handlers.ts` |
+| detail header `tools` slot | 会话详情头的工具动作槽位，和 `open / chat-with` 并列 | `detail-header-action-types.ts`, `DetailHeaderActionBar.tsx` |
+| `cache-images` | chat detail 中触发历史消息图片回填的工具动作 id | `conversations-context.tsx` |
 | `adaptiveMaxHeight` | `SelectMenu` 的动态面板高度开关；启用后菜单高度由当前可视区域计算而不是固定值 | `SelectMenu.tsx`, `ConversationListPane.tsx` |
 | clipping rect | `SelectMenu` 计算可用高度时找到的最近 overflow 裁剪容器矩形 | `findNearestClippingRect()` |
 
@@ -46,6 +49,7 @@
 | cursor | 表示同步进度的游标，用于判断 append 还是 rebuild | `notion-sync-cursor.test.ts`, `sync_mappings` |
 | `sync_mappings` | WebClipper 本地记录的 Notion page / cursor 映射 | IndexedDB |
 | `contentMarkdown` | 可直接被 Notion / Markdown / Obsidian 消费的消息文本 | WebClipper messages |
+| `BACKFILL_CONVERSATION_IMAGES` | 前端触发历史消息图片回填的 CORE 消息类型 | `message-contracts.ts`, `conversations/background/handlers.ts` |
 | Zip v2 | 当前标准备份格式 | `backup/export.ts`, `backup/import.ts` |
 | `contentVersion` | App 网页缓存的抽取算法版本 | `WebArticleCacheService.swift` |
 | stable conversation key | 为 NotionAI thread 迁移引入的稳定会话 key | `schema.ts` |
@@ -71,8 +75,13 @@
 - `webclipper/src/collectors/register-all.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/conversations/background/handlers.ts`
+- `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/integrations/detail-header-action-types.ts`
+- `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/platform/idb/schema.ts`
-- `webclipper/src/platform/messaging/message-contracts.ts`
 - `.github/workflows/webclipper-release.yml`
