@@ -140,6 +140,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   // Inpage
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
+  const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
 
   // Appearance
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
@@ -204,6 +205,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'inpage_display_mode',
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
+          'ai_chat_cache_images_enabled',
           'ui_theme_mode',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
@@ -228,6 +230,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only)
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
+      setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
       const rawThemeMode = String(local?.ui_theme_mode || '').trim().toLowerCase();
       setThemeMode(
         rawThemeMode === 'light' || rawThemeMode === 'dark' || rawThemeMode === 'system'
@@ -531,6 +534,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask]
   );
 
+  const onToggleAiChatCacheImagesEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        await storageSet({ ai_chat_cache_images_enabled: next === true });
+        setAiChatCacheImagesEnabled(next === true);
+      });
+    },
+    [runTask]
+  );
+
   const onChangeThemeMode = useCallback(
     async (next: 'system' | 'light' | 'dark') => {
       await runTask(async () => {
@@ -807,6 +820,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onChangeInpageDisplayMode,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    aiChatCacheImagesEnabled,
+    onToggleAiChatCacheImagesEnabled,
     themeMode,
     onChangeThemeMode,
 
