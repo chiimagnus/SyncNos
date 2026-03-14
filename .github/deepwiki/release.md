@@ -45,7 +45,7 @@
 | --- | --- | --- | --- |
 | `package-release-assets.mjs` | `.github/scripts/webclipper/` | `--target`, `--out`, `--zip`, `--zip-name` 等参数 | Chrome / Edge zip、Firefox xpi、对应 dist 目录 |
 | `package-amo-source.mjs` | `.github/scripts/webclipper/` | WebClipper 源码、根 `LICENSE`、必要脚本 | reviewer-friendly `SyncNos-WebClipper-amo-source.zip` |
-| `publish-amo.mjs` | `.github/scripts/webclipper/` | `AMO_JWT_*`, `AMO_ADDON_ID`, XPI 路径、source zip 路径 | AMO 上传、轮询、创建版本 |
+| `publish-amo.mjs` | `.github/scripts/webclipper/` | `AMO_JWT_*`, `AMO_ADDON_ID`, XPI 路径、source zip 路径；listed 渠道还需要 `AMO_ADDON_SUMMARY`（可选 `AMO_ADDON_SUMMARY_LOCALE`） | AMO 上传、轮询、创建版本 |
 | `publish-edge.mjs` | `.github/scripts/webclipper/` | `EDGE_ADDONS_*`, Edge zip 路径、publish 开关 | Edge Add-ons 上传/发布、轮询操作状态 |
 
 | 脚本细节 | 说明 |
@@ -71,6 +71,7 @@
 | --- | --- | --- | --- |
 | manifest 版本与 tag 不一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml` | 校验阶段直接失败 | 检查 `manifest.version` |
 | AMO 凭据缺失 | `publish-amo.mjs` | `missing env` 或 API 请求失败 | 检查 `AMO_JWT_ISSUER`, `AMO_JWT_SECRET`, `AMO_ADDON_ID` |
+| AMO listed 元数据缺失（summary） | AMO Developer Hub / `publish-amo.mjs` | `Add-on metadata is required ... ['summary']` | 在 AMO 后台补 summary，或在 workflow vars 提供 `AMO_ADDON_SUMMARY` |
 | CWS 凭据缺失 | `webclipper-cws-publish.yml` | 上传 action 失败 | 检查 CWS secrets |
 | Firefox manifest 补丁缺失 | `package-release-assets.mjs` | AMO validator 报 background / gecko 问题 | 检查脚本补丁分支 |
 | 误把 `package.json` 当商店版本事实源 | 发布认知层 | 版本看起来对，workflow 仍然失败 | 记住商店用的是 `wxt.config.ts` |

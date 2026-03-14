@@ -9,6 +9,13 @@ function requiredEnv(name) {
   return String(v).trim();
 }
 
+function optionalEnv(name) {
+  const v = process.env[name];
+  if (!v) return null;
+  const s = String(v).trim();
+  return s ? s : null;
+}
+
 function base64Url(input) {
   const b64 = Buffer.from(input).toString("base64");
   return b64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -21,7 +28,9 @@ function jwtHs256({ issuer, secret }) {
     iss: issuer,
     jti: randomUUID(),
     iat: now,
-    exp: now + 60
+    // The publish flow can spend minutes waiting for AMO validation to finish.
+    // Keep this short-lived, but long enough for the whole run.
+    exp: now + 300
   }));
   const msg = `${header}.${payload}`;
   const sig = createHmac("sha256", secret).update(msg).digest("base64")
@@ -33,11 +42,12 @@ async function sleep(ms) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-async function amoRequest({ method, url, token, body }) {
+async function amoRequest({ method, url, token, body, headers }) {
   const res = await fetch(url, {
     method,
     headers: {
-      Authorization: `JWT ${token}`
+      Authorization: `JWT ${token}`,
+      ...(headers || {})
     },
     body
   });
@@ -52,6 +62,61 @@ async function amoRequest({ method, url, token, body }) {
   }
 
   return json;
+}
+
+function hasNonEmptySummary(summary) {
+  if (!summary) return false;
+  if (typeof summary === "string") return !!summary.trim();
+  if (typeof summary === "object" && !Array.isArray(summary)) {
+    for (const v of Object.values(summary)) {
+      if (typeof v === "string" && v.trim()) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+async function ensureListedAddonMetadata({ baseUrl, token, addonId, channel }) {
+  if (channel !== "listed") return;
+
+  const addon = await amoRequest({
+    method: "GET",
+    url: `${baseUrl}/addons/addon/${addonId}/`,
+    token
+  });
+
+  if (hasNonEmptySummary(addon && addon.summary)) return;
+
+  const summaryText = optionalEnv("AMO_ADDON_SUMMARY");
+  const locale = optionalEnv("AMO_ADDON_SUMMARY_LOCALE") || "en-US";
+
+  if (!summaryText) {
+    throw new Error(
+      `[amo] cannot create a listed version: add-on metadata "summary" is missing.\n` +
+      `Set it once in AMO Developer Hub (Edit listing information), or provide env AMO_ADDON_SUMMARY ` +
+      `(and optionally AMO_ADDON_SUMMARY_LOCALE, default: en-US) for CI.`
+    );
+  }
+
+  const merged = (addon && addon.summary && typeof addon.summary === "object" && !Array.isArray(addon.summary))
+    ? { ...addon.summary }
+    : {};
+  merged[locale] = summaryText;
+
+  // eslint-disable-next-line no-console
+  console.log(`[amo] set add-on summary: locale=${locale}`);
+
+  const updated = await amoRequest({
+    method: "PATCH",
+    url: `${baseUrl}/addons/addon/${addonId}/`,
+    token,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ summary: merged })
+  });
+
+  if (!hasNonEmptySummary(updated && updated.summary)) {
+    throw new Error(`[amo] failed to set add-on summary via API; please set it in AMO Developer Hub.`);
+  }
 }
 
 async function uploadXpi({ baseUrl, token, xpiPath, channel }) {
@@ -111,6 +176,8 @@ async function main() {
   const sourceZipPath = process.env.AMO_SOURCE_ZIP_PATH || join(webclipperRoot, "SyncNos-WebClipper-amo-source.zip");
 
   const token = jwtHs256({ issuer, secret });
+
+  await ensureListedAddonMetadata({ baseUrl, token, addonId, channel });
 
   // eslint-disable-next-line no-console
   console.log(`[amo] upload xpi: ${xpiPath}`);
