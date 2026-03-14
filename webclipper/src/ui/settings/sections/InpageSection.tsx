@@ -29,9 +29,6 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
   } = props;
 
-  const aiChatCacheImagesLabel = 'Cache AI chat images locally（退出账号仍可看）';
-  const aiChatCacheImagesHint = 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.';
-
   const themeModeButtonClassName = (active: boolean) =>
     [
       buttonTintClassName(),
@@ -131,10 +128,15 @@ export function InpageSection(props: {
             onChange={(e) => onToggleAiChatCacheImagesEnabled(!!e.target.checked)}
             className={checkboxClassName}
           />
-          {aiChatCacheImagesLabel}
+          <span className="tw-inline-flex tw-items-center tw-gap-2">
+            <span>{t('aiChatCacheImagesLabel')}</span>
+            <span className="tw-inline-flex tw-items-center tw-rounded-md tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-1.5 tw-py-0.5 tw-text-[10px] tw-font-black tw-tracking-wide tw-text-[var(--text-secondary)]">
+              {t('betaTag')}
+            </span>
+          </span>
         </label>
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {aiChatCacheImagesHint}
+          {t('aiChatCacheImagesHint')}
         </div>
 
         <div className="tw-mt-2.5 tw-grid tw-gap-2">

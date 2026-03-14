@@ -51,6 +51,9 @@ export const zh: { [K in TranslationKey]: string } = {
   inpageDisplayModeHint: '切换后需刷新页面以生效。',
   aiChatAutoSaveLabel: '自动保存 AI 对话',
   aiChatAutoSaveHint: '仅对支持的 AI 聊天站点生效，切换后需刷新页面。',
+  aiChatCacheImagesLabel: '缓存 AI 对话图片到本地（退出账号仍可看）',
+  aiChatCacheImagesHint: '仅影响 AI 对话。采集时会下载图片，避免云链接失效。',
+  betaTag: 'Beta',
   inpageSupportedOnlyLabel: '仅在支持站点显示 Inpage 按钮',
   inpageSupportedOnlyHint: '切换后需刷新页面以生效。',
 
