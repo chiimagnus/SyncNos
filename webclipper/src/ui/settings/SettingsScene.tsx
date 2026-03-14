@@ -115,6 +115,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeInpageDisplayMode,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
+    aiChatCacheImagesEnabled,
+    onToggleAiChatCacheImagesEnabled,
     themeMode,
     onChangeThemeMode,
 
@@ -272,6 +274,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           aiChatAutoSaveEnabled={aiChatAutoSaveEnabled}
           onToggleAiChatAutoSaveEnabled={(next) => {
             void onToggleAiChatAutoSaveEnabled(next);
+          }}
+          aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
+          onToggleAiChatCacheImagesEnabled={(next) => {
+            void onToggleAiChatCacheImagesEnabled(next);
           }}
         />
       ) : null}

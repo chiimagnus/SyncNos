@@ -8,6 +8,7 @@ export async function writeConversationSnapshot(payload: any): Promise<Conversat
 export async function writeConversationMessagesSnapshot(
   conversationId: number,
   messages: any[],
+  options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
 ): Promise<{ upserted: number; deleted: number }> {
-  return syncConversationMessages(conversationId, messages);
+  return syncConversationMessages(conversationId, messages, options);
 }

@@ -14,8 +14,23 @@ export function InpageSection(props: {
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
+  aiChatCacheImagesEnabled: boolean;
+  onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
 }) {
-  const { busy, themeMode, onChangeThemeMode, displayMode, onChangeDisplayMode, aiChatAutoSaveEnabled, onToggleAiChatAutoSaveEnabled } = props;
+  const {
+    busy,
+    themeMode,
+    onChangeThemeMode,
+    displayMode,
+    onChangeDisplayMode,
+    aiChatAutoSaveEnabled,
+    onToggleAiChatAutoSaveEnabled,
+    aiChatCacheImagesEnabled,
+    onToggleAiChatCacheImagesEnabled,
+  } = props;
+
+  const aiChatCacheImagesLabel = 'Cache AI chat images locally（退出账号仍可看）';
+  const aiChatCacheImagesHint = 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.';
 
   const themeModeButtonClassName = (active: boolean) =>
     [
@@ -107,6 +122,21 @@ export function InpageSection(props: {
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('aiChatAutoSaveHint')}
         </div>
+
+        <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={aiChatCacheImagesEnabled}
+            disabled={busy}
+            onChange={(e) => onToggleAiChatCacheImagesEnabled(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          {aiChatCacheImagesLabel}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {aiChatCacheImagesHint}
+        </div>
+
         <div className="tw-mt-2.5 tw-grid tw-gap-2">
           {SUPPORTED_AI_CHAT_SITES.map((site) => {
             const hosts = Array.isArray(site.hosts) ? site.hosts.filter(Boolean) : [];

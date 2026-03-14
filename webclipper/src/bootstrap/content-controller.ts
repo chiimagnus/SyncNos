@@ -145,7 +145,10 @@ export function createContentController(deps: Deps) {
     return null;
   }
 
-  async function saveSnapshot(snapshot: any) {
+  async function saveSnapshot(
+    snapshot: any,
+    options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } },
+  ) {
     if (!snapshot || !snapshot.conversation) return null;
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
@@ -159,6 +162,10 @@ export function createContentController(deps: Deps) {
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId: conversation.id,
       messages: snapshot.messages || [],
+      mode: options?.mode || 'snapshot',
+      diff: options?.diff || null,
+      conversationSourceType: snapshot?.conversation?.sourceType || 'chat',
+      conversationUrl: snapshot?.conversation?.url || '',
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
@@ -269,7 +276,7 @@ export function createContentController(deps: Deps) {
           const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
           if (!incremental || !incremental.changed) return;
 
-          const saved = await saveSnapshot(incremental.snapshot);
+          const saved = await saveSnapshot(incremental.snapshot, { mode: 'incremental', diff: incremental.diff });
           if (saved) showInpageTip(t('saved'), 'ok');
         } catch (error) {
           if (runtime?.isInvalidContextError?.(error)) {

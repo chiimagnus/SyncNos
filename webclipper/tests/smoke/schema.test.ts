@@ -31,6 +31,25 @@ describe("smoke", () => {
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(true);
   });
 
+  it("computeIncremental uses stable fallback keys for auto-save", () => {
+    incrementalUpdater.__resetForTests();
+    const snap1 = { conversation: { conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
+    const snap2 = { conversation: { conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello!" }] };
+
+    const r1 = incrementalUpdater.computeIncremental(snap1);
+    expect(r1.changed).toBe(true);
+    expect(r1.diff.added.length).toBe(1);
+    expect(r1.diff.updated.length).toBe(0);
+    expect(String(snap1.messages[0].messageKey || "")).toMatch(/^autosave_/);
+
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.added.length).toBe(0);
+    expect(r2.diff.updated.length).toBe(1);
+    expect(r2.diff.removed.length).toBe(0);
+    expect(snap2.messages[0].messageKey).toBe(snap1.messages[0].messageKey);
+  });
+
   it("computeIncremental detects title/url updates even without message changes", () => {
     incrementalUpdater.__resetForTests();
     const base = { conversation: { conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
