@@ -17,6 +17,7 @@ describe("background-router obsidian sync routes", () => {
   it("delegates settings get/save and orchestrator actions", async () => {
     const calls: any = {
       testConnection: 0,
+      syncPreflight: 0,
       getSyncStatus: 0,
       syncConversations: null,
       syncMode: 'success',
@@ -68,6 +69,10 @@ describe("background-router obsidian sync routes", () => {
         clearSyncJobStatus: async () => ({ job: null }),
       },
       obsidianSyncOrchestrator: {
+        async testConnection({ instanceId }: any) {
+          calls.syncPreflight += 1;
+          return { ok: true, instanceId };
+        },
         async getSyncStatus({ instanceId }: any) {
           calls.getSyncStatus += 1;
           return { job: null, instanceId };

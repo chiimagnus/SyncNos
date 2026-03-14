@@ -20,6 +20,7 @@ type Deps = {
     clearSyncJobStatus: (input: { instanceId: string }) => Promise<unknown>;
   };
   obsidianSyncOrchestrator: {
+    testConnection: (input: { instanceId: string }) => Promise<any>;
     syncConversations: (input: {
       conversationIds?: unknown[];
       forceFullConversationIds?: unknown[];
@@ -35,6 +36,30 @@ function toSyncErrorResponse(router: AnyRouter, error: unknown) {
   const code = String((error as any)?.code ?? '').trim();
   if (code) return router.err(message, { code });
   return router.err(message);
+}
+
+function safeString(v: unknown) {
+  return String(v == null ? '' : v).trim();
+}
+
+function buildObsidianPreflightFailure(preflight: any) {
+  const error = preflight && typeof preflight === 'object' ? (preflight as any).error : null;
+  const code = safeString(error?.code).toLowerCase();
+  const detail = safeString(error?.message) || 'connection test failed';
+
+  const hintPrimary = 'Open Obsidian and ensure the Local REST API plugin is enabled.';
+  const hintSecondary = 'If this persists, check Settings -> Obsidian Local REST API (Base URL / API Key).';
+  const message = `Obsidian connection test failed. ${hintPrimary} ${hintSecondary} Details: ${detail}`.trim();
+
+  return {
+    message,
+    extra: {
+      code: code || 'preflight_failed',
+      provider: 'obsidian',
+      stage: 'preflight',
+      detail: { code: code || null, message: detail },
+    },
+  };
 }
 
 function normalizeIds(ids: unknown): number[] {
@@ -152,6 +177,18 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (currentJob?.status === 'running') {
         releaseLock();
         return router.err('sync already in progress', { code: 'sync_already_running' });
+      }
+
+      const preflight = await deps.obsidianSyncOrchestrator
+        .testConnection({ instanceId })
+        .catch((e: any) => ({
+          ok: false,
+          error: { code: 'network_error', message: e?.message ? String(e.message) : 'connection test failed' },
+        }));
+      if (!preflight || (preflight as any).ok !== true) {
+        releaseLock();
+        const failure = buildObsidianPreflightFailure(preflight);
+        return router.err(failure.message, failure.extra);
       }
 
       const run = deps.obsidianSyncOrchestrator.syncConversations({ conversationIds, forceFullConversationIds, instanceId });
