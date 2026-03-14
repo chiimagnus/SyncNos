@@ -49,6 +49,9 @@ export const en = {
   inpageDisplayModeHint: 'Requires a page refresh to apply.',
   aiChatAutoSaveLabel: 'Auto-save AI chats',
   aiChatAutoSaveHint: 'Only applies to supported AI chat sites. Requires a refresh to apply.',
+  aiChatCacheImagesLabel: 'Cache AI chat images locally（退出账号仍可看）',
+  aiChatCacheImagesHint: 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.',
+  betaTag: 'BETA',
   inpageSupportedOnlyLabel: 'Only show Inpage button on supported sites',
   inpageSupportedOnlyHint: 'Non-supported sites require a refresh to apply.',
 
@@ -302,11 +305,20 @@ export const en = {
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
+  detailHeaderToolsMenuLabel: 'Tools...',
+  detailHeaderToolsMenuAria: 'Tools',
   detailHeaderOpenInMenuLabel: 'Open in...',
   detailHeaderOpenInMenuAria: 'Open destinations',
   detailHeaderOpenInNotion: 'Open in Notion',
   detailHeaderOpenInObsidian: 'Open in Obsidian',
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
+  detailHeaderCacheImagesLabel: 'Cache images',
+  detailHeaderCacheImagesSuccess: 'Images cached.',
+  detailHeaderCacheImagesUpdatedMessages: 'Updated messages:',
+  detailHeaderCacheImagesDownloaded: 'downloaded',
+  detailHeaderCacheImagesCacheHits: 'cache hits',
+  detailHeaderCacheImagesNoop: 'No images to cache.',
+  detailHeaderCacheImagesFailed: 'Cache images failed',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',

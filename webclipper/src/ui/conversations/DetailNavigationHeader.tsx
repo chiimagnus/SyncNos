@@ -20,6 +20,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   const safeActions = Array.isArray(actions) ? actions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
+  const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   return (
     <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 md:tw-grid md:tw-gap-2">
@@ -45,7 +46,16 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         </div>
       </div>
 
-      <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2 md:tw-flex-wrap md:tw-justify-end">
+      <div className="tw-flex tw-shrink-0 tw-flex-wrap tw-items-center tw-justify-end tw-gap-2">
+        <DetailHeaderActionBar
+          actions={toolActions}
+          buttonClassName={headerActionButtonClass}
+          menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
+          menuTriggerTitle={t('detailHeaderToolsMenuLabel')}
+          menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
+          menuAriaLabel={t('detailHeaderToolsMenuAria')}
+          className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"
+        />
         <DetailHeaderActionBar
           actions={chatWithActions}
           buttonClassName={headerActionButtonClass}
@@ -53,7 +63,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           menuTriggerTitle={t('detailHeaderChatWithMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderChatWithMenuAria')}
           menuAriaLabel={t('detailHeaderChatWithMenuAria')}
-          className="tw-flex tw-items-center tw-gap-2 md:tw-flex-wrap md:tw-justify-end"
+          className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"
         />
         <DetailHeaderActionBar
           actions={openActions}
@@ -62,7 +72,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           menuTriggerTitle={t('detailHeaderOpenInMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
           menuAriaLabel={t('detailHeaderOpenInMenuAria')}
-          className="tw-flex tw-items-center tw-gap-2 md:tw-flex-wrap md:tw-justify-end"
+          className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"
         />
       </div>
     </div>

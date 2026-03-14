@@ -6,6 +6,7 @@ import { formatConversationMarkdown } from '../../conversations/domain/markdown'
 import { createZipBlob } from '../../sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
+import { backfillConversationImages } from '../../conversations/client/repo';
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
 import { t } from '../../i18n';
@@ -135,7 +136,47 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     setDetailHeaderActions([]);
     void resolveDetailHeaderActions({ conversation: selectedConversation, detail })
       .then((actions) => {
-        if (!cancelled) setDetailHeaderActions(actions);
+        if (cancelled) return;
+
+        const isArticle = String((selectedConversation as any)?.sourceType || '').trim().toLowerCase() === 'article';
+        const safeActions = Array.isArray(actions) ? actions : [];
+        if (isArticle) {
+          setDetailHeaderActions(safeActions);
+          return;
+        }
+
+        const conversationId = Number((selectedConversation as any)?.id);
+        const conversationUrl = String((selectedConversation as any)?.url || '');
+
+        const cacheImagesAction: DetailHeaderAction | null =
+          Number.isFinite(conversationId) && conversationId > 0
+            ? {
+                id: 'cache-images',
+                label: t('detailHeaderCacheImagesLabel'),
+                kind: 'open-target',
+                provider: 'local',
+                slot: 'tools',
+                onTrigger: async () => {
+                  const res = await backfillConversationImages(conversationId, conversationUrl);
+                  await refreshActiveDetail();
+                  const updated = Number(res?.updatedMessages) || 0;
+                  const downloaded = Number(res?.downloadedCount) || 0;
+                  const fromCache = Number(res?.fromCacheCount) || 0;
+                  if (!updated) {
+                    alert(t('detailHeaderCacheImagesNoop'));
+                  } else {
+                    const parts = [
+                      t('detailHeaderCacheImagesSuccess'),
+                      `${t('detailHeaderCacheImagesUpdatedMessages')} ${updated}`,
+                      `(${t('detailHeaderCacheImagesDownloaded')}: ${downloaded}, ${t('detailHeaderCacheImagesCacheHits')}: ${fromCache})`,
+                    ];
+                    alert(parts.filter(Boolean).join(' ').trim());
+                  }
+                },
+              }
+            : null;
+
+        setDetailHeaderActions(cacheImagesAction ? [cacheImagesAction, ...safeActions] : safeActions);
       })
       .catch(() => {
         if (!cancelled) setDetailHeaderActions([]);

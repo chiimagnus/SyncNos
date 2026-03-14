@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
-import { backfillConversationImages } from '../../conversations/client/repo';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
@@ -30,10 +28,10 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
+  const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
-  const [backfillBusy, setBackfillBusy] = useState(false);
 
   return (
     <section>
@@ -42,7 +40,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
         aria-label={t('conversationDetailAria')}
       >
         {!hideHeader ? (
-          <header className="tw-flex tw-flex-nowrap tw-items-start tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-pb-2">
+          <header className="tw-flex tw-flex-col tw-items-stretch tw-gap-2 tw-border-b tw-border-[var(--border)] tw-pb-2 md:tw-flex-row md:tw-items-start md:tw-justify-between md:tw-gap-3">
             <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-start tw-gap-2">
               {onBack ? (
                 <button type="button" onClick={onBack} className={navIconButtonSmClassName(false)} aria-label={t('backButton')}>
@@ -60,37 +58,16 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
                 </div>
               </div>
             </div>
-            <div className="tw-flex tw-shrink-0 tw-flex-nowrap tw-items-center tw-gap-2">
-              {!isArticle && selected ? (
-                <button
-                  type="button"
-                  disabled={backfillBusy}
-                  className={outlineButtonClass}
-                  onClick={() => {
-                    if (backfillBusy) return;
-                    setBackfillBusy(true);
-                    void (async () => {
-                      try {
-                        const res = await backfillConversationImages(Number((selected as any).id), String((selected as any).url || ''));
-                        await refreshActiveDetail();
-                        const updated = Number(res?.updatedMessages) || 0;
-                        const downloaded = Number(res?.downloadedCount) || 0;
-                        const fromCache = Number(res?.fromCacheCount) || 0;
-                        alert(
-                          updated
-                            ? `Images cached. Updated messages: ${updated} (downloaded: ${downloaded}, cache hits: ${fromCache})`
-                            : 'No images to cache.',
-                        );
-                      } catch (e) {
-                        alert((e as any)?.message ?? String(e ?? 'Cache images failed'));
-                      } finally {
-                        setBackfillBusy(false);
-                      }
-                    })();
-                  }}
-                >
-                  Cache images
-                </button>
+            <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">
+              {!isArticle ? (
+                <DetailHeaderActionBar
+                  actions={toolActions}
+                  buttonClassName={outlineButtonClass}
+                  menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
+                  menuTriggerTitle={t('detailHeaderToolsMenuLabel')}
+                  menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
+                  menuAriaLabel={t('detailHeaderToolsMenuAria')}
+                />
               ) : null}
               <DetailHeaderActionBar
                 actions={chatWithActions}

@@ -51,6 +51,9 @@ export const zh: { [K in TranslationKey]: string } = {
   inpageDisplayModeHint: '切换后需刷新页面以生效。',
   aiChatAutoSaveLabel: '自动保存 AI 对话',
   aiChatAutoSaveHint: '仅对支持的 AI 聊天站点生效，切换后需刷新页面。',
+  aiChatCacheImagesLabel: '缓存 AI 对话图片到本地（退出账号仍可看）',
+  aiChatCacheImagesHint: '仅影响 AI 对话。采集时会下载图片，避免云链接失效。',
+  betaTag: 'Beta',
   inpageSupportedOnlyLabel: '仅在支持站点显示 Inpage 按钮',
   inpageSupportedOnlyHint: '切换后需刷新页面以生效。',
 
@@ -301,11 +304,20 @@ export const zh: { [K in TranslationKey]: string } = {
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
+  detailHeaderToolsMenuLabel: '工具...',
+  detailHeaderToolsMenuAria: '工具',
   detailHeaderOpenInMenuLabel: '打开到...',
   detailHeaderOpenInMenuAria: '打开目标',
   detailHeaderOpenInNotion: '在 Notion 中打开',
   detailHeaderOpenInObsidian: '在 Obsidian 中打开',
   detailHeaderObsidianApiNotConnected: 'Obsidian API 未连接',
+  detailHeaderCacheImagesLabel: '缓存图片',
+  detailHeaderCacheImagesSuccess: '图片已缓存。',
+  detailHeaderCacheImagesUpdatedMessages: '更新消息数：',
+  detailHeaderCacheImagesDownloaded: '下载',
+  detailHeaderCacheImagesCacheHits: '命中缓存',
+  detailHeaderCacheImagesNoop: '没有可缓存的图片。',
+  detailHeaderCacheImagesFailed: '缓存图片失败',
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',
