@@ -3,14 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../../i18n';
 import type { ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 import { buttonIconCircleCardClassName } from '../shared/button-styles';
-import { useConversationsApp } from './conversations-context';
-import { openConversation } from './open-conversation';
 import type { TranslationKey } from '../../i18n/locales/en';
 
 type ConversationSyncFeedbackNoticeProps = {
   feedback: ConversationSyncFeedbackState;
   onDismiss: () => void;
-  onOpenConversation?: (conversationId: number) => void;
+  onJumpToConversation?: (conversationId: number) => void;
 };
 
 type NoticeTones = {
@@ -217,8 +215,7 @@ function SummaryBody(props: {
 }
 
 export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNoticeProps) {
-  const { feedback, onDismiss, onOpenConversation } = props;
-  const { setActiveId, clearSelected } = useConversationsApp();
+  const { feedback, onDismiss, onJumpToConversation } = props;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const prevProviderRef = useRef<ConversationSyncFeedbackState['provider']>(feedback.provider);
@@ -297,9 +294,11 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
     : feedback.message;
   const showRunningStageDetail = feedback.phase === 'running' && !!currentItemLabel && !!currentStageLabel;
 
-  const onJumpToConversation = (conversationId: unknown) => {
-    const id = openConversation(conversationId, { clearSelected, setActiveId, onOpenConversation });
-    if (id) setDetailsOpen(false);
+  const onJump = (conversationId: unknown) => {
+    const safeId = Number(conversationId);
+    if (!Number.isFinite(safeId) || safeId <= 0) return;
+    onJumpToConversation?.(Math.floor(safeId));
+    setDetailsOpen(false);
   };
 
   return (
@@ -329,7 +328,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           detailsOpen={detailsOpen}
           canShowDetails={canShowDetails}
           onToggleDetails={() => setDetailsOpen((open) => !open)}
-          onJumpToConversation={(conversationId) => onJumpToConversation(conversationId)}
+          onJumpToConversation={(conversationId) => onJump(conversationId)}
         />
 
         {canDismiss ? (
@@ -379,7 +378,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                       {Number(warning?.conversationId) > 0 ? (
                         <button
                           type="button"
-                          onClick={() => onJumpToConversation(warning?.conversationId)}
+                          onClick={() => onJump(warning?.conversationId)}
                           className={[
                             'tw-w-full tw-text-left tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]',
                             'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
@@ -413,7 +412,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                 {Number(failure.conversationId) > 0 ? (
                   <button
                     type="button"
-                    onClick={() => onJumpToConversation(failure.conversationId)}
+                    onClick={() => onJump(failure.conversationId)}
                     className={[
                       'tw-w-full tw-text-left tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]',
                       'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',

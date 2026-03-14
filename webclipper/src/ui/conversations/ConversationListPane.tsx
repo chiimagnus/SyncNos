@@ -187,6 +187,7 @@ export function ConversationListPane({
     toggleSelected,
     setActiveId,
     clearSelected,
+    openConversationExternalById,
     exporting,
     syncFeedback,
     syncingNotion,
@@ -542,6 +543,14 @@ export function ConversationListPane({
         ? t('obsidianSyncing')
         : providerButtonLabel(singleSyncProvider)
     : '';
+
+  const onNoticeJumpToConversation = (conversationId: number) => {
+    const id = Number(conversationId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    clearSelected();
+    openConversationExternalById(id);
+    onOpenConversation?.(id);
+  };
 
   const onConfirmDelete = async () => {
     await deleteSelected();
@@ -947,7 +956,7 @@ export function ConversationListPane({
             )}
           </div>
 
-          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onOpenConversation={onOpenConversation} />
+          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onJumpToConversation={onNoticeJumpToConversation} />
         </div>
       </div>
 
