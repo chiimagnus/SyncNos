@@ -30,6 +30,12 @@ vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
 
 vi.mock('../../src/ui/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: React.ReactNode }) => children,
+  useConversationsApp: () => ({
+    items: [],
+    activeId: null,
+    selectedConversation: null,
+    setActiveId: vi.fn(),
+  }),
 }));
 
 vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({

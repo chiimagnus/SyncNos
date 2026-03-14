@@ -22,6 +22,8 @@ function encodeBase64Url(text: string): string {
 function decodeBase64Url(value: string): string | null {
   const trimmed = String(value || '').trim();
   if (!trimmed) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) return null;
+  if (trimmed.length % 4 === 1) return null;
 
   const base64 = trimmed.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
