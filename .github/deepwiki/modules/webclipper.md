@@ -28,6 +28,7 @@
 | `src/ui/settings/sections/InsightSection.tsx` | Insight 状态容器 | 管理 loading / error / empty / populated 四类状态 |
 | `src/ui/settings/sections/InsightPanel.tsx` | Insight 统计视图 | 用 `recharts` 渲染来源分布、文章域名分布与 Top 3 conversation |
 | `src/ui/shared/hooks/useThemeMode.ts` | 主题模式应用 | 把 `ui_theme_mode` 转成 `data-theme` 覆盖，驱动 popup / app 同步换肤 |
+| `src/ui/shared/SelectMenu.tsx` | 共享下拉菜单组件 | 统一选项菜单键盘行为，并在 `adaptiveMaxHeight` 打开时按可裁剪容器动态计算高度 |
 | `src/ui/conversations/ConversationListPane.tsx` | 列表筛选、批量动作与来源持久化 | 控制 `source filter`、today/total 统计、导出/同步/删除菜单 |
 | `src/ui/conversations/pending-open.ts` | 窄屏待打开会话桥接 | 让 Insight / 列表 / 路由在 narrow 模式下也能准确落到 detail |
 
@@ -93,6 +94,7 @@
 - `SettingsScene.tsx` 会为 Insight 分区放宽 detail 宽度到 `1120px`，因为这一页需要容纳双栏图表与排行布局。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
 - `ConversationListPane.tsx` 会把来源筛选写入 `localStorage`（`webclipper_conversations_source_filter_key`），因此“为什么列表下次打开还停在 ChatGPT 过滤条件”是预期行为，不是脏状态。
+- `ConversationListPane.tsx` 的 `source/site` 筛选已启用 `SelectMenu` 的 `adaptiveMaxHeight`：`SelectMenu` 会通过 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再按 `side='top'|'bottom'` 计算可用高度（最小 `80px`），所以 popup 底部条里的菜单高度会随可视区域动态变化。
 - `ConversationListPane.tsx` 底部 `today / total` 统计在提供 `onOpenInsightsSection` 回调时会变成可点击入口：popup 会跳 `'/settings?section=insight'`，app 会在 HashRouter 内导航到同一路由。
 - `ConversationsScene.tsx` 在窄屏下采用 list/detail 双路由；如果某个入口（例如 Insight Top conversations）需要直接开 detail，会通过 `pending-open.ts` 把目标会话先写入 `sessionStorage`，再在 scene 初始化时消费。
 - detail header 右上角的会话级动作由 `detail-header-actions.ts` 统一解析；当前规则固定为：单目标直出按钮，Notion + Obsidian 双目标时显示菜单，popup 的旧 `More` 占位已经移除。
@@ -105,6 +107,7 @@
 - **改 inpage 体验**：先看 `content-controller.ts`, `bootstrap/content.ts`, `inpage-button-shadow.ts`, `inpage-tip-shadow.ts`。
 - **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
 - **改 Insight 统计 / 排行 / 图表**：先看 `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `useSettingsSceneController.ts`；这里决定 Top N、Other 分桶、空态 / 错误态和图表布局。
+- **改列表筛选下拉 / 菜单裁切**：先看 `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx`；不要再回退固定 `maxHeight`，否则容易在底部条或窄窗口出现无谓滚动条。
 - **改主题模式 / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `useThemeMode.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略状态来源。
 - **改 detail header 打开目标**：先看 `detail-header-actions.ts`, `detail-header-obsidian-target.ts`, `DetailHeaderActionBar.tsx`, `ConversationsScene.tsx`, `ConversationDetailPane.tsx`，不要在 popup / app JSX 里各自拼目标 URL，也不要把 Obsidian 文件打开退回到 URI file deep link。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
@@ -119,6 +122,7 @@
 | cursor / append / rebuild 异常 | `notion-sync-cursor.test.ts`, Notion / Obsidian orchestrators | 先判断是 mapping 问题还是目标系统问题 |
 | 当前页抓取异常 | `current-page-capture.ts`, `background-router-current-page-capture.test.ts`, `usePopupCurrentPageCapture.ts` | 看 capture state 判定、消息转发与按钮状态 |
 | inpage 行为异常 | `bootstrap/content.ts`, `content-controller.ts`, `inpage-button-shadow.ts` | 看 gating、点击动作和 runtime invalidation |
+| source/site 筛选下拉异常（高度、滚动、裁切） | `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx` | 看 `adaptiveMaxHeight`、`findNearestClippingRect()` 与 `side` 设置是否一致 |
 | article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
 | Chat with AI / 打开目标异常 | `chatwith-settings.ts`, `detail-header-actions.test.ts`, `app-detail-header-actions.test.ts`, `settings-sections.test.ts` | 看模板变量、平台设置、菜单动作与 Settings 分组 |
 | Insight 统计异常 | `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.test.ts`, `settings-sections.test.ts` | 先区分是 IndexedDB 读失败、聚合规则偏差、还是 Settings 导航 / 图表布局回归 |
@@ -156,6 +160,8 @@
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/shared/MenuPopover.tsx`
+- `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/app/conversations/CapturedListSidebar.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

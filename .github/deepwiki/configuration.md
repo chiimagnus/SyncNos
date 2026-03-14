@@ -32,6 +32,7 @@
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
 | 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
+| `SelectMenu.adaptiveMaxHeight` | `ui/shared/SelectMenu.tsx`, `ConversationListPane.tsx` | 默认 `false`；source/site 筛选启用为 `true` | 在菜单展开时基于最近可裁剪容器动态计算 `panelMaxHeight`，减少多余滚动条与裁切 |
 | `ai_chat_auto_save_enabled` | `chrome.storage.local` | 默认 `true` | 控制支持 AI 站点是否自动保存；关闭后仍可手动保存 |
 | `ui_theme_mode` | `chrome.storage.local`, `useThemeMode.ts` | 默认 `system` | 控制 popup / app 主题跟随系统，或强制 light / dark |
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, SettingsScene controller | 用户选择值 | 决定扩展 Notion 的写入根 |
@@ -71,6 +72,7 @@
 - **改了 `wxt.config.ts` 的 `manifest.version` 却没对齐 tag**：CWS / AMO workflow 会直接报 `manifest version mismatch`。
 - **以为扩展升级后会自动打开设置页**：`background.ts` 仅在首次安装（`details.reason === 'install'`）自动打开 About；更新不会自动弹出设置页。
 - **切了 `inpage_display_mode` 或 `ai_chat_auto_save_enabled` 但当前页不变**：因为 content script 只在启动时读取这些开关，必须刷新或新开页面。
+- **以为筛选下拉高度不再固定 `320px` 是样式异常**：`source/site` 筛选菜单现在显式启用 `adaptiveMaxHeight`，会随可视区域动态变化，这是预期行为。
 - **以为主题切到 light / dark 会只影响当前页面**：`ui_theme_mode` 写在 `chrome.storage.local`，popup 与 app 都会通过 `useThemeMode()` 一起响应。
 - **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
 - **Obsidian 使用了错误的 URL / header / API Key**：当前设计默认围绕 `http://127.0.0.1:27123` 与 `Authorization` 头工作。
@@ -105,6 +107,16 @@ export function applyThemeMode(mode: ThemeMode) {
 }
 ```
 
+### 片段 4：筛选菜单会根据最近可裁剪容器动态计算可用高度
+```ts
+const clipRect = findNearestClippingRect(el);
+const available = side === 'top'
+  ? rect.top - (clipRect?.top ?? 0) - gap - margin
+  : (clipRect?.bottom ?? window.innerHeight) - rect.bottom - gap - margin;
+
+const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 160));
+```
+
 ## 来源引用（Source References）
 - `macOS/SyncNos/SyncNosApp.swift`
 - `macOS/SyncNos/AppDelegate.swift`
@@ -122,6 +134,8 @@ export function applyThemeMode(mode: ThemeMode) {
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/shared/MenuPopover.tsx`
+- `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/pending-open.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `.github/workflows/release.yml`

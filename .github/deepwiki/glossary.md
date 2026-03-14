@@ -36,6 +36,8 @@
 | conversation kind | WebClipper 会话分类，目前主要是 `chat` 与 `article` | `conversation-kinds.ts` |
 | `article_body` | article 会话的正文消息 key | `article-fetch.ts` |
 | `inpage_display_mode` | 控制 inpage UI 显示范围的开关（`supported / all / off`，并兼容旧 `inpage_supported_only`） | `bootstrap/content.ts`, Settings |
+| `adaptiveMaxHeight` | `SelectMenu` 的动态面板高度开关；启用后菜单高度由当前可视区域计算而不是固定值 | `SelectMenu.tsx`, `ConversationListPane.tsx` |
+| clipping rect | `SelectMenu` 计算可用高度时找到的最近 overflow 裁剪容器矩形 | `findNearestClippingRect()` |
 
 ## 同步与存储术语
 
@@ -69,6 +71,8 @@
 - `webclipper/src/collectors/register-all.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/ui/shared/SelectMenu.tsx`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `.github/workflows/webclipper-release.yml`

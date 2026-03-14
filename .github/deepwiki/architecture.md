@@ -53,6 +53,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 - `SettingsScene.tsx + useSettingsSceneController.ts` 共同承担 WebClipper 的“设置组合根”职责：一方面把 `chrome.storage.local` 里的 theme / inpage / chat-with / Notion / Obsidian 设置喂给 UI，另一方面只在进入 `insight` 分区时懒加载本地统计。
 - `ConversationsScene.tsx + pending-open.ts` 共同承担窄屏下的 list/detail bridge：当用户从 Insight 排行或其他路由跳到对话详情时，会先把目标 `conversationId` 写入 `sessionStorage`，再由 scene 消费并切进 detail。
 - `ConversationListPane.tsx` 通过 `onOpenInsightsSection` 把列表底部统计组件连接到 popup/app 路由壳层：popup 打开 `'/settings?section=insight'`，app 在 HashRouter 内导航同一参数。
+- `SelectMenu.tsx + MenuPopover.tsx` 共同定义 WebClipper 下拉面板的高度边界：当 `adaptiveMaxHeight` 启用时，会通过 `findNearestClippingRect()` 查找最近 overflow 裁剪容器并动态计算 `panelMaxHeight`，从而让底部 `source/site` 筛选菜单在受限容器里减少无谓滚动条与裁切。
 
 ## 关键契约
 
@@ -65,6 +66,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | `conversation-kinds.ts` | `webclipper/src/protocols/conversation-kinds.ts` | Notion / Obsidian orchestrator | 决定 chat/article 的 DB、folder 与重建规则 |
 | `chatwith-settings.ts` | `webclipper/src/integrations/chatwith/chatwith-settings.ts` | detail header、SettingsScene controller、backup tests | 统一 `Chat with AI` 的模板、平台列表、字符截断与存储键 |
 | `useThemeMode.ts` | `webclipper/src/ui/shared/hooks/useThemeMode.ts` | popup/app 壳层、SettingsScene | 统一 `ui_theme_mode` → `data-theme` 的主题应用逻辑 |
+| `SelectMenu` 自适应高度约束 | `webclipper/src/ui/shared/SelectMenu.tsx` | `ConversationListPane` 等下拉触发点 | `adaptiveMaxHeight` 会结合 `side` 与最近可裁剪容器动态计算 `panelMaxHeight` |
 | Zip v2 备份契约 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | 备份与恢复流程 | 约束 manifest、CSV、分源 JSON、storage-local.json 的结构 |
 
 ## 图表
@@ -123,6 +125,8 @@ flowchart TB
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/bootstrap/content.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
+- `webclipper/src/ui/shared/MenuPopover.tsx`
+- `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`

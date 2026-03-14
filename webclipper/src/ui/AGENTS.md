@@ -266,3 +266,18 @@
 - **手动覆盖行为**：当 `ui_theme_mode = light / dark` 时，根节点会出现 `:root[data-theme='light'/'dark']`，优先级高于媒体查询
 - **实现真源**：`src/ui/shared/hooks/useThemeMode.ts` + `src/ui/styles/tokens.css`
 - **工程约束**：新增组件必须同时兼容媒体查询和 `:root[data-theme='light'/'dark']`，不要把主题状态私有化到某个页面组件
+
+## B5 · 下拉菜单可视区域策略（SelectMenu）
+
+`SelectMenu` 是 WebClipper 在列表筛选等场景的共享下拉组件。对于位于底部工具条、滚动容器或窄视口中的菜单，统一采用“可视区域自适应”策略，而不是固定高度。
+
+| 场景 | 规则 | 真源 |
+| --- | --- | --- |
+| 普通下拉 | 可使用固定 `maxHeight` | `src/ui/shared/SelectMenu.tsx` |
+| 底部条/受限容器下拉 | 优先启用 `adaptiveMaxHeight`，让组件动态计算 `panelMaxHeight` | `src/ui/conversations/ConversationListPane.tsx` |
+| 可视区域计算 | 通过 `findNearestClippingRect()` 找最近 overflow 裁剪容器，再结合 `side` 计算剩余高度；最小值 `80px` | `src/ui/shared/SelectMenu.tsx` |
+
+- 不要把 `source/site` 筛选菜单回退到固定 `maxHeight=320`，这会在某些窗口高度和布局下引入无谓滚动条或菜单裁切。
+- 调整菜单样式或布局时，必须同时在 popup 和 app 手工验证：
+  - 空间充足时不出现无谓滚动条
+  - 空间不足时出现可控滚动且菜单不被裁切

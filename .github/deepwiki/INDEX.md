@@ -9,6 +9,7 @@
 - **采集稳定性变化**：Gemini 进一步过滤隐藏说话人/状态文案并增强 blob 图片内联；Kimi 与 z.ai 补齐用户上传附件图片抓取范围。
 - **详情页动作变化**：Conversation detail header 现在会根据启用的平台动态暴露多个 `Chat with <platform>` 动作；动作会先把渲染后的 payload 复制到剪贴板，再跳转目标 AI 站点。
 - **移动/窄屏行为变化**：会话列表来源筛选会写入 `localStorage`；从 Insight / 列表跳详情时，窄屏路由通过 `sessionStorage` bridge 把目标会话带到 detail 页。
+- **筛选下拉可视区域变化（2026-03-14）**：会话列表底部 `source/site` 筛选菜单改为 `adaptiveMaxHeight`；`SelectMenu` 会通过 `findNearestClippingRect` 查找最近可裁剪容器并动态计算 `panelMaxHeight`，减少底部区域的多余滚动条与菜单裁切。
 - **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
@@ -67,6 +68,7 @@
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
 | WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
 | WebClipper 的主题模式、inpage 开关和 AI 自动保存配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
+| WebClipper 底部 `source/site` 筛选菜单为什么高度会动态变化、怎样排查裁切？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [troubleshooting.md](troubleshooting.md) |
 | `Chat with AI` 是怎么从详情页触发的、模板和平台存在哪？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
 | 为什么窄屏下从 Insight 点进对话能直接打开 detail？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [architecture.md](architecture.md) |
 | 我应该改哪个目录？ | [overview.md](overview.md) | [architecture.md](architecture.md), `modules/` |

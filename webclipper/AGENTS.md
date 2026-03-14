@@ -51,6 +51,7 @@
   - `About`: `insight`, `about`
 - `Chat with AI` 不只是设置页配置：detail header 会根据启用的平台动态显示 `Chat with <platform>` 动作；动作会先复制 payload，再跳转到目标站点。
 - 会话列表底部 `today/total` 统计在 popup/app 中可作为 Insight 快捷入口：通过 `onOpenInsightsSection` 跳到 `Settings?section=insight`。
+- 会话列表底部 `source/site` 筛选菜单统一使用 `SelectMenu` 的 `adaptiveMaxHeight`；菜单展开时会按最近可裁剪容器动态计算可用高度，避免固定 `maxHeight` 导致的多余滚动条或裁切。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
@@ -117,6 +118,7 @@
   - `Open in Obsidian` 的文件打开只能走 Obsidian Local REST API 的 `POST /open/{filename}`；`obsidian://open` 只允许用于拉起桌面 App，再回到 REST API 完成目标文件打开。
 - **会话列表 UI-only 状态**：`src/ui/conversations/ConversationListPane.tsx` + `src/ui/conversations/pending-open.ts`
   - 来源筛选保存在 `localStorage`（`webclipper_conversations_source_filter_key`），只影响列表视图。
+  - `sourceFilterSelect` / `siteFilterSelect` 使用 `SelectMenu` 的 `adaptiveMaxHeight`，由 `findNearestClippingRect()` + `side` 计算动态 `panelMaxHeight`，不再硬编码 `320px`。
   - 窄屏下从 Insight / 其他入口跳详情时，目标 `conversationId` 通过 `sessionStorage` (`webclipper_pending_open_conversation_id`) 做一次性桥接。
   - 底部统计组件在有 `onOpenInsightsSection` 回调时可点击跳转到 Insight 分区；若无回调则回退为纯展示态。
 - **Inpage 显示范围设置**：`src/entrypoints/content.ts` + `src/bootstrap/content.ts`
@@ -150,6 +152,7 @@ Phase 3（JS→TS）收口状态：
   - OAuth 状态机（pending/error/connected）
   - IndexedDB schema/migration、备份导入合并规则
   - Collector 解析规则（结构变化、空态、异常 DOM）
+- 对 `SelectMenu` / 列表筛选改动，至少补 popup + app 手工冒烟：确认底部条中的菜单高度会按可视区域自适应，空间充足时不出现无谓滚动条，空间不足时不被裁切。
 
 ## Quick Start
 

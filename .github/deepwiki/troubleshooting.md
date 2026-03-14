@@ -9,6 +9,7 @@
 | WeRead / Dedao 登录态失效 | Keychain Cookie / SiteLogins | `SiteLoginsStore.swift` | 看 cookieHeader 是否还能匹配目标域名 |
 | 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
 | WebClipper 页面内按钮没出现 | content script / `inpage_display_mode` / 不支持页面 | `content.ts`, `bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
+| WebClipper 底部 `source/site` 筛选下拉出现多余滚动条或被裁切 | `SelectMenu` 自适应高度 / 容器裁剪边界 | `ConversationListPane.tsx`, `SelectMenu.tsx` | 检查 `adaptiveMaxHeight`、`side` 与 `findNearestClippingRect()` 是否生效 |
 | Google AI Studio 自动保存不完整 | collector 虚拟化渲染 | `googleaistudio-collector.ts`, `content-controller.ts` | 该来源更依赖手动保存 |
 | 网页文章抓取失败 | `Readability` / 页面正文不足 | `article-fetch.ts` | 常见报错是 `No article content detected` |
 | 升级扩展后没有自动跳设置页 | `onInstalled` 行为策略 | `background.ts` | 当前仅首次安装自动打开 About，更新不会自动弹页 |
@@ -63,6 +64,11 @@
 - Obsidian：重点检查 `apiBaseUrl`, `authHeaderName`, API Key、目标目录，以及 PATCH 失败后是否已自动回退 full rebuild。
 - 备份导入：Zip v2 是 merge import；“导入后旧记录还在”通常是设计行为，不是导入失败。
 
+### 5. source/site 筛选菜单高度异常（太矮、滚动条过多或被裁切）
+- 会话列表底部的 `sourceFilterSelect` / `siteFilterSelect` 现在启用 `adaptiveMaxHeight`，不再使用固定 `maxHeight=320`。
+- `SelectMenu` 展开时会调用 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再结合 `side='top'|'bottom'` 计算可用高度；在 popup 底部区域、窄视口或字体缩放变化时，菜单高度动态变化是预期行为。
+- 如果出现明显裁切，先排查调用方是否误把 `adaptiveMaxHeight` 去掉，或 `MenuPopover` 的 `panelMaxHeight` 被覆盖。
+
 ## 构建与发布问题
 
 | 症状 | 首查位置 | 说明 |
@@ -93,6 +99,7 @@
 | `macOS/SyncNos/Services/Auth/IAPService.swift` | 试用期、欢迎态、购买缓存 | paywall 逻辑底层事实源 |
 | `webclipper/src/bootstrap/content.ts` | inpage gating、支持站点判断 | 为什么按钮出现 / 不出现最先看这里 |
 | `webclipper/src/bootstrap/content-controller.ts` | 单击 / 双击 / 手动保存 / article fetch | 页面交互实际入口 |
+| `webclipper/src/ui/shared/SelectMenu.tsx` | 下拉菜单高度、键盘导航、裁剪容器计算 | source/site 过滤菜单异常优先看这里 |
 | `webclipper/src/platform/idb/schema.ts` | 升级后数据异常 | IndexedDB 版本迁移都在这里 |
 | `webclipper/tests/storage/schema-migration.test.ts` | 迁移行为核对 | 最能确认“这是预期迁移还是新 bug” |
 | `.github/workflows/webclipper-*.yml` | 发布失败 | 版本校验、secrets、构建顺序的真实来源 |
@@ -109,6 +116,7 @@
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
+- `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/platform/idb/schema.ts`

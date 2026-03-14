@@ -89,6 +89,7 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
    - `webclipper/src/ui/settings/types.ts`（section 分组与顺序）
    - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`（`ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `chat_with_*`）
    - `webclipper/src/ui/shared/hooks/useThemeMode.ts`（popup / app 主题应用）
+   - `webclipper/src/ui/shared/SelectMenu.tsx`（source/site 筛选菜单的 `adaptiveMaxHeight` 与可视区域计算）
    - `webclipper/src/ui/popup/PopupShell.tsx` / `webclipper/src/ui/app/AppShell.tsx`（列表统计跳转 Insight 的路由入口）
    - `webclipper/src/ui/conversations/ConversationListPane.tsx` / `pending-open.ts`（来源筛选持久化与窄屏 detail bridge）
 4. 默认验证顺序使用：

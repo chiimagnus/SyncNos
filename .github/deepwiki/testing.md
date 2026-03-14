@@ -51,7 +51,8 @@
 4. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save` 保存与刷新行为。
 5. **WebClipper（Chat with AI）**：在 article 或 chat detail 中验证启用平台是否出现在 header；点击后应先复制 payload，再打开目标站点；长内容应按 `maxChars` 截断。
 6. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。
-7. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
+7. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
+8. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
 
 ## 发布前检查
 
@@ -74,6 +75,7 @@
 
 ## 备注
 - 本次 deepwiki 更新本身是文档改动，验证重点是“事实是否与源码 / 配置 / workflow 对齐”，而不是重新引入额外测试工具。
+- `SelectMenu` 的 `adaptiveMaxHeight` / `findNearestClippingRect()` 当前主要依赖 UI 冒烟验证；如果该逻辑扩展到更多入口，建议补组件级测试覆盖 `top/bottom + clipping parent` 场景。
 - 需要真的跑代码时，优先遵循仓库已有的命令，不新增新的 lint / test 系统。
 
 ## 来源引用（Source References）
@@ -97,6 +99,8 @@
 - `webclipper/tests/unit/settings-sections.test.ts`
 - `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/shared/SelectMenu.tsx`
+- `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `.github/workflows/webclipper-amo-publish.yml`

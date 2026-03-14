@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `dc4d4368549bfd5a22c55048375eb9e13335bed6` |
+| Commit hash | `f3257e3b1c5bf6ce1891d62232fae6ed63e6f7b5` |
 | Branch name | `main` |
-| Generation timestamp | `2026-03-13 14:52:20 CST` |
+| Generation timestamp | `2026-03-14 10:48:17 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental refresh |
@@ -38,17 +38,19 @@
 
 ## Asset Inventory
 - `assets/repository-flow-01.svg` (existing asset, sourced from `macOS/Resource/flows.svg`)
+- `assets/popup-screenshots.png` (existing screenshot asset, used in README / deepwiki)
+- `assets/setting-screenshots.png` (existing screenshot asset, used in README / deepwiki)
 
 ## What Changed In This Update
-- 刷新生成元数据到 `main` 分支当前 `HEAD`（`dc4d4368`），并更新本次增量覆盖说明。
-- 为 `INDEX.md`、`business-context.md`、`overview.md`、`architecture.md`、`modules/webclipper.md` 补充当前版本的关键行为：`v1.3.1` 版本事实源、列表统计直达 Insight、安装/升级打开设置策略、近期 collector 稳定性修复（Gemini/Kimi/z.ai）。
-- 为 `configuration.md`、`dependencies.md`、`release.md`、`testing.md` 刷新版本与验证口径：`manifest.version = 1.3.1`、`package.json version = 2003.08.20`、商店 tag 校验规则、collector 回归测试入口。
-- 为 `data-flow.md`、`troubleshooting.md`、`glossary.md` 统一 `inpage_display_mode` 术语，并保留旧键 `inpage_supported_only` 的兼容说明，避免新旧文档语义冲突。
-- 同步相关仓库级文档：`README.md`、`README.zh-CN.md`、`webclipper/AGENTS.md`，保证用户入口文档与 deepwiki 的行为描述一致。
+- 刷新生成元数据到 `main` 分支当前 `HEAD`（`f3257e3b`），并更新本次增量覆盖说明。
+- 为 `INDEX.md`、`overview.md`、`architecture.md`、`configuration.md`、`modules/webclipper.md` 增量同步最新 UI 行为：`SelectMenu` 新增 `adaptiveMaxHeight`，并通过 `findNearestClippingRect()` 基于最近可裁剪容器计算可用高度，减少底部筛选菜单多余滚动条与裁切。
+- 为 `testing.md`、`troubleshooting.md`、`workflow.md`、`glossary.md` 补充对应验证与排障语义：source/site 筛选菜单不再固定 `maxHeight=320`，而是按视口和容器动态变化。
+- 同步相关执行文档：`AGENTS.md`、`webclipper/AGENTS.md`、`webclipper/src/ui/AGENTS.md`，确保仓库级与 UI 级规范都覆盖最新下拉菜单可视区域策略。
+- 本次未新增页面文件，继续保持稳定文件名并在既有页面追加证据。
 
 ## Coverage Notes
 - 当前 deepwiki 已覆盖仓库级入口、双产品线模块、配置、测试、存储、发布与排障，并持续把 WebClipper 的 Insight 统计能力串入业务入口层和工程入口层。
-- 本次增量刷新重点是“版本事实更新 + 列表统计跳转 Insight + 安装/升级行为 + collector 稳定性修复 + 术语统一（inpage_display_mode）”，未新增页面文件，继续保持稳定文件名并在既有页面追加证据。
+- 本次增量刷新重点是“筛选下拉可视区域自适应（`adaptiveMaxHeight` + `findNearestClippingRect`）”，并把该行为同步到架构、配置、模块、测试、排障与协作文档链路。
 - 仍保留的显式 Coverage Gaps：App Store 提交流程没有仓库内自动化证据；OCR 与键盘焦点专项文档尚未继续拆成 deepwiki 独立子页。
 
 ## Audit Basis
@@ -58,8 +60,9 @@
 | 仓库级语义 | `README.md`, `AGENTS.md`, `macOS/SyncNos/AGENTS.md`, `webclipper/AGENTS.md` |
 | App 入口与主流程 | `macOS/SyncNos/SyncNosApp.swift`, `macOS/SyncNos/AppDelegate.swift`, `macOS/SyncNos/Views/RootView.swift` |
 | App 服务与存储 | `DIContainer.swift`, `NotionSyncEngine.swift`, `IAPService.swift`, `SiteLoginsStore.swift`, `ChatCacheService.swift`, `WebArticleCacheService.swift` |
-| WebClipper 运行时与数据 | `background.ts`, `content.ts`, `bootstrap/content.ts`, `current-page-capture.ts`, `message-contracts.ts`, `schema.ts`, `storage-idb.ts`, `pending-open.ts`, `PopupShell.tsx`, `AppShell.tsx`, `CapturedListSidebar.tsx` |
+| WebClipper 运行时与数据 | `background.ts`, `content.ts`, `bootstrap/content.ts`, `current-page-capture.ts`, `message-contracts.ts`, `schema.ts`, `storage-idb.ts`, `pending-open.ts`, `PopupShell.tsx`, `AppShell.tsx`, `CapturedListSidebar.tsx`, `MenuPopover.tsx`, `SelectMenu.tsx` |
 | WebClipper 采集、设置与同步 | `register-all.ts`, `gemini-collector.ts`, `kimi-collector.ts`, `zai-collector.ts`, `googleaistudio-collector.ts`, `article-fetch.ts`, `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.ts`, `i18n/index.ts`, `SettingsSidebarNav.tsx`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.ts`, `ConversationListPane.tsx`, `ConversationsScene.tsx`, `useThemeMode.ts`, `conversation-kinds.ts`, `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*`, `tests/collectors/*` |
+| 相关文档与执行约束 | `AGENTS.md`, `webclipper/AGENTS.md`, `webclipper/src/ui/AGENTS.md` |
 | 发布与打包 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` |
 
 ## Notes For Next Update
@@ -67,3 +70,4 @@
 - 如果 OCR、键盘焦点、Notion / Obsidian 集成继续膨胀，适合拆出独立专题页，而不是把细节继续塞回 overview / architecture。
 - 如果 Insight 继续扩展出时间维度、趋势页或独立配置，优先考虑把 `modules/webclipper.md` / `storage.md` 中的统计说明拆成专题页，而不是继续堆在设置模块页里。
 - 如果 `General` 分区继续膨胀（例如加入更多主题 / 布局 / 列表偏好），考虑把 Appearance 与 Inpage 行为拆成独立 deepwiki 专题页，而不是让 `configuration.md` 和 `modules/webclipper.md` 变成“设置项百科全书”。
+- 如果 `SelectMenu` 的 `adaptiveMaxHeight` 继续扩展到更多入口，建议补组件级测试（`top/bottom + clipping parent`）并在 `testing.md` 中升级为自动化回归项。
