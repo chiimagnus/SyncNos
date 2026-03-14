@@ -192,31 +192,38 @@ async function downloadImageAsDataUrl(input: {
   url: string;
   referrer?: string;
   maxBytes: number;
-}): Promise<{ dataUrl: string; byteSize: number; contentType: string } | null> {
+}): Promise<
+  | { ok: true; dataUrl: string; byteSize: number; contentType: string }
+  | { ok: false; reason: 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
+> {
   const safeUrl = String(input.url || '').trim();
-  if (!isHttpUrl(safeUrl)) return null;
+  if (!isHttpUrl(safeUrl)) return { ok: false, reason: 'fetch' };
 
   const referrer = isHttpUrl(input.referrer) ? String(input.referrer) : undefined;
-  const res = await fetch(safeUrl, {
-    method: 'GET',
-    credentials: 'include',
-    redirect: 'follow',
-    ...(referrer ? { referrer } : {}),
-  });
-  if (!res.ok) return null;
+  try {
+    const res = await fetch(safeUrl, {
+      method: 'GET',
+      credentials: 'include',
+      redirect: 'follow',
+      ...(referrer ? { referrer } : {}),
+    });
+    if (!res.ok) return { ok: false, reason: 'http' };
 
-  const contentType = parseContentType(res.headers.get('content-type'));
-  if (!contentType.startsWith('image/')) return null;
+    const contentType = parseContentType(res.headers.get('content-type'));
+    if (!contentType.startsWith('image/')) return { ok: false, reason: 'non_image' };
 
-  const buffer = await res.arrayBuffer();
-  const byteSize = buffer.byteLength || 0;
-  if (!byteSize) return null;
-  if (byteSize > input.maxBytes) return null;
+    const buffer = await res.arrayBuffer();
+    const byteSize = buffer.byteLength || 0;
+    if (!byteSize) return { ok: false, reason: 'empty' };
+    if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
 
-  const base64 = arrayBufferToBase64(buffer);
-  if (!base64) return null;
+    const base64 = arrayBufferToBase64(buffer);
+    if (!base64) return { ok: false, reason: 'fetch' };
 
-  return { dataUrl: `data:${contentType};base64,${base64}`, byteSize, contentType };
+    return { ok: true, dataUrl: `data:${contentType};base64,${base64}`, byteSize, contentType };
+  } catch (_e) {
+    return { ok: false, reason: 'fetch' };
+  }
 }
 
 export type InlineChatImagesResult = {
@@ -283,8 +290,9 @@ export async function inlineChatImagesInMessages(input: {
         referrer: input.conversationUrl,
         maxBytes: INLINE_HTTP_IMAGE_MAX_BYTES,
       });
-      if (!downloaded) {
-        warningFlags.add('inline_images_download_failed');
+      if (!downloaded.ok) {
+        if (downloaded.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
+        else warningFlags.add('inline_images_download_failed');
         continue;
       }
       if ((inlinedBytes + downloaded.byteSize) > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {

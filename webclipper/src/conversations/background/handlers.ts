@@ -75,6 +75,17 @@ export function registerConversationHandlers(router: AnyRouter) {
             onlyMessageKeys: keys,
           });
           messages = inlined.messages;
+          if (inlined.downloadedCount > 0 || (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)) {
+            console.info('[ImageInline]', {
+              conversationId,
+              mode,
+              inlinedCount: inlined.inlinedCount,
+              downloadedCount: inlined.downloadedCount,
+              fromCacheCount: inlined.fromCacheCount,
+              inlinedBytes: inlined.inlinedBytes,
+              warningFlags: inlined.warningFlags,
+            });
+          }
         }
       }
     } catch (_e) {
