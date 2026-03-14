@@ -403,6 +403,7 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
     return {
       ok: false,
       error: { code: 'missing_api_key', message: 'Obsidian API Key is required.' },
+      message: 'missing api key',
       instanceId: safeString(instanceId),
     };
   }
@@ -410,23 +411,44 @@ async function testConnection({ instanceId }: { instanceId?: string } = {}) {
   const clientMod = getLocalRestClientModule();
   const client = clientMod.createClient(conn);
   if (!client || client.ok === false || typeof (client as any).getServerStatus !== 'function') {
+    const error = client && client.error ? client.error : { code: 'invalid_client', message: 'invalid client' };
     return {
       ok: false,
-      error: client && client.error ? client.error : { code: 'invalid_client', message: 'invalid client' },
+      error,
+      message: safeString(error.message) || 'invalid client',
       instanceId: safeString(instanceId),
     };
   }
 
   const res = await (client as any).getServerStatus();
   if (!res || !res.ok) {
+    const error = res && res.error ? res.error : { code: 'network_error', message: 'connection failed' };
     return {
       ok: false,
-      error: res && res.error ? res.error : { code: 'network_error', message: 'connection failed' },
+      error,
+      message: safeString(error.message) || 'connection failed',
       instanceId: safeString(instanceId),
     };
   }
 
-  return { ok: true, data: res.data || null, instanceId: safeString(instanceId) };
+  const data = res.data || null;
+  const authenticated =
+    data && typeof data === 'object' && (data as any).authenticated != null
+      ? Boolean((data as any).authenticated)
+      : null;
+  if (authenticated === false) {
+    const message = safeString((data as any)?.message) || 'unauthorized';
+    return {
+      ok: false,
+      error: { code: 'auth_error', message },
+      message,
+      data,
+      instanceId: safeString(instanceId),
+    };
+  }
+
+  const okMessage = authenticated === true ? 'authenticated' : 'connected';
+  return { ok: true, data, message: okMessage, instanceId: safeString(instanceId) };
 }
 
 async function getSyncStatus({ instanceId }: { instanceId?: string } = {}) {
