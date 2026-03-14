@@ -11,7 +11,7 @@ import { navIconButtonClassName } from '../shared/nav-styles';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
-import { decodeConversationLoc } from '../../shared/conversation-loc';
+import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conversation-loc';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
@@ -52,7 +52,7 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
-    const { items, activeId, setActiveId } = useConversationsApp();
+    const { items, activeId, selectedConversation, setActiveId } = useConversationsApp();
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
@@ -97,6 +97,23 @@ export default function AppShell() {
 
       setActiveId(Number(found.id));
     }, [activeId, items, location.pathname, location.search, setActiveId]);
+
+    useEffect(() => {
+      if (location.pathname !== '/') return;
+      if (!selectedConversation) return;
+
+      const nextLoc = encodeConversationLoc({
+        source: selectedConversation.source,
+        conversationKey: selectedConversation.conversationKey,
+      });
+
+      const params = new URLSearchParams(String(location.search || ''));
+      const currentLoc = params.get('loc');
+      if (currentLoc === nextLoc) return;
+
+      params.set('loc', nextLoc);
+      navigate({ pathname: '/', search: `?${params.toString()}` }, { replace: true });
+    }, [location.pathname, location.search, navigate, selectedConversation]);
 
     const renderSidebar = !isNarrow && !sidebarCollapsed;
 
