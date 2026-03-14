@@ -43,7 +43,6 @@ function setupChromeStorage() {
 describe("obsidian-sync-orchestrator", () => {
   it("reports missing_api_key when api key is not configured", async () => {
     setupChromeStorage();
-    await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
@@ -54,7 +53,7 @@ describe("obsidian-sync-orchestrator", () => {
 
   it("decides full rebuild when remote note is missing (404)", async () => {
     setupChromeStorage();
-    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
@@ -86,7 +85,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].mode).toBe("full_rebuild");
     expect(syncRes.results[0].ok).toBe(true);
@@ -94,7 +93,7 @@ describe("obsidian-sync-orchestrator", () => {
 
   it("decides incremental append when remote has cursor and there are new messages", async () => {
     setupChromeStorage();
-    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
@@ -132,7 +131,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].mode).toBe("incremental_append");
     expect(syncRes.results[0].appended).toBe(1);
@@ -144,7 +143,7 @@ describe("obsidian-sync-orchestrator", () => {
 
   it("falls back to full rebuild when cursor updatedAt mismatches local history", async () => {
     setupChromeStorage();
-    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
@@ -181,7 +180,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe("full_rebuild");
@@ -189,7 +188,7 @@ describe("obsidian-sync-orchestrator", () => {
 
   it("falls back to full rebuild when PATCH fails with PatchFailed (non-dedup)", async () => {
     setupChromeStorage();
-    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
@@ -230,7 +229,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(patchCount).toBe(1);
     expect(syncRes.results[0].ok).toBe(true);
@@ -239,7 +238,7 @@ describe("obsidian-sync-orchestrator", () => {
 
   it("renames note when title changes by rebuilding new file and deleting old file", async () => {
     setupChromeStorage();
-    const store = await loadModule("../../src/sync/obsidian/obsidian-settings-store.ts");
+    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
     await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
@@ -299,7 +298,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe("full_rebuild_rename");

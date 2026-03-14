@@ -44,7 +44,7 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
   it("full -> incremental -> delete -> rebuild, and handles auth failure", async () => {
     setupChromeStorage();
 
-    const settingsStore = await load("../../src/sync/obsidian/obsidian-settings-store.ts");
+    const settingsStore = await load("../../src/sync/obsidian/settings-store.ts");
     await load("../../src/sync/obsidian/obsidian-local-rest-client.ts");
     await load("../../src/sync/obsidian/obsidian-note-path.ts");
     await load("../../src/sync/obsidian/obsidian-sync-metadata.ts");
@@ -64,7 +64,7 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     });
     backgroundStorageMocks.getMessagesByConversationId.mockImplementation(async () => messages.slice());
 
-    await settingsStore.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await settingsStore.saveObsidianSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
 
     // Remote state
     let remoteExists = false;
