@@ -105,7 +105,7 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_.syncnos-md-image-link]:tw-mt-1 [&_.syncnos-md-image-link]:tw-text-[11px] [&_.syncnos-md-image-link]:tw-text-[var(--text-secondary)]',
 
       // KaTeX blocks: prevent overflow and keep spacing consistent with other blocks.
-      '[&_.syncnos-math-block]:tw-my-2 [&_.syncnos-math-block]:tw-overflow-x-auto [&_.syncnos-math-block]:tw-max-w-full',
+      '[&_.katex-display]:tw-my-2 [&_.katex-display]:tw-overflow-x-auto [&_.katex-display]:tw-max-w-full',
 
       // Links: keep a stable cue (underline) while ensuring readability on the green bubble too.
       '[&_a]:tw-text-[var(--info)] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
