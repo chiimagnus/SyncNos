@@ -57,7 +57,7 @@ describe('createMarkdownRenderer', () => {
   it('renders block math with KaTeX', () => {
     const md = createMarkdownRenderer();
     const html = md.render('$$E=mc^2$$');
-    expect(html).toContain('syncnos-math-block');
+    expect(html).toContain('katex-display');
     expect(html).toContain('katex');
   });
 });
