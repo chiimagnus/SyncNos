@@ -304,6 +304,8 @@ export const zh: { [K in TranslationKey]: string } = {
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
+  detailHeaderToolsMenuLabel: '工具...',
+  detailHeaderToolsMenuAria: '工具',
   detailHeaderOpenInMenuLabel: '打开到...',
   detailHeaderOpenInMenuAria: '打开目标',
   detailHeaderOpenInNotion: '在 Notion 中打开',

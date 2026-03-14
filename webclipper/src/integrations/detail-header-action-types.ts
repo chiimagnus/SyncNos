@@ -2,7 +2,7 @@ export type DetailHeaderActionKind = 'external-link' | 'open-target';
 
 export type DetailHeaderActionProvider = string;
 
-export type DetailHeaderActionSlot = 'open' | 'chat-with';
+export type DetailHeaderActionSlot = 'open' | 'chat-with' | 'tools';
 
 export type DetailHeaderAction = {
   id: string;

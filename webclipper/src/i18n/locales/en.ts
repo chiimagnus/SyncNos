@@ -305,6 +305,8 @@ export const en = {
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',
   detailHeaderChatWithMenuAria: 'Chat with',
+  detailHeaderToolsMenuLabel: 'Tools...',
+  detailHeaderToolsMenuAria: 'Tools',
   detailHeaderOpenInMenuLabel: 'Open in...',
   detailHeaderOpenInMenuAria: 'Open destinations',
   detailHeaderOpenInNotion: 'Open in Notion',

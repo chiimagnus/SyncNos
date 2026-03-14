@@ -1,11 +1,9 @@
-import { useState } from 'react';
-import { ChevronLeft, ImageDown } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
 import { t, formatConversationTitle } from '../../i18n';
 import { useConversationsApp } from './conversations-context';
-import { backfillConversationImages } from '../../conversations/client/repo';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
@@ -30,10 +28,10 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
   const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
+  const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
-  const [backfillBusy, setBackfillBusy] = useState(false);
 
   return (
     <section>
@@ -61,47 +59,15 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
               </div>
             </div>
             <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">
-              {!isArticle && selected ? (
-                <button
-                  type="button"
-                  disabled={backfillBusy}
-                  className={outlineButtonClass}
-                  title={t('detailHeaderCacheImagesLabel')}
-                  aria-label={t('detailHeaderCacheImagesLabel')}
-                  onClick={() => {
-                    if (backfillBusy) return;
-                    setBackfillBusy(true);
-                    void (async () => {
-                      try {
-                        const res = await backfillConversationImages(Number((selected as any).id), String((selected as any).url || ''));
-                        await refreshActiveDetail();
-                        const updated = Number(res?.updatedMessages) || 0;
-                        const downloaded = Number(res?.downloadedCount) || 0;
-                        const fromCache = Number(res?.fromCacheCount) || 0;
-                        if (!updated) {
-                          alert(t('detailHeaderCacheImagesNoop'));
-                        } else {
-                          const parts = [
-                            t('detailHeaderCacheImagesSuccess'),
-                            `${t('detailHeaderCacheImagesUpdatedMessages')} ${updated}`,
-                            `(${t('detailHeaderCacheImagesDownloaded')}: ${downloaded}, ${t('detailHeaderCacheImagesCacheHits')}: ${fromCache})`,
-                          ];
-                          alert(parts.filter(Boolean).join(' ').trim());
-                        }
-                      } catch (e) {
-                        const fallback = t('detailHeaderCacheImagesFailed');
-                        alert((e as any)?.message ?? String(e ?? fallback));
-                      } finally {
-                        setBackfillBusy(false);
-                      }
-                    })();
-                  }}
-                >
-                  <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-                    <ImageDown size={14} strokeWidth={2} aria-hidden="true" />
-                    <span className="tw-hidden md:tw-inline tw-whitespace-nowrap">{t('detailHeaderCacheImagesLabel')}</span>
-                  </span>
-                </button>
+              {!isArticle ? (
+                <DetailHeaderActionBar
+                  actions={toolActions}
+                  buttonClassName={outlineButtonClass}
+                  menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
+                  menuTriggerTitle={t('detailHeaderToolsMenuLabel')}
+                  menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
+                  menuAriaLabel={t('detailHeaderToolsMenuAria')}
+                />
               ) : null}
               <DetailHeaderActionBar
                 actions={chatWithActions}
