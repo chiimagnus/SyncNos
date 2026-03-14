@@ -99,6 +99,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [busyCount, setBusyCount] = useState(0);
   const busy = busyCount > 0;
   const [error, setError] = useState<string | null>(null);
+  const taskQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Notion
   const [notionConnected, setNotionConnected] = useState<boolean | null>(null);
@@ -164,29 +165,34 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
 
   const runTask = useCallback(async (task: () => Promise<void>, options: RunTaskOptions = {}) => {
-    const {
-      useBusy = true,
-      clearError = true,
-      fallbackMessage = 'failed',
-      onError,
-    } = options;
+    const run = taskQueueRef.current.then(async () => {
+      const {
+        useBusy = true,
+        clearError = true,
+        fallbackMessage = 'failed',
+        onError,
+      } = options;
 
-    if (clearError) setError(null);
-    if (useBusy) setBusyCount((count) => count + 1);
+      if (clearError) setError(null);
+      if (useBusy) setBusyCount((count) => count + 1);
 
-    try {
-      await task();
-      return true;
-    } catch (e) {
-      const message = toErrorMessage(e, fallbackMessage);
-      setError(message);
-      if (onError) onError(message);
-      return false;
-    } finally {
-      if (useBusy) {
-        setBusyCount((count) => (count <= 0 ? 0 : count - 1));
+      try {
+        await task();
+        return true;
+      } catch (e) {
+        const message = toErrorMessage(e, fallbackMessage);
+        setError(message);
+        if (onError) onError(message);
+        return false;
+      } finally {
+        if (useBusy) {
+          setBusyCount((count) => (count <= 0 ? 0 : count - 1));
+        }
       }
-    }
+    });
+
+    taskQueueRef.current = run.then(() => undefined, () => undefined);
+    return run;
   }, []);
 
   const refresh = useCallback(async () => {
