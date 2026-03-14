@@ -12,7 +12,6 @@ import { SYNC_JOB_STORAGE_KEYS } from '../../sync/sync-job-store';
 import { storageOnChanged } from '../../platform/storage/local';
 import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '../../sync/models';
 import type { SyncStartAck } from '../../sync/repo';
-import { primeObsidianAppForSync } from './obsidian-sync-launch';
 import { t } from '../../i18n';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
@@ -410,6 +409,76 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       const ids = normalizeIds(conversationIds);
       if (!ids.length) return null;
 
+      if (provider === 'obsidian') {
+        const token = runTokenRef.current + 1;
+        runTokenRef.current = token;
+
+        try {
+          const ack = await syncObsidianConversations(ids);
+          if (disposedRef.current) return ack;
+
+          const nextRun: ActiveRun = { provider, token };
+          activeRunRef.current = nextRun;
+          setActiveRun(nextRun);
+
+          const runningFeedback: ConversationSyncFeedbackState = {
+            provider,
+            phase: 'running',
+            total: ids.length,
+            done: 0,
+            currentConversationId: ids[0] || null,
+            currentConversationTitle: '',
+            currentStage: 'preparing_queue',
+            failures: [],
+            warnings: [],
+            message: buildRunningMessage(provider, 0, ids.length),
+            updatedAt: Date.now(),
+            summary: null,
+          };
+          feedbackRef.current = runningFeedback;
+          setFeedback(runningFeedback);
+
+          await refreshFromBackground(provider);
+          return ack;
+        } catch (error) {
+          if (disposedRef.current) throw error;
+
+          const code = errorCode(error);
+          if (code === 'sync_already_running') {
+            await refreshFromBackground(provider);
+            return null;
+          }
+
+          const disabledByGate = code === 'sync_provider_disabled';
+          const failureText = disabledByGate
+            ? t('syncProviderDisabled')
+            : error instanceof Error
+              ? error.message
+              : String(error || 'sync failed');
+          const message = disabledByGate
+            ? `${providerLabel(provider)} · ${t('phaseFailed')}: ${t('syncProviderDisabled')}`
+            : toErrorMessage(provider, error);
+
+          runTokenRef.current += 1;
+          setActiveRun((current) => (current?.token === token ? null : current));
+          setFeedback({
+            provider,
+            phase: 'failed',
+            total: 0,
+            done: 0,
+            currentConversationId: null,
+            currentConversationTitle: '',
+            currentStage: '',
+            failures: [{ conversationId: 0, error: failureText }],
+            warnings: [],
+            message,
+            updatedAt: Date.now(),
+            summary: null,
+          });
+          throw error;
+        }
+      }
+
       const token = runTokenRef.current + 1;
       runTokenRef.current = token;
       const nextRun: ActiveRun = { provider, token };
@@ -434,13 +503,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       setFeedback(runningFeedback);
 
       try {
-        if (provider === 'obsidian') {
-          await primeObsidianAppForSync();
-        }
-
-        const ack = provider === 'notion'
-          ? await syncNotionConversations(ids)
-          : await syncObsidianConversations(ids);
+        const ack = await syncNotionConversations(ids);
         if (disposedRef.current) return ack;
         await refreshFromBackground(provider);
         return ack;
