@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '../../i18n';
 import Settings from './routes/Settings';
@@ -52,7 +52,9 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
-    const { items, activeId, openConversationExternalById, selectedConversation } = useConversationsApp();
+    const { items, openConversationExternalById, selectedConversation } = useConversationsApp();
+    const lastInternalLocRef = useRef<string | null>(null);
+    const processedLocRef = useRef<string | null>(null);
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
@@ -86,17 +88,29 @@ export default function AppShell() {
       const search = String(location.search || '');
       const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
       const loc = params.get('loc');
+      if (loc && lastInternalLocRef.current && loc === lastInternalLocRef.current) {
+        lastInternalLocRef.current = null;
+        processedLocRef.current = loc;
+        return;
+      }
+      if (!loc || processedLocRef.current === loc) return;
+
       const decoded = decodeConversationLoc(loc);
-      if (!decoded) return;
+      if (!decoded) {
+        processedLocRef.current = loc;
+        return;
+      }
 
       const found = items.find(
         (x) => String(x.source || '').trim().toLowerCase() === decoded.source && String(x.conversationKey || '').trim() === decoded.conversationKey,
       );
-      if (!found) return;
-      if (Number(found.id) === Number(activeId)) return;
-
+      if (!found) {
+        if (items.length) processedLocRef.current = loc;
+        return;
+      }
+      processedLocRef.current = loc;
       openConversationExternalById(Number(found.id));
-    }, [activeId, items, location.pathname, location.search, openConversationExternalById]);
+    }, [items, location.pathname, location.search, openConversationExternalById]);
 
     useEffect(() => {
       if (location.pathname !== '/') return;
@@ -112,6 +126,7 @@ export default function AppShell() {
       if (currentLoc === nextLoc) return;
 
       params.set('loc', nextLoc);
+      lastInternalLocRef.current = nextLoc;
       navigate({ pathname: '/', search: `?${params.toString()}` }, { replace: true });
     }, [location.pathname, location.search, navigate, selectedConversation]);
 
