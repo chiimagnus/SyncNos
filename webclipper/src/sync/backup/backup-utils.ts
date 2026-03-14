@@ -78,7 +78,6 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
   next.url = pickStringPreferExisting(a.url, b.url);
   next.author = pickStringPreferExisting(a.author, b.author);
   next.publishedAt = pickStringPreferExisting(a.publishedAt, b.publishedAt);
-  next.description = pickStringPreferExisting(a.description, b.description);
   next.warningFlags = mergeWarningFlags(a.warningFlags, b.warningFlags);
 
   // notionPageId: never overwrite a non-empty local mapping.

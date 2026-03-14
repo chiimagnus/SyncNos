@@ -271,7 +271,6 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
     url: nextUrl || (existing ? existing.url || '' : ''),
     author: payload.author || (existing ? existing.author || '' : ''),
     publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
-    description: payload.description || (existing ? existing.description || '' : ''),
     warningFlags: Array.isArray(payload.warningFlags)
       ? payload.warningFlags
       : (existing ? existing.warningFlags || [] : []),

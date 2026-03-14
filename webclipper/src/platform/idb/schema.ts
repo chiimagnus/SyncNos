@@ -1,5 +1,5 @@
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -42,6 +42,29 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   pushAll(base);
   pushAll(incoming);
   return Array.from(values);
+}
+
+function stripConversationDescriptionField({ db, tx }: MigrationContext): void {
+  if (!db.objectStoreNames.contains('conversations')) return;
+  const conversationsStore = tx.objectStore('conversations');
+
+  try {
+    const req = conversationsStore.openCursor();
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) return;
+      const value = cursor.value as Record<string, unknown> | undefined;
+      if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'description')) {
+        const next = { ...(value as any) };
+        delete (next as any).description;
+        cursor.update(next as any);
+      }
+      cursor.continue();
+    };
+    req.onerror = () => {};
+  } catch (_e) {
+    // ignore
+  }
 }
 
 function pickMaxFiniteNumber(...values: unknown[]): number | null {
@@ -462,7 +485,6 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     next.title = safeString(next.title) || safeString(incoming.title);
     next.author = safeString(next.author) || safeString(incoming.author);
     next.publishedAt = safeString(next.publishedAt) || safeString(incoming.publishedAt);
-    next.description = safeString(next.description) || safeString(incoming.description);
     next.notionPageId = safeString(next.notionPageId) || safeString(incoming.notionPageId);
     next.warningFlags = mergeStringArray(next.warningFlags, incoming.warningFlags);
     next.lastCapturedAt =
@@ -865,6 +887,13 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   if (tx && oldVersion < 4) {
     try {
       migrateLegacyArticleConversations({ db, tx });
+    } catch (_e) {
+      // ignore migration failures to avoid open abortion
+    }
+  }
+  if (tx && oldVersion < 6) {
+    try {
+      stripConversationDescriptionField({ db, tx });
     } catch (_e) {
       // ignore migration failures to avoid open abortion
     }

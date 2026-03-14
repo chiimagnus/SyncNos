@@ -170,7 +170,7 @@ describe("insight stats", () => {
     ]);
   });
 
-  it("normalizes article domains to registrable domains", async () => {
+  it("keeps article domains as full hostnames", async () => {
     await seedConversation({
       sourceType: "article",
       source: "web",
@@ -208,9 +208,10 @@ describe("insight stats", () => {
 
     expect(stats.articleCount).toBe(4);
     expect(stats.articleDomainDistribution).toEqual([
-      { label: "sspai.com", count: 2 },
-      { label: "dedao.cn", count: 1 },
       { label: "foo.github.io", count: 1 },
+      { label: "m.dedao.cn", count: 1 },
+      { label: "sspai.com", count: 1 },
+      { label: "www.sspai.com", count: 1 },
     ]);
   });
 

@@ -7,7 +7,6 @@ export type Conversation = {
   url?: string;
   author?: string;
   publishedAt?: string;
-  description?: string;
   warningFlags?: string[];
   notionPageId?: string;
   lastCapturedAt?: number;

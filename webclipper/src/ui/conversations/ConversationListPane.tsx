@@ -16,7 +16,7 @@ import { navItemClassName } from '../shared/nav-styles';
 import { buttonDangerTintClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '../shared/button-styles';
 import { MenuPopover } from '../shared/MenuPopover';
 import { SelectMenu } from '../shared/SelectMenu';
-import { parseRegistrableDomainFromUrl } from '../shared/domain';
+import { parseHostnameFromUrl } from '../shared/domain';
 
 type SourceMeta = { key: string; label: string };
 
@@ -71,9 +71,9 @@ function isArticleConversation(conversation: Conversation): boolean {
 
 function getConversationSiteFilterKey(conversation: Conversation): string {
   if (!isArticleConversation(conversation)) return SITE_FILTER_UNKNOWN_KEY;
-  const domain = parseRegistrableDomainFromUrl((conversation as any).url);
-  if (!domain) return SITE_FILTER_UNKNOWN_KEY;
-  return toSiteFilterKey(domain);
+  const hostname = parseHostnameFromUrl((conversation as any).url);
+  if (!hostname) return SITE_FILTER_UNKNOWN_KEY;
+  return toSiteFilterKey(hostname);
 }
 
 function getSourceMeta(raw: unknown): SourceMeta {
@@ -276,16 +276,16 @@ export function ConversationListPane({
 
     for (const conversation of sourceFilteredItems) {
       if (!isArticleConversation(conversation as any)) continue;
-      const domain = parseRegistrableDomainFromUrl((conversation as any).url);
-      if (!domain) {
+      const hostname = parseHostnameFromUrl((conversation as any).url);
+      if (!hostname) {
         unknownCount += 1;
         continue;
       }
-      domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
+      domainCounts.set(hostname, (domainCounts.get(hostname) || 0) + 1);
     }
 
     const domains = Array.from(domainCounts.entries())
-      .map(([domain, count]) => ({ key: toSiteFilterKey(domain), label: domain, count }))
+      .map(([hostname, count]) => ({ key: toSiteFilterKey(hostname), label: hostname, count }))
       .sort((a, b) => {
         if (b.count !== a.count) return b.count - a.count;
         return String(a.label || '').localeCompare(String(b.label || ''));

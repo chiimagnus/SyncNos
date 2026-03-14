@@ -61,7 +61,6 @@ describe("notion-sync-orchestrator kind routing", () => {
               url: "https://a",
               author: "Alice",
               publishedAt: "2026-02-26",
-              description: "Desc",
               lastCapturedAt: 1000
             },
             mapping: null

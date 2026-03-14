@@ -95,12 +95,10 @@ describe('notion-db-manager', () => {
         URL: { url: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
-        Description: { rich_text: {} },
       },
       ensureSchemaPatch: {
         Author: { rich_text: {} },
         Published: { rich_text: {} },
-        Description: { rich_text: {} },
       },
     };
 

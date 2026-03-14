@@ -33,7 +33,6 @@ function formatArticleMarkdown(conversation: Conversation, messages: Conversatio
   if (isNonEmptyString(c.author)) lines.push(`- Author: ${String(c.author)}`);
   if (isNonEmptyString(c.publishedAt)) lines.push(`- Published: ${String(c.publishedAt)}`);
   if (isNonEmptyString(c.url)) lines.push(`- URL: ${String(c.url)}`);
-  if (isNonEmptyString(c.description)) lines.push(`- Description: ${String(c.description)}`);
   lines.push('');
   lines.push('## Content');
   lines.push('');
