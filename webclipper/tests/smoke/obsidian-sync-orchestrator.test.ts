@@ -51,6 +51,27 @@ describe("obsidian-sync-orchestrator", () => {
     expect(res.error?.code).toBe("missing_api_key");
   });
 
+  it("reports auth_error when server responds authenticated=false", async () => {
+    setupChromeStorage();
+    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
+    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
+
+    // @ts-expect-error test global
+    globalThis.fetch = async () => {
+      return new Response(JSON.stringify({ authenticated: false, message: "unauthorized" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "bad" });
+    const res = await orch.testConnection({ instanceId: "x" });
+    expect(res.ok).toBe(false);
+    expect(res.error?.code).toBe("auth_error");
+    expect(String(res.error?.message || "")).toContain("unauthorized");
+  });
+
   it("decides full rebuild when remote note is missing (404)", async () => {
     setupChromeStorage();
     const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
