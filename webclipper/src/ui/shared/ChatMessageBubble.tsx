@@ -50,7 +50,7 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       // NOTE: Tailwind uses `prefix: "tw-"`. For arbitrary properties/selectors, do NOT
       // prefix the `[...]` segment, only prefix the actual utility (e.g. `[&_p]:tw-mt-0`).
       // Keep the container shrinkable in flex/grid layouts.
-      'tw-min-w-0 tw-break-words [overflow-wrap:anywhere] tw-overflow-x-hidden tw-leading-[1.55] tw-text-[13px]',
+      'tw-min-w-0 tw-break-words [overflow-wrap:anywhere] tw-overflow-x-hidden tw-leading-[1.6] tw-text-[14px]',
       '[&>*:first-child]:tw-mt-0 [&>*:last-child]:tw-mb-0',
 
       '[&_p]:tw-mt-0 [&_p]:tw-mb-3',
@@ -79,12 +79,12 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
 
       // Inline code: avoid "too black" chips in dark mode (preflight is disabled).
       // Use currentColor-based translucent background so it adapts to both bubble variants.
-      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,currentColor_12%,transparent)] [&_code]:tw-font-mono [&_code]:tw-text-[12px]',
-      '[&_kbd]:tw-inline-flex [&_kbd]:tw-items-center [&_kbd]:tw-rounded-[6px] [&_kbd]:tw-border [&_kbd]:tw-border-[var(--border)] [&_kbd]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_kbd]:tw-px-[6px] [&_kbd]:tw-py-[1px] [&_kbd]:tw-font-mono [&_kbd]:tw-text-[12px]',
+      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,currentColor_12%,transparent)] [&_code]:tw-font-mono [&_code]:tw-text-[13px]',
+      '[&_kbd]:tw-inline-flex [&_kbd]:tw-items-center [&_kbd]:tw-rounded-[6px] [&_kbd]:tw-border [&_kbd]:tw-border-[var(--border)] [&_kbd]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_kbd]:tw-px-[6px] [&_kbd]:tw-py-[1px] [&_kbd]:tw-font-mono [&_kbd]:tw-text-[13px]',
 
       // Code blocks: keep contrast high in both light/dark bubbles (avoid near-black background).
       '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[var(--border)] [&_pre]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_pre]:tw-overflow-auto',
-      '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-leading-[1.5] [&_pre>code]:tw-text-[12px]',
+      '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-leading-[1.55] [&_pre>code]:tw-text-[13px]',
 
       // Tables can be wider than the viewport; let the table itself scroll instead of the whole bubble.
       '[&_table]:tw-block [&_table]:tw-overflow-x-auto [&_table]:tw-border-collapse [&_table]:tw-w-max [&_table]:tw-max-w-full',
@@ -102,7 +102,8 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
       '[&_img]:tw-rounded-[10px] [&_img]:tw-border [&_img]:tw-border-[var(--border)]',
       // When images fail to load, show an explicit link below the image to keep it discoverable.
       '[&_.syncnos-md-image]:tw-inline-block [&_.syncnos-md-image]:tw-max-w-full',
-      '[&_.syncnos-md-image-link]:tw-mt-1 [&_.syncnos-md-image-link]:tw-text-[11px] [&_.syncnos-md-image-link]:tw-text-[var(--text-secondary)]',
+      '[&_.syncnos-md-image-link]:tw-mt-1 [&_.syncnos-md-image-link]:tw-block [&_.syncnos-md-image-link]:tw-max-w-full [&_.syncnos-md-image-link]:tw-overflow-hidden [&_.syncnos-md-image-link]:tw-text-ellipsis [&_.syncnos-md-image-link]:tw-whitespace-nowrap [&_.syncnos-md-image-link]:tw-text-[11px] [&_.syncnos-md-image-link]:tw-text-[var(--text-secondary)]',
+      '[&_.syncnos-md-image-link_a]:tw-text-[var(--text-secondary)] [&_.syncnos-md-image-link_a]:tw-no-underline [&_.syncnos-md-image-link_a:hover]:tw-underline [&_.syncnos-md-image-link_a]:tw-underline-offset-[2px]',
 
       // KaTeX blocks: prevent overflow and keep spacing consistent with other blocks.
       '[&_.katex-display]:tw-my-2 [&_.katex-display]:tw-overflow-x-auto [&_.katex-display]:tw-max-w-full',
