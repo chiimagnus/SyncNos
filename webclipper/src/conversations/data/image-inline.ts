@@ -103,7 +103,7 @@ function replaceMarkdownImageUrls(markdown: string, replacements: Map<string, st
     const url = stripAngleBrackets(urlPart);
     const next = replacements.get(url);
     if (!next) return _full;
-    const nextPart = urlPart.trim().startsWith('<') ? `<${next}>` : next;
+    const nextPart = urlPart.trim().startsWith('<') && !isDataImageUrl(next) ? `<${next}>` : next;
     return `![${alt}](${nextPart}${title})`;
   });
 }
@@ -301,4 +301,3 @@ export async function inlineChatImagesInMessages(input: {
     warningFlags: Array.from(warningFlags),
   };
 }
-
