@@ -84,134 +84,7 @@ function replaceMarkdownImageUrls(markdown: string, replacements: Map<string, st
   });
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, reason: string): Promise<T> {
-  if (!timeoutMs || timeoutMs <= 0) return promise;
-  let timer: any = null;
-  const timeout = new Promise<T>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(reason)), timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) clearTimeout(timer);
-  }) as Promise<T>;
-}
-
-async function canvasToPngBlob(canvas: any): Promise<Blob | null> {
-  try {
-    if (!canvas || typeof canvas.toBlob !== 'function') return null;
-    return await new Promise((resolve) => {
-      try {
-        canvas.toBlob((blob: Blob | null) => resolve(blob), 'image/png');
-      } catch (_e) {
-        resolve(null);
-      }
-    });
-  } catch (_e) {
-    return null;
-  }
-}
-
-function byteSizeFromDataUrl(dataUrl: string): number {
-  const text = String(dataUrl || '');
-  const comma = text.indexOf(',');
-  if (comma < 0) return 0;
-  const base64 = text.slice(comma + 1);
-  const len = base64.length;
-  if (!len) return 0;
-  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
-  return Math.max(0, Math.floor((len * 3) / 4) - padding);
-}
-
-function shouldPreferImageElement(url: URL): boolean {
-  // Some endpoints (e.g. ChatGPT estuary) are frequently blocked for fetch() from extension contexts,
-  // but load fine as <img> subresource requests.
-  const pathname = String(url.pathname || '');
-  return /\/backend-api\/estuary\//i.test(pathname);
-}
-
-async function downloadAsDataUrlSameOriginViaImageElement(input: {
-  url: string;
-  origin: string;
-  maxBytes: number;
-  timeoutMs?: number;
-}): Promise<{ ok: true; dataUrl: string; byteSize: number } | { ok: false; reason: string }> {
-  const safeUrl = String(input.url || '').trim();
-  if (!isHttpUrl(safeUrl)) return { ok: false, reason: 'invalid_url' };
-  let parsed: URL | null = null;
-  try {
-    parsed = new URL(safeUrl);
-  } catch (_e) {
-    parsed = null;
-  }
-  if (!parsed || parsed.origin !== input.origin) return { ok: false, reason: 'cross_origin' };
-
-  const ImageCtor = (globalThis as any).Image;
-  const doc = (globalThis as any).document;
-  if (typeof ImageCtor !== 'function' || !doc || typeof doc.createElement !== 'function') {
-    return { ok: false, reason: 'no_dom' };
-  }
-
-  const loadPromise = new Promise<any>((resolve, reject) => {
-    try {
-      const img = new ImageCtor();
-      try {
-        img.decoding = 'async';
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        // Reduce referrer-related auth issues; cookies still apply for same-origin.
-        img.referrerPolicy = 'no-referrer';
-      } catch (_e) {
-        // ignore
-      }
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('image_load_failed'));
-      img.src = safeUrl;
-    } catch (_e) {
-      reject(new Error('image_ctor_failed'));
-    }
-  });
-
-  let img: any = null;
-  try {
-    img = await withTimeout(loadPromise, input.timeoutMs || 10_000, 'image_timeout');
-  } catch (e: any) {
-    const msg = String(e?.message || '');
-    return { ok: false, reason: msg === 'image_load_failed' ? 'image_load_failed' : msg === 'image_timeout' ? 'timeout' : 'image_failed' };
-  }
-
-  const width = Number(img?.naturalWidth || img?.width || 0);
-  const height = Number(img?.naturalHeight || img?.height || 0);
-  if (!width || !height) return { ok: false, reason: 'empty' };
-
-  try {
-    const canvas = doc.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext && canvas.getContext('2d');
-    if (!ctx || typeof ctx.drawImage !== 'function') return { ok: false, reason: 'canvas_failed' };
-    ctx.drawImage(img, 0, 0);
-
-    const blob = await canvasToPngBlob(canvas);
-    if (!blob) return { ok: false, reason: 'to_blob_failed' };
-    if ((blob.size || 0) > input.maxBytes) return { ok: false, reason: 'too_large' };
-
-    const buffer = await blob.arrayBuffer();
-    const byteSize = buffer.byteLength || 0;
-    if (!byteSize) return { ok: false, reason: 'empty' };
-    if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
-
-    const base64 = arrayBufferToBase64(buffer);
-    const dataUrl = `data:image/png;base64,${base64}`;
-    const computedSize = byteSizeFromDataUrl(dataUrl) || byteSize;
-    if (computedSize > input.maxBytes) return { ok: false, reason: 'too_large' };
-    return { ok: true, dataUrl, byteSize: computedSize };
-  } catch (_e) {
-    return { ok: false, reason: 'canvas_tainted' };
-  }
-}
-
-async function downloadAsDataUrlSameOriginViaFetch(input: {
+async function downloadAsDataUrlSameOrigin(input: {
   url: string;
   origin: string;
   referrer?: string;
@@ -255,42 +128,6 @@ async function downloadAsDataUrlSameOriginViaFetch(input: {
   } catch (_e) {
     return { ok: false, reason: 'fetch_failed' };
   }
-}
-
-async function downloadAsDataUrlSameOrigin(input: {
-  url: string;
-  origin: string;
-  referrer?: string;
-  maxBytes: number;
-}): Promise<{ ok: true; dataUrl: string; byteSize: number } | { ok: false; reason: string }> {
-  const safeUrl = String(input.url || '').trim();
-  if (!isHttpUrl(safeUrl)) return { ok: false, reason: 'invalid_url' };
-  let parsed: URL | null = null;
-  try {
-    parsed = new URL(safeUrl);
-  } catch (_e) {
-    parsed = null;
-  }
-  if (!parsed || parsed.origin !== input.origin) return { ok: false, reason: 'cross_origin' };
-
-  const preferImage = shouldPreferImageElement(parsed);
-  const ordered = preferImage ? (['image', 'fetch'] as const) : (['fetch', 'image'] as const);
-  let last: { ok: false; reason: string } | null = null;
-
-  for (const mode of ordered) {
-    // eslint-disable-next-line no-await-in-loop
-    const res =
-      mode === 'image'
-        ? await downloadAsDataUrlSameOriginViaImageElement({ url: safeUrl, origin: input.origin, maxBytes: input.maxBytes })
-        : await downloadAsDataUrlSameOriginViaFetch(input);
-    if (res.ok) return res;
-    last = res;
-
-    // If the environment has no DOM, skip the image-element attempt quickly.
-    if (mode === 'image' && res.reason === 'no_dom') continue;
-  }
-
-  return last || { ok: false, reason: 'fetch_failed' };
 }
 
 export async function inlineSameOriginImagesInSnapshot(input: {
@@ -379,3 +216,4 @@ export async function inlineSameOriginImagesInSnapshot(input: {
 
   return { snapshot, inlinedCount, inlinedBytes, warningFlags: Array.from(warningFlags) };
 }
+
