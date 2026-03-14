@@ -3,7 +3,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'r
 import { t } from '../../i18n';
 import Settings from './routes/Settings';
 import { CapturedListSidebar } from './conversations/CapturedListSidebar';
-import { ConversationsProvider } from '../conversations/conversations-context';
+import { ConversationsProvider, useConversationsApp } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
@@ -11,6 +11,7 @@ import { navIconButtonClassName } from '../shared/nav-styles';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
+import { decodeConversationLoc } from '../../shared/conversation-loc';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
@@ -51,6 +52,7 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
+    const { items, activeId, setActiveId } = useConversationsApp();
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
@@ -77,6 +79,24 @@ export default function AppShell() {
       return () => document.removeEventListener('keydown', onKey, true);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showSettingsSheet]);
+
+    useEffect(() => {
+      if (location.pathname !== '/') return;
+
+      const search = String(location.search || '');
+      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+      const loc = params.get('loc');
+      const decoded = decodeConversationLoc(loc);
+      if (!decoded) return;
+
+      const found = items.find(
+        (x) => String(x.source || '').trim().toLowerCase() === decoded.source && String(x.conversationKey || '').trim() === decoded.conversationKey,
+      );
+      if (!found) return;
+      if (Number(found.id) === Number(activeId)) return;
+
+      setActiveId(Number(found.id));
+    }, [activeId, items, location.pathname, location.search, setActiveId]);
 
     const renderSidebar = !isNarrow && !sidebarCollapsed;
 
