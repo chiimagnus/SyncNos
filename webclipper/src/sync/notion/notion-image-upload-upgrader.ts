@@ -1,5 +1,6 @@
 // @ts-nocheck
 import notionFilesApi from './notion-files-api.ts';
+import { getImageCacheAssetById } from '../../conversations/data/image-cache-read.ts';
 
   const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
@@ -7,6 +8,18 @@ import notionFilesApi from './notion-files-api.ts';
     const text = String(url || "").trim();
     if (!text) return false;
     return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(text);
+  }
+
+  function parseSyncnosAssetId(url) {
+    const text = String(url || "").trim();
+    const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
+    if (!matched) return 0;
+    const id = Number(matched[1]);
+    return Number.isFinite(id) && id > 0 ? id : 0;
+  }
+
+  function isSyncnosAssetUrl(url) {
+    return parseSyncnosAssetId(url) > 0;
   }
 
   function guessExtensionFromContentType(contentType) {
@@ -203,6 +216,34 @@ function guessFilenameFromUrl(url) {
     return ready && ready.id ? String(ready.id).trim() : fileId;
   }
 
+  async function uploadFromSyncnosAsset(files, accessToken, url) {
+    const assetId = parseSyncnosAssetId(url);
+    if (!assetId) throw new Error("invalid syncnos asset url");
+
+    const asset = await getImageCacheAssetById({ id: assetId });
+    if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
+
+    const bytes = new Uint8Array(await asset.blob.arrayBuffer());
+    if (!bytes.byteLength) throw new Error("local asset bytes empty");
+    if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${bytes.byteLength}`);
+
+    const contentType = String(asset.contentType || asset.blob.type || guessContentTypeFromUrl(asset.url) || "").trim()
+      || "application/octet-stream";
+    const ext = guessExtensionFromContentType(contentType);
+    const filename = `image-${assetId}.${ext}`;
+
+    const up = await files.createFileUpload({
+      accessToken,
+      filename,
+      contentType
+    });
+    const fileId = up && up.id ? String(up.id).trim() : "";
+    if (!fileId) throw new Error("missing file upload id");
+    await files.sendFileUpload({ accessToken, id: fileId, bytes, filename, contentType });
+    const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
+    return ready && ready.id ? String(ready.id).trim() : fileId;
+  }
+
   async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
     const list = Array.isArray(blocks) ? blocks : [];
     if (!list.length) return [];
@@ -246,6 +287,20 @@ function guessFilenameFromUrl(url) {
             }
             uploadId = "";
           }
+        } else if (isSyncnosAssetUrl(url)) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            uploadId = await uploadFromSyncnosAsset(files, accessToken, url);
+            if (uploadId) cache.set(url, uploadId);
+          } catch (e) {
+            const msg = e && e.message ? String(e.message) : String(e);
+            try {
+              console.warn("[NotionImageUpload] syncnos_asset upload failed:", url, msg);
+            } catch (_e2) {
+              // ignore
+            }
+            uploadId = "";
+          }
         } else {
         try {
           // eslint-disable-next-line no-await-in-loop
@@ -277,7 +332,9 @@ function guessFilenameFromUrl(url) {
       }
 
       if (!uploadId) {
-        if (isDataImageUrl(url)) out.push(paragraphBlock("[Image omitted: inline image upload failed]"));
+        if (isDataImageUrl(url) || isSyncnosAssetUrl(url)) {
+          out.push(paragraphBlock("[Image omitted: local image upload failed]"));
+        }
         else out.push(b);
         continue;
       }
