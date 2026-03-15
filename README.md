@@ -2,101 +2,118 @@
 
 # SyncNos
 
-A toolkit focused on syncing reading highlights and AI conversations.  
-It consolidates multi-source content to Notion and provides a WebClipper browser extension.
+Never lose an AI conversation or a great article again.
 
-[SyncNos Angel Sponsors😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
+11+ AI platforms + any web article — auto-captured in the background, stored locally first.
+One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
-[![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
-[![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total?label=Release%20Downloads&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
+[SyncNos Angel Sponsors 😍](https://持弛.com/SyncNos天使赞助者们) · English · [中文](README.zh-CN.md)
 
-[![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
-[![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
-[![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+[![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
+[![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Ffjkobfponhpmhfnieakdgfbclbhfodkf&query=%24.version&label=Edge%20Add-ons&color=blue)](https://microsoftedge.microsoft.com/addons/detail/syncnos-webclipper/fjkobfponhpmhfnieakdgfbclbhfodkf)
+[![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+[![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total)](https://github.com/chiimagnus/SyncNos/releases)
 
 </div>
 
-## Support
 
-SyncNos is built by one person with care.
+## Why SyncNos WebClipper?
 
-If you'd like to sponsor, I have one small ask: **don't just send money — leave a message with it.** A word about why you use SyncNos, a story, even just a "hi" is enough.
-
-It's not the money that keeps me going. It's knowing someone out there cares. That connection is what makes open source worth it.
-
-<img src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus donation QR" width="180" />
-
-## WebClipper (Browser Extension)
-
-Save AI chats and web articles from supported sites: local storage, export, backup, and sync to Notion / Obsidian.
-
-<details>
-<summary><kbd>Expand</kbd></summary>
-
-### UI Preview (Extension)
-
-![WebClipper (extension) Popup: save and browse conversations](.github/deepwiki/assets/popup-screenshots.png)
-
-![WebClipper (extension) Settings: backup and sync (Notion / Obsidian)](.github/deepwiki/assets/setting-screenshots.png)
-
-### Download & Install (Extension)
-
-| Channel | Download |
+| | |
 | --- | --- |
-| Chrome [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
-| Edge [![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases) | [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) |
-| Firefox [![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) | [Firefox AMO](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
+| 🔒 **Your data stays in your browser** | No third-party servers, no data collection. Everything is stored in IndexedDB first — you decide where it goes next. |
+| 🔄 **Incremental sync, no duplicates** | Only new content gets synced. Precise cursor tracking picks up right where you left off. Your knowledge base grows while you chat. |
+| 🔓 **Fully open source** | Every line of code is in this repo. You can see exactly what runs in your browser. |
+| 📦 **Multi-target output** | Notion / Obsidian / Markdown / Zip — your data, your choice. No vendor lock-in. |
 
-### Get Started in 3 Steps
+---
 
-1. Install the extension (Chrome/Edge/Firefox).
-2. Open a supported chat/article page, then click the top-right button in the Popup to save content.
-3. Open Settings: export Markdown, backup/restore the database, or sync to Notion / Obsidian.
+## Install
 
-### Key Capabilities (Overview)
-
-- **One-click save**: save AI chats / web articles to local browser storage.
-- **Readable**: Popup/App renders message Markdown for easier reading and editing.
-- **Portable**: export Markdown (single file or zip), and backup/restore the database.
-- **Syncable**: sync conversations to Notion (OAuth), or to Obsidian via Obsidian Local REST API.
-- **Controllable**: configurable theme mode, Inpage button visibility, install/update behaviors, and optional AI chat image caching (including on-demand re-cache in detail view).
-
-### Supported Sites
-
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI / z.ai / Google AI Studio
-
-</details>
-
-## macOS App
-
-Sync reading highlights and notes from multiple sources to Notion (macOS 14.0+).
-
-<details>
-<summary><kbd>Expand</kbd></summary>
-
-| Item | Details |
+| Browser | Download |
 | --- | --- |
-| Supported OS | **macOS 14.0+** |
-| Download | [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888) |
+| Chrome | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
+| Edge | [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) |
+| Firefox | [Firefox AMO](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
+| Arc / Brave / other Chromium | Use the Chrome Web Store link |
 
-### Get Started in 3 Steps
+---
 
-1. Install from the [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888).
-2. Connect Notion via in-app OAuth.
-3. Pick a source and run a sync.
+## Get Started in 3 Steps
 
-### Sync From
+1. **Install the extension** (Chrome / Edge / Firefox / Arc)
+2. **Open any supported AI platform or web page** — the extension captures conversations and articles in the background
+3. **Sync or export** — go to Settings to sync to Notion / Obsidian, or export Markdown / Zip backups
 
-- Apple Books
-- GoodLinks
-- WeRead
-- Dedao
-- Chat history (beta)
-  - OCR supported
-  - Local storage encryption
+---
 
-### Sync To
+## Supported Sources
 
-- Notion OAuth
+### AI Conversations (11+ platforms)
 
-</details>
+| Platform | Capture Mode |
+| --- | --- |
+| ChatGPT | Auto |
+| Claude | Auto |
+| Gemini | Auto |
+| DeepSeek | Auto |
+| Kimi | Auto |
+| Doubao (豆包) | Auto |
+| Yuanbao (元宝) | Auto |
+| Poe | Auto |
+| Notion AI | Auto |
+| z.ai | Auto |
+| Google AI Studio | Manual save preferred (virtual list limitation) |
+
+### Web Articles
+
+Any `http(s)` page can be clipped — body text, title, author, and publish date are extracted automatically.
+
+---
+
+## Sync Targets
+
+| Target | Details |
+| --- | --- |
+| **Notion** | One-click sync after OAuth. AI chats → `SyncNos-AI Chats` database; web articles → `SyncNos-Web Articles` database. |
+| **Obsidian** | Writes directly to your vault via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Local-to-local, no network involved. |
+| **Markdown / Zip** | Single file or bulk export. Keep an offline copy of everything, always. |
+
+---
+
+## Features
+
+- **Background auto-capture** — opens a supported site, starts capturing. No manual action needed (with a few exceptions).
+- **Local-first storage** — all content lands in IndexedDB before going anywhere else.
+- **Incremental sync** — precise cursor tracking. Only new messages and articles get synced.
+- **Insight dashboard** — total clips, source breakdown, longest conversations — see your knowledge accumulate.
+- **Chat with AI** — copy any local conversation or article to your clipboard and jump to your favorite AI platform to continue the discussion.
+- **Image caching** — optionally cache AI conversation images locally. Backfill historical images from the detail page.
+- **Database backup / restore** — full export and import of your local session database. Sensitive data (OAuth tokens, etc.) is automatically excluded.
+- **Theme mode** — follow system / manually switch Light / Dark.
+- **Inpage button** — configurable display scope (all sites / supported sites only / off).
+
+---
+
+## Screenshots
+
+<!-- Update with your latest screenshots -->
+
+WebClipper Popup: save and browse conversations
+![WebClipper Popup](.github/deepwiki/assets/popup-screenshots.png)
+
+WebClipper Settings: backup and sync (Notion / Obsidian)
+![WebClipper Settings](.github/deepwiki/assets/setting-screenshots.png)
+
+---
+
+## macOS App (Archived)
+
+> **⚠️ The macOS App is no longer maintained. Source code is kept in the `macOS/` directory for reference.**
+>
+> The original macOS App synced reading highlights from Apple Books, WeRead, GoodLinks, and Dedao to Notion.
+> You can still download the last published version from the [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888), but no further updates will be made.
+
+---
+
+## Development
