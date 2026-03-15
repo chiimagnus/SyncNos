@@ -7,7 +7,7 @@ Never lose an AI conversation or a great article again.
 11+ AI platforms + any web article — auto-captured in the background, stored locally first.
 One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
-[SyncNos Angel Sponsors 😍](https://持弛.com/SyncNos天使赞助者们) · English · [中文](README.zh-CN.md)
+[SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · English · [中文](README.zh-CN.md)
 
 [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
 [![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Ffjkobfponhpmhfnieakdgfbclbhfodkf&query=%24.version&label=Edge%20Add-ons&color=blue)](https://microsoftedge.microsoft.com/addons/detail/syncnos-webclipper/fjkobfponhpmhfnieakdgfbclbhfodkf)
