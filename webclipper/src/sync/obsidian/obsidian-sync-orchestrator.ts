@@ -162,10 +162,10 @@ async function materializeMarkdownAssetsForObsidian({
 
   for (const assetId of targetIds) {
     const index = indexByAssetId.get(assetId);
-    if (!index) continue;
+    if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
     // eslint-disable-next-line no-await-in-loop
     const asset = await getImageCacheAssetById({ id: assetId });
-    if (!asset || !(asset.blob instanceof Blob)) continue;
+    if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
     const ext = inferImageExtFromAsset(asset);
     const attachmentName = `${noteBase}-${index}.${ext}`;
