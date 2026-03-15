@@ -490,7 +490,7 @@ export function ConversationListPane({
     const id = Number((conversation as any).id);
     try {
       const d = await getConversationDetail(id);
-      const mdText = formatConversationMarkdownForExternalOutput(conversation as any, d as any);
+      const mdText = await formatConversationMarkdownForExternalOutput(conversation as any, d as any);
       await copyTextToClipboard(mdText);
       setCopiedId(id);
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);

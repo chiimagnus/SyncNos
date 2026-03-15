@@ -1,6 +1,7 @@
 import { storageGet, storageSet } from '../../platform/storage/local';
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { buildConversationBasename } from '../../conversations/domain/file-naming';
+import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
 import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
 
 export type ChatWithAiPlatform = {
@@ -174,10 +175,13 @@ function isDataImageUrl(url: unknown): boolean {
   return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
 }
 
-function isSyncnosAssetUrl(url: unknown): boolean {
+function parseSyncnosAssetId(url: unknown): number | null {
   const text = String(url || '').trim();
-  if (!text) return false;
-  return /^syncnos-asset:\/\/\d+$/i.test(text);
+  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
+  if (!matched) return null;
+  const id = Number(matched[1]);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
 }
 
 function normalizeImageExt(raw: unknown): string {
@@ -189,14 +193,18 @@ function normalizeImageExt(raw: unknown): string {
   return /^[a-z0-9]+$/.test(text) ? text : 'png';
 }
 
-function inferImageExtFromUrl(url: string): string {
-  const text = String(url || '').trim();
+function inferImageExtFromSource(input: { contentType?: string; url?: string }): string {
+  const contentType = String(input.contentType || '').trim().toLowerCase();
+  if (contentType.startsWith('image/')) {
+    return normalizeImageExt(contentType.slice('image/'.length));
+  }
+
+  const text = String(input.url || '').trim();
   if (!text) return 'png';
   if (isDataImageUrl(text)) {
     const matched = /^data:image\/([a-z0-9.+-]+)/i.exec(text);
     return normalizeImageExt(matched?.[1] || '');
   }
-  if (isSyncnosAssetUrl(text)) return 'png';
   try {
     const u = new URL(text);
     const pathname = String(u.pathname || '');
@@ -209,13 +217,45 @@ function inferImageExtFromUrl(url: string): string {
   return 'png';
 }
 
-export function materializeMarkdownAssetPaths(input: { markdown: string; markdownBasename: string }): string {
+async function inferMaterializedImageExt(url: string): Promise<string> {
+  const text = String(url || '').trim();
+  const assetId = parseSyncnosAssetId(text);
+  if (!assetId) {
+    return inferImageExtFromSource({ url: text });
+  }
+  const asset = await getImageCacheAssetById({ id: assetId });
+  if (!asset) return 'png';
+  return inferImageExtFromSource({ contentType: asset.contentType, url: asset.url });
+}
+
+export async function materializeMarkdownAssetPaths(input: { markdown: string; markdownBasename: string }): Promise<string> {
   const markdown = String(input.markdown || '');
   if (!markdown) return '';
 
   const basename = String(input.markdownBasename || '').trim() || 'conversation';
-  let localIndex = 0;
+  const orderedUrls: string[] = [];
+  const seenUrls = new Set<string>();
+
+  INTERNAL_IMAGE_REF_RE.lastIndex = 0;
+  let match: RegExpExecArray | null = null;
+  while ((match = INTERNAL_IMAGE_REF_RE.exec(markdown)) != null) {
+    const urlPart = match[2] ? String(match[2]) : '';
+    const url = stripAngleBrackets(urlPart);
+    const shouldMaterialize = isDataImageUrl(url) || parseSyncnosAssetId(url) != null;
+    if (!shouldMaterialize) continue;
+    if (seenUrls.has(url)) continue;
+    seenUrls.add(url);
+    orderedUrls.push(url);
+  }
+  if (!orderedUrls.length) return markdown;
+
   const replacements = new Map<string, string>();
+  for (let i = 0; i < orderedUrls.length; i += 1) {
+    const url = orderedUrls[i]!;
+    // eslint-disable-next-line no-await-in-loop
+    const ext = await inferMaterializedImageExt(url);
+    replacements.set(url, `${basename}-${i + 1}.${ext}`);
+  }
 
   INTERNAL_IMAGE_REF_RE.lastIndex = 0;
   return markdown.replace(INTERNAL_IMAGE_REF_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
@@ -223,32 +263,26 @@ export function materializeMarkdownAssetPaths(input: { markdown: string; markdow
     const urlPart = urlPartRaw ? String(urlPartRaw) : '';
     const title = titleRaw ? String(titleRaw) : '';
     const url = stripAngleBrackets(urlPart);
-    const shouldMaterialize = isDataImageUrl(url) || isSyncnosAssetUrl(url);
+    const shouldMaterialize = isDataImageUrl(url) || parseSyncnosAssetId(url) != null;
     if (!shouldMaterialize) return _full;
 
-    let materialized = replacements.get(url);
-    if (!materialized) {
-      localIndex += 1;
-      const ext = inferImageExtFromUrl(url);
-      materialized = `${basename}-${localIndex}.${ext}`;
-      replacements.set(url, materialized);
-    }
-
+    const materialized = replacements.get(url);
+    if (!materialized) return _full;
     const nextPart = urlPart.trim().startsWith('<') ? `<${materialized}>` : materialized;
     return `![${alt}](${nextPart}${title})`;
   });
 }
 
-export function formatConversationMarkdownForExternalOutput(
+export async function formatConversationMarkdownForExternalOutput(
   conversation: Conversation,
   detail: ConversationDetail,
-): string {
+): Promise<string> {
   const raw = formatConversationMarkdown(conversation, (detail?.messages || []) as any);
   const basename = buildConversationBasename(conversation as any);
   return materializeMarkdownAssetPaths({ markdown: raw, markdownBasename: basename });
 }
 
-function getArticleContent(conversation: Conversation, detail: ConversationDetail): string {
+async function getArticleContent(conversation: Conversation, detail: ConversationDetail): Promise<string> {
   const sourceType = String(conversation?.sourceType || '').trim().toLowerCase();
   if (sourceType !== 'article') {
     return formatConversationMarkdownForExternalOutput(conversation, detail);
@@ -284,12 +318,18 @@ export function truncateForChatWith(input: string, maxChars: number): { text: st
   return { text: `${text.slice(0, sliceLen)}${suffix}`, truncated: true };
 }
 
-export function buildChatWithPayload(conversation: Conversation, detail: ConversationDetail, promptTemplate: string): string {
+export async function buildChatWithPayload(
+  conversation: Conversation,
+  detail: ConversationDetail,
+  promptTemplate: string,
+): Promise<string> {
+  const articleContent = await getArticleContent(conversation, detail);
+  const conversationMarkdown = await formatConversationMarkdownForExternalOutput(conversation, detail);
   const vars: Record<string, string> = {
     article_title: String(conversation?.title || ''),
     article_url: getConversationUrl(conversation),
-    article_content: getArticleContent(conversation, detail),
-    conversation_markdown: formatConversationMarkdownForExternalOutput(conversation, detail),
+    article_content: articleContent,
+    conversation_markdown: conversationMarkdown,
   };
 
   const rendered = renderChatWithTemplate(String(promptTemplate || ''), vars);
