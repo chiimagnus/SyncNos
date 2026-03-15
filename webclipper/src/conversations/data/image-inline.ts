@@ -216,7 +216,7 @@ function parseDataImageUrl(input: {
   if (!byteSize) return { ok: false, reason: 'empty' };
   if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
 
-  const blob = new Blob([bytes], { type: contentType });
+  const blob = new Blob([Uint8Array.from(bytes)], { type: contentType });
   return { ok: true, blob, byteSize, contentType };
 }
 
