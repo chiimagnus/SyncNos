@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from './markdown';
+import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
 
 type BubbleRole = 'user' | 'assistant' | 'other';
 
@@ -19,16 +20,69 @@ export type ChatMessageBubbleProps = {
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
   markdown: string;
+  conversationId?: number;
   className?: string;
 };
 
 // Shared singleton to avoid per-message renderer instantiation.
 const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
 
-export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, className }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({
+  role,
+  headerLeft,
+  headerRight,
+  markdown,
+  conversationId,
+  className,
+}: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
+  const markdownRef = useRef<HTMLDivElement | null>(null);
 
   const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
+
+  useEffect(() => {
+    const root = markdownRef.current;
+    if (!root) return;
+
+    const nodes = Array.from(root.querySelectorAll<HTMLImageElement>('img[data-syncnos-asset-id]'));
+    if (!nodes.length) return;
+
+    const groupedNodes = new Map<number, HTMLImageElement[]>();
+    for (const node of nodes) {
+      const id = Number(node.dataset.syncnosAssetId);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const list = groupedNodes.get(id) || [];
+      list.push(node);
+      groupedNodes.set(id, list);
+    }
+    if (!groupedNodes.size) return;
+
+    let disposed = false;
+    const objectUrls: string[] = [];
+
+    async function hydrateAssetImages() {
+      try {
+        for (const [assetId, targetNodes] of groupedNodes.entries()) {
+          // eslint-disable-next-line no-await-in-loop
+          const asset = await getImageCacheAssetById({ id: assetId, conversationId });
+          if (!asset || disposed) continue;
+          const objectUrl = URL.createObjectURL(asset.blob);
+          objectUrls.push(objectUrl);
+          for (const node of targetNodes) node.src = objectUrl;
+        }
+      } catch (error) {
+        console.warn('[ImageAssetRender] failed to hydrate local asset images', {
+          error: error instanceof Error ? error.message : String(error || ''),
+        });
+      }
+    }
+
+    void hydrateAssetImages();
+    return () => {
+      disposed = true;
+      for (const objectUrl of objectUrls) URL.revokeObjectURL(objectUrl);
+    };
+  }, [html, conversationId]);
 
   const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[12px] tw-p-3 tw-shadow-none';
 
@@ -140,7 +194,11 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <div className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')} dangerouslySetInnerHTML={{ __html: html }} />
+      <div
+        ref={markdownRef}
+        className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </section>
   );
 }
