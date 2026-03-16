@@ -94,7 +94,7 @@ export async function resolveChatWithDetailHeaderActions({
     if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return [];
 
     const settings = await loadChatWithSettings();
-    const payload = buildChatWithPayload(conversation, detail as any, settings.promptTemplate);
+    const payload = await buildChatWithPayload(conversation, detail as any, settings.promptTemplate);
 
     const actions: DetailHeaderAction[] = [];
     for (const platform of settings.platforms || []) {
@@ -115,4 +115,3 @@ export async function resolveChatWithDetailHeaderActions({
     return [];
   }
 }
-

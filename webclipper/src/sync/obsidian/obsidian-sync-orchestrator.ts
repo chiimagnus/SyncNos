@@ -24,11 +24,169 @@ import {
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
 import obsidianSyncJobStore from './obsidian-sync-job-store.ts';
+import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
 
 const SYNC_PROVIDER = 'obsidian';
+const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
+}
+
+function stripAngleBrackets(url: unknown) {
+  const text = safeString(url);
+  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
+  return text;
+}
+
+function parseSyncnosAssetId(url: unknown) {
+  const text = safeString(url);
+  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
+  if (!matched) return 0;
+  const id = Number(matched[1]);
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+function normalizeImageExt(raw: unknown) {
+  const text = safeString(raw).toLowerCase();
+  if (!text) return 'png';
+  if (text === 'jpeg') return 'jpg';
+  if (text === 'svg+xml') return 'svg';
+  if (text === 'x-icon' || text === 'vnd.microsoft.icon') return 'ico';
+  return /^[a-z0-9]+$/.test(text) ? text : 'png';
+}
+
+function inferImageExtFromAsset(asset: { contentType?: unknown; url?: unknown }) {
+  const contentType = safeString(asset.contentType).toLowerCase();
+  if (contentType.startsWith('image/')) return normalizeImageExt(contentType.slice('image/'.length));
+  const url = safeString(asset.url);
+  if (/^data:image\//i.test(url)) {
+    const matched = /^data:image\/([a-z0-9.+-]+)/i.exec(url);
+    return normalizeImageExt(matched?.[1] || '');
+  }
+  try {
+    const parsed = new URL(url);
+    const pathname = safeString(parsed.pathname);
+    const filename = pathname.split('/').filter(Boolean).pop() || '';
+    const dot = filename.lastIndexOf('.');
+    if (dot >= 0 && dot < filename.length - 1) return normalizeImageExt(filename.slice(dot + 1));
+  } catch (_e) {
+    // ignore
+  }
+  return 'png';
+}
+
+function collectOrderedSyncnosAssetIds(markdown: unknown): number[] {
+  const text = String(markdown || '');
+  if (!text) return [];
+  const seen = new Set<number>();
+  const ordered: number[] = [];
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
+  let match: RegExpExecArray | null = null;
+  while ((match = MARKDOWN_IMAGE_RE.exec(text)) != null) {
+    const urlPart = match[2] ? String(match[2]) : '';
+    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
+    if (!assetId) continue;
+    if (seen.has(assetId)) continue;
+    seen.add(assetId);
+    ordered.push(assetId);
+  }
+  return ordered;
+}
+
+function replaceSyncnosAssetsWithAttachmentNames(
+  markdown: unknown,
+  attachmentNameByAssetId: Map<number, string>,
+) {
+  const text = String(markdown || '');
+  if (!text || !attachmentNameByAssetId.size) return text;
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
+  return text.replace(MARKDOWN_IMAGE_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
+    const alt = altRaw ? String(altRaw) : '';
+    const urlPart = urlPartRaw ? String(urlPartRaw) : '';
+    const title = titleRaw ? String(titleRaw) : '';
+    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
+    if (!assetId) return _full;
+    const attachmentName = attachmentNameByAssetId.get(assetId);
+    if (!attachmentName) return _full;
+    const nextPart = urlPart.trim().startsWith('<') ? `<${attachmentName}>` : attachmentName;
+    return `![${alt}](${nextPart}${title})`;
+  });
+}
+
+function buildNoteBasenameFromFilePath(filePath: unknown) {
+  const text = safeString(filePath);
+  if (!text) return 'note';
+  const filename = text.split('/').filter(Boolean).pop() || text;
+  if (filename.toLowerCase().endsWith('.md')) return filename.slice(0, -3) || 'note';
+  const dot = filename.lastIndexOf('.');
+  return dot > 0 ? filename.slice(0, dot) : filename;
+}
+
+function buildAttachmentPath(filePath: unknown, attachmentName: string) {
+  const raw = safeString(filePath);
+  const dir = raw.split('/').slice(0, -1).filter(Boolean).join('/');
+  return dir ? `${dir}/${attachmentName}` : attachmentName;
+}
+
+async function materializeMarkdownAssetsForObsidian({
+  client,
+  filePath,
+  markdown,
+  indexScopeMarkdown,
+}: {
+  client: any;
+  filePath: string;
+  markdown: string;
+  indexScopeMarkdown?: string;
+}): Promise<string> {
+  const targetMarkdown = String(markdown || '');
+  if (!targetMarkdown) return targetMarkdown;
+  if (!client || typeof client.putVaultBinaryFile !== 'function') {
+    throw new Error('obsidian client does not support binary attachment upload');
+  }
+
+  const scopeIds = collectOrderedSyncnosAssetIds(indexScopeMarkdown || targetMarkdown);
+  if (!scopeIds.length) return targetMarkdown;
+
+  const indexByAssetId = new Map<number, number>();
+  for (let i = 0; i < scopeIds.length; i += 1) {
+    indexByAssetId.set(scopeIds[i]!, i + 1);
+  }
+
+  const targetIds = collectOrderedSyncnosAssetIds(targetMarkdown);
+  if (!targetIds.length) return targetMarkdown;
+
+  const noteBase = buildNoteBasenameFromFilePath(filePath);
+  const attachmentNameByAssetId = new Map<number, string>();
+
+  for (const assetId of targetIds) {
+    const index = indexByAssetId.get(assetId);
+    if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
+    // eslint-disable-next-line no-await-in-loop
+    const asset = await getImageCacheAssetById({ id: assetId });
+    if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
+
+    const ext = inferImageExtFromAsset(asset);
+    const attachmentName = `${noteBase}-${index}.${ext}`;
+    attachmentNameByAssetId.set(assetId, attachmentName);
+
+    const contentType = safeString(asset.contentType || asset.blob.type) || `image/${ext}`;
+    // eslint-disable-next-line no-await-in-loop
+    const bytes = new Uint8Array(await asset.blob.arrayBuffer());
+    // eslint-disable-next-line no-await-in-loop
+    const putRes = await client.putVaultBinaryFile(
+      buildAttachmentPath(filePath, attachmentName),
+      bytes,
+      { contentType },
+    );
+    if (!putRes || !putRes.ok) {
+      const message = putRes && putRes.error && putRes.error.message ? putRes.error.message : 'attachment put failed';
+      throw new Error(String(message || 'attachment put failed'));
+    }
+  }
+
+  return replaceSyncnosAssetsWithAttachmentNames(targetMarkdown, attachmentNameByAssetId);
 }
 
 function normalizeIds(list: unknown) {
@@ -554,10 +712,16 @@ async function syncConversations({
             conversation: decision.convo,
             cursor: pickLocalCursor(decision.messages),
           });
-          const markdown = writer.buildFullNoteMarkdown({
+          const rawMarkdown = writer.buildFullNoteMarkdown({
             conversation: decision.convo,
             messages: decision.messages,
             syncnosObject,
+          });
+          const markdown = await materializeMarkdownAssetsForObsidian({
+            client,
+            filePath: decision.filePath,
+            markdown: rawMarkdown,
+            indexScopeMarkdown: rawMarkdown,
           });
           const putRes = await client.putVaultFile(decision.filePath, markdown);
           if (!putRes || !putRes.ok) {
@@ -618,7 +782,22 @@ async function syncConversations({
             currentConversationTitle: currentTitle,
             currentStage: 'appending_new_messages',
           });
-          const chunk = writer.buildIncrementalAppendMarkdown({ newMessages: decision.newMessages });
+          const chunkRaw = writer.buildIncrementalAppendMarkdown({ newMessages: decision.newMessages });
+          const scopeSyncnosObject = metaMod.buildSyncnosObject({
+            conversation: decision.convo,
+            cursor: pickLocalCursor(decision.messages),
+          });
+          const scopeMarkdown = writer.buildFullNoteMarkdown({
+            conversation: decision.convo,
+            messages: decision.messages,
+            syncnosObject: scopeSyncnosObject,
+          });
+          const chunk = await materializeMarkdownAssetsForObsidian({
+            client,
+            filePath: decision.filePath,
+            markdown: chunkRaw,
+            indexScopeMarkdown: scopeMarkdown,
+          });
           const patchRes = await writer.appendUnderMessagesHeading({
             client,
             filePath: decision.filePath,
@@ -662,10 +841,16 @@ async function syncConversations({
               conversation: decision.convo,
               cursor: pickLocalCursor(decision.messages),
             });
-            const markdown = writer.buildFullNoteMarkdown({
+            const rawMarkdown = writer.buildFullNoteMarkdown({
               conversation: decision.convo,
               messages: decision.messages,
               syncnosObject,
+            });
+            const markdown = await materializeMarkdownAssetsForObsidian({
+              client,
+              filePath: decision.filePath,
+              markdown: rawMarkdown,
+              indexScopeMarkdown: rawMarkdown,
             });
             const putRes = await client.putVaultFile(decision.filePath, markdown);
             if (!putRes || !putRes.ok) {

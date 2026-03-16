@@ -1,8 +1,57 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from './markdown';
+import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
 
 type BubbleRole = 'user' | 'assistant' | 'other';
+
+const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
+
+function stripAngleBrackets(url: string): string {
+  const text = String(url || '').trim();
+  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
+  return text;
+}
+
+function parseSyncnosAssetId(url: unknown): number | null {
+  const text = String(url || '').trim();
+  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
+  if (!matched) return null;
+  const id = Number(matched[1]);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
+}
+
+function collectOrderedSyncnosAssetIds(markdown: string): number[] {
+  const raw = String(markdown || '');
+  if (!raw) return [];
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
+  const seen = new Set<number>();
+  const out: number[] = [];
+  let match: RegExpExecArray | null = null;
+  while ((match = MARKDOWN_IMAGE_RE.exec(raw)) != null) {
+    const urlPart = match[2] ? String(match[2]) : '';
+    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
+    if (!assetId) continue;
+    if (seen.has(assetId)) continue;
+    seen.add(assetId);
+    out.push(assetId);
+  }
+  return out;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
 
 function normalizeRole(role: unknown): BubbleRole {
   const r = String(role || '').trim().toLowerCase();
@@ -19,16 +68,80 @@ export type ChatMessageBubbleProps = {
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
   markdown: string;
+  conversationId?: number;
   className?: string;
 };
 
 // Shared singleton to avoid per-message renderer instantiation.
 const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
 
-export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, className }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({
+  role,
+  headerLeft,
+  headerRight,
+  markdown,
+  conversationId,
+  className,
+}: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
+  const markdownRef = useRef<HTMLDivElement | null>(null);
 
-  const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
+  const [assetSrcById, setAssetSrcById] = useState<Map<number, string>>(() => new Map());
+
+  useEffect(() => {
+    const ids = collectOrderedSyncnosAssetIds(String(markdown || ''));
+    if (!ids.length) {
+      setAssetSrcById(new Map());
+      return;
+    }
+
+    let disposed = false;
+    const objectUrls: string[] = [];
+
+    async function resolveAssets() {
+      const next = new Map<number, string>();
+      try {
+        for (const id of ids) {
+          // eslint-disable-next-line no-await-in-loop
+          const asset = await getImageCacheAssetById({ id, conversationId });
+          if (!asset || disposed) continue;
+          let url: string | null = null;
+          try {
+            url = URL.createObjectURL(asset.blob);
+            objectUrls.push(url);
+          } catch (_e) {
+            url = null;
+          }
+          if (!url) {
+            // eslint-disable-next-line no-await-in-loop
+            const dataUrl = await blobToDataUrl(asset.blob);
+            if (disposed) continue;
+            url = dataUrl;
+          }
+          if (url) next.set(id, url);
+        }
+      } catch (error) {
+        console.warn('[ImageAssetRender] failed to resolve local asset urls', {
+          error: error instanceof Error ? error.message : String(error || ''),
+        });
+      }
+      if (!disposed) setAssetSrcById(next);
+    }
+
+    void resolveAssets();
+    return () => {
+      disposed = true;
+      for (const objectUrl of objectUrls) URL.revokeObjectURL(objectUrl);
+    };
+  }, [markdown, conversationId]);
+
+  const html = useMemo(() => {
+    return sharedMd.render(String(markdown || ''), { syncnosAssetSrcById: assetSrcById } as any);
+  }, [markdown, assetSrcById]);
+  const innerHtml = useMemo(() => ({ __html: html }), [html]);
+
+  // NOTE: asset URLs are resolved before render via markdown-it env;
+  // no post-render DOM hydration is needed, which avoids re-render race conditions.
 
   const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[12px] tw-p-3 tw-shadow-none';
 
@@ -140,7 +253,11 @@ export function ChatMessageBubble({ role, headerLeft, headerRight, markdown, cla
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <div className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')} dangerouslySetInnerHTML={{ __html: html }} />
+      <div
+        ref={markdownRef}
+        className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
+        dangerouslySetInnerHTML={innerHtml}
+      />
     </section>
   );
 }

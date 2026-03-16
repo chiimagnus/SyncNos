@@ -203,6 +203,14 @@ function createClient({
     return request('GET', `/vault/${encoded}`, { accept: accept || 'text/markdown' });
   }
 
+  function normalizeBinaryBody(bytes: unknown): Blob | Uint8Array | null {
+    if (typeof Blob !== 'undefined' && bytes instanceof Blob) return bytes;
+    if (bytes instanceof Uint8Array) return bytes;
+    if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
+    if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return null;
+  }
+
   function listVaultDir(pathToDirectory: string) {
     const encoded = encodeVaultPath(pathToDirectory);
     return request('GET', `/vault/${encoded}/`, { accept: 'application/json' });
@@ -213,6 +221,38 @@ function createClient({
     return request('PUT', `/vault/${encoded}`, {
       body: String(markdown || ''),
       contentType: 'text/markdown',
+      accept: 'application/json',
+    });
+  }
+
+  function putVaultBinaryFile(
+    filePath: string,
+    bytes: unknown,
+    {
+      contentType,
+    }: {
+      contentType?: string;
+    } = {},
+  ) {
+    const body = normalizeBinaryBody(bytes);
+    if (!body) {
+      return Promise.resolve({
+        ok: false,
+        status: 0,
+        data: null,
+        error: {
+          code: 'bad_request',
+          status: 0,
+          errorCode: null,
+          message: 'invalid binary body',
+          body: null,
+        },
+      });
+    }
+    const encoded = encodeVaultPath(filePath);
+    return request('PUT', `/vault/${encoded}`, {
+      body,
+      contentType: safeString(contentType) || 'application/octet-stream',
       accept: 'application/json',
     });
   }
@@ -281,6 +321,7 @@ function createClient({
     getVaultFile,
     listVaultDir,
     putVaultFile,
+    putVaultBinaryFile,
     deleteVaultFile,
     openVaultFile,
     patchVaultFile,

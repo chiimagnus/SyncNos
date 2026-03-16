@@ -48,6 +48,16 @@ describe('createMarkdownRenderer', () => {
     expect(html).not.toContain('syncnos-md-image-link');
   });
 
+  it('renders syncnos-asset images with local asset markers and placeholder src', () => {
+    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    const html = md.render('![](syncnos-asset://42)');
+    expect(html).toContain('<img');
+    expect(html).toContain('data-syncnos-asset-id="42"');
+    expect(html).toContain('src="about:blank"');
+    expect(html).not.toContain('syncnos-md-image-link');
+    expect(html).not.toContain('src="https://');
+  });
+
   it('renders inline math with KaTeX', () => {
     const md = createMarkdownRenderer();
     const html = md.render('x = $E=mc^2$');

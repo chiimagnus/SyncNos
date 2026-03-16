@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation } from '../../conversations/domain/models';
-import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import { getConversationDetail } from '../../conversations/client/repo';
+import { formatConversationMarkdownForExternalOutput } from '../../integrations/chatwith/chatwith-settings';
 import { tabsCreate } from '../../platform/webext/tabs';
 import { storageOnChanged } from '../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
@@ -490,7 +490,7 @@ export function ConversationListPane({
     const id = Number((conversation as any).id);
     try {
       const d = await getConversationDetail(id);
-      const mdText = formatConversationMarkdown(conversation as any, (d as any).messages || []);
+      const mdText = await formatConversationMarkdownForExternalOutput(conversation as any, d as any);
       await copyTextToClipboard(mdText);
       setCopiedId(id);
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);

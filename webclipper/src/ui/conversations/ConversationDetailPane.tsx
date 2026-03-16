@@ -97,11 +97,17 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
           <div className="tw-mt-3 tw-grid tw-gap-2.5">
             {detail.messages.map((m) => {
               const text = String((m as any).contentMarkdown || (m as any).contentText || '');
+              const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
               return (
                 <ChatMessageBubble
                   key={String((m as any).id)}
                   role={isArticle ? undefined : (m as any).role}
                   markdown={text}
+                  conversationId={
+                    Number.isFinite(messageConversationId) && messageConversationId > 0
+                      ? messageConversationId
+                      : undefined
+                  }
                 />
               );
             })}

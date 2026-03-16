@@ -37,6 +37,15 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
   }
 
+  function parseSyncnosAssetId(url: unknown): number | null {
+    const text = String(url || '').trim();
+    const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
+    if (!matched) return null;
+    const id = Number(matched[1]);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    return id;
+  }
+
   function sanitizeUrlForDisplay(url: unknown): string {
     const text = String(url || '').trim();
     if (!text) return '';
@@ -83,11 +92,23 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     const safeSrc = String(src || '').trim();
     if (!safeSrc) return defaultImageRender(tokens, idx, opts, env, self);
 
-    const escapedSrc = inst.utils.escapeHtml(safeSrc);
     const escapedAlt = inst.utils.escapeHtml(String(alt || ''));
-
     const titleRaw = token && typeof token.attrGet === 'function' ? String(token.attrGet('title') || '') : '';
     const titleAttr = titleRaw ? ` title="${inst.utils.escapeHtml(titleRaw)}"` : '';
+    const assetId = parseSyncnosAssetId(safeSrc);
+    if (assetId) {
+      const envMap = env && typeof env === 'object' ? (env as any).syncnosAssetSrcById : null;
+      const resolved =
+        envMap && (typeof envMap.get === 'function' ? envMap.get(assetId) : (envMap as any)[assetId]);
+      const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
+      // Use a tiny valid image as fallback to avoid noisy console errors.
+      const placeholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+      const finalSrc = safeResolved || placeholderSrc;
+      const escapedFinal = inst.utils.escapeHtml(finalSrc);
+      return `<img src="${escapedFinal}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
+    }
+
+    const escapedSrc = inst.utils.escapeHtml(safeSrc);
 
     const img = `<img src="${escapedSrc}" alt="${escapedAlt}"${titleAttr}>`;
 

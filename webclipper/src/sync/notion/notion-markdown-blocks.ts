@@ -359,6 +359,17 @@
       return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?;base64,/i.test(text);
     }
 
+    function isSyncnosAssetUrl(url) {
+      const text = String(url || "").trim();
+      return /^syncnos-asset:\/\/\d+$/i.test(text);
+    }
+
+    function stripAngleBrackets(url) {
+      const text = String(url || "").trim();
+      if (text.startsWith("<") && text.endsWith(">")) return text.slice(1, -1).trim();
+      return text;
+    }
+
     function startsWithFence(line) {
       return String(line || "").trimStart().startsWith("```");
     }
@@ -395,8 +406,8 @@
       const trimmed = String(line || "").trim();
       const m = trimmed.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)\s*$/);
       if (!m) return null;
-      const url = String(m[2] || "").trim();
-      if (!isHttpUrl(url) && !isDataImageUrl(url)) return null;
+      const url = stripAngleBrackets(String(m[2] || "").trim());
+      if (!isHttpUrl(url) && !isDataImageUrl(url) && !isSyncnosAssetUrl(url)) return null;
       return { url, alt: String(m[1] || "") };
     }
 
