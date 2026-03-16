@@ -2,11 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IDBKeyRange, indexedDB } from "fake-indexeddb";
 import { inlineChatImagesInMessages, __closeDbForTests as __closeImageInlineDbForTests } from "../../src/conversations/data/image-inline";
+import { openDb as openSchemaDb } from "../../src/platform/idb/schema";
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("indexedDB request failed"));
+  });
+}
+
+function txDone(t: IDBTransaction): Promise<true> {
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve(true);
+    t.onerror = () => reject(t.error || new Error("transaction failed"));
+    t.onabort = () => reject(t.error || new Error("transaction aborted"));
   });
 }
 
@@ -57,6 +66,20 @@ describe("image-inline", () => {
     expect(String(messages1[0].contentMarkdown)).not.toContain("data:image");
     expect(String(messages1[1].contentMarkdown)).not.toContain("data:image");
     expect(String(messages1[2].contentMarkdown)).not.toContain("data:image");
+
+    // Ensure we do not store the full `data:` URL as an IndexedDB key/index value.
+    const db = await openSchemaDb();
+    const t = db.transaction(["image_cache"], "readonly");
+    const store = t.objectStore("image_cache");
+    const rows = (await reqToPromise(store.getAll() as any)) as any[];
+    await txDone(t);
+    db.close();
+
+    const dataRows = rows.filter((r) => String(r?.url || "").startsWith("data:"));
+    expect(dataRows.length).toBe(1);
+    expect(String(dataRows[0].url)).toMatch(/^data:image\/png;fnv1a64=[0-9a-f]{16}$/);
+    expect(String(dataRows[0].url)).not.toContain("base64");
+    expect(String(dataRows[0].url).length).toBeLessThan(80);
 
     // Simulate a new capture of the same message still referencing the same url.
     const messages2 = [

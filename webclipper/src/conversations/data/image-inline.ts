@@ -187,7 +187,7 @@ function parseDataImageUrl(input: {
   dataUrl: string;
   maxBytes: number;
 }):
-  | { ok: true; blob: Blob; byteSize: number; contentType: string }
+  | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
   | { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' } {
   const safeDataUrl = String(input.dataUrl || '').trim();
   if (!isDataImageUrl(safeDataUrl)) return { ok: false, reason: 'non_image' };
@@ -216,8 +216,19 @@ function parseDataImageUrl(input: {
   if (!byteSize) return { ok: false, reason: 'empty' };
   if (byteSize > input.maxBytes) return { ok: false, reason: 'too_large' };
 
+  // Avoid storing the full `data:` URL as an IndexedDB key/index value.
+  // Use a short, content-addressed-ish cache key derived from bytes instead.
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let i = 0; i < bytes.length; i += 1) {
+    hash ^= BigInt(bytes[i]);
+    hash = (hash * prime) & 0xffffffffffffffffn;
+  }
+  const hashHex = hash.toString(16).padStart(16, '0');
+  const cacheKey = `data:${contentType};fnv1a64=${hashHex}`;
+
   const blob = new Blob([Uint8Array.from(bytes)], { type: contentType });
-  return { ok: true, blob, byteSize, contentType };
+  return { ok: true, blob, byteSize, contentType, cacheKey };
 }
 
 async function getCachedImage(conversationId: number, url: string): Promise<ImageCacheRow | null> {
@@ -383,8 +394,27 @@ export async function inlineChatImagesInMessages(input: {
         continue;
       }
 
+      let parsedDataUrl:
+        | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
+        | { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' }
+        | null = null;
+      let cacheLookupUrl = url;
+      if (isDataUrl) {
+        parsedDataUrl = parseDataImageUrl({ dataUrl: url, maxBytes: INLINE_HTTP_IMAGE_MAX_BYTES });
+        if (!parsedDataUrl.ok) {
+          if (parsedDataUrl.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
+          else warningFlags.add('inline_images_download_failed');
+          continue;
+        }
+        if ((inlinedBytes + parsedDataUrl.byteSize) > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
+          warningFlags.add('inline_images_total_bytes_limit_reached');
+          continue;
+        }
+        cacheLookupUrl = parsedDataUrl.cacheKey;
+      }
+
       // eslint-disable-next-line no-await-in-loop
-      const cached = await getCachedImage(conversationId, url);
+      const cached = (await getCachedImage(conversationId, cacheLookupUrl)) || (isDataUrl ? await getCachedImage(conversationId, url) : null);
       if (cached) {
         // eslint-disable-next-line no-await-in-loop
         const cachedAsset = await ensureCachedAssetRecord(cached);
@@ -399,20 +429,12 @@ export async function inlineChatImagesInMessages(input: {
 
       let nextAsset: CachedAsset | null = null;
       if (isDataUrl) {
-        const parsed = parseDataImageUrl({ dataUrl: url, maxBytes: INLINE_HTTP_IMAGE_MAX_BYTES });
-        if (!parsed.ok) {
-          if (parsed.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
-          else warningFlags.add('inline_images_download_failed');
-          continue;
-        }
-        if ((inlinedBytes + parsed.byteSize) > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
-          warningFlags.add('inline_images_total_bytes_limit_reached');
-          continue;
-        }
+        const parsed = parsedDataUrl && parsedDataUrl.ok ? parsedDataUrl : null;
+        if (!parsed) continue;
         // eslint-disable-next-line no-await-in-loop
         nextAsset = await upsertCachedImageAsset({
           conversationId,
-          url,
+          url: parsed.cacheKey,
           blob: parsed.blob,
           byteSize: parsed.byteSize,
           contentType: parsed.contentType,
