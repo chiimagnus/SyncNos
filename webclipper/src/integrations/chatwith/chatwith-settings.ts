@@ -228,6 +228,23 @@ async function inferMaterializedImageExt(url: string): Promise<string> {
   return inferImageExtFromSource({ contentType: asset.contentType, url: asset.url });
 }
 
+export function materializeMarkdownAssetPlaceholders(input: { markdown: string }): string {
+  const markdown = String(input.markdown || '');
+  if (!markdown) return '';
+
+  INTERNAL_IMAGE_REF_RE.lastIndex = 0;
+  return markdown.replace(INTERNAL_IMAGE_REF_RE, (_full, altRaw, urlPartRaw) => {
+    const alt = altRaw ? String(altRaw) : '';
+    const urlPart = urlPartRaw ? String(urlPartRaw) : '';
+    const url = stripAngleBrackets(urlPart);
+    const shouldReplace = isDataImageUrl(url) || parseSyncnosAssetId(url) != null;
+    if (!shouldReplace) return _full;
+
+    const label = alt && alt.trim() ? `Image: ${alt.trim()}` : 'Image omitted';
+    return `[${label}]`;
+  });
+}
+
 export async function materializeMarkdownAssetPaths(input: { markdown: string; markdownBasename: string }): Promise<string> {
   const markdown = String(input.markdown || '');
   if (!markdown) return '';
@@ -278,8 +295,7 @@ export async function formatConversationMarkdownForExternalOutput(
   detail: ConversationDetail,
 ): Promise<string> {
   const raw = formatConversationMarkdown(conversation, (detail?.messages || []) as any);
-  const basename = buildConversationBasename(conversation as any);
-  return materializeMarkdownAssetPaths({ markdown: raw, markdownBasename: basename });
+  return materializeMarkdownAssetPlaceholders({ markdown: raw });
 }
 
 async function getArticleContent(conversation: Conversation, detail: ConversationDetail): Promise<string> {
@@ -291,8 +307,7 @@ async function getArticleContent(conversation: Conversation, detail: Conversatio
   const messages = Array.isArray(detail?.messages) ? detail.messages : [];
   const primary = messages[0] as any;
   const markdown = String(primary?.contentMarkdown || primary?.contentText || '');
-  const basename = buildConversationBasename(conversation as any);
-  return materializeMarkdownAssetPaths({ markdown, markdownBasename: basename });
+  return materializeMarkdownAssetPlaceholders({ markdown });
 }
 
 export function renderChatWithTemplate(template: string, vars: Record<string, string>): string {

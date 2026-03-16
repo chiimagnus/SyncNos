@@ -5,6 +5,19 @@ import { getImageCacheAssetById } from '../../conversations/data/image-cache-rea
 
 type BubbleRole = 'user' | 'assistant' | 'other';
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 function normalizeRole(role: unknown): BubbleRole {
   const r = String(role || '').trim().toLowerCase();
   if (!r) return 'other';
@@ -59,6 +72,7 @@ export function ChatMessageBubble({
 
     let disposed = false;
     const objectUrls: string[] = [];
+    const cleanupListeners: Array<() => void> = [];
 
     async function hydrateAssetImages() {
       try {
@@ -66,9 +80,38 @@ export function ChatMessageBubble({
           // eslint-disable-next-line no-await-in-loop
           const asset = await getImageCacheAssetById({ id: assetId, conversationId });
           if (!asset || disposed) continue;
-          const objectUrl = URL.createObjectURL(asset.blob);
-          objectUrls.push(objectUrl);
-          for (const node of targetNodes) node.src = objectUrl;
+          let objectUrl: string | null = null;
+          try {
+            objectUrl = URL.createObjectURL(asset.blob);
+            objectUrls.push(objectUrl);
+            for (const node of targetNodes) node.src = objectUrl;
+          } catch (_e) {
+            objectUrl = null;
+          }
+
+          if (!objectUrl || !targetNodes.length) {
+            // eslint-disable-next-line no-await-in-loop
+            const dataUrl = await blobToDataUrl(asset.blob);
+            if (disposed) continue;
+            for (const node of targetNodes) node.src = dataUrl;
+            continue;
+          }
+
+          // If the blob URL fails to load (e.g. CSP blocks `blob:`), fall back to a `data:` URL.
+          const first = targetNodes[0]!;
+          let fallbackTriggered = false;
+          const onError = () => {
+            if (disposed || fallbackTriggered) return;
+            fallbackTriggered = true;
+            void blobToDataUrl(asset.blob)
+              .then((dataUrl) => {
+                if (disposed) return;
+                for (const node of targetNodes) node.src = dataUrl;
+              })
+              .catch(() => {});
+          };
+          first.addEventListener('error', onError, { once: true });
+          cleanupListeners.push(() => first.removeEventListener('error', onError));
         }
       } catch (error) {
         console.warn('[ImageAssetRender] failed to hydrate local asset images', {
@@ -80,6 +123,7 @@ export function ChatMessageBubble({
     void hydrateAssetImages();
     return () => {
       disposed = true;
+      for (const fn of cleanupListeners) fn();
       for (const objectUrl of objectUrls) URL.revokeObjectURL(objectUrl);
     };
   }, [html, conversationId]);
