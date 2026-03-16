@@ -70,6 +70,7 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
 ### 先判断产品线
 
 - 开始任何仓库级理解、规划、评审或文档改动前，先读 `.github/deepwiki/business-context.md`；需要继续展开时，再从 `.github/deepwiki/INDEX.md` 进入对应专题页。
+- 一般情况下不需要全量通读 `.github/deepwiki/`；按 `.github/deepwiki/INDEX.md` 导航到最小必要页面即可。
 - 修改 `macOS/` 时，优先查看 `.github/deepwiki/modules/syncnos-app.md`、`macOS/SyncNos/AGENTS.md`、对应服务层 `AGENTS.md` 与业务文档，按 MVVM + 协议注入边界落点修改。
 - 修改 `webclipper/` 时，优先查看 `.github/deepwiki/modules/webclipper.md`、`webclipper/AGENTS.md`，先确认变更属于 `background`、`content`、`popup` 还是 `app`。
 - 若改动影响共享业务说明或仓库级入口文档，代码确认后同步更新相关 `AGENTS.md`、`.github/deepwiki/INDEX.md`、`.github/deepwiki/business-context.md` 与 `README.md`。
