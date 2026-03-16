@@ -7,7 +7,7 @@ Never lose an AI conversation or a great article again.
 11+ AI platforms + any web article — auto-captured in the background, stored locally first.
 One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
-[SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · English · [中文](README.zh-CN.md)
+[SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
 
 [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
 [![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Ffjkobfponhpmhfnieakdgfbclbhfodkf&query=%24.version&label=Edge%20Add-ons&color=blue)](https://microsoftedge.microsoft.com/addons/detail/syncnos-webclipper/fjkobfponhpmhfnieakdgfbclbhfodkf)
@@ -28,9 +28,9 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
 ---
 
-## Install
+## Download & Install
 
-| Browser | Download |
+| Channel | Download |
 | --- | --- |
 | Chrome | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
 | Edge | [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) |
@@ -71,7 +71,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 
 ---
 
-## Sync Targets
+## Output Targets
 
 | Target | Details |
 | --- | --- |
@@ -81,9 +81,9 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 
 ---
 
-## Features
+## Core Capabilities
 
-- **Background auto-capture** — opens a supported site, starts capturing. No manual action needed (with a few exceptions).
+- **Background auto-capture** — open a supported site and capturing starts automatically. No manual action needed (with a few exceptions).
 - **Local-first storage** — all content lands in IndexedDB before going anywhere else.
 - **Incremental sync** — precise cursor tracking. Only new messages and articles get synced.
 - **Insight dashboard** — total clips, source breakdown, longest conversations — see your knowledge accumulate.
@@ -97,7 +97,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 
 ## Screenshots
 
-<!-- Update with your latest screenshots -->
+<!-- Keep your screenshots here; update as needed -->
 
 WebClipper Popup: save and browse conversations
 ![WebClipper Popup](.github/deepwiki/assets/popup-screenshots.png)
@@ -107,13 +107,16 @@ WebClipper Settings: backup and sync (Notion / Obsidian)
 
 ---
 
-## macOS App (Archived)
+## Support
 
-> **⚠️ The macOS App is no longer maintained. Source code is kept in the `macOS/` directory for reference.**
->
-> The original macOS App synced reading highlights from Apple Books, WeRead, GoodLinks, and Dedao to Notion.
-> You can still download the last published version from the [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888), but no further updates will be made.
+SyncNos is a one-person project, built with care.
+
+If you'd like to sponsor me, I have a small request: **don't just send money — leave a message.**
+Tell me why you use SyncNos, share a story, or simply say "keep going".
+
+What keeps me going isn't the money — it's knowing someone cares.
+What connects us is emotion, not a transaction.
+
+<img src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus tip jar QR" width="180" />
 
 ---
-
-## Development
