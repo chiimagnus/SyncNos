@@ -115,6 +115,7 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
    - `webclipper/src/ui/AGENTS.md`
    - `README.zh-CN.md`
 4. 未被明确要求时，不要查看或编辑国际化字段。
+5. 对版本号、DB 版本、权限、迁移等易过期事实，优先在 deepwiki 维护单一权威描述；其他入口文档只保留导航与原则，避免多处写死造成漂移。
 
 ## 常用命令
 

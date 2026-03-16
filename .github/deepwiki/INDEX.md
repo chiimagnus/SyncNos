@@ -3,15 +3,8 @@
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
 - **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
-- **近期关键变化（v1.3.2）**：WebClipper 版本事实源更新到 `wxt.config.ts` 的 `manifest.version = 1.3.2`；商店 workflow 仍以它和 tag 对齐。
-- **列表统计交互变化**：会话列表底部的 `today / total` 统计在 popup 与 app 中都可作为入口，直接跳到 `Settings?section=insight`。
-- **安装/升级行为变化**：扩展仅在首次安装自动打开 About 分区；升级后不再自动打开设置页，避免打断现有工作流。
-- **采集稳定性变化**：Gemini 进一步过滤隐藏说话人/状态文案并增强 blob 图片内联；Kimi 与 z.ai 补齐用户上传附件图片抓取范围。
-- **详情页动作变化**：Conversation detail header 现在会根据启用的平台动态暴露多个 `Chat with <platform>` 动作；动作会先把渲染后的 payload 复制到剪贴板，再跳转目标 AI 站点。
-- **详情工具动作变化（2026-03-14）**：chat detail 新增 `cache-images` 工具动作；该动作通过 `BACKFILL_CONVERSATION_IMAGES` 回填历史消息图片，并在 popup/app 窄屏 `DetailNavigationHeader` 与主详情页保持一致的槽位行为。
-- **移动/窄屏行为变化**：会话列表来源筛选会写入 `localStorage`；从 Insight / 列表跳详情时，窄屏路由通过 `sessionStorage` bridge 把目标会话带到 detail 页。
-- **筛选下拉可视区域变化（2026-03-14）**：会话列表底部 `source/site` 筛选菜单改为 `adaptiveMaxHeight`；`SelectMenu` 会通过 `findNearestClippingRect` 查找最近可裁剪容器并动态计算 `panelMaxHeight`，减少底部区域的多余滚动条与菜单裁切。
 - **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
+- **稳定事实源**：版本、权限、配置、迁移规则请以 `wxt.config.ts`、`schema.ts`、workflow 与脚本为准；本索引不再保留按日期堆叠的变更流水。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
 | 维度 | 主入口页面 | 你会得到什么 |

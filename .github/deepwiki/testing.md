@@ -34,7 +34,7 @@
 | 文件 | 验证点 | 为什么重要 |
 | --- | --- | --- |
 | `tests/unit/notion-sync-cursor.test.ts` | Notion cursor 的 append / rebuild 判断 | 直接决定是否会重复写入或错误重建 |
-| `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 迁移：NotionAI stable key 与 article canonical key 归并 | 直接关系到旧数据升级与 mapping 延续 |
+| `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 / v6 迁移：NotionAI stable key、article canonical key 归并与 legacy 字段清理 | 直接关系到旧数据升级与 mapping 延续 |
 | `tests/storage/conversations-idb.test.ts` | conversations / messages 的本地持久化 | 确认 UI 和同步层读到的事实源正确 |
 | `tests/storage/insight-stats.test.ts` | Insight 聚合：空库、chat/article 混合、Unknown 域名、Top N 折叠、Top 3 对话排序 | 防止本地统计页把“事实源”算错或把尾部来源错误归桶 |
 | `tests/unit/markdown-renderer.test.ts` | 消息渲染与 markdown 输出 | 防止 UI 与导出文本回归 |
@@ -58,7 +58,7 @@
 
 | 检查项 | 先看哪里 | 期望 |
 | --- | --- | --- |
-| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | tag 去掉 `v` 后与 `1.3.2` 对齐 |
+| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | tag 去掉 `v` 后与 `1.3.3` 对齐 |
 | Chrome / Firefox 构建均可通过 | `package.json` scripts | `build` / `build:firefox` 成功 |
 | dist 引用完整 | `check-dist.mjs` | `npm run check` 通过 |
 | AMO / CWS 凭据 | workflow secrets | 发布 workflow 不因凭据缺失失败 |

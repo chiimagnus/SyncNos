@@ -60,14 +60,13 @@
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
-- 最近 collector 稳定性修复把 Gemini 的隐藏说话人/隐藏状态文案从正文提取里剔除，并补齐 Kimi 与 z.ai 用户上传附件图片抓取，减少“文本被噪音污染”与“附件图丢失”。
 
 ## 本地数据与同步结构
 
 | 区域 | 主要实现 | 关键点 |
 | --- | --- | --- |
 | 本地会话库 | `storage-idb.ts` | `upsertConversation()` / `syncConversationMessages()` 负责 conversation + message 快照更新 |
-| Schema 与迁移 | `schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=4`，同时处理 NotionAI stable key 与 legacy article canonical key 迁移 |
+| Schema 与迁移 | `schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=6`，处理 NotionAI stable key、legacy article canonical key 迁移与 legacy 字段清理 |
 | 会话种类 | `conversation-kinds.ts` | `chat` 与 `article` 决定 Notion DB、Obsidian folder 与重建规则 |
 | Notion 同步 | `notion-sync-orchestrator.ts` | 需要 token + `notion_parent_page_id`，cursor 命中 append，否则 rebuild |
 | Obsidian 同步 | `obsidian-sync-orchestrator.ts` | 支持 `incremental_append`、`full_rebuild`、rename；PATCH 失败回退 `full_rebuild_fallback` |
@@ -76,7 +75,7 @@
 - article 会话通过 `sourceType='article'` 标记，并保存单条 `article_body` 正文消息。
 - Notion orchestrator 会按 kind 选择 `SyncNos-AI Chats` 或 `SyncNos-Web Articles` 数据库，并在数据库缓存失效时尝试恢复一次。
 - Obsidian orchestrator 在 patch 失败时不是直接报错，而是尽量回退全量重建，优先保证文件最终可恢复到正确状态。
-- `schema.ts` 的 v4 升级不仅加版本号，还会把 legacy article 会话按 canonical URL 归并到稳定 key，避免 “当前页抓取 / article 导入” 在历史版本升级后生成重复 conversation。
+- `schema.ts` 的升级链路采用 `oldVersion < 2 / < 4 / < 6` 分段处理：分别覆盖 NotionAI key 归一、article canonical 归并与 `conversations.description` 旧字段清理。
 
 ## 设置与 UI 入口
 

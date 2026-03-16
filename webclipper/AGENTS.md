@@ -30,6 +30,7 @@
 - 备份导入入口统一在 `Settings -> Data -> Backup`（含 Firefox popup）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 - 对话删除必须显式二次确认，避免误删。
+- 版本号、DB schema 版本、迁移链路等事实以 `wxt.config.ts`、`schema.ts` 和 workflow 为准；文档优先保留稳定边界，避免多处写死临时版本信息。
 - 外观主题使用 `ui_theme_mode`（`system / light / dark`）持久化到 `chrome.storage.local`；popup 与 app 统一通过 `src/ui/shared/hooks/useThemeMode.ts` 应用 `data-theme` 覆盖，禁止在单个页面里偷偷做另一套主题切换状态。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
 - inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。

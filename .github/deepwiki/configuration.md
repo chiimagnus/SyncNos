@@ -28,7 +28,7 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.3.2` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.3.3` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
 | 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
@@ -85,7 +85,7 @@
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
-  version: '1.3.2',
+  version: '1.3.3',
   permissions: ['storage', 'contextMenus', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
