@@ -97,7 +97,10 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     const titleAttr = titleRaw ? ` title="${inst.utils.escapeHtml(titleRaw)}"` : '';
     const assetId = parseSyncnosAssetId(safeSrc);
     if (assetId) {
-      return `<img src="about:blank" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
+      // Use a tiny valid image as the initial src to avoid noisy `about:blank` console errors.
+      const placeholderSrc =
+        'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+      return `<img src="${placeholderSrc}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
     }
 
     const escapedSrc = inst.utils.escapeHtml(safeSrc);

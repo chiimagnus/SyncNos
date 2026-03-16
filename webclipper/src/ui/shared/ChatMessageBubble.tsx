@@ -52,6 +52,7 @@ export function ChatMessageBubble({
   const markdownRef = useRef<HTMLDivElement | null>(null);
 
   const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
+  const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
   useEffect(() => {
     const root = markdownRef.current;
@@ -241,7 +242,7 @@ export function ChatMessageBubble({
       <div
         ref={markdownRef}
         className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={innerHtml}
       />
     </section>
   );
