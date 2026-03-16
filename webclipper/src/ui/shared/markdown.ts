@@ -97,10 +97,15 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     const titleAttr = titleRaw ? ` title="${inst.utils.escapeHtml(titleRaw)}"` : '';
     const assetId = parseSyncnosAssetId(safeSrc);
     if (assetId) {
-      // Use a tiny valid image as the initial src to avoid noisy `about:blank` console errors.
-      const placeholderSrc =
-        'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-      return `<img src="${placeholderSrc}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
+      const envMap = env && typeof env === 'object' ? (env as any).syncnosAssetSrcById : null;
+      const resolved =
+        envMap && (typeof envMap.get === 'function' ? envMap.get(assetId) : (envMap as any)[assetId]);
+      const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
+      // Use a tiny valid image as fallback to avoid noisy console errors.
+      const placeholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+      const finalSrc = safeResolved || placeholderSrc;
+      const escapedFinal = inst.utils.escapeHtml(finalSrc);
+      return `<img src="${escapedFinal}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
     }
 
     const escapedSrc = inst.utils.escapeHtml(safeSrc);

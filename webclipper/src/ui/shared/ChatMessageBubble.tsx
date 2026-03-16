@@ -1,9 +1,44 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from './markdown';
 import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
 
 type BubbleRole = 'user' | 'assistant' | 'other';
+
+const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
+
+function stripAngleBrackets(url: string): string {
+  const text = String(url || '').trim();
+  if (text.startsWith('<') && text.endsWith('>')) return text.slice(1, -1).trim();
+  return text;
+}
+
+function parseSyncnosAssetId(url: unknown): number | null {
+  const text = String(url || '').trim();
+  const matched = /^syncnos-asset:\/\/(\d+)$/i.exec(text);
+  if (!matched) return null;
+  const id = Number(matched[1]);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
+}
+
+function collectOrderedSyncnosAssetIds(markdown: string): number[] {
+  const raw = String(markdown || '');
+  if (!raw) return [];
+  MARKDOWN_IMAGE_RE.lastIndex = 0;
+  const seen = new Set<number>();
+  const out: number[] = [];
+  let match: RegExpExecArray | null = null;
+  while ((match = MARKDOWN_IMAGE_RE.exec(raw)) != null) {
+    const urlPart = match[2] ? String(match[2]) : '';
+    const assetId = parseSyncnosAssetId(stripAngleBrackets(urlPart));
+    if (!assetId) continue;
+    if (seen.has(assetId)) continue;
+    seen.add(assetId);
+    out.push(assetId);
+  }
+  return out;
+}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -51,83 +86,62 @@ export function ChatMessageBubble({
   const bubbleRole = normalizeRole(role);
   const markdownRef = useRef<HTMLDivElement | null>(null);
 
-  const html = useMemo(() => sharedMd.render(String(markdown || '')), [markdown]);
-  const innerHtml = useMemo(() => ({ __html: html }), [html]);
+  const [assetSrcById, setAssetSrcById] = useState<Map<number, string>>(() => new Map());
 
   useEffect(() => {
-    const root = markdownRef.current;
-    if (!root) return;
-
-    const nodes = Array.from(root.querySelectorAll<HTMLImageElement>('img[data-syncnos-asset-id]'));
-    if (!nodes.length) return;
-
-    const groupedNodes = new Map<number, HTMLImageElement[]>();
-    for (const node of nodes) {
-      const id = Number(node.dataset.syncnosAssetId);
-      if (!Number.isFinite(id) || id <= 0) continue;
-      const list = groupedNodes.get(id) || [];
-      list.push(node);
-      groupedNodes.set(id, list);
+    const ids = collectOrderedSyncnosAssetIds(String(markdown || ''));
+    if (!ids.length) {
+      setAssetSrcById(new Map());
+      return;
     }
-    if (!groupedNodes.size) return;
 
     let disposed = false;
     const objectUrls: string[] = [];
-    const cleanupListeners: Array<() => void> = [];
 
-    async function hydrateAssetImages() {
+    async function resolveAssets() {
+      const next = new Map<number, string>();
       try {
-        for (const [assetId, targetNodes] of groupedNodes.entries()) {
+        for (const id of ids) {
           // eslint-disable-next-line no-await-in-loop
-          const asset = await getImageCacheAssetById({ id: assetId, conversationId });
+          const asset = await getImageCacheAssetById({ id, conversationId });
           if (!asset || disposed) continue;
-          let objectUrl: string | null = null;
+          let url: string | null = null;
           try {
-            objectUrl = URL.createObjectURL(asset.blob);
-            objectUrls.push(objectUrl);
-            for (const node of targetNodes) node.src = objectUrl;
+            url = URL.createObjectURL(asset.blob);
+            objectUrls.push(url);
           } catch (_e) {
-            objectUrl = null;
+            url = null;
           }
-
-          if (!objectUrl || !targetNodes.length) {
+          if (!url) {
             // eslint-disable-next-line no-await-in-loop
             const dataUrl = await blobToDataUrl(asset.blob);
             if (disposed) continue;
-            for (const node of targetNodes) node.src = dataUrl;
-            continue;
+            url = dataUrl;
           }
-
-          // If the blob URL fails to load (e.g. CSP blocks `blob:`), fall back to a `data:` URL.
-          const first = targetNodes[0]!;
-          let fallbackTriggered = false;
-          const onError = () => {
-            if (disposed || fallbackTriggered) return;
-            fallbackTriggered = true;
-            void blobToDataUrl(asset.blob)
-              .then((dataUrl) => {
-                if (disposed) return;
-                for (const node of targetNodes) node.src = dataUrl;
-              })
-              .catch(() => {});
-          };
-          first.addEventListener('error', onError, { once: true });
-          cleanupListeners.push(() => first.removeEventListener('error', onError));
+          if (url) next.set(id, url);
         }
       } catch (error) {
-        console.warn('[ImageAssetRender] failed to hydrate local asset images', {
+        console.warn('[ImageAssetRender] failed to resolve local asset urls', {
           error: error instanceof Error ? error.message : String(error || ''),
         });
       }
+      if (!disposed) setAssetSrcById(next);
     }
 
-    void hydrateAssetImages();
+    void resolveAssets();
     return () => {
       disposed = true;
-      for (const fn of cleanupListeners) fn();
       for (const objectUrl of objectUrls) URL.revokeObjectURL(objectUrl);
     };
-  }, [html, conversationId]);
+  }, [markdown, conversationId]);
+
+  const html = useMemo(() => {
+    return sharedMd.render(String(markdown || ''), { syncnosAssetSrcById: assetSrcById } as any);
+  }, [markdown, assetSrcById]);
+  const innerHtml = useMemo(() => ({ __html: html }), [html]);
+
+  // NOTE: asset URLs are resolved before render via markdown-it env;
+  // no post-render DOM hydration is needed, which avoids re-render race conditions.
 
   const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[12px] tw-p-3 tw-shadow-none';
 
