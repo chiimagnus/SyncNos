@@ -488,5 +488,42 @@ export async function extractZipEntries(blob: Blob): Promise<Map<string, Uint8Ar
     entries.set(name, data);
   }
 
+  // User-facing resilience: some zip tools add a top-level folder when re-zipping extracted backups
+  // (e.g. `SyncNos-Backup-xxxx/manifest.json`). Backup import expects `manifest.json` at the root.
+  if (!entries.has('manifest.json')) {
+    const manifestCandidates: string[] = [];
+    for (const name of entries.keys()) {
+      if (!name.endsWith('/manifest.json')) continue;
+      if (name.indexOf('/') <= 0) continue;
+      manifestCandidates.push(name);
+    }
+
+    if (manifestCandidates.length) {
+      manifestCandidates.sort((a, b) => {
+        const aDepth = a.split('/').length;
+        const bDepth = b.split('/').length;
+        if (aDepth !== bDepth) return aDepth - bDepth;
+        return a.length - b.length;
+      });
+
+      const chosen = manifestCandidates[0]!;
+      const prefix = chosen.slice(0, chosen.length - 'manifest.json'.length);
+      if (prefix && prefix.endsWith('/')) {
+        const normalized = new Map<string, Uint8Array>();
+        for (const [name, fileBytes] of entries.entries()) {
+          if (name.startsWith(prefix)) {
+            const stripped = name.slice(prefix.length);
+            if (!stripped) continue;
+            // Prefer stripped names to ensure backup files are reachable by import paths.
+            normalized.set(stripped, fileBytes);
+            continue;
+          }
+          if (!normalized.has(name)) normalized.set(name, fileBytes);
+        }
+        if (normalized.has('manifest.json')) return normalized;
+      }
+    }
+  }
+
   return entries;
 }
