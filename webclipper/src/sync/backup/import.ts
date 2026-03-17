@@ -352,12 +352,19 @@ export async function importBackupZipV2Merge(
   const seenUnique = new Set<string>();
   let totalMessages = 0;
 
+  const loadedBundleEntryNames = new Set<string>();
+  const missingBundleEntryNames: string[] = [];
+
   for (const filePath of convoFiles) {
     if (!filePath) continue;
     // Resilience: some user-edited / corrupted zips may have a manifest that references missing bundles.
     // Prefer importing the rest of the backup instead of hard-failing the entire import.
     const bundleBytes = entries.get(filePath);
-    if (!bundleBytes) continue;
+    if (!bundleBytes) {
+      missingBundleEntryNames.push(filePath);
+      continue;
+    }
+    loadedBundleEntryNames.add(filePath);
     const bundle = JSON.parse(decodeUtf8(bundleBytes));
     const bundleValidation = validateConversationBundle(bundle);
     if (!bundleValidation.ok) {
@@ -376,6 +383,49 @@ export async function importBackupZipV2Merge(
 
     incomingConversations.push(convo);
     if ((bundle as any).syncMapping) incomingMappings.push((bundle as any).syncMapping);
+  }
+
+  // Backward-compat resilience: older backup zips may have non-ASCII bundle filenames encoded without the UTF-8 flag,
+  // which makes unzip libraries decode entry names as mojibake. In that case, manifest-declared paths won't match
+  // the actual zip entry names, so we would incorrectly skip most bundles.
+  //
+  // If the manifest references missing bundles, fall back to scanning all `sources/**/*.json` entries that validate
+  // as conversation bundles.
+  if (missingBundleEntryNames.length) {
+    const fallbackCandidates: string[] = [];
+    for (const name of entries.keys()) {
+      if (!name) continue;
+      if (!name.startsWith('sources/')) continue;
+      if (!name.endsWith('.json')) continue;
+      if (loadedBundleEntryNames.has(name)) continue;
+      fallbackCandidates.push(name);
+    }
+
+    for (const name of fallbackCandidates) {
+      const bytes = entries.get(name);
+      if (!bytes) continue;
+      let bundle: any;
+      try {
+        bundle = JSON.parse(decodeUtf8(bytes));
+      } catch (_e) {
+        continue;
+      }
+      const bundleValidation = validateConversationBundle(bundle);
+      if (!bundleValidation.ok) continue;
+
+      const convo = bundle.conversation;
+      const uk = uniqueConversationKey(convo);
+      if (!uk) continue;
+      if (seenUnique.has(uk)) throw new Error('Duplicate conversation key in zip');
+      seenUnique.add(uk);
+
+      const msgs = Array.isArray(bundle.messages) ? bundle.messages : [];
+      messagesByUniqueKey.set(uk, msgs);
+      totalMessages += msgs.length;
+
+      incomingConversations.push(convo);
+      if (bundle.syncMapping) incomingMappings.push(bundle.syncMapping);
+    }
   }
 
   const stats = makeStats();

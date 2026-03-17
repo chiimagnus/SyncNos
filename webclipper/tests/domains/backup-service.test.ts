@@ -487,6 +487,55 @@ describe('backup service', () => {
     expect(convs.length).toBe(1);
   });
 
+  it('importBackupZipV2Merge recovers bundles when manifest paths do not match zip entry names', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    const manifest = {
+      backupSchemaVersion: 2,
+      exportedAt: '2026-03-17T00:00:00.000Z',
+      db: { name: 'webclipper', version: 1 },
+      counts: { conversations: 1, messages: 1, sync_mappings: 0 },
+      config: { storageLocalPath: 'config/storage-local.json' },
+      index: { conversationsCsvPath: 'sources/conversations.csv' },
+      sources: [{ source: 'notionai', conversationCount: 1, files: ['sources/notionai/notionai-打招呼-abc.json'] }],
+    };
+
+    const bundle = {
+      schemaVersion: 1,
+      conversation: {
+        sourceType: 'chat',
+        source: 'notionai',
+        conversationKey: 'c1',
+        title: '打招呼',
+        url: 'https://x',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      },
+      messages: [{ messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 }],
+      syncMapping: null,
+    };
+
+    // Simulate older zips where non-ASCII filenames were encoded without the UTF-8 flag:
+    // the bundle exists, but under a different decoded entry name than the manifest-declared path.
+    const entries = new Map<string, Uint8Array>();
+    const enc = new TextEncoder();
+    entries.set('manifest.json', enc.encode(JSON.stringify(manifest)));
+    entries.set('config/storage-local.json', enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} })));
+    entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
+    entries.set('sources/notionai/notionai-µëôµï¢σæ╝-abc.json', enc.encode(JSON.stringify(bundle)));
+
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.conversationsAdded).toBe(1);
+    expect(stats.messagesAdded).toBe(1);
+  });
+
   it('importBackupLegacyJsonMerge merges into IndexedDB and applies allowlisted settings only', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
