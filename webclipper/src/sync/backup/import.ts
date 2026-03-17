@@ -356,8 +356,9 @@ export async function importBackupZipV2Merge(
     if (!filePath) continue;
     // Resilience: some user-edited / corrupted zips may have a manifest that references missing bundles.
     // Prefer importing the rest of the backup instead of hard-failing the entire import.
-    if (!entries.has(filePath)) continue;
-    const bundle = readJsonEntry(entries, filePath);
+    const bundleBytes = entries.get(filePath);
+    if (!bundleBytes) continue;
+    const bundle = JSON.parse(decodeUtf8(bundleBytes));
     const bundleValidation = validateConversationBundle(bundle);
     if (!bundleValidation.ok) {
       throw new Error(bundleValidation.error || `Invalid conversation bundle: ${filePath}`);
