@@ -49,25 +49,33 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function getTurnWrappers(root: any): any {
     const scope = root || env.document;
-    const uniqueNodes = new Set();
-
-    scope.querySelectorAll("div[data-testid='conversation-turn']").forEach((el: any) => uniqueNodes.add(el));
-    scope.querySelectorAll('[data-message-author-role]').forEach((el: any) => uniqueNodes.add(el));
-    scope.querySelectorAll('.agent-turn').forEach((el: any) => uniqueNodes.add(el));
-
-    const sorted: any[] = Array.from(uniqueNodes) as any[];
     const DOCUMENT_POSITION_FOLLOWING = env.window?.Node?.DOCUMENT_POSITION_FOLLOWING ?? 4;
-    sorted.sort((a: any, b: any) => {
-      if (a === b) return 0;
-      return a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-    });
 
-    const finalNodes: any[] = [];
-    for (const node of sorted) {
-      const isChild = finalNodes.some((parent: any) => parent.contains(node));
-      if (!isChild) finalNodes.push(node);
+    function sortInDocumentOrder(nodes: any[]): any[] {
+      const sorted = nodes.slice();
+      sorted.sort((a: any, b: any) => {
+        if (a === b) return 0;
+        return a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+      return sorted;
     }
-    return finalNodes;
+
+    function dropAncestors(nodes: any[]): any[] {
+      if (!nodes.length) return nodes;
+      return nodes.filter((node: any) => !nodes.some((other: any) => other !== node && node.contains(other)));
+    }
+
+    // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple
+    // assistant messages inside a single `.agent-turn` container; keeping `.agent-turn`
+    // as the wrapper would only capture the first message.
+    const roleNodes = Array.from(scope.querySelectorAll('[data-message-author-role]')) as any[];
+    if (roleNodes.length) return sortInDocumentOrder(dropAncestors(roleNodes));
+
+    const turnNodes = Array.from(scope.querySelectorAll("div[data-testid='conversation-turn']")) as any[];
+    if (turnNodes.length) return sortInDocumentOrder(dropAncestors(turnNodes));
+
+    const agentTurnNodes = Array.from(scope.querySelectorAll('.agent-turn')) as any[];
+    return sortInDocumentOrder(dropAncestors(agentTurnNodes));
   }
 
   function roleFromWrapper(wrapper: any): any {
