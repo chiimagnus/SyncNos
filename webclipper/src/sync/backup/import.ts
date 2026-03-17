@@ -354,6 +354,9 @@ export async function importBackupZipV2Merge(
 
   for (const filePath of convoFiles) {
     if (!filePath) continue;
+    // Resilience: some user-edited / corrupted zips may have a manifest that references missing bundles.
+    // Prefer importing the rest of the backup instead of hard-failing the entire import.
+    if (!entries.has(filePath)) continue;
     const bundle = readJsonEntry(entries, filePath);
     const bundleValidation = validateConversationBundle(bundle);
     if (!bundleValidation.ok) {
@@ -377,7 +380,7 @@ export async function importBackupZipV2Merge(
   const stats = makeStats();
   const progress: ImportProgress = {
     done: 0,
-    total: convoFiles.length + totalMessages + incomingMappings.length + settingsKeys.length + imageCacheAssets.length,
+    total: incomingConversations.length + totalMessages + incomingMappings.length + settingsKeys.length + imageCacheAssets.length,
     stage: '',
   };
   const report = () => onProgress?.({ ...progress });
