@@ -28,6 +28,10 @@ export const ARTICLE_MESSAGE_TYPES = {
   FETCH_ACTIVE_TAB: 'fetchActiveTabArticle',
 } as const;
 
+export const CHATGPT_MESSAGE_TYPES = {
+  EXTRACT_DEEP_RESEARCH: 'chatgptExtractDeepResearch',
+} as const;
+
 export const CURRENT_PAGE_MESSAGE_TYPES = {
   GET_CAPTURE_STATE: 'getCurrentPageCaptureState',
   CAPTURE: 'captureCurrentPage',
@@ -52,6 +56,7 @@ export const messageContracts = {
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
+  CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
   UI_EVENT_TYPES,
@@ -62,6 +67,7 @@ export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[keyof typeof CORE_MESS
 export type NotionMessageType = (typeof NOTION_MESSAGE_TYPES)[keyof typeof NOTION_MESSAGE_TYPES];
 export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof OBSIDIAN_MESSAGE_TYPES];
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
+export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
 export type UiMessageType = (typeof UI_MESSAGE_TYPES)[keyof typeof UI_MESSAGE_TYPES];
 export type UiEventType = (typeof UI_EVENT_TYPES)[keyof typeof UI_EVENT_TYPES];
@@ -72,5 +78,6 @@ export type MessageType =
   | NotionMessageType
   | ObsidianMessageType
   | ArticleMessageType
+  | ChatgptMessageType
   | CurrentPageMessageType
   | UiMessageType;

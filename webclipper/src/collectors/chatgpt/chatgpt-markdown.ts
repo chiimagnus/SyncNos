@@ -126,27 +126,113 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
     return String(text || "").replace(/\|/g, "\\|");
   }
 
-  function removeNonContentNodes(container: any): any {
-    if (!container || !container.querySelectorAll) return container;
+	  function removeNonContentNodes(container: any): any {
+	    if (!container || !container.querySelectorAll) return container;
 
-    container.querySelectorAll("button, svg, path, textarea, input, select, option, script, style").forEach((el: any) => {
-      try {
-        el.remove();
-      } catch (_e) {
-        // ignore
-      }
-    });
+	    function looksLikeMermaidSource(text: string): boolean {
+	      const s = String(text || "").trim();
+	      if (!s || s.length < 12) return false;
+	      return /\b(graph\s+(TD|LR|RL|BT)|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt)\b/i.test(s);
+	    }
 
-    container.querySelectorAll(".sr-only, [aria-hidden='true']").forEach((el: any) => {
-      try {
-        el.remove();
-      } catch (_e) {
-        // ignore
-      }
-    });
+	    function shouldKeepHiddenNode(el: any): boolean {
+	      if (!el) return false;
+	      const text = String(el.textContent || "").trim();
+	      if (text.includes("\n")) return true;
+	      if (text.length >= 120) return true;
+	      if (looksLikeMermaidSource(text)) return true;
 
-    return container;
-  }
+	      // Many rich-code/diagram components keep the raw source in hidden/sr-only nodes.
+	      // Keep those nodes when they are clearly part of a code/diagram container.
+	      try {
+	        const keepSelectors = [
+	          "pre",
+	          "code",
+	          "#code-block-viewer",
+	          "[data-code-block]",
+	          "[data-language]",
+	          "[data-code-language]",
+	          ".cm-content",
+	          ".cm-line",
+	          ".mermaid",
+	          "[data-testid*='code' i]",
+	        ];
+	        const selector = keepSelectors.join(",");
+	        if (typeof el.closest === "function" && el.closest(selector)) return true;
+	      } catch (_e) {
+	        // ignore
+	      }
+
+	      return false;
+	    }
+
+	    container.querySelectorAll("svg, path, input, select, option, script, style").forEach((el: any) => {
+	      try {
+	        el.remove();
+	      } catch (_e) {
+	        // ignore
+	      }
+	    });
+
+	    container.querySelectorAll("button").forEach((el: any) => {
+	      try {
+	        const candidates = [
+	          String(el.getAttribute ? el.getAttribute("data-clipboard-text") || "" : ""),
+	          String(el.getAttribute ? el.getAttribute("data-copy-text") || "" : ""),
+	          String(el.getAttribute ? el.getAttribute("data-code") || "" : ""),
+	          String(el.getAttribute ? el.getAttribute("data-source") || "" : ""),
+	          String(el.getAttribute ? el.getAttribute("data-mermaid") || "" : ""),
+	          String(el.getAttribute ? el.getAttribute("data-mermaid-source") || "" : "")
+	        ].filter(Boolean);
+	        const picked = candidates.find((s: string) => s && (s.includes("\n") || s.length > 160)) || "";
+	        const code = String(picked || "").replace(/\r\n?/g, "\n").replace(/\n+$/g, "");
+	        if (code && (code.includes("\n") || code.length > 120)) {
+	          const doc = container.ownerDocument || document;
+	          const pre = doc && doc.createElement ? doc.createElement("pre") : null;
+	          const codeEl = pre && pre.appendChild ? doc.createElement("code") : null;
+	          if (pre && codeEl) {
+	            if (looksLikeMermaidSource(code)) codeEl.setAttribute("class", "language-mermaid");
+	            codeEl.textContent = code;
+	            pre.appendChild(codeEl);
+	            try {
+	              el.parentNode && el.parentNode.insertBefore(pre, el);
+	            } catch (_e2) {
+	              // ignore
+	            }
+	          }
+	        }
+	      } catch (_e) {
+	        // ignore
+	      }
+	      try {
+	        el.remove();
+	      } catch (_e) {
+	        // ignore
+	      }
+	    });
+
+	    // Some code/diagram components may store the raw source in hidden/readonly textareas.
+	    // Remove them by default to avoid capturing input boxes, but keep when they clearly look like content.
+	    container.querySelectorAll("textarea").forEach((el: any) => {
+	      if (shouldKeepHiddenNode(el)) return;
+	      try {
+	        el.remove();
+	      } catch (_e) {
+	        // ignore
+	      }
+	    });
+
+	    container.querySelectorAll(".sr-only, [aria-hidden='true']").forEach((el: any) => {
+	      if (shouldKeepHiddenNode(el)) return;
+	      try {
+	        el.remove();
+	      } catch (_e) {
+	        // ignore
+	      }
+	    });
+
+	    return container;
+	  }
 
   function getAssistantContentRoot(wrapper: any): any {
     if (!wrapper) return null;
@@ -356,23 +442,34 @@ import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
       return `${out.join("\n")}\n\n`;
     }
 
-    function renderNode(node: any, ctx: any): any {
-      if (!node) return "";
-      if (node.nodeType === TEXT_NODE) return node.nodeValue ? String(node.nodeValue) : "";
-      if (node.nodeType !== ELEMENT_NODE) return "";
+	    function renderNode(node: any, ctx: any): any {
+	      if (!node) return "";
+	      if (node.nodeType === TEXT_NODE) return node.nodeValue ? String(node.nodeValue) : "";
+	      if (node.nodeType !== ELEMENT_NODE) return "";
 
       const tag = node.tagName ? String(node.tagName).toLowerCase() : "";
       if (!tag) return renderChildren(node, ctx);
 
-      if (tag === "br") return "\n";
-      if (tag === "hr") return "\n\n---\n\n";
-      if (tag === "script" || tag === "style" || tag === "svg" || tag === "path" || tag === "button") return "";
+	      if (tag === "br") return "\n";
+	      if (tag === "hr") return "\n\n---\n\n";
+	      if (tag === "script" || tag === "style" || tag === "svg" || tag === "path" || tag === "button") return "";
 
-      if (tag === "pre") {
-        const text = extractPreCodeText(node);
-        if (!text.trim()) return "";
-        const lang = detectCodeLanguage(node);
-        const fence = codeFenceDelimiter(text);
+	      if (tag === "textarea") {
+	        const text = String((node && typeof node.value === "string" ? node.value : node.textContent) || "")
+	          .replace(/\r\n?/g, "\n")
+	          .replace(/\n+$/g, "");
+	        if (!text.trim()) return "";
+	        const isMermaid = /\b(graph\s+(TD|LR|RL|BT)|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt)\b/i.test(text);
+	        const fence = codeFenceDelimiter(text);
+	        const lang = isMermaid ? "mermaid" : "";
+	        return `\n\n${fence}${lang}\n${text}\n${fence}\n\n`;
+	      }
+
+	      if (tag === "pre") {
+	        const text = extractPreCodeText(node);
+	        if (!text.trim()) return "";
+	        const lang = detectCodeLanguage(node);
+	        const fence = codeFenceDelimiter(text);
         return `\n\n${fence}${lang}\n${text}\n${fence}\n\n`;
       }
 

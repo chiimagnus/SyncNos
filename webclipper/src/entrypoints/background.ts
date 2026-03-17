@@ -3,6 +3,7 @@ import { registerConversationHandlers } from '../conversations/background/handle
 import { registerSyncHandlers } from '../sync/background-handlers';
 import { createBackgroundRouter } from '../platform/messaging/background-router';
 import { registerWebArticleHandlers } from '../collectors/web/article-fetch-background-handlers';
+import { registerChatgptDeepResearchHandlers } from '../collectors/chatgpt/chatgpt-deep-research-background-handlers';
 import { registerUiMessageHandlers } from '../platform/messaging/ui-background-handlers';
 import {
   ensureDefaultNotionOAuthClientId,
@@ -38,6 +39,7 @@ export default defineBackground(() => {
 
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
+  registerChatgptDeepResearchHandlers(router);
   registerNotionSettingsHandlers(router, {
     notionSyncJobStore: services.notionSyncJobStore,
     conversationKinds: services.conversationKinds,

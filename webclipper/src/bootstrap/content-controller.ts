@@ -1,6 +1,7 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
 import { t } from '../i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '../collectors/ai-chat-sites';
+import { hydrateChatgptDeepResearchSnapshot } from '../collectors/chatgpt/chatgpt-deep-research-hydrator';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
@@ -151,6 +152,21 @@ export function createContentController(deps: Deps) {
   ) {
     if (!snapshot || !snapshot.conversation) return null;
 
+    if (options?.mode !== 'incremental') {
+      try {
+        const isChatgpt = String(snapshot?.conversation?.source || '').trim().toLowerCase() === 'chatgpt';
+        const hasDeepResearchPlaceholders =
+          isChatgpt &&
+          Array.isArray(snapshot?.messages) &&
+          snapshot.messages.some((m: any) => String(m?.contentText || m?.contentMarkdown || '').trim().startsWith('Deep Research (iframe):'));
+        if (hasDeepResearchPlaceholders) {
+          await hydrateChatgptDeepResearchSnapshot(snapshot, send);
+        }
+      } catch (_e) {
+        // ignore hydration failures
+      }
+    }
+
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: snapshot.conversation,
     });
@@ -178,6 +194,13 @@ export function createContentController(deps: Deps) {
     let stopped = false;
     let manualSaveInFlight = false;
     let observer: { start?: () => void; stop?: () => void } | null = null;
+    let deepResearchHydrateInFlight = false;
+    let deepResearchLastHydrateAttemptAt = 0;
+    let deepResearchPollTimer: ReturnType<typeof setTimeout> | null = null;
+    let deepResearchPollStartedAt = 0;
+    const DEEP_RESEARCH_POLL_INTERVAL_MS = 5_000;
+    const DEEP_RESEARCH_POLL_MAX_DURATION_MS = 3 * 60_000;
+    const DEEP_RESEARCH_HYDRATE_MIN_INTERVAL_MS = 12_000;
     const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
     const hasStorageGet = !!storageApi?.local?.get;
     // Default to enabled when storage API is unavailable (e.g. tests).
@@ -196,10 +219,45 @@ export function createContentController(deps: Deps) {
       if (stopped) return;
       stopped = true;
       inpageButton?.cleanupButtons?.('');
+      if (deepResearchPollTimer) {
+        clearTimeout(deepResearchPollTimer);
+        deepResearchPollTimer = null;
+      }
       observer?.stop?.();
     }
 
     runtime?.onInvalidated?.(() => stop());
+
+    function hasChatgptDeepResearchPlaceholderMessages(snapshot: any): boolean {
+      return (
+        Array.isArray(snapshot?.messages) &&
+        snapshot.messages.some((m: any) =>
+          String(m?.contentText || m?.contentMarkdown || '')
+            .trim()
+            .startsWith('Deep Research (iframe):'),
+        )
+      );
+    }
+
+    function clearDeepResearchPoll() {
+      if (deepResearchPollTimer) {
+        clearTimeout(deepResearchPollTimer);
+        deepResearchPollTimer = null;
+      }
+      deepResearchPollStartedAt = 0;
+    }
+
+    function ensureDeepResearchPoll(handleTick: () => Promise<void>) {
+      if (deepResearchPollTimer) return;
+      const now = Date.now();
+      if (!deepResearchPollStartedAt) deepResearchPollStartedAt = now;
+      if (now - deepResearchPollStartedAt > DEEP_RESEARCH_POLL_MAX_DURATION_MS) return;
+
+      deepResearchPollTimer = setTimeout(() => {
+        deepResearchPollTimer = null;
+        void handleTick();
+      }, DEEP_RESEARCH_POLL_INTERVAL_MS);
+    }
 
     const clickSave = async () => {
       if (stopped) return;
@@ -251,6 +309,63 @@ export function createContentController(deps: Deps) {
       return collector;
     }
 
+    const handleTick = async () => {
+      if (stopped) return;
+
+      try {
+        notionAiModelPicker?.maybeApply?.();
+
+        const collector = refreshInpageButton();
+        if (!collector || typeof collector.capture !== 'function') return;
+        if (collector.id === 'googleaistudio') return;
+        if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
+        if (aiChatAutoSaveEnabled !== true) return;
+
+        const snapshot = await Promise.resolve(collector.capture());
+        if (!snapshot) return;
+
+        const isChatgpt = String(collector.id || '').trim().toLowerCase() === 'chatgpt';
+        if (isChatgpt && hasChatgptDeepResearchPlaceholderMessages(snapshot)) {
+          // Deep Research reports load inside a cross-origin iframe and may initially be captured as a placeholder URL.
+          // Poll and hydrate until the report becomes available, then proceed with incremental auto-save.
+          ensureDeepResearchPoll(handleTick);
+
+          const now = Date.now();
+          const canHydrate =
+            !deepResearchHydrateInFlight &&
+            now - deepResearchLastHydrateAttemptAt >= DEEP_RESEARCH_HYDRATE_MIN_INTERVAL_MS;
+          if (!canHydrate) return;
+
+          deepResearchHydrateInFlight = true;
+          deepResearchLastHydrateAttemptAt = now;
+          try {
+            await hydrateChatgptDeepResearchSnapshot(snapshot, send);
+          } catch (_e) {
+            // ignore hydration failures
+          } finally {
+            deepResearchHydrateInFlight = false;
+          }
+
+          if (hasChatgptDeepResearchPlaceholderMessages(snapshot)) return;
+          clearDeepResearchPoll();
+        } else {
+          clearDeepResearchPoll();
+        }
+
+        const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
+        if (!incremental || !incremental.changed) return;
+
+        const saved = await saveSnapshot(incremental.snapshot, { mode: 'incremental', diff: incremental.diff });
+        if (saved) showInpageTip(t('saved'), 'ok');
+      } catch (error) {
+        if (runtime?.isInvalidContextError?.(error)) {
+          stop();
+          return;
+        }
+        console.error('WebClipper auto-save failed:', error);
+      }
+    };
+
     observer = runtimeObserver?.createObserver?.({
       debounceMs: 600,
       getRoot: () => {
@@ -258,34 +373,7 @@ export function createContentController(deps: Deps) {
         const collector = getCollector();
         return collector && typeof collector.getRoot === 'function' ? collector.getRoot() : null;
       },
-      onTick: async () => {
-        if (stopped) return;
-
-        try {
-          notionAiModelPicker?.maybeApply?.();
-
-          const collector = refreshInpageButton();
-          if (!collector || typeof collector.capture !== 'function') return;
-          if (collector.id === 'googleaistudio') return;
-          if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
-          if (aiChatAutoSaveEnabled !== true) return;
-
-          const snapshot = await Promise.resolve(collector.capture());
-          if (!snapshot) return;
-
-          const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
-          if (!incremental || !incremental.changed) return;
-
-          const saved = await saveSnapshot(incremental.snapshot, { mode: 'incremental', diff: incremental.diff });
-          if (saved) showInpageTip(t('saved'), 'ok');
-        } catch (error) {
-          if (runtime?.isInvalidContextError?.(error)) {
-            stop();
-            return;
-          }
-          console.error('WebClipper auto-save failed:', error);
-        }
-      },
+      onTick: handleTick,
     }) || null;
 
     return {
