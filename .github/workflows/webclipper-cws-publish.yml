@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Resolve tag name
         id: tag
@@ -59,7 +59,7 @@ jobs:
           echo "target=${target}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -101,13 +101,13 @@ jobs:
       # - CWS_CLIENT_ID
       # - CWS_CLIENT_SECRET
       # - CWS_REFRESH_TOKEN
-      - name: Upload to Chrome Web Store
-        uses: mnao305/chrome-extension-upload@v5.0.0
-        with:
-          file-path: webclipper/SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip
-          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
-          client-id: ${{ secrets.CWS_CLIENT_ID }}
-          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
-          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
-          publish: ${{ steps.publish.outputs.publish }}
-          publish-target: ${{ steps.publish.outputs.target }}
+      - name: Upload/Publish to Chrome Web Store
+        run: node .github/scripts/webclipper/publish-cws.mjs
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_ZIP_PATH: webclipper/SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip
+          CWS_PUBLISH: ${{ steps.publish.outputs.publish }}
+          CWS_PUBLISH_TARGET: ${{ steps.publish.outputs.target }}
