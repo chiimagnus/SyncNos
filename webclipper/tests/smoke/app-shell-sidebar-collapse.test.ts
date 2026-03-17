@@ -44,7 +44,19 @@ vi.mock('../../src/ui/conversations/conversations-context', () => ({
 }));
 
 vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
-  ConversationDetailPane: () => createElement('div', null, 'detail-pane'),
+  ConversationDetailPane: ({ onExpandSidebar }: { onExpandSidebar?: () => void }) =>
+    createElement(
+      'div',
+      null,
+      createElement(
+        'header',
+        null,
+        onExpandSidebar
+          ? createElement('button', { type: 'button', onClick: onExpandSidebar, 'aria-label': 'Expand sidebar' }, 'expand')
+          : null,
+      ),
+      createElement('div', null, 'detail-pane'),
+    ),
 }));
 
 import AppShell from '../../src/ui/app/AppShell';
@@ -112,7 +124,12 @@ describe('AppShell sidebar collapse', () => {
 
     const expandBtn = document.querySelector('[aria-label="Expand sidebar"]') as HTMLButtonElement | null;
     expect(expandBtn).toBeTruthy();
-    expect(expandBtn!.className).toContain('tw-z-30');
+    expect(expandBtn!.closest('header')).toBeTruthy();
+
+    act(() => {
+      expandBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Collapse sidebar"]')).toBeTruthy();
   });
 });
-

@@ -11,9 +11,10 @@ import { navIconButtonSmClassName } from '../shared/nav-styles';
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
+  onExpandSidebar?: () => void;
 };
 
-export function ConversationDetailPane({ onBack, hideHeader = false }: ConversationDetailPaneProps) {
+export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSidebar }: ConversationDetailPaneProps) {
   const {
     activeId,
     listError,
@@ -33,6 +34,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
+  const expandSidebarLabel = t('expandSidebar');
 
   return (
     <section>
@@ -48,6 +50,22 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
             ].join(' ')}
           >
             <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-start tw-gap-2">
+              {onExpandSidebar ? (
+                <button type="button" onClick={onExpandSidebar} className={navIconButtonSmClassName(false)} aria-label={expandSidebarLabel}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path
+                      d="M9.75 3.25L13 6.5L9.75 9.75"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M12.8 6.5H3.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                  <span className="tw-sr-only">{expandSidebarLabel}</span>
+                </button>
+              ) : null}
+
               {onBack ? (
                 <button type="button" onClick={onBack} className={navIconButtonSmClassName(false)} aria-label={t('backButton')}>
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />

@@ -7,7 +7,6 @@ import { ConversationsProvider, useConversationsApp } from '../conversations/con
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
-import { navIconButtonClassName } from '../shared/nav-styles';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
@@ -15,15 +14,6 @@ import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conve
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
-
-function ExpandIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M9.75 3.25L13 6.5L9.75 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12.8 6.5H3.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -144,17 +134,6 @@ export default function AppShell() {
         ) : null}
 
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
-          {!isNarrow && sidebarCollapsed ? (
-            <button
-              type="button"
-              onClick={() => setCollapsed(false)}
-              className={['tw-absolute tw-left-3 tw-top-3 tw-z-30', navIconButtonClassName(false)].join(' ')}
-              aria-label={t('expandSidebar')}
-            >
-              <ExpandIcon />
-            </button>
-          ) : null}
-
           {isNarrow ? (
             <div
               className={[
@@ -200,7 +179,7 @@ export default function AppShell() {
               aria-hidden={showSettingsSheet}
             >
               <Routes location={routesLocation}>
-                <Route path="/" element={<ConversationDetailPane />} />
+                <Route path="/" element={<ConversationDetailPane onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined} />} />
                 <Route path="/settings" element={<Navigate to="/" replace />} />
                 <Route path="/sync" element={<Navigate to="/settings" replace />} />
                 <Route path="/backup" element={<Navigate to="/settings" replace />} />
