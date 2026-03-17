@@ -203,6 +203,34 @@ describe("content-controller inpage combo", () => {
     expect(harness.tipCalls.some((c) => String(c.text) === "Saved")).toBe(true);
   });
 
+  it("skips auto-save when chatgpt deep research message is still a placeholder", async () => {
+    const snapshot = {
+      conversation: { source: "chatgpt", conversationKey: "auto-dr-placeholder-1" },
+      messages: [
+        {
+          role: "assistant",
+          contentText:
+            "Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop",
+          contentMarkdown:
+            "Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop",
+        },
+      ],
+    };
+
+    const harness = createHarness({
+      collectorId: "chatgpt",
+      captureImpl: () => snapshot,
+      incrementalImpl: () => {
+        throw new Error("incremental should not run when placeholder is present");
+      },
+    });
+
+    await harness.runTick();
+
+    expect(harness.sendCalls.length).toBe(0);
+    expect(harness.tipCalls.length).toBe(0);
+  });
+
   it("disables auto-save for googleaistudio to avoid virtualized truncation", async () => {
     const snapshot = {
       conversation: { source: "googleaistudio", conversationKey: "auto-ai-studio-1" },

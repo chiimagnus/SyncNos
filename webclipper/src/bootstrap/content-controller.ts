@@ -286,11 +286,23 @@ export function createContentController(deps: Deps) {
           if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
           if (aiChatAutoSaveEnabled !== true) return;
 
-          const snapshot = await Promise.resolve(collector.capture());
-          if (!snapshot) return;
+	          const snapshot = await Promise.resolve(collector.capture());
+	          if (!snapshot) return;
 
-          const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
-          if (!incremental || !incremental.changed) return;
+	          const isChatgpt = String(collector.id || '').trim().toLowerCase() === 'chatgpt';
+	          if (isChatgpt && Array.isArray(snapshot?.messages)) {
+	            const hasDeepResearchPlaceholders = snapshot.messages.some((m: any) =>
+	              String(m?.contentText || m?.contentMarkdown || '')
+	                .trim()
+	                .startsWith('Deep Research (iframe):'),
+	            );
+	            // Deep Research reports load inside an iframe and may initially be captured as a placeholder URL.
+	            // Avoid auto-saving partial content; let the user trigger a manual save once the report is ready.
+	            if (hasDeepResearchPlaceholders) return;
+	          }
+
+	          const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
+	          if (!incremental || !incremental.changed) return;
 
           const saved = await saveSnapshot(incremental.snapshot, { mode: 'incremental', diff: incremental.diff });
           if (saved) showInpageTip(t('saved'), 'ok');
