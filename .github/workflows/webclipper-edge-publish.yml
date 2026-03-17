@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Resolve tag name
         id: tag
@@ -48,7 +48,7 @@ jobs:
           echo "publish=${publish}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -98,4 +98,3 @@ jobs:
           EDGE_ADDONS_PRODUCT_ID: ${{ secrets.EDGE_ADDONS_PRODUCT_ID }}
           EDGE_ZIP_PATH: webclipper/SyncNos-WebClipper-edge-${{ steps.tag.outputs.name }}.zip
           EDGE_ADDONS_PUBLISH: ${{ steps.publish.outputs.publish }}
-
