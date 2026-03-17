@@ -63,6 +63,8 @@ export const en = {
   lastExport: 'last export:',
   importStatus: 'import:',
   statsConversations: 'Conversations:',
+  statsAdded: 'Added',
+  statsUpdated: 'Updated',
   statsMessages: 'Messages:',
   statsMappings: 'Mappings:',
   statsSettingsApplied: 'Settings applied:',
