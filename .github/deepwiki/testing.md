@@ -58,7 +58,7 @@
 
 | 检查项 | 先看哪里 | 期望 |
 | --- | --- | --- |
-| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | tag 去掉 `v` 后与 `1.3.3` 对齐 |
+| manifest 版本与 tag 一致 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 具体版本值以 `configuration.md` 为准（本页不写死） |
 | Chrome / Firefox 构建均可通过 | `package.json` scripts | `build` / `build:firefox` 成功 |
 | dist 引用完整 | `check-dist.mjs` | `npm run check` 通过 |
 | AMO / CWS 凭据 | workflow secrets | 发布 workflow 不因凭据缺失失败 |
