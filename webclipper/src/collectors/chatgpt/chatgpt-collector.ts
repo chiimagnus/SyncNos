@@ -74,13 +74,19 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
         const requestId = `dr_${now}_${Math.random().toString(16).slice(2)}`;
         const timeoutId = env.window.setTimeout(() => {
+          const pending = deepResearchPending.get(requestId);
           deepResearchPending.delete(requestId);
+          try {
+            if (pending?.intervalId) clearInterval(pending.intervalId);
+          } catch (_e) {
+            // ignore
+          }
           resolve(null);
         }, timeoutMs);
 
-        let targetOrigin = '*';
+        let preferredTargetOrigin = '*';
         try {
-          if (iframeSrc) targetOrigin = new URL(iframeSrc).origin;
+          if (iframeSrc) preferredTargetOrigin = new URL(iframeSrc).origin;
         } catch (_e) {
           // ignore
         }
@@ -95,10 +101,23 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
                 type: DEEP_RESEARCH_MESSAGE_TYPES.REQUEST,
                 requestId,
               },
-              targetOrigin,
+              preferredTargetOrigin,
             );
           } catch (_e) {
-            // ignore
+            // If the iframe hasn't navigated yet, its WindowProxy may still have the parent's origin,
+            // which causes a mismatch error when using the expected iframe origin. Fall back to '*'.
+            try {
+              targetWindow.postMessage(
+                {
+                  __syncnos: true,
+                  type: DEEP_RESEARCH_MESSAGE_TYPES.REQUEST,
+                  requestId,
+                },
+                '*',
+              );
+            } catch (_e2) {
+              // ignore
+            }
           }
         };
 
@@ -256,7 +275,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
       const deepResearchIframe = role === 'assistant' ? findDeepResearchIframe(el) : null;
       if (role === 'assistant' && deepResearchIframe) {
-        const extracted = await requestDeepResearchContent(deepResearchIframe, { timeoutMs: allowEditing ? 12000 : 2500 });
+        // Prefer a fast placeholder and let the background hydrator fill the body reliably.
+        // Best-effort request is kept short to avoid blocking capture for long-running reports.
+        const extracted = await requestDeepResearchContent(deepResearchIframe, { timeoutMs: allowEditing ? 600 : 200 });
         if (extracted) {
           const markdown = String(extracted.markdown || '').trim();
           const text = String(extracted.text || '').trim();

@@ -12,6 +12,23 @@ function isAllowedParentOrigin(origin: string): boolean {
   return value === 'https://chatgpt.com' || value === 'https://www.chatgpt.com' || value === 'https://chat.openai.com';
 }
 
+function resolveAllowedParentOrigin(eventOrigin: string): string | null {
+  const rawOrigin = String(eventOrigin || '').trim();
+  if (isAllowedParentOrigin(rawOrigin)) return rawOrigin;
+
+  // Some browsers/environments may report a null/empty origin for postMessage from extension isolated worlds.
+  // Fall back to verifying via `document.referrer`, which should reflect the embedding ChatGPT page.
+  const ref = String(document.referrer || '').trim();
+  if (!ref) return null;
+  try {
+    const refOrigin = new URL(ref).origin;
+    if (isAllowedParentOrigin(refOrigin)) return refOrigin;
+  } catch (_e) {
+    // ignore
+  }
+  return null;
+}
+
 function normalizeTitle(value: unknown): string {
   return String(value || '')
     .replace(/\s+/g, ' ')
@@ -61,7 +78,8 @@ export default defineContentScript({
   allFrames: true,
   main() {
     window.addEventListener('message', (event: MessageEvent) => {
-      if (!isAllowedParentOrigin(String(event.origin || ''))) return;
+      const parentOrigin = resolveAllowedParentOrigin(String(event.origin || ''));
+      if (!parentOrigin) return;
       const data: any = (event as any)?.data;
       if (!data || data.__syncnos !== true) return;
       if (data.type !== MESSAGE_TYPES.REQUEST) return;
@@ -80,7 +98,7 @@ export default defineContentScript({
             markdown: snapshot.markdown,
             text: snapshot.text,
           },
-          event.origin,
+          parentOrigin,
         );
       } catch (_e) {
         window.parent.postMessage(
@@ -92,10 +110,9 @@ export default defineContentScript({
             markdown: '',
             text: '',
           },
-          event.origin,
+          parentOrigin,
         );
       }
     });
   },
 });
-

@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import { hydrateChatgptDeepResearchSnapshot } from '../collectors/chatgpt/chatgpt-deep-research-hydrator';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -225,6 +226,19 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       const snapshot = await Promise.resolve(target.collector.capture({ manual: true }));
       if (!snapshot) {
         throw new Error(t('noVisibleConversationFound'));
+      }
+
+      try {
+        const isChatgpt = String(snapshot?.conversation?.source || '').trim().toLowerCase() === 'chatgpt';
+        const hasDeepResearchPlaceholders =
+          isChatgpt &&
+          Array.isArray(snapshot?.messages) &&
+          snapshot.messages.some((m: any) => String(m?.contentText || m?.contentMarkdown || '').trim().startsWith('Deep Research (iframe):'));
+        if (hasDeepResearchPlaceholders) {
+          await hydrateChatgptDeepResearchSnapshot(snapshot, send);
+        }
+      } catch (_e) {
+        // ignore hydration failures
       }
 
       const saved = await saveSnapshot(snapshot);

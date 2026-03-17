@@ -1,6 +1,7 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
 import { t } from '../i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '../collectors/ai-chat-sites';
+import { hydrateChatgptDeepResearchSnapshot } from '../collectors/chatgpt/chatgpt-deep-research-hydrator';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
@@ -150,6 +151,21 @@ export function createContentController(deps: Deps) {
     options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
+
+    if (options?.mode !== 'incremental') {
+      try {
+        const isChatgpt = String(snapshot?.conversation?.source || '').trim().toLowerCase() === 'chatgpt';
+        const hasDeepResearchPlaceholders =
+          isChatgpt &&
+          Array.isArray(snapshot?.messages) &&
+          snapshot.messages.some((m: any) => String(m?.contentText || m?.contentMarkdown || '').trim().startsWith('Deep Research (iframe):'));
+        if (hasDeepResearchPlaceholders) {
+          await hydrateChatgptDeepResearchSnapshot(snapshot, send);
+        }
+      } catch (_e) {
+        // ignore hydration failures
+      }
+    }
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: snapshot.conversation,
