@@ -101,7 +101,7 @@ export async function createZipBlob(entries: ZipInputEntry[]): Promise<Blob> {
     }
   }
 
-  const zipBytes = await zipToUint8Array(zippable, { level: 6 });
+  const zipBytes = await zipToUint8Array(zippable, { level: 9, mem: 8 });
   return new Blob([new Uint8Array(zipBytes)], { type: 'application/zip' });
 }
 
