@@ -10,6 +10,8 @@ import { deleteConversations, getConversationDetail, listConversations } from '.
 import { backfillConversationImages } from '../../conversations/client/repo';
 import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '../../integrations/detail-header-actions';
+import { UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
+import { connectPort } from '../../platform/runtime/ports';
 import { t } from '../../i18n';
 import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 
@@ -218,6 +220,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [items, setItems] = useState<Conversation[]>([]);
 
   const [activeId, setActiveId] = useState<number | null>(null);
+  const activeIdRef = useRef<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -304,7 +307,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   }, [refreshList]);
 
   const refreshActiveDetail = useCallback(async () => {
-    const id = Number(activeId);
+    const id = Number(activeIdRef.current);
     if (!Number.isFinite(id) || id <= 0) {
       setDetail(null);
       return;
@@ -321,11 +324,116 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     } finally {
       setLoadingDetail(false);
     }
-  }, [activeId]);
+  }, []);
 
   useEffect(() => {
+    activeIdRef.current = activeId;
     void refreshActiveDetail();
-  }, [refreshActiveDetail]);
+  }, [activeId, refreshActiveDetail]);
+
+  useEffect(() => {
+    let disposed = false;
+    let port: any = null;
+    let refreshTimer: any = null;
+    let pendingList = false;
+    let pendingDetail = false;
+
+    const flush = async () => {
+      if (disposed) return;
+      const doList = pendingList;
+      const doDetail = pendingDetail;
+      pendingList = false;
+      pendingDetail = false;
+      refreshTimer = null;
+
+      if (doList) await refreshList().catch(() => {});
+      // Only force-refresh detail when the active conversation is known to have changed
+      // (or when sync finishes and metadata such as notionPageId is updated).
+      if (doDetail) await refreshActiveDetail().catch(() => {});
+    };
+
+    const scheduleFlush = () => {
+      if (disposed) return;
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(() => {
+        void flush();
+      }, 250);
+    };
+
+    const connect = () => {
+      if (disposed) return;
+      try {
+        port = connectPort(UI_PORT_NAMES.POPUP_EVENTS);
+      } catch (_e) {
+        port = null;
+        return;
+      }
+
+      const onMessage = (message: any) => {
+        if (disposed) return;
+        if (!message || typeof message !== 'object') return;
+        if (message.type !== UI_EVENT_TYPES.CONVERSATIONS_CHANGED) return;
+
+        const payload = (message as any).payload || {};
+        pendingList = true;
+
+        const reason = String(payload.reason || '').trim();
+        if (reason === 'delete') {
+          // Let refreshList() normalize activeId; detail will refresh via the activeId effect.
+        } else if (reason === 'syncFinished') {
+          pendingDetail = true;
+        } else {
+          const changedId = Number(payload.conversationId);
+          if (Number.isFinite(changedId) && changedId > 0 && Number(activeIdRef.current) === changedId) {
+            pendingDetail = true;
+          }
+          const ids = Array.isArray(payload.conversationIds) ? payload.conversationIds : [];
+          if (ids.some((id: any) => Number(id) === Number(activeIdRef.current))) {
+            pendingDetail = true;
+          }
+        }
+
+        scheduleFlush();
+      };
+
+      const onDisconnect = () => {
+        try {
+          port?.onMessage?.removeListener?.(onMessage);
+        } catch (_e) {
+          // ignore
+        }
+        port = null;
+        if (disposed) return;
+        setTimeout(connect, 1000);
+      };
+
+      try {
+        port?.onMessage?.addListener?.(onMessage);
+        port?.onDisconnect?.addListener?.(onDisconnect);
+      } catch (_e) {
+        try {
+          port?.disconnect?.();
+        } catch (_e2) {
+          // ignore
+        }
+        port = null;
+      }
+    };
+
+    connect();
+
+    return () => {
+      disposed = true;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = null;
+      try {
+        port?.disconnect?.();
+      } catch (_e) {
+        // ignore
+      }
+      port = null;
+    };
+  }, [refreshActiveDetail, refreshList]);
 
   useEffect(() => {
     let cancelled = false;

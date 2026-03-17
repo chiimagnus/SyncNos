@@ -5,30 +5,12 @@ import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
 
 import { t } from '../../../i18n';
 import { ConversationListPane } from '../../conversations/ConversationListPane';
-import { useConversationsApp } from '../../conversations/conversations-context';
 import { navIconButtonClassName } from '../../shared/nav-styles';
-
-function RefreshIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M13 8a5 5 0 10-1.3 3.4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M13 3.5v3h-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
   const routerLocation = useLocation();
   const navigate = useNavigate();
   const logoUrl = runtimeGetURL('icons/icon-48.png');
-
-  const { refreshList, loadingList } = useConversationsApp();
 
   const state: any = (routerLocation as any)?.state ?? {};
   const settingsOpen = routerLocation.pathname === '/settings';
@@ -109,16 +91,6 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             >
               <span className="tw-sr-only">{t('settingsLabel')}</span>
               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => refreshList().catch(() => {})}
-              className={navIconButtonClassName(false)}
-              aria-label={t('refreshList')}
-              disabled={loadingList}
-            >
-              <RefreshIcon />
             </button>
 
             <button type="button" onClick={onCollapse} className={navIconButtonClassName(false)} aria-label={t('collapseSidebar')}>

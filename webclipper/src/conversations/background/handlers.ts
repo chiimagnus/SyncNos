@@ -44,6 +44,13 @@ export function registerConversationHandlers(router: AnyRouter) {
       existed = false;
     }
     const convo = await writeConversationSnapshot(payload);
+    const conversationId = Number((convo as any)?.id);
+    if (Number.isFinite(conversationId) && conversationId > 0) {
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: existed ? 'upsertConversation' : 'createConversation',
+        conversationId,
+      });
+    }
     return router.ok({ ...(convo as any), __isNew: !existed });
   });
 

@@ -1,4 +1,4 @@
-import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_EVENT_TYPES } from '../platform/messaging/message-contracts';
 import { storageGet } from '../platform/storage/local';
 import { getNotionOAuthToken } from './notion/auth/token-store';
 import { ensureSyncProviderEnabled } from './sync-provider-gate';
@@ -7,6 +7,7 @@ type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
 let notionDetachedRun: Promise<unknown> | null = null;
@@ -115,11 +116,20 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('missing parentPageId');
       }
 
+      const hub = router.eventsHub;
       const run = deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId });
       notionDetachedRun = run;
       void run
         .finally(() => {
           if (notionDetachedRun === run) notionDetachedRun = null;
+          try {
+            hub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+              reason: 'syncFinished',
+              provider: 'notion',
+            });
+          } catch (_e) {
+            // ignore
+          }
         })
         .catch(() => {});
       return router.ok({ started: true, provider: 'notion' });
@@ -191,11 +201,20 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err(failure.message, failure.extra);
       }
 
+      const hub = router.eventsHub;
       const run = deps.obsidianSyncOrchestrator.syncConversations({ conversationIds, forceFullConversationIds, instanceId });
       obsidianDetachedRun = run;
       void run
         .finally(() => {
           if (obsidianDetachedRun === run) obsidianDetachedRun = null;
+          try {
+            hub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+              reason: 'syncFinished',
+              provider: 'obsidian',
+            });
+          } catch (_e) {
+            // ignore
+          }
         })
         .catch(() => {});
       return router.ok({ started: true, provider: 'obsidian' });
