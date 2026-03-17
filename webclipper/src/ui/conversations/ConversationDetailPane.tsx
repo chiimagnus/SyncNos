@@ -32,6 +32,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
 
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
+  const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
 
   return (
     <section>
@@ -40,7 +41,12 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
         aria-label={t('conversationDetailAria')}
       >
         {!hideHeader ? (
-          <header className="tw-flex tw-flex-col tw-items-stretch tw-gap-2 tw-border-b tw-border-[var(--border)] tw-pb-2 md:tw-flex-row md:tw-items-start md:tw-justify-between md:tw-gap-3">
+          <header
+            className={[
+              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-flex-col tw-items-stretch tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-pt-3 tw-pb-2 md:tw-flex-row md:tw-items-start md:tw-justify-between md:tw-gap-3 md:tw-pt-4',
+              containerPaddingClassName,
+            ].join(' ')}
+          >
             <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-start tw-gap-2">
               {onBack ? (
                 <button type="button" onClick={onBack} className={navIconButtonSmClassName(false)} aria-label={t('backButton')}>
@@ -89,34 +95,42 @@ export function ConversationDetailPane({ onBack, hideHeader = false }: Conversat
           </header>
         ) : null}
 
-        {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
-        {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
-        {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
+        <div
+          className={[
+            containerPaddingClassName,
+            'tw-pb-3 md:tw-pb-4',
+            hideHeader ? 'tw-pt-3 md:tw-pt-4' : '',
+          ].join(' ')}
+        >
+          {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
+          {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
+          {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
 
-        {detail?.messages?.length ? (
-          <div className="tw-mt-3 tw-grid tw-gap-2.5">
-            {detail.messages.map((m) => {
-              const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-              const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
-              return (
-                <ChatMessageBubble
-                  key={String((m as any).id)}
-                  role={isArticle ? undefined : (m as any).role}
-                  markdown={text}
-                  conversationId={
-                    Number.isFinite(messageConversationId) && messageConversationId > 0
-                      ? messageConversationId
-                      : undefined
-                  }
-                />
-              );
-            })}
-          </div>
-        ) : activeId ? (
-          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
-        ) : (
-          <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('selectAConversation')}</p>
-        )}
+          {detail?.messages?.length ? (
+            <div className="tw-mt-3 tw-grid tw-gap-2.5">
+              {detail.messages.map((m) => {
+                const text = String((m as any).contentMarkdown || (m as any).contentText || '');
+                const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
+                return (
+                  <ChatMessageBubble
+                    key={String((m as any).id)}
+                    role={isArticle ? undefined : (m as any).role}
+                    markdown={text}
+                    conversationId={
+                      Number.isFinite(messageConversationId) && messageConversationId > 0
+                        ? messageConversationId
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </div>
+          ) : activeId ? (
+            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
+          ) : (
+            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('selectAConversation')}</p>
+          )}
+        </div>
       </section>
     </section>
   );

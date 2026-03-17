@@ -96,7 +96,7 @@ export function ConversationsScene({
     if (narrowRoute === 'detail') {
       return (
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-          <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
+          <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden">
             {inlineNarrowDetailHeader ? <ConversationDetailPane onBack={returnToList} /> : <ConversationDetailPane hideHeader />}
           </div>
         </div>
@@ -115,7 +115,7 @@ export function ConversationsScene({
       <aside className="tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
         {list}
       </aside>
-      <main className="route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-primary)] tw-overflow-auto tw-overflow-x-hidden tw-p-3">
+      <main className="route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-primary)] tw-overflow-auto tw-overflow-x-hidden">
         <ConversationDetailPane />
       </main>
     </div>
