@@ -13,6 +13,9 @@ import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
 
 type AnyRecord = Record<string, any>;
 
+const IMAGE_CACHE_INDEX_PATH = 'assets/image-cache/index.json';
+const IMAGE_CACHE_BLOBS_PREFIX = 'assets/image-cache/blobs/';
+
 function sanitizeZipPathPart(input: unknown, fallback: string) {
   const text = String(input || '').trim();
   if (!text) return fallback;
@@ -61,6 +64,97 @@ function compareMessages(a: AnyRecord, b: AnyRecord) {
   return aKey.localeCompare(bKey);
 }
 
+function parseContentType(value: unknown): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.split(';')[0]!.trim().toLowerCase();
+}
+
+function isDataImageUrl(url: unknown): boolean {
+  const text = String(url || '').trim();
+  if (!text) return false;
+  return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const normalized = String(base64 || '').replace(/\s+/g, '');
+  if (!normalized) return new Uint8Array();
+
+  const atobFn = (globalThis as any).atob as ((input: string) => string) | undefined;
+  if (typeof atobFn === 'function') {
+    const binary = atobFn(normalized);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  const bufferApi = (globalThis as any).Buffer as any;
+  if (bufferApi && typeof bufferApi.from === 'function') {
+    const nodeBuffer = bufferApi.from(normalized, 'base64');
+    return new Uint8Array(nodeBuffer);
+  }
+
+  throw new Error('base64 decoder unavailable');
+}
+
+function utf8ToBytes(text: string): Uint8Array {
+  const encoder = (globalThis as any).TextEncoder as (new () => TextEncoder) | undefined;
+  if (encoder) {
+    return new encoder().encode(String(text || ''));
+  }
+  const bufferApi = (globalThis as any).Buffer as any;
+  if (bufferApi && typeof bufferApi.from === 'function') {
+    const nodeBuffer = bufferApi.from(String(text || ''), 'utf8');
+    return new Uint8Array(nodeBuffer);
+  }
+  const raw = String(text || '');
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i) & 0xff;
+  return out;
+}
+
+function decodeDataImageUrlToBlob(dataUrl: string): Blob | null {
+  const safeDataUrl = String(dataUrl || '').trim();
+  if (!isDataImageUrl(safeDataUrl)) return null;
+
+  const commaAt = safeDataUrl.indexOf(',');
+  if (commaAt <= 0) return null;
+
+  const meta = safeDataUrl.slice('data:'.length, commaAt).trim();
+  const payload = safeDataUrl.slice(commaAt + 1);
+  const metaParts = meta
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const contentType = parseContentType(metaParts[0] || '');
+  if (!contentType.startsWith('image/')) return null;
+
+  const isBase64 = metaParts.some((part) => part.toLowerCase() === 'base64');
+  let bytes: Uint8Array;
+  try {
+    bytes = isBase64 ? base64ToBytes(payload) : utf8ToBytes(decodeURIComponent(payload));
+  } catch (_e) {
+    return null;
+  }
+
+  if ((bytes.byteLength || 0) <= 0) return null;
+  return new Blob([Uint8Array.from(bytes)], { type: contentType });
+}
+
+function extFromImageContentType(contentType: string): string {
+  const ct = String(contentType || '').trim().toLowerCase();
+  if (!ct.startsWith('image/')) return 'bin';
+  if (ct === 'image/jpeg') return 'jpg';
+  if (ct === 'image/jpg') return 'jpg';
+  if (ct === 'image/png') return 'png';
+  if (ct === 'image/webp') return 'webp';
+  if (ct === 'image/gif') return 'gif';
+  if (ct === 'image/svg+xml') return 'svg';
+  const raw = ct.slice('image/'.length);
+  const cleaned = raw.replace(/[^a-z0-9.+-]/g, '');
+  return cleaned || 'bin';
+}
+
 export type BackupZipV2ExportResult = {
   filename: string;
   blob: Blob;
@@ -70,10 +164,11 @@ export type BackupZipV2ExportResult = {
 
 export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings'], 'readonly');
+  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readonly');
   const conversations = (await reqToPromise(stores.conversations.getAll() as any)) as AnyRecord[];
   const messages = (await reqToPromise(stores.messages.getAll() as any)) as AnyRecord[];
   const syncMappings = (await reqToPromise(stores.sync_mappings.getAll() as any)) as AnyRecord[];
+  const imageCache = (await reqToPromise(stores.image_cache.getAll() as any)) as AnyRecord[];
   await txDone(t);
 
   const rawStorage = await storageGetAll();
@@ -85,6 +180,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const allConversations = Array.isArray(conversations) ? conversations : [];
   const allMessages = Array.isArray(messages) ? messages : [];
   const allMappings = Array.isArray(syncMappings) ? syncMappings : [];
+  const allImageCache = Array.isArray(imageCache) ? imageCache : [];
 
   const messagesByConversationId = new Map<number, AnyRecord[]>();
   for (const m of allMessages) {
@@ -137,6 +233,15 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const indexLines = [indexHeader.map(csvCell).join(',')];
 
   const usedPathsBySource = new Map<string, Set<string>>();
+
+  const uniqueKeyByConversationId = new Map<number, string>();
+  for (const c of allConversations) {
+    const cid = Number(c && c.id);
+    if (!Number.isFinite(cid) || cid <= 0) continue;
+    const uk = uniqueConversationKey(c);
+    if (!uk) continue;
+    uniqueKeyByConversationId.set(cid, uk);
+  }
 
   for (const [source, convos] of sources.entries()) {
     const safeSource = sanitizeZipPathPart(source.toLowerCase(), 'unknown');
@@ -221,6 +326,52 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     lastModified: exportedAt,
   });
 
+  const imageCacheAssets: AnyRecord[] = [];
+  for (const row of allImageCache) {
+    const assetId = Number(row && row.id);
+    if (!Number.isFinite(assetId) || assetId <= 0) continue;
+    const conversationId = Number(row && row.conversationId);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+    const uniqueKey = uniqueKeyByConversationId.get(conversationId) || '';
+    if (!uniqueKey) continue;
+
+    const url = row && row.url ? String(row.url) : '';
+    if (!url.trim()) continue;
+
+    let blob: Blob | null = null;
+    if (row && row.blob instanceof Blob) blob = row.blob;
+    else if (row && typeof row.dataUrl === 'string') blob = decodeDataImageUrlToBlob(row.dataUrl);
+    if (!blob) continue;
+
+    const contentType = parseContentType(row.contentType || blob.type);
+    if (!contentType.startsWith('image/')) continue;
+
+    const byteSize = Number(row.byteSize) || blob.size || 0;
+    if (byteSize <= 0) continue;
+
+    const ext = extFromImageContentType(contentType);
+    const blobPath = `${IMAGE_CACHE_BLOBS_PREFIX}${assetId}.${ext}`;
+
+    files.push({ name: blobPath, data: blob, lastModified: exportedAt });
+    imageCacheAssets.push({
+      assetId,
+      uniqueKey,
+      url,
+      contentType,
+      byteSize,
+      createdAt: Number(row.createdAt) || 0,
+      updatedAt: Number(row.updatedAt) || 0,
+      blobPath,
+    });
+  }
+
+  const imageCacheIndexDoc = { schemaVersion: 1, assets: imageCacheAssets };
+  files.push({
+    name: IMAGE_CACHE_INDEX_PATH,
+    data: JSON.stringify(imageCacheIndexDoc, null, 2),
+    lastModified: exportedAt,
+  });
+
   const manifest = {
     backupSchemaVersion: BACKUP_ZIP_SCHEMA_VERSION,
     exportedAt,
@@ -229,10 +380,12 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
       conversations: allConversations.length,
       messages: allMessages.length,
       sync_mappings: allMappings.length,
+      image_cache: imageCacheAssets.length,
     },
     config: { storageLocalPath: 'config/storage-local.json' },
     index: { conversationsCsvPath: 'sources/conversations.csv' },
     sources: manifestSources,
+    assets: { imageCacheIndexPath: IMAGE_CACHE_INDEX_PATH },
   };
   files.unshift({
     name: 'manifest.json',

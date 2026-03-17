@@ -3,6 +3,7 @@ type UnknownRecord = Record<string, any>;
 export const BACKUP_SCHEMA_VERSION = 1;
 export const BACKUP_ZIP_SCHEMA_VERSION = 2;
 export const LAST_BACKUP_EXPORT_AT_STORAGE_KEY = 'last_backup_export_at';
+export const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
 
 // Legacy export: previously we only backed up an allowlist of keys.
 // Now we back up all chrome.storage.local keys except a small sensitive denylist.
@@ -233,6 +234,46 @@ function isSafeZipPath(pathValue: unknown) {
   return true;
 }
 
+export function validateImageCacheIndexDocument(doc: unknown): { ok: boolean; error: string } {
+  const d: any = doc;
+  if (!d || typeof d !== 'object') return { ok: false, error: 'Image cache index is not an object' };
+  if (Number(d.schemaVersion) !== IMAGE_CACHE_INDEX_SCHEMA_VERSION) {
+    return { ok: false, error: 'Unsupported image cache schemaVersion' };
+  }
+  const assets = Array.isArray(d.assets) ? d.assets : null;
+  if (!assets) return { ok: false, error: 'Missing image cache assets' };
+
+  for (const a of assets) {
+    if (!a || typeof a !== 'object') return { ok: false, error: 'Invalid image cache asset item' };
+    const assetId = Number(a.assetId);
+    if (!Number.isFinite(assetId) || assetId <= 0) return { ok: false, error: 'Invalid image cache assetId' };
+
+    const uk = String(a.uniqueKey || '').trim();
+    if (!isNonEmptyString(uk) || !uk.includes('||')) return { ok: false, error: 'Invalid image cache uniqueKey' };
+
+    const url = String(a.url || '').trim();
+    if (!isNonEmptyString(url)) return { ok: false, error: 'Invalid image cache url' };
+
+    const contentType = String(a.contentType || '').trim().toLowerCase();
+    if (!isNonEmptyString(contentType) || !contentType.startsWith('image/')) {
+      return { ok: false, error: 'Invalid image cache contentType' };
+    }
+
+    const byteSize = Number(a.byteSize);
+    if (!Number.isFinite(byteSize) || byteSize <= 0) return { ok: false, error: 'Invalid image cache byteSize' };
+
+    const blobPath = String(a.blobPath || '').trim();
+    if (!isNonEmptyString(blobPath) || !isSafeZipPath(blobPath)) {
+      return { ok: false, error: 'Invalid image cache blobPath' };
+    }
+    if (!blobPath.startsWith('assets/image-cache/blobs/')) {
+      return { ok: false, error: 'Invalid image cache blobPath prefix' };
+    }
+  }
+
+  return { ok: true, error: '' };
+}
+
 export function validateBackupManifest(doc: unknown): { ok: boolean; error: string } {
   const d: any = doc;
   if (!d || typeof d !== 'object') return { ok: false, error: 'Manifest is not an object' };
@@ -248,6 +289,11 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
   for (const k of ['conversations', 'messages', 'sync_mappings']) {
     if (!Number.isFinite(Number(d.counts[k])) || Number(d.counts[k]) < 0) {
       return { ok: false, error: `Invalid counts.${k}` };
+    }
+  }
+  if ((d.counts as any).image_cache != null) {
+    if (!Number.isFinite(Number((d.counts as any).image_cache)) || Number((d.counts as any).image_cache) < 0) {
+      return { ok: false, error: 'Invalid counts.image_cache' };
     }
   }
 
@@ -290,6 +336,19 @@ export function validateBackupManifest(doc: unknown): { ok: boolean; error: stri
       if (!p.endsWith('.json')) return { ok: false, error: 'Invalid sources file extension' };
       if (seenFiles.has(p)) return { ok: false, error: 'Duplicate sources file path' };
       seenFiles.add(p);
+    }
+  }
+
+  if (d.assets != null) {
+    if (!d.assets || typeof d.assets !== 'object') return { ok: false, error: 'Invalid assets' };
+    const imageCacheIndexPath = (d.assets as any).imageCacheIndexPath;
+    if (imageCacheIndexPath != null) {
+      if (!isNonEmptyString(imageCacheIndexPath) || !isSafeZipPath(imageCacheIndexPath)) {
+        return { ok: false, error: 'Invalid assets.imageCacheIndexPath' };
+      }
+      if (!String(imageCacheIndexPath).endsWith('.json')) {
+        return { ok: false, error: 'Invalid assets.imageCacheIndexPath extension' };
+      }
     }
   }
 

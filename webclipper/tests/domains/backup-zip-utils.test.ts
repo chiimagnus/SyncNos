@@ -133,4 +133,17 @@ describe('backup zip-utils', () => {
       JSON.stringify({ ok: true, big }),
     );
   });
+
+  it('extractZipEntries strips a single top-level folder prefix (rezipped backups)', async () => {
+    const blob = await createZipBlob([
+      { name: 'SyncNos-Backup-Example/manifest.json', data: '{"ok":true}' },
+      { name: 'SyncNos-Backup-Example/sources/conversations.csv', data: 'a,b,c' },
+      { name: 'SyncNos-Backup-Example/sources/chatgpt/c1.json', data: '{"hello":"world"}' },
+    ]);
+    const entries = await extractZipEntries(blob);
+    expect(entries.has('manifest.json')).toBe(true);
+    expect(entries.has('sources/conversations.csv')).toBe(true);
+    expect(entries.has('sources/chatgpt/c1.json')).toBe(true);
+    expect(new TextDecoder().decode(entries.get('manifest.json')!)).toBe('{"ok":true}');
+  });
 });
