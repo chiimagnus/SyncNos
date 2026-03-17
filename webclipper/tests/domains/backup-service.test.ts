@@ -242,6 +242,165 @@ describe('backup service', () => {
     expect(assets.some((a) => Number(a.id) === referencedId)).toBe(true);
   });
 
+  it('importBackupZipV2Merge tolerates missing image index and strips syncnos-asset urls', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const t = db.transaction(['conversations', 'messages', 'image_cache'], 'readwrite');
+    const convId = await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        title: 'Hello',
+        url: 'https://x',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      }) as any,
+    );
+    const oldImgId = await reqToPromise<number>(
+      t.objectStore('image_cache').add({
+        conversationId: convId,
+        url: 'https://img.example/x.png',
+        blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: convId,
+        messageKey: 'm1',
+        role: 'user',
+        contentText: 'hi',
+        contentMarkdown: `![x](syncnos-asset://${oldImgId})`,
+        sequence: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    db.close();
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const indexPath = String(manifest.assets?.imageCacheIndexPath || '');
+    const indexDoc = JSON.parse(new TextDecoder().decode(entries.get(indexPath)!));
+    const blobPath = String(indexDoc.assets?.[0]?.blobPath || '');
+
+    entries.delete(indexPath);
+    if (blobPath) entries.delete(blobPath);
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    await importBackupZipV2Merge(entries);
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
+    const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll() as any);
+    const assets = await reqToPromise<any[]>(t2.objectStore('image_cache').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      t2.oncomplete = () => resolve();
+      t2.onerror = () => reject(t2.error);
+      t2.onabort = () => reject(t2.error);
+    });
+    db2.close();
+
+    expect(assets.length).toBe(0);
+    expect(String(msgs[0].contentMarkdown || '')).not.toContain('syncnos-asset://');
+    expect(String(msgs[0].contentMarkdown || '')).toContain('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
+  });
+
+  it('importBackupZipV2Merge tolerates missing image blob and falls back to https url', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const t = db.transaction(['conversations', 'messages', 'image_cache'], 'readwrite');
+    const convId = await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        title: 'Hello',
+        url: 'https://x',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      }) as any,
+    );
+    const oldImgId = await reqToPromise<number>(
+      t.objectStore('image_cache').add({
+        conversationId: convId,
+        url: 'https://img.example/x.png',
+        blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: convId,
+        messageKey: 'm1',
+        role: 'user',
+        contentText: 'hi',
+        contentMarkdown: `![x](syncnos-asset://${oldImgId})`,
+        sequence: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    db.close();
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const indexPath = String(manifest.assets?.imageCacheIndexPath || '');
+    const indexDoc = JSON.parse(new TextDecoder().decode(entries.get(indexPath)!));
+    const blobPath = String(indexDoc.assets?.[0]?.blobPath || '');
+    if (blobPath) entries.delete(blobPath);
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    await importBackupZipV2Merge(entries);
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
+    const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll() as any);
+    const assets = await reqToPromise<any[]>(t2.objectStore('image_cache').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      t2.oncomplete = () => resolve();
+      t2.onerror = () => reject(t2.error);
+      t2.onabort = () => reject(t2.error);
+    });
+    db2.close();
+
+    expect(assets.length).toBe(0);
+    expect(String(msgs[0].contentMarkdown || '')).toContain('https://img.example/x.png');
+  });
+
   it('importBackupLegacyJsonMerge merges into IndexedDB and applies allowlisted settings only', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

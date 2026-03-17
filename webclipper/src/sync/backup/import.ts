@@ -21,16 +21,48 @@ function parseContentType(value: unknown): string {
   return raw.split(';')[0]!.trim().toLowerCase();
 }
 
-function rewriteSyncnosAssetUrlsInMarkdown(markdown: string, remap: Map<number, number>): string {
+const SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+function isHttpUrl(url: unknown): boolean {
+  const text = String(url || '').trim();
+  return /^https?:\/\//i.test(text);
+}
+
+function isDataImageUrl(url: unknown): boolean {
+  const text = String(url || '').trim();
+  if (!text) return false;
+  return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
+}
+
+function normalizeFallbackImageUrl(url: unknown): string {
+  const text = String(url || '').trim();
+  if (!text) return SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC;
+  if (isHttpUrl(text) || isDataImageUrl(text)) return text;
+  return SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC;
+}
+
+function rewriteSyncnosAssetUrlsInMarkdown(
+  markdown: string,
+  input: {
+    remap: Map<number, number>;
+    fallbackUrlByOldId: Map<number, string>;
+    defaultUrl?: string;
+  },
+): string {
   const raw = String(markdown || '');
-  if (!raw || !remap.size) return raw;
+  if (!raw) return raw;
   if (!raw.includes('syncnos-asset://')) return raw;
+  const remap = input.remap;
+  const fallbackUrlByOldId = input.fallbackUrlByOldId;
+  const defaultUrl = normalizeFallbackImageUrl(input.defaultUrl || SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC);
   return raw.replace(/syncnos-asset:\/\/(\d+)/gi, (full, idRaw) => {
     const oldId = Number(idRaw);
     if (!Number.isFinite(oldId) || oldId <= 0) return full;
     const nextId = remap.get(oldId);
-    if (!nextId) return full;
-    return `syncnos-asset://${nextId}`;
+    if (nextId) return `syncnos-asset://${nextId}`;
+    const fallback = fallbackUrlByOldId.get(oldId);
+    if (fallback) return fallback;
+    return defaultUrl;
   });
 }
 
@@ -303,8 +335,10 @@ export async function importBackupZipV2Merge(
 
   const imageCacheIndexPath =
     manifest && (manifest as any).assets ? String((manifest as any).assets.imageCacheIndexPath || '').trim() : '';
+  const imageCacheIndexDeclared = Boolean(imageCacheIndexPath);
+  const imageCacheIndexMissing = imageCacheIndexDeclared && !entries.has(imageCacheIndexPath);
   const imageCacheIndexDoc =
-    imageCacheIndexPath && entries.has(imageCacheIndexPath) ? readJsonEntry(entries, imageCacheIndexPath) : null;
+    imageCacheIndexPath && !imageCacheIndexMissing ? readJsonEntry(entries, imageCacheIndexPath) : null;
   if (imageCacheIndexDoc) {
     const imageValidation = validateImageCacheIndexDocument(imageCacheIndexDoc);
     if (!imageValidation.ok) throw new Error(imageValidation.error || 'Invalid image cache index');
@@ -343,7 +377,7 @@ export async function importBackupZipV2Merge(
   const stats = makeStats();
   const progress: ImportProgress = {
     done: 0,
-    total: convoFiles.length + totalMessages + incomingMappings.length + settingsKeys.length,
+    total: convoFiles.length + totalMessages + incomingMappings.length + settingsKeys.length + imageCacheAssets.length,
     stage: '',
   };
   const report = () => onProgress?.({ ...progress });
@@ -400,34 +434,91 @@ export async function importBackupZipV2Merge(
 
   // 1.5) Restore image cache assets and rewrite incoming markdown asset urls.
   const assetIdRemap = new Map<number, number>();
+  const fallbackUrlByOldId = new Map<number, string>();
+
+  // If the manifest declares an image cache index but the zip does not contain it, treat this as a "text-only"
+  // import: strip all `syncnos-asset://` references to a safe placeholder so we don't persist broken private URLs.
+  if (imageCacheIndexMissing) {
+    for (const [uk, list] of messagesByUniqueKey.entries()) {
+      const msgs = Array.isArray(list) ? list : [];
+      for (const msg of msgs) {
+        if (!msg || typeof msg !== 'object') continue;
+        const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
+        if (!markdown) continue;
+        const next = rewriteSyncnosAssetUrlsInMarkdown(markdown, {
+          remap: assetIdRemap,
+          fallbackUrlByOldId,
+          defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
+        });
+        if (next !== markdown) msg.contentMarkdown = next;
+      }
+      messagesByUniqueKey.set(uk, msgs);
+    }
+  }
+
   if (imageCacheAssets.length) {
     const { t, stores: s } = tx(db, ['image_cache'], 'readwrite');
     const idx = s.image_cache.index('by_conversationId_url');
     const now = Date.now();
 
-    for (const asset of imageCacheAssets) {
+    progress.stage = 'Assets';
+    report();
+
+    for (let i = 0; i < imageCacheAssets.length; i += 1) {
+      const asset = imageCacheAssets[i];
       const assetId = Number(asset && asset.assetId);
-      if (!Number.isFinite(assetId) || assetId <= 0) continue;
+      if (!Number.isFinite(assetId) || assetId <= 0) {
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
       const uniqueKey = asset && asset.uniqueKey ? String(asset.uniqueKey) : '';
-      if (!uniqueKey.trim()) continue;
+      if (!uniqueKey.trim()) {
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
       const localConversationId = uniqueToLocalId.get(uniqueKey);
-      if (!localConversationId) continue;
+      if (!localConversationId) {
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
 
       const url = asset && asset.url ? String(asset.url) : '';
-      if (!url.trim()) continue;
+      const safeUrl = url.trim();
+      if (!safeUrl) {
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
 
       const contentType = parseContentType(asset && asset.contentType ? asset.contentType : '');
-      if (!contentType.startsWith('image/')) continue;
+      if (!contentType.startsWith('image/')) {
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
 
       const blobPath = asset && asset.blobPath ? String(asset.blobPath) : '';
       const bytes = blobPath ? entries.get(blobPath) : null;
-      if (!bytes) continue;
+      if (!bytes) {
+        fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
       const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
       const byteSize = Number(asset.byteSize) || blob.size || 0;
-      if (byteSize <= 0) continue;
+      if (byteSize <= 0) {
+        fallbackUrlByOldId.set(assetId, normalizeFallbackImageUrl(safeUrl));
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
+        continue;
+      }
 
       // eslint-disable-next-line no-await-in-loop
-      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, url.trim()]) as any);
+      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
       if (existing && existing.id) {
         const existingId = Number(existing.id);
         if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
@@ -437,12 +528,16 @@ export async function importBackupZipV2Merge(
           Number((existing as any).byteSize) ||
           (existingBlob instanceof Blob ? existingBlob.size : 0) ||
           0;
-        if (existingBlob instanceof Blob && existingSize > 0) continue;
+        if (existingBlob instanceof Blob && existingSize > 0) {
+          if (i % 20 === 0) report();
+          bump(1, 'Assets');
+          continue;
+        }
 
         const next = {
           ...existing,
           conversationId: localConversationId,
-          url: url.trim(),
+          url: safeUrl,
           blob,
           byteSize,
           contentType,
@@ -451,12 +546,14 @@ export async function importBackupZipV2Merge(
         };
         // eslint-disable-next-line no-await-in-loop
         await reqToPromise(s.image_cache.put(next as any));
+        if (i % 20 === 0) report();
+        bump(1, 'Assets');
         continue;
       }
 
       const record = {
         conversationId: localConversationId,
-        url: url.trim(),
+        url: safeUrl,
         blob,
         byteSize,
         contentType,
@@ -467,19 +564,29 @@ export async function importBackupZipV2Merge(
       const newId = await reqToPromise(s.image_cache.add(record as any) as any);
       const nextId = Number(newId);
       if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
+
+      if (i % 20 === 0) report();
+      bump(1, 'Assets');
     }
 
     await txDone(t);
   }
 
-  if (assetIdRemap.size) {
+  // If we restored some assets, rewrite `syncnos-asset://<oldId>` references to the local asset ids.
+  // If assets are missing (e.g. user intentionally removed blobs), fall back to the original http(s) image URL
+  // when available, or a tiny placeholder image otherwise.
+  if (assetIdRemap.size || fallbackUrlByOldId.size) {
     for (const [uk, list] of messagesByUniqueKey.entries()) {
       const msgs = Array.isArray(list) ? list : [];
       for (const msg of msgs) {
         if (!msg || typeof msg !== 'object') continue;
         const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
         if (!markdown) continue;
-        const next = rewriteSyncnosAssetUrlsInMarkdown(markdown, assetIdRemap);
+        const next = rewriteSyncnosAssetUrlsInMarkdown(markdown, {
+          remap: assetIdRemap,
+          fallbackUrlByOldId,
+          defaultUrl: SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
+        });
         if (next !== markdown) msg.contentMarkdown = next;
       }
       messagesByUniqueKey.set(uk, msgs);
