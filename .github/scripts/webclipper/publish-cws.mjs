@@ -100,27 +100,7 @@ async function uploadZip({ extensionId, accessToken, zipPath }) {
   }
 }
 
-async function waitUploadReady({ extensionId, accessToken, maxRetries, retryAfterMs }) {
-  const url = `https://www.googleapis.com/chromewebstore/v1.1/items/${extensionId}?projection=DRAFT`;
-  for (let i = 1; i <= maxRetries; i++) {
-    const { json } = await cwsRequest({ method: "GET", url, accessToken });
-    const uploadState = json && json.uploadState ? String(json.uploadState) : "";
-
-    // eslint-disable-next-line no-console
-    console.log(`[cws] draft uploadState: ${uploadState || "unknown"} (attempt ${i}/${maxRetries})`);
-
-    if (uploadState === "SUCCESS") return;
-    if (uploadState === "FAILURE") {
-      throw new Error(`[cws] draft indicates upload failure:\n${JSON.stringify(json, null, 2)}`);
-    }
-
-    await sleep(retryAfterMs);
-  }
-
-  throw new Error(`[cws] upload did not become ready in time (retries=${maxRetries}, retryAfterMs=${retryAfterMs})`);
-}
-
-async function publishItem({ extensionId, accessToken, target }) {
+async function tryPublishItem({ extensionId, accessToken, target }) {
   const url = `https://www.googleapis.com/chromewebstore/v1.1/items/${extensionId}/publish?publishTarget=${encodeURIComponent(target)}`;
   const { json } = await cwsRequest({
     method: "POST",
@@ -130,11 +110,27 @@ async function publishItem({ extensionId, accessToken, target }) {
   });
 
   const status = Array.isArray(json && json.status) ? json.status.map(String) : [];
-  // eslint-disable-next-line no-console
-  console.log(`[cws] publish status: ${status.length ? status.join(", ") : "unknown"}`);
+  return { ok: status.includes("OK"), status, json };
+}
 
-  if (status.includes("OK")) return;
-  throw new Error(`[cws] publish failed:\n${JSON.stringify(json, null, 2)}`);
+async function publishWithRetry({ extensionId, accessToken, target, maxRetries, retryAfterMs }) {
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      const { ok, status, json } = await tryPublishItem({ extensionId, accessToken, target });
+      // eslint-disable-next-line no-console
+      console.log(`[cws] publish status: ${status.length ? status.join(", ") : "unknown"} (attempt ${i}/${maxRetries})`);
+      if (ok) return;
+      // eslint-disable-next-line no-console
+      console.log(`[cws] publish not OK, response:\n${JSON.stringify(json, null, 2)}`);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.log(`[cws] publish request failed (attempt ${i}/${maxRetries}): ${e && e.message ? e.message : String(e)}`);
+    }
+
+    await sleep(retryAfterMs);
+  }
+
+  throw new Error(`[cws] publish did not succeed in time (retries=${maxRetries}, retryAfterMs=${retryAfterMs})`);
 }
 
 async function main() {
@@ -163,10 +159,9 @@ async function main() {
 
   const accessToken = await fetchAccessToken({ clientId, clientSecret, refreshToken });
   await uploadZip({ extensionId, accessToken, zipPath });
-  await waitUploadReady({ extensionId, accessToken, maxRetries, retryAfterMs });
 
   if (!publish) return;
-  await publishItem({ extensionId, accessToken, target });
+  await publishWithRetry({ extensionId, accessToken, target, maxRetries, retryAfterMs });
 }
 
 main().catch((e) => {
@@ -174,4 +169,3 @@ main().catch((e) => {
   console.error(e && e.stack ? e.stack : String(e));
   process.exit(1);
 });
-
