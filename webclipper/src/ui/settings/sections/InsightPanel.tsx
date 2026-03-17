@@ -132,7 +132,7 @@ function DailyTrendChart(props: {
     return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightDistributionEmpty')}</div>;
   }
 
-  const chartHeight = 192;
+  const chartHeight = 204;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
 
@@ -173,7 +173,7 @@ function DailyTrendChart(props: {
           width={chartWidth}
           height={chartHeight}
           data={items}
-          margin={{ top: 12, right: 16, bottom: 36, left: 0 }}
+          margin={{ top: 26, right: 16, bottom: 36, left: 0 }}
         >
           <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
           <XAxis
@@ -230,10 +230,11 @@ function DailyTrendChart(props: {
                   if (!Number.isFinite(value) || value <= 0) return null;
                   const x = Number(labelProps?.x || 0);
                   const y = Number(labelProps?.y || 0);
+                  const textY = y < 22 ? y + 16 : y - 6;
                   return (
                     <text
                       x={x}
-                      y={y - 6}
+                      y={textY}
                       textAnchor="middle"
                       fill="var(--text-secondary)"
                       fontSize={12}
