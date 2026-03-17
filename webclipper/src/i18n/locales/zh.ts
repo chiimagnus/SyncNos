@@ -65,6 +65,8 @@ export const zh: { [K in TranslationKey]: string } = {
   lastExport: '上次导出：',
   importStatus: '导入：',
   statsConversations: '对话：',
+  statsAdded: '新增',
+  statsUpdated: '更新',
   statsMessages: '消息：',
   statsMappings: '映射：',
   statsSettingsApplied: '应用设置：',

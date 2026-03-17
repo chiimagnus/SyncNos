@@ -401,6 +401,141 @@ describe('backup service', () => {
     expect(String(msgs[0].contentMarkdown || '')).toContain('https://img.example/x.png');
   });
 
+  it('importBackupZipV2Merge tolerates missing conversation bundle entry', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const t = db.transaction(['conversations', 'messages'], 'readwrite');
+    const conv1 = await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'notionai',
+        conversationKey: 'c1',
+        title: '打招呼',
+        url: 'https://x',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      }) as any,
+    );
+    const conv2 = await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'c2',
+        title: 'Hello',
+        url: 'https://y',
+        warningFlags: [],
+        lastCapturedAt: 2,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: conv1,
+        messageKey: 'm1',
+        role: 'user',
+        contentText: 'hi',
+        contentMarkdown: '',
+        sequence: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: conv2,
+        messageKey: 'm2',
+        role: 'user',
+        contentText: 'hi',
+        contentMarkdown: '',
+        sequence: 1,
+        updatedAt: 2,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    db.close();
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+
+    // Remove the first referenced bundle entry to simulate a user-edited / corrupted zip.
+    const firstBundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
+    if (firstBundlePath) entries.delete(firstBundlePath);
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.conversationsAdded + stats.conversationsUpdated).toBeGreaterThanOrEqual(1);
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(['conversations'], 'readonly');
+    const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      t2.oncomplete = () => resolve();
+      t2.onerror = () => reject(t2.error);
+      t2.onabort = () => reject(t2.error);
+    });
+    db2.close();
+    expect(convs.length).toBe(1);
+  });
+
+  it('importBackupZipV2Merge recovers bundles when manifest paths do not match zip entry names', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    const manifest = {
+      backupSchemaVersion: 2,
+      exportedAt: '2026-03-17T00:00:00.000Z',
+      db: { name: 'webclipper', version: 1 },
+      counts: { conversations: 1, messages: 1, sync_mappings: 0 },
+      config: { storageLocalPath: 'config/storage-local.json' },
+      index: { conversationsCsvPath: 'sources/conversations.csv' },
+      sources: [{ source: 'notionai', conversationCount: 1, files: ['sources/notionai/notionai-打招呼-abc.json'] }],
+    };
+
+    const bundle = {
+      schemaVersion: 1,
+      conversation: {
+        sourceType: 'chat',
+        source: 'notionai',
+        conversationKey: 'c1',
+        title: '打招呼',
+        url: 'https://x',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      },
+      messages: [{ messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 }],
+      syncMapping: null,
+    };
+
+    // Simulate older zips where non-ASCII filenames were encoded without the UTF-8 flag:
+    // the bundle exists, but under a different decoded entry name than the manifest-declared path.
+    const entries = new Map<string, Uint8Array>();
+    const enc = new TextEncoder();
+    entries.set('manifest.json', enc.encode(JSON.stringify(manifest)));
+    entries.set('config/storage-local.json', enc.encode(JSON.stringify({ schemaVersion: 1, storageLocal: {} })));
+    entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
+    entries.set('sources/notionai/notionai-µëôµï¢σæ╝-abc.json', enc.encode(JSON.stringify(bundle)));
+
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.conversationsAdded).toBe(1);
+    expect(stats.messagesAdded).toBe(1);
+  });
+
   it('importBackupLegacyJsonMerge merges into IndexedDB and applies allowlisted settings only', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

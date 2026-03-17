@@ -10,13 +10,13 @@ function ImportStatsList(props: { stats: any }) {
   return (
     <ul className="tw-m-0 tw-pl-[18px]">
       <li>
-        {t('statsConversations')} +{stats.conversationsAdded} / ~{stats.conversationsUpdated}
+        {t('statsConversations')} {t('statsAdded')} {stats.conversationsAdded} · {t('statsUpdated')} {stats.conversationsUpdated}
       </li>
       <li>
-        {t('statsMessages')} +{stats.messagesAdded} / ~{stats.messagesUpdated} ({t('skipped')} {stats.messagesSkipped})
+        {t('statsMessages')} {t('statsAdded')} {stats.messagesAdded} · {t('statsUpdated')} {stats.messagesUpdated} ({t('skipped')} {stats.messagesSkipped})
       </li>
       <li>
-        {t('statsMappings')} +{stats.mappingsAdded} / ~{stats.mappingsUpdated}
+        {t('statsMappings')} {t('statsAdded')} {stats.mappingsAdded} · {t('statsUpdated')} {stats.mappingsUpdated}
       </li>
       <li>{t('statsSettingsApplied')} {stats.settingsApplied}</li>
     </ul>

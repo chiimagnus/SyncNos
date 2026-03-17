@@ -53,7 +53,8 @@ describe('createMarkdownRenderer', () => {
     const html = md.render('![](syncnos-asset://42)');
     expect(html).toContain('<img');
     expect(html).toContain('data-syncnos-asset-id="42"');
-    expect(html).toContain('src="about:blank"');
+    // Use a tiny valid image as fallback to avoid noisy console errors.
+    expect(html).toContain('src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="');
     expect(html).not.toContain('syncnos-md-image-link');
     expect(html).not.toContain('src="https://');
   });
