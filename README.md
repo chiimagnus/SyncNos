@@ -47,6 +47,12 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
 ---
 
+## Demo Video
+
+[![SyncNos demo video](.github/deepwiki/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
+
+---
+
 ## Supported Sources
 
 ### AI Conversations (11+ platforms)

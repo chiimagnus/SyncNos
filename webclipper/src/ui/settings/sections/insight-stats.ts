@@ -12,6 +12,11 @@ export type InsightDistributionItem = {
   count: number;
 };
 
+export type InsightDailyTrendPoint = {
+  dayStart: number;
+  count: number;
+};
+
 export type InsightTopConversation = {
   conversationId: number;
   title: string;
@@ -23,9 +28,11 @@ export type InsightStats = {
   totalClips: number;
   chatCount: number;
   articleCount: number;
+  chatDailyTrend: InsightDailyTrendPoint[];
   chatSourceDistribution: InsightDistributionItem[];
   totalMessages: number;
   topConversations: InsightTopConversation[];
+  articleDailyTrend: InsightDailyTrendPoint[];
   articleDomainDistribution: InsightDistributionItem[];
 };
 
@@ -40,6 +47,7 @@ export const INSIGHT_TOP_CONVERSATION_LIMIT = 3;
 export const INSIGHT_OTHER_LABEL = t('insightOtherLabel');
 export const INSIGHT_UNKNOWN_DOMAIN_LABEL = t('insightUnknownLabel');
 export const INSIGHT_UNKNOWN_SOURCE_LABEL = t('insightUnknownLabel');
+export const INSIGHT_UNKNOWN_DATE_LABEL = t('insightUnknownLabel');
 export const INSIGHT_UNTITLED_CONVERSATION = t('untitled');
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -100,6 +108,59 @@ function parseHostname(value: unknown): string {
   return hostname || INSIGHT_UNKNOWN_DOMAIN_LABEL;
 }
 
+function getStartOfLocalDay(ts: number): number {
+  if (!Number.isFinite(ts) || ts <= 0) return Number.NaN;
+  const date = new Date(ts);
+  if (!Number.isFinite(date.getTime())) return Number.NaN;
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function buildDailyTrend(options: {
+  counts: Map<number, number>;
+  unknownCount: number;
+  since?: number;
+  until?: number;
+}): InsightDailyTrendPoint[] {
+  const since = Number(options.since);
+  const until = Number(options.until);
+  const hasRange = Number.isFinite(since) && Number.isFinite(until) && since > 0 && until > 0 && until >= since;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const out: InsightDailyTrendPoint[] = [];
+
+  const unknownCount = Math.max(0, Math.floor(options.unknownCount || 0));
+  const counts = options.counts;
+
+  if (hasRange) {
+    const start = getStartOfLocalDay(since);
+    const end = getStartOfLocalDay(until);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return out;
+
+    for (let cursor = start; cursor <= end; cursor += dayMs) {
+      out.push({ dayStart: cursor, count: counts.get(cursor) || 0 });
+    }
+    return out;
+  }
+
+  const keys = Array.from(counts.keys())
+    .filter((key) => Number.isFinite(key))
+    .sort((a, b) => a - b);
+  if (!keys.length) {
+    if (unknownCount > 0) out.push({ dayStart: -1, count: unknownCount });
+    return out;
+  }
+
+  const minDay = keys[0];
+  const maxDay = keys[keys.length - 1];
+  if (unknownCount > 0) out.push({ dayStart: -1, count: unknownCount });
+
+  for (let cursor = minDay; cursor <= maxDay; cursor += dayMs) {
+    out.push({ dayStart: cursor, count: counts.get(cursor) || 0 });
+  }
+
+  return out;
+}
+
 async function readAllConversations(
   conversationsStore: IDBObjectStore,
 ): Promise<Conversation[]> {
@@ -138,9 +199,11 @@ export function createEmptyInsightStats(): InsightStats {
     totalClips: 0,
     chatCount: 0,
     articleCount: 0,
+    chatDailyTrend: [],
     chatSourceDistribution: [],
     totalMessages: 0,
     topConversations: [],
+    articleDailyTrend: [],
     articleDomainDistribution: [],
   };
 }
@@ -181,6 +244,10 @@ export function buildInsightStats(
   const chatSources = new Map<string, number>();
   const articleDomains = new Map<string, number>();
   const topConversations: InsightTopConversation[] = [];
+  const chatDailyCounts = new Map<number, number>();
+  const articleDailyCounts = new Map<number, number>();
+  let chatUnknownDateCount = 0;
+  let articleUnknownDateCount = 0;
 
   for (const conversation of data.conversations) {
     if (hasRange && !isWithinRange(conversation.lastCapturedAt, since, until)) {
@@ -188,11 +255,18 @@ export function buildInsightStats(
     }
 
     const sourceType = normalizeSourceType(conversation.sourceType);
+    const dayStart = getStartOfLocalDay(Number(conversation.lastCapturedAt) || 0);
 
     if (sourceType === 'chat') {
       stats.chatCount += 1;
       const sourceLabel = normalizeSourceLabel(conversation.source);
       chatSources.set(sourceLabel, (chatSources.get(sourceLabel) || 0) + 1);
+
+      if (Number.isFinite(dayStart)) {
+        chatDailyCounts.set(dayStart, (chatDailyCounts.get(dayStart) || 0) + 1);
+      } else if (!hasRange) {
+        chatUnknownDateCount += 1;
+      }
 
       const conversationId = Number(conversation.id);
       const messageCount = Number(data.messageCounts.get(conversationId) || 0);
@@ -210,9 +284,21 @@ export function buildInsightStats(
       stats.articleCount += 1;
       const domain = parseHostname(conversation.url);
       articleDomains.set(domain, (articleDomains.get(domain) || 0) + 1);
+
+      if (Number.isFinite(dayStart)) {
+        articleDailyCounts.set(dayStart, (articleDailyCounts.get(dayStart) || 0) + 1);
+      } else if (!hasRange) {
+        articleUnknownDateCount += 1;
+      }
     }
   }
 
+  stats.chatDailyTrend = buildDailyTrend({
+    counts: chatDailyCounts,
+    unknownCount: chatUnknownDateCount,
+    since: hasRange ? since : undefined,
+    until: hasRange ? until : undefined,
+  });
   stats.chatSourceDistribution = buildDistribution(chatSources, INSIGHT_CHAT_SOURCE_LIMIT);
   stats.articleDomainDistribution = buildDistribution(articleDomains, INSIGHT_ARTICLE_DOMAIN_LIMIT);
   stats.topConversations = topConversations
@@ -222,6 +308,12 @@ export function buildInsightStats(
     })
     .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
   stats.totalClips = stats.chatCount + stats.articleCount;
+  stats.articleDailyTrend = buildDailyTrend({
+    counts: articleDailyCounts,
+    unknownCount: articleUnknownDateCount,
+    since: hasRange ? since : undefined,
+    until: hasRange ? until : undefined,
+  });
 
   return stats;
 }

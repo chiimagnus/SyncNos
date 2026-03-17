@@ -176,6 +176,7 @@ Phase 3（JS→TS）收口状态：
 - 安装依赖：`npm --prefix webclipper install`
 - 本地开发（WXT / Chrome）：`npm --prefix webclipper run dev`
   - 在 `chrome://extensions` 加载 `webclipper/.output/chrome-mv3/`
+  - 若你使用 Arc（或其他 Chromium 但未安装 Chrome）：可设置 `WXT_CHROME_BINARY` 指向浏览器可执行文件；本项目在 macOS 下也会在未发现 Chrome 时自动尝试使用 `/Applications/Arc.app/Contents/MacOS/Arc`
 - 构建（WXT / Chrome）：`npm --prefix webclipper run build`
 - 构建（WXT / Firefox）：`npm --prefix webclipper run build:firefox`
 

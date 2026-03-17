@@ -3,12 +3,14 @@ import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 
 import { t } from '../../../i18n';
-import { Bar, BarChart, Cell, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, Cell, CartesianGrid, LabelList, Tooltip, XAxis, YAxis } from 'recharts';
 
 import {
+  type InsightDailyTrendPoint,
   type InsightDistributionItem,
   type InsightStats,
   type InsightTopConversation,
+  INSIGHT_UNKNOWN_DATE_LABEL,
 } from './insight-stats';
 import type { InsightTimeRange } from './insight-stats';
 import { cardClassName, selectClassName } from '../ui';
@@ -22,6 +24,17 @@ const CHART_BASE_COLOR = 'var(--accent)';
 
 function formatCount(value: number): string {
   return Number(value || 0).toLocaleString();
+}
+
+function formatTrendDayLabel(dayStart: number, mode: 'short' | 'long'): string {
+  const safeDayStart = Number(dayStart);
+  if (!Number.isFinite(safeDayStart) || safeDayStart === -1) return INSIGHT_UNKNOWN_DATE_LABEL;
+
+  const options: Intl.DateTimeFormatOptions =
+    mode === 'short'
+      ? { month: 'numeric', day: 'numeric' }
+      : { year: 'numeric', month: 'numeric', day: 'numeric' };
+  return new Intl.DateTimeFormat(undefined, options).format(new Date(safeDayStart));
 }
 
 function getOrangeBarFill(index: number, total: number): string {
@@ -104,6 +117,137 @@ function DistributionChart(props: {
             ))}
           </Bar>
         </BarChart>
+      ) : null}
+    </div>
+  );
+}
+
+function DailyTrendChart(props: {
+  items: InsightDailyTrendPoint[];
+  stroke: string;
+  ariaLabel: string;
+}) {
+  const { items, stroke, ariaLabel } = props;
+  if (!items.length) {
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightDistributionEmpty')}</div>;
+  }
+
+  const chartHeight = 204;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  const labelMode: 'short' | 'long' = items.length <= 32 ? 'short' : 'long';
+  const shouldRenderDot = items.length <= 90;
+  const shouldRenderLabels = items.length <= 16;
+
+  useLayoutEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const updateSize = () => {
+      const nextWidth = Math.max(0, Math.floor(node.getBoundingClientRect().width));
+      setChartWidth((prevWidth) => (prevWidth === nextWidth ? prevWidth : nextWidth));
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(() => updateSize());
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      aria-label={ariaLabel}
+      style={{ height: chartHeight }}
+      className="tw-w-full tw-min-w-0"
+    >
+      {chartWidth > 0 ? (
+        <AreaChart
+          width={chartWidth}
+          height={chartHeight}
+          data={items}
+          margin={{ top: 26, right: 16, bottom: 36, left: 0 }}
+        >
+          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="dayStart"
+            axisLine={false}
+            tickLine={false}
+            minTickGap={18}
+            interval="preserveStartEnd"
+            angle={-42}
+            textAnchor="end"
+            height={44}
+            tick={{ fill: 'var(--text-secondary)', fontSize: 12, fontWeight: 700 }}
+            tickFormatter={(value) => formatTrendDayLabel(Number(value), labelMode)}
+          />
+          <YAxis
+            dataKey="count"
+            axisLine={false}
+            tickLine={false}
+            width={34}
+            allowDecimals={false}
+            tick={{ fill: 'var(--text-secondary)', fontSize: 12, fontWeight: 700 }}
+          />
+          <Tooltip
+            cursor={{ stroke: 'color-mix(in srgb, var(--accent) 26%, transparent)', strokeWidth: 1 }}
+            formatter={(value) => [formatCount(Number(value || 0)), t('insightTooltipClips')]}
+            labelFormatter={(label) => formatTrendDayLabel(Number(label), 'long')}
+            itemStyle={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 800 }}
+            labelStyle={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700 }}
+            contentStyle={{
+              borderRadius: 12,
+              border: '1px solid var(--border)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
+              boxShadow: 'none',
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="count"
+            stroke={stroke}
+            strokeWidth={2}
+            fill={`color-mix(in srgb, ${stroke} 22%, transparent)`}
+            fillOpacity={1}
+            dot={shouldRenderDot ? { r: 2.5, strokeWidth: 2, fill: 'var(--bg-card)' } : false}
+            activeDot={{ r: 4, strokeWidth: 2, fill: 'var(--bg-card)' }}
+            isAnimationActive={false}
+          >
+            {shouldRenderLabels ? (
+              <LabelList
+                dataKey="count"
+                position="top"
+                content={(labelProps: any) => {
+                  const value = Number(labelProps?.value || 0);
+                  if (!Number.isFinite(value) || value <= 0) return null;
+                  const x = Number(labelProps?.x || 0);
+                  const y = Number(labelProps?.y || 0);
+                  const textY = y < 22 ? y + 16 : y - 6;
+                  return (
+                    <text
+                      x={x}
+                      y={textY}
+                      textAnchor="middle"
+                      fill="var(--text-secondary)"
+                      fontSize={12}
+                      fontWeight={800}
+                    >
+                      {formatCount(value)}
+                    </text>
+                  );
+                }}
+              />
+            ) : null}
+          </Area>
+        </AreaChart>
       ) : null}
     </div>
   );
@@ -269,6 +413,10 @@ export function InsightPanel(props: {
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightChatSectionTitle')}</h2>
 
+          <div className="tw-mt-3">
+            <DailyTrendChart items={stats.chatDailyTrend} stroke="var(--info)" ariaLabel={t('insightOverviewChatCount')} />
+          </div>
+
           <div className="tw-mt-4">
             <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightSourceDistributionTitle')}</div>
             <DistributionChart items={stats.chatSourceDistribution} emptyText={t('insightDistributionEmpty')} />
@@ -288,6 +436,9 @@ export function InsightPanel(props: {
 
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightArticlesSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightArticlesSectionTitle')}</h2>
+          <div className="tw-mt-3">
+            <DailyTrendChart items={stats.articleDailyTrend} stroke="var(--secondary)" ariaLabel={t('insightOverviewArticleCount')} />
+          </div>
           <div className="tw-mt-4">
             <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightArticleDomainsTitle')}</div>
             <DistributionChart items={stats.articleDomainDistribution} emptyText={t('insightDistributionEmpty')} />

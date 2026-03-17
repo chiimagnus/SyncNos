@@ -83,9 +83,11 @@ describe("insight stats", () => {
       totalClips: 0,
       chatCount: 0,
       articleCount: 0,
+      chatDailyTrend: [],
       chatSourceDistribution: [],
       totalMessages: 0,
       topConversations: [],
+      articleDailyTrend: [],
       articleDomainDistribution: [],
     });
   });
@@ -129,6 +131,8 @@ describe("insight stats", () => {
     expect(stats.totalClips).toBe(4);
     expect(stats.chatCount).toBe(2);
     expect(stats.articleCount).toBe(2);
+    expect(stats.chatDailyTrend.map((item) => item.count)).toEqual([2]);
+    expect(stats.articleDailyTrend.map((item) => item.count)).toEqual([2]);
     expect(stats.totalMessages).toBe(15);
     expect(stats.chatSourceDistribution).toEqual([
       { label: "ChatGPT", count: 1 },

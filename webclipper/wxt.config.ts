@@ -1,9 +1,45 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { defineConfig } from 'wxt';
+
+function firstExistingPath(candidates: string[]): string | undefined {
+  for (const candidate of candidates) {
+    try {
+      if (candidate && fs.existsSync(candidate)) return candidate;
+    } catch {
+      // ignore
+    }
+  }
+  return undefined;
+}
+
+function resolveChromiumBinaryForMac(): string | undefined {
+  const configured = process.env.WXT_CHROME_BINARY?.trim();
+  if (configured) return configured;
+
+  const defaultChrome = firstExistingPath([
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+  ]);
+  if (defaultChrome) return undefined;
+
+  return firstExistingPath([
+    '/Applications/Arc.app/Contents/MacOS/Arc',
+    path.join(
+      process.env.HOME ?? '',
+      'Applications/Arc.app/Contents/MacOS/Arc',
+    ),
+  ]);
+}
+
+const chromeBinary =
+  process.platform === 'darwin' ? resolveChromiumBinaryForMac() : undefined;
 
 export default defineConfig({
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],
   entrypointsDir: 'src/entrypoints',
+  webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
   vite: () => ({
     build: {
       // KaTeX/Recharts can legitimately push some chunks beyond Vite's default 500kB warning threshold.

@@ -47,6 +47,12 @@
 
 ---
 
+## 操作演示视频
+
+[![SyncNos 操作演示视频](.github/deepwiki/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
+
+---
+
 ## 支持采集的来源
 
 ### AI 对话（11+ 平台）

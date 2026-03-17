@@ -194,7 +194,7 @@ export default function AppShell() {
           ) : (
             <div
               className={[
-                'route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-p-3 md:tw-p-4',
+                'route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden',
                 showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
               ].join(' ')}
               aria-hidden={showSettingsSheet}
