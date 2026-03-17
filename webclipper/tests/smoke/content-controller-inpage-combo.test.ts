@@ -227,8 +227,69 @@ describe("content-controller inpage combo", () => {
 
     await harness.runTick();
 
-    expect(harness.sendCalls.length).toBe(0);
+    expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(false);
     expect(harness.tipCalls.length).toBe(0);
+  });
+
+  it("auto-saves chatgpt deep research once hydration becomes available", async () => {
+    vi.useFakeTimers();
+
+    const snapshot = {
+      conversation: { source: "chatgpt", conversationKey: "auto-dr-hydrate-1" },
+      messages: [
+        {
+          role: "assistant",
+          contentText:
+            "Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop",
+          contentMarkdown:
+            "Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop",
+        },
+      ],
+    };
+
+    let extractCalls = 0;
+    const harness = createHarness({
+      collectorId: "chatgpt",
+      captureImpl: () => snapshot,
+      incrementalImpl: (snap) => {
+        expect(String(snap?.messages?.[0]?.contentText || "")).not.toMatch(/^Deep Research \\(iframe\\):/);
+        return { changed: true, snapshot: snap };
+      },
+      sendImpl: async (type: string, payload?: any) => {
+        if (type === "chatgptExtractDeepResearch") {
+          extractCalls += 1;
+          if (extractCalls === 1) return { ok: true, data: { items: [] } };
+          return {
+            ok: true,
+            data: {
+              items: [
+                {
+                  href: payload?.urls?.[0],
+                  title: "Deep Research",
+                  text: "x".repeat(400),
+                  markdown: "# Deep Research\n\n" + "x".repeat(400),
+                },
+              ],
+            },
+          };
+        }
+        if (type === "upsertConversation") return { ok: true, data: { id: 33 } };
+        if (type === "syncConversationMessages") return { ok: true, data: { inserted: 1 } };
+        return { ok: true, data: {} };
+      },
+    });
+
+    await harness.runTick();
+    expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
+    expect(harness.tipCalls.some((c) => String(c.text) === "Saved")).toBe(true);
+
+    vi.useRealTimers();
   });
 
   it("disables auto-save for googleaistudio to avoid virtualized truncation", async () => {
