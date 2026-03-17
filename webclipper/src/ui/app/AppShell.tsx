@@ -148,7 +148,7 @@ export default function AppShell() {
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className={['tw-absolute tw-left-3 tw-top-3 tw-z-10', navIconButtonClassName(false)].join(' ')}
+              className={['tw-absolute tw-left-3 tw-top-3 tw-z-30', navIconButtonClassName(false)].join(' ')}
               aria-label={t('expandSidebar')}
             >
               <ExpandIcon />
