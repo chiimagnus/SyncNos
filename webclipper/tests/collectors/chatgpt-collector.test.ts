@@ -85,6 +85,36 @@ describe("chatgpt-collector", () => {
     expect(assistant.contentText).not.toContain("复制");
   });
 
+  it("extracts multiple assistant messages inside an agent-turn container", async () => {
+    const html = `
+      <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
+      <div class="group/turn-messages flex flex-col agent-turn">
+        <div data-message-author-role="assistant" data-message-id="m_ai_1" class="text-message">
+          <div class="markdown prose"><p>first</p></div>
+        </div>
+        <div class="flex items-center justify-between">
+          <button type="button">Thought for 1s</button>
+        </div>
+        <div data-message-author-role="assistant" data-message-id="m_ai_2" class="text-message">
+          <div class="markdown prose"><p>second</p></div>
+        </div>
+      </div>
+    `;
+
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_agent_turn_1");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = createChatgptCollectorDef(env).collector.capture({ manual: true }) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "assistant"]);
+    expect(snap.messages.map((m: any) => m.contentText)).toEqual(["Q", "first", "second"]);
+  });
+
   it("falls back to plain text markdown when markdown helper is unavailable", async () => {
     const html = `
       <article data-testid="conversation-turn-1">
