@@ -83,13 +83,14 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
       title: String(x?.title || '').trim(),
       text: String(x?.text || '').trim(),
       html: String(x?.html || '').trim(),
+      markdown: String(x?.markdown || '').trim(),
     }))
     .filter((x: any) => x.text.length >= 120)
     .sort((a: any, b: any) => b.text.length - a.text.length)[0];
 
   if (!best) return snapshot;
 
-  const markdown = tryHtmlToMarkdown(best.html) || best.text;
+  const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
   const text = best.text;
 
   for (const { m } of targets) {

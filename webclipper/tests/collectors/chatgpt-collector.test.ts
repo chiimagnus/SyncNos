@@ -115,6 +115,38 @@ describe("chatgpt-collector", () => {
     expect(snap.messages.map((m: any) => m.contentText)).toEqual(["Q", "first", "second"]);
   });
 
+  it("preserves hidden mermaid code blocks that are rendered as diagrams", async () => {
+    const html = `
+      <article data-testid="conversation-turn-1">
+        <div data-message-author-role="assistant" data-message-id="m_ai_mermaid">
+          <div class="markdown prose">
+            <p>下面是一个 mermaid：</p>
+            <div class="mermaid">
+              <svg aria-hidden="true"><path d="M0 0" /></svg>
+              <pre class="sr-only" aria-hidden="true"><code class="language-mermaid">graph TD\n  A[Start] --> B{Decision}\n  B -->|Yes| C[OK]\n  B -->|No| D[Retry]</code></pre>
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_mermaid_1");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("assistant");
+    expect(snap.messages[0].contentMarkdown).toContain("```mermaid");
+    expect(snap.messages[0].contentMarkdown).toContain("graph TD");
+    expect(snap.messages[0].contentText).toContain("graph TD");
+  });
+
   it("captures deep-research iframe content via postMessage", async () => {
     const html = `
       <div data-message-author-role="assistant" data-message-id="m_ai_prev">
