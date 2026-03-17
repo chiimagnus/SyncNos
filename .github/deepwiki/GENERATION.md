@@ -43,7 +43,7 @@
 
 ## What Changed In This Update
 - 清理 `INDEX.md` 的日期型“变更流水”内容，改为稳定入口与事实源说明，减少跨页重复与时效性噪声。
-- 将 deepwiki 中 WebClipper manifest 版本事实统一更新为 `1.3.3`（`dependencies.md`、`configuration.md`、`release.md`、`testing.md`）。
+- 将 WebClipper manifest 发版号收敛为单一事实源：仅在 `configuration.md` 记录具体值，其余页面只做引用。
 - 将 deepwiki 中 IndexedDB 版本事实统一更新为 `DB_VERSION = 6`，并补齐 `oldVersion < 6` 清理迁移说明（`storage.md`、`modules/webclipper.md`）。
 - 在存储专题页补充 `image_cache` store 与备份边界，避免“缓存层=备份层”的误读。
 - 删除模块页中易过期的“近期修复流水”表述，保留稳定的职责、边界与入口信息。

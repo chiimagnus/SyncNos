@@ -1,0 +1,75 @@
+# 安全模型（Security）
+
+## 安全范围
+本页描述仓库内可验证的安全实践：凭据管理、备份边界、扩展权限、OAuth 交换、发布链路校验。
+
+> 若需先理解业务影响面，先读 [business-context.md](business-context.md)。
+
+## 敏感数据面与落点
+
+| 数据类型 | 产生侧 | 存储位置 | 安全策略 |
+| --- | --- | --- | --- |
+| Notion OAuth token（扩展） | WebClipper | `chrome.storage.local`（token store） | 备份时显式排除 `notion_oauth_token*` |
+| Notion OAuth client secret（扩展） | 用户配置/worker secret | 本地仅短期使用；worker 侧 secret | `ensureDefaultNotionOAuthClientId()` 会移除本地 secret |
+| 站点 Cookie（App） | macOS App | Keychain（`SiteLoginsStore`） | 不进入扩展备份，不明文落仓 |
+| IAP/设备标识（App） | macOS App | UserDefaults + Keychain | 双写策略，敏感值保留 Keychain |
+| 会话与消息内容（扩展） | WebClipper | IndexedDB | 仅本地事实源，外发需用户触发 |
+| 备份包 | WebClipper | 本地 Zip v2 文件 | denylist + 路径安全校验 + schema 校验 |
+
+## 扩展权限与最小化原则
+
+| 权限类型 | 当前配置 | 风险点 | 控制措施 |
+| --- | --- | --- | --- |
+| `permissions` | `storage/contextMenus/tabs/webNavigation/activeTab/scripting` | 过度权限可能扩大攻击面 | 仅保留采集与同步所需能力 |
+| `host_permissions` | 支持站点 + Notion + `http(s)://*/*` | 覆盖面广 | 运行时再由 `inpage_display_mode` 与支持站点 gating 控制实际启用 |
+| `web_accessible_resources` | 仅图标资源 | 跨站资源暴露 | 限定 `resources` 与 `matches` |
+
+## OAuth 与令牌交换安全
+
+| 环节 | 实现 | 安全控制 |
+| --- | --- | --- |
+| 授权入口 | `getNotionOAuthDefaults()` | 固定授权 URL、固定 redirect URI |
+| state 校验 | `handleNotionOAuthCallbackNavigation()` | 必须匹配 `notion_oauth_pending_state` |
+| 令牌交换 | Cloudflare Worker `/notion/oauth/exchange` | `POST` + JSON 校验 + 12s 超时 |
+| 速率限制 | worker `bestEffortRateLimit` | 单 IP 10 分钟最多 30 次 |
+| 凭据管理 | `wrangler secret` | `NOTION_CLIENT_SECRET` 不入仓 |
+
+## 备份与导入安全控制
+
+| 控制点 | 文件 | 说明 |
+| --- | --- | --- |
+| 敏感键排除 | `backup-utils.ts` | denylist 排除 `notion_oauth_token*`、`notion_oauth_client_secret` |
+| Zip 路径安全 | `backup-utils.ts`, `zip-utils.ts` | 拒绝 `..`、绝对路径、NUL 字符等危险 entry |
+| manifest/schema 校验 | `backup-utils.ts` | 校验 `backupSchemaVersion`、sources、assets、扩展名 |
+| 导入合并策略 | `import.ts` | merge import，优先保留本地有效字段，避免误覆盖 |
+| 资产回退策略 | `import.ts` | 缺失图片 blob 时回退到 URL/占位图，不写入无效数据 |
+
+## 供应链与发布校验
+
+| 校验点 | 位置 | 作用 |
+| --- | --- | --- |
+| tag 规则 `v*` | `webclipper-*.yml` | 统一发布触发入口 |
+| `manifest.version` 对齐 tag | `webclipper-amo/cws/edge` workflows | 防止“代码版本/发布版本”错位 |
+| Node 固定版本 | `actions/setup-node@v5` + `node-version: 20` | 降低构建环境漂移 |
+| Firefox 特定补丁 | `package-release-assets.mjs` | 满足 AMO 校验要求 |
+
+## 已知边界与待增强项
+
+- 扩展 `host_permissions` 仍较宽，当前依赖运行时 gating 控制行为；后续可继续评估细化范围。
+- Cloudflare worker 采用 `Access-Control-Allow-Origin: *` 以满足扩展调用便捷性，需要配合严格的路径/方法校验与限流。
+- App Store 提交流程不在仓库内，当前无法在此页面给出同级自动化安全检查证据。
+
+## 来源引用（Source References）
+- `webclipper/wxt.config.ts`
+- `webclipper/src/sync/notion/auth/oauth.ts`
+- `webclipper/src/sync/notion/auth/token-store.ts`
+- `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
+- `webclipper/cloudflare-workers/syncnos-notion-oauth/wrangler.toml`
+- `webclipper/src/sync/backup/backup-utils.ts`
+- `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/zip-utils.ts`
+- `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
+- `macOS/SyncNos/Services/Auth/IAPService.swift`
+- `.github/workflows/webclipper-amo-publish.yml`
+- `.github/workflows/webclipper-cws-publish.yml`
+- `.github/workflows/webclipper-edge-publish.yml`

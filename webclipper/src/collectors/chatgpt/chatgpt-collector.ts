@@ -270,12 +270,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           // If extraction fails (timing/permissions), keep a stable placeholder so users can still recover the link.
           const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
           const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
-          const normalized = String(contentText || '').trim();
-          const looksLikeOnlyLabel = !normalized || /^chatgpt said:?\s*$/i.test(normalized);
-          if (looksLikeOnlyLabel || !baseMarkdown) {
-            contentText = placeholder;
-            baseMarkdown = placeholder;
-          }
+          // Some locales expose an sr-only "ChatGPT said" label as the only text sibling of the iframe.
+          // Always prefer a stable placeholder so the hydrator can reliably fill the final report.
+          contentText = placeholder;
+          baseMarkdown = placeholder;
         }
       }
 

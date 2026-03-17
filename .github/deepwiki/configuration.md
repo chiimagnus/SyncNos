@@ -28,7 +28,7 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.3.3` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.3.4` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
 | 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
@@ -45,6 +45,11 @@
 | Insight 统计限制 | `ui/settings/sections/insight-stats.ts` | `INSIGHT_CHAT_SOURCE_LIMIT=4`, `INSIGHT_ARTICLE_DOMAIN_LIMIT=8`, `INSIGHT_TOP_CONVERSATION_LIMIT=3` | 控制平台来源排行、文章域名排行与 Top conversation 截断方式 |
 | Obsidian 设置 | `obsidian*` settings store | `apiBaseUrl`, `authHeaderName`, `chatFolder`, `articleFolder`, 可选 API Key | 控制扩展写入本地 vault |
 | 备份敏感键排除 | `backup-utils.ts` | 精确排除 `notion_oauth_token_v1`, `notion_oauth_client_secret`，且排除任何 `notion_oauth_token*` | 避免敏感信息进入备份 |
+
+### 版本号单一事实源（Single Source of Truth）
+- deepwiki 里 **只在本页**记录 WebClipper 的具体发版号（`manifest.version`）。
+- 其他页面（如 `dependencies.md` / `release.md` / `testing.md`）只引用本页，不再重复写死版本值。
+- 当版本变更时，只需要修改此处与源码 `webclipper/wxt.config.ts`，避免多处文档漂移。
 
 - 扩展 UI 文案没有独立的“语言设置”键；`i18n/index.ts` 会按 `navigator.language` 自动在 `en` / `zh` 间切换。
 - 主题模式不是只靠 CSS 媒体查询：`useThemeMode()` 会监听 `chrome.storage.local` 的 `ui_theme_mode`，并把 `data-theme='light'/'dark'` 覆盖写到根节点；`system` 模式才回退到 `prefers-color-scheme`。
@@ -85,7 +90,7 @@
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
 ```ts
 manifest: {
-  version: '1.3.3',
+  version: '<manifest.version>',
   permissions: ['storage', 'contextMenus', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
   host_permissions: ['https://chat.openai.com/*', 'https://api.notion.com/*', 'http://*/*', 'https://*/*']
 }
