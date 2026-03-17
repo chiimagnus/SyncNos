@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
 import { exportBackupZipV2 } from '../../src/sync/backup/export';
-import { importBackupLegacyJsonMerge } from '../../src/sync/backup/import';
+import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '../../src/sync/backup/import';
 import { extractZipEntries } from '../../src/sync/backup/zip-utils';
 import { __closeDbForTests } from '../../src/sync/backup/idb';
 import { openDb } from '../../src/platform/idb/schema';
@@ -80,7 +80,7 @@ describe('backup service', () => {
     globalThis.browser = undefined;
 
     const db = await openDb();
-    const t = db.transaction(['conversations', 'messages', 'sync_mappings'], 'readwrite');
+    const t = db.transaction(['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
     const convId = await reqToPromise<number>(
       t.objectStore('conversations').add({
         sourceType: 'chat',
@@ -92,12 +92,24 @@ describe('backup service', () => {
         lastCapturedAt: 1,
       }) as any,
     );
+    const imgId = await reqToPromise<number>(
+      t.objectStore('image_cache').add({
+        conversationId: convId,
+        url: 'https://img.example/x.png',
+        blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+        byteSize: 3,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
     await reqToPromise(
       t.objectStore('messages').add({
         conversationId: convId,
         messageKey: 'm1',
         role: 'user',
         contentText: 'hi',
+        contentMarkdown: `![x](syncnos-asset://${imgId})`,
         sequence: 1,
         updatedAt: 1,
       }) as any,
@@ -127,6 +139,7 @@ describe('backup service', () => {
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
     expect(manifest.backupSchemaVersion).toBe(2);
     expect(manifest.counts.conversations).toBe(1);
+    expect(manifest.assets.imageCacheIndexPath).toBe('assets/image-cache/index.json');
 
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
     expect(config.schemaVersion).toBe(1);
@@ -140,6 +153,93 @@ describe('backup service', () => {
     expect(bundle.conversation.source).toBe('chatgpt');
     expect(bundle.messages.length).toBe(1);
     expect(bundle.syncMapping.notionPageId).toBe('np1');
+
+    expect(entries.has('assets/image-cache/index.json')).toBe(true);
+    const imageIndex = JSON.parse(new TextDecoder().decode(entries.get('assets/image-cache/index.json')!));
+    expect(imageIndex.schemaVersion).toBe(1);
+    expect(Array.isArray(imageIndex.assets)).toBe(true);
+    expect(imageIndex.assets.length).toBe(1);
+    expect(imageIndex.assets[0].assetId).toBe(imgId);
+    expect(typeof imageIndex.assets[0].blobPath).toBe('string');
+    expect(entries.has(imageIndex.assets[0].blobPath)).toBe(true);
+  });
+
+  it('importBackupZipV2Merge restores image cache and rewrites syncnos-asset urls', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const t = db.transaction(['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
+    const convId = await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        title: 'Hello',
+        url: 'https://x',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      }) as any,
+    );
+    const oldImgId = await reqToPromise<number>(
+      t.objectStore('image_cache').add({
+        conversationId: convId,
+        url: 'https://img.example/x.png',
+        blob: new Blob([new Uint8Array([9, 8, 7, 6])], { type: 'image/png' }),
+        byteSize: 4,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('messages').add({
+        conversationId: convId,
+        messageKey: 'm1',
+        role: 'user',
+        contentText: 'hi',
+        contentMarkdown: `![x](syncnos-asset://${oldImgId})`,
+        sequence: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    db.close();
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.conversationsAdded + stats.conversationsUpdated).toBeGreaterThanOrEqual(1);
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
+    const msgs = await reqToPromise<any[]>(t2.objectStore('messages').getAll() as any);
+    const assets = await reqToPromise<any[]>(t2.objectStore('image_cache').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      t2.oncomplete = () => resolve();
+      t2.onerror = () => reject(t2.error);
+      t2.onabort = () => reject(t2.error);
+    });
+    db2.close();
+
+    expect(msgs.length).toBe(1);
+    expect(assets.length).toBe(1);
+    const md = String(msgs[0].contentMarkdown || '');
+    const match = /syncnos-asset:\/\/(\d+)/.exec(md);
+    expect(match).not.toBeNull();
+    const referencedId = Number(match?.[1]);
+    expect(assets.some((a) => Number(a.id) === referencedId)).toBe(true);
   });
 
   it('importBackupLegacyJsonMerge merges into IndexedDB and applies allowlisted settings only', async () => {

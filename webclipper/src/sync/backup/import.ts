@@ -1,6 +1,7 @@
 import { storageSet } from '../../platform/storage/local';
 import {
   filterStorageForBackup,
+  validateImageCacheIndexDocument,
   mergeConversationRecord,
   mergeMessageRecord,
   mergeSyncMappingRecord,
@@ -13,6 +14,25 @@ import {
 import { openDb, reqToPromise, tx, txDone } from './idb';
 
 type AnyRecord = Record<string, any>;
+
+function parseContentType(value: unknown): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.split(';')[0]!.trim().toLowerCase();
+}
+
+function rewriteSyncnosAssetUrlsInMarkdown(markdown: string, remap: Map<number, number>): string {
+  const raw = String(markdown || '');
+  if (!raw || !remap.size) return raw;
+  if (!raw.includes('syncnos-asset://')) return raw;
+  return raw.replace(/syncnos-asset:\/\/(\d+)/gi, (full, idRaw) => {
+    const oldId = Number(idRaw);
+    if (!Number.isFinite(oldId) || oldId <= 0) return full;
+    const nextId = remap.get(oldId);
+    if (!nextId) return full;
+    return `syncnos-asset://${nextId}`;
+  });
+}
 
 export type ImportProgress = { done: number; total: number; stage: string };
 
@@ -281,6 +301,17 @@ export async function importBackupZipV2Merge(
     for (const p of files) convoFiles.push(String(p || '').trim());
   }
 
+  const imageCacheIndexPath =
+    manifest && (manifest as any).assets ? String((manifest as any).assets.imageCacheIndexPath || '').trim() : '';
+  const imageCacheIndexDoc =
+    imageCacheIndexPath && entries.has(imageCacheIndexPath) ? readJsonEntry(entries, imageCacheIndexPath) : null;
+  if (imageCacheIndexDoc) {
+    const imageValidation = validateImageCacheIndexDocument(imageCacheIndexDoc);
+    if (!imageValidation.ok) throw new Error(imageValidation.error || 'Invalid image cache index');
+  }
+  const imageCacheAssets: AnyRecord[] =
+    imageCacheIndexDoc && Array.isArray((imageCacheIndexDoc as any).assets) ? (imageCacheIndexDoc as any).assets : [];
+
   const incomingConversations: AnyRecord[] = [];
   const messagesByUniqueKey = new Map<string, AnyRecord[]>();
   const incomingMappings: AnyRecord[] = [];
@@ -365,6 +396,94 @@ export async function importBackupZipV2Merge(
     }
 
     await txDone(t);
+  }
+
+  // 1.5) Restore image cache assets and rewrite incoming markdown asset urls.
+  const assetIdRemap = new Map<number, number>();
+  if (imageCacheAssets.length) {
+    const { t, stores: s } = tx(db, ['image_cache'], 'readwrite');
+    const idx = s.image_cache.index('by_conversationId_url');
+    const now = Date.now();
+
+    for (const asset of imageCacheAssets) {
+      const assetId = Number(asset && asset.assetId);
+      if (!Number.isFinite(assetId) || assetId <= 0) continue;
+      const uniqueKey = asset && asset.uniqueKey ? String(asset.uniqueKey) : '';
+      if (!uniqueKey.trim()) continue;
+      const localConversationId = uniqueToLocalId.get(uniqueKey);
+      if (!localConversationId) continue;
+
+      const url = asset && asset.url ? String(asset.url) : '';
+      if (!url.trim()) continue;
+
+      const contentType = parseContentType(asset && asset.contentType ? asset.contentType : '');
+      if (!contentType.startsWith('image/')) continue;
+
+      const blobPath = asset && asset.blobPath ? String(asset.blobPath) : '';
+      const bytes = blobPath ? entries.get(blobPath) : null;
+      if (!bytes) continue;
+      const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
+      const byteSize = Number(asset.byteSize) || blob.size || 0;
+      if (byteSize <= 0) continue;
+
+      // eslint-disable-next-line no-await-in-loop
+      const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, url.trim()]) as any);
+      if (existing && existing.id) {
+        const existingId = Number(existing.id);
+        if (Number.isFinite(existingId) && existingId > 0) assetIdRemap.set(assetId, existingId);
+
+        const existingBlob = (existing as any).blob as unknown;
+        const existingSize =
+          Number((existing as any).byteSize) ||
+          (existingBlob instanceof Blob ? existingBlob.size : 0) ||
+          0;
+        if (existingBlob instanceof Blob && existingSize > 0) continue;
+
+        const next = {
+          ...existing,
+          conversationId: localConversationId,
+          url: url.trim(),
+          blob,
+          byteSize,
+          contentType,
+          createdAt: Number(existing.createdAt) || Number(asset.createdAt) || now,
+          updatedAt: now,
+        };
+        // eslint-disable-next-line no-await-in-loop
+        await reqToPromise(s.image_cache.put(next as any));
+        continue;
+      }
+
+      const record = {
+        conversationId: localConversationId,
+        url: url.trim(),
+        blob,
+        byteSize,
+        contentType,
+        createdAt: Number(asset.createdAt) || now,
+        updatedAt: now,
+      };
+      // eslint-disable-next-line no-await-in-loop
+      const newId = await reqToPromise(s.image_cache.add(record as any) as any);
+      const nextId = Number(newId);
+      if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
+    }
+
+    await txDone(t);
+  }
+
+  if (assetIdRemap.size) {
+    for (const [uk, list] of messagesByUniqueKey.entries()) {
+      const msgs = Array.isArray(list) ? list : [];
+      for (const msg of msgs) {
+        if (!msg || typeof msg !== 'object') continue;
+        const markdown = msg.contentMarkdown && String(msg.contentMarkdown).trim() ? String(msg.contentMarkdown) : '';
+        if (!markdown) continue;
+        const next = rewriteSyncnosAssetUrlsInMarkdown(markdown, assetIdRemap);
+        if (next !== markdown) msg.contentMarkdown = next;
+      }
+      messagesByUniqueKey.set(uk, msgs);
+    }
   }
 
   // 2) Upsert messages by (localConversationId, messageKey).
