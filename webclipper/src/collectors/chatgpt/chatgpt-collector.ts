@@ -84,13 +84,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           resolve(null);
         }, timeoutMs);
 
-        let preferredTargetOrigin = '*';
-        try {
-          if (iframeSrc) preferredTargetOrigin = new URL(iframeSrc).origin;
-        } catch (_e) {
-          // ignore
-        }
-
         const sendRequest = () => {
           const targetWindow = iframeEl?.contentWindow;
           if (!targetWindow || typeof targetWindow.postMessage !== 'function') return;
@@ -101,23 +94,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
                 type: DEEP_RESEARCH_MESSAGE_TYPES.REQUEST,
                 requestId,
               },
-              preferredTargetOrigin,
+              // Use '*' to avoid origin-mismatch errors while the iframe is still navigating (often starts as about:blank inheriting parent origin).
+              // The receiver validates parent origins and request ids, and we only post to the specific iframe window.
+              '*',
             );
           } catch (_e) {
-            // If the iframe hasn't navigated yet, its WindowProxy may still have the parent's origin,
-            // which causes a mismatch error when using the expected iframe origin. Fall back to '*'.
-            try {
-              targetWindow.postMessage(
-                {
-                  __syncnos: true,
-                  type: DEEP_RESEARCH_MESSAGE_TYPES.REQUEST,
-                  requestId,
-                },
-                '*',
-              );
-            } catch (_e2) {
-              // ignore
-            }
+            // ignore
           }
         };
 
