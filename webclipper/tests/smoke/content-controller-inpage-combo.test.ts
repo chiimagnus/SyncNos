@@ -253,7 +253,7 @@ describe("content-controller inpage combo", () => {
       collectorId: "chatgpt",
       captureImpl: () => snapshot,
       incrementalImpl: (snap) => {
-        expect(String(snap?.messages?.[0]?.contentText || "")).not.toMatch(/^Deep Research \\(iframe\\):/);
+        expect(String(snap?.messages?.[0]?.contentText || "")).not.toMatch(/^Deep Research \(iframe\):/);
         return { changed: true, snapshot: snap };
       },
       sendImpl: async (type: string, payload?: any) => {

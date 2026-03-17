@@ -200,6 +200,57 @@ describe("chatgpt-collector", () => {
     expect(snap.messages[1].contentText).toContain('Body');
   });
 
+  it("falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label", async () => {
+    const html = `
+      <article data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="t1">
+        <h6 class="sr-only select-none">ChatGPT说:</h6>
+        <div class="agent-turn">
+          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/?app=chatgpt&locale=zh-CN"></iframe>
+        </div>
+      </article>
+    `;
+
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_fallback_1");
+    const iframe = dom.window.document.querySelector("iframe") as any;
+    expect(iframe).toBeTruthy();
+
+    const fakeFrameWindow = {
+      postMessage: (msg: any) => {
+        const requestId = msg?.requestId;
+        dom.window.dispatchEvent(
+          new (dom.window as any).MessageEvent("message", {
+            data: {
+              __syncnos: true,
+              type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+              requestId,
+              title: "Deep Research",
+              markdown: "",
+              text: "",
+            },
+            origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+            source: fakeFrameWindow as any,
+          }),
+        );
+      },
+    };
+    Object.defineProperty(iframe, "contentWindow", { configurable: true, value: fakeFrameWindow });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({})) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].role).toBe("assistant");
+    expect(String(snap.messages[0].contentText)).toMatch(/^Deep Research \(iframe\):/);
+    expect(String(snap.messages[0].contentText)).toContain("connector_openai_deep_research.web-sandbox.oaiusercontent.com");
+    expect(String(snap.messages[0].contentText)).not.toContain("ChatGPT说");
+  });
+
   it("falls back to plain text markdown when markdown helper is unavailable", async () => {
     const html = `
       <article data-testid="conversation-turn-1">
