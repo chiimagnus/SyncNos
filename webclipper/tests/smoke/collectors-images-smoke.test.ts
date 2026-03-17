@@ -32,7 +32,7 @@ describe("collectors images (smoke)", () => {
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = createChatgptCollectorDef(env).collector.capture({ manual: true }) as any;
+    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true })) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     expect(snap.messages[0].contentMarkdown).toContain("![](https://img.test/u.png)");

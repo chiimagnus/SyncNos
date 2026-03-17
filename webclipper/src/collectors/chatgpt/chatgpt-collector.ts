@@ -4,6 +4,126 @@ import { appendImageMarkdown, extractImageUrlsFromElement } from '../collector-u
 import chatgptMarkdown from './chatgpt-markdown.ts';
 
 export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinition {
+  const DEEP_RESEARCH_MESSAGE_TYPES = Object.freeze({
+    REQUEST: 'SYNCNOS_DEEP_RESEARCH_REQUEST',
+    RESPONSE: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
+  });
+
+  const deepResearchCache = new Map<string, { markdown: string; text: string; title: string; updatedAt: number }>();
+  const deepResearchInFlight = new Map<string, Promise<{ markdown: string; text: string; title: string } | null>>();
+  const deepResearchPending = new Map<
+    string,
+    {
+      resolve: (payload: { markdown: string; text: string; title: string } | null) => void;
+      timeoutId: any;
+      intervalId?: any;
+    }
+  >();
+  let deepResearchListenerInstalled = false;
+
+  function ensureDeepResearchListener() {
+    if (deepResearchListenerInstalled) return;
+    deepResearchListenerInstalled = true;
+    env.window.addEventListener('message', (event: any) => {
+      const data = event?.data;
+      if (!data || data.__syncnos !== true) return;
+      if (data.type !== DEEP_RESEARCH_MESSAGE_TYPES.RESPONSE) return;
+      const requestId = String(data.requestId || '').trim();
+      if (!requestId) return;
+
+      const pending = deepResearchPending.get(requestId);
+      if (!pending) return;
+      deepResearchPending.delete(requestId);
+      try {
+        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        if (pending.intervalId) clearInterval(pending.intervalId);
+      } catch (_e) {
+        // ignore
+      }
+
+      const markdown = String(data.markdown || '').trim();
+      const text = String(data.text || '').trim();
+      const title = String(data.title || '').trim() || 'Deep Research';
+      if (!markdown && !text) {
+        pending.resolve(null);
+        return;
+      }
+      pending.resolve({ markdown, text, title });
+    });
+  }
+
+  function findDeepResearchIframe(wrapper: any): any | null {
+    if (!wrapper || !wrapper.querySelector) return null;
+    return wrapper.querySelector("iframe[title='internal://deep-research']") || null;
+  }
+
+  function requestDeepResearchContent(iframeEl: any, options?: { timeoutMs?: number }): Promise<{ markdown: string; text: string; title: string } | null> {
+    const iframeSrc = String(iframeEl?.getAttribute?.('src') || '').trim();
+    const cacheKey = iframeSrc || String(iframeEl?.getAttribute?.('title') || 'deep-research');
+    const cached = deepResearchCache.get(cacheKey);
+    const now = Date.now();
+    if (cached && now - cached.updatedAt < 60_000) return Promise.resolve({ markdown: cached.markdown, text: cached.text, title: cached.title });
+
+    const existing = deepResearchInFlight.get(cacheKey);
+    if (existing) return existing;
+
+    const timeoutMs = Number.isFinite(options?.timeoutMs as any) ? Math.max(400, Number(options?.timeoutMs)) : 2500;
+    const p = new Promise<{ markdown: string; text: string; title: string } | null>((resolve) => {
+      try {
+        ensureDeepResearchListener();
+
+        const requestId = `dr_${now}_${Math.random().toString(16).slice(2)}`;
+        const timeoutId = env.window.setTimeout(() => {
+          deepResearchPending.delete(requestId);
+          resolve(null);
+        }, timeoutMs);
+
+        let targetOrigin = '*';
+        try {
+          if (iframeSrc) targetOrigin = new URL(iframeSrc).origin;
+        } catch (_e) {
+          // ignore
+        }
+
+        const sendRequest = () => {
+          const targetWindow = iframeEl?.contentWindow;
+          if (!targetWindow || typeof targetWindow.postMessage !== 'function') return;
+          try {
+            targetWindow.postMessage(
+              {
+                __syncnos: true,
+                type: DEEP_RESEARCH_MESSAGE_TYPES.REQUEST,
+                requestId,
+              },
+              targetOrigin,
+            );
+          } catch (_e) {
+            // ignore
+          }
+        };
+
+        // Race-proof: the iframe's content script may not be ready yet. Retry for a short window.
+        const intervalId = env.window.setInterval(() => {
+          if (!deepResearchPending.has(requestId)) return;
+          sendRequest();
+        }, 250);
+
+        deepResearchPending.set(requestId, { resolve, timeoutId, intervalId });
+        sendRequest();
+      } catch (_e) {
+        resolve(null);
+      }
+    }).then((payload) => {
+      if (payload) deepResearchCache.set(cacheKey, { ...payload, updatedAt: Date.now() });
+      return payload;
+    }).finally(() => {
+      deepResearchInFlight.delete(cacheKey);
+    });
+
+    deepResearchInFlight.set(cacheKey, p);
+    return p;
+  }
+
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname);
@@ -65,14 +185,22 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       return nodes.filter((node: any) => !nodes.some((other: any) => other !== node && node.contains(other)));
     }
 
-    // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple
-    // assistant messages inside a single `.agent-turn` container; keeping `.agent-turn`
-    // as the wrapper would only capture the first message.
     const roleNodes = Array.from(scope.querySelectorAll('[data-message-author-role]')) as any[];
-    if (roleNodes.length) return sortInDocumentOrder(dropAncestors(roleNodes));
+    const articleTurnNodes = Array.from(scope.querySelectorAll("article[data-testid^='conversation-turn-']")) as any[];
+    const divTurnNodes = Array.from(scope.querySelectorAll("div[data-testid='conversation-turn']")) as any[];
 
-    const turnNodes = Array.from(scope.querySelectorAll("div[data-testid='conversation-turn']")) as any[];
-    if (turnNodes.length) return sortInDocumentOrder(dropAncestors(turnNodes));
+    // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple assistant
+    // messages inside a single `.agent-turn` container; keeping `.agent-turn` as the wrapper would
+    // only capture the first message.
+    if (roleNodes.length) {
+      const picked = dropAncestors(roleNodes);
+      const extraTurns = articleTurnNodes.filter((turn: any) => !picked.some((node: any) => turn.contains(node)));
+      return sortInDocumentOrder(dropAncestors(Array.from(new Set(picked.concat(extraTurns).concat(divTurnNodes).filter(Boolean))) as any[]));
+    }
+
+    if (divTurnNodes.length || articleTurnNodes.length) {
+      return sortInDocumentOrder(dropAncestors(divTurnNodes.concat(articleTurnNodes)));
+    }
 
     const agentTurnNodes = Array.from(scope.querySelectorAll('.agent-turn')) as any[];
     return sortInDocumentOrder(dropAncestors(agentTurnNodes));
@@ -91,7 +219,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return 'assistant';
   }
 
-  function collectMessages({ allowEditing }: any = {}): any {
+  async function collectMessages({ allowEditing }: any = {}): Promise<any[]> {
     const root = getConversationRoot();
     if (!root) return [];
     if (!allowEditing && inEditMode(root)) return [];
@@ -103,14 +231,14 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       for (const turn of turns) wrappers.push(turn);
     }
 
-    const out = [];
+    const out: any[] = [];
     for (let i = 0; i < wrappers.length; i += 1) {
       const el = wrappers[i];
       const role = roleFromWrapper(el);
       const node = role === 'user' ? userContentNode(el) : assistantContentNode(el);
       const raw = node ? node.innerText || node.textContent || '' : '';
       const fallbackText = env.normalize.normalizeText(raw);
-      const contentText =
+      let contentText =
         role === 'assistant' && typeof chatgptMarkdown.extractAssistantText === 'function'
           ? chatgptMarkdown.extractAssistantText(el) || fallbackText
           : fallbackText;
@@ -120,11 +248,35 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         const secondary = extractImageUrlsFromElement(el);
         return Array.from(new Set(primary.concat(secondary)));
       })();
-      if (!contentText && !imageUrls.length) continue;
-      const baseMarkdown =
+
+      let baseMarkdown =
         role === 'assistant' && typeof chatgptMarkdown.extractAssistantMarkdown === 'function'
           ? chatgptMarkdown.extractAssistantMarkdown(el) || contentText || ''
           : contentText || '';
+
+      const deepResearchIframe = role === 'assistant' ? findDeepResearchIframe(el) : null;
+      if (role === 'assistant' && deepResearchIframe) {
+        const extracted = await requestDeepResearchContent(deepResearchIframe, { timeoutMs: allowEditing ? 12000 : 2500 });
+        if (extracted) {
+          const markdown = String(extracted.markdown || '').trim();
+          const text = String(extracted.text || '').trim();
+          baseMarkdown = markdown || text || baseMarkdown || '';
+          contentText = env.normalize.normalizeText(text || markdown || contentText || '');
+        } else {
+          // The parent page doesn't contain the report body; only the iframe does.
+          // If extraction fails (timing/permissions), keep a stable placeholder so users can still recover the link.
+          const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
+          const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
+          const normalized = String(contentText || '').trim();
+          const looksLikeOnlyLabel = !normalized || /^chatgpt said:?\s*$/i.test(normalized);
+          if (looksLikeOnlyLabel || !baseMarkdown) {
+            contentText = placeholder;
+            baseMarkdown = placeholder;
+          }
+        }
+      }
+
+      if (!contentText && !imageUrls.length) continue;
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
       const messageId = el.getAttribute && (el.getAttribute('data-message-id') || el.id);
       const messageKey = messageId || env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
@@ -141,9 +293,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return out;
   }
 
-  function capture(options: any): any {
+  async function capture(options: any): Promise<any | null> {
     if (!matches({ hostname: env.location.hostname })) return null;
-    const messages = collectMessages({ allowEditing: !!(options && options.manual) });
+    const messages = await collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
     const conversationKey = findConversationIdFromUrl() || makeFallbackConversationKey(messages);
     return {
