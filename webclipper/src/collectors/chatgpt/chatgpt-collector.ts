@@ -187,20 +187,22 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     }
 
     const roleNodes = Array.from(scope.querySelectorAll('[data-message-author-role]')) as any[];
-    const articleTurnNodes = Array.from(scope.querySelectorAll("article[data-testid^='conversation-turn-']")) as any[];
-    const divTurnNodes = Array.from(scope.querySelectorAll("div[data-testid='conversation-turn']")) as any[];
+    // Modern ChatGPT wraps each turn with `data-testid="conversation-turn-N"` but the tag varies (`article`, `section`, etc).
+    const turnNodes = Array.from(
+      scope.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
+    ) as any[];
 
     // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple assistant
     // messages inside a single `.agent-turn` container; keeping `.agent-turn` as the wrapper would
     // only capture the first message.
     if (roleNodes.length) {
       const picked = dropAncestors(roleNodes);
-      const extraTurns = articleTurnNodes.filter((turn: any) => !picked.some((node: any) => turn.contains(node)));
-      return sortInDocumentOrder(dropAncestors(Array.from(new Set(picked.concat(extraTurns).concat(divTurnNodes).filter(Boolean))) as any[]));
+      const extraTurns = turnNodes.filter((turn: any) => !picked.some((node: any) => turn.contains(node)));
+      return sortInDocumentOrder(dropAncestors(Array.from(new Set(picked.concat(extraTurns).filter(Boolean))) as any[]));
     }
 
-    if (divTurnNodes.length || articleTurnNodes.length) {
-      return sortInDocumentOrder(dropAncestors(divTurnNodes.concat(articleTurnNodes)));
+    if (turnNodes.length) {
+      return sortInDocumentOrder(dropAncestors(turnNodes));
     }
 
     const agentTurnNodes = Array.from(scope.querySelectorAll('.agent-turn')) as any[];
@@ -210,6 +212,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   function roleFromWrapper(wrapper: any): any {
     const direct = wrapper && wrapper.getAttribute ? wrapper.getAttribute('data-message-author-role') : '';
     if (direct === 'user' || direct === 'assistant') return direct;
+
+    const turnRole = wrapper && wrapper.getAttribute ? wrapper.getAttribute('data-turn') : '';
+    if (turnRole === 'user' || turnRole === 'assistant') return turnRole;
 
     const inner = wrapper && wrapper.querySelector ? wrapper.querySelector('[data-message-author-role]') : null;
     const innerRole = inner && inner.getAttribute ? inner.getAttribute('data-message-author-role') : '';

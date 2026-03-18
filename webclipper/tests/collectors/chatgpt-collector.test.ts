@@ -200,6 +200,59 @@ describe("chatgpt-collector", () => {
     expect(snap.messages[1].contentText).toContain('Body');
   });
 
+  it("captures deep-research iframe inside section conversation-turn wrappers", async () => {
+    const html = `
+      <section data-testid="conversation-turn-1" data-turn="user">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
+      </section>
+      <section data-testid="conversation-turn-2" data-turn="assistant" data-turn-id="t2">
+        <h4 class="sr-only select-none">ChatGPT said:</h4>
+        <div class="agent-turn">
+          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
+        </div>
+      </section>
+    `;
+
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_section_1");
+    const iframe = dom.window.document.querySelector("iframe") as any;
+    expect(iframe).toBeTruthy();
+
+    const fakeFrameWindow = {
+      postMessage: (msg: any) => {
+        const requestId = msg?.requestId;
+        dom.window.dispatchEvent(
+          new (dom.window as any).MessageEvent("message", {
+            data: {
+              __syncnos: true,
+              type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+              requestId,
+              title: "Report",
+              markdown: "# Title\n\nBody",
+              text: "Title\n\nBody",
+            },
+            origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+            source: fakeFrameWindow as any,
+          }),
+        );
+      },
+    };
+    Object.defineProperty(iframe, "contentWindow", { configurable: true, value: fakeFrameWindow });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant"]);
+    expect(snap.messages[0].contentText).toBe("Q");
+    expect(snap.messages[1].contentMarkdown).toContain("# Title");
+    expect(snap.messages[1].contentText).toContain("Body");
+  });
+
   it("falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label", async () => {
     const html = `
       <article data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="t1">
