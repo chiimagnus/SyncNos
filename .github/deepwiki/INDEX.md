@@ -32,8 +32,10 @@
 4. [modules/syncnos-app.md](modules/syncnos-app.md) — 进入 App 的启动、门控、同步与缓存实现。
 5. [modules/webclipper.md](modules/webclipper.md) — 进入扩展的 background/content/popup/app 分层与采集策略。
 6. [data-flow.md](data-flow.md) — 对照真实输入输出链路检查改动影响面。
-7. [testing.md](testing.md) — 确认验证顺序与现有测试覆盖。
-8. [workflow.md](workflow.md) — 确认协作方式、文档同步与发布边界。
+7. [api.md](api.md) — 确认消息契约、OAuth code exchange、外部 API 调用边界。
+8. [security.md](security.md) — 确认权限边界、敏感信息保护与风险控制面。
+9. [testing.md](testing.md) — 确认验证顺序与现有测试覆盖。
+10. [workflow.md](workflow.md) — 确认协作方式、文档同步与发布边界。
 
 ### Release-first
 1. [release.md](release.md) — GitHub Release、CWS、AMO、产物命名和脚本职责。
@@ -50,8 +52,8 @@
 | 基础全景 | `overview.md`, `architecture.md`, `dependencies.md`, `data-flow.md` | 帮你建立仓库全貌、运行时边界和主链路。 |
 | 工程执行 | `configuration.md`, `testing.md`, `workflow.md` | 回答“如何配置、如何验证、如何协作”。 |
 | 产品模块 | `modules/syncnos-app.md`, `modules/webclipper.md` | 回答“改 App 去哪里、改扩展去哪里”。 |
-| 专题页面 | `storage.md`, `release.md`, `troubleshooting.md` | 回答“数据落点、交付链路、故障定位”。 |
-| 参考 | `glossary.md`, `GENERATION.md` | 统一术语与生成元数据。 |
+| 专题页面 | [storage.md](storage.md), [release.md](release.md), [troubleshooting.md](troubleshooting.md), [api.md](api.md), [operations.md](operations.md), [security.md](security.md) | 回答“数据落点、交付链路、故障定位、API 契约、运维与安全边界”。 |
+| 参考 | [glossary.md](glossary.md), [GENERATION.md](GENERATION.md) | 统一术语与生成元数据。 |
 
 ## 页面地图（按问题导航）
 
@@ -68,6 +70,9 @@
 | 为什么窄屏下从 Insight 点进对话能直接打开 detail？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [architecture.md](architecture.md) |
 | 我应该改哪个目录？ | [overview.md](overview.md) | [architecture.md](architecture.md), `modules/` |
 | 某个数据源 / collector / sync job 影响哪些系统？ | [architecture.md](architecture.md) | [data-flow.md](data-flow.md), [troubleshooting.md](troubleshooting.md) |
+| OAuth 交换、消息契约和外部 API 边界在哪里看？ | [api.md](api.md) | [dependencies.md](dependencies.md), [security.md](security.md) |
+| 权限、凭据、敏感数据保护策略在哪里看？ | [security.md](security.md) | [configuration.md](configuration.md), [workflow.md](workflow.md) |
+| 日常运行检查和故障处理 Runbook 在哪里看？ | [operations.md](operations.md) | [troubleshooting.md](troubleshooting.md), [release.md](release.md) |
 | 怎样验证发布不会炸？ | [release.md](release.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
 
 ## Coverage Gaps
@@ -80,3 +85,4 @@
 
 ## 更新记录（Update Notes）
 - 2026-03-19：Coverage Gaps 增加专项文档可点击链接，便于从索引直接跳转到仓库内技术文档。
+- 2026-03-19：补齐 `api.md`、`operations.md`、`security.md` 与 `glossary.md` 的索引级可达链接，消除页面可见性缺口。

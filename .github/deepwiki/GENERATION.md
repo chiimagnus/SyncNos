@@ -24,6 +24,9 @@
 - [configuration.md](configuration.md)
 - [testing.md](testing.md)
 - [workflow.md](workflow.md)
+- [api.md](api.md)
+- [operations.md](operations.md)
+- [security.md](security.md)
 - [storage.md](storage.md)
 - [release.md](release.md)
 - [troubleshooting.md](troubleshooting.md)
@@ -46,6 +49,7 @@
 - 在 `dependencies.md` 补充 Notion OAuth Worker 作为外部集成边界，明确 token exchange 由 Worker 侧持有密钥完成。
 - 在 `api.md` 新增 Notion OAuth Worker 交换流程（授权、回调校验、code exchange、token 入库）与关键参数矩阵。
 - 在 `INDEX.md` 的 Coverage Gaps 中补充 OCR 与键盘焦点专项文档的可点击链接。
+- 在 `INDEX.md` 与 `GENERATION.md` 补齐 `api.md` / `operations.md` / `security.md` / `glossary.md` 的页面可达性与清单一致性。
 
 ## Coverage Notes
 - 本次重点是“事实同步 + 外部集成边界补强”，未新增页面，保持文件名稳定。
