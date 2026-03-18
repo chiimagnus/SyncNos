@@ -367,4 +367,178 @@ describe("gemini-collector", () => {
     expect(assistant.contentText).toContain("量产节奏");
     expect(assistant.contentMarkdown).toContain("manual capture 会主动点击 chip");
   });
+
+  it("manual capture crawls multiple deep research chips (title-text + artifact-text) and merges reports into the assistant message", async () => {
+    const titleA = "2025 自动驾驶传感器趋势研究";
+    const titleB = "2025-2026 自动驾驶感知供应链与技术突破报告";
+
+    const html = `
+      <div id="chat-history">
+        <div class="conversation-container" id="block_multi_1">
+          <user-query><div class="query-text">请做两份报告</div></user-query>
+          <model-response>
+            <div class="model-response-text">
+              <p>我已经完成了研究。</p>
+              <response-element>
+                <immersive-entry-chip>
+                  <div data-test-id="container" class="container clickable">
+                    <deep-research-entry-chip-content>
+                      <div class="content-container">
+                        <span data-test-id="title-text" class="title-text">${titleA}</span>
+                      </div>
+                    </deep-research-entry-chip-content>
+                    <div data-test-id="open-button" class="button-section">
+                      <button data-test-id="view-report-button" aria-label="在 Canvas 中打开《${titleA}》">打开</button>
+                    </div>
+                  </div>
+                </immersive-entry-chip>
+                <immersive-entry-chip>
+                  <div data-test-id="container" class="container clickable">
+                    <div data-test-id="default-entry-chip-content" class="default-entry-chip-content">
+                      <div class="text">
+                        <div data-test-id="artifact-text" class="gds-title-m">${titleB}</div>
+                      </div>
+                    </div>
+                    <div data-test-id="open-button" class="button-section">
+                      <button data-test-id="view-report-button" aria-label="在 Canvas 中打开《${titleB}》">打开</button>
+                    </div>
+                  </div>
+                </immersive-entry-chip>
+              </response-element>
+            </div>
+          </model-response>
+        </div>
+      </div>
+    `;
+
+    const dom = setupGeminiDom(html, "https://gemini.google.com/app/deep_multi_1");
+    const doc = dom.window.document;
+
+    const ensurePanel = (title: string, body: string) => {
+      const existing = doc.querySelector("deep-research-immersive-panel");
+      if (!existing) {
+        doc.body.insertAdjacentHTML("beforeend", deepResearchPanelHtml(title, body));
+        return;
+      }
+      const h2 = existing.querySelector("toolbar h2.title-text");
+      if (h2) h2.textContent = title;
+      const md = existing.querySelector("#extended-response-markdown-content");
+      if (md) md.innerHTML = body;
+    };
+
+    const buttons = Array.from(doc.querySelectorAll("button[data-test-id='view-report-button']")) as HTMLElement[];
+    expect(buttons.length).toBe(2);
+
+    let clickedA = 0;
+    let clickedB = 0;
+    const longPad =
+      "这是一段用于单测的填充文本，目的是确保右侧面板的正文长度超过最小阈值，从而让 collector 判定为有效报告内容并完成提取与合并。";
+
+    buttons[0]?.addEventListener("click", () => {
+      clickedA += 1;
+      ensurePanel(
+        titleA,
+        `
+          <h1>${titleA}</h1>
+          <p>Report A unique content: 供应链与法规落地节奏的对比分析，用于验证多份报告逐个点开后都能被抓取并写回到对应聊天位置。${longPad}</p>
+          <p>第二段继续补足长度，保证 hash 签名会稳定随内容切换变化。${longPad}</p>
+        `,
+      );
+    });
+    buttons[1]?.addEventListener("click", () => {
+      clickedB += 1;
+      ensurePanel(
+        titleB,
+        `
+          <h1>${titleB}</h1>
+          <p>Report B unique content: MIPI A-PHY 与关键器件国产化率，用于验证 artifact-text 变体 chip 也能被识别并触发打开。${longPad}</p>
+          <p>第二段继续补足长度，用于验证多报告逐个点开后会被 merge 回同一条 assistant 消息。${longPad}</p>
+        `,
+      );
+    });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture({ manual: true })) as any;
+    expect(snap).toBeTruthy();
+    expect(clickedA).toBe(1);
+    expect(clickedB).toBe(1);
+    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistant).toBeTruthy();
+    expect(assistant.contentMarkdown).toContain("Report A unique content");
+    expect(assistant.contentMarkdown).toContain("Report B unique content");
+  });
+
+  it("manual capture continues when a later deep research trigger disappears (skips with placeholder)", async () => {
+    const titleA = "报告 A";
+    const titleB = "报告 B";
+    const html = `
+      <div id="chat-history">
+        <div class="conversation-container" id="block_multi_2">
+          <user-query><div class="query-text">两份报告</div></user-query>
+          <model-response>
+            <div class="model-response-text">
+              <response-element>
+                <immersive-entry-chip>
+                  <div data-test-id="container" class="container clickable">
+                    <span data-test-id="title-text" class="title-text">${titleA}</span>
+                    <button data-test-id="view-report-button" aria-label="在 Canvas 中打开《${titleA}》">打开</button>
+                  </div>
+                </immersive-entry-chip>
+                <immersive-entry-chip id="chipB">
+                  <div data-test-id="container" class="container clickable">
+                    <div data-test-id="artifact-text">${titleB}</div>
+                    <button data-test-id="view-report-button" aria-label="在 Canvas 中打开《${titleB}》">打开</button>
+                  </div>
+                </immersive-entry-chip>
+              </response-element>
+            </div>
+          </model-response>
+        </div>
+      </div>
+    `;
+
+    const dom = setupGeminiDom(html, "https://gemini.google.com/app/deep_multi_2");
+    const doc = dom.window.document;
+    const buttons = Array.from(doc.querySelectorAll("button[data-test-id='view-report-button']")) as HTMLElement[];
+    expect(buttons.length).toBe(2);
+
+    const longPad =
+      "这是一段用于单测的填充文本，目的是确保右侧面板的正文长度超过最小阈值，从而让 collector 判定为有效报告内容并完成提取与合并。";
+
+    buttons[0]?.addEventListener("click", () => {
+      // Simulate DOM re-render that removes the later trigger.
+      doc.querySelector("#chipB")?.remove();
+      doc.body.insertAdjacentHTML(
+        "beforeend",
+        deepResearchPanelHtml(
+          titleA,
+          `
+            <h1>${titleA}</h1>
+            <p>Report A content long enough to be extracted and merged. ${longPad}</p>
+            <p>Second paragraph to satisfy minimum length requirement and keep signature stable. ${longPad}</p>
+          `,
+        ),
+      );
+    });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = await Promise.resolve(createGeminiCollectorDef(env).collector.capture({ manual: true })) as any;
+    expect(snap).toBeTruthy();
+    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistant).toBeTruthy();
+    expect(assistant.contentMarkdown).toContain("Report A content long enough");
+    expect(assistant.contentMarkdown).toContain("未抓到全文");
+  });
 });
