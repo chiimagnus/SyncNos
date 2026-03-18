@@ -10,6 +10,8 @@ type ConversationState = {
   keyToFingerprint: Map<string, string>;
   // fingerprint -> stable key per occurrence index in the current visible snapshot.
   fingerprintToKeys: Map<string, string[]>;
+  lastVisibleMessageCount: number;
+  lastTail: Array<{ key: string; role: string; text: string; markdown: string }>;
   initialized: boolean;
 };
 
@@ -100,6 +102,7 @@ function makeConversationStateKey(snapshot: any): string {
 
 export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
   const byConversation = new Map<string, ConversationState>();
+  const TAIL_UPDATE_WINDOW_SIZE = 2;
 
   function getOrCreateState(key: string): ConversationState {
     const existing = byConversation.get(key);
@@ -110,6 +113,8 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       lastUrl: '',
       keyToFingerprint: new Map(),
       fingerprintToKeys: new Map(),
+      lastVisibleMessageCount: 0,
+      lastTail: [],
       initialized: false,
     };
     byConversation.set(key, next);
@@ -143,7 +148,11 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const added: string[] = [];
       const updated: string[] = [];
 
-      for (const message of messages) {
+      const tailStartIndex = Math.max(0, messages.length - TAIL_UPDATE_WINDOW_SIZE);
+      const allowTailUpdates = state.initialized && messages.length === state.lastVisibleMessageCount && state.lastTail.length > 0;
+
+      for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
+        const message = messages[messageIndex];
         if (!message) continue;
 
         const incomingKey = message && message.messageKey ? String(message.messageKey) : '';
@@ -153,7 +162,39 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
         const occurrenceIndex = perFingerprintOccurrence.get(fp) || 0;
         perFingerprintOccurrence.set(fp, occurrenceIndex + 1);
 
-        const key = pickOrCreateStableKey(state, fp, occurrenceIndex, incomingKey);
+        let key = '';
+
+        if (allowTailUpdates && messageIndex >= tailStartIndex) {
+          const tailIndex = messageIndex - tailStartIndex;
+          const prev = state.lastTail[tailIndex];
+          if (prev && prev.key) {
+            const role = String((message && message.role) || 'assistant').trim() || 'assistant';
+            if (prev.role === role) {
+              const text = normalizeContent(message && message.contentText);
+              const markdownRaw =
+                message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
+              const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
+
+              const textGrew = !!(prev.text && text && text.startsWith(prev.text) && text.length > prev.text.length);
+              const markdownGrew = !!(
+                prev.markdown &&
+                markdown &&
+                markdown.startsWith(prev.markdown) &&
+                markdown.length > prev.markdown.length
+              );
+
+              if (textGrew || markdownGrew) {
+                key = prev.key;
+                // Force-adopt the key for the new fingerprint occurrence so future ticks remain stable.
+                const list = state.fingerprintToKeys.get(fp) || [];
+                list[occurrenceIndex] = key;
+                state.fingerprintToKeys.set(fp, list);
+              }
+            }
+          }
+        }
+
+        if (!key) key = pickOrCreateStableKey(state, fp, occurrenceIndex, incomingKey);
         message.messageKey = key;
 
         const prevFp = state.keyToFingerprint.get(key);
@@ -169,6 +210,17 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       state.initialized = true;
       state.lastTitle = nextTitle;
       state.lastUrl = nextUrl;
+      state.lastVisibleMessageCount = messages.length;
+      const nextTail = messages
+        .slice(Math.max(0, messages.length - TAIL_UPDATE_WINDOW_SIZE))
+        .map((m: any) => ({
+          key: String(m?.messageKey || ''),
+          role: String((m && m.role) || 'assistant').trim() || 'assistant',
+          text: normalizeContent(m && m.contentText),
+          markdown: normalizeContent(m && m.contentMarkdown),
+        }))
+        .filter((x: any) => x && x.key);
+      state.lastTail = nextTail;
 
       return {
         changed,

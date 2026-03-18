@@ -44,10 +44,10 @@ describe("smoke", () => {
 
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.added.length).toBe(1);
-    expect(r2.diff.updated.length).toBe(0);
+    expect(r2.diff.added.length).toBe(0);
+    expect(r2.diff.updated.length).toBe(1);
     expect(r2.diff.removed.length).toBe(0);
-    expect(snap2.messages[0].messageKey).not.toBe(snap1.messages[0].messageKey);
+    expect(snap2.messages[0].messageKey).toBe(snap1.messages[0].messageKey);
   });
 
   it("computeIncremental does not overwrite history when the visible window shifts", () => {
