@@ -129,12 +129,76 @@ function computeSuffixPrefixOverlap(prev: string[], cur: string[], requiredOverl
   return 0;
 }
 
+function buildTailEntries(args: {
+  prevTail: TailEntry[];
+  curTail: Array<{ role: string; identityHash: string; text: string; markdown: string; stableIncomingKey: string }>;
+  tailWindowMessages: any[];
+  stateKeyHash: string;
+}): TailEntry[] {
+  const { prevTail, curTail, tailWindowMessages, stateKeyHash } = args;
+  const usedPrev = new Set<number>();
+
+  const pickPrevIndex = (cur: any): number => {
+    const tryPick = (predicate: (p: TailEntry) => boolean): number => {
+      for (let i = 0; i < prevTail.length; i += 1) {
+        if (usedPrev.has(i)) continue;
+        const p = prevTail[i];
+        if (!p || !p.key) continue;
+        if (predicate(p)) return i;
+      }
+      return -1;
+    };
+
+    const idx1 = tryPick((p) => p.role === cur.role && p.identityHash === cur.identityHash);
+    if (idx1 >= 0) return idx1;
+
+    const idx2 = tryPick((p) => p.role === cur.role && p.text === cur.text && p.markdown === cur.markdown);
+    if (idx2 >= 0) return idx2;
+
+    const idx3 = tryPick((p) => {
+      if (p.role !== cur.role) return false;
+      const decision = isPrefixOrFillingUpdate({ text: p.text, markdown: p.markdown }, { text: cur.text, markdown: cur.markdown });
+      return !decision.changed || decision.acceptable;
+    });
+    return idx3;
+  };
+
+  const out: TailEntry[] = [];
+  for (let i = 0; i < curTail.length; i += 1) {
+    const cur = curTail[i];
+    const msg = tailWindowMessages[i];
+    const keyFromMsg = String(msg?.messageKey || '').trim();
+
+    let key = cur?.stableIncomingKey || '';
+    if (!key && keyFromMsg.startsWith(`autosave_${stateKeyHash}_`)) key = keyFromMsg;
+
+    if (!key) {
+      const prevIndex = pickPrevIndex(cur);
+      if (prevIndex >= 0) {
+        usedPrev.add(prevIndex);
+        key = prevTail[prevIndex].key;
+      }
+    }
+
+    out.push({
+      key: key || '',
+      role: cur.role,
+      identityHash: cur.identityHash,
+      text: cur.text,
+      markdown: cur.markdown,
+    });
+  }
+
+  return out;
+}
+
 export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
   const byConversation = new Map<string, ConversationState>();
   const TAIL_UPDATE_WINDOW_SIZE = 2;
   const MAX_WINDOW_MESSAGES = 200;
   const IDENTITY_PREFIX_LEN = 96;
   const MIN_OVERLAP_FOR_LONG_WINDOWS = 8;
+  const SEED_MAX_MESSAGES = 6;
 
   function getOrCreateState(key: string): ConversationState {
     const existing = byConversation.get(key);
@@ -225,6 +289,54 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
           text: m.text,
           markdown: m.markdown,
         }));
+
+        // Seed: for short conversations, persist the initial window once so the first user/assistant messages don't get missed.
+        // For long conversations, skip seeding to avoid huge writes on re-entry when collectors only expose a tail window.
+        if (windowMessages.length > 0 && windowMessages.length <= SEED_MAX_MESSAGES) {
+          const added: string[] = [];
+          const addedSet = new Set<string>();
+          const occurrenceByIdentity = new Map<string, number>();
+          for (let i = 0; i < windowMessages.length; i += 1) {
+            const msg = windowMessages[i];
+            const meta = currentComparable[i];
+            if (!msg || !meta) continue;
+
+            const keyFromCollector = meta.stableIncomingKey;
+            if (keyFromCollector) {
+              msg.messageKey = keyFromCollector;
+              if (!addedSet.has(keyFromCollector)) {
+                addedSet.add(keyFromCollector);
+                added.push(keyFromCollector);
+              }
+              continue;
+            }
+
+            const nextOcc = (occurrenceByIdentity.get(meta.identityHash) || 0) + 1;
+            occurrenceByIdentity.set(meta.identityHash, nextOcc);
+            const syntheticKey = `autosave_${state.stateKeyHash}_${meta.identityHash}_s${nextOcc}`;
+            msg.messageKey = syntheticKey;
+            if (!addedSet.has(syntheticKey)) {
+              addedSet.add(syntheticKey);
+              added.push(syntheticKey);
+            }
+          }
+
+          snapshot.messages = windowMessages.filter(Boolean);
+          // Keep tail keys in-sync with seeded messageKey assignments.
+          const curTail = currentComparable.slice(Math.max(0, currentComparable.length - TAIL_UPDATE_WINDOW_SIZE));
+          state.lastTail = curTail.map((m, idx) => {
+            const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
+            const keyFromMsg = String(msg?.messageKey || '').trim();
+            const key =
+              m.stableIncomingKey ||
+              (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') ||
+              '';
+            return { key, role: m.role, identityHash: m.identityHash, text: m.text, markdown: m.markdown };
+          });
+
+          return { changed: true, snapshot, diff: { added, updated: [], removed: [] } };
+        }
+
         return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
       }
 
@@ -319,14 +431,12 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
         state.lastTitle = nextTitle;
         state.lastUrl = nextUrl;
         state.lastWindowIdentityHashes = currentIdentityHashes;
-        state.lastTail = curTail.map((m, idx) => {
-          const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
-          const keyFromMsg = String(msg?.messageKey || '').trim();
-          const key =
-            m.stableIncomingKey ||
-            (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') ||
-            '';
-          return { key, role: m.role, identityHash: m.identityHash, text: m.text, markdown: m.markdown };
+        const tailWindowMessages = windowMessages.slice(Math.max(0, windowMessages.length - curTail.length));
+        state.lastTail = buildTailEntries({
+          prevTail,
+          curTail,
+          tailWindowMessages,
+          stateKeyHash: state.stateKeyHash,
         });
         return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
       }
@@ -336,14 +446,12 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       state.lastTitle = nextTitle;
       state.lastUrl = nextUrl;
       state.lastWindowIdentityHashes = currentIdentityHashes;
-      state.lastTail = curTail.map((m, idx) => {
-        const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
-        const keyFromMsg = String(msg?.messageKey || '').trim();
-        const key =
-          m.stableIncomingKey ||
-          (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') ||
-          '';
-        return { key, role: m.role, identityHash: m.identityHash, text: m.text, markdown: m.markdown };
+      const tailWindowMessages = windowMessages.slice(Math.max(0, windowMessages.length - curTail.length));
+      state.lastTail = buildTailEntries({
+        prevTail,
+        curTail,
+        tailWindowMessages,
+        stateKeyHash: state.stateKeyHash,
       });
 
       return { changed: true, snapshot, diff: { added, updated, removed: [] } };

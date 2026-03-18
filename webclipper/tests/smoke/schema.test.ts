@@ -18,18 +18,18 @@ describe("smoke", () => {
     const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b" }] };
     const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b!" }] };
 
-    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline: no write
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true); // seed initial messages
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(false);
     const r3 = incrementalUpdater.computeIncremental(snap3);
     expect(r3.changed).toBe(true);
-    expect(r3.diff.added.length).toBe(1);
+    expect(r3.diff.updated.length).toBe(1);
   });
 
   it("computeIncremental detects content update for same messageKey", () => {
     incrementalUpdater.__resetForTests();
     const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
     const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi!" }] };
-    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline: no write
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true); // seed initial messages
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
     expect(r2.diff.updated).toEqual(["m1"]);
@@ -42,15 +42,15 @@ describe("smoke", () => {
     const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello!!" }] };
 
     const r1 = incrementalUpdater.computeIncremental(snap1);
-    expect(r1.changed).toBe(false); // baseline: no write
+    expect(r1.changed).toBe(true); // seed initial messages
+    expect(r1.diff.added.length).toBe(1);
+    const key = String(r1.snapshot.messages[0].messageKey || "");
+    expect(key).toMatch(/^autosave_/);
 
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.added.length).toBe(1);
-    expect(r2.diff.updated.length).toBe(0);
-    expect(String(r2.snapshot.messages[0].messageKey || "")).toMatch(/^autosave_/);
-
-    const key = String(r2.snapshot.messages[0].messageKey || "");
+    expect(r2.diff.added.length).toBe(0);
+    expect(r2.diff.updated).toEqual([key]);
     const r3 = incrementalUpdater.computeIncremental(snap3);
     expect(r3.changed).toBe(true);
     expect(r3.diff.added.length).toBe(0);
@@ -84,7 +84,10 @@ describe("smoke", () => {
         { role: "assistant", contentText: "C" },
       ],
     };
-    incrementalUpdater.computeIncremental(snap1); // baseline
+    const r1 = incrementalUpdater.computeIncremental(snap1); // seed
+    expect(r1.changed).toBe(true);
+    const keyB = String(r1.snapshot.messages[1].messageKey || "");
+    expect(keyB).toMatch(/^autosave_/);
 
     const snap2 = {
       conversation: { source: "debug", conversationKey: "c1" },
@@ -96,8 +99,8 @@ describe("smoke", () => {
     };
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.added.length).toBe(1);
-    expect(r2.diff.updated.length).toBe(0);
+    expect(r2.diff.added.length).toBe(0);
+    expect(r2.diff.updated).toEqual([keyB]);
     expect(r2.diff.removed.length).toBe(0);
     expect(r2.snapshot.messages.length).toBe(1);
     expect(String(r2.snapshot.messages[0].contentText || "")).toBe("B!!!");
@@ -108,7 +111,7 @@ describe("smoke", () => {
 
     const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
     const r1 = incrementalUpdater.computeIncremental(snap1);
-    expect(r1.changed).toBe(false); // baseline: no write
+    expect(r1.changed).toBe(true); // seed initial messages
 
     const snap2 = {
       conversation: { source: "debug", conversationKey: "c1" },
@@ -135,7 +138,7 @@ describe("smoke", () => {
         { messageKey: "k2", role: "user", contentText: "C" },
       ],
     };
-    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true); // seed
 
     // Window shifts but the collector reuses index-based keys (k0/k1/k2) for different messages.
     const snap2 = {
@@ -179,7 +182,7 @@ describe("smoke", () => {
     const sameMsgsNewTitle = { conversation: { source: "debug", conversationKey: "c1", title: "t2", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
     const sameMsgsNewUrl = { conversation: { source: "debug", conversationKey: "c1", title: "t2", url: "https://b" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
 
-    expect(incrementalUpdater.computeIncremental(base).changed).toBe(false); // baseline
+    expect(incrementalUpdater.computeIncremental(base).changed).toBe(true); // seed
     expect(incrementalUpdater.computeIncremental(sameMsgsNewTitle).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(sameMsgsNewUrl).changed).toBe(true);
   });
@@ -189,7 +192,7 @@ describe("smoke", () => {
     const base = { conversation: { source: "debug", conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
     const emptyMeta = { conversation: { source: "debug", conversationKey: "c1", title: "", url: "" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
 
-    expect(incrementalUpdater.computeIncremental(base).changed).toBe(false); // baseline
+    expect(incrementalUpdater.computeIncremental(base).changed).toBe(true); // seed
     expect(incrementalUpdater.computeIncremental(emptyMeta).changed).toBe(false);
     // And it should carry forward the previous non-empty values.
     expect(emptyMeta.conversation.title).toBe("t1");
