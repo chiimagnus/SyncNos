@@ -7,8 +7,6 @@
   --bubble-surface-text: rgb(255 255 255);
   --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 
-  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, rgb(214 158 46)));
-  --bubble-loading-border: color-mix(in srgb, var(--warning, rgb(214 158 46)) 72%, transparent);
   --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, rgb(229 62 62)));
   --bubble-error-border: color-mix(in srgb, var(--error, rgb(229 62 62)) 74%, transparent);
 
@@ -27,8 +25,6 @@
   --bubble-surface-text: rgb(255 255 255);
   --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 
-  --bubble-loading-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--warning, rgb(214 158 46)));
-  --bubble-loading-border: color-mix(in srgb, var(--warning, rgb(214 158 46)) 72%, transparent);
   --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, rgb(229 62 62)));
   --bubble-error-border: color-mix(in srgb, var(--error, rgb(229 62 62)) 74%, transparent);
   box-sizing: border-box;
@@ -56,13 +52,6 @@
   position: absolute;
   width: 0;
   height: 0;
-}
-
-:host([data-kind="loading"]) .webclipper-inpage-bubble__surface {
-  border-color: var(--bubble-loading-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)),
-    var(--bubble-loading-bg);
 }
 
 :host([data-kind="error"]) .webclipper-inpage-bubble__surface {
@@ -117,10 +106,6 @@
   border-left: var(--bubble-arrow-size) solid var(--bubble-surface-bg);
 }
 
-:host([data-kind="loading"][data-placement="left"]) .webclipper-inpage-bubble__arrow {
-  border-left-color: var(--bubble-loading-bg);
-}
-
 :host([data-kind="error"][data-placement="left"]) .webclipper-inpage-bubble__arrow {
   border-left-color: var(--bubble-error-bg);
 }
@@ -132,10 +117,6 @@
   border-top: var(--bubble-arrow-size) solid transparent;
   border-bottom: var(--bubble-arrow-size) solid transparent;
   border-right: var(--bubble-arrow-size) solid var(--bubble-surface-bg);
-}
-
-:host([data-kind="loading"][data-placement="right"]) .webclipper-inpage-bubble__arrow {
-  border-right-color: var(--bubble-loading-bg);
 }
 
 :host([data-kind="error"][data-placement="right"]) .webclipper-inpage-bubble__arrow {
@@ -151,10 +132,6 @@
   border-top: var(--bubble-arrow-size) solid var(--bubble-surface-bg);
 }
 
-:host([data-kind="loading"][data-placement="top"]) .webclipper-inpage-bubble__arrow {
-  border-top-color: var(--bubble-loading-bg);
-}
-
 :host([data-kind="error"][data-placement="top"]) .webclipper-inpage-bubble__arrow {
   border-top-color: var(--bubble-error-bg);
 }
@@ -166,10 +143,6 @@
   border-left: var(--bubble-arrow-size) solid transparent;
   border-right: var(--bubble-arrow-size) solid transparent;
   border-bottom: var(--bubble-arrow-size) solid var(--bubble-surface-bg);
-}
-
-:host([data-kind="loading"][data-placement="bottom"]) .webclipper-inpage-bubble__arrow {
-  border-bottom-color: var(--bubble-loading-bg);
 }
 
 :host([data-kind="error"][data-placement="bottom"]) .webclipper-inpage-bubble__arrow {

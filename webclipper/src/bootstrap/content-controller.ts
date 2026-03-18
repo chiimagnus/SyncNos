@@ -28,7 +28,7 @@ type InpageButtonApi = {
 };
 
 type InpageTipApi = {
-  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'loading' | 'error' }) => void;
+  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
 };
 
 type RuntimeObserverApi = {
@@ -98,11 +98,11 @@ export function createContentController(deps: Deps) {
   const incrementalUpdater = deps.incrementalUpdater;
   const notionAiModelPicker = deps.notionAiModelPicker;
 
-  function toTipKind(kind?: unknown): 'default' | 'loading' | 'error' | undefined {
+  function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
     const value = String(kind || '').trim().toLowerCase();
     if (!value) return undefined;
     if (value === 'ok') return 'default';
-    if (value === 'default' || value === 'loading' || value === 'error') return value;
+    if (value === 'default' || value === 'error') return value;
     return undefined;
   }
 
@@ -276,7 +276,6 @@ export function createContentController(deps: Deps) {
     const clickSave = async () => {
       if (stopped) return;
       if (manualSaveInFlight) {
-        showInpageTip(t('savingDots'), 'loading');
         inpageButton?.setSaving?.(true);
         return;
       }

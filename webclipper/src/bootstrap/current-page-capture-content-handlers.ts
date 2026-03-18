@@ -8,11 +8,11 @@ type ApiResponse<T> = {
 };
 
 type InpageTipApi = {
-  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'loading' | 'error' }) => void;
+  showSaveTip?: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
 };
 
-function normalizeTipKind(value: unknown): 'default' | 'loading' | 'error' {
-  return value === 'loading' || value === 'error' ? value : 'default';
+function normalizeTipKind(value: unknown): 'default' | 'error' {
+  return value === 'error' ? 'error' : 'default';
 }
 
 function ok<T>(data: T): ApiResponse<T> {

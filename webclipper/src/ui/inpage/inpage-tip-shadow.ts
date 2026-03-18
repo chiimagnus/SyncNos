@@ -7,7 +7,7 @@ const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
 const BUBBLE_SHADOW_CSS = String(inpageTipCssRaw || '');
 
-type TipKind = 'default' | 'loading' | 'error';
+type TipKind = 'default' | 'error';
 
 const state = {
   hideTimer: null as any,
@@ -150,7 +150,7 @@ function setTextAndKind(el: HTMLElement, text: unknown, kind?: TipKind) {
   const shadow = (el as any).shadowRoot as ShadowRoot | null;
   const textEl = shadow?.querySelector?.('.webclipper-inpage-bubble__text') as HTMLElement | null;
   if (textEl) textEl.textContent = String(text || '');
-  const normalizedKind: TipKind = kind === 'error' || kind === 'loading' ? kind : 'default';
+  const normalizedKind: TipKind = kind === 'error' ? 'error' : 'default';
   (el as any).dataset.kind = normalizedKind;
 }
 
