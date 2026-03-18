@@ -296,6 +296,112 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return hash ? `hash:${hash}` : '';
   }
 
+  function getCurrentDeepResearchPanelSignature(): string {
+    return extractDeepResearchPanelSignature(pickActiveDeepResearchPanel());
+  }
+
+  function isDeepResearchChipOpen(chip: ParentNode | null): boolean {
+    if (!chip || typeof (chip as any).querySelector !== 'function') return false;
+    const container = (chip as any).querySelector?.("[data-test-id='container']") as HTMLElement | null;
+    const className = String((container as any)?.className || '').toLowerCase();
+    if (className.includes('is-open')) return true;
+    const ariaExpanded = String((container as any)?.getAttribute?.('aria-expanded') || '').trim().toLowerCase();
+    if (ariaExpanded === 'true') return true;
+    return false;
+  }
+
+  function findAnyOpenDeepResearchChipTrigger(blocks: any[]): HTMLElement | null {
+    for (const b of blocks) {
+      const model = b?.querySelector?.('model-response') || null;
+      if (!model) continue;
+      const chips = findDeepResearchChips(model);
+      for (const chip of chips) {
+        if (!isDeepResearchChipOpen(chip)) continue;
+        const trigger = findDeepResearchTriggerFromChip(chip);
+        if (trigger) return trigger;
+      }
+    }
+    return null;
+  }
+
+  function findDeepResearchPanelCloseButton(panel: ParentNode | null): HTMLElement | null {
+    if (!panel || typeof (panel as any).querySelector !== 'function') return null;
+    const selectors = [
+      "button[data-test-id='close-button']",
+      "button[aria-label*='关闭']",
+      "button[aria-label*='返回']",
+      "button[aria-label*='Close']",
+      "button[aria-label*='Back']",
+      "button mat-icon[fonticon='close']",
+      "button mat-icon[fonticon='arrow_back']",
+      "button mat-icon[fonticon='chevron_left']",
+    ];
+    for (const selector of selectors) {
+      const el = (panel as any).querySelector(selector) as HTMLElement | null;
+      if (!el) continue;
+      // If a mat-icon was selected, click its nearest button.
+      if (String((el as any).tagName || '').toLowerCase() === 'mat-icon') {
+        const btn = (el as any).closest?.('button') as HTMLElement | null;
+        if (btn) return btn;
+      }
+      return el;
+    }
+    return null;
+  }
+
+  async function restoreDeepResearchPanelStateBestEffort(input: {
+    blocks: any[];
+    jobs: DeepResearchJob[];
+    initialSignature: string;
+    initialHadPanel: boolean;
+  }): Promise<void> {
+    const initialSig = String(input.initialSignature || '').trim();
+    const currentSig = getCurrentDeepResearchPanelSignature();
+
+    if (input.initialHadPanel && initialSig) {
+      if (currentSig && currentSig === initialSig) return;
+      // Try to restore by clicking jobs until the signature matches.
+      for (const job of input.jobs) {
+        const trigger = resolveDeepResearchTriggerFromJob(input.blocks, job);
+        if (!trigger) continue;
+        const beforeSig = getCurrentDeepResearchPanelSignature();
+        await openDeepResearchPanel(trigger);
+        const panel = await waitForDeepResearchPanelSwitch(beforeSig, { timeoutMs: 4_000, expectedTitle: job.title || '' });
+        const sig = extractDeepResearchPanelSignature(panel);
+        if (sig && sig === initialSig) return;
+      }
+      return;
+    }
+
+    // Initially no panel: try to close whatever is open now (best-effort).
+    const panel = pickActiveDeepResearchPanel();
+    if (!panel) return;
+
+    const openChipTrigger = findAnyOpenDeepResearchChipTrigger(input.blocks);
+    if (openChipTrigger) {
+      const beforeSig = getCurrentDeepResearchPanelSignature();
+      await openDeepResearchPanel(openChipTrigger);
+      const afterSig = getCurrentDeepResearchPanelSignature();
+      if (beforeSig && !afterSig) return;
+    }
+
+    const closeBtn = findDeepResearchPanelCloseButton(panel);
+    if (closeBtn) {
+      await openDeepResearchPanel(closeBtn);
+      return;
+    }
+
+    // Escape is a common dismiss affordance for overlays.
+    try {
+      const KeyboardEventCtor = (env.window as any).KeyboardEvent;
+      if (KeyboardEventCtor) {
+        env.document.dispatchEvent(new KeyboardEventCtor('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      }
+    } catch (_e) {
+      // ignore
+    }
+  }
+
   function findDeepResearchPanelByTitle(expectedTitle: string): Element | null {
     const panels = findDeepResearchPanels();
     if (!panels.length) return null;
@@ -712,6 +818,10 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     const blocks: any[] = Array.from(root.querySelectorAll(".conversation-container")) as any[];
     if (!blocks.length) return [];
 
+    const initialPanel = pickActiveDeepResearchPanel();
+    const initialSignature = extractDeepResearchPanelSignature(initialPanel);
+    const initialHadPanel = !!extractDeepResearchPanelContent(initialPanel);
+
     const manualDeepResearchJobs = options.manual === true ? buildDeepResearchJobs(blocks) : [];
     const manualDeepResearchResults = options.manual === true && manualDeepResearchJobs.length
       ? await crawlDeepResearchJobsManual(blocks, manualDeepResearchJobs)
@@ -721,6 +831,15 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       const existing = manualJobsByBlockIndex.get(job.blockIndex) || [];
       existing.push(job);
       manualJobsByBlockIndex.set(job.blockIndex, existing);
+    }
+
+    if (options.manual === true && manualDeepResearchJobs.length) {
+      await restoreDeepResearchPanelStateBestEffort({
+        blocks,
+        jobs: manualDeepResearchJobs,
+        initialSignature,
+        initialHadPanel,
+      });
     }
 
     const out: any[] = [];
