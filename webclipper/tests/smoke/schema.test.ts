@@ -85,6 +85,64 @@ describe("smoke", () => {
     expect(String(snap2.messages[0].messageKey || "")).not.toBe(keyA);
   });
 
+  it("computeIncremental updates only within the tail window (N=2) on prefix growth", () => {
+    incrementalUpdater.__resetForTests();
+
+    const snap1 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { role: "user", contentText: "A" },
+        { role: "assistant", contentText: "B" },
+        { role: "assistant", contentText: "C" },
+      ],
+    };
+    incrementalUpdater.computeIncremental(snap1);
+    const keyB = String(snap1.messages[1].messageKey || "");
+    const keyC = String(snap1.messages[2].messageKey || "");
+
+    const snap2 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { role: "user", contentText: "A" },
+        { role: "assistant", contentText: "B!!!" }, // grows (second-last)
+        { role: "assistant", contentText: "C" }, // unchanged (last)
+      ],
+    };
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.added.length).toBe(0);
+    expect(r2.diff.updated).toEqual([keyB]);
+    expect(r2.diff.removed.length).toBe(0);
+
+    expect(String(snap2.messages[1].messageKey || "")).toBe(keyB);
+    expect(String(snap2.messages[2].messageKey || "")).toBe(keyC);
+  });
+
+  it("computeIncremental treats a new message as added (no false tail update)", () => {
+    incrementalUpdater.__resetForTests();
+
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
+    const r1 = incrementalUpdater.computeIncremental(snap1);
+    expect(r1.changed).toBe(true);
+    const key1 = String(snap1.messages[0].messageKey || "");
+
+    const snap2 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { role: "assistant", contentText: "hello" },
+        { role: "assistant", contentText: "new" },
+      ],
+    };
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.updated.length).toBe(0);
+    expect(r2.diff.added.length).toBe(1);
+    expect(r2.diff.removed.length).toBe(0);
+
+    expect(String(snap2.messages[0].messageKey || "")).toBe(key1);
+    expect(String(snap2.messages[1].messageKey || "")).not.toBe(key1);
+  });
+
   it("computeIncremental ignores unstable incoming messageKey reuse across window shift", () => {
     incrementalUpdater.__resetForTests();
 
