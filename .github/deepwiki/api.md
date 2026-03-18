@@ -36,6 +36,22 @@
 | Notion API | `https://api.notion.com/*` | HTTPS | token + Parent Page + DB/page payload | 数据库/页面/block 读写 |
 | Obsidian Local REST API | `http://127.0.0.1:27123/*`（可配置） | HTTP | API Key + path/body | 文件写入、patch、open |
 
+## Notion OAuth Worker 交换流程
+
+| 阶段 | 入口 / 文件 | 关键点 |
+| --- | --- | --- |
+| 用户发起授权 | `oauth.ts` + Notion authorize URL | 使用 `authorizationUrl=https://api.notion.com/v1/oauth/authorize`，并生成 `state` 写入本地 pending key |
+| 回调拦截 | `handleNotionOAuthCallbackNavigation()` | 只处理 `redirectUri=https://chiimagnus.github.io/syncnos-oauth/callback`，并校验 `state` 一致 |
+| code 交换 | Worker `index.ts` | 扩展向 `/notion/oauth/exchange` 发送 `{ code, redirectUri }`；Worker 在服务端用 `NOTION_CLIENT_ID/SECRET` 调 Notion token endpoint |
+| token 入库 | `setNotionOAuthToken()` | 扩展仅持久化 `access_token` 与 workspace 信息，不落地 `client_secret` |
+
+| 关键参数 | 位置 | 说明 |
+| --- | --- | --- |
+| `tokenExchangeProxyUrl` | `oauth.ts` | `https://syncnos-notion-oauth.chiimagnus.workers.dev/notion/oauth/exchange` |
+| Worker `NOTION_CLIENT_ID` | Cloudflare Worker env | OAuth client id，仅 Worker 可见 |
+| Worker `NOTION_CLIENT_SECRET` | Cloudflare Worker env | OAuth client secret，仅 Worker 可见 |
+| `redirectUri` | `oauth.ts` + Worker | 固定为 `https://chiimagnus.github.io/syncnos-oauth/callback`，用于 code exchange 对齐 |
+
 ## 典型调用时序
 
 ```mermaid
@@ -80,3 +96,6 @@ sequenceDiagram
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
 - `webclipper/src/bootstrap/current-page-capture.ts`
 - `webclipper/src/platform/messaging/ui-background-handlers.ts`
+
+## 更新记录（Update Notes）
+- 2026-03-19：新增 Notion OAuth Worker 的 code exchange 分阶段说明与关键参数矩阵，明确密钥仅在 Worker 侧持有。

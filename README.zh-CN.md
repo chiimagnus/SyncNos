@@ -69,7 +69,9 @@
 | Poe | 自动 |
 | Notion AI | 自动 |
 | z.ai | 自动 |
-| Google AI Studio | 手动保存优先（虚拟列表限制） |
+| Google AI Studio | 手动保存优先¹ |
+
+¹ 受虚拟列表限制，自动采集可能只覆盖当前可见 turns。若要完整历史，请使用 inpage 手动保存或 popup 的当前页抓取。
 
 ### 网页文章
 

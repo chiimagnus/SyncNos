@@ -5,12 +5,12 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `ea57c00506d9e0b4ba90868ccbc23fa6a4db4435` |
+| Commit hash | `246e4bda356dfedb9db1c0ba0ab474b62223aaf0` |
 | Branch name | `main` |
-| Generation timestamp | `2026-03-16 18:41:56 CST` |
+| Generation timestamp | `2026-03-19 01:51:24 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
-| Update mode | Incremental cleanup |
+| Update mode | Incremental sync update |
 
 ## Page Inventory
 
@@ -42,14 +42,13 @@
 - `assets/setting-screenshots.png`
 
 ## What Changed In This Update
-- 清理 `INDEX.md` 的日期型“变更流水”内容，改为稳定入口与事实源说明，减少跨页重复与时效性噪声。
-- 将 WebClipper manifest 发版号收敛为单一事实源：仅在 `configuration.md` 记录具体值，其余页面只做引用。
-- 将 deepwiki 中 IndexedDB 版本事实统一更新为 `DB_VERSION = 6`，并补齐 `oldVersion < 6` 清理迁移说明（`storage.md`、`modules/webclipper.md`）。
-- 在存储专题页补充 `image_cache` store 与备份边界，避免“缓存层=备份层”的误读。
-- 删除模块页中易过期的“近期修复流水”表述，保留稳定的职责、边界与入口信息。
+- 在 `configuration.md` 同步 `manifest.version=1.3.5`，并补充 App `AutoSyncService.intervalSeconds=5*60` 的配置事实。
+- 在 `dependencies.md` 补充 Notion OAuth Worker 作为外部集成边界，明确 token exchange 由 Worker 侧持有密钥完成。
+- 在 `api.md` 新增 Notion OAuth Worker 交换流程（授权、回调校验、code exchange、token 入库）与关键参数矩阵。
+- 在 `INDEX.md` 的 Coverage Gaps 中补充 OCR 与键盘焦点专项文档的可点击链接。
 
 ## Coverage Notes
-- 本次重点是“去冗余 + 去老旧 + 校准事实源”，未新增页面，保持文件名稳定。
+- 本次重点是“事实同步 + 外部集成边界补强”，未新增页面，保持文件名稳定。
 - deepwiki 继续覆盖双产品线、配置、数据流、存储、测试、发布与排障；并强化“代码/配置优先于文档摘要”的写作约束。
 - 仍保留的 Coverage Gaps：App Store 提交流程缺少仓库内自动化证据；OCR 与键盘焦点专项文档尚未拆为 deepwiki 独立专题页。
 
@@ -60,6 +59,7 @@
 | 仓库入口与规范 | `AGENTS.md`, `README.md`, `README.zh-CN.md`, `macOS/SyncNos/AGENTS.md`, `webclipper/AGENTS.md` |
 | WebClipper 版本与权限 | `webclipper/wxt.config.ts`, `webclipper/package.json` |
 | WebClipper 设置与运行时 | `webclipper/src/entrypoints/background.ts`, `webclipper/src/ui/settings/types.ts`, `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts` |
+| OAuth 与外部交换 | `webclipper/src/sync/notion/auth/oauth.ts`, `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts` |
 | WebClipper 存储与迁移 | `webclipper/src/platform/idb/schema.ts`, `webclipper/src/conversations/data/storage-idb.ts` |
 | 备份边界 | `webclipper/src/sync/backup/export.ts`, `webclipper/src/sync/backup/import.ts`, `webclipper/src/sync/backup/backup-utils.ts` |
 | 发布流程 | `.github/workflows/webclipper-*.yml`, `.github/scripts/webclipper/*.mjs` |

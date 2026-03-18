@@ -40,8 +40,9 @@
 
 | 服务 / 平台 | 调用方 | 方式 | 作用 |
 | --- | --- | --- | --- |
-| Notion API / OAuth | App + WebClipper | HTTPS | Parent Page、数据库、页面属性、blocks 写入 |
-| Obsidian Local REST API | WebClipper | 本地 HTTP | 把会话或文章写入 vault |
+| Notion OAuth authorize + Notion API | App + WebClipper | HTTPS | Parent Page、数据库、页面属性、blocks 写入 |
+| Notion OAuth Worker（`syncnos-notion-oauth`） | WebClipper | HTTPS `POST /notion/oauth/exchange` | 在 Worker 端持有 `client_secret` 完成 code exchange，避免扩展侧暴露密钥 |
+| Obsidian Local REST API | WebClipper | 本地 HTTP（默认 `http://127.0.0.1:27123`） | 把会话或文章写入 vault |
 | Apple Books / GoodLinks 本地库 | App | 本地目录 / SQLite | 读取阅读高亮与元数据 |
 | WeRead / Dedao 登录态 | App | Cookie Header / 站点会话 | 拉取在线阅读内容 |
 | 浏览器 DOM | WebClipper | content script | 采集 AI 对话与网页正文 |
@@ -70,6 +71,7 @@
 | CI Node 版本 | `20` | `webclipper-*.yml` | 统一打包与发布环境 |
 
 - **重要区分**：WebClipper 发布 workflow 只强制校验 `wxt.config.ts` 的 `manifest.version` 与 `v*` tag 是否一致，不会校验 `package.json` 的 `version`。
+- **OAuth 交换边界**：扩展回调后会把 `code` 发给 `https://syncnos-notion-oauth.chiimagnus.workers.dev/notion/oauth/exchange`；Worker 再向 Notion token endpoint 交换 `access_token`。
 - **权限边界**：扩展 manifest 使用 `storage`, `contextMenus`, `tabs`, `webNavigation`, `activeTab`, `scripting`，并配合广泛 `host_permissions` 覆盖支持站点与普通网页；UI 是否真正启动仍受运行时 gating 控制。
 
 ## 修改依赖时最应该注意什么
@@ -88,8 +90,13 @@
 - `macOS/SyncNos/AppDelegate.swift`
 - `webclipper/package.json`
 - `webclipper/wxt.config.ts`
+- `webclipper/src/sync/notion/auth/oauth.ts`
+- `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
 - `macOS/Packages/MenuBarDockKit/Package.swift`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
 - `.github/scripts/webclipper/package-release-assets.mjs`
+
+## 更新记录（Update Notes）
+- 2026-03-19：补充 Notion OAuth Worker 作为外部集成边界，明确 token exchange 路径与 Obsidian 默认本地 API 地址。

@@ -72,8 +72,11 @@
 
 ## Coverage Gaps
 - **App Store 交付链路**：仓库中能看到 App Store 链接，但没有公开的 App Store 提交 workflow 或脚本；deepwiki 明确把它视为“仓库外渠道信息”。
-- **OCR 与键盘焦点专项文档**：仓库已有 `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md` 与 `macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
+- **OCR 与键盘焦点专项文档**：仓库已有 [`macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md`](../../macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md) 与 [`macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`](../../macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md)，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
 - **集成专题页**：当前 Notion / Obsidian / collectors 仍主要分布在 `architecture.md`、`data-flow.md` 与 `modules/` 页面；如果未来这些区域继续膨胀，适合再拆专题页。
 
 ## Generation Metadata
 - [GENERATION.md](GENERATION.md)
+
+## 更新记录（Update Notes）
+- 2026-03-19：Coverage Gaps 增加专项文档可点击链接，便于从索引直接跳转到仓库内技术文档。
