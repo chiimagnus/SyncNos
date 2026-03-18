@@ -66,6 +66,14 @@
   animation: webclipperInpageRainbow 1100ms linear both;
 }
 
+.webclipper-inpage-btn.is-saving {
+  animation: webclipperInpageBounce 1100ms cubic-bezier(0.18, 1, 0.32, 1) infinite;
+}
+
+.webclipper-inpage-btn.is-saving .webclipper-inpage-btn__icon {
+  animation: webclipperInpageRainbow 1100ms linear infinite;
+}
+
 @keyframes webclipperInpageShake {
   0%,
   100% {
@@ -132,7 +140,9 @@
   .webclipper-inpage-btn.is-easter-3,
   .webclipper-inpage-btn.is-easter-5,
   .webclipper-inpage-btn.is-easter-7,
-  .webclipper-inpage-btn.is-easter-7 .webclipper-inpage-btn__icon {
+  .webclipper-inpage-btn.is-saving,
+  .webclipper-inpage-btn.is-easter-7 .webclipper-inpage-btn__icon,
+  .webclipper-inpage-btn.is-saving .webclipper-inpage-btn__icon {
     animation: none;
     filter: none;
   }

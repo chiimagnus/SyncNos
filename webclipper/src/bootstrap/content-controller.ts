@@ -24,6 +24,7 @@ type InpageButtonApi = {
     onCombo?: (payload: { level: number; count?: number }) => void;
   }) => void;
   cleanupButtons?: (collectorId: string) => void;
+  setSaving?: (saving: boolean) => void;
 };
 
 type InpageTipApi = {
@@ -206,6 +207,7 @@ export function createContentController(deps: Deps) {
     // Default to enabled when storage API is unavailable (e.g. tests).
     // When storage is available, wait for the async read to avoid a "first tick" auto-save surprise for users who disabled it.
     let aiChatAutoSaveEnabled: boolean | null = hasStorageGet ? null : true;
+    let savingDepth = 0;
 
     void readAiChatAutoSaveEnabled()
       .then((enabled) => {
@@ -218,6 +220,8 @@ export function createContentController(deps: Deps) {
     function stop() {
       if (stopped) return;
       stopped = true;
+      savingDepth = 0;
+      inpageButton?.setSaving?.(false);
       inpageButton?.cleanupButtons?.('');
       if (deepResearchPollTimer) {
         clearTimeout(deepResearchPollTimer);
@@ -259,14 +263,26 @@ export function createContentController(deps: Deps) {
       }, DEEP_RESEARCH_POLL_INTERVAL_MS);
     }
 
+    function beginSaving() {
+      savingDepth += 1;
+      if (savingDepth === 1) inpageButton?.setSaving?.(true);
+    }
+
+    function endSaving() {
+      savingDepth = Math.max(0, savingDepth - 1);
+      if (savingDepth === 0) inpageButton?.setSaving?.(false);
+    }
+
     const clickSave = async () => {
       if (stopped) return;
       if (manualSaveInFlight) {
         showInpageTip(t('savingDots'), 'loading');
+        inpageButton?.setSaving?.(true);
         return;
       }
 
       manualSaveInFlight = true;
+      beginSaving();
       try {
         await currentPageCapture.captureCurrentPage({
           onProgress: (progress) => {
@@ -277,6 +293,7 @@ export function createContentController(deps: Deps) {
         // tip already shown in progress callback
       } finally {
         manualSaveInFlight = false;
+        endSaving();
       }
     };
 
@@ -338,12 +355,14 @@ export function createContentController(deps: Deps) {
 
           deepResearchHydrateInFlight = true;
           deepResearchLastHydrateAttemptAt = now;
+          beginSaving();
           try {
             await hydrateChatgptDeepResearchSnapshot(snapshot, send);
           } catch (_e) {
             // ignore hydration failures
           } finally {
             deepResearchHydrateInFlight = false;
+            endSaving();
           }
 
           if (hasChatgptDeepResearchPlaceholderMessages(snapshot)) return;
@@ -355,8 +374,13 @@ export function createContentController(deps: Deps) {
         const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
         if (!incremental || !incremental.changed) return;
 
-        const saved = await saveSnapshot(incremental.snapshot, { mode: 'append', diff: incremental.diff });
-        if (saved) showInpageTip(t('saved'), 'ok');
+        beginSaving();
+        try {
+          const saved = await saveSnapshot(incremental.snapshot, { mode: 'append', diff: incremental.diff });
+          if (saved) showInpageTip(t('saved'), 'ok');
+        } finally {
+          endSaving();
+        }
       } catch (error) {
         if (runtime?.isInvalidContextError?.(error)) {
           stop();
