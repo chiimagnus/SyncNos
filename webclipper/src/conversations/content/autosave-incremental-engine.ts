@@ -2,15 +2,24 @@ import normalizeApi from '../../shared/normalize.ts';
 
 type Diff = { added: string[]; updated: string[]; removed: string[] };
 
+type IncomingKeyIdentity = { role: string; text: string; markdown: string };
+
+type TailEntry = {
+  key: string;
+  role: string;
+  identityHash: string;
+  text: string;
+  markdown: string;
+};
+
 type ConversationState = {
   key: string;
   lastTitle: string;
   lastUrl: string;
   stateKeyHash: string;
-  captureSeq: number;
-  lastVisibleFingerprints: string[];
-  lastVisibleKeys: string[];
-  lastTail: Array<{ key: string; role: string; text: string; markdown: string }>;
+  lastWindowIdentityHashes: string[];
+  lastTail: TailEntry[];
+  incomingKeyIdentities: Map<string, IncomingKeyIdentity>;
   initialized: boolean;
 };
 
@@ -26,13 +35,15 @@ function normalizeContent(value: unknown): string {
   return String(value || '');
 }
 
-function fingerprintBase(message: any): { role: string; base: string } {
+function getMessageIdentityBase(message: any, identityPrefixLen: number): { role: string; base: string; text: string; markdown: string } {
   const role = String((message && message.role) || 'assistant').trim() || 'assistant';
   const text = normalizeContent(message && message.contentText);
   const markdownRaw = message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
   const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
-  const base = markdown ? `${role}|${text}|md:${markdown}` : `${role}|${text}`;
-  return { role, base };
+  const full = text || markdown;
+  const clipped = full ? full.slice(0, identityPrefixLen) : '';
+  const base = `${role}|${clipped}`;
+  return { role, base, text, markdown };
 }
 
 function fingerprintHash(base: string): string {
@@ -49,10 +60,6 @@ function arrayEqual(a: string[], b: string[]) {
     if (a[i] !== b[i]) return false;
   }
   return true;
-}
-
-function makeAutoSaveMessageKey(state: ConversationState, messageIndex: number) {
-  return `autosave_${state.stateKeyHash}_${state.captureSeq}_${messageIndex}`;
 }
 
 function computeStateKeyHash(stateKey: string): string {
@@ -79,9 +86,55 @@ function makeConversationStateKey(snapshot: any): string {
   return `${source}::${conversationKey}`;
 }
 
+function isPrefixOrFillingUpdate(prev: { text: string; markdown: string }, next: { text: string; markdown: string }) {
+  const prevText = prev.text || '';
+  const nextText = next.text || '';
+  const prevMarkdown = prev.markdown || '';
+  const nextMarkdown = next.markdown || '';
+
+  const textFilled = !prevText && !!nextText;
+  const markdownFilled = !prevMarkdown && !!nextMarkdown;
+
+  const textGrew = !!(prevText && nextText && nextText.startsWith(prevText) && nextText.length > prevText.length);
+  const markdownGrew = !!(
+    prevMarkdown &&
+    nextMarkdown &&
+    nextMarkdown.startsWith(prevMarkdown) &&
+    nextMarkdown.length > prevMarkdown.length
+  );
+
+  return {
+    changed: prevText !== nextText || prevMarkdown !== nextMarkdown,
+    acceptable: textFilled || markdownFilled || textGrew || markdownGrew,
+  };
+}
+
+function computeSuffixPrefixOverlap(prev: string[], cur: string[], requiredOverlap: number): number {
+  const prevLen = prev.length;
+  const curLen = cur.length;
+  const maxOverlap = Math.min(prevLen, curLen);
+  if (maxOverlap <= 0) return 0;
+
+  for (let overlap = maxOverlap; overlap >= requiredOverlap; overlap -= 1) {
+    const start = prevLen - overlap;
+    let ok = true;
+    for (let i = 0; i < overlap; i += 1) {
+      if (prev[start + i] !== cur[i]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return overlap;
+  }
+  return 0;
+}
+
 export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
   const byConversation = new Map<string, ConversationState>();
   const TAIL_UPDATE_WINDOW_SIZE = 2;
+  const MAX_WINDOW_MESSAGES = 200;
+  const IDENTITY_PREFIX_LEN = 96;
+  const MIN_OVERLAP_FOR_LONG_WINDOWS = 8;
 
   function getOrCreateState(key: string): ConversationState {
     const existing = byConversation.get(key);
@@ -91,10 +144,9 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       lastTitle: '',
       lastUrl: '',
       stateKeyHash: computeStateKeyHash(key),
-      captureSeq: 0,
-      lastVisibleFingerprints: [],
-      lastVisibleKeys: [],
+      lastWindowIdentityHashes: [],
       lastTail: [],
+      incomingKeyIdentities: new Map(),
       initialized: false,
     };
     byConversation.set(key, next);
@@ -122,123 +174,179 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const nextUrl = normalizeMeta(snapshot.conversation.url);
       const metaChanged = state.initialized && (nextTitle !== state.lastTitle || nextUrl !== state.lastUrl);
 
-      const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
-      const currentFingerprints = messages.map((m: any) => {
-        const { base } = fingerprintBase(m);
-        return fingerprintHash(base);
-      });
+      const allMessages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
+      const windowStart = Math.max(0, allMessages.length - MAX_WINDOW_MESSAGES);
+      const windowMessages = allMessages.slice(windowStart);
+      const currentIdentityHashes: string[] = [];
+      const currentComparable: Array<{ role: string; identityHash: string; text: string; markdown: string; stableIncomingKey: string }> = [];
 
-      if (state.initialized && arrayEqual(currentFingerprints, state.lastVisibleFingerprints)) {
-        if (!metaChanged) return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
+      for (const m of windowMessages) {
+        const incomingKeyRaw = String(m?.messageKey || '').trim();
+        const { role, base, text, markdown } = getMessageIdentityBase(m, IDENTITY_PREFIX_LEN);
+        const identityHash = fingerprintHash(base);
+
+        let stableIncomingKey = '';
+        if (incomingKeyRaw) {
+          const existing = state.incomingKeyIdentities.get(incomingKeyRaw);
+          if (!existing) {
+            state.incomingKeyIdentities.set(incomingKeyRaw, { role, text, markdown });
+            stableIncomingKey = incomingKeyRaw;
+          } else if (existing.role === role) {
+            const decision = isPrefixOrFillingUpdate(existing, { text, markdown });
+            if (decision.acceptable) {
+              // Keep the latest content snapshot so future comparisons can still accept prefix growth.
+              state.incomingKeyIdentities.set(incomingKeyRaw, { role, text, markdown });
+              stableIncomingKey = incomingKeyRaw;
+            } else {
+              // Treat as unstable key reuse (virtualized lists may recycle index-based keys).
+              stableIncomingKey = '';
+            }
+          } else {
+            // Treat as unstable key reuse (virtualized lists may recycle index-based keys).
+            stableIncomingKey = '';
+          }
+        }
+
+        currentIdentityHashes.push(identityHash);
+        currentComparable.push({ role, identityHash, text, markdown, stableIncomingKey });
+      }
+
+      // Session baseline: do not write on first capture (prevents massive duplication when re-entering a conversation).
+      // autosave should only persist deltas; full history persistence remains manual Save's job.
+      if (!state.initialized) {
+        state.initialized = true;
         state.lastTitle = nextTitle;
         state.lastUrl = nextUrl;
-        snapshot.messages = [];
-        return { changed: true, snapshot, diff: { added: [], updated: [], removed: [] } };
+        state.lastWindowIdentityHashes = currentIdentityHashes;
+        state.lastTail = currentComparable.slice(Math.max(0, currentComparable.length - TAIL_UPDATE_WINDOW_SIZE)).map((m) => ({
+          key: m.stableIncomingKey || '',
+          role: m.role,
+          identityHash: m.identityHash,
+          text: m.text,
+          markdown: m.markdown,
+        }));
+        return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
       }
 
       const added: string[] = [];
       const updated: string[] = [];
+      const addedSet = new Set<string>();
+      const updatedSet = new Set<string>();
 
-      state.captureSeq += 1;
+      const prevIdentityHashes = state.lastWindowIdentityHashes;
+      const curLen = currentIdentityHashes.length;
+      const prevLen = prevIdentityHashes.length;
+      const overlapBasis = Math.min(prevLen, curLen);
+      const requiredOverlap =
+        overlapBasis <= 2
+          ? overlapBasis
+          : Math.min(MIN_OVERLAP_FOR_LONG_WINDOWS, Math.max(2, Math.floor(overlapBasis * 0.6)));
+      const overlapLen = computeSuffixPrefixOverlap(prevIdentityHashes, currentIdentityHashes, requiredOverlap);
 
-      const prevLen = state.lastVisibleFingerprints.length;
-      const curLen = currentFingerprints.length;
-      const lengthSame = state.initialized && curLen === prevLen;
-      const stablePrefixLen = Math.max(0, curLen - TAIL_UPDATE_WINDOW_SIZE);
-      const prefixStable =
-        lengthSame &&
-        arrayEqual(
-          currentFingerprints.slice(0, stablePrefixLen),
-          state.lastVisibleFingerprints.slice(0, stablePrefixLen),
-        );
-      const appendAtEnd =
-        state.initialized &&
-        curLen === prevLen + 1 &&
-        arrayEqual(currentFingerprints.slice(0, prevLen), state.lastVisibleFingerprints);
+      const deltaByKey = new Map<string, any>();
 
-      const tailStartIndex = Math.max(0, curLen - TAIL_UPDATE_WINDOW_SIZE);
-      const allowTailUpdates = prefixStable && state.lastTail.length === Math.min(TAIL_UPDATE_WINDOW_SIZE, curLen);
-
-      const nextKeys: string[] = [];
-
-      for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
-        const message = messages[messageIndex];
-        if (!message) continue;
-
-        const fp = currentFingerprints[messageIndex] || '';
-        let key = '';
-
-        if (appendAtEnd && messageIndex < prevLen) {
-          key = String(state.lastVisibleKeys[messageIndex] || '');
-        } else if (prefixStable && messageIndex < stablePrefixLen) {
-          key = String(state.lastVisibleKeys[messageIndex] || '');
-        } else if (prefixStable && messageIndex >= tailStartIndex) {
-          // Tail window: allow exact-match reuse or prefix-growth update.
-          const prevFp = String(state.lastVisibleFingerprints[messageIndex] || '');
-          const prevKey = String(state.lastVisibleKeys[messageIndex] || '');
-          if (prevKey && prevFp && prevFp === fp) {
-            key = prevKey;
-          } else if (allowTailUpdates) {
-            const tailIndex = messageIndex - tailStartIndex;
-            const prev = state.lastTail[tailIndex];
-            if (prev && prev.key) {
-              const role = String((message && message.role) || 'assistant').trim() || 'assistant';
-              if (prev.role === role) {
-                const text = normalizeContent(message && message.contentText);
-                const markdownRaw =
-                  message && message.contentMarkdown && String(message.contentMarkdown).trim()
-                    ? String(message.contentMarkdown)
-                    : '';
-                const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
-
-                const textGrew = !!(prev.text && text && text.startsWith(prev.text) && text.length > prev.text.length);
-                const markdownGrew = !!(
-                  prev.markdown &&
-                  markdown &&
-                  markdown.startsWith(prev.markdown) &&
-                  markdown.length > prev.markdown.length
-                );
-                if (textGrew || markdownGrew) {
-                  key = prev.key;
-                  updated.push(key);
-                }
-              }
-            }
+      const pushDelta = (key: string, msg: any, kind: 'added' | 'updated') => {
+        if (!key || !msg) return;
+        if (!deltaByKey.has(key)) deltaByKey.set(key, msg);
+        if (kind === 'added') {
+          if (!addedSet.has(key)) {
+            addedSet.add(key);
+            added.push(key);
           }
+          return;
         }
-
-        if (!key) {
-          key = makeAutoSaveMessageKey(state, messageIndex);
-          added.push(key);
+        if (!updatedSet.has(key)) {
+          updatedSet.add(key);
+          updated.push(key);
         }
+      };
 
-        message.messageKey = key;
-        nextKeys[messageIndex] = key;
+      // 1) Tail prefix-growth / fill updates (N=2)
+      const curTail = currentComparable.slice(Math.max(0, currentComparable.length - TAIL_UPDATE_WINDOW_SIZE));
+      const prevTail = state.lastTail;
+      for (let idx = 0; idx < curTail.length; idx += 1) {
+        const prevEntry = prevTail[idx];
+        const curEntry = curTail[idx];
+        if (!prevEntry || !curEntry) continue;
+        if (prevEntry.role !== curEntry.role) continue;
+
+        const decision = isPrefixOrFillingUpdate(
+          { text: prevEntry?.text || '', markdown: prevEntry?.markdown || '' },
+          { text: curEntry.text, markdown: curEntry.markdown },
+        );
+        if (!decision.changed || !decision.acceptable) continue;
+
+        const msgIndexFromEnd = curTail.length - 1 - idx;
+        const key =
+          curEntry.stableIncomingKey ||
+          prevEntry?.key ||
+          `autosave_${state.stateKeyHash}_${curEntry.identityHash}_tail${msgIndexFromEnd + 1}`;
+        const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
+        if (msg) msg.messageKey = key;
+        pushDelta(key, msg, prevEntry?.key ? 'updated' : 'added');
       }
 
-      const changed = !state.initialized || metaChanged || added.length > 0 || updated.length > 0;
+      // 2) Appended new messages (only when we can confidently anchor to the previous window)
+      if (prevLen === 0 || overlapLen > 0) {
+        const appendStart = overlapLen;
+        const appended = windowMessages.slice(appendStart);
+        const appendedComparable = currentComparable.slice(appendStart);
 
-      state.initialized = true;
+        const occurrenceByIdentity = new Map<string, number>();
+        for (let i = 0; i < appended.length; i += 1) {
+          const msg = appended[i];
+          const meta = appendedComparable[i];
+          if (!msg || !meta) continue;
+
+          const keyFromCollector = meta.stableIncomingKey;
+          if (keyFromCollector) {
+            msg.messageKey = keyFromCollector;
+            pushDelta(keyFromCollector, msg, 'added');
+            continue;
+          }
+
+          const nextOcc = (occurrenceByIdentity.get(meta.identityHash) || 0) + 1;
+          occurrenceByIdentity.set(meta.identityHash, nextOcc);
+          const syntheticKey = `autosave_${state.stateKeyHash}_${meta.identityHash}_a${nextOcc}`;
+          msg.messageKey = syntheticKey;
+          pushDelta(syntheticKey, msg, 'added');
+        }
+      }
+
+      // If we couldn't anchor reliably, don't write message deltas (avoids duplicate blow-ups on re-entry / virtualized renders).
+      const changed = metaChanged || added.length > 0 || updated.length > 0;
+      if (!changed) {
+        state.lastTitle = nextTitle;
+        state.lastUrl = nextUrl;
+        state.lastWindowIdentityHashes = currentIdentityHashes;
+        state.lastTail = curTail.map((m, idx) => {
+          const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
+          const keyFromMsg = String(msg?.messageKey || '').trim();
+          const key =
+            m.stableIncomingKey ||
+            (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') ||
+            '';
+          return { key, role: m.role, identityHash: m.identityHash, text: m.text, markdown: m.markdown };
+        });
+        return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
+      }
+
+      snapshot.messages = Array.from(deltaByKey.values());
+
       state.lastTitle = nextTitle;
       state.lastUrl = nextUrl;
-      state.lastVisibleFingerprints = currentFingerprints;
-      state.lastVisibleKeys = nextKeys;
-      const nextTail = messages
-        .slice(Math.max(0, messages.length - TAIL_UPDATE_WINDOW_SIZE))
-        .map((m: any) => ({
-          key: String(m?.messageKey || ''),
-          role: String((m && m.role) || 'assistant').trim() || 'assistant',
-          text: normalizeContent(m && m.contentText),
-          markdown: normalizeContent(m && m.contentMarkdown),
-        }))
-        .filter((x: any) => x && x.key);
-      state.lastTail = nextTail;
+      state.lastWindowIdentityHashes = currentIdentityHashes;
+      state.lastTail = curTail.map((m, idx) => {
+        const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
+        const keyFromMsg = String(msg?.messageKey || '').trim();
+        const key =
+          m.stableIncomingKey ||
+          (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') ||
+          '';
+        return { key, role: m.role, identityHash: m.identityHash, text: m.text, markdown: m.markdown };
+      });
 
-      return {
-        changed,
-        snapshot,
-        diff: { added, updated, removed: [] },
-      };
+      return { changed: true, snapshot, diff: { added, updated, removed: [] } };
     },
 
     reset() {

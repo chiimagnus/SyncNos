@@ -18,71 +18,59 @@ describe("smoke", () => {
     const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b" }] };
     const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b!" }] };
 
-    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline: no write
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(false);
-    expect(incrementalUpdater.computeIncremental(snap3).changed).toBe(true);
+    const r3 = incrementalUpdater.computeIncremental(snap3);
+    expect(r3.changed).toBe(true);
+    expect(r3.diff.added.length).toBe(1);
   });
 
   it("computeIncremental detects content update for same messageKey", () => {
     incrementalUpdater.__resetForTests();
     const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
     const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi!" }] };
-    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
-    expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline: no write
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.updated).toEqual(["m1"]);
   });
 
   it("computeIncremental uses stable fallback keys for auto-save", () => {
     incrementalUpdater.__resetForTests();
     const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
     const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello!" }] };
+    const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello!!" }] };
 
     const r1 = incrementalUpdater.computeIncremental(snap1);
-    expect(r1.changed).toBe(true);
-    expect(r1.diff.added.length).toBe(1);
-    expect(r1.diff.updated.length).toBe(0);
-    expect(String(snap1.messages[0].messageKey || "")).toMatch(/^autosave_/);
+    expect(r1.changed).toBe(false); // baseline: no write
 
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.added.length).toBe(0);
-    expect(r2.diff.updated.length).toBe(1);
-    expect(r2.diff.removed.length).toBe(0);
-    expect(snap2.messages[0].messageKey).toBe(snap1.messages[0].messageKey);
+    expect(r2.diff.added.length).toBe(1);
+    expect(r2.diff.updated.length).toBe(0);
+    expect(String(r2.snapshot.messages[0].messageKey || "")).toMatch(/^autosave_/);
+
+    const key = String(r2.snapshot.messages[0].messageKey || "");
+    const r3 = incrementalUpdater.computeIncremental(snap3);
+    expect(r3.changed).toBe(true);
+    expect(r3.diff.added.length).toBe(0);
+    expect(r3.diff.updated).toEqual([key]);
   });
 
-  it("computeIncremental does not overwrite history when the visible window shifts", () => {
+  it("computeIncremental appends only the truly new tail when the window slides (MAX_WINDOW_MESSAGES=200)", () => {
     incrementalUpdater.__resetForTests();
 
-    const snap1 = {
-      conversation: { source: "debug", conversationKey: "c1" },
-      messages: [
-        { role: "user", contentText: "A" },
-        { role: "assistant", contentText: "B" },
-        { role: "user", contentText: "C" },
-      ],
-    };
-    const r1 = incrementalUpdater.computeIncremental(snap1);
-    expect(r1.changed).toBe(true);
-    expect(r1.diff.removed.length).toBe(0);
+    const mk = (i: number) => ({ role: i % 2 === 0 ? "user" : "assistant", contentText: `m${i}` });
+    const base = Array.from({ length: 201 }, (_, i) => mk(i)); // windowStart=1 -> last 200 messages
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: base };
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline
 
-    const keyA = String(snap1.messages[0].messageKey || "");
-    expect(keyA).toMatch(/^autosave_/);
-
-    // Simulate a virtualized list: the top part gets recycled and capture starts from the middle.
-    const snap2 = {
-      conversation: { source: "debug", conversationKey: "c1" },
-      messages: [
-        { role: "assistant", contentText: "B" },
-        { role: "user", contentText: "C" },
-        { role: "assistant", contentText: "D" },
-      ],
-    };
+    const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [...base, mk(201)] };
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.removed.length).toBe(0);
-
-    // The new first visible message must not reuse the key previously assigned to "A".
-    expect(String(snap2.messages[0].messageKey || "")).not.toBe(keyA);
+    expect(r2.diff.added.length).toBe(1);
+    expect(r2.snapshot.messages.length).toBe(1);
+    expect(String(r2.snapshot.messages[0].messageKey || "")).toMatch(/^autosave_/);
   });
 
   it("computeIncremental updates only within the tail window (N=2) on prefix growth", () => {
@@ -96,9 +84,7 @@ describe("smoke", () => {
         { role: "assistant", contentText: "C" },
       ],
     };
-    incrementalUpdater.computeIncremental(snap1);
-    const keyB = String(snap1.messages[1].messageKey || "");
-    const keyC = String(snap1.messages[2].messageKey || "");
+    incrementalUpdater.computeIncremental(snap1); // baseline
 
     const snap2 = {
       conversation: { source: "debug", conversationKey: "c1" },
@@ -110,12 +96,11 @@ describe("smoke", () => {
     };
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.added.length).toBe(0);
-    expect(r2.diff.updated).toEqual([keyB]);
+    expect(r2.diff.added.length).toBe(1);
+    expect(r2.diff.updated.length).toBe(0);
     expect(r2.diff.removed.length).toBe(0);
-
-    expect(String(snap2.messages[1].messageKey || "")).toBe(keyB);
-    expect(String(snap2.messages[2].messageKey || "")).toBe(keyC);
+    expect(r2.snapshot.messages.length).toBe(1);
+    expect(String(r2.snapshot.messages[0].contentText || "")).toBe("B!!!");
   });
 
   it("computeIncremental treats a new message as added (no false tail update)", () => {
@@ -123,8 +108,7 @@ describe("smoke", () => {
 
     const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
     const r1 = incrementalUpdater.computeIncremental(snap1);
-    expect(r1.changed).toBe(true);
-    const key1 = String(snap1.messages[0].messageKey || "");
+    expect(r1.changed).toBe(false); // baseline: no write
 
     const snap2 = {
       conversation: { source: "debug", conversationKey: "c1" },
@@ -138,9 +122,6 @@ describe("smoke", () => {
     expect(r2.diff.updated.length).toBe(0);
     expect(r2.diff.added.length).toBe(1);
     expect(r2.diff.removed.length).toBe(0);
-
-    expect(String(snap2.messages[0].messageKey || "")).toBe(key1);
-    expect(String(snap2.messages[1].messageKey || "")).not.toBe(key1);
   });
 
   it("computeIncremental ignores unstable incoming messageKey reuse across window shift", () => {
@@ -154,7 +135,7 @@ describe("smoke", () => {
         { messageKey: "k2", role: "user", contentText: "C" },
       ],
     };
-    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false); // baseline
 
     // Window shifts but the collector reuses index-based keys (k0/k1/k2) for different messages.
     const snap2 = {
@@ -168,24 +149,28 @@ describe("smoke", () => {
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
     expect(r2.diff.removed.length).toBe(0);
-
-    // Must not accept the conflicting incoming key (k0) for message "B".
-    expect(String(snap2.messages[0].messageKey || "")).not.toBe("k0");
+    expect(r2.diff.added.length).toBe(1);
+    expect(String(r2.snapshot.messages[0].messageKey || "")).toMatch(/^autosave_/);
   });
 
   it("computeIncremental isolates state by source and conversationKey", () => {
     incrementalUpdater.__resetForTests();
 
-    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "A" }] };
-    const r1 = incrementalUpdater.computeIncremental(snap1);
-    expect(r1.changed).toBe(true);
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [] as any[] };
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(false);
+    const snap1b = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "A" }] };
+    const r1b = incrementalUpdater.computeIncremental(snap1b);
+    expect(r1b.changed).toBe(true);
+    const key1 = String(r1b.snapshot.messages[0].messageKey || "");
 
-    const snap2 = { conversation: { source: "debug", conversationKey: "c2" }, messages: [{ role: "user", contentText: "B" }] };
-    const r2 = incrementalUpdater.computeIncremental(snap2);
-    expect(r2.changed).toBe(true);
+    const snap2 = { conversation: { source: "debug", conversationKey: "c2" }, messages: [] as any[] };
+    expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(false);
+    const snap2b = { conversation: { source: "debug", conversationKey: "c2" }, messages: [{ role: "user", contentText: "B" }] };
+    const r2b = incrementalUpdater.computeIncremental(snap2b);
+    expect(r2b.changed).toBe(true);
+    const key2 = String(r2b.snapshot.messages[0].messageKey || "");
 
-    // Different conversations should not share autosave state.
-    expect(String(snap2.messages[0].messageKey || "")).not.toBe(String(snap1.messages[0].messageKey || ""));
+    expect(key2).not.toBe(key1);
   });
 
   it("computeIncremental detects title/url updates even without message changes", () => {
@@ -194,7 +179,7 @@ describe("smoke", () => {
     const sameMsgsNewTitle = { conversation: { source: "debug", conversationKey: "c1", title: "t2", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
     const sameMsgsNewUrl = { conversation: { source: "debug", conversationKey: "c1", title: "t2", url: "https://b" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
 
-    expect(incrementalUpdater.computeIncremental(base).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(base).changed).toBe(false); // baseline
     expect(incrementalUpdater.computeIncremental(sameMsgsNewTitle).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(sameMsgsNewUrl).changed).toBe(true);
   });
@@ -204,7 +189,7 @@ describe("smoke", () => {
     const base = { conversation: { source: "debug", conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
     const emptyMeta = { conversation: { source: "debug", conversationKey: "c1", title: "", url: "" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
 
-    expect(incrementalUpdater.computeIncremental(base).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(base).changed).toBe(false); // baseline
     expect(incrementalUpdater.computeIncremental(emptyMeta).changed).toBe(false);
     // And it should carry forward the previous non-empty values.
     expect(emptyMeta.conversation.title).toBe("t1");
