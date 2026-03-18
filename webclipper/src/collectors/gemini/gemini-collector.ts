@@ -488,6 +488,42 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return out;
   }
 
+  function mergeDeepResearchResults(
+    input: {
+      baseText: string;
+      baseMarkdown: string;
+      jobs: DeepResearchJob[];
+      results: Map<string, { ok: boolean; title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode; error?: string }>;
+    },
+  ): { contentText: string; contentMarkdown: string } {
+    const baseText = env.normalize.normalizeText(input.baseText || '');
+    const baseMarkdown = String(input.baseMarkdown || '').trim() ? String(input.baseMarkdown) : baseText;
+
+    const sections: string[] = [];
+    const textParts: string[] = [];
+    for (const job of input.jobs) {
+      const res = input.results.get(job.jobKey);
+      if (res && res.ok) {
+        const title = env.normalize.normalizeText(res.title || job.title || '');
+        const md = String(res.contentMarkdown || '').trim() || env.normalize.normalizeText(res.contentText || '');
+        const mdBlock = title ? `\n\n## Deep Research: ${title}\n\n${md}` : `\n\n## Deep Research\n\n${md}`;
+        sections.push(mdBlock);
+        const textBlock = env.normalize.normalizeText(res.contentText || '');
+        if (textBlock) textParts.push(title ? `${title}\n${textBlock}` : textBlock);
+        continue;
+      }
+
+      const title = env.normalize.normalizeText(job.title || '');
+      const err = env.normalize.normalizeText(res?.error || 'failed');
+      sections.push(title ? `\n\n## Deep Research: ${title}\n\n(未抓到全文: ${err})` : `\n\n## Deep Research\n\n(未抓到全文: ${err})`);
+      textParts.push(title ? `${title}\n(未抓到全文: ${err})` : `(未抓到全文: ${err})`);
+    }
+
+    const mergedMarkdown = baseMarkdown + (sections.length ? `\n\n---\n${sections.join('\n\n---\n')}` : '');
+    const mergedText = baseText + (textParts.length ? `\n\n${textParts.join('\n\n')}` : '');
+    return { contentText: mergedText.trim(), contentMarkdown: mergedMarkdown.trim() };
+  }
+
   async function resolveDeepResearchContent(
     node: ParentNode | null,
     options: { manual?: boolean } = {},
@@ -680,10 +716,17 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     const manualDeepResearchResults = options.manual === true && manualDeepResearchJobs.length
       ? await crawlDeepResearchJobsManual(blocks, manualDeepResearchJobs)
       : new Map();
+    const manualJobsByBlockIndex = new Map<number, DeepResearchJob[]>();
+    for (const job of manualDeepResearchJobs) {
+      const existing = manualJobsByBlockIndex.get(job.blockIndex) || [];
+      existing.push(job);
+      manualJobsByBlockIndex.set(job.blockIndex, existing);
+    }
 
     const out: any[] = [];
     let seq = 0;
-    for (const b of blocks) {
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
+      const b = blocks[blockIndex];
       const userRoot = b.querySelector("user-query") || b.querySelector("[data-test-id='user-message']") || null;
       if (userRoot) {
         const userTextEl = userRoot.querySelector ? (userRoot.querySelector(".query-text") || userRoot) : userRoot;
@@ -706,16 +749,28 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
       const model = b.querySelector("model-response") || b.querySelector("model-response .model-response-text") || null;
       if (model) {
-        const deepResearch = await resolveDeepResearchContent(model, { manual: options.manual === true });
-        const text = deepResearch?.contentText || extractAssistantText(model);
+        const baseText = extractAssistantText(model);
+        const baseMarkdown = extractAssistantMarkdown(model, baseText);
+
+        const jobsForBlock = options.manual === true ? (manualJobsByBlockIndex.get(blockIndex) || []) : [];
+        const merged = (options.manual === true && jobsForBlock.length)
+          ? mergeDeepResearchResults({ baseText, baseMarkdown, jobs: jobsForBlock, results: manualDeepResearchResults })
+          : null;
+
+        const deepResearch = merged
+          ? null
+          : await resolveDeepResearchContent(model, { manual: options.manual === true });
+
+        const text = merged?.contentText || deepResearch?.contentText || baseText;
         const imageScope = (deepResearch?.contentRoot || model) as ParentNode | null;
         const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const baseMarkdown = deepResearch?.contentMarkdown || extractAssistantMarkdown(model, contentText);
-          const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls, { allowDataImageUrls: true });
+          const baseMd = merged?.contentMarkdown || deepResearch?.contentMarkdown || baseMarkdown || contentText;
+          const contentMarkdown = appendImageMarkdown(baseMd || contentText, imageUrls, { allowDataImageUrls: true });
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
+            // Keep messageKey stable across re-saves by using the base assistant text (without appended reports).
+            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText: baseText || contentText, sequence: seq }),
             role: "assistant",
             contentText,
             contentMarkdown,
