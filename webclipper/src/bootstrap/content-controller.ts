@@ -148,7 +148,7 @@ export function createContentController(deps: Deps) {
 
   async function saveSnapshot(
     snapshot: any,
-    options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } },
+    options?: { mode?: 'snapshot' | 'incremental' | 'append'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
 
@@ -355,7 +355,7 @@ export function createContentController(deps: Deps) {
         const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
         if (!incremental || !incremental.changed) return;
 
-        const saved = await saveSnapshot(incremental.snapshot, { mode: 'incremental', diff: incremental.diff });
+        const saved = await saveSnapshot(incremental.snapshot, { mode: 'append', diff: incremental.diff });
         if (saved) showInpageTip(t('saved'), 'ok');
       } catch (error) {
         if (runtime?.isInvalidContextError?.(error)) {
