@@ -6,11 +6,10 @@ type ConversationState = {
   key: string;
   lastTitle: string;
   lastUrl: string;
-  // All keys ever seen for this conversation. Must be append-only to prevent key reuse overwriting history.
-  keyToFingerprint: Map<string, string>;
-  // fingerprint -> stable key per occurrence index in the current visible snapshot.
-  fingerprintToKeys: Map<string, string[]>;
-  lastVisibleMessageCount: number;
+  stateKeyHash: string;
+  captureSeq: number;
+  lastVisibleFingerprints: string[];
+  lastVisibleKeys: string[];
   lastTail: Array<{ key: string; role: string; text: string; markdown: string }>;
   initialized: boolean;
 };
@@ -42,44 +41,24 @@ function fingerprintHash(base: string): string {
   return base;
 }
 
-function makeKey(hash: string, occurrenceIndex: number, disambiguator: number) {
-  const suffix = disambiguator > 0 ? `_${disambiguator}` : '';
-  return `autosave_${hash}_${occurrenceIndex}${suffix}`;
+function arrayEqual(a: string[], b: string[]) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
-function pickOrCreateStableKey(state: ConversationState, fp: string, occurrenceIndex: number, incomingKey: string): string {
-  const existingList = state.fingerprintToKeys.get(fp) || [];
-  const stable = existingList[occurrenceIndex];
+function makeAutoSaveMessageKey(state: ConversationState, messageIndex: number) {
+  return `autosave_${state.stateKeyHash}_${state.captureSeq}_${messageIndex}`;
+}
 
-  const incoming = String(incomingKey || '').trim();
-  const incomingFp = incoming ? state.keyToFingerprint.get(incoming) : null;
-  const incomingIsValid = !!(incoming && (!incomingFp || incomingFp === fp));
-
-  if (incomingIsValid) {
-    // Prefer the collector-provided key when it does not conflict with previously observed content.
-    // This keeps stable IDs stable, while still preventing overwrites when the collector reuses keys for different messages.
-    if (stable !== incoming) {
-      existingList[occurrenceIndex] = incoming;
-      state.fingerprintToKeys.set(fp, existingList);
-    }
-    return incoming;
-  }
-
-  if (stable) {
-    return stable;
-  }
-
-  let disambiguator = 0;
-  while (true) {
-    const candidate = makeKey(fp, occurrenceIndex, disambiguator);
-    const prev = state.keyToFingerprint.get(candidate);
-    if (!prev || prev === fp) {
-      existingList[occurrenceIndex] = candidate;
-      state.fingerprintToKeys.set(fp, existingList);
-      return candidate;
-    }
-    disambiguator += 1;
-  }
+function computeStateKeyHash(stateKey: string): string {
+  const normalize = normalizeApi as any;
+  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(stateKey));
+  return stateKey.replace(/[^a-zA-Z0-9]+/g, '_');
 }
 
 export type AutoSaveIncrementalResult = {
@@ -111,9 +90,10 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       key,
       lastTitle: '',
       lastUrl: '',
-      keyToFingerprint: new Map(),
-      fingerprintToKeys: new Map(),
-      lastVisibleMessageCount: 0,
+      stateKeyHash: computeStateKeyHash(key),
+      captureSeq: 0,
+      lastVisibleFingerprints: [],
+      lastVisibleKeys: [],
       lastTail: [],
       initialized: false,
     };
@@ -143,66 +123,97 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const metaChanged = state.initialized && (nextTitle !== state.lastTitle || nextUrl !== state.lastUrl);
 
       const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
-      const perFingerprintOccurrence = new Map<string, number>();
+      const currentFingerprints = messages.map((m: any) => {
+        const { base } = fingerprintBase(m);
+        return fingerprintHash(base);
+      });
+
+      if (state.initialized && arrayEqual(currentFingerprints, state.lastVisibleFingerprints)) {
+        if (!metaChanged) return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
+        state.lastTitle = nextTitle;
+        state.lastUrl = nextUrl;
+        snapshot.messages = [];
+        return { changed: true, snapshot, diff: { added: [], updated: [], removed: [] } };
+      }
 
       const added: string[] = [];
       const updated: string[] = [];
 
-      const tailStartIndex = Math.max(0, messages.length - TAIL_UPDATE_WINDOW_SIZE);
-      const allowTailUpdates = state.initialized && messages.length === state.lastVisibleMessageCount && state.lastTail.length > 0;
+      state.captureSeq += 1;
+
+      const prevLen = state.lastVisibleFingerprints.length;
+      const curLen = currentFingerprints.length;
+      const lengthSame = state.initialized && curLen === prevLen;
+      const stablePrefixLen = Math.max(0, curLen - TAIL_UPDATE_WINDOW_SIZE);
+      const prefixStable =
+        lengthSame &&
+        arrayEqual(
+          currentFingerprints.slice(0, stablePrefixLen),
+          state.lastVisibleFingerprints.slice(0, stablePrefixLen),
+        );
+      const appendAtEnd =
+        state.initialized &&
+        curLen === prevLen + 1 &&
+        arrayEqual(currentFingerprints.slice(0, prevLen), state.lastVisibleFingerprints);
+
+      const tailStartIndex = Math.max(0, curLen - TAIL_UPDATE_WINDOW_SIZE);
+      const allowTailUpdates = prefixStable && state.lastTail.length === Math.min(TAIL_UPDATE_WINDOW_SIZE, curLen);
+
+      const nextKeys: string[] = [];
 
       for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
         const message = messages[messageIndex];
         if (!message) continue;
 
-        const incomingKey = message && message.messageKey ? String(message.messageKey) : '';
-        const { base } = fingerprintBase(message);
-        const fp = fingerprintHash(base);
-
-        const occurrenceIndex = perFingerprintOccurrence.get(fp) || 0;
-        perFingerprintOccurrence.set(fp, occurrenceIndex + 1);
-
+        const fp = currentFingerprints[messageIndex] || '';
         let key = '';
 
-        if (allowTailUpdates && messageIndex >= tailStartIndex) {
-          const tailIndex = messageIndex - tailStartIndex;
-          const prev = state.lastTail[tailIndex];
-          if (prev && prev.key) {
-            const role = String((message && message.role) || 'assistant').trim() || 'assistant';
-            if (prev.role === role) {
-              const text = normalizeContent(message && message.contentText);
-              const markdownRaw =
-                message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
-              const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
+        if (appendAtEnd && messageIndex < prevLen) {
+          key = String(state.lastVisibleKeys[messageIndex] || '');
+        } else if (prefixStable && messageIndex < stablePrefixLen) {
+          key = String(state.lastVisibleKeys[messageIndex] || '');
+        } else if (prefixStable && messageIndex >= tailStartIndex) {
+          // Tail window: allow exact-match reuse or prefix-growth update.
+          const prevFp = String(state.lastVisibleFingerprints[messageIndex] || '');
+          const prevKey = String(state.lastVisibleKeys[messageIndex] || '');
+          if (prevKey && prevFp && prevFp === fp) {
+            key = prevKey;
+          } else if (allowTailUpdates) {
+            const tailIndex = messageIndex - tailStartIndex;
+            const prev = state.lastTail[tailIndex];
+            if (prev && prev.key) {
+              const role = String((message && message.role) || 'assistant').trim() || 'assistant';
+              if (prev.role === role) {
+                const text = normalizeContent(message && message.contentText);
+                const markdownRaw =
+                  message && message.contentMarkdown && String(message.contentMarkdown).trim()
+                    ? String(message.contentMarkdown)
+                    : '';
+                const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
 
-              const textGrew = !!(prev.text && text && text.startsWith(prev.text) && text.length > prev.text.length);
-              const markdownGrew = !!(
-                prev.markdown &&
-                markdown &&
-                markdown.startsWith(prev.markdown) &&
-                markdown.length > prev.markdown.length
-              );
-
-              if (textGrew || markdownGrew) {
-                key = prev.key;
-                // Force-adopt the key for the new fingerprint occurrence so future ticks remain stable.
-                const list = state.fingerprintToKeys.get(fp) || [];
-                list[occurrenceIndex] = key;
-                state.fingerprintToKeys.set(fp, list);
+                const textGrew = !!(prev.text && text && text.startsWith(prev.text) && text.length > prev.text.length);
+                const markdownGrew = !!(
+                  prev.markdown &&
+                  markdown &&
+                  markdown.startsWith(prev.markdown) &&
+                  markdown.length > prev.markdown.length
+                );
+                if (textGrew || markdownGrew) {
+                  key = prev.key;
+                  updated.push(key);
+                }
               }
             }
           }
         }
 
-        if (!key) key = pickOrCreateStableKey(state, fp, occurrenceIndex, incomingKey);
+        if (!key) {
+          key = makeAutoSaveMessageKey(state, messageIndex);
+          added.push(key);
+        }
+
         message.messageKey = key;
-
-        const prevFp = state.keyToFingerprint.get(key);
-        if (!prevFp) added.push(key);
-        else if (prevFp !== fp) updated.push(key);
-
-        // Append-only: never delete old keys; keep all known key -> fingerprint mappings forever.
-        state.keyToFingerprint.set(key, fp);
+        nextKeys[messageIndex] = key;
       }
 
       const changed = !state.initialized || metaChanged || added.length > 0 || updated.length > 0;
@@ -210,7 +221,8 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       state.initialized = true;
       state.lastTitle = nextTitle;
       state.lastUrl = nextUrl;
-      state.lastVisibleMessageCount = messages.length;
+      state.lastVisibleFingerprints = currentFingerprints;
+      state.lastVisibleKeys = nextKeys;
       const nextTail = messages
         .slice(Math.max(0, messages.length - TAIL_UPDATE_WINDOW_SIZE))
         .map((m: any) => ({

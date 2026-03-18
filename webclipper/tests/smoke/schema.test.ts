@@ -14,9 +14,9 @@ describe("smoke", () => {
 
   it("computeIncremental detects changes by messageKey sequence", () => {
     incrementalUpdater.__resetForTests();
-    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m2" }] };
-    const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m2" }] };
-    const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m3" }] };
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b" }] };
+    const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b" }] };
+    const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "a" }, { role: "assistant", contentText: "b!" }] };
 
     expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(false);
