@@ -57,9 +57,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return wrapper.querySelector("iframe[title='internal://deep-research']") || null;
   }
 
-  function requestDeepResearchContent(iframeEl: any, options?: { timeoutMs?: number }): Promise<{ markdown: string; text: string; title: string } | null> {
+  function requestDeepResearchContent(
+    iframeEl: any,
+    options?: { timeoutMs?: number; cacheKeyHint?: string },
+  ): Promise<{ markdown: string; text: string; title: string } | null> {
     const iframeSrc = String(iframeEl?.getAttribute?.('src') || '').trim();
-    const cacheKey = iframeSrc || String(iframeEl?.getAttribute?.('title') || 'deep-research');
+    // NOTE: The deep-research iframe src is often identical across multiple turns in the same conversation.
+    // If we cache purely by src, later reports incorrectly reuse the first extracted snapshot.
+    const cacheKeyHint = String(options?.cacheKeyHint || '').trim();
+    const cacheKeyBase = iframeSrc || String(iframeEl?.getAttribute?.('title') || 'deep-research');
+    const cacheKey = cacheKeyHint ? `${cacheKeyHint}|${cacheKeyBase}` : cacheKeyBase;
     const cached = deepResearchCache.get(cacheKey);
     const now = Date.now();
     if (cached && now - cached.updatedAt < 60_000) return Promise.resolve({ markdown: cached.markdown, text: cached.text, title: cached.title });
@@ -241,6 +248,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     for (let i = 0; i < wrappers.length; i += 1) {
       const el = wrappers[i];
       const role = roleFromWrapper(el);
+      const messageId =
+        (el.getAttribute && (el.getAttribute('data-message-id') || el.getAttribute('data-turn-id') || el.id)) || '';
       const node = role === 'user' ? userContentNode(el) : assistantContentNode(el);
       const raw = node ? node.innerText || node.textContent || '' : '';
       const fallbackText = env.normalize.normalizeText(raw);
@@ -264,7 +273,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       if (role === 'assistant' && deepResearchIframe) {
         // Prefer a fast placeholder and let the background hydrator fill the body reliably.
         // Best-effort request is kept short to avoid blocking capture for long-running reports.
-        const extracted = await requestDeepResearchContent(deepResearchIframe, { timeoutMs: allowEditing ? 600 : 200 });
+        const deepResearchCacheKeyHint = messageId || String(el.getAttribute?.('data-testid') || '') || String(i);
+        const extracted = await requestDeepResearchContent(deepResearchIframe, {
+          timeoutMs: allowEditing ? 600 : 200,
+          cacheKeyHint: deepResearchCacheKeyHint,
+        });
         if (extracted) {
           const markdown = String(extracted.markdown || '').trim();
           const text = String(extracted.text || '').trim();
@@ -284,7 +297,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
       if (!contentText && !imageUrls.length) continue;
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
-      const messageId = el.getAttribute && (el.getAttribute('data-message-id') || el.id);
       const messageKey = messageId || env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
       out.push({
         messageKey,
