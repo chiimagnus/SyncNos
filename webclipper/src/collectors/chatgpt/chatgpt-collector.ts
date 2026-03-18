@@ -54,7 +54,38 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function findDeepResearchIframe(wrapper: any): any | null {
     if (!wrapper || !wrapper.querySelector) return null;
-    return wrapper.querySelector("iframe[title='internal://deep-research']") || null;
+    const nodes = Array.from(wrapper.querySelectorAll("iframe[title='internal://deep-research']")) as any[];
+    if (!nodes.length) return null;
+    if (nodes.length === 1) return nodes[0];
+
+    // Some turns keep multiple deep-research iframes in the DOM (stale duplicates). Prefer the most visible one.
+    let best: any | null = null;
+    let bestArea = -1;
+    for (const node of nodes) {
+      if (!node || typeof node.getBoundingClientRect !== 'function') continue;
+      let rect: any = null;
+      try {
+        rect = node.getBoundingClientRect();
+      } catch (_e) {
+        rect = null;
+      }
+      const width = Number(rect?.width) || 0;
+      const height = Number(rect?.height) || 0;
+      const area = width * height;
+      if (!area) continue;
+      try {
+        const style = env.window?.getComputedStyle ? env.window.getComputedStyle(node) : null;
+        if (style && (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')) continue;
+      } catch (_e) {
+        // ignore
+      }
+      if (area > bestArea) {
+        bestArea = area;
+        best = node;
+      }
+    }
+
+    return best || nodes[0] || null;
   }
 
   function requestDeepResearchContent(
@@ -244,6 +275,23 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       for (const turn of turns) wrappers.push(turn);
     }
 
+    // If a conversation contains multiple deep-research iframes, we intentionally keep placeholders
+    // and let the background hydrator fill them in bulk. Partial in-page extraction would make the
+    // remaining placeholders ambiguous and can collapse reports.
+    let preferDeepResearchPlaceholders = false;
+    try {
+      let count = 0;
+      for (const w of wrappers) {
+        if (count >= 2) break;
+        const role = roleFromWrapper(w);
+        if (role !== 'assistant') continue;
+        if (findDeepResearchIframe(w)) count += 1;
+      }
+      preferDeepResearchPlaceholders = count >= 2;
+    } catch (_e) {
+      // ignore
+    }
+
     const out: any[] = [];
     for (let i = 0; i < wrappers.length; i += 1) {
       const el = wrappers[i];
@@ -273,25 +321,31 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       if (role === 'assistant' && deepResearchIframe) {
         // Prefer a fast placeholder and let the background hydrator fill the body reliably.
         // Best-effort request is kept short to avoid blocking capture for long-running reports.
-        const deepResearchCacheKeyHint = messageId || String(el.getAttribute?.('data-testid') || '') || String(i);
-        const extracted = await requestDeepResearchContent(deepResearchIframe, {
-          timeoutMs: allowEditing ? 600 : 200,
-          cacheKeyHint: deepResearchCacheKeyHint,
-        });
-        if (extracted) {
-          const markdown = String(extracted.markdown || '').trim();
-          const text = String(extracted.text || '').trim();
-          baseMarkdown = markdown || text || baseMarkdown || '';
-          contentText = env.normalize.normalizeText(text || markdown || contentText || '');
-        } else {
-          // The parent page doesn't contain the report body; only the iframe does.
-          // If extraction fails (timing/permissions), keep a stable placeholder so users can still recover the link.
-          const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
-          const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
-          // Some locales expose an sr-only "ChatGPT said" label as the only text sibling of the iframe.
-          // Always prefer a stable placeholder so the hydrator can reliably fill the final report.
+        const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
+        const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
+
+        if (preferDeepResearchPlaceholders) {
           contentText = placeholder;
           baseMarkdown = placeholder;
+        } else {
+          const deepResearchCacheKeyHint = messageId || String(el.getAttribute?.('data-testid') || '') || String(i);
+          const extracted = await requestDeepResearchContent(deepResearchIframe, {
+            timeoutMs: allowEditing ? 600 : 200,
+            cacheKeyHint: deepResearchCacheKeyHint,
+          });
+          if (extracted) {
+            const markdown = String(extracted.markdown || '').trim();
+            const text = String(extracted.text || '').trim();
+            baseMarkdown = markdown || text || baseMarkdown || '';
+            contentText = env.normalize.normalizeText(text || markdown || contentText || '');
+          } else {
+            // The parent page doesn't contain the report body; only the iframe does.
+            // If extraction fails (timing/permissions), keep a stable placeholder so users can still recover the link.
+            // Some locales expose an sr-only "ChatGPT said" label as the only text sibling of the iframe.
+            // Always prefer a stable placeholder so the hydrator can reliably fill the final report.
+            contentText = placeholder;
+            baseMarkdown = placeholder;
+          }
         }
       }
 

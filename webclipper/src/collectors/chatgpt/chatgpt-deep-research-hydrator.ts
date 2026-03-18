@@ -58,6 +58,10 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
 
   if (!targets.length) return snapshot;
 
+  // Keep this low enough to capture short states like "Research stopped", but still avoid
+  // hydrating placeholders with near-empty frame scaffolding.
+  const minTextLength = 4;
+
   const urls = targets
     .map(({ m }: { m: any }) => {
       const raw = String(m.contentText || m.contentMarkdown || '');
@@ -72,7 +76,7 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
   const res = await send(CHATGPT_MESSAGE_TYPES.EXTRACT_DEEP_RESEARCH, {
     expectedHost,
     // Multiple deep-research iframes often need a lower threshold to avoid dropping non-focused frames.
-    minTextLength: 80,
+    minTextLength,
     urls,
   });
   if (!res?.ok) return snapshot;
@@ -88,7 +92,7 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
       html: String(x?.html || '').trim(),
       markdown: String(x?.markdown || '').trim(),
     }))
-    .filter((x: any) => x.text.length >= 80);
+    .filter((x: any) => x.text.replace(/\s+/g, '').length >= minTextLength);
 
   if (!normalized.length) return snapshot;
 
@@ -106,6 +110,8 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
     .map((x: any) => ({
       ...x,
       top: Number(x?.frameRect?.top),
+      width: Number(x?.frameRect?.width),
+      height: Number(x?.frameRect?.height),
     }))
     .filter((x: any) => Number.isFinite(x.top));
 
@@ -121,11 +127,27 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
   }
 
   // Map frames to placeholders by vertical order. This avoids collapsing multiple reports into a single "best" report.
-  const sortedItems = withTop.slice().sort((a: any, b: any) => a.top - b.top);
+  const sortedItems = withTop
+    .slice()
+    // Drop clearly non-visible frames (some turns keep a stale iframe in the DOM with 0 height).
+    .filter((x: any) => !(Number.isFinite(x.width) && Number.isFinite(x.height)) || (x.width > 20 && x.height > 20))
+    .sort((a: any, b: any) => a.top - b.top);
+
+  // Deduplicate items that share the same on-page position and identical content (ChatGPT can keep a stale duplicate iframe).
+  const dedupedItems: any[] = [];
+  const seen = new Set<string>();
+  for (const item of sortedItems) {
+    const topBucket = Number.isFinite(item.top) ? String(Math.round(item.top)) : '';
+    const key = `${topBucket}|${item.title.slice(0, 64)}|${item.text.slice(0, 256)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedupedItems.push(item);
+  }
+
   const sortedTargets = targets.slice().sort((a: any, b: any) => a.idx - b.idx);
-  const n = Math.min(sortedTargets.length, sortedItems.length);
+  const n = Math.min(sortedTargets.length, dedupedItems.length);
   for (let i = 0; i < n; i += 1) {
-    const best = sortedItems[i];
+    const best = dedupedItems[i];
     const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
     const text = best.text;
     sortedTargets[i].m.contentText = text;

@@ -27,7 +27,9 @@ export function registerChatgptDeepResearchHandlers(router: AnyRouter) {
       if (!Number.isFinite(tabId) || tabId <= 0) return router.err('active tab unavailable');
 
       const expectedHost = normalizeDeepResearchHost(msg?.expectedHost) || 'connector_openai_deep_research.web-sandbox.oaiusercontent.com';
-      const minTextLength = Math.max(80, Number(msg?.minTextLength) || 240);
+      // Allow the caller to lower the threshold so we can still capture short states like
+      // "Research stopped". Host validation already prevents unrelated frames.
+      const minTextLength = Math.max(1, Number(msg?.minTextLength) || 240);
 
       const results = await scriptingExecuteScript({
         target: { tabId, allFrames: true },
