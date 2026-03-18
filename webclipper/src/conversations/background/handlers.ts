@@ -57,7 +57,8 @@ export function registerConversationHandlers(router: AnyRouter) {
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const mode = String(msg?.mode || '').trim().toLowerCase() === 'incremental' ? 'incremental' : 'snapshot';
+    const rawMode = String(msg?.mode || '').trim().toLowerCase();
+    const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
     const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
@@ -67,7 +68,7 @@ export function registerConversationHandlers(router: AnyRouter) {
         const local = await storageGet(['ai_chat_cache_images_enabled']);
         const enabled = local?.ai_chat_cache_images_enabled === true;
         const keys =
-          mode === 'incremental' && diff
+          (mode === 'incremental' || mode === 'append') && diff
             ? new Set(
                 [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
                   .map((x) => String(x || '').trim())

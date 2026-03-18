@@ -302,13 +302,13 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
-  options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
+  options?: { mode?: 'snapshot' | 'incremental' | 'append'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
 ): Promise<{ upserted: number; deleted: number }> {
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readwrite');
   const idx = stores.messages.index('by_conversationId_messageKey');
 
-  const mode = options?.mode === 'incremental' ? 'incremental' : 'snapshot';
+  const mode = options?.mode === 'incremental' ? 'incremental' : options?.mode === 'append' ? 'append' : 'snapshot';
   const diff = options?.diff || null;
 
   const normalizeKeys = (value: unknown): string[] => {
@@ -316,7 +316,7 @@ export async function syncConversationMessages(
     return value.map((x) => String(x || '').trim()).filter(Boolean);
   };
 
-  if (mode === 'incremental' && diff) {
+  if (mode !== 'snapshot' && diff) {
     const byKey = new Map<string, any>();
     for (const m of messages || []) {
       const key = m && m.messageKey ? String(m.messageKey).trim() : '';
@@ -327,7 +327,8 @@ export async function syncConversationMessages(
     const upsertKeys = Array.from(
       new Set([...normalizeKeys(diff.added), ...normalizeKeys(diff.updated)]),
     );
-    const removedKeys = normalizeKeys(diff.removed);
+    const allowDeletes = mode === 'incremental';
+    const removedKeys = allowDeletes ? normalizeKeys(diff.removed) : [];
 
     let upserted = 0;
     for (const key of upsertKeys) {
@@ -433,6 +434,14 @@ export async function syncConversationMessages(
 
   await txDone(t);
   return { upserted, deleted };
+}
+
+export async function syncConversationMessagesAppendOnly(
+  conversationId: number,
+  messages: any[],
+  diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null,
+): Promise<{ upserted: number; deleted: number }> {
+  return await syncConversationMessages(conversationId, messages, { mode: 'append', diff: diff || null });
 }
 
 export async function getConversations(): Promise<Conversation[]> {

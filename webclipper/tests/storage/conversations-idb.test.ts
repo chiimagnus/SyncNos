@@ -9,6 +9,7 @@ import {
   getConversations,
   getMessagesByConversationId,
   syncConversationMessages,
+  syncConversationMessagesAppendOnly,
   upsertConversation,
 } from "../../src/conversations/data/storage-idb";
 
@@ -112,6 +113,28 @@ describe("conversations storage-idb", () => {
     expect(res2.deleted).toBe(1);
     const after2 = await getMessagesByConversationId(id);
     expect(after2.map((m) => m.messageKey)).toEqual(["m1"]);
+  });
+
+  it("syncs messages in append-only mode and never deletes even when removed is provided", async () => {
+    const convo = await upsertConversation({ sourceType: "chat", source: "debug", conversationKey: "k1", title: "A", lastCapturedAt: 1 });
+    const id = Number(convo.id);
+
+    await syncConversationMessages(id, [
+      { messageKey: "m1", role: "user", contentText: "u", sequence: 1, updatedAt: 1 },
+      { messageKey: "m2", role: "assistant", contentText: "a", sequence: 2, updatedAt: 2 },
+    ]);
+
+    const res = await syncConversationMessagesAppendOnly(
+      id,
+      [{ messageKey: "m1", role: "user", contentText: "u2", sequence: 1, updatedAt: 3 }],
+      { added: [], updated: ["m1"], removed: ["m2"] },
+    );
+    expect(res.upserted).toBe(1);
+    expect(res.deleted).toBe(0);
+
+    const after = await getMessagesByConversationId(id);
+    expect(after.map((m) => m.messageKey)).toEqual(["m1", "m2"]);
+    expect(after.find((m) => m.messageKey === "m1")?.contentText).toBe("u2");
   });
 
   it("deletes conversations, messages, and sync mappings", async () => {

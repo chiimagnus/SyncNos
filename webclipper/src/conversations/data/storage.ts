@@ -20,9 +20,17 @@ export async function hasConversation(payload: any) {
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
-  options?: { mode?: 'snapshot' | 'incremental'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
+  options?: { mode?: 'snapshot' | 'incremental' | 'append'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
 ) {
   return await idb.syncConversationMessages(conversationId, messages, options);
+}
+
+export async function syncConversationMessagesAppendOnly(
+  conversationId: number,
+  messages: any[],
+  diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null,
+) {
+  return await idb.syncConversationMessagesAppendOnly(conversationId, messages, diff || null);
 }
 
 export async function deleteConversationsByIds(conversationIds: any[]) {
