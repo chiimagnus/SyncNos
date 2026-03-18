@@ -12,6 +12,13 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
   const INLINE_BLOB_IMAGES_MAX_COUNT = 12;
   const INLINE_BLOB_IMAGE_MAX_BYTES = 2_000_000;
   const INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES = 8_000_000;
+  const DEEP_RESEARCH_MIN_TEXT_LENGTH = 120;
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      env.window.setTimeout(resolve, Math.max(0, ms));
+    });
+  }
 
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
@@ -101,6 +108,148 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       const raw = node ? (node.innerText || node.textContent || "") : "";
       return env.normalize.normalizeText(raw);
     }
+  }
+
+  function normalizeComparableText(value: unknown): string {
+    return env.normalize.normalizeText(String(value || '')).toLowerCase();
+  }
+
+  function findDeepResearchChipTitle(node: ParentNode | null): string {
+    if (!node || typeof (node as any).querySelector !== 'function') return '';
+    const selectors = [
+      "immersive-entry-chip [data-test-id='title-text']",
+      "deep-research-entry-chip-content [data-test-id='title-text']",
+      "immersive-entry-chip .title-text",
+      "deep-research-entry-chip-content .title-text",
+    ];
+    for (const selector of selectors) {
+      const el = (node as any).querySelector(selector);
+      if (!el) continue;
+      const title = env.normalize.normalizeText((el as any).textContent || (el as any).innerText || '');
+      if (title) return title;
+    }
+    return '';
+  }
+
+  function findDeepResearchTrigger(node: ParentNode | null): HTMLElement | null {
+    if (!node || typeof (node as any).querySelector !== 'function') return null;
+    const selectors = [
+      "immersive-entry-chip [data-test-id='container'].clickable",
+      "immersive-entry-chip [data-test-id='container']",
+      "deep-research-entry-chip-content [data-test-id='container'].clickable",
+      "deep-research-entry-chip-content [data-test-id='container']",
+      "immersive-entry-chip .container.clickable",
+      "deep-research-entry-chip-content .container.clickable",
+      "immersive-entry-chip [data-test-id='title-text']",
+      "deep-research-entry-chip-content [data-test-id='title-text']",
+    ];
+    for (const selector of selectors) {
+      const el = (node as any).querySelector(selector) as HTMLElement | null;
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function findDeepResearchPanels(): Element[] {
+    const selectors = ['deep-research-immersive-panel', 'immersive-panel deep-research-immersive-panel'];
+    for (const selector of selectors) {
+      const nodes = Array.from(env.document.querySelectorAll(selector));
+      if (nodes.length) return nodes;
+    }
+    return [];
+  }
+
+  function extractDeepResearchPanelTitle(panel: ParentNode | null): string {
+    if (!panel || typeof (panel as any).querySelector !== 'function') return '';
+    const selectors = [
+      "toolbar h2.title-text",
+      "[data-test-id='message-content'] h1",
+      '#extended-response-markdown-content h1',
+      '.markdown-main-panel h1',
+    ];
+    for (const selector of selectors) {
+      const el = (panel as any).querySelector(selector);
+      if (!el) continue;
+      const title = env.normalize.normalizeText((el as any).textContent || (el as any).innerText || '');
+      if (title) return title;
+    }
+    return '';
+  }
+
+  function findDeepResearchPanelByTitle(expectedTitle: string): Element | null {
+    const panels = findDeepResearchPanels();
+    if (!panels.length) return null;
+
+    const normalizedExpected = normalizeComparableText(expectedTitle);
+    if (!normalizedExpected) return panels[0] || null;
+
+    for (const panel of panels) {
+      const panelTitle = normalizeComparableText(extractDeepResearchPanelTitle(panel));
+      if (panelTitle && panelTitle === normalizedExpected) return panel;
+    }
+    return null;
+  }
+
+  function extractDeepResearchPanelContent(panel: Element | null): { title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode } | null {
+    if (!panel) return null;
+    const title = extractDeepResearchPanelTitle(panel);
+    const contentText = extractAssistantText(panel);
+    if (!contentText || contentText.length < DEEP_RESEARCH_MIN_TEXT_LENGTH) return null;
+    const contentMarkdown = extractAssistantMarkdown(panel, contentText) || contentText;
+    return {
+      title,
+      contentText,
+      contentMarkdown,
+      contentRoot: panel,
+    };
+  }
+
+  async function openDeepResearchPanel(trigger: HTMLElement | null): Promise<void> {
+    if (!trigger) return;
+    if (typeof trigger.click === 'function') {
+      trigger.click();
+      return;
+    }
+
+    const MouseEventCtor = (env.window as any).MouseEvent;
+    if (typeof trigger.dispatchEvent === 'function' && MouseEventCtor) {
+      trigger.dispatchEvent(new MouseEventCtor('click', { bubbles: true, cancelable: true }));
+    }
+  }
+
+  async function waitForDeepResearchPanel(expectedTitle: string, options: { timeoutMs?: number; pollMs?: number } = {}): Promise<Element | null> {
+    const timeoutMs = Math.max(120, Number(options.timeoutMs) || 2_000);
+    const pollMs = Math.max(20, Number(options.pollMs) || 80);
+    const start = Date.now();
+
+    while ((Date.now() - start) <= timeoutMs) {
+      const panel = findDeepResearchPanelByTitle(expectedTitle);
+      if (extractDeepResearchPanelContent(panel)) return panel;
+      await sleep(pollMs);
+    }
+
+    return null;
+  }
+
+  async function resolveDeepResearchContent(
+    node: ParentNode | null,
+    options: { manual?: boolean } = {},
+  ): Promise<{ title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode } | null> {
+    const chipTitle = findDeepResearchChipTitle(node);
+    if (!chipTitle) return null;
+
+    const openPanel = findDeepResearchPanelByTitle(chipTitle);
+    const immediate = extractDeepResearchPanelContent(openPanel);
+    if (immediate) return immediate;
+
+    if (!options.manual) return null;
+
+    const trigger = findDeepResearchTrigger(node);
+    if (!trigger) return null;
+
+    await openDeepResearchPanel(trigger);
+    const panel = await waitForDeepResearchPanel(chipTitle);
+    return extractDeepResearchPanelContent(panel);
   }
 
   type InlineImageContext = {
@@ -262,7 +411,7 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return out;
   }
 
-  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
+  async function collectMessages(ctx: InlineImageContext, options: { manual?: boolean } = {}): Promise<any[]> {
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
@@ -295,11 +444,13 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
       const model = b.querySelector("model-response") || b.querySelector("model-response .model-response-text") || null;
       if (model) {
-        const text = extractAssistantText(model);
-        const imageUrls = await extractImageUrlsIncludingBlobImages(model, ctx);
+        const deepResearch = await resolveDeepResearchContent(model, { manual: options.manual === true });
+        const text = deepResearch?.contentText || extractAssistantText(model);
+        const imageScope = (deepResearch?.contentRoot || model) as ParentNode | null;
+        const imageUrls = await extractImageUrlsIncludingBlobImages(imageScope, ctx);
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const baseMarkdown = extractAssistantMarkdown(model, contentText);
+          const baseMarkdown = deepResearch?.contentMarkdown || extractAssistantMarkdown(model, contentText);
           const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls, { allowDataImageUrls: true });
           out.push({
             messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
@@ -316,10 +467,10 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return out;
   }
 
-  async function capture(): Promise<any> {
+  async function capture(options: any = {}): Promise<any> {
     if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const ctx = createInlineImageContext();
-    const messages = await collectMessages(ctx);
+    const messages = await collectMessages(ctx, { manual: options?.manual === true });
     if (!messages.length) return null;
     return {
       conversation: {
@@ -339,9 +490,12 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     capture,
     getRoot: getConversationRoot,
     __test: {
-      collectMessages: async () => collectMessages(createInlineImageContext()),
+      collectMessages: async (options: { manual?: boolean } = {}) => collectMessages(createInlineImageContext(), options),
       extractAssistantMarkdown,
-      extractAssistantText
+      extractAssistantText,
+      findDeepResearchChipTitle,
+      extractDeepResearchPanelTitle,
+      resolveDeepResearchContent,
     }
   };
 
