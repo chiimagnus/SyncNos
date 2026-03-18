@@ -50,6 +50,86 @@ describe("smoke", () => {
     expect(snap2.messages[0].messageKey).not.toBe(snap1.messages[0].messageKey);
   });
 
+  it("computeIncremental does not overwrite history when the visible window shifts", () => {
+    incrementalUpdater.__resetForTests();
+
+    const snap1 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { role: "user", contentText: "A" },
+        { role: "assistant", contentText: "B" },
+        { role: "user", contentText: "C" },
+      ],
+    };
+    const r1 = incrementalUpdater.computeIncremental(snap1);
+    expect(r1.changed).toBe(true);
+    expect(r1.diff.removed.length).toBe(0);
+
+    const keyA = String(snap1.messages[0].messageKey || "");
+    expect(keyA).toMatch(/^autosave_/);
+
+    // Simulate a virtualized list: the top part gets recycled and capture starts from the middle.
+    const snap2 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { role: "assistant", contentText: "B" },
+        { role: "user", contentText: "C" },
+        { role: "assistant", contentText: "D" },
+      ],
+    };
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.removed.length).toBe(0);
+
+    // The new first visible message must not reuse the key previously assigned to "A".
+    expect(String(snap2.messages[0].messageKey || "")).not.toBe(keyA);
+  });
+
+  it("computeIncremental ignores unstable incoming messageKey reuse across window shift", () => {
+    incrementalUpdater.__resetForTests();
+
+    const snap1 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { messageKey: "k0", role: "user", contentText: "A" },
+        { messageKey: "k1", role: "assistant", contentText: "B" },
+        { messageKey: "k2", role: "user", contentText: "C" },
+      ],
+    };
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
+
+    // Window shifts but the collector reuses index-based keys (k0/k1/k2) for different messages.
+    const snap2 = {
+      conversation: { source: "debug", conversationKey: "c1" },
+      messages: [
+        { messageKey: "k0", role: "assistant", contentText: "B" },
+        { messageKey: "k1", role: "user", contentText: "C" },
+        { messageKey: "k2", role: "assistant", contentText: "D" },
+      ],
+    };
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.removed.length).toBe(0);
+
+    // Must not accept the conflicting incoming key (k0) for message "B".
+    expect(String(snap2.messages[0].messageKey || "")).not.toBe("k0");
+  });
+
+  it("computeIncremental isolates state by source and conversationKey", () => {
+    incrementalUpdater.__resetForTests();
+
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "user", contentText: "A" }] };
+    const r1 = incrementalUpdater.computeIncremental(snap1);
+    expect(r1.changed).toBe(true);
+
+    const snap2 = { conversation: { source: "debug", conversationKey: "c2" }, messages: [{ role: "user", contentText: "B" }] };
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+
+    // Different conversations should not share autosave state.
+    expect(String(snap2.messages[0].messageKey || "")).not.toBe(String(snap1.messages[0].messageKey || ""));
+  });
+
   it("computeIncremental detects title/url updates even without message changes", () => {
     incrementalUpdater.__resetForTests();
     const base = { conversation: { source: "debug", conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
