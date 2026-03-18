@@ -54,12 +54,50 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function findDeepResearchIframe(wrapper: any): any | null {
     if (!wrapper || !wrapper.querySelector) return null;
-    return wrapper.querySelector("iframe[title='internal://deep-research']") || null;
+    const nodes = Array.from(wrapper.querySelectorAll("iframe[title='internal://deep-research']")) as any[];
+    if (!nodes.length) return null;
+    if (nodes.length === 1) return nodes[0];
+
+    // Some turns keep multiple deep-research iframes in the DOM (stale duplicates). Prefer the most visible one.
+    let best: any | null = null;
+    let bestArea = -1;
+    for (const node of nodes) {
+      if (!node || typeof node.getBoundingClientRect !== 'function') continue;
+      let rect: any = null;
+      try {
+        rect = node.getBoundingClientRect();
+      } catch (_e) {
+        rect = null;
+      }
+      const width = Number(rect?.width) || 0;
+      const height = Number(rect?.height) || 0;
+      const area = width * height;
+      if (!area) continue;
+      try {
+        const style = env.window?.getComputedStyle ? env.window.getComputedStyle(node) : null;
+        if (style && (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')) continue;
+      } catch (_e) {
+        // ignore
+      }
+      if (area > bestArea) {
+        bestArea = area;
+        best = node;
+      }
+    }
+
+    return best || nodes[0] || null;
   }
 
-  function requestDeepResearchContent(iframeEl: any, options?: { timeoutMs?: number }): Promise<{ markdown: string; text: string; title: string } | null> {
+  function requestDeepResearchContent(
+    iframeEl: any,
+    options?: { timeoutMs?: number; cacheKeyHint?: string },
+  ): Promise<{ markdown: string; text: string; title: string } | null> {
     const iframeSrc = String(iframeEl?.getAttribute?.('src') || '').trim();
-    const cacheKey = iframeSrc || String(iframeEl?.getAttribute?.('title') || 'deep-research');
+    // NOTE: The deep-research iframe src is often identical across multiple turns in the same conversation.
+    // If we cache purely by src, later reports incorrectly reuse the first extracted snapshot.
+    const cacheKeyHint = String(options?.cacheKeyHint || '').trim();
+    const cacheKeyBase = iframeSrc || String(iframeEl?.getAttribute?.('title') || 'deep-research');
+    const cacheKey = cacheKeyHint ? `${cacheKeyHint}|${cacheKeyBase}` : cacheKeyBase;
     const cached = deepResearchCache.get(cacheKey);
     const now = Date.now();
     if (cached && now - cached.updatedAt < 60_000) return Promise.resolve({ markdown: cached.markdown, text: cached.text, title: cached.title });
@@ -187,20 +225,22 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     }
 
     const roleNodes = Array.from(scope.querySelectorAll('[data-message-author-role]')) as any[];
-    const articleTurnNodes = Array.from(scope.querySelectorAll("article[data-testid^='conversation-turn-']")) as any[];
-    const divTurnNodes = Array.from(scope.querySelectorAll("div[data-testid='conversation-turn']")) as any[];
+    // Modern ChatGPT wraps each turn with `data-testid="conversation-turn-N"` but the tag varies (`article`, `section`, etc).
+    const turnNodes = Array.from(
+      scope.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
+    ) as any[];
 
     // Prefer message-level nodes if available. Some modern ChatGPT DOMs group multiple assistant
     // messages inside a single `.agent-turn` container; keeping `.agent-turn` as the wrapper would
     // only capture the first message.
     if (roleNodes.length) {
       const picked = dropAncestors(roleNodes);
-      const extraTurns = articleTurnNodes.filter((turn: any) => !picked.some((node: any) => turn.contains(node)));
-      return sortInDocumentOrder(dropAncestors(Array.from(new Set(picked.concat(extraTurns).concat(divTurnNodes).filter(Boolean))) as any[]));
+      const extraTurns = turnNodes.filter((turn: any) => !picked.some((node: any) => turn.contains(node)));
+      return sortInDocumentOrder(dropAncestors(Array.from(new Set(picked.concat(extraTurns).filter(Boolean))) as any[]));
     }
 
-    if (divTurnNodes.length || articleTurnNodes.length) {
-      return sortInDocumentOrder(dropAncestors(divTurnNodes.concat(articleTurnNodes)));
+    if (turnNodes.length) {
+      return sortInDocumentOrder(dropAncestors(turnNodes));
     }
 
     const agentTurnNodes = Array.from(scope.querySelectorAll('.agent-turn')) as any[];
@@ -210,6 +250,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   function roleFromWrapper(wrapper: any): any {
     const direct = wrapper && wrapper.getAttribute ? wrapper.getAttribute('data-message-author-role') : '';
     if (direct === 'user' || direct === 'assistant') return direct;
+
+    const turnRole = wrapper && wrapper.getAttribute ? wrapper.getAttribute('data-turn') : '';
+    if (turnRole === 'user' || turnRole === 'assistant') return turnRole;
 
     const inner = wrapper && wrapper.querySelector ? wrapper.querySelector('[data-message-author-role]') : null;
     const innerRole = inner && inner.getAttribute ? inner.getAttribute('data-message-author-role') : '';
@@ -232,10 +275,29 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       for (const turn of turns) wrappers.push(turn);
     }
 
+    // If a conversation contains multiple deep-research iframes, we intentionally keep placeholders
+    // and let the background hydrator fill them in bulk. Partial in-page extraction would make the
+    // remaining placeholders ambiguous and can collapse reports.
+    let preferDeepResearchPlaceholders = false;
+    try {
+      let count = 0;
+      for (const w of wrappers) {
+        if (count >= 2) break;
+        const role = roleFromWrapper(w);
+        if (role !== 'assistant') continue;
+        if (findDeepResearchIframe(w)) count += 1;
+      }
+      preferDeepResearchPlaceholders = count >= 2;
+    } catch (_e) {
+      // ignore
+    }
+
     const out: any[] = [];
     for (let i = 0; i < wrappers.length; i += 1) {
       const el = wrappers[i];
       const role = roleFromWrapper(el);
+      const messageId =
+        (el.getAttribute && (el.getAttribute('data-message-id') || el.getAttribute('data-turn-id') || el.id)) || '';
       const node = role === 'user' ? userContentNode(el) : assistantContentNode(el);
       const raw = node ? node.innerText || node.textContent || '' : '';
       const fallbackText = env.normalize.normalizeText(raw);
@@ -259,27 +321,36 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       if (role === 'assistant' && deepResearchIframe) {
         // Prefer a fast placeholder and let the background hydrator fill the body reliably.
         // Best-effort request is kept short to avoid blocking capture for long-running reports.
-        const extracted = await requestDeepResearchContent(deepResearchIframe, { timeoutMs: allowEditing ? 600 : 200 });
-        if (extracted) {
-          const markdown = String(extracted.markdown || '').trim();
-          const text = String(extracted.text || '').trim();
-          baseMarkdown = markdown || text || baseMarkdown || '';
-          contentText = env.normalize.normalizeText(text || markdown || contentText || '');
-        } else {
-          // The parent page doesn't contain the report body; only the iframe does.
-          // If extraction fails (timing/permissions), keep a stable placeholder so users can still recover the link.
-          const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
-          const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
-          // Some locales expose an sr-only "ChatGPT said" label as the only text sibling of the iframe.
-          // Always prefer a stable placeholder so the hydrator can reliably fill the final report.
+        const iframeUrl = String(deepResearchIframe.getAttribute?.('src') || '').trim();
+        const placeholder = iframeUrl ? `Deep Research (iframe): ${iframeUrl}` : 'Deep Research (iframe)';
+
+        if (preferDeepResearchPlaceholders) {
           contentText = placeholder;
           baseMarkdown = placeholder;
+        } else {
+          const deepResearchCacheKeyHint = messageId || String(el.getAttribute?.('data-testid') || '') || String(i);
+          const extracted = await requestDeepResearchContent(deepResearchIframe, {
+            timeoutMs: allowEditing ? 600 : 200,
+            cacheKeyHint: deepResearchCacheKeyHint,
+          });
+          if (extracted) {
+            const markdown = String(extracted.markdown || '').trim();
+            const text = String(extracted.text || '').trim();
+            baseMarkdown = markdown || text || baseMarkdown || '';
+            contentText = env.normalize.normalizeText(text || markdown || contentText || '');
+          } else {
+            // The parent page doesn't contain the report body; only the iframe does.
+            // If extraction fails (timing/permissions), keep a stable placeholder so users can still recover the link.
+            // Some locales expose an sr-only "ChatGPT said" label as the only text sibling of the iframe.
+            // Always prefer a stable placeholder so the hydrator can reliably fill the final report.
+            contentText = placeholder;
+            baseMarkdown = placeholder;
+          }
         }
       }
 
       if (!contentText && !imageUrls.length) continue;
       const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls);
-      const messageId = el.getAttribute && (el.getAttribute('data-message-id') || el.id);
       const messageKey = messageId || env.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
       out.push({
         messageKey,

@@ -200,6 +200,132 @@ describe("chatgpt-collector", () => {
     expect(snap.messages[1].contentText).toContain('Body');
   });
 
+  it("captures deep-research iframe inside section conversation-turn wrappers", async () => {
+    const html = `
+      <section data-testid="conversation-turn-1" data-turn="user">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
+      </section>
+      <section data-testid="conversation-turn-2" data-turn="assistant" data-turn-id="t2">
+        <h4 class="sr-only select-none">ChatGPT said:</h4>
+        <div class="agent-turn">
+          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
+        </div>
+      </section>
+    `;
+
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_section_1");
+    const iframe = dom.window.document.querySelector("iframe") as any;
+    expect(iframe).toBeTruthy();
+
+    const fakeFrameWindow = {
+      postMessage: (msg: any) => {
+        const requestId = msg?.requestId;
+        dom.window.dispatchEvent(
+          new (dom.window as any).MessageEvent("message", {
+            data: {
+              __syncnos: true,
+              type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+              requestId,
+              title: "Report",
+              markdown: "# Title\n\nBody",
+              text: "Title\n\nBody",
+            },
+            origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+            source: fakeFrameWindow as any,
+          }),
+        );
+      },
+    };
+    Object.defineProperty(iframe, "contentWindow", { configurable: true, value: fakeFrameWindow });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant"]);
+    expect(snap.messages[0].contentText).toBe("Q");
+    expect(snap.messages[1].contentMarkdown).toContain("# Title");
+    expect(snap.messages[1].contentText).toContain("Body");
+  });
+
+  it("captures multiple deep-research iframes with identical src as distinct reports", async () => {
+    const html = `
+      <section data-testid="conversation-turn-1" data-turn="user" data-turn-id="u1">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
+      </section>
+      <section data-testid="conversation-turn-2" data-turn="assistant" data-turn-id="a1">
+        <div class="agent-turn">
+          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
+        </div>
+      </section>
+      <section data-testid="conversation-turn-3" data-turn="assistant" data-turn-id="a2">
+        <div class="agent-turn">
+          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
+        </div>
+      </section>
+      <section data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="a3">
+        <div class="agent-turn">
+          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
+        </div>
+      </section>
+    `;
+
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_multi_1");
+    const iframes = Array.from(dom.window.document.querySelectorAll("iframe")) as any[];
+    expect(iframes.length).toBe(3);
+
+    const mkFrame = (title: string, body: string) => {
+      const win = {
+        postMessage: (msg: any) => {
+          const requestId = msg?.requestId;
+          dom.window.dispatchEvent(
+            new (dom.window as any).MessageEvent("message", {
+              data: {
+                __syncnos: true,
+                type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+                requestId,
+                title,
+                markdown: `# ${title}\n\n${body}`,
+                text: `${title}\n\n${body}`,
+              },
+              origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+              source: win as any,
+            }),
+          );
+        },
+      };
+      return win;
+    };
+
+    const w1 = mkFrame("Report A", "Body A");
+    const w2 = mkFrame("Report A", "Body A");
+    const w3 = mkFrame("Report B", "Body B");
+    Object.defineProperty(iframes[0], "contentWindow", { configurable: true, value: w1 });
+    Object.defineProperty(iframes[1], "contentWindow", { configurable: true, value: w2 });
+    Object.defineProperty(iframes[2], "contentWindow", { configurable: true, value: w3 });
+
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    const assistant = snap.messages.filter((m: any) => m.role === "assistant");
+    expect(assistant.length).toBe(3);
+    expect(assistant[0].contentText).toContain("Body A");
+    expect(assistant[1].contentText).toContain("Body A");
+    expect(assistant[2].contentText).toContain("Body B");
+    expect(assistant[0].contentText).not.toBe(assistant[2].contentText);
+  });
+
   it("falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label", async () => {
     const html = `
       <article data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="t1">

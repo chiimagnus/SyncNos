@@ -27,7 +27,50 @@ export function registerChatgptDeepResearchHandlers(router: AnyRouter) {
       if (!Number.isFinite(tabId) || tabId <= 0) return router.err('active tab unavailable');
 
       const expectedHost = normalizeDeepResearchHost(msg?.expectedHost) || 'connector_openai_deep_research.web-sandbox.oaiusercontent.com';
-      const minTextLength = Math.max(80, Number(msg?.minTextLength) || 240);
+      // Allow the caller to lower the threshold so we can still capture short states like
+      // "Research stopped". Host validation already prevents unrelated frames.
+      const minTextLength = Math.max(1, Number(msg?.minTextLength) || 240);
+
+      // Assign a stable DOM-order index on the parent page so multi-iframe hydration can map
+      // frames back to placeholders deterministically (frame rects can tie or be unreliable).
+      try {
+        await scriptingExecuteScript({
+          target: { tabId },
+          func: () => {
+            const attr = 'data-syncnos-dr-index';
+            const nodes = Array.from(document.querySelectorAll("iframe[title='internal://deep-research']")) as any[];
+            let idx = 0;
+            for (const node of nodes) {
+              if (!node || typeof node.getBoundingClientRect !== 'function') continue;
+              let rect: any = null;
+              try {
+                rect = node.getBoundingClientRect();
+              } catch (_e) {
+                rect = null;
+              }
+              const w = Number(rect?.width) || 0;
+              const h = Number(rect?.height) || 0;
+              if (w > 20 && h > 20) {
+                try {
+                  node.setAttribute(attr, String(idx));
+                } catch (_e) {
+                  // ignore
+                }
+                idx += 1;
+              } else {
+                try {
+                  node.removeAttribute(attr);
+                } catch (_e) {
+                  // ignore
+                }
+              }
+            }
+            return { ok: true, count: idx };
+          },
+        });
+      } catch (_e) {
+        // ignore
+      }
 
       const results = await scriptingExecuteScript({
         target: { tabId, allFrames: true },
@@ -277,6 +320,31 @@ export function registerChatgptDeepResearchHandlers(router: AnyRouter) {
           const html = normalizeText((root as any)?.outerHTML || '');
           const markdown = buildMarkdown(root);
 
+          let frameRect: any = null;
+          let frameIndex: any = null;
+          try {
+            const fe: any = (window as any).frameElement;
+            if (fe && typeof fe.getBoundingClientRect === 'function') {
+              const rect = fe.getBoundingClientRect();
+              frameRect = {
+                top: Number(rect?.top) || 0,
+                left: Number(rect?.left) || 0,
+                width: Number(rect?.width) || 0,
+                height: Number(rect?.height) || 0,
+              };
+            }
+            try {
+              const raw = fe && typeof fe.getAttribute === 'function' ? fe.getAttribute('data-syncnos-dr-index') : '';
+              const n = Number(raw);
+              frameIndex = Number.isFinite(n) ? n : null;
+            } catch (_e) {
+              frameIndex = null;
+            }
+          } catch (_e) {
+            frameRect = null;
+            frameIndex = null;
+          }
+
           return {
             href: String(location.href || ''),
             hostname: host,
@@ -284,13 +352,22 @@ export function registerChatgptDeepResearchHandlers(router: AnyRouter) {
             text,
             html,
             markdown,
+            frameRect,
+            frameIndex,
           };
         },
         args: [{ expectedHost, minTextLength }],
       });
 
       const items = (Array.isArray(results) ? results : [])
-        .map((r: any) => r?.result)
+        .map((r: any) => {
+          const value = r?.result;
+          if (!value) return null;
+          return {
+            frameId: Number(r?.frameId),
+            ...value,
+          };
+        })
         .filter(Boolean)
         .filter((x: any) => normalizeDeepResearchHost(x?.hostname));
 

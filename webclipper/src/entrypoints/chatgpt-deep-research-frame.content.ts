@@ -64,7 +64,11 @@ function extractDeepResearchSnapshot(): { title: string; markdown: string; text:
   const cloned = root?.cloneNode ? (root.cloneNode(true) as any) : null;
   if (cloned) chatgptMarkdown.removeNonContentNodes(cloned);
   const markdown = cloned ? String(chatgptMarkdown.htmlToMarkdown(cloned) || '').trim() : '';
-  const text = normalizeApi.normalizeText(String(root?.textContent || (root as any)?.innerText || ''));
+  // `outerHTML/textContent` do not include Shadow DOM content; `innerText` often reflects the rendered/composed tree.
+  // Prefer the longer one so we don't miss titles/bodies that render via shadow roots.
+  const visibleText = normalizeApi.normalizeText(String((root as any)?.innerText || ''));
+  const domText = normalizeApi.normalizeText(String(root?.textContent || ''));
+  const text = visibleText.length >= domText.length ? visibleText : domText;
 
   return {
     title,
