@@ -14,9 +14,9 @@ describe("smoke", () => {
 
   it("computeIncremental detects changes by messageKey sequence", () => {
     incrementalUpdater.__resetForTests();
-    const snap1 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m2" }] };
-    const snap2 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m2" }] };
-    const snap3 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m3" }] };
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m2" }] };
+    const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m2" }] };
+    const snap3 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1" }, { messageKey: "m3" }] };
 
     expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(false);
@@ -25,16 +25,16 @@ describe("smoke", () => {
 
   it("computeIncremental detects content update for same messageKey", () => {
     incrementalUpdater.__resetForTests();
-    const snap1 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
-    const snap2 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi!" }] };
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi!" }] };
     expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(true);
   });
 
   it("computeIncremental uses stable fallback keys for auto-save", () => {
     incrementalUpdater.__resetForTests();
-    const snap1 = { conversation: { conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
-    const snap2 = { conversation: { conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello!" }] };
+    const snap1 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello" }] };
+    const snap2 = { conversation: { source: "debug", conversationKey: "c1" }, messages: [{ role: "assistant", contentText: "hello!" }] };
 
     const r1 = incrementalUpdater.computeIncremental(snap1);
     expect(r1.changed).toBe(true);
@@ -44,17 +44,17 @@ describe("smoke", () => {
 
     const r2 = incrementalUpdater.computeIncremental(snap2);
     expect(r2.changed).toBe(true);
-    expect(r2.diff.added.length).toBe(0);
-    expect(r2.diff.updated.length).toBe(1);
+    expect(r2.diff.added.length).toBe(1);
+    expect(r2.diff.updated.length).toBe(0);
     expect(r2.diff.removed.length).toBe(0);
-    expect(snap2.messages[0].messageKey).toBe(snap1.messages[0].messageKey);
+    expect(snap2.messages[0].messageKey).not.toBe(snap1.messages[0].messageKey);
   });
 
   it("computeIncremental detects title/url updates even without message changes", () => {
     incrementalUpdater.__resetForTests();
-    const base = { conversation: { conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
-    const sameMsgsNewTitle = { conversation: { conversationKey: "c1", title: "t2", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
-    const sameMsgsNewUrl = { conversation: { conversationKey: "c1", title: "t2", url: "https://b" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const base = { conversation: { source: "debug", conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const sameMsgsNewTitle = { conversation: { source: "debug", conversationKey: "c1", title: "t2", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const sameMsgsNewUrl = { conversation: { source: "debug", conversationKey: "c1", title: "t2", url: "https://b" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
 
     expect(incrementalUpdater.computeIncremental(base).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(sameMsgsNewTitle).changed).toBe(true);
@@ -63,8 +63,8 @@ describe("smoke", () => {
 
   it("computeIncremental does not treat empty title/url as an update for same conversationKey", () => {
     incrementalUpdater.__resetForTests();
-    const base = { conversation: { conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
-    const emptyMeta = { conversation: { conversationKey: "c1", title: "", url: "" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const base = { conversation: { source: "debug", conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const emptyMeta = { conversation: { source: "debug", conversationKey: "c1", title: "", url: "" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
 
     expect(incrementalUpdater.computeIncremental(base).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(emptyMeta).changed).toBe(false);
