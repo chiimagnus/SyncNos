@@ -277,6 +277,22 @@ export function registerChatgptDeepResearchHandlers(router: AnyRouter) {
           const html = normalizeText((root as any)?.outerHTML || '');
           const markdown = buildMarkdown(root);
 
+          let frameRect: any = null;
+          try {
+            const fe: any = (window as any).frameElement;
+            if (fe && typeof fe.getBoundingClientRect === 'function') {
+              const rect = fe.getBoundingClientRect();
+              frameRect = {
+                top: Number(rect?.top) || 0,
+                left: Number(rect?.left) || 0,
+                width: Number(rect?.width) || 0,
+                height: Number(rect?.height) || 0,
+              };
+            }
+          } catch (_e) {
+            frameRect = null;
+          }
+
           return {
             href: String(location.href || ''),
             hostname: host,
@@ -284,13 +300,21 @@ export function registerChatgptDeepResearchHandlers(router: AnyRouter) {
             text,
             html,
             markdown,
+            frameRect,
           };
         },
         args: [{ expectedHost, minTextLength }],
       });
 
       const items = (Array.isArray(results) ? results : [])
-        .map((r: any) => r?.result)
+        .map((r: any) => {
+          const value = r?.result;
+          if (!value) return null;
+          return {
+            frameId: Number(r?.frameId),
+            ...value,
+          };
+        })
         .filter(Boolean)
         .filter((x: any) => normalizeDeepResearchHost(x?.hostname));
 

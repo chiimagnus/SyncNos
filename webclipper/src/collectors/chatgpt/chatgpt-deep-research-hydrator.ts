@@ -71,31 +71,65 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
 
   const res = await send(CHATGPT_MESSAGE_TYPES.EXTRACT_DEEP_RESEARCH, {
     expectedHost,
-    minTextLength: 240,
+    // Multiple deep-research iframes often need a lower threshold to avoid dropping non-focused frames.
+    minTextLength: 80,
     urls,
   });
   if (!res?.ok) return snapshot;
 
   const items = Array.isArray(res?.data?.items) ? res.data.items : [];
-  const best = items
+  const normalized = items
     .map((x: any) => ({
+      frameId: Number(x?.frameId),
+      frameRect: x?.frameRect && typeof x.frameRect === 'object' ? x.frameRect : null,
       href: normalizeUrl(x?.href),
       title: String(x?.title || '').trim(),
       text: String(x?.text || '').trim(),
       html: String(x?.html || '').trim(),
       markdown: String(x?.markdown || '').trim(),
     }))
-    .filter((x: any) => x.text.length >= 120)
-    .sort((a: any, b: any) => b.text.length - a.text.length)[0];
+    .filter((x: any) => x.text.length >= 80);
 
-  if (!best) return snapshot;
+  if (!normalized.length) return snapshot;
 
-  const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
-  const text = best.text;
+  if (targets.length <= 1) {
+    const best = normalized.slice().sort((a: any, b: any) => b.text.length - a.text.length)[0];
+    if (!best) return snapshot;
+    const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
+    const text = best.text;
+    targets[0].m.contentText = text;
+    targets[0].m.contentMarkdown = markdown;
+    return snapshot;
+  }
 
-  for (const { m } of targets) {
-    m.contentText = text;
-    m.contentMarkdown = markdown;
+  const withTop = normalized
+    .map((x: any) => ({
+      ...x,
+      top: Number(x?.frameRect?.top),
+    }))
+    .filter((x: any) => Number.isFinite(x.top));
+
+  // If we can't determine per-frame ordering, avoid incorrectly hydrating all placeholders with the same report.
+  if (withTop.length < 2) {
+    const best = normalized.slice().sort((a: any, b: any) => b.text.length - a.text.length)[0];
+    if (!best) return snapshot;
+    const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
+    const text = best.text;
+    targets[0].m.contentText = text;
+    targets[0].m.contentMarkdown = markdown;
+    return snapshot;
+  }
+
+  // Map frames to placeholders by vertical order. This avoids collapsing multiple reports into a single "best" report.
+  const sortedItems = withTop.slice().sort((a: any, b: any) => a.top - b.top);
+  const sortedTargets = targets.slice().sort((a: any, b: any) => a.idx - b.idx);
+  const n = Math.min(sortedTargets.length, sortedItems.length);
+  for (let i = 0; i < n; i += 1) {
+    const best = sortedItems[i];
+    const markdown = best.markdown || tryHtmlToMarkdown(best.html) || best.text;
+    const text = best.text;
+    sortedTargets[i].m.contentText = text;
+    sortedTargets[i].m.contentMarkdown = markdown;
   }
 
   return snapshot;
