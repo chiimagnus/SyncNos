@@ -356,12 +356,14 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     initialHadPanel: boolean;
   }): Promise<void> {
     const initialSig = String(input.initialSignature || '').trim();
-    const currentSig = getCurrentDeepResearchPanelSignature();
+    let currentSig = getCurrentDeepResearchPanelSignature();
 
     if (input.initialHadPanel && initialSig) {
       if (currentSig && currentSig === initialSig) return;
       // Try to restore by clicking jobs until the signature matches.
       for (const job of input.jobs) {
+        currentSig = getCurrentDeepResearchPanelSignature();
+        if (currentSig && currentSig === initialSig) return;
         const trigger = resolveDeepResearchTriggerFromJob(input.blocks, job);
         if (!trigger) continue;
         const beforeSig = getCurrentDeepResearchPanelSignature();
@@ -573,6 +575,19 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
   ): Promise<Map<string, { ok: boolean; title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode; error?: string }>> {
     const out = new Map<string, { ok: boolean; title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode; error?: string }>();
     for (const job of jobs) {
+      // If the report is already open, extract immediately instead of waiting for a signature change.
+      const activePanel = pickActiveDeepResearchPanel();
+      const activeContent = extractDeepResearchPanelContent(activePanel);
+      if (activeContent) {
+        const expectedNorm = normalizeComparableText(job.title || '');
+        const titleNorm = normalizeComparableText(activeContent.title || '');
+        const titleOk = !expectedNorm || !titleNorm ? false : titleNorm.includes(expectedNorm) || expectedNorm.includes(titleNorm);
+        if (titleOk) {
+          out.set(job.jobKey, { ok: true, ...activeContent });
+          continue;
+        }
+      }
+
       const trigger = resolveDeepResearchTriggerFromJob(blocks, job);
       if (!trigger) {
         out.set(job.jobKey, { ok: false, title: job.title || '', contentText: '', contentMarkdown: '', contentRoot: env.document.body, error: 'trigger_not_found' });
