@@ -25,6 +25,7 @@ function toButtonHostCss(css: string) {
     .replaceAll('.webclipper-inpage-btn.is-easter-3', ':host(.is-easter-3)')
     .replaceAll('.webclipper-inpage-btn.is-easter-5', ':host(.is-easter-5)')
     .replaceAll('.webclipper-inpage-btn.is-easter-7', ':host(.is-easter-7)')
+    .replaceAll('.webclipper-inpage-btn.is-saving', ':host(.is-saving)')
     .replace(/\.webclipper-inpage-btn(?!_)/g, ':host');
 }
 
@@ -487,8 +488,16 @@ function cleanupButtons(activeCollectorId: string) {
   if (legacyNotionBtn) legacyNotionBtn.remove();
 }
 
+function setSaving(saving: boolean) {
+  const el = document.getElementById(INPAGE_BTN_ID) as HTMLElement | null;
+  if (!el) return;
+  if (saving) el.classList.add('is-saving');
+  else el.classList.remove('is-saving');
+}
+
 export const inpageButtonApi = {
   initRuntime,
   ensureInpageButton,
   cleanupButtons,
+  setSaving,
 };

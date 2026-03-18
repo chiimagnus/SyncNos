@@ -16,7 +16,7 @@ type CurrentPageCaptureDeps = {
 };
 
 export type CurrentPageCaptureProgress = {
-  kind?: 'default' | 'loading' | 'error';
+  kind?: 'default' | 'error';
   message: string;
 };
 
@@ -189,13 +189,12 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       throw new Error(target.reason || t('currentPageCannotBeCaptured'));
     }
 
-    const report = (message: string, kind?: 'default' | 'loading' | 'error') => {
+    const report = (message: string, kind?: 'default' | 'error') => {
       onProgress?.({ message, kind });
     };
 
     try {
       if (target.kind === 'article') {
-        report(t('savingDots'), 'loading');
         const response = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
         if (!response?.ok) {
           throw new Error(response?.error?.message || t('captureFailedFallback'));
@@ -217,10 +216,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         };
       }
 
-      report(typeof target.collector.prepareManualCapture === 'function' ? t('loadingFullHistory') : t('savingDots'), 'loading');
       if (typeof target.collector.prepareManualCapture === 'function') {
         await target.collector.prepareManualCapture();
-        report(t('savingDots'), 'loading');
       }
 
       const snapshot = await Promise.resolve(target.collector.capture({ manual: true }));
