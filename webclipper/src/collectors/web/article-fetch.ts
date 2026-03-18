@@ -134,22 +134,133 @@ async function extractArticleOnTab(tabId: number) {
         return String(value || '').replace(/\s+/g, ' ');
       }
 
-      function sanitizeUrl(raw: unknown) {
-        const text = String(raw || '').trim();
-        if (!text) return '';
-        if (/^\/\//.test(text)) return `${location.protocol}${text}`;
-        try {
-          const resolved = new URL(text, location.href).toString();
-          return /^https?:\/\//i.test(resolved) ? resolved : '';
-        } catch (_e) {
-          return '';
-        }
-      }
+	      function sanitizeUrl(raw: unknown) {
+	        const text = String(raw || '').trim();
+	        if (!text) return '';
+	        if (/^\/\//.test(text)) return `${location.protocol}${text}`;
+	        try {
+	          const resolved = new URL(text, location.href).toString();
+	          return /^https?:\/\//i.test(resolved) ? resolved : '';
+	        } catch (_e) {
+	          return '';
+	        }
+	      }
 
-      function isBlockTag(tag: unknown) {
-        return [
-          'p', 'div', 'section', 'article', 'main', 'header', 'footer', 'aside',
-          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+	      function sanitizeWechatMediaUrl(raw: unknown) {
+	        const resolved = sanitizeUrl(raw);
+	        if (!resolved) return '';
+	        try {
+	          const url = new URL(resolved);
+	          url.searchParams.delete('tp');
+	          url.searchParams.delete('usePicPrefetch');
+	          url.searchParams.delete('wxfrom');
+	          url.searchParams.delete('from');
+	          return url.toString();
+	        } catch (_e) {
+	          return resolved;
+	        }
+	      }
+
+	      function extractWechatShareMediaImageUrls() {
+	        const hostname = String(location.hostname || '').toLowerCase();
+	        if (hostname !== 'mp.weixin.qq.com') return [];
+	        if (!document.querySelector('.share_content_page')) return [];
+	        if (!document.querySelector('#img_swiper_content')) return [];
+
+	        const urls: string[] = [];
+	        const pushUrl = (value: unknown) => {
+	          const url = sanitizeWechatMediaUrl(value);
+	          if (url) urls.push(url);
+	        };
+
+	        const swiperImgs = Array.from(document.querySelectorAll('.swiper_item_img img'));
+	        for (const img of swiperImgs) {
+	          const el = img as any;
+	          pushUrl(el.getAttribute?.('data-src') || el.getAttribute?.('src') || el.currentSrc || el.src || '');
+	        }
+
+	        if (urls.length < 2) {
+	          const thumbEls = Array.from(document.querySelectorAll('.swiper_indicator_list_pc [style*="background-image"]'));
+	          for (const el of thumbEls) {
+	            const style = String((el as any)?.getAttribute?.('style') || '');
+	            const match = style.match(/background-image\s*:\s*url\(["']?([^"')]+)["']?\)/i);
+	            if (!match || !match[1]) continue;
+	            try {
+	              const thumbUrl = new URL(match[1], location.href);
+	              // Most wechat image urls use /300 as thumbnail; /0 is the original size.
+	              thumbUrl.pathname = thumbUrl.pathname.replace(/\/300$/, '/0');
+	              pushUrl(thumbUrl.toString());
+	            } catch (_e) {
+	              // ignore
+	            }
+	          }
+	        }
+
+	        const seen = new Set<string>();
+	        const out: string[] = [];
+	        for (const url of urls) {
+	          if (seen.has(url)) continue;
+	          seen.add(url);
+	          out.push(url);
+	        }
+	        return out;
+	      }
+
+	      function buildWechatShareMediaGridHtml({ columns = 3 } = {}) {
+	        const imageUrls = extractWechatShareMediaImageUrls();
+	        if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
+
+	        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
+	        const tdStyle = 'padding:4px;vertical-align:top;';
+	        const imgStyle = 'width:100%;height:auto;display:block;';
+
+	        const rows: string[] = [];
+	        for (let i = 0; i < imageUrls.length; i += safeColumns) {
+	          const slice = imageUrls.slice(i, i + safeColumns);
+	          const cells: string[] = [];
+	          for (const url of slice) {
+	            cells.push(
+	              `<td style="${tdStyle}"><img src="${escapeHtml(url)}" alt="" loading="lazy" style="${imgStyle}" /></td>`,
+	            );
+	          }
+	          while (cells.length < safeColumns) cells.push(`<td style="${tdStyle}"></td>`);
+	          rows.push(`<tr>${cells.join('')}</tr>`);
+	        }
+
+	        const tableStyle = 'width:100%;border-collapse:collapse;table-layout:fixed;';
+	        return (
+	          `<hr />` +
+	          `<table data-syncnos-origin="wechat-share-media-grid" style="${tableStyle}"><tbody>${rows.join('')}</tbody></table>`
+	        );
+	      }
+
+	      function buildWechatShareMediaGridMarkdown({ columns = 3 } = {}) {
+	        const imageUrls = extractWechatShareMediaImageUrls();
+	        if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
+
+	        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
+	        const header = `| ${Array.from({ length: safeColumns }).map(() => ' ').join(' | ')} |`;
+	        const sep = `| ${Array.from({ length: safeColumns }).map(() => '---').join(' | ')} |`;
+
+	        const rows: string[] = [];
+	        for (let i = 0; i < imageUrls.length; i += safeColumns) {
+	          const slice = imageUrls.slice(i, i + safeColumns);
+	          const cells: string[] = [];
+	          for (const url of slice) {
+	            // Use <...> so URLs with parentheses stay valid in Markdown.
+	            cells.push(`![](<${url}>)`);
+	          }
+	          while (cells.length < safeColumns) cells.push(' ');
+	          rows.push(`| ${cells.join(' | ')} |`);
+	        }
+
+	        return `---\n\n${header}\n${sep}\n${rows.join('\n')}`;
+	      }
+
+	      function isBlockTag(tag: unknown) {
+	        return [
+	          'p', 'div', 'section', 'article', 'main', 'header', 'footer', 'aside',
+	          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
           'ul', 'ol', 'li', 'blockquote', 'pre', 'table', 'figure', 'hr',
         ].includes(String(tag || '').toLowerCase());
       }
@@ -317,10 +428,10 @@ async function extractArticleOnTab(tabId: number) {
 	        };
 	      }
 
-	      async function waitForDomStabilized() {
-	        const deadline = Date.now() + timeoutMs;
-	        let last: any = null;
-	        let stableTicks = 0;
+		      async function waitForDomStabilized() {
+		        const deadline = Date.now() + timeoutMs;
+		        let last: any = null;
+		        let stableTicks = 0;
 
 	        while (Date.now() < deadline) {
 	          const root = pickRoot();
@@ -352,12 +463,32 @@ async function extractArticleOnTab(tabId: number) {
           }
 
 	          // eslint-disable-next-line no-await-in-loop
-	          await new Promise((resolve) => setTimeout(resolve, 350));
-	        }
-	      }
+		          await new Promise((resolve) => setTimeout(resolve, 350));
+		        }
+		      }
 
-	      function normalizeDetailsElementsForReadability(doc: any) {
-	        if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
+		      async function waitForWechatShareMediaHydrated() {
+		        const hostname = String(location.hostname || '').toLowerCase();
+		        if (hostname !== 'mp.weixin.qq.com') return;
+		        if (!document.querySelector('.share_content_page')) return;
+		        if (!document.querySelector('#img_swiper_content')) return;
+
+		        const deadline = Date.now() + 1_500;
+		        let lastCount = 0;
+		        let stableTicks = 0;
+		        while (Date.now() < deadline) {
+		          const count = document.querySelectorAll('.swiper_item_img img').length;
+		          if (count >= 4 && count === lastCount) stableTicks += 1;
+		          else stableTicks = 0;
+		          lastCount = count;
+		          if (stableTicks >= 2) return;
+		          // eslint-disable-next-line no-await-in-loop
+		          await new Promise((resolve) => setTimeout(resolve, 150));
+		        }
+		      }
+
+		      function normalizeDetailsElementsForReadability(doc: any) {
+		        if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
 
 	        const detailsNodes = Array.from(doc.querySelectorAll('details') as any) as any[];
 	        if (!detailsNodes.length) return;
@@ -392,43 +523,54 @@ async function extractArticleOnTab(tabId: number) {
 	        }
 	      }
 
-	      try {
-	        await waitForDomStabilized();
+		      try {
+		        await waitForDomStabilized();
+		        await waitForWechatShareMediaHydrated();
 
-	        const wechatRoot = document.querySelector('#js_content') as any;
-	        if (wechatRoot) {
-	          wechatRoot.style.visibility = 'visible';
+		        const wechatRoot = document.querySelector('#js_content') as any;
+		        if (wechatRoot) {
+		          wechatRoot.style.visibility = 'visible';
 	          wechatRoot.style.opacity = '1';
 	        }
 	        const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
 	        noisyNodes.forEach((node: any) => node?.remove?.());
 
-	        if (typeof (globalThis as any).Readability === 'function') {
-	          const cloned = document.cloneNode(true) as any;
-	          normalizeDetailsElementsForReadability(cloned);
-	          const article = new (globalThis as any).Readability(cloned).parse();
-	          if (article) {
-	            const title = normalize(article.title || '');
-	            const author =
-	              normalize(article.byline || '') ||
-	              readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
-	            const content = normalize(article.content || '');
-	            const text = normalize(article.textContent || '');
-	            if (content || text) {
-              return {
-                ok: true,
-                title,
-                author,
-                publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
-                excerpt: normalize(article.excerpt || ''),
-                contentHTML: buildHtml(content, text),
-                contentMarkdown: htmlToMarkdown(content, text),
-                textContent: text,
-                warningFlags: [],
-              };
-            }
-          }
-        }
+		        if (typeof (globalThis as any).Readability === 'function') {
+		          const cloned = document.cloneNode(true) as any;
+		          normalizeDetailsElementsForReadability(cloned);
+		          const article = new (globalThis as any).Readability(cloned).parse();
+		          if (article) {
+		            const title = normalize(article.title || '');
+		            const author =
+		              normalize(article.byline || '') ||
+		              readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+		            const content = normalize(article.content || '');
+		            const text = normalize(article.textContent || '');
+		            if (content || text) {
+		              const wechatGridHtml = buildWechatShareMediaGridHtml({ columns: 3 });
+		              const wechatGridMarkdown = buildWechatShareMediaGridMarkdown({ columns: 3 });
+		              const htmlBody =
+		                normalize(content) ||
+		                (text ? `<p>${escapeHtml(text)}</p>` : '');
+		              const contentWithWechatGrid = wechatGridHtml ? `${htmlBody}${wechatGridHtml}` : htmlBody;
+		              const markdownBase = htmlToMarkdown(content, text);
+		              const markdownWithWechatGrid = wechatGridMarkdown
+		                ? normalize(`${markdownBase}\n\n${wechatGridMarkdown}`)
+		                : markdownBase;
+	              return {
+	                ok: true,
+	                title,
+	                author,
+	                publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
+	                excerpt: normalize(article.excerpt || ''),
+	                contentHTML: buildHtml(contentWithWechatGrid, text),
+	                contentMarkdown: markdownWithWechatGrid,
+	                textContent: text,
+	                warningFlags: [],
+	              };
+	            }
+	          }
+	        }
 
         const fallback = fallbackExtract();
         if (fallback) return fallback;
