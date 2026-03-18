@@ -114,11 +114,21 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return env.normalize.normalizeText(String(value || '')).toLowerCase();
   }
 
+  function extractDeepResearchTitleFromAriaLabel(label: string): string {
+    const text = env.normalize.normalizeText(label || '');
+    if (!text) return '';
+    const m = text.match(/《([^》]{1,220})》/);
+    if (m && m[1]) return env.normalize.normalizeText(m[1]);
+    return '';
+  }
+
   function findDeepResearchChipTitle(node: ParentNode | null): string {
     if (!node || typeof (node as any).querySelector !== 'function') return '';
     const selectors = [
       "immersive-entry-chip [data-test-id='title-text']",
+      "immersive-entry-chip [data-test-id='artifact-text']",
       "deep-research-entry-chip-content [data-test-id='title-text']",
+      "default-entry-chip-content [data-test-id='artifact-text']",
       "immersive-entry-chip .title-text",
       "deep-research-entry-chip-content .title-text",
     ];
@@ -128,12 +138,22 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       const title = env.normalize.normalizeText((el as any).textContent || (el as any).innerText || '');
       if (title) return title;
     }
+
+    // Fallback: parse from the "打开" button aria-label, e.g. 在 Canvas 中打开《...》
+    const btn = (node as any).querySelector?.("button[data-test-id='view-report-button']") as HTMLElement | null;
+    if (btn) {
+      const label = String((btn as any).getAttribute?.('aria-label') || '').trim();
+      const parsed = extractDeepResearchTitleFromAriaLabel(label);
+      if (parsed) return parsed;
+    }
     return '';
   }
 
   function findDeepResearchTrigger(node: ParentNode | null): HTMLElement | null {
     if (!node || typeof (node as any).querySelector !== 'function') return null;
     const selectors = [
+      "immersive-entry-chip button[data-test-id='view-report-button']",
+      "button[data-test-id='view-report-button']",
       "immersive-entry-chip [data-test-id='container'].clickable",
       "immersive-entry-chip [data-test-id='container']",
       "deep-research-entry-chip-content [data-test-id='container'].clickable",
