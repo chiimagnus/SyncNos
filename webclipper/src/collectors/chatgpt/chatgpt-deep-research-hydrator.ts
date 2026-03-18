@@ -86,6 +86,7 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
     .map((x: any) => ({
       frameId: Number(x?.frameId),
       frameRect: x?.frameRect && typeof x.frameRect === 'object' ? x.frameRect : null,
+      frameIndex: Number.isFinite(Number(x?.frameIndex)) ? Number(x?.frameIndex) : null,
       href: normalizeUrl(x?.href),
       title: String(x?.title || '').trim(),
       text: String(x?.text || '').trim(),
@@ -131,14 +132,25 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
     .slice()
     // Drop clearly non-visible frames (some turns keep a stale iframe in the DOM with 0 height).
     .filter((x: any) => !(Number.isFinite(x.width) && Number.isFinite(x.height)) || (x.width > 20 && x.height > 20))
-    .sort((a: any, b: any) => a.top - b.top);
+    // Prefer stable DOM-order indices assigned on the parent page when available.
+    .sort((a: any, b: any) => {
+      const ai = a.frameIndex;
+      const bi = b.frameIndex;
+      const aHas = Number.isFinite(ai);
+      const bHas = Number.isFinite(bi);
+      if (aHas && bHas) return Number(ai) - Number(bi);
+      if (aHas) return -1;
+      if (bHas) return 1;
+      // Fallback: when `top` ties (common with stale/duplicated iframes), use `frameId` as a stable tie-breaker.
+      return (a.top - b.top) || (Number(a.frameId) - Number(b.frameId));
+    });
 
   // Deduplicate items that share the same on-page position and identical content (ChatGPT can keep a stale duplicate iframe).
   const dedupedItems: any[] = [];
   const seen = new Set<string>();
   for (const item of sortedItems) {
-    const topBucket = Number.isFinite(item.top) ? String(Math.round(item.top)) : '';
-    const key = `${topBucket}|${item.title.slice(0, 64)}|${item.text.slice(0, 256)}`;
+    // Do not include `top` in the key; duplicates can appear at different positions.
+    const key = `${item.href}|${item.title.slice(0, 96)}|${item.text.slice(0, 512)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     dedupedItems.push(item);
