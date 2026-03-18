@@ -69,7 +69,9 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 | Poe | Auto |
 | Notion AI | Auto |
 | z.ai | Auto |
-| Google AI Studio | Manual save preferred (virtual list limitation) |
+| Google AI Studio | Manual save preferred¹ |
+
+¹ Virtual list limitation: auto-capture may only detect currently visible turns. For full history, use inpage save or popup current-page capture.
 
 ### Web Articles
 

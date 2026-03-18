@@ -19,6 +19,7 @@
 | `hasCompletedOnboarding` | `RootView.swift`, `OnboardingViewModel.swift` | `false` → 完成后写为 `true` | 决定是否先进入 onboarding |
 | `debug.forceOnboardingEveryLaunch` | `SyncNosApp.swift` | Debug 默认注册为 `false` | 开发时强制每次启动重走 onboarding |
 | `autoSync.appleBooks` / `goodLinks` / `weRead` | `SyncNosApp.swift` | UserDefaults 布尔值 | 决定启动时是否自动开启 AutoSyncService |
+| `AutoSyncService.intervalSeconds` | `AutoSyncService.swift` | `5 * 60`（5 分钟） | 定时增量同步轮询间隔；启动后也会被通知触发即时同步 |
 | `SyncNos.FontScaleLevel` | `macOS/SyncNos/Services/Core/AGENTS.md` | 离散等级 | 控制字体与布局缩放 |
 | `CFBundleURLSchemes = syncnos` | `Info.plist` | 固定 | 处理 OAuth URL callback 兜底 |
 | Notion 同步参数 | `NotionSyncConfig.swift` | `batchConcurrency=3`, `readRPS=8`, `writeRPS=3`, `appendBatchSize=50`, `timeout=120s` | 控制 App 到 Notion 的吞吐与稳定性 |
@@ -28,7 +29,7 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.3.4` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.3.5` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
 | 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
@@ -127,6 +128,7 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 
 ## 来源引用（Source References）
 - `macOS/SyncNos/SyncNosApp.swift`
+- `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift`
 - `macOS/SyncNos/AppDelegate.swift`
 - `macOS/SyncNos/Views/RootView.swift`
 - `macOS/SyncNos/Info.plist`
@@ -153,3 +155,6 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
+
+## 更新记录（Update Notes）
+- 2026-03-19：将 `manifest.version` 同步为 `1.3.5`；补充 `AutoSyncService.intervalSeconds=5*60` 的 App 侧轮询事实与来源引用。
