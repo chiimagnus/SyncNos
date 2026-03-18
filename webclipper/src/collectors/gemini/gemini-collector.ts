@@ -170,6 +170,51 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     return null;
   }
 
+  function findDeepResearchChips(node: ParentNode | null): Element[] {
+    if (!node || typeof (node as any).querySelectorAll !== 'function') return [];
+    const chips = Array.from((node as any).querySelectorAll('immersive-entry-chip')) as Element[];
+    return chips.filter(Boolean);
+  }
+
+  function findDeepResearchChipTitleFromChip(chip: ParentNode | null): string {
+    if (!chip || typeof (chip as any).querySelector !== 'function') return '';
+    const selectors = [
+      "[data-test-id='title-text']",
+      "[data-test-id='artifact-text']",
+      '.title-text',
+    ];
+    for (const selector of selectors) {
+      const el = (chip as any).querySelector(selector);
+      if (!el) continue;
+      const title = env.normalize.normalizeText((el as any).textContent || (el as any).innerText || '');
+      if (title) return title;
+    }
+    const btn = (chip as any).querySelector?.("button[data-test-id='view-report-button']") as HTMLElement | null;
+    if (btn) {
+      const label = String((btn as any).getAttribute?.('aria-label') || '').trim();
+      const parsed = extractDeepResearchTitleFromAriaLabel(label);
+      if (parsed) return parsed;
+    }
+    return '';
+  }
+
+  function findDeepResearchTriggerFromChip(chip: ParentNode | null): HTMLElement | null {
+    if (!chip || typeof (chip as any).querySelector !== 'function') return null;
+    const selectors = [
+      "button[data-test-id='view-report-button']",
+      "[data-test-id='container'].clickable",
+      "[data-test-id='container']",
+      '.container.clickable',
+      "[data-test-id='title-text']",
+      "[data-test-id='artifact-text']",
+    ];
+    for (const selector of selectors) {
+      const el = (chip as any).querySelector(selector) as HTMLElement | null;
+      if (el) return el;
+    }
+    return null;
+  }
+
   function findDeepResearchPanels(): Element[] {
     const selectors = ['deep-research-immersive-panel', 'immersive-panel deep-research-immersive-panel'];
     for (const selector of selectors) {
@@ -194,6 +239,61 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       if (title) return title;
     }
     return '';
+  }
+
+  function isHiddenByAttributes(el: Element): boolean {
+    try {
+      if ((el as any).hidden) return true;
+      const ariaHidden = String((el as any).getAttribute?.('aria-hidden') || '').trim().toLowerCase();
+      if (ariaHidden === 'true') return true;
+      const style = String((el as any).getAttribute?.('style') || '').toLowerCase();
+      if (style.includes('display:none') || style.includes('display: none')) return true;
+      if (style.includes('visibility:hidden') || style.includes('visibility: hidden')) return true;
+      if (style.includes('opacity:0') || style.includes('opacity: 0')) return true;
+      return false;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function pickActiveDeepResearchPanel(): Element | null {
+    const panels = findDeepResearchPanels();
+    if (!panels.length) return null;
+    const visible = panels.filter((p) => p && !isHiddenByAttributes(p));
+    return (visible.length ? visible[visible.length - 1] : panels[panels.length - 1]) || null;
+  }
+
+  function extractDeepResearchPanelIds(panel: ParentNode | null): { reportId: string; responseId: string } {
+    const empty = { reportId: '', responseId: '' };
+    if (!panel) return empty;
+
+    const tryExtract = (input: unknown): { reportId: string; responseId: string } => {
+      const text = String(input || '');
+      const mReport = text.match(/\br_[0-9a-f]{16}\b/);
+      const mResp = text.match(/\brc_[0-9a-f]{16}\b/);
+      return { reportId: mReport ? mReport[0] : '', responseId: mResp ? mResp[0] : '' };
+    };
+
+    const exportBtn = (panel as any).querySelector?.("button[data-test-id='export-menu-button']") as Element | null;
+    const exportJslog = exportBtn ? String((exportBtn as any).getAttribute?.('jslog') || '') : '';
+    const exportIds = tryExtract(exportJslog);
+    if (exportIds.reportId || exportIds.responseId) return exportIds;
+
+    const panelJslog = String((panel as any).getAttribute?.('jslog') || '');
+    const panelIds = tryExtract(panelJslog);
+    if (panelIds.reportId || panelIds.responseId) return panelIds;
+
+    return empty;
+  }
+
+  function extractDeepResearchPanelSignature(panel: Element | null): string {
+    if (!panel) return '';
+    const ids = extractDeepResearchPanelIds(panel);
+    if (ids.reportId || ids.responseId) return `id:${ids.reportId || ''}:${ids.responseId || ''}`;
+    const title = normalizeComparableText(extractDeepResearchPanelTitle(panel));
+    const content = env.normalize.normalizeText(extractTextExcludingNonContent(panel)).slice(0, 1200);
+    const hash = typeof env.normalize.fnv1a32 === 'function' ? env.normalize.fnv1a32(`${title}|${content}`) : '';
+    return hash ? `hash:${hash}` : '';
   }
 
   function findDeepResearchPanelByTitle(expectedTitle: string): Element | null {
@@ -224,17 +324,57 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     };
   }
 
+  function scrollIntoViewSafe(el: Element | null) {
+    try {
+      (el as any)?.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+    } catch (_e) {
+      try {
+        (el as any)?.scrollIntoView?.();
+      } catch (_e2) {
+        // ignore
+      }
+    }
+  }
+
+  function clickLikeUser(el: HTMLElement | null) {
+    if (!el) return;
+    scrollIntoViewSafe(el);
+    const PointerEventCtor = (env.window as any).PointerEvent;
+    const MouseEventCtor = (env.window as any).MouseEvent;
+
+    const dispatch = (type: string) => {
+      try {
+        if (PointerEventCtor) {
+          el.dispatchEvent(new PointerEventCtor(type, { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+          return;
+        }
+        if (MouseEventCtor) {
+          el.dispatchEvent(new MouseEventCtor(type, { bubbles: true, cancelable: true }));
+        }
+      } catch (_e) {
+        // ignore
+      }
+    };
+
+    dispatch('pointerdown');
+    dispatch('mousedown');
+    try {
+      el.focus?.();
+    } catch (_e) {
+      // ignore
+    }
+    if (typeof el.click === 'function') {
+      el.click();
+    } else {
+      dispatch('click');
+    }
+    dispatch('mouseup');
+    dispatch('pointerup');
+  }
+
   async function openDeepResearchPanel(trigger: HTMLElement | null): Promise<void> {
     if (!trigger) return;
-    if (typeof trigger.click === 'function') {
-      trigger.click();
-      return;
-    }
-
-    const MouseEventCtor = (env.window as any).MouseEvent;
-    if (typeof trigger.dispatchEvent === 'function' && MouseEventCtor) {
-      trigger.dispatchEvent(new MouseEventCtor('click', { bubbles: true, cancelable: true }));
-    }
+    clickLikeUser(trigger);
   }
 
   async function waitForDeepResearchPanel(expectedTitle: string, options: { timeoutMs?: number; pollMs?: number } = {}): Promise<Element | null> {
@@ -249,6 +389,103 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     }
 
     return null;
+  }
+
+  type DeepResearchJob = {
+    jobKey: string;
+    blockIndex: number;
+    chipIndex: number;
+    title: string;
+    blockId: string;
+  };
+
+  function buildDeepResearchJobs(blocks: any[]): DeepResearchJob[] {
+    const out: DeepResearchJob[] = [];
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
+      const b = blocks[blockIndex];
+      const model = b?.querySelector?.('model-response') || null;
+      if (!model) continue;
+
+      const chips = findDeepResearchChips(model);
+      if (!chips.length) continue;
+
+      let chipSeq = 0;
+      for (const chip of chips) {
+        const trigger = findDeepResearchTriggerFromChip(chip);
+        if (!trigger) continue;
+        const title = findDeepResearchChipTitleFromChip(chip) || '';
+        const blockId = String((b as any)?.id || '').trim();
+        const base = `${blockId || `idx:${blockIndex}`}|chip:${chipSeq}|${title}`;
+        const hash = typeof env.normalize.fnv1a32 === 'function' ? env.normalize.fnv1a32(base) : '';
+        const jobKey = hash ? `gemini_dr_${hash}` : `gemini_dr_${blockIndex}_${chipSeq}`;
+        out.push({ jobKey, blockIndex, chipIndex: chipSeq, title, blockId });
+        chipSeq += 1;
+      }
+    }
+    return out;
+  }
+
+  function resolveDeepResearchTriggerFromJob(blocks: any[], job: DeepResearchJob): HTMLElement | null {
+    const block =
+      (job.blockId && env.document.getElementById(job.blockId))
+        ? env.document.getElementById(job.blockId)
+        : blocks[job.blockIndex];
+    if (!block) return null;
+    const model = (block as any).querySelector?.('model-response') || null;
+    if (!model) return null;
+    const chips = findDeepResearchChips(model);
+    const chip = chips[job.chipIndex] || null;
+    return findDeepResearchTriggerFromChip(chip);
+  }
+
+  async function waitForDeepResearchPanelSwitch(
+    previousSignature: string,
+    options: { timeoutMs?: number; pollMs?: number; expectedTitle?: string } = {},
+  ): Promise<Element | null> {
+    const timeoutMs = Math.max(200, Number(options.timeoutMs) || 8_000);
+    const pollMs = Math.max(30, Number(options.pollMs) || 80);
+    const expectedNorm = normalizeComparableText(options.expectedTitle || '');
+    const start = Date.now();
+
+    while ((Date.now() - start) <= timeoutMs) {
+      const panel = pickActiveDeepResearchPanel();
+      const content = extractDeepResearchPanelContent(panel);
+      if (content) {
+        const sig = extractDeepResearchPanelSignature(panel);
+        const titleNorm = normalizeComparableText(content.title || '');
+        const titleOk = !expectedNorm || !titleNorm ? true : titleNorm.includes(expectedNorm) || expectedNorm.includes(titleNorm);
+        if (titleOk && sig && sig !== previousSignature) return panel;
+      }
+      await sleep(pollMs);
+    }
+    return null;
+  }
+
+  async function crawlDeepResearchJobsManual(
+    blocks: any[],
+    jobs: DeepResearchJob[],
+  ): Promise<Map<string, { ok: boolean; title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode; error?: string }>> {
+    const out = new Map<string, { ok: boolean; title: string; contentText: string; contentMarkdown: string; contentRoot: ParentNode; error?: string }>();
+    for (const job of jobs) {
+      const trigger = resolveDeepResearchTriggerFromJob(blocks, job);
+      if (!trigger) {
+        out.set(job.jobKey, { ok: false, title: job.title || '', contentText: '', contentMarkdown: '', contentRoot: env.document.body, error: 'trigger_not_found' });
+        continue;
+      }
+
+      const beforePanel = pickActiveDeepResearchPanel();
+      const beforeSig = extractDeepResearchPanelSignature(beforePanel);
+
+      await openDeepResearchPanel(trigger);
+      const panel = await waitForDeepResearchPanelSwitch(beforeSig, { timeoutMs: 8_000, expectedTitle: job.title || '' });
+      const content = extractDeepResearchPanelContent(panel);
+      if (!content) {
+        out.set(job.jobKey, { ok: false, title: job.title || '', contentText: '', contentMarkdown: '', contentRoot: env.document.body, error: 'panel_extract_failed' });
+        continue;
+      }
+      out.set(job.jobKey, { ok: true, ...content });
+    }
+    return out;
   }
 
   async function resolveDeepResearchContent(
@@ -438,6 +675,11 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
 
     const blocks: any[] = Array.from(root.querySelectorAll(".conversation-container")) as any[];
     if (!blocks.length) return [];
+
+    const manualDeepResearchJobs = options.manual === true ? buildDeepResearchJobs(blocks) : [];
+    const manualDeepResearchResults = options.manual === true && manualDeepResearchJobs.length
+      ? await crawlDeepResearchJobsManual(blocks, manualDeepResearchJobs)
+      : new Map();
 
     const out: any[] = [];
     let seq = 0;
