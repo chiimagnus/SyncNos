@@ -45,6 +45,19 @@ function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
 }
 
+function isEditableTarget(target: unknown): boolean {
+  const el = target as any;
+  const tag = String(el?.tagName || '').toUpperCase();
+  if (tag === 'TEXTAREA') return true;
+  if (tag === 'INPUT') return true;
+  try {
+    if (el?.isContentEditable) return true;
+  } catch (_e) {
+    // ignore
+  }
+  return false;
+}
+
 function formatTime(ts: number | null | undefined): string {
   const t = Number(ts);
   if (!Number.isFinite(t) || t <= 0) return '';
@@ -296,6 +309,7 @@ export function mountThreadedCommentsPanel(
 
   const state = {
     busy: false,
+    pendingComposerFocus: false,
     handlers: {
       onSave: null as any,
       onReply: null as any,
@@ -304,17 +318,34 @@ export function mountThreadedCommentsPanel(
     },
   };
 
+  const focusComposer = () => {
+    try {
+      if (!composerTextarea || typeof (composerTextarea as any).focus !== 'function') return;
+      (composerTextarea as any).focus();
+      // Put caret at the end for convenience.
+      try {
+        const value = String((composerTextarea as any).value || '');
+        (composerTextarea as any).setSelectionRange?.(value.length, value.length);
+      } catch (_e2) {
+        // ignore
+      }
+    } catch (_e) {
+      // ignore
+    }
+  };
+
   function refreshButtons() {
     const text = String((composerTextarea as any).value || '').trim();
     composerSend.disabled = state.busy || !text;
-    composerTextarea.disabled = state.busy;
+    // Keep composer editable even when busy (loading comments etc). We'll block send instead.
+    composerTextarea.disabled = false;
 
     const replyInputs = shadow.querySelectorAll?.('.webclipper-inpage-comments-panel__reply-textarea') as
       | NodeListOf<HTMLTextAreaElement>
       | null;
     replyInputs?.forEach?.((node) => {
       try {
-        node.disabled = state.busy;
+        node.disabled = false;
       } catch (_e) {
         // ignore
       }
@@ -332,6 +363,11 @@ export function mountThreadedCommentsPanel(
         // ignore
       }
     });
+
+    if (!state.busy && state.pendingComposerFocus) {
+      state.pendingComposerFocus = false;
+      focusComposer();
+    }
   }
 
   function setOpen(open: boolean) {
@@ -381,7 +417,8 @@ export function mountThreadedCommentsPanel(
         // ignore
       }
       if (input?.focusComposer) {
-        composerTextarea?.focus?.();
+        state.pendingComposerFocus = true;
+        if (!state.busy) focusComposer();
       }
       apiRef.setBusy(false);
     },
@@ -395,6 +432,14 @@ export function mountThreadedCommentsPanel(
     },
     setBusy(busy) {
       state.busy = !!busy;
+      if (state.busy) {
+        // If the composer currently has focus (or we just requested focus), keep a refocus request queued.
+        try {
+          if (document.activeElement === composerTextarea) state.pendingComposerFocus = true;
+        } catch (_e) {
+          // ignore
+        }
+      }
       refreshButtons();
     },
     setQuoteText(text) {
@@ -630,6 +675,30 @@ export function mountThreadedCommentsPanel(
   refreshButtons();
   host.appendChild(el);
 
+  const stopShortcutKeyPropagation = (e: Event) => {
+    if (!isEditableTarget((e as any).target)) return;
+    try {
+      (e as any).stopImmediatePropagation?.();
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      e.stopPropagation();
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  // Prevent site-level single-letter shortcuts: key events crossing the Shadow DOM boundary are retargeted to the host,
+  // so many sites won't detect that we're typing in a textarea. Stop propagation inside the shadow root.
+  try {
+    shadow.addEventListener('keydown', stopShortcutKeyPropagation, true);
+    shadow.addEventListener('keypress', stopShortcutKeyPropagation, true);
+    shadow.addEventListener('keyup', stopShortcutKeyPropagation, true);
+  } catch (_e) {
+    // ignore
+  }
+
   const cleanup = () => {
     // Ensure we restore page layout even if the panel is removed while open.
     try {
@@ -643,6 +712,13 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     themeObserver = null;
+    try {
+      shadow.removeEventListener('keydown', stopShortcutKeyPropagation, true);
+      shadow.removeEventListener('keypress', stopShortcutKeyPropagation, true);
+      shadow.removeEventListener('keyup', stopShortcutKeyPropagation, true);
+    } catch (_e) {
+      // ignore
+    }
     try {
       el.remove();
     } catch (_e) {

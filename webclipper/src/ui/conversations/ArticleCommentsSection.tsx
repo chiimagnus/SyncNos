@@ -44,6 +44,7 @@ export function ArticleCommentsSection({
   quoteTextRef.current = String(quoteText || '');
   const focusSignal = Number(focusComposerSignal || 0);
   const lastFocusSignalRef = useRef<number>(0);
+  const pendingFocusRef = useRef<boolean>(false);
 
   const normalizedUrl = useMemo(() => normalizeHttpUrl(canonicalUrl), [canonicalUrl]);
 
@@ -190,6 +191,11 @@ export function ArticleCommentsSection({
       },
     });
 
+    if (pendingFocusRef.current || focusSignal > 0) {
+      pendingFocusRef.current = false;
+      mounted.api.open({ focusComposer: true });
+    }
+
     return () => {
       mounted.cleanup();
       apiRef.current = null;
@@ -205,10 +211,13 @@ export function ArticleCommentsSection({
 
   useEffect(() => {
     const api = apiRef.current;
-    if (!api) return;
     if (!focusSignal) return;
     if (lastFocusSignalRef.current === focusSignal) return;
     lastFocusSignalRef.current = focusSignal;
+    if (!api) {
+      pendingFocusRef.current = true;
+      return;
+    }
     api.open({ focusComposer: true });
   }, [focusSignal]);
 
