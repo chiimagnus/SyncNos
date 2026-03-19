@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { t } from '../../i18n';
-import { UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
+import { CONTENT_MESSAGE_TYPES, UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
 import { connectPort } from '../../platform/runtime/ports';
 import { deleteArticleCommentById, listArticleCommentsByCanonicalUrl, type ArticleCommentDto } from '../../comments/client/repo';
+import { tabsQuery, tabsSendMessage } from '../../platform/webext/tabs';
 
 function formatTime(ts: number | null | undefined): string {
   const value = Number(ts);
@@ -118,6 +119,21 @@ export function ArticleCommentsSection({ conversationId, canonicalUrl }: { conve
   }, [conversationId, normalizedUrl]);
 
   const heading = t('articleCommentsHeading');
+  const locate = async (comment: ArticleCommentDto) => {
+    const exact = String(comment?.quoteText || '').trim();
+    if (!exact) return;
+    const ctx = (comment as any)?.quoteContext || null;
+    const selector = {
+      exact,
+      ...(ctx?.prefix ? { prefix: String(ctx.prefix) } : null),
+      ...(ctx?.suffix ? { suffix: String(ctx.suffix) } : null),
+    };
+    const tabs = await tabsQuery({ active: true, currentWindow: true });
+    const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
+    const tabId = Number((tab as any)?.id);
+    if (!tab || !Number.isFinite(tabId) || tabId <= 0) return;
+    await tabsSendMessage(tabId, { type: CONTENT_MESSAGE_TYPES.LOCATE_INPAGE_COMMENT_ANCHOR, payload: { selector } } as any);
+  };
 
   return (
     <section className="tw-mt-4 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 md:tw-p-4">
@@ -143,7 +159,24 @@ export function ArticleCommentsSection({ conversationId, canonicalUrl }: { conve
 
       <div className="tw-mt-3 tw-grid tw-gap-3">
         {items.map((c) => (
-          <div key={String(c.id)} className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-p-3">
+          <div
+            key={String(c.id)}
+            className="tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-p-3"
+            onClick={(e) => {
+              const target = e.target as HTMLElement | null;
+              if (target?.closest?.('button')) return;
+              void locate(c);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              const target = e.target as HTMLElement | null;
+              if (target?.closest?.('button')) return;
+              e.preventDefault();
+              void locate(c);
+            }}
+          >
             {String(c.quoteText || '').trim() ? (
               <div className="tw-mb-2 tw-rounded-xl tw-border tw-border-[color-mix(in_srgb,var(--border)_55%,#e8c86a)] tw-bg-[rgba(232,200,106,0.18)] tw-p-2.5">
                 <div className="tw-whitespace-pre-wrap tw-break-words tw-text-[12px] tw-font-semibold tw-text-[var(--text-primary)]">
@@ -182,4 +215,3 @@ export function ArticleCommentsSection({ conversationId, canonicalUrl }: { conve
     </section>
   );
 }
-

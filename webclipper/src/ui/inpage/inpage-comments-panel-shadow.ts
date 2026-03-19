@@ -4,6 +4,8 @@ export type InpageCommentItem = {
   id: number;
   authorName?: string | null;
   createdAt?: number | null;
+  quoteText?: string | null;
+  quoteContext?: any;
   commentText: string;
 };
 
@@ -14,7 +16,11 @@ export type InpageCommentsPanelApi = {
   setBusy: (busy: boolean) => void;
   setQuoteText: (text: string) => void;
   setComments: (items: InpageCommentItem[]) => void;
-  setHandlers: (handlers: { onSave?: (text: string) => void | Promise<void>; onDelete?: (id: number) => void | Promise<void> }) => void;
+  setHandlers: (handlers: {
+    onSave?: (text: string) => void | Promise<void>;
+    onDelete?: (id: number) => void | Promise<void>;
+    onLocate?: (item: InpageCommentItem) => void | Promise<void>;
+  }) => void;
   setTitle: (title: string) => void;
 };
 
@@ -124,7 +130,7 @@ function ensurePanelElement(): HTMLElement {
 
   const state = {
     busy: false,
-    handlers: { onSave: null as any, onDelete: null as any },
+    handlers: { onSave: null as any, onDelete: null as any, onLocate: null as any },
   };
 
   function refreshButtons() {
@@ -175,6 +181,13 @@ function ensurePanelElement(): HTMLElement {
         const card = document.createElement('div');
         card.className = 'webclipper-inpage-comments-panel__card';
         list.appendChild(card);
+        card.addEventListener('click', (e) => {
+          const target = e?.target as HTMLElement | null;
+          if (target?.closest?.('button')) return;
+          const handler = state.handlers.onLocate;
+          if (typeof handler !== 'function') return;
+          void Promise.resolve(handler(item));
+        });
 
         const headerRow = document.createElement('div');
         headerRow.className = 'webclipper-inpage-comments-panel__card-header';
@@ -299,4 +312,3 @@ const apiRef: InpageCommentsPanelApi = {
 export function getInpageCommentsPanelApi(): InpageCommentsPanelApi {
   return apiRef;
 }
-

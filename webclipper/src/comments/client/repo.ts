@@ -16,6 +16,7 @@ export type ArticleCommentDto = {
   conversationId: number | null;
   canonicalUrl: string;
   quoteText: string;
+  quoteContext?: { prefix?: string; suffix?: string } | null;
   commentText: string;
   createdAt: number;
   updatedAt: number;
@@ -30,4 +31,3 @@ export async function deleteArticleCommentById(id: number): Promise<boolean> {
   const res = await send<ApiResponse<{ ok: boolean }>>(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id });
   return unwrap(res).ok === true;
 }
-

@@ -1,4 +1,5 @@
 import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CONTENT_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
+import { locateAndFlashTextQuote } from '../comments/anchor/text-quote-dom';
 import { getInpageCommentsPanelApi } from '../ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -114,6 +115,8 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
         id: Number(c?.id),
         authorName: 'You',
         createdAt: Number(c?.createdAt) || null,
+        quoteText: String(c?.quoteText || ''),
+        quoteContext: c?.quoteContext ?? null,
         commentText: String(c?.commentText || ''),
       })),
     );
@@ -164,6 +167,16 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
         if (!rt?.send) return;
         const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id } as any);
         if (res?.ok) await refreshCommentsList();
+      },
+      onLocate: async (item) => {
+        const exact = safeString((item as any)?.quoteText);
+        if (!exact) return;
+        const ctx = (item as any)?.quoteContext;
+        locateAndFlashTextQuote({
+          exact,
+          ...(ctx?.prefix ? { prefix: String(ctx.prefix) } : null),
+          ...(ctx?.suffix ? { suffix: String(ctx.suffix) } : null),
+        });
       },
     });
   }
