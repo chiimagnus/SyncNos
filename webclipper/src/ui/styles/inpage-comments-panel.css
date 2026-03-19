@@ -1,15 +1,17 @@
 :host {
-  --panel-bg: #ffffff;
-  --panel-text: #2c3038;
-  --panel-text-muted: #636b78;
-  --panel-border: #d8dce2;
+  /* Align with WebClipper design tokens (tokens.css). */
+  --panel-bg: var(--bg-card, rgb(255 255 255));
+  --panel-text: var(--text-primary, rgb(44 48 56));
+  --panel-text-muted: var(--text-secondary, rgb(99 107 120));
+  --panel-border: var(--border, rgb(216 220 226));
   --panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-  --panel-backdrop: rgba(0, 0, 0, 0.08);
-  --panel-accent: #ffc6ad;
-  --panel-danger: #e53e3e;
+  --panel-backdrop: var(--bg-overlay, rgba(0, 0, 0, 0.45));
+  --panel-accent: var(--accent, rgb(255 198 173));
+  --panel-accent-foreground: var(--accent-foreground, var(--panel-text));
+  --panel-danger: var(--error, rgb(229 62 62));
 
-  --quote-bg: rgba(232, 200, 106, 0.22);
-  --quote-border: rgba(232, 200, 106, 0.55);
+  --quote-bg: color-mix(in srgb, var(--tertiary, rgb(232 200 106)) 18%, transparent);
+  --quote-border: color-mix(in srgb, var(--tertiary, rgb(232 200 106)) 55%, var(--panel-border));
 
   position: relative;
   width: 100%;
@@ -22,22 +24,6 @@
   color: var(--panel-text);
   font: 13px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   isolation: isolate;
-}
-
-@media (prefers-color-scheme: dark) {
-  :host {
-    --panel-bg: #262830;
-    --panel-text: #dce0e8;
-    --panel-text-muted: #8b919a;
-    --panel-border: #363840;
-    --panel-shadow: 0 20px 54px rgba(0, 0, 0, 0.55);
-    --panel-backdrop: rgba(0, 0, 0, 0.2);
-    --panel-accent: #ffd4c2;
-    --panel-danger: #fc8181;
-
-    --quote-bg: rgba(232, 200, 106, 0.16);
-    --quote-border: rgba(232, 200, 106, 0.35);
-  }
 }
 
 .webclipper-inpage-comments-panel__backdrop {
@@ -54,7 +40,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--panel-bg);
   box-shadow: var(--panel-shadow);
   overflow: hidden;
@@ -76,7 +62,7 @@
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__surface {
   position: absolute;
   inset: 10px 10px 10px 10px;
-  border-radius: 14px;
+  border-radius: 16px;
 }
 
 .webclipper-inpage-comments-panel__header {
@@ -101,7 +87,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 9px;
+  border-radius: 12px;
   border: 1px solid var(--panel-border);
   background: transparent;
   color: var(--panel-text);
@@ -123,7 +109,7 @@
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
   padding: 10px 10px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
 }
@@ -140,7 +126,7 @@
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--panel-accent) 55%, var(--panel-border));
   background: color-mix(in srgb, var(--panel-accent) 70%, var(--panel-bg));
-  color: #1a1c20;
+  color: var(--panel-accent-foreground);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -160,7 +146,7 @@
 .webclipper-inpage-comments-panel__composer {
   margin: 0 0 14px 0;
   padding: 10px;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
   display: flex;
@@ -217,7 +203,7 @@
 .webclipper-inpage-comments-panel__send.is-primary {
   border-color: color-mix(in srgb, var(--panel-accent) 70%, var(--panel-border));
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), var(--panel-accent);
-  color: #1a1c20;
+  color: var(--panel-accent-foreground);
 }
 
 .webclipper-inpage-comments-panel__send:disabled {
@@ -242,7 +228,7 @@
 
 .webclipper-inpage-comments-panel__thread {
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 10px;
   background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
 }
@@ -250,7 +236,7 @@
 .webclipper-inpage-comments-panel__thread-quote {
   margin: 0 0 8px 0;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
 }
@@ -382,7 +368,7 @@
   min-height: 34px;
   max-height: 140px;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
   color: var(--panel-text);
@@ -397,7 +383,7 @@
 .webclipper-inpage-comments-panel__empty {
   padding: 14px 10px;
   border: 1px dashed var(--panel-border);
-  border-radius: 14px;
+  border-radius: 16px;
   color: var(--panel-text-muted);
   text-align: center;
 }
