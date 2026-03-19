@@ -89,10 +89,10 @@ afterEach(() => {
 });
 
 describe("content-controller inpage combo", () => {
-  it("does not show fallback tip when popup open succeeds", async () => {
+  it("does not show fallback tip when comments sidebar open succeeds", async () => {
     const harness = createHarness({
       sendImpl: async (type: string) => {
-        if (type === "openExtensionPopup") return { ok: true, data: { opened: true } };
+        if (type === "openCurrentTabInpageCommentsPanel") return { ok: true, data: { opened: true } };
         return { ok: true, data: {} };
       }
     });
@@ -103,13 +103,14 @@ describe("content-controller inpage combo", () => {
 
     await cfg.onDoubleClick();
 
-    expect(harness.tipCalls.some((c) => String(c.text).includes("toolbar icon"))).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === "openCurrentTabInpageCommentsPanel")).toBe(true);
+    expect(harness.tipCalls.some((c) => String(c.text).includes("comments sidebar"))).toBe(false);
   });
 
-  it("shows fallback tip when popup open fails", async () => {
+  it("shows fallback tip when comments sidebar open fails", async () => {
     const harness = createHarness({
       sendImpl: async (type: string) => {
-        if (type === "openExtensionPopup") return { ok: false, error: { message: "unsupported" } };
+        if (type === "openCurrentTabInpageCommentsPanel") return { ok: false, error: { message: "unsupported" } };
         return { ok: true, data: {} };
       }
     });
@@ -120,7 +121,8 @@ describe("content-controller inpage combo", () => {
 
     await cfg.onDoubleClick();
 
-    expect(harness.tipCalls.some((c) => String(c.text).includes("toolbar icon"))).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === "openCurrentTabInpageCommentsPanel")).toBe(true);
+    expect(harness.tipCalls.some((c) => String(c.text).includes("comments sidebar"))).toBe(true);
   });
 
   it("emits easter-egg line for combo callback", async () => {

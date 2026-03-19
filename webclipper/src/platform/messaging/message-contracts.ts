@@ -52,6 +52,7 @@ export const COMMENTS_MESSAGE_TYPES = {
 
 export const UI_MESSAGE_TYPES = {
   OPEN_EXTENSION_POPUP: 'openExtensionPopup',
+  OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL: 'openCurrentTabInpageCommentsPanel',
   GET_ACTIVE_TAB_CAPTURE_STATE: 'getActiveTabCaptureState',
   CAPTURE_ACTIVE_TAB_CURRENT_PAGE: 'captureActiveTabCurrentPage',
 } as const;

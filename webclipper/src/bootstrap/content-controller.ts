@@ -57,7 +57,7 @@ const CORE_MESSAGE_TYPES = Object.freeze({
 });
 
 const UI_MESSAGE_TYPES = Object.freeze({
-  OPEN_EXTENSION_POPUP: 'openExtensionPopup',
+  OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL: 'openCurrentTabInpageCommentsPanel',
 });
 
 const EASTER_EGG_LINES = Object.freeze({
@@ -296,12 +296,15 @@ export function createContentController(deps: Deps) {
       }
     };
 
-    const openPopupPanel = async () => {
+    const openCommentsSidebar = async () => {
       try {
-        const response = await send(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP);
-        if (!response?.ok) showInpageTip(t('clickToolbarIconToOpenPanel'), 'error');
+        const selectionText = String(globalThis.getSelection?.()?.toString() || '').trim();
+        const response = await send(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
+          selectionText,
+        });
+        if (!response?.ok) showInpageTip(t('clickToolbarIconToOpenCommentsSidebar'), 'error');
       } catch (_error) {
-        showInpageTip(t('clickToolbarIconToOpenPanel'), 'error');
+        showInpageTip(t('clickToolbarIconToOpenCommentsSidebar'), 'error');
       }
     };
 
@@ -319,7 +322,7 @@ export function createContentController(deps: Deps) {
       inpageButton?.ensureInpageButton?.({
         collectorId: inpageCollector?.id,
         onClick: clickSave,
-        onDoubleClick: openPopupPanel,
+        onDoubleClick: openCommentsSidebar,
         onCombo: showComboLine,
       });
       return collector;
