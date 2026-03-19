@@ -496,8 +496,7 @@ export function mountThreadedCommentsPanel(
 
   function syncOverlayVisibility() {
     try {
-      const overlay = isOverlay();
-      backdrop.style.display = overlay ? 'block' : 'none';
+      backdrop.style.display = 'none';
       closeBtn.style.display = 'inline-flex';
     } catch (_e) {
       // ignore

@@ -70,14 +70,13 @@
 }
 
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__backdrop {
-  display: block;
+  display: none;
 }
 
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__surface {
   position: absolute;
-  inset: 10px 10px 10px 0;
-  border-right: 0;
-  border-radius: 14px 0 0 14px;
+  inset: 10px 10px 10px 10px;
+  border-radius: 14px;
 }
 
 .webclipper-inpage-comments-panel__header {

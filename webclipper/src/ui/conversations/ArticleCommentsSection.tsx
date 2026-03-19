@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { t } from '../../i18n';
 import { CONTENT_MESSAGE_TYPES, UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
 import { connectPort } from '../../platform/runtime/ports';
 import { addArticleComment, deleteArticleCommentById, listArticleCommentsByCanonicalUrl } from '../../comments/client/repo';
@@ -130,7 +129,7 @@ export function ArticleCommentsSection({
     if (apiRef.current) return;
     const host = hostRef.current;
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, title: t('articleCommentsHeading') });
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, title: 'Comments' });
     apiRef.current = mounted.api;
     mounted.api.setQuoteText('');
     mounted.api.setHandlers({
