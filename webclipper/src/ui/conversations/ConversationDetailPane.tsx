@@ -7,6 +7,21 @@ import { useConversationsApp } from './conversations-context';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
+import { ArticleCommentsSection } from './ArticleCommentsSection';
+
+function normalizeHttpUrl(raw: unknown): string {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = String(url.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
 
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
@@ -33,6 +48,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
 
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
+  const canonicalUrl = normalizeHttpUrl((selected as any)?.url);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
 
@@ -123,6 +139,13 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
           {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
           {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
           {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
+
+          {isArticle && selected && canonicalUrl ? (
+            <ArticleCommentsSection
+              conversationId={Number((selected as any)?.id || activeId || 0)}
+              canonicalUrl={canonicalUrl}
+            />
+          ) : null}
 
           {detail?.messages?.length ? (
             <div className="tw-mt-3 tw-grid tw-gap-2.5">

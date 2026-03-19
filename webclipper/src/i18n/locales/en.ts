@@ -162,6 +162,10 @@ export const en = {
   noMessages: 'No messages.',
   selectAConversation: 'Select a conversation.',
 
+  // ArticleCommentsSection
+  articleCommentsHeading: 'Comments',
+  articleCommentsEmpty: 'No comments yet.',
+
   // ConversationSyncFeedbackNotice
   phaseRunning: 'Syncing',
   phaseSuccess: 'Completed',
