@@ -44,23 +44,11 @@ export function menuChevronClassName(): string {
 }
 
 export function buttonIconCircleCardClassName(): string {
-  return [
-    'tw-inline-flex tw-size-7 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]',
-    'tw-text-[11px] tw-font-black tw-text-[var(--text-secondary)]',
-    'tw-shadow-none tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--tint webclipper-btn--icon webclipper-btn--icon-xs webclipper-btn--round webclipper-btn--tone-muted';
 }
 
 export function buttonIconCircleGhostClassName(): string {
-  return [
-    'tw-inline-flex tw-size-6 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0',
-    'tw-text-[var(--text-secondary)] tw-shadow-none',
-    'tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--tint webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--round webclipper-btn--tone-muted';
 }
 
 export function buttonMiniIconClassName(active: boolean): string {

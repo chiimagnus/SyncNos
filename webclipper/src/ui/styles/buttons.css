@@ -115,9 +115,38 @@
 }
 
 .webclipper-btn--icon {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  --btn-icon-size: 36px;
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  min-height: var(--btn-icon-size);
   padding: 0;
   font-weight: 900;
+}
+
+.webclipper-btn--icon-sm {
+  --btn-icon-size: 32px;
+}
+
+.webclipper-btn--icon-xs {
+  --btn-icon-size: 28px;
+}
+
+.webclipper-btn--icon-xxs {
+  --btn-icon-size: 24px;
+}
+
+.webclipper-btn--icon-xl {
+  --btn-icon-size: 44px;
+}
+
+.webclipper-btn--round {
+  border-radius: 999px;
+}
+
+.webclipper-btn--tone-muted {
+  color: var(--text-secondary);
+}
+
+.webclipper-btn--tone-muted:hover:not(:disabled) {
+  color: var(--text-primary);
 }
