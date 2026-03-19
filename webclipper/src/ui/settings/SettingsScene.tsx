@@ -4,7 +4,7 @@ import { getURL } from '../../platform/runtime/runtime';
 
 import { t } from '../../i18n';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
-import { buttonTintClassName } from '../shared/button-styles';
+import { buttonFilledClassName, buttonTintClassName } from '../shared/button-styles';
 
 import { useSettingsSceneController } from './hooks/useSettingsSceneController';
 import { SettingsSidebarNav } from './SettingsSidebarNav';
@@ -341,12 +341,9 @@ export function SettingsScene(props: SettingsSceneProps) {
                         type="button"
                         onClick={() => setActiveSection(section.key)}
                         className={[
-                          'tw-flex tw-w-full tw-appearance-none tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-rounded-xl tw-border tw-border-transparent tw-px-3 tw-py-3 tw-text-left tw-shadow-none tw-transition-colors tw-duration-150',
-                          'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+                          active ? buttonFilledClassName() : buttonTintClassName(),
+                          'tw-flex tw-w-full tw-flex-col tw-items-start tw-justify-center tw-gap-0.5 tw-px-3 tw-py-3 tw-text-left',
                           index === 0 ? '' : 'tw-mt-1',
-                          active
-                            ? 'tw-bg-[var(--accent)] tw-text-[var(--accent-foreground)]'
-                            : 'tw-bg-[var(--bg-card)] hover:tw-bg-[var(--bg-sunken)]',
                         ].join(' ')}
                         aria-current={active ? 'page' : undefined}
                       >

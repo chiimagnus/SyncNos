@@ -281,10 +281,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
               aria-checked={selected ? 'true' : 'false'}
               disabled={!!opt.disabled}
               tabIndex={isActive ? 0 : -1}
-              className={[
-                menuItemButtonClassName,
-                selected ? 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]' : '',
-              ].join(' ')}
+              className={menuItemButtonClassName}
               onClick={() => pickIndex(index)}
               onMouseEnter={() => setActiveIndex(index)}
               onFocus={() => setActiveIndex(index)}

@@ -1,81 +1,21 @@
-function buttonBevelStrokeClassName(input: { surface: 'card' | 'accent' | 'error' }): string {
-  const vars =
-    input.surface === 'accent'
-      ? [
-          'tw-[--btn-stroke-tl:color-mix(in_srgb,var(--accent)_58%,white)]',
-          'tw-[--btn-stroke-br:color-mix(in_srgb,var(--accent)_78%,black)]',
-        ]
-      : input.surface === 'error'
-        ? [
-            'tw-[--btn-stroke-tl:color-mix(in_srgb,var(--error)_58%,white)]',
-            'tw-[--btn-stroke-br:color-mix(in_srgb,var(--error)_78%,black)]',
-          ]
-        : [
-            'tw-[--btn-stroke-tl:color-mix(in_srgb,var(--bg-card)_62%,white)]',
-            'tw-[--btn-stroke-br:color-mix(in_srgb,var(--bg-card)_74%,black)]',
-          ];
-
-  return [
-    ...vars,
-    'tw-shadow-[inset_1px_1px_0_var(--btn-stroke-tl),inset_-1px_-1px_0_var(--btn-stroke-br)]',
-    'active:tw-shadow-[inset_1px_1px_0_var(--btn-stroke-br),inset_-1px_-1px_0_var(--btn-stroke-tl)]',
-    'active:tw-translate-y-[1px]',
-    'tw-transition-[background-color,border-color,color,box-shadow,transform] tw-duration-200',
-  ].join(' ');
-}
-
 export function buttonTintClassName(): string {
-  return [
-    'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-px-3',
-    'tw-bg-[var(--bg-card)] tw-text-xs tw-font-extrabold tw-text-[var(--text-primary)] tw-shadow-none',
-    buttonBevelStrokeClassName({ surface: 'card' }),
-    'hover:tw-bg-[var(--bg-sunken)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn';
 }
 
 export function buttonFilledClassName(): string {
-  return [
-    'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-px-3',
-    'tw-bg-[var(--accent)] tw-text-xs tw-font-extrabold tw-text-[var(--accent-foreground)] tw-shadow-none',
-    buttonBevelStrokeClassName({ surface: 'accent' }),
-    'hover:tw-bg-[var(--accent-hover)] active:tw-bg-[var(--accent-active)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--filled';
 }
 
 export function buttonDangerClassName(): string {
-  return [
-    'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-px-3',
-    'tw-bg-[var(--error)] tw-text-xs tw-font-extrabold tw-text-[var(--error-foreground)] tw-shadow-none',
-    buttonBevelStrokeClassName({ surface: 'error' }),
-    'hover:tw-opacity-90 active:tw-opacity-80',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--danger';
 }
 
 export function buttonDangerTintClassName(): string {
-  return [
-    'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3',
-    'tw-border-[color-mix(in_srgb,var(--error)_55%,var(--border))] tw-bg-[var(--bg-card)] tw-text-xs tw-font-extrabold tw-text-[var(--error)] tw-shadow-none',
-    buttonBevelStrokeClassName({ surface: 'card' }),
-    'hover:tw-bg-[var(--bg-sunken)] active:tw-bg-[var(--bg-sunken)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--danger-tint';
 }
 
 export function buttonMenuItemClassName(): string {
-  return [
-    'tw-w-full tw-cursor-pointer tw-appearance-none tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2',
-    'tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]',
-    'tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38] disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--menu-item';
 }
 
 export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
@@ -98,38 +38,14 @@ export function menuChevronClassName(): string {
 }
 
 export function buttonIconCircleCardClassName(): string {
-  return [
-    'tw-inline-flex tw-size-7 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]',
-    'tw-text-[11px] tw-font-black tw-text-[var(--text-secondary)]',
-    'tw-shadow-none tw-transition-colors tw-duration-150 hover:tw-bg-[var(--bg-sunken)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xs webclipper-btn--round webclipper-btn--tone-muted';
 }
 
 export function buttonIconCircleGhostClassName(): string {
-  return [
-    'tw-inline-flex tw-size-6 tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent tw-p-0',
-    'tw-text-[var(--text-secondary)] tw-shadow-none',
-    'tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--round webclipper-btn--tone-muted';
 }
 
 export function buttonMiniIconClassName(active: boolean): string {
-  const base = [
-    'tw-inline-flex tw-size-[18px] tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent',
-    'tw-text-[12px] tw-font-black tw-shadow-none',
-    'tw-transition-colors tw-duration-150',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-  ].join(' ');
-
-  const hoverBg = active ? 'hover:tw-bg-[var(--accent-hover)]' : 'hover:tw-bg-[var(--bg-card)]';
-  return [
-    base,
-    'tw-text-[currentColor] tw-opacity-80 hover:tw-opacity-100',
-    hoverBg,
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38] disabled:hover:tw-bg-transparent disabled:hover:tw-opacity-[0.38]',
-  ].join(' ');
+  if (active) return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs';
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--tone-muted';
 }

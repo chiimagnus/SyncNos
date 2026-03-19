@@ -1,6 +1,6 @@
 import type { NotionPageOption } from '../utils';
 import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, checkboxClassName, selectClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 import { SelectMenu } from '../../shared/SelectMenu';
 
@@ -78,7 +78,7 @@ export function NotionOAuthSection(props: {
             <SelectMenu<string>
               buttonId="notionPages"
               className="tw-flex-1 tw-min-w-0"
-              buttonClassName={`${selectClassName} tw-w-full`}
+              buttonClassName={`${buttonClassName} tw-w-full`}
               value={String(notionParentPageId || '')}
               disabled={busy || !notionConnected}
               ariaLabel={t('parentPage')}
@@ -105,7 +105,7 @@ export function NotionOAuthSection(props: {
               title={t('refresh')}
               onClick={onLoadNotionPages}
               disabled={busy || !notionConnected || loadingNotionPages}
-              className="tw-inline-flex tw-size-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-xs tw-font-black tw-text-[var(--text-primary)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]"
+              className="webclipper-btn webclipper-btn--icon"
               aria-label={t('refreshPagesAria')}
             >
               ↻

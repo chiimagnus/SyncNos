@@ -199,7 +199,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
                 {commentsCollapsed ? (
                   <button
                     type="button"
-                    className="tw-flex tw-h-[44px] tw-w-[44px] tw-items-center tw-justify-center tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-text-[var(--text-primary)]"
+                    className="webclipper-btn webclipper-btn--icon webclipper-btn--icon-xl webclipper-btn--tone-muted"
                     onClick={() => setCommentsCollapsed(false)}
                     aria-label={t('articleCommentsHeading')}
                     title={t('articleCommentsHeading')}

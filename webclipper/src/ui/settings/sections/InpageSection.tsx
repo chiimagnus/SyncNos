@@ -1,6 +1,6 @@
 import { t } from '../../../i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '../../../collectors/ai-chat-sites';
-import { cardClassName, checkboxClassName, selectClassName } from '../ui';
+import { cardClassName, checkboxClassName } from '../ui';
 import { buttonTintClassName } from '../../shared/button-styles';
 import { SelectMenu } from '../../shared/SelectMenu';
 
@@ -16,7 +16,7 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
-}) {
+  }) {
   const {
     busy,
     themeMode,
@@ -29,12 +29,7 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
   } = props;
 
-  const themeModeButtonClassName = (active: boolean) =>
-    [
-      buttonTintClassName(),
-      'tw-min-h-8 tw-rounded-lg',
-      active ? 'tw-bg-[var(--bg-sunken)]' : '',
-    ].join(' ');
+  const themeModeButtonClassName = () => buttonTintClassName();
 
   return (
     <div className="tw-grid tw-gap-4">
@@ -52,7 +47,7 @@ export function InpageSection(props: {
                 type="button"
                 disabled={busy}
                 onClick={() => onChangeThemeMode('system')}
-                className={themeModeButtonClassName(themeMode === 'system')}
+                className={themeModeButtonClassName()}
                 aria-pressed={themeMode === 'system'}
               >
                 {t('themeModeSystem')}
@@ -61,7 +56,7 @@ export function InpageSection(props: {
                 type="button"
                 disabled={busy}
                 onClick={() => onChangeThemeMode('light')}
-                className={themeModeButtonClassName(themeMode === 'light')}
+                className={themeModeButtonClassName()}
                 aria-pressed={themeMode === 'light'}
               >
                 {t('themeModeLight')}
@@ -70,7 +65,7 @@ export function InpageSection(props: {
                 type="button"
                 disabled={busy}
                 onClick={() => onChangeThemeMode('dark')}
-                className={themeModeButtonClassName(themeMode === 'dark')}
+                className={themeModeButtonClassName()}
                 aria-pressed={themeMode === 'dark'}
               >
                 {t('themeModeDark')}
@@ -92,7 +87,7 @@ export function InpageSection(props: {
               disabled={busy}
               ariaLabel={t('inpageDisplayModeLabel')}
               minWidth={180}
-              buttonClassName={`${selectClassName} tw-min-w-[180px]`}
+              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
               options={[
                 { value: 'supported', label: t('inpageDisplayModeSupported') },
                 { value: 'all', label: t('inpageDisplayModeAll') },
