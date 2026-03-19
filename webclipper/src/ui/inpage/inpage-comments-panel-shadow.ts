@@ -17,14 +17,6 @@ function ensurePanel(): { el: HTMLElement; api: ThreadedCommentsPanelApi } {
     singleton = { el: existing, api: (existing as any).__webclipperPanelApi as ThreadedCommentsPanelApi };
     return singleton;
   }
-  if (existing) {
-    // Clean up legacy panels from older builds to avoid duplicate IDs and stale UI.
-    try {
-      existing.remove();
-    } catch (_e) {
-      // ignore
-    }
-  }
 
   const host = document.documentElement;
   const { el, api } = mountThreadedCommentsPanel(host, { overlay: true, initiallyOpen: false, title: 'Comments' });
