@@ -13,6 +13,10 @@
   --quote-bg: color-mix(in srgb, var(--tertiary, rgb(232 200 106)) 18%, transparent);
   --quote-border: color-mix(in srgb, var(--tertiary, rgb(232 200 106)) 55%, var(--panel-border));
 
+  /* Button bevel strokes (top-left highlight + bottom-right shadow). */
+  --btn-stroke-tl: color-mix(in srgb, var(--panel-bg) 62%, white);
+  --btn-stroke-br: color-mix(in srgb, var(--panel-bg) 74%, black);
+
   position: relative;
   width: 100%;
   height: auto;
@@ -197,34 +201,48 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 12px;
-  border: 0;
-  background: var(--bg-card, rgba(255, 255, 255, 0.9));
-  color: var(--text-secondary, var(--panel-text-muted));
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+  color: var(--panel-text-muted);
   cursor: pointer;
   font: inherit;
   font-weight: 900;
   user-select: none;
+  box-shadow:
+    inset 1px 1px 0 var(--btn-stroke-tl),
+    inset -1px -1px 0 var(--btn-stroke-br);
+  transition: background 160ms ease, box-shadow 120ms ease, transform 120ms ease, color 160ms ease;
 }
 
 .webclipper-inpage-comments-panel__send.is-primary {
-  background: var(--accent, var(--panel-accent));
-  color: var(--accent-foreground, var(--panel-accent-foreground));
+  --btn-stroke-tl: color-mix(in srgb, var(--panel-accent) 58%, white);
+  --btn-stroke-br: color-mix(in srgb, var(--panel-accent) 78%, black);
+  border-color: color-mix(in srgb, var(--panel-accent) 68%, var(--panel-border));
+  background: var(--panel-accent);
+  color: var(--panel-accent-foreground);
 }
 
 .webclipper-inpage-comments-panel__send.is-primary:hover {
-  background: var(--accent-hover, color-mix(in srgb, var(--accent, var(--panel-accent)) 86%, transparent));
+  background: var(--accent-hover, color-mix(in srgb, var(--panel-accent) 86%, transparent));
 }
 
 .webclipper-inpage-comments-panel__send.is-primary:active {
-  background: var(--accent-active, var(--accent-hover, var(--accent, var(--panel-accent))));
+  background: var(--accent-active, var(--accent-hover, var(--panel-accent)));
 }
 
 .webclipper-inpage-comments-panel__send:hover {
   background: var(--bg-sunken, rgba(0, 0, 0, 0.06));
-  color: var(--text-primary, var(--panel-text));
+  color: var(--panel-text);
+}
+
+.webclipper-inpage-comments-panel__send:active {
+  box-shadow:
+    inset 1px 1px 0 var(--btn-stroke-br),
+    inset -1px -1px 0 var(--btn-stroke-tl);
+  transform: translateY(1px);
 }
 
 .webclipper-inpage-comments-panel__send:focus-visible {
