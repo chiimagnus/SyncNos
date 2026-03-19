@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import inpageCommentsPanelCssRaw from '../styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '../styles/buttons.css?raw';
 import tokensCssRaw from '../styles/tokens.css?raw';
@@ -57,6 +58,7 @@ function formatTime(ts: number | null | undefined): string {
 type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
+  showHeader?: boolean;
 };
 
 export function mountThreadedCommentsPanel(
@@ -66,6 +68,7 @@ export function mountThreadedCommentsPanel(
   const el = document.createElement('webclipper-threaded-comments-panel') as any as HTMLElement;
   if (options.overlay) el.setAttribute('data-overlay', '1');
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
+  const showHeader = options.showHeader !== false;
 
   const syncThemeAttr = () => {
     const theme = document.documentElement?.getAttribute?.('data-theme');
@@ -96,16 +99,16 @@ export function mountThreadedCommentsPanel(
   surface.className = 'webclipper-inpage-comments-panel__surface';
   shadow.appendChild(surface);
 
-  const header = document.createElement('div');
-  header.className = 'webclipper-inpage-comments-panel__header';
-  surface.appendChild(header);
+  if (showHeader) {
+    const header = document.createElement('div');
+    header.className = 'webclipper-inpage-comments-panel__header';
+    surface.appendChild(header);
 
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'webclipper-inpage-comments-panel__close';
-  closeBtn.type = 'button';
-  closeBtn.setAttribute('aria-label', 'Close');
-  closeBtn.textContent = '×';
-  header.appendChild(closeBtn);
+    const headerTitle = document.createElement('div');
+    headerTitle.className = 'webclipper-inpage-comments-panel__header-title';
+    headerTitle.textContent = t('articleCommentsHeading');
+    header.appendChild(headerTitle);
+  }
 
   const body = document.createElement('div');
   body.className = 'webclipper-inpage-comments-panel__body';
@@ -208,8 +211,6 @@ export function mountThreadedCommentsPanel(
       setImportantStyle(el, 'display', 'none');
     }
   }
-
-  closeBtn.addEventListener('click', () => apiRef.close());
 
   composerTextarea.addEventListener('input', () => refreshButtons());
   composerTextarea.addEventListener('keydown', (e) => {
