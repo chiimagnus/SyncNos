@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { CONTENT_MESSAGE_TYPES, UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
+import { UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
 import { connectPort } from '../../platform/runtime/ports';
 import { addArticleComment, deleteArticleCommentById, listArticleCommentsByCanonicalUrl } from '../../comments/client/repo';
-import { tabsQuery, tabsSendMessage } from '../../platform/webext/tabs';
 import { mountThreadedCommentsPanel, type ThreadedCommentsPanelApi, type ThreadedCommentItem } from '../comments/threaded-comments-panel';
 
 function normalizeHttpUrl(raw: unknown): string {
@@ -37,7 +36,6 @@ export function ArticleCommentsSection({
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
-  const lastRawItemsRef = useRef<any[]>([]);
 
   const normalizedUrl = useMemo(() => normalizeHttpUrl(canonicalUrl), [canonicalUrl]);
 
@@ -48,7 +46,6 @@ export function ArticleCommentsSection({
     try {
       const next = await listArticleCommentsByCanonicalUrl(normalizedUrl);
       const list = Array.isArray(next) ? next : [];
-      lastRawItemsRef.current = list;
       setItems(list);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'unknown error'));
@@ -147,7 +144,6 @@ export function ArticleCommentsSection({
             conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
             parentId: null,
             quoteText: '',
-            quoteContext: null,
             commentText: value,
           } as any);
           await refresh();
@@ -166,7 +162,6 @@ export function ArticleCommentsSection({
             conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
             parentId: Number(parentId),
             quoteText: '',
-            quoteContext: null,
             commentText: value,
           } as any);
           await refresh();
@@ -184,25 +179,6 @@ export function ArticleCommentsSection({
         } finally {
           mounted.api.setBusy(false);
         }
-      },
-      onLocate: async (item) => {
-        const raw = lastRawItemsRef.current;
-        const parentId = (item as any)?.parentId != null ? Number((item as any).parentId) : null;
-        const root = parentId ? raw.find((c) => Number(c?.id) === parentId) ?? null : raw.find((c) => Number(c?.id) === Number(item?.id)) ?? null;
-        const exact = String(root?.quoteText || (item as any)?.quoteText || '').trim();
-        if (!exact) return;
-        const ctx = (root as any)?.quoteContext || (item as any)?.quoteContext || null;
-        const selector = {
-          exact,
-          ...(ctx?.prefix ? { prefix: String(ctx.prefix) } : null),
-          ...(ctx?.suffix ? { suffix: String(ctx.suffix) } : null),
-        };
-
-        const tabs = await tabsQuery({ active: true, currentWindow: true });
-        const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
-        const tabId = Number((tab as any)?.id);
-        if (!tab || !Number.isFinite(tabId) || tabId <= 0) return;
-        await tabsSendMessage(tabId, { type: CONTENT_MESSAGE_TYPES.LOCATE_INPAGE_COMMENT_ANCHOR, payload: { selector } } as any);
       },
     });
 
@@ -224,7 +200,6 @@ export function ArticleCommentsSection({
           authorName: 'You',
           createdAt: Number(c?.createdAt) || null,
           quoteText: String(c?.quoteText || ''),
-          quoteContext: c?.quoteContext ?? null,
           commentText: String(c?.commentText || ''),
         }),
       ),

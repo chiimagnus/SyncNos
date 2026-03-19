@@ -55,7 +55,6 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
       conversationId: msg?.conversationId ? Number(msg.conversationId) : null,
       canonicalUrl,
       quoteText: msg?.quoteText ?? '',
-      quoteContext: msg?.quoteContext ?? null,
       commentText: String(msg?.commentText || ''),
     });
 

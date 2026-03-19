@@ -8,7 +8,6 @@ export type ThreadedCommentItem = {
   authorName?: string | null;
   createdAt?: number | null;
   quoteText?: string | null;
-  quoteContext?: any;
   commentText: string;
 };
 
@@ -23,7 +22,6 @@ export type ThreadedCommentsPanelApi = {
     onSave?: (text: string) => void | Promise<void>;
     onReply?: (parentId: number, text: string) => void | Promise<void>;
     onDelete?: (id: number) => void | Promise<void>;
-    onLocate?: (item: ThreadedCommentItem) => void | Promise<void>;
     onClose?: () => void;
   }) => void;
 };
@@ -167,7 +165,6 @@ export function mountThreadedCommentsPanel(
       onSave: null as any,
       onReply: null as any,
       onDelete: null as any,
-      onLocate: null as any,
       onClose: null as any,
     },
   };
@@ -274,7 +271,6 @@ export function mountThreadedCommentsPanel(
         onSave: null,
         onReply: null,
         onDelete: null,
-        onLocate: null,
         onClose: null,
       };
     },
@@ -302,14 +298,6 @@ export function mountThreadedCommentsPanel(
         const thread = document.createElement('div');
         thread.className = 'webclipper-inpage-comments-panel__thread';
         threads.appendChild(thread);
-
-        thread.addEventListener('click', (e) => {
-          const target = e?.target as HTMLElement | null;
-          if (target?.closest?.('button,textarea')) return;
-          const handler = state.handlers.onLocate;
-          if (typeof handler !== 'function') return;
-          void Promise.resolve(handler(root));
-        });
 
         const quoteValue = String(root?.quoteText || '').trim();
         if (quoteValue) {
@@ -390,14 +378,6 @@ export function mountThreadedCommentsPanel(
             const replyRow = document.createElement('div');
             replyRow.className = 'webclipper-inpage-comments-panel__reply';
             repliesWrap.appendChild(replyRow);
-
-            replyRow.addEventListener('click', (e) => {
-              const target = e?.target as HTMLElement | null;
-              if (target?.closest?.('button')) return;
-              const handler = state.handlers.onLocate;
-              if (typeof handler !== 'function') return;
-              void Promise.resolve(handler(root));
-            });
 
             const replyHeader = document.createElement('div');
             replyHeader.className = 'webclipper-inpage-comments-panel__reply-header';
