@@ -36,6 +36,10 @@ vi.mock('../../src/ui/shared/ChatMessageBubble', () => ({
   ChatMessageBubble: () => createElement('div', null, 'message'),
 }));
 
+vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
+  ArticleCommentsSection: () => createElement('div', null, 'comments-section'),
+}));
+
 vi.mock('../../src/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
@@ -48,6 +52,8 @@ vi.mock('../../src/i18n', () => ({
       backButton: 'Back',
       detailHeaderOpenInMenuAria: 'Open destinations',
       messageRoleFallback: 'message',
+      openCommentsSidebar: 'Open comments sidebar',
+      closeCommentsSidebar: 'Close comments sidebar',
     };
     return labels[key] || key;
   },
@@ -177,5 +183,38 @@ describe('ConversationDetailPane header actions', () => {
 
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('shows a comments sidebar toggle in article detail mode', () => {
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-11',
+      url: 'https://example.com/article',
+    } as any;
+    currentState.detailHeaderActions = [];
+
+    const onToggleCommentsSidebar = vi.fn();
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane, { onToggleCommentsSidebar, commentsSidebarOpen: false }));
+    });
+
+    const openBtn = document.querySelector('[aria-label="Open comments sidebar"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onToggleCommentsSidebar).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane, { onToggleCommentsSidebar, commentsSidebarOpen: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Close comments sidebar"]')).toBeTruthy();
   });
 });

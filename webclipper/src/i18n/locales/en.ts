@@ -165,6 +165,8 @@ export const en = {
   // ArticleCommentsSection
   articleCommentsHeading: 'Comments',
   articleCommentsEmpty: 'No comments yet.',
+  openCommentsSidebar: 'Open comments sidebar',
+  closeCommentsSidebar: 'Close comments sidebar',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: 'Syncing',
@@ -204,7 +206,7 @@ export const en = {
   updatedPrefix: 'Updated: ',
   saved: 'Saved',
   updated: 'Updated',
-  clickToolbarIconToOpenPanel: 'Click toolbar icon to open panel',
+  clickToolbarIconToOpenCommentsSidebar: 'Click toolbar icon to open comments sidebar',
   activeTabNotFound: 'Active tab not found',
   noVisibleConversationFound: 'No visible conversation found',
 

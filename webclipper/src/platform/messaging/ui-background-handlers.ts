@@ -1,14 +1,36 @@
 import { t } from '../../i18n';
 import { tabsQuery, tabsSendMessage } from '../webext/tabs';
-import { CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from './message-contracts';
+import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from './message-contracts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
-  register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  register: (type: string, handler: (msg: any, sender?: any) => Promise<any> | any) => void;
 };
 
 export function registerUiMessageHandlers(router: AnyRouter) {
+  router.register(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, async (msg: any, sender: any) => {
+    const tabId = Number(sender?.tab?.id);
+    if (!Number.isFinite(tabId) || tabId <= 0) {
+      return router.err('current tab is unavailable', { code: 'OPEN_INPAGE_COMMENTS_PANEL_UNAVAILABLE' });
+    }
+
+    try {
+      await tabsSendMessage(tabId, {
+        type: CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL,
+        payload: {
+          tabId,
+          selectionText: String((msg as any)?.selectionText || ''),
+          source: 'doubleclick',
+        },
+      });
+      return router.ok({ opened: true });
+    } catch (e) {
+      const message = (e as any)?.message ?? String(e ?? 'open inpage comments panel failed');
+      return router.err(message, { code: 'OPEN_INPAGE_COMMENTS_PANEL_FAILED' });
+    }
+  });
+
   router.register(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP, async () => {
     const actionApi = (globalThis as any).chrome?.action ?? (globalThis as any).browser?.action;
     if (!actionApi || typeof actionApi.openPopup !== 'function') {
