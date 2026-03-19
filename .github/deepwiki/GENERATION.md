@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `246e4bda356dfedb9db1c0ba0ab474b62223aaf0` |
-| Branch name | `main` |
-| Generation timestamp | `2026-03-19 01:51:24 CST` |
+| Commit hash | `bbeeafc8efe87a4c58cbee9eaa5cfed6eb50b51e` |
+| Branch name | `xy` |
+| Generation timestamp | `2026-03-19 23:22:35 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental sync update |
@@ -33,6 +33,7 @@
 - [glossary.md](glossary.md)
 
 ### Module Pages
+- [modules/comments.md](modules/comments.md)
 - [modules/syncnos-app.md](modules/syncnos-app.md)
 - [modules/webclipper.md](modules/webclipper.md)
 
@@ -50,11 +51,13 @@
 - 在 `api.md` 新增 Notion OAuth Worker 交换流程（授权、回调校验、code exchange、token 入库）与关键参数矩阵。
 - 在 `INDEX.md` 的 Coverage Gaps 中补充 OCR 与键盘焦点专项文档的可点击链接。
 - 在 `INDEX.md` 与 `GENERATION.md` 补齐 `api.md` / `operations.md` / `security.md` / `glossary.md` 的页面可达性与清单一致性。
+- 新增 `modules/comments.md`，并同步 `modules/webclipper.md`、`storage.md`、`testing.md`、`architecture.md`、`data-flow.md`、`business-context.md`、`workflow.md`、`overview.md`、`glossary.md` 以覆盖 article comments / 注释线程。
+- 纠正 WebClipper 本地数据库版本到 `DB_VERSION = 7`，并明确 `article_comments` 仍未纳入 Zip v2 备份 / 导入。
 
 ## Coverage Notes
-- 本次重点是“事实同步 + 外部集成边界补强”，未新增页面，保持文件名稳定。
+- 本次重点是“事实同步 + comments 模块页 / 外部集成边界补强”；页面集合有小幅增加，其余页面保持稳定。
 - deepwiki 继续覆盖双产品线、配置、数据流、存储、测试、发布与排障；并强化“代码/配置优先于文档摘要”的写作约束。
-- 仍保留的 Coverage Gaps：App Store 提交流程缺少仓库内自动化证据；OCR 与键盘焦点专项文档尚未拆为 deepwiki 独立专题页。
+- 仍保留的 Coverage Gaps：App Store 提交流程缺少仓库内自动化证据；OCR 与键盘焦点专项文档尚未拆为 deepwiki 独立专题页；`article_comments` 目前仍是本地注释层，未纳入 Zip v2 备份 / 导入。
 
 ## Audit Basis
 
@@ -65,6 +68,7 @@
 | WebClipper 设置与运行时 | `webclipper/src/entrypoints/background.ts`, `webclipper/src/ui/settings/types.ts`, `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts` |
 | OAuth 与外部交换 | `webclipper/src/sync/notion/auth/oauth.ts`, `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts` |
 | WebClipper 存储与迁移 | `webclipper/src/platform/idb/schema.ts`, `webclipper/src/conversations/data/storage-idb.ts` |
+| WebClipper 评论线程 | `webclipper/src/comments/background/handlers.ts`, `webclipper/src/comments/data/storage-idb.ts` |
 | 备份边界 | `webclipper/src/sync/backup/export.ts`, `webclipper/src/sync/backup/import.ts`, `webclipper/src/sync/backup/backup-utils.ts` |
 | 发布流程 | `.github/workflows/webclipper-*.yml`, `.github/scripts/webclipper/*.mjs` |
 

@@ -34,8 +34,9 @@
 | 文件 | 验证点 | 为什么重要 |
 | --- | --- | --- |
 | `tests/unit/notion-sync-cursor.test.ts` | Notion cursor 的 append / rebuild 判断 | 直接决定是否会重复写入或错误重建 |
-| `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 / v6 迁移：NotionAI stable key、article canonical key 归并与 legacy 字段清理 | 直接关系到旧数据升级与 mapping 延续 |
+| `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 / v6 迁移 + v7 article_comments store：NotionAI stable key、article canonical key 归并与 legacy 字段清理 | 直接关系到旧数据升级与 mapping 延续 |
 | `tests/storage/conversations-idb.test.ts` | conversations / messages 的本地持久化 | 确认 UI 和同步层读到的事实源正确 |
+| `tests/storage/article-comments-idb.test.ts` | `article_comments` 的增删改查、回复、级联删除与 orphan attachment | 确认 article 详情页的本地评论线程不丢、不串、不挂空 |
 | `tests/storage/insight-stats.test.ts` | Insight 聚合：空库、chat/article 混合、Unknown 域名、Top N 折叠、Top 3 对话排序 | 防止本地统计页把“事实源”算错或把尾部来源错误归桶 |
 | `tests/unit/markdown-renderer.test.ts` | 消息渲染与 markdown 输出 | 防止 UI 与导出文本回归 |
 | `tests/collectors/gemini-collector.test.ts` | 过滤隐藏说话人 / 状态文案、blob 上传图片内联 | 防止 Gemini 页面结构变化把噪音文案或上传图片误写入正文 |
@@ -48,11 +49,12 @@
 1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
 2. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开 popup、多击提示、popup 列表刷新。
 3. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
-4. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save / AI chat cache images` 设置行为。
-5. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
-6. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。
-7. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
-8. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
+4. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除、锚点定位都可用；刷新后评论仍在本地；如果从外部恢复备份，注意当前版本不会带回 `article_comments`。
+5. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save / AI chat cache images` 设置行为。
+6. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
+7. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。
+8. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
+9. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
 
 ## 发布前检查
 
@@ -77,6 +79,7 @@
 - 本次 deepwiki 更新本身是文档改动，验证重点是“事实是否与源码 / 配置 / workflow 对齐”，而不是重新引入额外测试工具。
 - `SelectMenu` 的 `adaptiveMaxHeight` / `findNearestClippingRect()` 当前主要依赖 UI 冒烟验证；如果该逻辑扩展到更多入口，建议补组件级测试覆盖 `top/bottom + clipping parent` 场景。
 - `cache-images` 目前仍以手工冒烟为主（仓库内暂未发现专门单测）；若后续继续演进，建议补 `background handler + image-backfill-job + action slot` 联动测试。
+- `article_comments` 相关改动，至少要跑 `tests/storage/article-comments-idb.test.ts`，并做一次 article detail / inpage comments panel 的人工回归；它目前是 WebClipper 里最容易被忘记带回去的本地事实层之一。
 - 需要真的跑代码时，优先遵循仓库已有的命令，不新增新的 lint / test 系统。
 
 ## 来源引用（Source References）
@@ -89,6 +92,7 @@
 - `webclipper/tests/unit/notion-sync-cursor.test.ts`
 - `webclipper/tests/storage/schema-migration.test.ts`
 - `webclipper/tests/storage/conversations-idb.test.ts`
+- `webclipper/tests/storage/article-comments-idb.test.ts`
 - `webclipper/tests/storage/insight-stats.test.ts`
 - `webclipper/tests/collectors/gemini-collector.test.ts`
 - `webclipper/tests/collectors/kimi-collector.test.ts`
@@ -104,6 +108,12 @@
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/comments/background/handlers.ts`
+- `webclipper/src/comments/client/repo.ts`
+- `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
+- `webclipper/src/ui/comments/threaded-comments-panel.ts`
+- `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/ui/shared/hooks/useThemeMode.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

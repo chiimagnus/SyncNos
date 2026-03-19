@@ -19,7 +19,7 @@
 | 3 | 用产品线边界组织叙述 | 避免把 App 约束和扩展约束混写 |
 | 4 | 未被明确要求时不碰 i18n 字段 | 降低与任务无关的多语言改动风险 |
 | 5 | 更新 deepwiki 时同步 `INDEX.md` 与 `GENERATION.md` | 保证知识入口和元数据一致 |
-| 6 | 若 WebClipper 改动涉及设置结构、视觉 tokens 或主题切换，同时同步 `webclipper/AGENTS.md` 与 `webclipper/src/ui/AGENTS.md` | 避免执行文档和 UI 设计文档继续沿用旧规则 |
+| 6 | 若 WebClipper 改动涉及设置结构、视觉 tokens、主题切换或 comments / detail UI，同时同步 `webclipper/AGENTS.md`、`webclipper/src/ui/AGENTS.md` 与 `modules/comments.md` | 避免执行文档和 UI 设计文档继续沿用旧规则 |
 
 ## SyncNos App 开发工作流
 
@@ -49,6 +49,7 @@
 | 新增或调整仓库级行为 | 先改代码 / 配置，再回写 deepwiki | 避免 deepwiki 成为旧事实 |
 | 改动影响阅读路径 | 同步更新 `INDEX.md` | 让后续读者能正确进入相关页面 |
 | 页面集合变化 | 同步更新 `GENERATION.md` | 便于下次增量更新对比 |
+| 新增 WebClipper comments 子系统 | 同步更新 `modules/comments.md`、`modules/webclipper.md`、`storage.md`、`testing.md` | 避免 comments 相关事实散落在多页 |
 | 改动影响 README、产品说明或 UI 设计原则 | 同步更新 `README.md` / `README.zh-CN.md` / `webclipper/src/ui/AGENTS.md` | 避免用户文档、执行文档、设计文档各讲各的 |
 | 无法确认的区域 | 在 Coverage Gaps 里写明 | 防止 deepwiki 假装完整 |
 
@@ -82,6 +83,12 @@
 - `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
+- `webclipper/src/comments/background/handlers.ts`
+- `webclipper/src/comments/client/repo.ts`
+- `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
+- `webclipper/src/ui/comments/threaded-comments-panel.ts`
+- `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
