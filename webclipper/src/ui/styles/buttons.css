@@ -1,9 +1,6 @@
 .webclipper-btn {
   /* Reset */
   appearance: none;
-  border: 0;
-  background: transparent;
-  color: inherit;
   font: inherit;
   text-decoration: none;
   user-select: none;
@@ -27,6 +24,10 @@
   --btn-surface: var(--bg-card);
   --btn-stroke-tl: color-mix(in srgb, var(--btn-surface) 62%, white);
   --btn-stroke-br: color-mix(in srgb, var(--btn-surface) 74%, black);
+
+  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
 
   box-shadow:
     inset 1px 1px 0 var(--btn-stroke-tl),
@@ -58,32 +59,13 @@
   opacity: 0.38;
 }
 
-.webclipper-btn--tint {
-  --btn-surface: var(--bg-card);
-  border: 1px solid var(--border);
-  background-color: var(--bg-card);
-  color: var(--text-primary);
-}
-
-.webclipper-btn--tint:hover:not(:disabled) {
+.webclipper-btn:not(.webclipper-btn--filled):not(.webclipper-btn--danger):not(.webclipper-btn--danger-tint):not(.webclipper-btn--menu-item):hover:not(:disabled) {
   background-color: var(--bg-sunken);
 }
 
-.webclipper-btn--sunken {
+.webclipper-btn:not(.webclipper-btn--filled):not(.webclipper-btn--danger):not(.webclipper-btn--danger-tint):not(.webclipper-btn--menu-item)[aria-pressed='true'] {
   --btn-surface: var(--bg-sunken);
-  border: 1px solid var(--border);
   background-color: var(--bg-sunken);
-  color: var(--text-primary);
-}
-
-.webclipper-btn--sunken:hover:not(:disabled) {
-  background-color: var(--bg-primary);
-}
-
-.webclipper-btn--compact {
-  min-height: 32px;
-  padding: 0 8px;
-  border-radius: 10px;
 }
 
 .webclipper-btn--filled {
@@ -156,7 +138,7 @@
   border-color: var(--border);
 }
 
-.webclipper-btn--selected {
+.webclipper-btn--menu-item[aria-checked='true'] {
   --btn-surface: var(--bg-sunken);
   background-color: var(--bg-sunken);
   border-color: var(--border);

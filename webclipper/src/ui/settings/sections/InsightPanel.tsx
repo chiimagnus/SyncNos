@@ -13,7 +13,7 @@ import {
   INSIGHT_UNKNOWN_DATE_LABEL,
 } from './insight-stats';
 import type { InsightTimeRange } from './insight-stats';
-import { cardClassName, selectClassName } from '../ui';
+import { buttonClassName, cardClassName } from '../ui';
 import { useConversationsApp } from '../../conversations/conversations-context';
 import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '../../shared/SelectMenu';
@@ -354,7 +354,7 @@ export function InsightPanel(props: {
           value={range}
           onChange={onChangeRange}
           ariaLabel={t('insightRangeAria')}
-          buttonClassName={selectClassName}
+          buttonClassName={buttonClassName}
           options={[
             { value: 'all', label: t('insightRangeAll') },
             { value: 'today', label: t('insightRangeToday') },

@@ -1,13 +1,9 @@
 export function buttonTintClassName(): string {
-  return 'webclipper-btn webclipper-btn--tint';
+  return 'webclipper-btn';
 }
 
 export function buttonFilledClassName(): string {
   return 'webclipper-btn webclipper-btn--filled';
-}
-
-export function buttonSunkenClassName(): string {
-  return 'webclipper-btn webclipper-btn--sunken';
 }
 
 export function buttonDangerClassName(): string {
@@ -42,26 +38,14 @@ export function menuChevronClassName(): string {
 }
 
 export function buttonIconCircleCardClassName(): string {
-  return 'webclipper-btn webclipper-btn--tint webclipper-btn--icon webclipper-btn--icon-xs webclipper-btn--round webclipper-btn--tone-muted';
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xs webclipper-btn--round webclipper-btn--tone-muted';
 }
 
 export function buttonIconCircleGhostClassName(): string {
-  return 'webclipper-btn webclipper-btn--tint webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--round webclipper-btn--tone-muted';
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--round webclipper-btn--tone-muted';
 }
 
 export function buttonMiniIconClassName(active: boolean): string {
-  const base = [
-    'tw-inline-flex tw-size-[18px] tw-cursor-pointer tw-appearance-none tw-items-center tw-justify-center tw-rounded-full tw-border-0 tw-bg-transparent',
-    'tw-text-[12px] tw-font-black tw-shadow-none',
-    'tw-transition-colors tw-duration-150',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-  ].join(' ');
-
-  const hoverBg = active ? 'hover:tw-bg-[var(--accent-hover)]' : 'hover:tw-bg-[var(--bg-card)]';
-  return [
-    base,
-    'tw-text-[currentColor] tw-opacity-80 hover:tw-opacity-100',
-    hoverBg,
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38] disabled:hover:tw-bg-transparent disabled:hover:tw-opacity-[0.38]',
-  ].join(' ');
+  if (active) return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs';
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--tone-muted';
 }

@@ -697,7 +697,6 @@ export function ConversationListPane({
               triggerLabelClassName="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-whitespace-nowrap tw-text-left"
               buttonClassName={[
                 sourceFilterActive ? buttonFilledClassName() : buttonTintClassName(),
-                'webclipper-btn--compact',
                 'tw-w-[80px] tw-shrink-0',
               ].join(' ')}
               options={sourceOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
@@ -719,7 +718,7 @@ export function ConversationListPane({
                 triggerLabelClassName="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-whitespace-nowrap tw-text-left"
                 buttonClassName={[
                   buttonTintClassName(),
-                  'webclipper-btn--compact tw-w-[80px] tw-shrink-0',
+                  'tw-w-[80px] tw-shrink-0',
                 ].join(' ')}
                 options={siteOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
               />

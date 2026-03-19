@@ -281,10 +281,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
               aria-checked={selected ? 'true' : 'false'}
               disabled={!!opt.disabled}
               tabIndex={isActive ? 0 : -1}
-              className={[
-                menuItemButtonClassName,
-                selected ? 'webclipper-btn--selected' : '',
-              ].join(' ')}
+              className={menuItemButtonClassName}
               onClick={() => pickIndex(index)}
               onMouseEnter={() => setActiveIndex(index)}
               onFocus={() => setActiveIndex(index)}

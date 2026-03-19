@@ -465,7 +465,7 @@ export function mountThreadedCommentsPanel(
         replyComposer.appendChild(replyTextarea);
 
         const replySend = document.createElement('button');
-        replySend.className = 'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--tint webclipper-btn--icon';
+        replySend.className = 'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon';
         replySend.type = 'button';
         replySend.setAttribute('aria-label', 'Reply');
         replySend.textContent = '↑';

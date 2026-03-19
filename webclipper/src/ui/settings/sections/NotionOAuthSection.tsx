@@ -1,6 +1,6 @@
 import type { NotionPageOption } from '../utils';
 import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, checkboxClassName, selectClassName } from '../ui';
+import { buttonClassName, cardClassName, checkboxClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 import { SelectMenu } from '../../shared/SelectMenu';
 
@@ -78,7 +78,7 @@ export function NotionOAuthSection(props: {
             <SelectMenu<string>
               buttonId="notionPages"
               className="tw-flex-1 tw-min-w-0"
-              buttonClassName={`${selectClassName} tw-w-full`}
+              buttonClassName={`${buttonClassName} tw-w-full`}
               value={String(notionParentPageId || '')}
               disabled={busy || !notionConnected}
               ariaLabel={t('parentPage')}
@@ -105,9 +105,7 @@ export function NotionOAuthSection(props: {
               title={t('refresh')}
               onClick={onLoadNotionPages}
               disabled={busy || !notionConnected || loadingNotionPages}
-              className={[
-                'webclipper-btn webclipper-btn--tint webclipper-btn--icon',
-              ].join(' ')}
+              className="webclipper-btn webclipper-btn--icon"
               aria-label={t('refreshPagesAria')}
             >
               ↻
