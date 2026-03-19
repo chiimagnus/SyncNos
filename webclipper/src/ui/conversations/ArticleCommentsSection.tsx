@@ -129,7 +129,7 @@ export function ArticleCommentsSection({
     if (apiRef.current) return;
     const host = hostRef.current;
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, title: 'Comments' });
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false });
     apiRef.current = mounted.api;
     mounted.api.setQuoteText('');
     mounted.api.setHandlers({

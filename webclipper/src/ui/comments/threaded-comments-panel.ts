@@ -25,7 +25,6 @@ export type ThreadedCommentsPanelApi = {
     onLocate?: (item: ThreadedCommentItem) => void | Promise<void>;
     onClose?: () => void;
   }) => void;
-  setTitle: (title: string) => void;
 };
 
 function toHostTokensCss(css: string) {
@@ -55,7 +54,6 @@ function formatTime(ts: number | null | undefined): string {
 type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
-  title?: string;
 };
 
 export function mountThreadedCommentsPanel(
@@ -102,11 +100,6 @@ export function mountThreadedCommentsPanel(
   const header = document.createElement('div');
   header.className = 'webclipper-inpage-comments-panel__header';
   surface.appendChild(header);
-
-  const title = document.createElement('div');
-  title.className = 'webclipper-inpage-comments-panel__title';
-  title.textContent = String(options.title || 'Comments');
-  header.appendChild(title);
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'webclipper-inpage-comments-panel__close';
@@ -157,11 +150,6 @@ export function mountThreadedCommentsPanel(
   composerSend.setAttribute('aria-label', 'Comment');
   composerSend.textContent = '↑';
   composerActions.appendChild(composerSend);
-
-  const meta = document.createElement('div');
-  meta.className = 'webclipper-inpage-comments-panel__meta';
-  meta.textContent = 'Comments';
-  body.appendChild(meta);
 
   const threads = document.createElement('div');
   threads.className = 'webclipper-inpage-comments-panel__threads';
@@ -287,9 +275,6 @@ export function mountThreadedCommentsPanel(
       quoteText.textContent = value;
       quote.style.display = value ? 'block' : 'none';
     },
-    setTitle(nextTitle) {
-      title.textContent = String(nextTitle || 'Comments');
-    },
     setHandlers(handlers: any) {
       state.handlers = handlers || {
         onSave: null,
@@ -302,7 +287,6 @@ export function mountThreadedCommentsPanel(
     setComments(items) {
       threads.textContent = '';
       const normalized = (Array.isArray(items) ? items : []).filter((x) => x && Number.isFinite(Number((x as any)?.id)));
-      meta.textContent = `Comments · ${normalized.length}`;
       if (!normalized.length) {
         threads.appendChild(empty);
         refreshButtons();

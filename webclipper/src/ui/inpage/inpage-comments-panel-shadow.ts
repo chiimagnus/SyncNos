@@ -19,7 +19,7 @@ function ensurePanel(): { el: HTMLElement; api: ThreadedCommentsPanelApi } {
   }
 
   const host = document.documentElement;
-  const { el, api } = mountThreadedCommentsPanel(host, { overlay: true, initiallyOpen: false, title: 'Comments' });
+  const { el, api } = mountThreadedCommentsPanel(host, { overlay: true, initiallyOpen: false });
   el.id = PANEL_ID;
 
   (el as any).__webclipperPanelApi = api;
@@ -51,9 +51,6 @@ const apiRef: InpageCommentsPanelApi = {
   },
   setHandlers(handlers) {
     ensurePanel().api.setHandlers(handlers as any);
-  },
-  setTitle(title) {
-    ensurePanel().api.setTitle(title);
   },
 };
 
