@@ -242,6 +242,17 @@
 | **disabled** | 前景色 38% 透明度（M3 规范） | `rgba(44,48,56,0.38)` | `rgba(220,224,232,0.38)` |
 | **focus ring** | focus-ring + 2px outline + 2px offset | `#FFC6AD` | `#FFD4C2` |
 
+### B2.1 · Button Bevel（双 Stroke）
+
+插件内的按钮默认采用“**圆角矩形 + 双 stroke bevel**”的视觉语言：左上角更亮、右下角更暗，形成轻微的立体感；按下（active）时 **stroke 方向反转 + 轻微下压 1px**，让用户感知到“按下去”。
+
+**规范：**
+
+1. **按钮 class 不手写**：优先复用 `webclipper/src/ui/shared/button-styles.ts` 的 `buttonTintClassName()` / `buttonFilledClassName()` / `buttonDanger*ClassName()`。
+2. **bevel 的实现方式**：`box-shadow: inset 1px 1px 0 ... , inset -1px -1px 0 ...`（两条内阴影作为双 stroke）。
+3. **按下态（active）**：把两条 inset 的颜色对调（反转），并 `translateY(1px)`。
+4. **主题兼容**：stroke 色值用 `color-mix()` 从当前 surface token（`--bg-card` / `--accent` / `--error`）派生，禁止硬编码亮暗色值。
+
 ## B3 · 插件 UI 与宣传图的差异
 
 | **维度** | **宣传图** | **插件 UI** |

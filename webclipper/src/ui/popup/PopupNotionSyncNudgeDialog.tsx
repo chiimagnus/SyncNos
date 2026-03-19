@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { t } from '../../i18n';
+import { buttonFilledClassName, buttonTintClassName } from '../shared/button-styles';
 
 type PopupNotionSyncNudgeDialogProps = {
   open: boolean;
@@ -12,6 +13,8 @@ type PopupNotionSyncNudgeDialogProps = {
 export function PopupNotionSyncNudgeDialog(props: PopupNotionSyncNudgeDialogProps) {
   const { open, dontShowAgain, onDontShowAgainChange, onDismiss, onConfirm } = props;
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const cancelButtonClassName = buttonTintClassName();
+  const confirmButtonClassName = buttonFilledClassName();
 
   useEffect(() => {
     if (!open) return;
@@ -62,14 +65,14 @@ export function PopupNotionSyncNudgeDialog(props: PopupNotionSyncNudgeDialogProp
         <div className="tw-mt-4 tw-flex tw-justify-end tw-gap-2">
           <button
             type="button"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--text-primary)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+            className={cancelButtonClassName}
             onClick={onDismiss}
           >
             {t('popupNotionSyncNudgeDismiss')}
           </button>
           <button
             type="button"
-            className="tw-inline-flex tw-min-h-9 tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-bg-[var(--accent)] tw-px-3 tw-text-xs tw-font-extrabold tw-text-[var(--accent-foreground)] tw-transition-colors tw-duration-200 hover:tw-bg-[var(--accent-hover)] active:tw-bg-[var(--accent-active)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+            className={confirmButtonClassName}
             onClick={onConfirm}
           >
             {t('popupNotionSyncNudgeConfirm')}

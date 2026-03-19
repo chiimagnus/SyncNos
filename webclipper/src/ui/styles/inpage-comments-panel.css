@@ -331,16 +331,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  border: 0;
-  background: transparent;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+  box-shadow:
+    inset 1px 1px 0 var(--btn-stroke-tl),
+    inset -1px -1px 0 var(--btn-stroke-br);
   color: var(--panel-text-muted);
   cursor: pointer;
   font: inherit;
   font-weight: 900;
   user-select: none;
+  transition: background 160ms ease, box-shadow 120ms ease, transform 120ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .webclipper-inpage-comments-panel__icon-btn:hover {
@@ -348,8 +352,23 @@
   color: var(--panel-text);
 }
 
+.webclipper-inpage-comments-panel__icon-btn:active {
+  box-shadow:
+    inset 1px 1px 0 var(--btn-stroke-br),
+    inset -1px -1px 0 var(--btn-stroke-tl);
+  transform: translateY(1px);
+}
+
 .webclipper-inpage-comments-panel__icon-btn.is-danger {
+  --btn-stroke-tl: color-mix(in srgb, var(--panel-danger) 58%, white);
+  --btn-stroke-br: color-mix(in srgb, var(--panel-danger) 78%, black);
+  border-color: color-mix(in srgb, var(--panel-danger) 55%, var(--panel-border));
+  background: color-mix(in srgb, var(--panel-bg) 88%, var(--panel-danger));
   color: var(--panel-danger);
+}
+
+.webclipper-inpage-comments-panel__icon-btn.is-danger:hover {
+  background: color-mix(in srgb, var(--bg-sunken, var(--panel-bg)) 86%, var(--panel-danger));
 }
 
 .webclipper-inpage-comments-panel__icon-btn:focus-visible {
