@@ -69,6 +69,23 @@
   background-color: var(--bg-sunken);
 }
 
+.webclipper-btn--sunken {
+  --btn-surface: var(--bg-sunken);
+  border: 1px solid var(--border);
+  background-color: var(--bg-sunken);
+  color: var(--text-primary);
+}
+
+.webclipper-btn--sunken:hover:not(:disabled) {
+  background-color: var(--bg-primary);
+}
+
+.webclipper-btn--compact {
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+}
+
 .webclipper-btn--filled {
   --btn-surface: var(--accent);
   border: 0;
@@ -112,6 +129,37 @@
 
 .webclipper-btn--danger-tint:active:not(:disabled) {
   background-color: var(--bg-sunken);
+}
+
+.webclipper-btn--menu-item {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 8px;
+
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 11px;
+
+  --btn-surface: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  border: 1px solid transparent;
+  background-color: var(--btn-surface);
+  color: var(--text-primary);
+
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.webclipper-btn--menu-item:hover:not(:disabled) {
+  --btn-surface: var(--bg-sunken);
+  background-color: var(--btn-surface);
+  border-color: var(--border);
+}
+
+.webclipper-btn--selected {
+  --btn-surface: var(--bg-sunken);
+  background-color: var(--bg-sunken);
+  border-color: var(--border);
 }
 
 .webclipper-btn--icon {

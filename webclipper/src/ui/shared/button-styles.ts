@@ -6,6 +6,10 @@ export function buttonFilledClassName(): string {
   return 'webclipper-btn webclipper-btn--filled';
 }
 
+export function buttonSunkenClassName(): string {
+  return 'webclipper-btn webclipper-btn--sunken';
+}
+
 export function buttonDangerClassName(): string {
   return 'webclipper-btn webclipper-btn--danger';
 }
@@ -15,13 +19,7 @@ export function buttonDangerTintClassName(): string {
 }
 
 export function buttonMenuItemClassName(): string {
-  return [
-    'tw-w-full tw-cursor-pointer tw-appearance-none tw-rounded-[11px] tw-border tw-border-transparent tw-bg-transparent tw-px-2.5 tw-py-2',
-    'tw-text-left tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]',
-    'tw-transition-colors tw-duration-150 hover:tw-border-[var(--border)] hover:tw-bg-[var(--bg-sunken)]',
-    'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-    'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38] disabled:hover:tw-border-transparent disabled:hover:tw-bg-transparent',
-  ].join(' ');
+  return 'webclipper-btn webclipper-btn--menu-item';
 }
 
 export function menuPopoverPanelClassName(minWidth: 150 | 170): string {

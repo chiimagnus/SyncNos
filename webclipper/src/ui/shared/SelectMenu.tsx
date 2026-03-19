@@ -283,7 +283,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
               tabIndex={isActive ? 0 : -1}
               className={[
                 menuItemButtonClassName,
-                selected ? 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]' : '',
+                selected ? 'webclipper-btn--selected' : '',
               ].join(' ')}
               onClick={() => pickIndex(index)}
               onMouseEnter={() => setActiveIndex(index)}

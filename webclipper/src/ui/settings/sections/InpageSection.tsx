@@ -1,7 +1,7 @@
 import { t } from '../../../i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '../../../collectors/ai-chat-sites';
 import { cardClassName, checkboxClassName, selectClassName } from '../ui';
-import { buttonTintClassName } from '../../shared/button-styles';
+import { buttonSunkenClassName, buttonTintClassName } from '../../shared/button-styles';
 import { SelectMenu } from '../../shared/SelectMenu';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
@@ -16,7 +16,7 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
-}) {
+  }) {
   const {
     busy,
     themeMode,
@@ -31,9 +31,8 @@ export function InpageSection(props: {
 
   const themeModeButtonClassName = (active: boolean) =>
     [
-      buttonTintClassName(),
-      'tw-min-h-8 tw-rounded-lg',
-      active ? 'tw-bg-[var(--bg-sunken)]' : '',
+      active ? buttonSunkenClassName() : buttonTintClassName(),
+      'webclipper-btn--compact',
     ].join(' ');
 
   return (
