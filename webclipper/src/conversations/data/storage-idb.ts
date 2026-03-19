@@ -453,6 +453,22 @@ export async function getConversations(): Promise<Conversation[]> {
   return items as any;
 }
 
+export async function getConversationBySourceConversationKey(
+  source: string,
+  conversationKey: string,
+): Promise<Conversation | null> {
+  const normalizedSource = safeString(source);
+  const normalizedKey = safeString(conversationKey);
+  if (!normalizedSource || !normalizedKey) return null;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  const idx = stores.conversations.index('by_source_conversationKey');
+  const item = (await reqToPromise(idx.get([normalizedSource, normalizedKey]) as any)) as any;
+  await txDone(t);
+  return item || null;
+}
+
 export async function getMessagesByConversationId(
   conversationId: number,
 ): Promise<ConversationMessage[]> {

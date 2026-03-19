@@ -1,4 +1,9 @@
-import { hasConversation, syncConversationMessages, upsertConversation } from '../../conversations/data/storage';
+import {
+  getConversationBySourceConversationKey,
+  hasConversation,
+  syncConversationMessages,
+  upsertConversation,
+} from '../../conversations/data/storage';
 import { scriptingExecuteScript } from '../../platform/webext/scripting';
 import { tabsGet, tabsQuery } from '../../platform/webext/tabs';
 
@@ -664,4 +669,36 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     wordCount: countWords(body),
     lastCapturedAt: capturedAt,
   };
+}
+
+export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: number } = {}) {
+  const tab = await resolveTargetTab(tabId);
+  const normalizedUrl = normalizeHttpUrl(tab.url || '');
+  if (!normalizedUrl) throw toError('active tab must be an http(s) page');
+
+  const key = conversationKeyForUrl(normalizedUrl);
+  try {
+    const existing = await getConversationBySourceConversationKey(ARTICLE_SOURCE, key);
+    const existingId = Number((existing as any)?.id);
+    if (existing && Number.isFinite(existingId) && existingId > 0) {
+      const warningFlags = Array.isArray((existing as any)?.warningFlags)
+        ? (existing as any).warningFlags.map((x: any) => String(x || '').trim()).filter(Boolean)
+        : [];
+      return {
+        isNew: false,
+        conversationId: existingId,
+        url: normalizedUrl,
+        title: normalizeText((existing as any)?.title || '') || fallbackTitle(normalizedUrl, (tab as any)?.title || ''),
+        author: normalizeText((existing as any)?.author || ''),
+        publishedAt: normalizeText((existing as any)?.publishedAt || ''),
+        warningFlags,
+        wordCount: null,
+        lastCapturedAt: Number((existing as any)?.lastCapturedAt) || null,
+      };
+    }
+  } catch (_e) {
+    // ignore and fallback to capture
+  }
+
+  return await fetchActiveTabArticle({ tabId: Number((tab as any)?.id) });
 }

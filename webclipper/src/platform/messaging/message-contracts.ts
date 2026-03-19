@@ -26,6 +26,7 @@ export const OBSIDIAN_MESSAGE_TYPES = {
 
 export const ARTICLE_MESSAGE_TYPES = {
   FETCH_ACTIVE_TAB: 'fetchActiveTabArticle',
+  RESOLVE_OR_CAPTURE_ACTIVE_TAB: 'resolveOrCaptureActiveTabArticle',
 } as const;
 
 export const CHATGPT_MESSAGE_TYPES = {
@@ -35,6 +36,11 @@ export const CHATGPT_MESSAGE_TYPES = {
 export const CURRENT_PAGE_MESSAGE_TYPES = {
   GET_CAPTURE_STATE: 'getCurrentPageCaptureState',
   CAPTURE: 'captureCurrentPage',
+} as const;
+
+// Messages sent to content scripts (not handled by background router).
+export const CONTENT_MESSAGE_TYPES = {
+  OPEN_INPAGE_COMMENTS_PANEL: 'openInpageCommentsPanel',
 } as const;
 
 export const COMMENTS_MESSAGE_TYPES = {

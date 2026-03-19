@@ -4,6 +4,7 @@ import { createContentController } from '../bootstrap/content-controller.ts';
 import { registerCurrentPageCaptureContentHandlers } from '../bootstrap/current-page-capture-content-handlers.ts';
 import { createCurrentPageCaptureService } from '../bootstrap/current-page-capture.ts';
 import { startContentBootstrap } from '../bootstrap/content.ts';
+import { registerInpageCommentsPanelContentHandlers } from '../bootstrap/inpage-comments-panel-content-handlers.ts';
 import { createCollectorEnv } from '../collectors/collector-env.ts';
 import { registerAllCollectors } from '../collectors/register-all.ts';
 import { createCollectorsRegistry } from '../collectors/registry.ts';
@@ -30,6 +31,7 @@ export default defineContentScript({
     });
 
     registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
+    registerInpageCommentsPanelContentHandlers(runtime);
 
     const controller = createContentController({
       runtime,

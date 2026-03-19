@@ -4,6 +4,10 @@ export async function listConversations() {
   return await idb.getConversations();
 }
 
+export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {
+  return await idb.getConversationBySourceConversationKey(source, conversationKey);
+}
+
 export async function getConversationDetail(conversationId: number) {
   const messages = await idb.getMessagesByConversationId(conversationId);
   return { conversationId, messages };
