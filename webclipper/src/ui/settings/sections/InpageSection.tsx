@@ -16,8 +16,6 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
-  inpageCommentsAutoOpenEnabled: boolean;
-  onToggleInpageCommentsAutoOpenEnabled: (next: boolean) => void;
 }) {
   const {
     busy,
@@ -29,8 +27,6 @@ export function InpageSection(props: {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
-    inpageCommentsAutoOpenEnabled,
-    onToggleInpageCommentsAutoOpenEnabled,
   } = props;
 
   const themeModeButtonClassName = (active: boolean) =>
@@ -105,18 +101,6 @@ export function InpageSection(props: {
             />
           </div>
           <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('inpageDisplayModeHint')}</div>
-
-          <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-            <input
-              type="checkbox"
-              checked={inpageCommentsAutoOpenEnabled}
-              disabled={busy}
-              onChange={(e) => onToggleInpageCommentsAutoOpenEnabled(!!e.target.checked)}
-              className={checkboxClassName}
-            />
-            {t('inpageCommentsAutoOpenLabel')}
-          </label>
-          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('inpageCommentsAutoOpenHint')}</div>
         </div>
       </section>
 

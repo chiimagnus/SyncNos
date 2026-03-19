@@ -48,6 +48,7 @@ function ensurePanelElement(): HTMLElement {
   const el = document.createElement('webclipper-inpage-comments-panel');
   el.id = PANEL_ID;
   applyPanelHostLayoutStyles(el as any);
+  setImportantStyle(el as any, 'display', 'none');
 
   const shadow = el.attachShadow({ mode: 'open' });
 

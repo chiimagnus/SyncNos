@@ -16,9 +16,6 @@ import normalizeApi from '../shared/normalize.ts';
 import { inpageButtonApi } from '../ui/inpage/inpage-button-shadow.ts';
 import { inpageTipApi } from '../ui/inpage/inpage-tip-shadow.ts';
 import { createRuntimeClient } from '../platform/runtime/client.ts';
-import { COMMENTS_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-
-const STORAGE_KEY_INPAGE_COMMENTS_AUTO_OPEN = 'inpage_comments_auto_open_enabled';
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
@@ -46,21 +43,6 @@ function isTopFrame(): boolean {
   }
 }
 
-function readCommentsAutoOpenSetting(): Promise<boolean> {
-  const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
-  return new Promise((resolve) => {
-    try {
-      const local = storageApi?.local;
-      if (!local?.get) return resolve(true);
-      local.get([STORAGE_KEY_INPAGE_COMMENTS_AUTO_OPEN], (res: any) => {
-        resolve(res?.[STORAGE_KEY_INPAGE_COMMENTS_AUTO_OPEN] !== false);
-      });
-    } catch (_e) {
-      resolve(true);
-    }
-  });
-}
-
 export default defineContentScript({
   // Inpage visibility is controlled at runtime by `inpage_display_mode` (and legacy `inpage_supported_only`).
   // This avoids browser-specific dynamic content-script registration support gaps.
@@ -77,19 +59,7 @@ export default defineContentScript({
 
     registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
     registerInpageCommentsLocateContentHandlers();
-    const { controller: inpageCommentsController } = registerInpageCommentsPanelContentHandlers(runtime);
-
-    void (async () => {
-      if (!isTopFrame()) return;
-      const enabled = await readCommentsAutoOpenSetting();
-      if (!enabled) return;
-      const canonicalUrl = normalizeHttpUrl(location.href);
-      if (!canonicalUrl) return;
-      const res: any = await runtime.send(COMMENTS_MESSAGE_TYPES.HAS_ARTICLE_COMMENTS, { canonicalUrl });
-      const hasAny = res?.ok === true && res?.data?.hasAny === true;
-      if (!hasAny) return;
-      await inpageCommentsController.open({ focusEditor: false, ensureArticle: false });
-    })().catch(() => {});
+    registerInpageCommentsPanelContentHandlers(runtime);
 
     const controller = createContentController({
       runtime,

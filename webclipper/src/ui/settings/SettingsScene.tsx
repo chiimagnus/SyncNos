@@ -117,8 +117,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
-    inpageCommentsAutoOpenEnabled,
-    onToggleInpageCommentsAutoOpenEnabled,
     themeMode,
     onChangeThemeMode,
 
@@ -280,10 +278,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
           onToggleAiChatCacheImagesEnabled={(next) => {
             void onToggleAiChatCacheImagesEnabled(next);
-          }}
-          inpageCommentsAutoOpenEnabled={inpageCommentsAutoOpenEnabled}
-          onToggleInpageCommentsAutoOpenEnabled={(next) => {
-            void onToggleInpageCommentsAutoOpenEnabled(next);
           }}
         />
       ) : null}
