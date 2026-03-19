@@ -17,7 +17,6 @@ export type ArticleCommentDto = {
   conversationId: number | null;
   canonicalUrl: string;
   quoteText: string;
-  quoteContext?: { prefix?: string; suffix?: string } | null;
   commentText: string;
   createdAt: number;
   updatedAt: number;
@@ -28,7 +27,6 @@ export async function addArticleComment(input: {
   conversationId: number | null;
   parentId?: number | null;
   quoteText?: string | null;
-  quoteContext?: { prefix?: string; suffix?: string } | null;
   commentText: string;
 }): Promise<ArticleCommentDto> {
   const res = await send<ApiResponse<ArticleCommentDto>>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, input as any);

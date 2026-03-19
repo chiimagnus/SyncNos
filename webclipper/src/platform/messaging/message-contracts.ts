@@ -41,7 +41,6 @@ export const CURRENT_PAGE_MESSAGE_TYPES = {
 // Messages sent to content scripts (not handled by background router).
 export const CONTENT_MESSAGE_TYPES = {
   OPEN_INPAGE_COMMENTS_PANEL: 'openInpageCommentsPanel',
-  LOCATE_INPAGE_COMMENT_ANCHOR: 'locateInpageCommentAnchor',
 } as const;
 
 export const COMMENTS_MESSAGE_TYPES = {

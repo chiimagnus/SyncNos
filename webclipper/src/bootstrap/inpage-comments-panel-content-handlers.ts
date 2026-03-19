@@ -1,5 +1,4 @@
 import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CONTENT_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
-import { locateAndFlashTextQuote } from '../comments/anchor/text-quote-dom';
 import { getInpageCommentsPanelApi } from '../ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -42,44 +41,6 @@ function pickQuoteFromSelection(fallback: unknown): string {
   }
 }
 
-function pickQuoteContextFromSelection(contextLen: number): { prefix?: string; suffix?: string } | null {
-  const len = Number(contextLen);
-  const limit = Number.isFinite(len) ? Math.max(0, Math.min(160, Math.floor(len))) : 64;
-  if (!limit) return null;
-  try {
-    const selection = globalThis.getSelection?.();
-    if (!selection || selection.rangeCount <= 0) return null;
-    const range = selection.getRangeAt(0);
-    if (!range || range.collapsed) return null;
-
-    const startNode = range.startContainer as any;
-    const endNode = range.endContainer as any;
-
-    let prefix = '';
-    if (startNode && startNode.nodeType === 3) {
-      const value = String(startNode.nodeValue || '');
-      const start = Math.max(0, Number(range.startOffset || 0) - limit);
-      const end = Math.max(0, Math.min(value.length, Number(range.startOffset || 0)));
-      prefix = value.slice(start, end);
-    }
-
-    let suffix = '';
-    if (endNode && endNode.nodeType === 3) {
-      const value = String(endNode.nodeValue || '');
-      const start = Math.max(0, Math.min(value.length, Number(range.endOffset || 0)));
-      const end = Math.max(0, Math.min(value.length, start + limit));
-      suffix = value.slice(start, end);
-    }
-
-    const out: any = {};
-    if (prefix) out.prefix = prefix;
-    if (suffix) out.suffix = suffix;
-    return Object.keys(out).length ? out : null;
-  } catch (_e) {
-    return null;
-  }
-}
-
 export type InpageCommentsPanelController = {
   open: (input?: { tabId?: number | null; selectionText?: string | null; focusEditor?: boolean; ensureArticle?: boolean }) => Promise<void>;
 };
@@ -91,9 +52,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
   let activeCanonicalUrl = '';
   let activeConversationId: number | null = null;
   let activeQuoteText = '';
-  let activeQuoteContext: any = null;
   let lastTabId: number | null = null;
-  let lastRawComments: any[] = [];
 
   async function refreshCommentsList() {
     const canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
@@ -111,7 +70,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
       return;
     }
     const items = Array.isArray(res?.data) ? res.data : [];
-    lastRawComments = items;
     api.setComments(
       items.map((c: any) => ({
         id: Number(c?.id),
@@ -119,7 +77,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
         authorName: 'You',
         createdAt: Number(c?.createdAt) || null,
         quoteText: String(c?.quoteText || ''),
-        quoteContext: c?.quoteContext ?? null,
         commentText: String(c?.commentText || ''),
       })),
     );
@@ -161,7 +118,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
           canonicalUrl,
           conversationId: activeConversationId,
           quoteText: activeQuoteText,
-          quoteContext: activeQuoteContext,
           commentText: text,
         } as any);
         if (res?.ok) await refreshCommentsList();
@@ -189,7 +145,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
           conversationId: activeConversationId,
           parentId: Number(parentId),
           quoteText: '',
-          quoteContext: null,
           commentText: text,
         } as any);
         if (res?.ok) await refreshCommentsList();
@@ -198,21 +153,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
         if (!rt?.send) return;
         const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id } as any);
         if (res?.ok) await refreshCommentsList();
-      },
-      onLocate: async (item) => {
-        const parentId = (item as any)?.parentId != null ? Number((item as any).parentId) : null;
-        const root = parentId
-          ? lastRawComments.find((c) => Number(c?.id) === parentId) ?? null
-          : lastRawComments.find((c) => Number(c?.id) === Number((item as any)?.id)) ?? null;
-
-        const exact = safeString(root?.quoteText ?? (item as any)?.quoteText);
-        if (!exact) return;
-        const ctx = root?.quoteContext ?? (item as any)?.quoteContext;
-        locateAndFlashTextQuote({
-          exact,
-          ...(ctx?.prefix ? { prefix: String(ctx.prefix) } : null),
-          ...(ctx?.suffix ? { suffix: String(ctx.suffix) } : null),
-        });
       },
     });
   }
@@ -230,7 +170,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
     activeQuoteText = quoteText;
-    activeQuoteContext = pickQuoteContextFromSelection(64);
     api.setQuoteText(quoteText);
     api.open({ focusEditor: input?.focusEditor === true });
 
