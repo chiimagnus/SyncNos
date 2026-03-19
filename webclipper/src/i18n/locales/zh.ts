@@ -164,7 +164,7 @@ export const zh: { [K in TranslationKey]: string } = {
   // ArticleCommentsSection
   articleCommentsHeading: '评论',
   articleCommentsEmpty: '暂无评论。',
-  openCommentsSidebar: '打开评论侧边栏',
+  openCommentsSidebar: '评论',
   closeCommentsSidebar: '收起评论侧边栏',
 
   // ConversationSyncFeedbackNotice
@@ -205,7 +205,7 @@ export const zh: { [K in TranslationKey]: string } = {
   updatedPrefix: '已更新：',
   saved: '已保存',
   updated: '已更新',
-  clickToolbarIconToOpenCommentsSidebar: '请点击工具栏图标打开评论侧边栏',
+  clickToolbarIconToOpenCommentsSidebar: '请点击工具栏图标进行评论',
   activeTabNotFound: '未找到当前标签页',
   noVisibleConversationFound: '未找到可见对话',
 

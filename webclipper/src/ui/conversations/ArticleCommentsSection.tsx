@@ -22,11 +22,15 @@ function normalizeHttpUrl(raw: unknown): string {
 export function ArticleCommentsSection({
   conversationId,
   canonicalUrl,
+  quoteText,
+  focusComposerSignal,
   containerClassName,
   onRequestClose,
 }: {
   conversationId: number;
   canonicalUrl: string;
+  quoteText?: string;
+  focusComposerSignal?: number;
   containerClassName?: string;
   onRequestClose?: () => void;
 }) {
@@ -36,6 +40,10 @@ export function ArticleCommentsSection({
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
+  const quoteTextRef = useRef<string>(String(quoteText || ''));
+  quoteTextRef.current = String(quoteText || '');
+  const focusSignal = Number(focusComposerSignal || 0);
+  const lastFocusSignalRef = useRef<number>(0);
 
   const normalizedUrl = useMemo(() => normalizeHttpUrl(canonicalUrl), [canonicalUrl]);
 
@@ -128,7 +136,7 @@ export function ArticleCommentsSection({
 
     const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
     apiRef.current = mounted.api;
-    mounted.api.setQuoteText('');
+    mounted.api.setQuoteText(String(quoteTextRef.current || ''));
     mounted.api.setHandlers({
       onClose: () => {
         if (typeof onRequestClose === 'function') onRequestClose();
@@ -143,7 +151,7 @@ export function ArticleCommentsSection({
             canonicalUrl: normalizedUrl,
             conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
             parentId: null,
-            quoteText: '',
+            quoteText: String(quoteTextRef.current || ''),
             commentText: value,
           } as any);
           await refresh();
@@ -188,6 +196,21 @@ export function ArticleCommentsSection({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, normalizedUrl, onRequestClose]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    api.setQuoteText(String(quoteTextRef.current || ''));
+  }, [quoteText]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    if (!focusSignal) return;
+    if (lastFocusSignalRef.current === focusSignal) return;
+    lastFocusSignalRef.current = focusSignal;
+    api.open({ focusComposer: true });
+  }, [focusSignal]);
 
   useEffect(() => {
     const api = apiRef.current;

@@ -8,6 +8,7 @@ import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
 import { ArticleCommentsSection } from './ArticleCommentsSection';
+import { useRef } from 'react';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -27,7 +28,7 @@ export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
   onExpandSidebar?: () => void;
-  onToggleCommentsSidebar?: () => void;
+  onTriggerCommentsSidebar?: (quoteText: string) => void;
   commentsSidebarOpen?: boolean;
 };
 
@@ -35,7 +36,7 @@ export function ConversationDetailPane({
   onBack,
   hideHeader = false,
   onExpandSidebar,
-  onToggleCommentsSidebar,
+  onTriggerCommentsSidebar,
   commentsSidebarOpen = false,
 }: ConversationDetailPaneProps) {
   const {
@@ -60,7 +61,27 @@ export function ConversationDetailPane({
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
-  const commentsSidebarLabel = commentsSidebarOpen ? t('closeCommentsSidebar') : t('openCommentsSidebar');
+  const commentsSidebarLabel = t('openCommentsSidebar');
+  const messagesRootRef = useRef<HTMLDivElement | null>(null);
+  const selectionQuoteRef = useRef<string>('');
+
+  const readSelectionQuote = (): string => {
+    const root = messagesRootRef.current;
+    if (!root) return '';
+    try {
+      const sel = globalThis.getSelection?.();
+      if (!sel || sel.rangeCount <= 0) return '';
+      const text = String(sel.toString() || '').trim();
+      if (!text) return '';
+      const anchor = sel.anchorNode as any as Node | null;
+      const focus = sel.focusNode as any as Node | null;
+      if (anchor && !root.contains(anchor)) return '';
+      if (focus && !root.contains(focus)) return '';
+      return text;
+    } catch (_e) {
+      return '';
+    }
+  };
 
   return (
     <section>
@@ -136,10 +157,23 @@ export function ConversationDetailPane({
                 menuAriaLabel={t('detailHeaderOpenInMenuAria')}
               />
 
-              {onToggleCommentsSidebar ? (
+              {onTriggerCommentsSidebar ? (
                 <button
                   type="button"
-                  onClick={onToggleCommentsSidebar}
+                  onMouseDown={(e) => {
+                    selectionQuoteRef.current = readSelectionQuote();
+                    // Avoid the button stealing focus and potentially collapsing selection before we read it.
+                    try {
+                      e.preventDefault();
+                    } catch (_e2) {
+                      // ignore
+                    }
+                  }}
+                  onClick={() => {
+                    const quoteText = String(selectionQuoteRef.current || '').trim();
+                    // When no selection, explicitly clear the quote.
+                    onTriggerCommentsSidebar(quoteText);
+                  }}
                   className={navIconButtonSmClassName(Boolean(commentsSidebarOpen))}
                   aria-label={commentsSidebarLabel}
                   title={commentsSidebarLabel}
@@ -187,7 +221,7 @@ export function ConversationDetailPane({
               ) : null}
 
               {detail?.messages?.length ? (
-                <div className="tw-mt-3 tw-grid tw-gap-2.5">
+                <div ref={messagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
                   {detail.messages.map((m) => {
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
                     const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);

@@ -6,10 +6,18 @@ import { navIconButtonSmClassName } from '../shared/nav-styles';
 export type ArticleCommentsSidebarProps = {
   conversationId: number;
   canonicalUrl: string;
+  quoteText?: string;
+  focusComposerSignal?: number;
   onClose: () => void;
 };
 
-export function ArticleCommentsSidebar({ conversationId, canonicalUrl, onClose }: ArticleCommentsSidebarProps) {
+export function ArticleCommentsSidebar({
+  conversationId,
+  canonicalUrl,
+  quoteText,
+  focusComposerSignal,
+  onClose,
+}: ArticleCommentsSidebarProps) {
   return (
     <aside
       className="tw-flex tw-h-full tw-min-h-0 tw-flex-col tw-bg-[var(--bg-sunken)]"
@@ -44,6 +52,8 @@ export function ArticleCommentsSidebar({ conversationId, canonicalUrl, onClose }
         <ArticleCommentsSection
           conversationId={conversationId}
           canonicalUrl={canonicalUrl}
+          quoteText={quoteText}
+          focusComposerSignal={focusComposerSignal}
           containerClassName="tw-px-3 tw-py-3"
           onRequestClose={onClose}
         />
