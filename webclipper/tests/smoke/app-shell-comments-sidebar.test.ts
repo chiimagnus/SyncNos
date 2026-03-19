@@ -1,0 +1,162 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, createElement } from 'react';
+import ReactDOM from 'react-dom/client';
+import { JSDOM } from 'jsdom';
+
+const currentState = {
+  items: [],
+  openConversationExternalById: vi.fn(),
+  selectedConversation: {
+    id: 21,
+    title: 'Article',
+    source: 'web',
+    sourceType: 'article',
+    conversationKey: 'article-21',
+    url: 'https://example.com/article',
+  },
+};
+
+vi.mock('../../src/i18n', () => ({
+  t: (key: string) => {
+    const labels: Record<string, string> = {
+      collapseSidebar: 'Collapse sidebar',
+      expandSidebar: 'Expand sidebar',
+      openCommentsSidebar: 'Open comments sidebar',
+      closeCommentsSidebar: 'Close comments sidebar',
+      articleCommentsHeading: 'Comments',
+    };
+    return labels[key] || key;
+  },
+}));
+
+vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
+  useIsNarrowScreen: () => false,
+}));
+
+vi.mock('../../src/ui/app/routes/Settings', () => ({
+  default: () => createElement('div', null, 'settings'),
+}));
+
+vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
+  CapturedListSidebar: () => createElement('div', null, 'sidebar'),
+}));
+
+vi.mock('../../src/ui/conversations/conversations-context', () => ({
+  ConversationsProvider: ({ children }: { children: React.ReactNode }) => children,
+  useConversationsApp: () => currentState,
+}));
+
+vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
+  ConversationDetailPane: ({
+    onToggleCommentsSidebar,
+    commentsSidebarOpen,
+  }: {
+    onToggleCommentsSidebar?: () => void;
+    commentsSidebarOpen?: boolean;
+  }) =>
+    createElement(
+      'div',
+      null,
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: onToggleCommentsSidebar,
+          'aria-label': commentsSidebarOpen ? 'Close comments sidebar' : 'Open comments sidebar',
+        },
+        commentsSidebarOpen ? 'close-comments' : 'open-comments',
+      ),
+      createElement('div', null, 'detail-pane'),
+    ),
+}));
+
+vi.mock('../../src/ui/conversations/ArticleCommentsSidebar', () => ({
+  ArticleCommentsSidebar: ({ onClose }: { onClose: () => void }) =>
+    createElement(
+      'aside',
+      { 'aria-label': 'Comments sidebar' },
+      createElement(
+        'button',
+        { type: 'button', onClick: onClose, 'aria-label': 'Close comments sidebar' },
+        'close-sidebar',
+      ),
+      createElement('div', null, 'comments-sidebar'),
+    ),
+}));
+
+import AppShell from '../../src/ui/app/AppShell';
+
+function setupDom() {
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+    url: 'https://example.com/',
+    pretendToBeVisual: true,
+  });
+
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
+  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
+  Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
+  Object.defineProperty(globalThis, 'getComputedStyle', {
+    configurable: true,
+    value: dom.window.getComputedStyle.bind(dom.window),
+  });
+  Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
+    configurable: true,
+    value: true,
+  });
+}
+
+function cleanupDom() {
+  delete (globalThis as any).window;
+  delete (globalThis as any).document;
+  delete (globalThis as any).navigator;
+  delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).Node;
+  delete (globalThis as any).localStorage;
+  delete (globalThis as any).getComputedStyle;
+  delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+}
+
+describe('AppShell comments sidebar', () => {
+  let root: ReactDOM.Root | null = null;
+
+  beforeEach(() => {
+    setupDom();
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+  });
+
+  afterEach(() => {
+    act(() => {
+      root?.unmount();
+    });
+    root = null;
+    cleanupDom();
+  });
+
+  it('opens and closes the docked comments sidebar from the detail view toggle', () => {
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    const openBtn = document.querySelector('[aria-label="Open comments sidebar"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
+    expect(document.querySelector('aside')).toBeTruthy();
+
+    const closeBtn = document.querySelector('[aria-label="Close comments sidebar"]') as HTMLButtonElement | null;
+    expect(closeBtn).toBeTruthy();
+
+    act(() => {
+      closeBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeFalsy();
+  });
+});

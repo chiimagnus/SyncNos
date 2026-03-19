@@ -164,6 +164,8 @@ export const zh: { [K in TranslationKey]: string } = {
   // ArticleCommentsSection
   articleCommentsHeading: '评论',
   articleCommentsEmpty: '暂无评论。',
+  openCommentsSidebar: '打开评论侧边栏',
+  closeCommentsSidebar: '收起评论侧边栏',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: '同步中',

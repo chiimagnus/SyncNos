@@ -6,6 +6,7 @@ import { CapturedListSidebar } from './conversations/CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
+import { ArticleCommentsSidebar } from '../conversations/ArticleCommentsSidebar';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
@@ -14,6 +15,20 @@ import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conve
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
+
+function normalizeHttpUrl(raw: unknown): string {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = String(url.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
 
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -39,16 +54,21 @@ export default function AppShell() {
   function AppShellFrame() {
     useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
+    const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false);
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
     const { items, openConversationExternalById, selectedConversation } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
+    const isArticleConversation = String((selectedConversation as any)?.sourceType || '').trim().toLowerCase() === 'article';
+    const canonicalUrl = normalizeHttpUrl((selectedConversation as any)?.url);
+    const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? state?.backgroundLocation ?? null : null;
+    const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarOpen && !showSettingsSheet;
 
     const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
@@ -57,6 +77,11 @@ export default function AppShell() {
       if (from) navigate(from, { replace: true });
       else navigate('/', { replace: true });
     };
+
+    useEffect(() => {
+      if (isArticleConversation && canonicalUrl) return;
+      setCommentsSidebarOpen(false);
+    }, [canonicalUrl, isArticleConversation]);
 
     useEffect(() => {
       if (!showSettingsSheet) return;
@@ -171,19 +196,40 @@ export default function AppShell() {
               </div>
             </div>
           ) : (
-            <div
-              className={[
-                'route-scroll tw-h-full tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden',
-                showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
-              ].join(' ')}
-              aria-hidden={showSettingsSheet}
-            >
-              <Routes location={routesLocation}>
-                <Route path="/" element={<ConversationDetailPane onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined} />} />
-                <Route path="/settings" element={<Navigate to="/" replace />} />
-                <Route path="/sync" element={<Navigate to="/settings" replace />} />
-                <Route path="/backup" element={<Navigate to="/settings" replace />} />
-              </Routes>
+            <div className="tw-flex tw-h-full tw-min-h-0 tw-min-w-0">
+              <div
+                className={[
+                  'route-scroll tw-h-full tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden',
+                  showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
+                ].join(' ')}
+                aria-hidden={showSettingsSheet}
+              >
+                <Routes location={routesLocation}>
+                  <Route
+                    path="/"
+                    element={
+                      <ConversationDetailPane
+                        onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
+                        onToggleCommentsSidebar={canToggleCommentsSidebar ? () => setCommentsSidebarOpen((prev) => !prev) : undefined}
+                        commentsSidebarOpen={showCommentsSidebar}
+                      />
+                    }
+                  />
+                  <Route path="/settings" element={<Navigate to="/" replace />} />
+                  <Route path="/sync" element={<Navigate to="/settings" replace />} />
+                  <Route path="/backup" element={<Navigate to="/settings" replace />} />
+                </Routes>
+              </div>
+
+              {showCommentsSidebar ? (
+                <div className="tw-h-full tw-min-h-0 tw-shrink-0 tw-w-[min(420px,36vw)] tw-min-w-[340px] tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
+                  <ArticleCommentsSidebar
+                    conversationId={Number((selectedConversation as any)?.id || 0)}
+                    canonicalUrl={canonicalUrl}
+                    onClose={() => setCommentsSidebarOpen(false)}
+                  />
+                </div>
+              ) : null}
             </div>
           )}
 

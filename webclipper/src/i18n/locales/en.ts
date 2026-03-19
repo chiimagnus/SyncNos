@@ -165,6 +165,8 @@ export const en = {
   // ArticleCommentsSection
   articleCommentsHeading: 'Comments',
   articleCommentsEmpty: 'No comments yet.',
+  openCommentsSidebar: 'Open comments sidebar',
+  closeCommentsSidebar: 'Close comments sidebar',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: 'Syncing',

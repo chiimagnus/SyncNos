@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
@@ -28,10 +27,17 @@ export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
   onExpandSidebar?: () => void;
+  onToggleCommentsSidebar?: () => void;
+  commentsSidebarOpen?: boolean;
 };
 
-export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSidebar }: ConversationDetailPaneProps) {
-  const [commentsCollapsed, setCommentsCollapsed] = useState(true);
+export function ConversationDetailPane({
+  onBack,
+  hideHeader = false,
+  onExpandSidebar,
+  onToggleCommentsSidebar,
+  commentsSidebarOpen = false,
+}: ConversationDetailPaneProps) {
   const {
     activeId,
     listError,
@@ -54,11 +60,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
-
-  useEffect(() => {
-    // Default collapsed per-article (matches “默认关闭”的预期).
-    setCommentsCollapsed(true);
-  }, [activeId, canonicalUrl]);
+  const commentsSidebarLabel = commentsSidebarOpen ? t('closeCommentsSidebar') : t('openCommentsSidebar');
 
   return (
     <section>
@@ -133,6 +135,30 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
                 menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
                 menuAriaLabel={t('detailHeaderOpenInMenuAria')}
               />
+
+              {onToggleCommentsSidebar ? (
+                <button
+                  type="button"
+                  onClick={onToggleCommentsSidebar}
+                  className={navIconButtonSmClassName(Boolean(commentsSidebarOpen))}
+                  aria-label={commentsSidebarLabel}
+                  title={commentsSidebarLabel}
+                  aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path
+                      d="M4 3.5H11.5C12.3284 3.5 13 4.17157 13 5V9.25C13 10.0784 12.3284 10.75 11.5 10.75H7.5L4.75 13V10.75H4C3.17157 10.75 2.5 10.0784 2.5 9.25V5C2.5 4.17157 3.17157 3.5 4 3.5Z"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M5.25 6H10.25" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    <path d="M5.25 8.25H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                  <span className="tw-sr-only">{commentsSidebarLabel}</span>
+                </button>
+              ) : null}
             </div>
           </header>
         ) : null}
@@ -150,7 +176,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
               {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
               {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
 
-              {/* Narrow screens: keep inline comments (sidebar is hidden). */}
+              {/* Narrow screens: keep inline comments. */}
               {hasArticleCommentsPane ? (
                 <div className="md:tw-hidden">
                   <ArticleCommentsSection
@@ -186,46 +212,6 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
               )}
             </div>
 
-            {hasArticleCommentsPane ? (
-              <aside
-                className={[
-                  'tw-hidden md:tw-block',
-                  'tw-sticky tw-top-24 tw-self-start',
-                  commentsCollapsed
-                    ? 'tw-w-[44px] tw-min-w-[44px]'
-                    : 'tw-w-[360px] tw-min-w-[360px] tw-max-h-[calc(100dvh-120px)] tw-overflow-y-auto',
-                ].join(' ')}
-              >
-                {commentsCollapsed ? (
-                  <button
-                    type="button"
-                    className="webclipper-btn webclipper-btn--icon webclipper-btn--icon-xl webclipper-btn--tone-muted"
-                    onClick={() => setCommentsCollapsed(false)}
-                    aria-label={t('articleCommentsHeading')}
-                    title={t('articleCommentsHeading')}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path
-                        d="M3.5 3.75C3.5 2.7835 4.2835 2 5.25 2H10.75C11.7165 2 12.5 2.7835 12.5 3.75V9.25C12.5 10.2165 11.7165 11 10.75 11H7.4L5.1 12.9C4.7 13.23 4 12.95 4 12.43V11H5.25"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path d="M5.5 5.5H10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <path d="M5.5 7.75H9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                ) : (
-                  <ArticleCommentsSection
-                    conversationId={Number((selected as any)?.id || activeId || 0)}
-                    canonicalUrl={canonicalUrl}
-                    containerClassName="tw-mt-0"
-                    onRequestClose={() => setCommentsCollapsed(true)}
-                  />
-                )}
-              </aside>
-            ) : null}
           </div>
         </div>
       </section>
