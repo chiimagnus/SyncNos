@@ -249,9 +249,11 @@
 **规范：**
 
 1. **按钮 class 不手写**：优先复用 `webclipper/src/ui/shared/button-styles.ts` 的 `buttonTintClassName()` / `buttonFilledClassName()` / `buttonDanger*ClassName()`。
-2. **按钮真源**：`webclipper/src/ui/styles/buttons.css`（`webclipper-btn` + variants；bevel 用两条 inset strokes；`:active` 时反转 + 下压，并包含统一过渡）。
-3. **按下态（active）**：把两条 inset 的颜色对调（反转），并 `translateY(1px)`。
-4. **主题兼容**：stroke 色值用 `color-mix()` 从当前 surface token（`--bg-card` / `--accent` / `--error`）派生，禁止硬编码亮暗色值。
+2. **默认按钮就是 `webclipper-btn`**：`buttonTintClassName()` 返回的就是 `webclipper-btn`（不再存在 `webclipper-btn--tint` 这类分叉）。
+3. **按钮真源**：`webclipper/src/ui/styles/buttons.css`（`webclipper-btn` + 少量 modifier；bevel 用两条 inset strokes；`:active` 时反转 + 下压，并包含统一过渡）。
+4. **按下态（active）**：把两条 inset 的颜色对调（反转），并 `translateY(1px)`。
+5. **主题兼容**：stroke 色值用 `color-mix()` 从当前 surface token（`--bg-card` / `--accent` / `--error`）派生，禁止硬编码亮暗色值。
+6. **选中态走 aria**：toggle 用 `aria-pressed='true'`；`SelectMenu` 的选中项用 `aria-checked='true'`（样式在 `buttons.css` 统一处理）。
 
 ## B3 · 插件 UI 与宣传图的差异
 

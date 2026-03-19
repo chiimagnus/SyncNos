@@ -22,7 +22,15 @@
 | `src/conversations/data/storage-idb.ts` | 本地会话数据层 | 承载 IndexedDB 事实源 |
 | `src/conversations/background/handlers.ts` | 会话消息与图片回填路由 | 控制 `SYNC_CONVERSATION_MESSAGES` 的图片内联与 `BACKFILL_CONVERSATION_IMAGES` 消息处理 |
 | `src/conversations/background/image-backfill-job.ts` | 历史消息图片补全任务 | 复扫 conversation 消息并按 diff 增量回写 `contentMarkdown` |
-| `src/platform/idb/schema.ts` | DB schema 与迁移 | 处理 NotionAI stable key migration |
+| `src/comments/background/handlers.ts` | 文章评论消息路由 | 处理评论增删改、回复、锚点定位与 inpage panel 通信 |
+| `src/comments/data/storage-idb.ts` | 文章评论存储层 | 承载 `article_comments` 的本地读写与查询 |
+| `src/comments/client/repo.ts` | 文章评论客户端仓库 | 为 UI 提供 comments 读写 API |
+| `src/ui/conversations/ArticleCommentsSection.tsx` | 文章详情评论区 | 在 article detail 中展示本地评论线程 |
+| `src/ui/comments/threaded-comments-panel.ts` | threaded comments 面板 | 负责 comments 的线程渲染与交互 |
+| `src/ui/inpage/inpage-comments-panel-shadow.ts` | inpage comments 面板壳 | 让页面内评论面板运行在独立 shadow root 中 |
+| `src/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments 内容脚手架 | 连接 content script 与 comments panel 逻辑 |
+| `src/bootstrap/inpage-comments-locate-content-handlers.ts` | 评论锚点定位脚手架 | 负责把 quoteText / quoteContext 解析成正文高亮定位 |
+| `src/platform/idb/schema.ts` | DB schema 与迁移 | 处理 NotionAI stable key migration 与 `article_comments`（DB_VERSION = 7） |
 | `src/sync/notion/notion-sync-orchestrator.ts` | Notion 同步编排 | 控制 DB / page / cursor / rebuild |
 | `src/sync/obsidian/obsidian-sync-orchestrator.ts` | Obsidian 同步编排 | 控制 append / rebuild / rename / fallback |
 | `src/ui/settings/SettingsScene.tsx` | 设置页总入口 | 管理 Notion、Notion AI、Obsidian、Backup、Chat with AI、Insight、Inpage、About |
@@ -45,6 +53,7 @@
 | popup | 轻量会话 / 设置入口 | React 组件、ConversationsProvider | `src/entrypoints/popup/` |
 | app | 扩展完整页面 UI | React Router、ConversationsScene、SettingsScene | `src/entrypoints/app/` |
 | conversations | 本地事实源与 CRUD | IndexedDB、background handlers | `storage-idb.ts` |
+| comments | article 详情评论线程与本地注释层 | IndexedDB、comments background handlers、inpage panel | `src/comments/`, `ArticleCommentsSection.tsx` |
 | sync | Notion / Obsidian / backup 编排层 | `conversation-kinds.ts`, settings stores | `src/sync/` |
 
 ## 支持的采集面
@@ -55,33 +64,38 @@
 | 普通网页文章 | 任意 `http(s)` 页面 | 手动抓取时注入 `readability.js` 提取正文 |
 | inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击开 popup、多击彩蛋提示 |
 | Popup 当前页抓取 | `usePopupCurrentPageCapture.ts` + `current-page-capture.ts` | 先判断当前页可抓取，再用统一按钮触发 chat / article 抓取 |
+| 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除、锚点定位；不属于新的抓取站点 |
 
 - `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
+- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，但当前**不进入 Notion / Obsidian / Zip v2**；如果你改 comments 流程，一定同时看 storage、background handler 和 inpage 面板。
 
 ## 本地数据与同步结构
 
 | 区域 | 主要实现 | 关键点 |
 | --- | --- | --- |
 | 本地会话库 | `storage-idb.ts` | `upsertConversation()` / `syncConversationMessages()` 负责 conversation + message 快照更新 |
-| Schema 与迁移 | `schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=6`，处理 NotionAI stable key、legacy article canonical key 迁移与 legacy 字段清理 |
+| Schema 与迁移 | `schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=7`，处理 NotionAI stable key、legacy article canonical key 迁移、legacy 字段清理与 `article_comments` store |
 | 会话种类 | `conversation-kinds.ts` | `chat` 与 `article` 决定 Notion DB、Obsidian folder 与重建规则 |
+| 文章评论线程 | `comments/data/storage-idb.ts`, `comments/background/handlers.ts` | `article_comments` 负责 article 详情页的本地评论、回复与删除 |
 | Notion 同步 | `notion-sync-orchestrator.ts` | 需要 token + `notion_parent_page_id`，cursor 命中 append，否则 rebuild |
 | Obsidian 同步 | `obsidian-sync-orchestrator.ts` | 支持 `incremental_append`、`full_rebuild`、rename；PATCH 失败回退 `full_rebuild_fallback` |
 | 备份导入导出 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | Zip v2、敏感键排除、merge import |
 
 - article 会话通过 `sourceType='article'` 标记，并保存单条 `article_body` 正文消息。
+- article 评论通过 `article_comments` 独立存储，并以 `canonicalUrl` + `conversationId` 组织线程；它是 article 会话的本地注释层，而不是新的远端同步目标。
 - Notion orchestrator 会按 kind 选择 `SyncNos-AI Chats` 或 `SyncNos-Web Articles` 数据库，并在数据库缓存失效时尝试恢复一次。
 - Obsidian orchestrator 在 patch 失败时不是直接报错，而是尽量回退全量重建，优先保证文件最终可恢复到正确状态。
-- `schema.ts` 的升级链路采用 `oldVersion < 2 / < 4 / < 6` 分段处理：分别覆盖 NotionAI key 归一、article canonical 归并与 `conversations.description` 旧字段清理。
+- `schema.ts` 的升级链路采用 `oldVersion < 2 / < 4 / < 6` 分段处理：分别覆盖 NotionAI key 归一、article canonical 归并与 `conversations.description` 旧字段清理；`article_comments` 作为 v7 新 store 直接纳入 schema。
 
 ## 设置与 UI 入口
 
 | UI 区域 | 主要实现 | 说明 |
 | --- | --- | --- |
 | 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `DetailNavigationHeader.tsx`, `conversations-context.tsx`, `src/integrations/detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 动作解析逻辑（含窄屏头部） |
+| 文章评论区 | `ConversationDetailPane.tsx`, `ArticleCommentsSection.tsx`, `threaded-comments-panel.ts`, `inpage-comments-panel-shadow.ts` | article detail / inpage comments panel 共享本地 threaded comments 线程 |
 | 设置页 | `SettingsScene.tsx`, `SettingsSidebarNav.tsx`, `types.ts` | 真实设置中枢，按 `Features / Data / About` 分组组织 `General`、`Chat with AI`、`Backup`、`Notion`、`Obsidian`、`Insight`、`About` |
 | Markdown 渲染 | `ui/shared/markdown.ts`, `ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
 | Chat with AI | `ChatWithAiSection.tsx`, `chatwith-settings.ts`, `chatwith-detail-header-actions.ts` | 管理 prompt 模板、平台列表、最大字符数，并把 article / conversation 渲染为可复制载荷，再从 detail header 触发复制 + 跳转 |
@@ -95,6 +109,7 @@
 - `ai_chat_cache_images_enabled` 是 `General` 分区里的独立开关：默认 `false`，仅影响 `sourceType='chat'` 的图片内联；article 会话不会显示该工具动作。
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
 - detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
+- article comments 只在 article detail 和 inpage panel 中出现；它们是本地评论线程，不占用 `Chat with AI`、`tools` 或 `open` 的动作槽位。
 - detail header 的动作槽位由 `detail-header-action-types.ts` 统一定义为 `open / chat-with / tools`；`ConversationDetailPane` 与 `DetailNavigationHeader` 都按同一槽位拆分渲染。
 - `conversations-context.tsx` 会为非 article 会话注入 `cache-images` 工具动作：点击后调用 `backfillConversationImages()`，后台复扫消息并在成功后刷新当前 detail，同时反馈 `updatedMessages / downloadedCount / fromCacheCount`。
 - `useSettingsSceneController.ts` 只在 `activeSection === 'insight'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。
@@ -132,6 +147,7 @@
 | inpage 行为异常 | `bootstrap/content.ts`, `content-controller.ts`, `inpage-button-shadow.ts` | 看 gating、点击动作和 runtime invalidation |
 | source/site 筛选下拉异常（高度、滚动、裁切） | `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx` | 看 `adaptiveMaxHeight`、`findNearestClippingRect()` 与 `side` 设置是否一致 |
 | article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
+| article comments / 锚点异常 | `comments/data/storage-idb.ts`, `comments/background/handlers.ts`, `ArticleCommentsSection.tsx`, `threaded-comments-panel.ts`, `inpage-comments-panel-shadow.ts` | 看 canonicalUrl 归一、reply / delete 路由与 shadow DOM 面板挂载 |
 | Chat with AI / 打开目标异常 | `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.test.ts`, `app-detail-header-actions.test.ts` | 看模板变量、平台设置、槽位动作分发与 clipboard + 跳转行为 |
 | 详情工具动作异常（cache-images） | `conversations-context.tsx`, `conversations/background/handlers.ts`, `image-backfill-job.ts` | 看动作显隐（仅 chat）、`BACKFILL_CONVERSATION_IMAGES` 路由与回填计数是否一致 |
 | Insight 统计异常 | `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.test.ts`, `settings-sections.test.ts` | 先区分是 IndexedDB 读失败、聚合规则偏差、还是 Settings 导航 / 图表布局回归 |
@@ -155,6 +171,11 @@
 - `webclipper/src/conversations/data/storage-idb.ts`
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
+- `webclipper/src/comments/background/handlers.ts`
+- `webclipper/src/comments/client/repo.ts`
+- `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
+- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
 - `webclipper/src/conversations/client/repo.ts`
 - `webclipper/src/i18n/index.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
@@ -193,5 +214,6 @@
 - `webclipper/tests/collectors/zai-collector.test.ts`
 - `webclipper/tests/smoke/detail-header-actions.test.ts`
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
+- `webclipper/tests/storage/article-comments-idb.test.ts`
 - `webclipper/tests/storage/insight-stats.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`

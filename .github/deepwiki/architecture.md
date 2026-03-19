@@ -44,6 +44,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | --- | --- | --- | --- |
 | collectors | `src/collectors/` | 站点识别、DOM 抽取、消息标准化 | `register-all.ts`, 各站点 collector |
 | conversations | `src/conversations/` | IndexedDB CRUD、本地事实源、UI 读取面 | `storage-idb.ts`, background handlers |
+| comments | `src/comments/` | article 详情评论线程、回复 / 删除、锚点定位 | `background/handlers.ts`, `data/storage-idb.ts`, `ArticleCommentsSection.tsx` |
 | sync | `src/sync/` | Notion / Obsidian / 备份的编排层 | `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
 | ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层，以及主题模式、窄屏 list/detail 路由和会话级动作解析 | `ConversationsScene.tsx`, `SettingsScene.tsx`, `useThemeMode.ts`, `pending-open.ts` |
 | messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts`（含 `BACKFILL_CONVERSATION_IMAGES`） |
@@ -54,6 +55,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 - `ConversationsScene.tsx + pending-open.ts` 共同承担窄屏下的 list/detail bridge：当用户从 Insight 排行或其他路由跳到对话详情时，会先把目标 `conversationId` 写入 `sessionStorage`，再由 scene 消费并切进 detail。
 - `conversations-context.tsx + DetailHeaderActionBar.tsx + DetailNavigationHeader.tsx` 共同承担会话详情动作分发：`open / chat-with / tools` 三类槽位在主详情页和窄屏 header 使用同一规则，避免两套动作系统分叉。
 - `conversations/background/handlers.ts + image-backfill-job.ts` 把“图片缓存”拆成两条链：实时采集时按 `ai_chat_cache_images_enabled` 做内联；历史会话通过 `BACKFILL_CONVERSATION_IMAGES` 手动回填并广播刷新事件。
+- `comments/background/handlers.ts + ArticleCommentsSection.tsx + threaded-comments-panel.ts + inpage-comments-panel-shadow.ts` 负责 article 本地评论线程：它依赖 `article_comments` store 和 canonical URL 归一，但不进入 Notion / Obsidian 同步链。
 - `ConversationListPane.tsx` 通过 `onOpenInsightsSection` 把列表底部统计组件连接到 popup/app 路由壳层：popup 打开 `'/settings?section=insight'`，app 在 HashRouter 内导航同一参数。
 - `SelectMenu.tsx + MenuPopover.tsx` 共同定义 WebClipper 下拉面板的高度边界：当 `adaptiveMaxHeight` 启用时，会通过 `findNearestClippingRect()` 查找最近 overflow 裁剪容器并动态计算 `panelMaxHeight`，从而让底部 `source/site` 筛选菜单在受限容器里减少无谓滚动条与裁切。
 
@@ -64,7 +66,8 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | `NotionSyncSourceProtocol` | `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift` | App 各来源适配器、`NotionSyncEngine` | 把不同来源统一成可同步的条目 / 内容结构 |
 | `NotionSyncConfig` | `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift` | App 同步引擎 | 定义并发、RPS、批量大小、超时与重试策略 |
 | `Notification.Name` 常量 | `macOS/SyncNos/Models/Core/NotificationNames.swift` | App 视图、ViewModel、Service | 统一同步、搜索、窗口、IAP、登录等事件 |
-| `message-contracts.ts` | `webclipper/src/platform/messaging/message-contracts.ts` | content / background / popup / app | 把扩展功能拆成 CORE / NOTION / OBSIDIAN / ARTICLE / UI 五类消息 |
+| `message-contracts.ts` | `webclipper/src/platform/messaging/message-contracts.ts` | content / background / popup / app | 把扩展功能拆成 CORE / NOTION / OBSIDIAN / ARTICLE / COMMENTS / UI 六类消息 |
+| `COMMENTS_MESSAGE_TYPES` | `webclipper/src/platform/messaging/message-contracts.ts` | comments UI / background / content | 定义 article 评论线程的 add / list / delete / attach-orphan 消息 |
 | `CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES` | `webclipper/src/platform/messaging/message-contracts.ts` | `conversations-context.tsx`, background handlers | 提供会话详情“缓存图片”工具动作的前后端消息契约 |
 | `conversation-kinds.ts` | `webclipper/src/protocols/conversation-kinds.ts` | Notion / Obsidian orchestrator | 决定 chat/article 的 DB、folder 与重建规则 |
 | `chatwith-settings.ts` | `webclipper/src/integrations/chatwith/chatwith-settings.ts` | detail header、SettingsScene controller、backup tests | 统一 `Chat with AI` 的模板、平台列表、字符截断与存储键 |
@@ -133,7 +136,15 @@ flowchart TB
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/conversations/client/repo.ts`
+- `webclipper/src/comments/background/handlers.ts`
+- `webclipper/src/comments/client/repo.ts`
+- `webclipper/src/comments/data/storage-idb.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
+- `webclipper/src/ui/comments/threaded-comments-panel.ts`
+- `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
+- `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
+- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
 - `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
 - `webclipper/src/integrations/detail-header-actions.ts`

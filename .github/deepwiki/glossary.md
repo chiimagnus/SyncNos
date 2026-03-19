@@ -35,10 +35,12 @@
 | app | 扩展内部完整页面 UI | `src/entrypoints/app/` |
 | conversation kind | WebClipper 会话分类，目前主要是 `chat` 与 `article` | `conversation-kinds.ts` |
 | `article_body` | article 会话的正文消息 key | `article-fetch.ts` |
+| `article_comments` | article 详情页的本地评论线程 store | `comments/data/storage-idb.ts`, `ArticleCommentsSection.tsx` |
 | `inpage_display_mode` | 控制 inpage UI 显示范围的开关（`supported / all / off`，并兼容旧 `inpage_supported_only`） | `bootstrap/content.ts`, Settings |
 | `ai_chat_cache_images_enabled` | 控制 chat 消息采集时是否尝试图片内联的设置键 | `useSettingsSceneController.ts`, `conversations/background/handlers.ts` |
 | detail header `tools` slot | 会话详情头的工具动作槽位，和 `open / chat-with` 并列 | `detail-header-action-types.ts`, `DetailHeaderActionBar.tsx` |
 | `cache-images` | chat detail 中触发历史消息图片回填的工具动作 id | `conversations-context.tsx` |
+| `OPEN_INPAGE_COMMENTS_PANEL` / `LOCATE_INPAGE_COMMENT_ANCHOR` | 打开页面内评论面板与定位正文锚点的内容脚本消息 | `message-contracts.ts`, `inpage-comments-panel-content-handlers.ts`, `inpage-comments-locate-content-handlers.ts` |
 | `adaptiveMaxHeight` | `SelectMenu` 的动态面板高度开关；启用后菜单高度由当前可视区域计算而不是固定值 | `SelectMenu.tsx`, `ConversationListPane.tsx` |
 | clipping rect | `SelectMenu` 计算可用高度时找到的最近 overflow 裁剪容器矩形 | `findNearestClippingRect()` |
 
@@ -50,6 +52,7 @@
 | `sync_mappings` | WebClipper 本地记录的 Notion page / cursor 映射 | IndexedDB |
 | `contentMarkdown` | 可直接被 Notion / Markdown / Obsidian 消费的消息文本 | WebClipper messages |
 | `BACKFILL_CONVERSATION_IMAGES` | 前端触发历史消息图片回填的 CORE 消息类型 | `message-contracts.ts`, `conversations/background/handlers.ts` |
+| `COMMENTS_MESSAGE_TYPES` | WebClipper 评论线程的后台消息类型集合 | `message-contracts.ts`, `comments/background/handlers.ts` |
 | Zip v2 | 当前标准备份格式 | `backup/export.ts`, `backup/import.ts` |
 | `contentVersion` | App 网页缓存的抽取算法版本 | `WebArticleCacheService.swift` |
 | stable conversation key | 为 NotionAI thread 迁移引入的稳定会话 key | `schema.ts` |
@@ -79,6 +82,14 @@
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/comments/background/handlers.ts`
+- `webclipper/src/comments/client/repo.ts`
+- `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
+- `webclipper/src/ui/comments/threaded-comments-panel.ts`
+- `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
+- `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
+- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
 - `webclipper/src/integrations/detail-header-action-types.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
