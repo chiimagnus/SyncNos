@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { t } from '../../i18n';
 import { CONTENT_MESSAGE_TYPES, UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
@@ -35,7 +35,17 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
-export function ArticleCommentsSection({ conversationId, canonicalUrl }: { conversationId: number; canonicalUrl: string }) {
+export function ArticleCommentsSection({
+  conversationId,
+  canonicalUrl,
+  headerExtra,
+  containerClassName,
+}: {
+  conversationId: number;
+  canonicalUrl: string;
+  headerExtra?: ReactNode;
+  containerClassName?: string;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<ArticleCommentDto[]>([]);
@@ -210,13 +220,19 @@ export function ArticleCommentsSection({ conversationId, canonicalUrl }: { conve
   };
 
   return (
-    <section className="tw-mt-4 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 md:tw-p-4">
+    <section
+      className={[
+        'tw-mt-4 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 md:tw-p-4',
+        containerClassName || '',
+      ].join(' ')}
+    >
       <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
         <h3 className="tw-m-0 tw-text-[14px] tw-font-extrabold tw-text-[var(--text-primary)]">
           {heading}
         </h3>
-        <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-          {items.length}
+        <div className="tw-flex tw-items-center tw-gap-2">
+          {headerExtra ? <div className="tw-flex tw-items-center">{headerExtra}</div> : null}
+          <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">{items.length}</div>
         </div>
       </div>
 
