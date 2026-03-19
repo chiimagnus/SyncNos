@@ -45,6 +45,8 @@ export const zh: { [K in TranslationKey]: string } = {
   contextMenuSaveCurrentAiChat: '保存当前 AI 对话',
   contextMenuAddComment: '添加评论',
   contextMenuInpageGroupTitle: '页面内按钮',
+  inpageCommentsAutoOpenLabel: '自动弹出评论面板',
+  inpageCommentsAutoOpenHint: '当页面已有评论时自动弹出。切换后需刷新页面以生效。',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',
   inpageDisplayModeAll: '所有站点显示',

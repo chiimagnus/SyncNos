@@ -142,6 +142,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
+  const [inpageCommentsAutoOpenEnabled, setInpageCommentsAutoOpenEnabled] = useState<boolean>(true);
 
   // Appearance
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
@@ -212,6 +213,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
           'ai_chat_cache_images_enabled',
+          'inpage_comments_auto_open_enabled',
           'ui_theme_mode',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
@@ -237,6 +239,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
+      setInpageCommentsAutoOpenEnabled(local?.inpage_comments_auto_open_enabled !== false);
       const rawThemeMode = String(local?.ui_theme_mode || '').trim().toLowerCase();
       setThemeMode(
         rawThemeMode === 'light' || rawThemeMode === 'dark' || rawThemeMode === 'system'
@@ -550,6 +553,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask]
   );
 
+  const onToggleInpageCommentsAutoOpenEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        await storageSet({ inpage_comments_auto_open_enabled: next === true });
+        setInpageCommentsAutoOpenEnabled(next === true);
+      });
+    },
+    [runTask]
+  );
+
   const onChangeThemeMode = useCallback(
     async (next: 'system' | 'light' | 'dark') => {
       await runTask(async () => {
@@ -828,6 +841,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    inpageCommentsAutoOpenEnabled,
+    onToggleInpageCommentsAutoOpenEnabled,
     themeMode,
     onChangeThemeMode,
 

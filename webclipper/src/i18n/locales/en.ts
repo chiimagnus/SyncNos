@@ -43,6 +43,8 @@ export const en = {
   contextMenuSaveCurrentAiChat: 'Save current AI chat',
   contextMenuAddComment: 'Add comment',
   contextMenuInpageGroupTitle: 'Inpage Button',
+  inpageCommentsAutoOpenLabel: 'Auto-open comments panel',
+  inpageCommentsAutoOpenHint: 'Auto-open on pages that already have comments. Requires a refresh to apply.',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
   inpageDisplayModeAll: 'On all sites',
