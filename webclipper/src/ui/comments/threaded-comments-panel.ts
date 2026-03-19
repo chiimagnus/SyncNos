@@ -1,4 +1,5 @@
 import inpageCommentsPanelCssRaw from '../styles/inpage-comments-panel.css?raw';
+import buttonsCssRaw from '../styles/buttons.css?raw';
 import tokensCssRaw from '../styles/tokens.css?raw';
 
 export type ThreadedCommentItem = {
@@ -33,7 +34,11 @@ function toHostTokensCss(css: string) {
   return css.replaceAll(':root', ':host');
 }
 
-const PANEL_SHADOW_CSS = [toHostTokensCss(String(tokensCssRaw || '')), String(inpageCommentsPanelCssRaw || '')]
+const PANEL_SHADOW_CSS = [
+  toHostTokensCss(String(tokensCssRaw || '')),
+  String(buttonsCssRaw || ''),
+  String(inpageCommentsPanelCssRaw || ''),
+]
   .filter(Boolean)
   .join('\n');
 
@@ -141,7 +146,8 @@ export function mountThreadedCommentsPanel(
   composerMain.appendChild(composerActions);
 
   const composerSend = document.createElement('button');
-  composerSend.className = 'webclipper-inpage-comments-panel__send is-primary';
+  composerSend.className =
+    'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--filled webclipper-btn--icon';
   composerSend.type = 'button';
   composerSend.setAttribute('aria-label', 'Comment');
   composerSend.textContent = '↑';
@@ -349,7 +355,8 @@ export function mountThreadedCommentsPanel(
         commentHeader.appendChild(commentActions);
 
         const del = document.createElement('button');
-        del.className = 'webclipper-inpage-comments-panel__icon-btn is-danger';
+        del.className =
+          'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
         del.type = 'button';
         del.setAttribute('aria-label', 'Delete');
         del.textContent = '×';
@@ -420,7 +427,8 @@ export function mountThreadedCommentsPanel(
             replyHeader.appendChild(replyActions);
 
             const replyDel = document.createElement('button');
-            replyDel.className = 'webclipper-inpage-comments-panel__icon-btn is-danger';
+            replyDel.className =
+              'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
             replyDel.type = 'button';
             replyDel.setAttribute('aria-label', 'Delete');
             replyDel.textContent = '×';
@@ -457,7 +465,7 @@ export function mountThreadedCommentsPanel(
         replyComposer.appendChild(replyTextarea);
 
         const replySend = document.createElement('button');
-        replySend.className = 'webclipper-inpage-comments-panel__send';
+        replySend.className = 'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--tint webclipper-btn--icon';
         replySend.type = 'button';
         replySend.setAttribute('aria-label', 'Reply');
         replySend.textContent = '↑';

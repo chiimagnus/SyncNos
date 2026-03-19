@@ -1,0 +1,123 @@
+.webclipper-btn {
+  /* Reset */
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  user-select: none;
+
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  cursor: pointer;
+
+  /* Typography */
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+
+  /* Bevel strokes derive from the actual surface color. */
+  --btn-surface: var(--bg-card);
+  --btn-stroke-tl: color-mix(in srgb, var(--btn-surface) 62%, white);
+  --btn-stroke-br: color-mix(in srgb, var(--btn-surface) 74%, black);
+
+  box-shadow:
+    inset 1px 1px 0 var(--btn-stroke-tl),
+    inset -1px -1px 0 var(--btn-stroke-br);
+
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    opacity 160ms ease;
+}
+
+.webclipper-btn:active {
+  box-shadow:
+    inset 1px 1px 0 var(--btn-stroke-br),
+    inset -1px -1px 0 var(--btn-stroke-tl);
+  transform: translateY(1px);
+}
+
+.webclipper-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.webclipper-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.webclipper-btn--tint {
+  --btn-surface: var(--bg-card);
+  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.webclipper-btn--tint:hover:not(:disabled) {
+  background-color: var(--bg-sunken);
+}
+
+.webclipper-btn--filled {
+  --btn-surface: var(--accent);
+  border: 0;
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.webclipper-btn--filled:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.webclipper-btn--filled:active:not(:disabled) {
+  background-color: var(--accent-active);
+}
+
+.webclipper-btn--danger {
+  --btn-surface: var(--error);
+  border: 0;
+  background-color: var(--error);
+  color: var(--error-foreground);
+}
+
+.webclipper-btn--danger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.webclipper-btn--danger:active:not(:disabled) {
+  opacity: 0.8;
+}
+
+.webclipper-btn--danger-tint {
+  --btn-surface: var(--bg-card);
+  border: 1px solid color-mix(in srgb, var(--error) 55%, var(--border));
+  background-color: var(--bg-card);
+  color: var(--error);
+}
+
+.webclipper-btn--danger-tint:hover:not(:disabled) {
+  background-color: var(--bg-sunken);
+}
+
+.webclipper-btn--danger-tint:active:not(:disabled) {
+  background-color: var(--bg-sunken);
+}
+
+.webclipper-btn--icon {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-weight: 900;
+}

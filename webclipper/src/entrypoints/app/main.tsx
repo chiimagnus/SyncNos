@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import AppShell from '../../ui/app/AppShell';
 import '../../ui/styles/tailwind.css';
+import '../../ui/styles/buttons.css';
 import 'katex/dist/katex.min.css';
 import '../../ui/styles/tokens.css';
 import './style.css';
