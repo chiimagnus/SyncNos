@@ -93,6 +93,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
   let activeQuoteText = '';
   let activeQuoteContext: any = null;
   let lastTabId: number | null = null;
+  let lastRawComments: any[] = [];
 
   async function refreshCommentsList() {
     const canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
@@ -110,9 +111,11 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
       return;
     }
     const items = Array.isArray(res?.data) ? res.data : [];
+    lastRawComments = items;
     api.setComments(
       items.map((c: any) => ({
         id: Number(c?.id),
+        parentId: c?.parentId != null ? Number(c.parentId) : null,
         authorName: 'You',
         createdAt: Number(c?.createdAt) || null,
         quoteText: String(c?.quoteText || ''),
@@ -163,15 +166,48 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
         } as any);
         if (res?.ok) await refreshCommentsList();
       },
+      onReply: async (parentId, text) => {
+        if (!rt?.send) return;
+        let canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
+        if (!canonicalUrl) return;
+
+        if (!activeConversationId) {
+          const resolved = await resolveOrCaptureArticle(lastTabId);
+          canonicalUrl = normalizeHttpUrl(resolved.canonicalUrl) || canonicalUrl;
+          activeCanonicalUrl = canonicalUrl;
+          activeConversationId = resolved.conversationId;
+          if (canonicalUrl && activeConversationId) {
+            await rt.send(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, {
+              canonicalUrl,
+              conversationId: activeConversationId,
+            } as any);
+          }
+        }
+
+        const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
+          canonicalUrl,
+          conversationId: activeConversationId,
+          parentId: Number(parentId),
+          quoteText: '',
+          quoteContext: null,
+          commentText: text,
+        } as any);
+        if (res?.ok) await refreshCommentsList();
+      },
       onDelete: async (id) => {
         if (!rt?.send) return;
         const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id } as any);
         if (res?.ok) await refreshCommentsList();
       },
       onLocate: async (item) => {
-        const exact = safeString((item as any)?.quoteText);
+        const parentId = (item as any)?.parentId != null ? Number((item as any).parentId) : null;
+        const root = parentId
+          ? lastRawComments.find((c) => Number(c?.id) === parentId) ?? null
+          : lastRawComments.find((c) => Number(c?.id) === Number((item as any)?.id)) ?? null;
+
+        const exact = safeString(root?.quoteText ?? (item as any)?.quoteText);
         if (!exact) return;
-        const ctx = (item as any)?.quoteContext;
+        const ctx = root?.quoteContext ?? (item as any)?.quoteContext;
         locateAndFlashTextQuote({
           exact,
           ...(ctx?.prefix ? { prefix: String(ctx.prefix) } : null),

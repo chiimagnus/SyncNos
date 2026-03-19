@@ -5,6 +5,7 @@ export type ArticleCommentQuoteContext = {
 
 export type ArticleComment = {
   id: number;
+  parentId: number | null;
   conversationId: number | null;
   canonicalUrl: string;
   quoteText: string;
@@ -15,6 +16,7 @@ export type ArticleComment = {
 };
 
 export type AddArticleCommentInput = {
+  parentId?: number | null;
   conversationId: number | null;
   canonicalUrl: string;
   quoteText?: string | null;
@@ -23,4 +25,3 @@ export type AddArticleCommentInput = {
   createdAt?: number | null;
   updatedAt?: number | null;
 };
-

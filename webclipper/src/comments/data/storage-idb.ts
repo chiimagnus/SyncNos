@@ -80,6 +80,12 @@ function normalizeConversationId(value: unknown): number | null {
   return id;
 }
 
+function normalizeParentId(value: unknown): number | null {
+  const id = Number(value);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
+}
+
 function normalizeTimestamp(value: unknown, fallback: number): number {
   const t = Number(value);
   if (!Number.isFinite(t) || t <= 0) return fallback;
@@ -93,6 +99,7 @@ function normalizeCommentText(value: unknown): string {
 function toComment(row: any): ArticleComment {
   return {
     id: Number(row?.id),
+    parentId: normalizeParentId(row?.parentId),
     conversationId: normalizeConversationId(row?.conversationId),
     canonicalUrl: normalizeHttpUrl(row?.canonicalUrl),
     quoteText: safeString(row?.quoteText),
@@ -118,6 +125,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const updatedAt = normalizeTimestamp(input?.updatedAt, createdAt);
 
   const row: any = {
+    parentId: normalizeParentId(input?.parentId),
     conversationId: normalizeConversationId(input?.conversationId),
     canonicalUrl,
     quoteText,
@@ -170,7 +178,31 @@ export async function deleteArticleCommentById(id: number): Promise<boolean> {
 
   const db = await openDb();
   const { t, stores } = tx(db, ['article_comments'], 'readwrite');
-  await reqToPromise(stores.article_comments.delete(commentId));
+
+  await new Promise<void>((resolve, reject) => {
+    try {
+      const req = stores.article_comments.openCursor();
+      req.onerror = () => reject(req.error || new Error('cursor failed'));
+      req.onsuccess = () => {
+        const cursor = req.result as IDBCursorWithValue | null;
+        if (!cursor) return resolve();
+        const value: any = cursor.value;
+        const rowId = Number(value?.id);
+        const parentId = normalizeParentId(value?.parentId);
+        if ((Number.isFinite(rowId) && rowId === commentId) || parentId === commentId) {
+          try {
+            cursor.delete();
+          } catch (_e) {
+            // ignore and continue
+          }
+        }
+        cursor.continue();
+      };
+    } catch (e) {
+      reject(e);
+    }
+  });
+
   await txDone(t);
   return true;
 }
@@ -235,4 +267,3 @@ export async function attachOrphanCommentsToConversation(
   await txDone(t);
   return { updated };
 }
-

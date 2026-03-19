@@ -59,6 +59,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
     if (!canonicalUrl) return router.err('missing canonicalUrl');
 
     const comment = await addArticleComment({
+      parentId: msg?.parentId != null ? Number(msg.parentId) : null,
       conversationId: msg?.conversationId ? Number(msg.conversationId) : null,
       canonicalUrl,
       quoteText: msg?.quoteText ?? '',
@@ -96,4 +97,3 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
     return router.ok(res);
   });
 }
-

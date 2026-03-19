@@ -13,6 +13,7 @@ function unwrap<T>(res: ApiResponse<T>): T {
 
 export type ArticleCommentDto = {
   id: number;
+  parentId: number | null;
   conversationId: number | null;
   canonicalUrl: string;
   quoteText: string;
@@ -21,6 +22,18 @@ export type ArticleCommentDto = {
   createdAt: number;
   updatedAt: number;
 };
+
+export async function addArticleComment(input: {
+  canonicalUrl: string;
+  conversationId: number | null;
+  parentId?: number | null;
+  quoteText?: string | null;
+  quoteContext?: { prefix?: string; suffix?: string } | null;
+  commentText: string;
+}): Promise<ArticleCommentDto> {
+  const res = await send<ApiResponse<ArticleCommentDto>>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, input as any);
+  return unwrap(res);
+}
 
 export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string): Promise<ArticleCommentDto[]> {
   const res = await send<ApiResponse<ArticleCommentDto[]>>(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, { canonicalUrl });

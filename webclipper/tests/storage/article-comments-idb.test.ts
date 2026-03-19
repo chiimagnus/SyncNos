@@ -71,6 +71,35 @@ describe("article comments storage-idb", () => {
     expect(after.map((c) => c.id)).toEqual([c2.id]);
   });
 
+  it("supports replies and cascades delete on root", async () => {
+    const url = "https://example.com/thread";
+    const root = await addArticleComment({
+      parentId: null,
+      conversationId: null,
+      canonicalUrl: url,
+      quoteText: "quote",
+      commentText: "root",
+      createdAt: 10,
+    });
+    const reply1 = await addArticleComment({
+      parentId: root.id,
+      conversationId: null,
+      canonicalUrl: url,
+      quoteText: "",
+      commentText: "reply",
+      createdAt: 11,
+    });
+
+    const list = await listArticleCommentsByCanonicalUrl(url);
+    const byId = new Map(list.map((c) => [c.id, c]));
+    expect(byId.get(root.id)?.parentId).toBe(null);
+    expect(byId.get(reply1.id)?.parentId).toBe(root.id);
+
+    await deleteArticleCommentById(root.id);
+    const after = await listArticleCommentsByCanonicalUrl(url);
+    expect(after.length).toBe(0);
+  });
+
   it("hasAnyForCanonicalUrl returns true when exists", async () => {
     const url = "https://example.com/a";
     expect(await hasAnyArticleCommentsForCanonicalUrl(url)).toBe(false);
@@ -94,4 +123,3 @@ describe("article comments storage-idb", () => {
     expect(byId.get(already.id)?.conversationId).toBe(9);
   });
 });
-
