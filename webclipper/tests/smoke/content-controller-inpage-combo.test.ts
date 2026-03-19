@@ -104,7 +104,7 @@ describe("content-controller inpage combo", () => {
     await cfg.onDoubleClick();
 
     expect(harness.sendCalls.some((c) => c.type === "openCurrentTabInpageCommentsPanel")).toBe(true);
-    expect(harness.tipCalls.some((c) => String(c.text).includes("comments sidebar"))).toBe(false);
+    expect(harness.tipCalls.some((c) => String(c.text).includes("toolbar icon"))).toBe(false);
   });
 
   it("shows fallback tip when comments sidebar open fails", async () => {
@@ -122,7 +122,7 @@ describe("content-controller inpage combo", () => {
     await cfg.onDoubleClick();
 
     expect(harness.sendCalls.some((c) => c.type === "openCurrentTabInpageCommentsPanel")).toBe(true);
-    expect(harness.tipCalls.some((c) => String(c.text).includes("comments sidebar"))).toBe(true);
+    expect(harness.tipCalls.some((c) => String(c.text).includes("toolbar icon"))).toBe(true);
   });
 
   it("emits easter-egg line for combo callback", async () => {

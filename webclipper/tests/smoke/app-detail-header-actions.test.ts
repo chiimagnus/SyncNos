@@ -52,8 +52,8 @@ vi.mock('../../src/i18n', () => ({
       backButton: 'Back',
       detailHeaderOpenInMenuAria: 'Open destinations',
       messageRoleFallback: 'message',
-      openCommentsSidebar: 'Open comments sidebar',
-      closeCommentsSidebar: 'Close comments sidebar',
+      openCommentsSidebar: 'Comment',
+      closeCommentsSidebar: 'Collapse comments sidebar',
     };
     return labels[key] || key;
   },
@@ -196,25 +196,28 @@ describe('ConversationDetailPane header actions', () => {
     } as any;
     currentState.detailHeaderActions = [];
 
-    const onToggleCommentsSidebar = vi.fn();
+    const onTriggerCommentsSidebar = vi.fn();
 
     act(() => {
-      root!.render(createElement(ConversationDetailPane, { onToggleCommentsSidebar, commentsSidebarOpen: false }));
+      root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: false }));
     });
 
-    const openBtn = document.querySelector('[aria-label="Open comments sidebar"]') as HTMLButtonElement | null;
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
 
     act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onToggleCommentsSidebar).toHaveBeenCalledTimes(1);
+    expect(onTriggerCommentsSidebar).toHaveBeenCalledTimes(1);
+    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith('');
 
     act(() => {
-      root!.render(createElement(ConversationDetailPane, { onToggleCommentsSidebar, commentsSidebarOpen: true }));
+      root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: true }));
     });
 
-    expect(document.querySelector('[aria-label="Close comments sidebar"]')).toBeTruthy();
+    const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
+    expect(pressedBtn).toBeTruthy();
   });
 });

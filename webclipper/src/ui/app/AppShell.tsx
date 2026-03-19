@@ -55,6 +55,8 @@ export default function AppShell() {
     useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false);
+    const [commentsSidebarQuoteText, setCommentsSidebarQuoteText] = useState('');
+    const [commentsSidebarFocusSignal, setCommentsSidebarFocusSignal] = useState(0);
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
@@ -81,7 +83,14 @@ export default function AppShell() {
     useEffect(() => {
       if (isArticleConversation && canonicalUrl) return;
       setCommentsSidebarOpen(false);
+      setCommentsSidebarQuoteText('');
     }, [canonicalUrl, isArticleConversation]);
+
+    const triggerCommentsSidebar = (quoteText: string) => {
+      setCommentsSidebarQuoteText(String(quoteText || '').trim());
+      setCommentsSidebarOpen(true);
+      setCommentsSidebarFocusSignal((prev) => prev + 1);
+    };
 
     useEffect(() => {
       if (!showSettingsSheet) return;
@@ -210,7 +219,7 @@ export default function AppShell() {
                     element={
                       <ConversationDetailPane
                         onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
-                        onToggleCommentsSidebar={canToggleCommentsSidebar ? () => setCommentsSidebarOpen((prev) => !prev) : undefined}
+                        onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
                         commentsSidebarOpen={showCommentsSidebar}
                       />
                     }
@@ -226,6 +235,8 @@ export default function AppShell() {
                   <ArticleCommentsSidebar
                     conversationId={Number((selectedConversation as any)?.id || 0)}
                     canonicalUrl={canonicalUrl}
+                    quoteText={commentsSidebarQuoteText}
+                    focusComposerSignal={commentsSidebarFocusSignal}
                     onClose={() => setCommentsSidebarOpen(false)}
                   />
                 </div>

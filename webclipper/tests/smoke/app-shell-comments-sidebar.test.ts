@@ -21,8 +21,8 @@ vi.mock('../../src/i18n', () => ({
     const labels: Record<string, string> = {
       collapseSidebar: 'Collapse sidebar',
       expandSidebar: 'Expand sidebar',
-      openCommentsSidebar: 'Open comments sidebar',
-      closeCommentsSidebar: 'Close comments sidebar',
+      openCommentsSidebar: 'Comment',
+      closeCommentsSidebar: 'Collapse comments sidebar',
       articleCommentsHeading: 'Comments',
     };
     return labels[key] || key;
@@ -48,10 +48,10 @@ vi.mock('../../src/ui/conversations/conversations-context', () => ({
 
 vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
   ConversationDetailPane: ({
-    onToggleCommentsSidebar,
+    onTriggerCommentsSidebar,
     commentsSidebarOpen,
   }: {
-    onToggleCommentsSidebar?: () => void;
+    onTriggerCommentsSidebar?: (quoteText: string) => void;
     commentsSidebarOpen?: boolean;
   }) =>
     createElement(
@@ -61,10 +61,11 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
         'button',
         {
           type: 'button',
-          onClick: onToggleCommentsSidebar,
-          'aria-label': commentsSidebarOpen ? 'Close comments sidebar' : 'Open comments sidebar',
+          onClick: () => onTriggerCommentsSidebar?.(''),
+          'aria-label': 'Comment',
+          'aria-pressed': commentsSidebarOpen ? 'true' : 'false',
         },
-        commentsSidebarOpen ? 'close-comments' : 'open-comments',
+        'open-comments',
       ),
       createElement('div', null, 'detail-pane'),
     ),
@@ -77,7 +78,7 @@ vi.mock('../../src/ui/conversations/ArticleCommentsSidebar', () => ({
       { 'aria-label': 'Comments sidebar' },
       createElement(
         'button',
-        { type: 'button', onClick: onClose, 'aria-label': 'Close comments sidebar' },
+        { type: 'button', onClick: onClose, 'aria-label': 'Collapse comments sidebar' },
         'close-sidebar',
       ),
       createElement('div', null, 'comments-sidebar'),
@@ -135,12 +136,12 @@ describe('AppShell comments sidebar', () => {
     cleanupDom();
   });
 
-  it('opens and closes the docked comments sidebar from the detail view toggle', () => {
+  it('opens the docked comments sidebar from the detail view trigger and closes from the sidebar collapse button', () => {
     act(() => {
       root!.render(createElement(AppShell));
     });
 
-    const openBtn = document.querySelector('[aria-label="Open comments sidebar"]') as HTMLButtonElement | null;
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(openBtn).toBeTruthy();
 
     act(() => {
@@ -150,7 +151,13 @@ describe('AppShell comments sidebar', () => {
     expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
     expect(document.querySelector('aside')).toBeTruthy();
 
-    const closeBtn = document.querySelector('[aria-label="Close comments sidebar"]') as HTMLButtonElement | null;
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
+
+    const closeBtn = document.querySelector('[aria-label="Collapse comments sidebar"]') as HTMLButtonElement | null;
     expect(closeBtn).toBeTruthy();
 
     act(() => {
