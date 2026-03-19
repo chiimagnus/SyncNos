@@ -320,10 +320,11 @@ describe("chatgpt-collector", () => {
     expect(snap).toBeTruthy();
     const assistant = snap.messages.filter((m: any) => m.role === "assistant");
     expect(assistant.length).toBe(3);
-    expect(assistant[0].contentText).toContain("Body A");
-    expect(assistant[1].contentText).toContain("Body A");
-    expect(assistant[2].contentText).toContain("Body B");
-    expect(assistant[0].contentText).not.toBe(assistant[2].contentText);
+    // When multiple deep-research iframes exist, we prefer stable placeholders and let the hydrator fill the body.
+    expect(String(assistant[0].contentText)).toContain("Deep Research (iframe)");
+    expect(String(assistant[1].contentText)).toContain("Deep Research (iframe)");
+    expect(String(assistant[2].contentText)).toContain("Deep Research (iframe)");
+    expect(String(assistant[0].messageKey || "")).not.toBe(String(assistant[1].messageKey || ""));
   });
 
   it("falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label", async () => {

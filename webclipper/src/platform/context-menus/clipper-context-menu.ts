@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import { CURRENT_PAGE_MESSAGE_TYPES } from '../messaging/message-contracts';
+import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES } from '../messaging/message-contracts';
 import { storageGet, storageOnChanged, storageSet } from '../storage/local';
 import { tabsQuery, tabsSendMessage } from '../webext/tabs';
 
@@ -11,6 +11,7 @@ const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
 const MENU_ROOT_ID = 'syncnos_clipper_root';
 const MENU_SAVE_CURRENT_PAGE_ID = 'syncnos_clipper_save_current_page';
+const MENU_ADD_COMMENT_ID = 'syncnos_clipper_add_comment';
 const MENU_INPAGE_GROUP_ID = 'syncnos_clipper_inpage_group';
 const MENU_AUTOSAVE_ID = 'syncnos_clipper_autosave';
 const MENU_MODE_SUPPORTED_ID = 'syncnos_clipper_mode_supported';
@@ -111,7 +112,7 @@ async function createOrRefreshMenus(api: any) {
   await removeAllMenus(api);
 
   const base = {
-    contexts: ['page'],
+    contexts: ['page', 'selection'],
     documentUrlPatterns: ['http://*/*', 'https://*/*'],
   } as any;
 
@@ -126,6 +127,13 @@ async function createOrRefreshMenus(api: any) {
     id: MENU_SAVE_CURRENT_PAGE_ID,
     parentId: MENU_ROOT_ID,
     title: t('contextMenuSaveCurrentPage'),
+  });
+
+  api.create({
+    ...base,
+    id: MENU_ADD_COMMENT_ID,
+    parentId: MENU_ROOT_ID,
+    title: t('contextMenuAddComment'),
   });
 
   api.create({
@@ -195,12 +203,26 @@ export function registerClipperContextMenu(): void {
   void createOrRefreshMenus(api);
 
   try {
-    api.onClicked?.addListener?.((info: any) => {
+    api.onClicked?.addListener?.((info: any, tab: any) => {
       const id = String(info?.menuItemId || '');
       if (!id) return;
 
       if (id === MENU_SAVE_CURRENT_PAGE_ID) {
         void captureActiveTabCurrentPage().catch(() => {});
+        return;
+      }
+
+      if (id === MENU_ADD_COMMENT_ID) {
+        const tabId = Number(tab?.id ?? info?.tabId);
+        if (!Number.isFinite(tabId) || tabId <= 0) return;
+        void tabsSendMessage(tabId, {
+          type: CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL,
+          payload: {
+            source: 'contextmenu',
+            tabId,
+            selectionText: String(info?.selectionText || ''),
+          },
+        }).catch(() => {});
         return;
       }
 

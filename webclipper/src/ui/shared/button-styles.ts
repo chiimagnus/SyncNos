@@ -1,8 +1,35 @@
+function buttonBevelStrokeClassName(input: { surface: 'card' | 'accent' | 'error' }): string {
+  const vars =
+    input.surface === 'accent'
+      ? [
+          'tw-[--btn-stroke-tl:color-mix(in_srgb,var(--accent)_58%,white)]',
+          'tw-[--btn-stroke-br:color-mix(in_srgb,var(--accent)_78%,black)]',
+        ]
+      : input.surface === 'error'
+        ? [
+            'tw-[--btn-stroke-tl:color-mix(in_srgb,var(--error)_58%,white)]',
+            'tw-[--btn-stroke-br:color-mix(in_srgb,var(--error)_78%,black)]',
+          ]
+        : [
+            'tw-[--btn-stroke-tl:color-mix(in_srgb,var(--bg-card)_62%,white)]',
+            'tw-[--btn-stroke-br:color-mix(in_srgb,var(--bg-card)_74%,black)]',
+          ];
+
+  return [
+    ...vars,
+    'tw-shadow-[inset_1px_1px_0_var(--btn-stroke-tl),inset_-1px_-1px_0_var(--btn-stroke-br)]',
+    'active:tw-shadow-[inset_1px_1px_0_var(--btn-stroke-br),inset_-1px_-1px_0_var(--btn-stroke-tl)]',
+    'active:tw-translate-y-[1px]',
+    'tw-transition-[background-color,border-color,color,box-shadow,transform] tw-duration-200',
+  ].join(' ');
+}
+
 export function buttonTintClassName(): string {
   return [
     'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-px-3',
     'tw-bg-[var(--bg-card)] tw-text-xs tw-font-extrabold tw-text-[var(--text-primary)] tw-shadow-none',
-    'tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)]',
+    buttonBevelStrokeClassName({ surface: 'card' }),
+    'hover:tw-bg-[var(--bg-sunken)]',
     'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
     'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
   ].join(' ');
@@ -12,7 +39,8 @@ export function buttonFilledClassName(): string {
   return [
     'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-px-3',
     'tw-bg-[var(--accent)] tw-text-xs tw-font-extrabold tw-text-[var(--accent-foreground)] tw-shadow-none',
-    'tw-transition-colors tw-duration-200 hover:tw-bg-[var(--accent-hover)] active:tw-bg-[var(--accent-active)]',
+    buttonBevelStrokeClassName({ surface: 'accent' }),
+    'hover:tw-bg-[var(--accent-hover)] active:tw-bg-[var(--accent-active)]',
     'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
     'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
   ].join(' ');
@@ -22,7 +50,8 @@ export function buttonDangerClassName(): string {
   return [
     'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border-0 tw-px-3',
     'tw-bg-[var(--error)] tw-text-xs tw-font-extrabold tw-text-[var(--error-foreground)] tw-shadow-none',
-    'tw-transition-opacity tw-duration-200 hover:tw-opacity-90 active:tw-opacity-80',
+    buttonBevelStrokeClassName({ surface: 'error' }),
+    'hover:tw-opacity-90 active:tw-opacity-80',
     'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
     'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
   ].join(' ');
@@ -32,7 +61,8 @@ export function buttonDangerTintClassName(): string {
   return [
     'tw-inline-flex tw-min-h-9 tw-appearance-none tw-cursor-pointer tw-items-center tw-justify-center tw-rounded-xl tw-border tw-px-3',
     'tw-border-[color-mix(in_srgb,var(--error)_55%,var(--border))] tw-bg-[var(--bg-card)] tw-text-xs tw-font-extrabold tw-text-[var(--error)] tw-shadow-none',
-    'tw-transition-colors tw-duration-200 hover:tw-bg-[var(--bg-sunken)] active:tw-bg-[var(--bg-sunken)]',
+    buttonBevelStrokeClassName({ surface: 'card' }),
+    'hover:tw-bg-[var(--bg-sunken)] active:tw-bg-[var(--bg-sunken)]',
     'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
     'disabled:tw-cursor-not-allowed disabled:tw-opacity-[0.38]',
   ].join(' ');

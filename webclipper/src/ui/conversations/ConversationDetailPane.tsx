@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
@@ -7,6 +8,21 @@ import { useConversationsApp } from './conversations-context';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName } from '../shared/nav-styles';
+import { ArticleCommentsSection } from './ArticleCommentsSection';
+
+function normalizeHttpUrl(raw: unknown): string {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = String(url.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
 
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
@@ -15,6 +31,7 @@ export type ConversationDetailPaneProps = {
 };
 
 export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSidebar }: ConversationDetailPaneProps) {
+  const [commentsCollapsed, setCommentsCollapsed] = useState(true);
   const {
     activeId,
     listError,
@@ -33,8 +50,15 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
 
   const outlineButtonClass = buttonTintClassName();
   const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
+  const canonicalUrl = normalizeHttpUrl((selected as any)?.url);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
+  const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
+
+  useEffect(() => {
+    // Default collapsed per-article (matches “默认关闭”的预期).
+    setCommentsCollapsed(true);
+  }, [activeId, canonicalUrl]);
 
   return (
     <section>
@@ -120,34 +144,89 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
             hideHeader ? 'tw-pt-3 md:tw-pt-4' : '',
           ].join(' ')}
         >
-          {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
-          {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
-          {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
+          <div className="tw-flex tw-min-w-0 tw-gap-4">
+            <div className="tw-min-w-0 tw-flex-1">
+              {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
+              {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
+              {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
 
-          {detail?.messages?.length ? (
-            <div className="tw-mt-3 tw-grid tw-gap-2.5">
-              {detail.messages.map((m) => {
-                const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-                const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
-                return (
-                  <ChatMessageBubble
-                    key={String((m as any).id)}
-                    role={isArticle ? undefined : (m as any).role}
-                    markdown={text}
-                    conversationId={
-                      Number.isFinite(messageConversationId) && messageConversationId > 0
-                        ? messageConversationId
-                        : undefined
-                    }
+              {/* Narrow screens: keep inline comments (sidebar is hidden). */}
+              {hasArticleCommentsPane ? (
+                <div className="md:tw-hidden">
+                  <ArticleCommentsSection
+                    conversationId={Number((selected as any)?.id || activeId || 0)}
+                    canonicalUrl={canonicalUrl}
                   />
-                );
-              })}
+                </div>
+              ) : null}
+
+              {detail?.messages?.length ? (
+                <div className="tw-mt-3 tw-grid tw-gap-2.5">
+                  {detail.messages.map((m) => {
+                    const text = String((m as any).contentMarkdown || (m as any).contentText || '');
+                    const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
+                    return (
+                      <ChatMessageBubble
+                        key={String((m as any).id)}
+                        role={isArticle ? undefined : (m as any).role}
+                        markdown={text}
+                        conversationId={
+                          Number.isFinite(messageConversationId) && messageConversationId > 0
+                            ? messageConversationId
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              ) : activeId ? (
+                <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
+              ) : (
+                <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('selectAConversation')}</p>
+              )}
             </div>
-          ) : activeId ? (
-            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
-          ) : (
-            <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('selectAConversation')}</p>
-          )}
+
+            {hasArticleCommentsPane ? (
+              <aside
+                className={[
+                  'tw-hidden md:tw-block',
+                  'tw-sticky tw-top-24 tw-self-start',
+                  commentsCollapsed
+                    ? 'tw-w-[44px] tw-min-w-[44px]'
+                    : 'tw-w-[360px] tw-min-w-[360px] tw-max-h-[calc(100dvh-120px)] tw-overflow-y-auto',
+                ].join(' ')}
+              >
+                {commentsCollapsed ? (
+                  <button
+                    type="button"
+                    className="tw-flex tw-h-[44px] tw-w-[44px] tw-items-center tw-justify-center tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[var(--text-secondary)] hover:tw-text-[var(--text-primary)]"
+                    onClick={() => setCommentsCollapsed(false)}
+                    aria-label={t('articleCommentsHeading')}
+                    title={t('articleCommentsHeading')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path
+                        d="M3.5 3.75C3.5 2.7835 4.2835 2 5.25 2H10.75C11.7165 2 12.5 2.7835 12.5 3.75V9.25C12.5 10.2165 11.7165 11 10.75 11H7.4L5.1 12.9C4.7 13.23 4 12.95 4 12.43V11H5.25"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path d="M5.5 5.5H10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                      <path d="M5.5 7.75H9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                ) : (
+                  <ArticleCommentsSection
+                    conversationId={Number((selected as any)?.id || activeId || 0)}
+                    canonicalUrl={canonicalUrl}
+                    containerClassName="tw-mt-0"
+                    onRequestClose={() => setCommentsCollapsed(true)}
+                  />
+                )}
+              </aside>
+            ) : null}
+          </div>
         </div>
       </section>
     </section>

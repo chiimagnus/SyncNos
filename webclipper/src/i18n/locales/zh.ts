@@ -43,6 +43,7 @@ export const zh: { [K in TranslationKey]: string } = {
   contextMenuRootTitle: 'SyncNos WebClipper',
   contextMenuSaveCurrentPage: '保存当前页面',
   contextMenuSaveCurrentAiChat: '保存当前 AI 对话',
+  contextMenuAddComment: '添加评论',
   contextMenuInpageGroupTitle: '页面内按钮',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',
@@ -159,6 +160,10 @@ export const zh: { [K in TranslationKey]: string } = {
   loadingDots: '加载中\u2026',
   noMessages: '暂无消息。',
   selectAConversation: '请选择一个对话。',
+
+  // ArticleCommentsSection
+  articleCommentsHeading: '评论',
+  articleCommentsEmpty: '暂无评论。',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: '同步中',

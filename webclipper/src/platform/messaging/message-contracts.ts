@@ -26,6 +26,7 @@ export const OBSIDIAN_MESSAGE_TYPES = {
 
 export const ARTICLE_MESSAGE_TYPES = {
   FETCH_ACTIVE_TAB: 'fetchActiveTabArticle',
+  RESOLVE_OR_CAPTURE_ACTIVE_TAB: 'resolveOrCaptureActiveTabArticle',
 } as const;
 
 export const CHATGPT_MESSAGE_TYPES = {
@@ -35,6 +36,19 @@ export const CHATGPT_MESSAGE_TYPES = {
 export const CURRENT_PAGE_MESSAGE_TYPES = {
   GET_CAPTURE_STATE: 'getCurrentPageCaptureState',
   CAPTURE: 'captureCurrentPage',
+} as const;
+
+// Messages sent to content scripts (not handled by background router).
+export const CONTENT_MESSAGE_TYPES = {
+  OPEN_INPAGE_COMMENTS_PANEL: 'openInpageCommentsPanel',
+  LOCATE_INPAGE_COMMENT_ANCHOR: 'locateInpageCommentAnchor',
+} as const;
+
+export const COMMENTS_MESSAGE_TYPES = {
+  LIST_ARTICLE_COMMENTS: 'listArticleComments',
+  ADD_ARTICLE_COMMENT: 'addArticleComment',
+  DELETE_ARTICLE_COMMENT: 'deleteArticleComment',
+  ATTACH_ORPHAN_ARTICLE_COMMENTS: 'attachOrphanArticleComments',
 } as const;
 
 export const UI_MESSAGE_TYPES = {
@@ -58,6 +72,7 @@ export const messageContracts = {
   ARTICLE_MESSAGE_TYPES,
   CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
+  COMMENTS_MESSAGE_TYPES,
   UI_MESSAGE_TYPES,
   UI_EVENT_TYPES,
   UI_PORT_NAMES,
@@ -69,6 +84,7 @@ export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof O
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
 export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
+export type CommentsMessageType = (typeof COMMENTS_MESSAGE_TYPES)[keyof typeof COMMENTS_MESSAGE_TYPES];
 export type UiMessageType = (typeof UI_MESSAGE_TYPES)[keyof typeof UI_MESSAGE_TYPES];
 export type UiEventType = (typeof UI_EVENT_TYPES)[keyof typeof UI_EVENT_TYPES];
 export type UiPortName = (typeof UI_PORT_NAMES)[keyof typeof UI_PORT_NAMES];
@@ -80,4 +96,5 @@ export type MessageType =
   | ArticleMessageType
   | ChatgptMessageType
   | CurrentPageMessageType
+  | CommentsMessageType
   | UiMessageType;

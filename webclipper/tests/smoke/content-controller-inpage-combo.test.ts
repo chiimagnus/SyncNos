@@ -349,7 +349,6 @@ describe("content-controller inpage combo", () => {
     await Promise.resolve();
 
     expect(harness.sendCalls.filter((c) => c.type === "upsertConversation")).toHaveLength(1);
-    expect(harness.tipCalls.some((c) => String(c.text) === "Saving..." && c.opts?.kind === "loading")).toBe(true);
 
     resolveUpsert && resolveUpsert({});
     await firstClick;

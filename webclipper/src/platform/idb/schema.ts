@@ -1,5 +1,5 @@
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 6;
+export const DB_VERSION = 7;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -868,6 +868,24 @@ function ensureImageCacheStore(db: IDBDatabase, tx: IDBTransaction | null): void
   }
 }
 
+function ensureArticleCommentsStore(db: IDBDatabase, tx: IDBTransaction | null): void {
+  if (!db.objectStoreNames.contains('article_comments')) {
+    const store = db.createObjectStore('article_comments', { keyPath: 'id', autoIncrement: true });
+    store.createIndex('by_canonicalUrl_createdAt', ['canonicalUrl', 'createdAt'], { unique: false });
+    store.createIndex('by_conversationId_createdAt', ['conversationId', 'createdAt'], { unique: false });
+    return;
+  }
+
+  if (!tx) return;
+  const store = tx.objectStore('article_comments');
+  if (!store.indexNames.contains('by_canonicalUrl_createdAt')) {
+    store.createIndex('by_canonicalUrl_createdAt', ['canonicalUrl', 'createdAt'], { unique: false });
+  }
+  if (!store.indexNames.contains('by_conversationId_createdAt')) {
+    store.createIndex('by_conversationId_createdAt', ['conversationId', 'createdAt'], { unique: false });
+  }
+}
+
 function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   const db = request.result;
   const tx = request.transaction;
@@ -876,6 +894,7 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
   ensureMessagesStore(db, tx);
   ensureSyncMappingsStore(db, tx);
   ensureImageCacheStore(db, tx);
+  ensureArticleCommentsStore(db, tx);
 
   if (tx && oldVersion < 2) {
     try {

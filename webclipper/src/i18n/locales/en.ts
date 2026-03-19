@@ -41,6 +41,7 @@ export const en = {
   contextMenuRootTitle: 'SyncNos WebClipper',
   contextMenuSaveCurrentPage: 'Save current page',
   contextMenuSaveCurrentAiChat: 'Save current AI chat',
+  contextMenuAddComment: 'Add comment',
   contextMenuInpageGroupTitle: 'Inpage Button',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
@@ -160,6 +161,10 @@ export const en = {
   loadingDots: 'Loading\u2026',
   noMessages: 'No messages.',
   selectAConversation: 'Select a conversation.',
+
+  // ArticleCommentsSection
+  articleCommentsHeading: 'Comments',
+  articleCommentsEmpty: 'No comments yet.',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: 'Syncing',
