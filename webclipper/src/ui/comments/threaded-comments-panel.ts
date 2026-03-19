@@ -1,4 +1,5 @@
 import inpageCommentsPanelCssRaw from '../styles/inpage-comments-panel.css?raw';
+import tokensCssRaw from '../styles/tokens.css?raw';
 
 export type ThreadedCommentItem = {
   id: number;
@@ -27,7 +28,15 @@ export type ThreadedCommentsPanelApi = {
   setTitle: (title: string) => void;
 };
 
-const PANEL_SHADOW_CSS = String(inpageCommentsPanelCssRaw || '');
+function toHostTokensCss(css: string) {
+  // Scope tokens to the Shadow DOM host so inpage panels still use our design system.
+  // `tokens.css` uses `:root` selectors; in Shadow DOM we want `:host`.
+  return css.replaceAll(':root', ':host');
+}
+
+const PANEL_SHADOW_CSS = [toHostTokensCss(String(tokensCssRaw || '')), String(inpageCommentsPanelCssRaw || '')]
+  .filter(Boolean)
+  .join('\n');
 
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
@@ -56,6 +65,26 @@ export function mountThreadedCommentsPanel(
   const el = document.createElement('webclipper-threaded-comments-panel') as any as HTMLElement;
   if (options.overlay) el.setAttribute('data-overlay', '1');
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
+
+  const syncThemeAttr = () => {
+    const theme = document.documentElement?.getAttribute?.('data-theme');
+    if (theme === 'light' || theme === 'dark') {
+      el.setAttribute('data-theme', theme);
+    } else {
+      el.removeAttribute('data-theme');
+    }
+  };
+  syncThemeAttr();
+
+  let themeObserver: MutationObserver | null = null;
+  try {
+    if (typeof MutationObserver !== 'undefined') {
+      themeObserver = new MutationObserver(() => syncThemeAttr());
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+  } catch (_e) {
+    themeObserver = null;
+  }
 
   const shadow = el.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
@@ -516,6 +545,12 @@ export function mountThreadedCommentsPanel(
   host.appendChild(el);
 
   const cleanup = () => {
+    try {
+      themeObserver?.disconnect?.();
+    } catch (_e) {
+      // ignore
+    }
+    themeObserver = null;
     try {
       el.remove();
     } catch (_e) {

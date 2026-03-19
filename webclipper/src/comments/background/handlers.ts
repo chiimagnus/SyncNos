@@ -3,7 +3,6 @@ import {
   addArticleComment,
   attachOrphanCommentsToConversation,
   deleteArticleCommentById,
-  hasAnyArticleCommentsForCanonicalUrl,
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
 } from '../data/storage';
@@ -45,13 +44,6 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
     }
 
     return router.err('missing canonicalUrl or conversationId');
-  });
-
-  router.register(COMMENTS_MESSAGE_TYPES.HAS_ARTICLE_COMMENTS, async (msg) => {
-    const canonicalUrl = normalizeHttpUrl(msg?.canonicalUrl);
-    if (!canonicalUrl) return router.err('missing canonicalUrl');
-    const ok = await hasAnyArticleCommentsForCanonicalUrl(canonicalUrl);
-    return router.ok({ hasAny: ok });
   });
 
   router.register(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, async (msg) => {

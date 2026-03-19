@@ -48,7 +48,6 @@ export const COMMENTS_MESSAGE_TYPES = {
   LIST_ARTICLE_COMMENTS: 'listArticleComments',
   ADD_ARTICLE_COMMENT: 'addArticleComment',
   DELETE_ARTICLE_COMMENT: 'deleteArticleComment',
-  HAS_ARTICLE_COMMENTS: 'hasArticleComments',
   ATTACH_ORPHAN_ARTICLE_COMMENTS: 'attachOrphanArticleComments',
 } as const;
 
