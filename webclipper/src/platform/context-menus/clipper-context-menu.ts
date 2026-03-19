@@ -112,7 +112,7 @@ async function createOrRefreshMenus(api: any) {
   await removeAllMenus(api);
 
   const base = {
-    contexts: ['page'],
+    contexts: ['page', 'selection'],
     documentUrlPatterns: ['http://*/*', 'https://*/*'],
   } as any;
 
@@ -134,7 +134,6 @@ async function createOrRefreshMenus(api: any) {
     id: MENU_ADD_COMMENT_ID,
     parentId: MENU_ROOT_ID,
     title: t('contextMenuAddComment'),
-    contexts: ['page', 'selection'],
   });
 
   api.create({
