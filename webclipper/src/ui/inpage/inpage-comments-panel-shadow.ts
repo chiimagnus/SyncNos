@@ -5,25 +5,39 @@ export type InpageCommentsPanelApi = Omit<ThreadedCommentsPanelApi, 'open'> & {
   open: (input?: { focusEditor?: boolean }) => void;
 };
 
-const PANEL_ID = 'webclipper-inpage-comments-panel';
+const PANEL_ID = 'webclipper-threaded-comments-panel-overlay';
+const LEGACY_PANEL_SELECTORS = [
+  '#webclipper-inpage-comments-panel',
+  'webclipper-inpage-comments-panel',
+] as const;
 
 let singleton: { el: HTMLElement; api: ThreadedCommentsPanelApi } | null = null;
+let legacyCleared = false;
 
 function ensurePanel(): { el: HTMLElement; api: ThreadedCommentsPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
+
+  if (!legacyCleared) {
+    legacyCleared = true;
+    for (const selector of LEGACY_PANEL_SELECTORS) {
+      try {
+        document.querySelectorAll(selector).forEach((node) => {
+          try {
+            (node as any).remove?.();
+          } catch (_e) {
+            // ignore
+          }
+        });
+      } catch (_e) {
+        // ignore
+      }
+    }
+  }
 
   const existing = document.getElementById(PANEL_ID) as HTMLElement | null;
   if (existing && (existing as any).__webclipperPanelApi) {
     singleton = { el: existing, api: (existing as any).__webclipperPanelApi as ThreadedCommentsPanelApi };
     return singleton;
-  }
-  if (existing) {
-    // Clean up legacy panels from older builds to avoid duplicate IDs and stale UI.
-    try {
-      existing.remove();
-    } catch (_e) {
-      // ignore
-    }
   }
 
   const host = document.documentElement;
