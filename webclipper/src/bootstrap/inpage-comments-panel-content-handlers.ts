@@ -41,6 +41,44 @@ function pickQuoteFromSelection(fallback: unknown): string {
   }
 }
 
+function pickQuoteContextFromSelection(contextLen: number): { prefix?: string; suffix?: string } | null {
+  const len = Number(contextLen);
+  const limit = Number.isFinite(len) ? Math.max(0, Math.min(160, Math.floor(len))) : 64;
+  if (!limit) return null;
+  try {
+    const selection = globalThis.getSelection?.();
+    if (!selection || selection.rangeCount <= 0) return null;
+    const range = selection.getRangeAt(0);
+    if (!range || range.collapsed) return null;
+
+    const startNode = range.startContainer as any;
+    const endNode = range.endContainer as any;
+
+    let prefix = '';
+    if (startNode && startNode.nodeType === 3) {
+      const value = String(startNode.nodeValue || '');
+      const start = Math.max(0, Number(range.startOffset || 0) - limit);
+      const end = Math.max(0, Math.min(value.length, Number(range.startOffset || 0)));
+      prefix = value.slice(start, end);
+    }
+
+    let suffix = '';
+    if (endNode && endNode.nodeType === 3) {
+      const value = String(endNode.nodeValue || '');
+      const start = Math.max(0, Math.min(value.length, Number(range.endOffset || 0)));
+      const end = Math.max(0, Math.min(value.length, start + limit));
+      suffix = value.slice(start, end);
+    }
+
+    const out: any = {};
+    if (prefix) out.prefix = prefix;
+    if (suffix) out.suffix = suffix;
+    return Object.keys(out).length ? out : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 export type InpageCommentsPanelController = {
   open: (input?: { tabId?: number | null; selectionText?: string | null; focusEditor?: boolean; ensureArticle?: boolean }) => Promise<void>;
 };
@@ -52,6 +90,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
   let activeCanonicalUrl = '';
   let activeConversationId: number | null = null;
   let activeQuoteText = '';
+  let activeQuoteContext: any = null;
   let lastTabId: number | null = null;
 
   async function refreshCommentsList() {
@@ -116,6 +155,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
           canonicalUrl,
           conversationId: activeConversationId,
           quoteText: activeQuoteText,
+          quoteContext: activeQuoteContext,
           commentText: text,
         } as any);
         if (res?.ok) await refreshCommentsList();
@@ -141,6 +181,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
     activeQuoteText = quoteText;
+    activeQuoteContext = pickQuoteContextFromSelection(64);
     api.setQuoteText(quoteText);
     api.open({ focusEditor: input?.focusEditor === true });
 
