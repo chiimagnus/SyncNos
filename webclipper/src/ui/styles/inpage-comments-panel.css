@@ -11,12 +11,9 @@
   --quote-bg: rgba(232, 200, 106, 0.22);
   --quote-border: rgba(232, 200, 106, 0.55);
 
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: min(380px, 92vw);
-  height: 100vh;
-  z-index: 2147483647;
+  position: relative;
+  width: 100%;
+  height: auto;
   display: block;
   margin: 0;
   padding: 0;
@@ -47,20 +44,40 @@
   position: fixed;
   inset: 0;
   background: var(--panel-backdrop);
+  display: none;
 }
 
 .webclipper-inpage-comments-panel__surface {
-  position: absolute;
-  inset: 10px 10px 10px 0;
+  position: relative;
+  inset: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--panel-border);
-  border-right: 0;
-  border-radius: 14px 0 0 14px;
+  border-radius: 14px;
   background: var(--panel-bg);
   box-shadow: var(--panel-shadow);
   overflow: hidden;
+}
+
+:host([data-overlay='1']) {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(380px, 92vw);
+  height: 100vh;
+  z-index: 2147483647;
+}
+
+:host([data-overlay='1']) .webclipper-inpage-comments-panel__backdrop {
+  display: block;
+}
+
+:host([data-overlay='1']) .webclipper-inpage-comments-panel__surface {
+  position: absolute;
+  inset: 10px 10px 10px 0;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
 }
 
 .webclipper-inpage-comments-panel__header {

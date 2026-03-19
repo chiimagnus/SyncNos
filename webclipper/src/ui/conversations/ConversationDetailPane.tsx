@@ -221,17 +221,7 @@ export function ConversationDetailPane({ onBack, hideHeader = false, onExpandSid
                     conversationId={Number((selected as any)?.id || activeId || 0)}
                     canonicalUrl={canonicalUrl}
                     containerClassName="tw-mt-0"
-                    headerExtra={
-                      <button
-                        type="button"
-                        className="tw-inline-flex tw-h-7 tw-w-7 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-transparent tw-text-[12px] tw-font-black tw-text-[var(--text-secondary)] hover:tw-border-[color-mix(in_srgb,var(--border)_55%,var(--text-secondary))]"
-                        onClick={() => setCommentsCollapsed(true)}
-                        aria-label="Collapse"
-                        title="Collapse"
-                      >
-                        ×
-                      </button>
-                    }
+                    onRequestClose={() => setCommentsCollapsed(true)}
                   />
                 )}
               </aside>
