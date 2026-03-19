@@ -44,15 +44,15 @@
   width: min(420px, 92vw);
   height: 100vh;
   z-index: 2147483647;
-  background: var(--panel-bg);
+  background: var(--bg-sunken, var(--panel-bg));
   border-left: 1px solid var(--panel-border);
-  box-shadow: -24px 0 48px color-mix(in srgb, var(--panel-text) 14%, transparent);
+  box-shadow: none;
 }
 
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__surface {
   position: absolute;
   inset: 0;
-  background: var(--panel-bg);
+  background: transparent;
 }
 
 .webclipper-inpage-comments-panel__header {
@@ -63,13 +63,16 @@
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  padding: 12px 14px 10px 14px;
+  padding: 12px 12px;
   border-bottom: 1px solid var(--panel-border);
-  background: color-mix(in srgb, var(--panel-bg) 96%, transparent);
+  background: var(--panel-bg);
 }
 
 .webclipper-inpage-comments-panel__header-title {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--panel-text);
   font-size: 13px;
   font-weight: 900;
@@ -81,6 +84,11 @@
   min-height: 0;
   overflow: auto;
   padding: 10px 12px 20px 12px;
+}
+
+:host([data-overlay='1']) .webclipper-inpage-comments-panel__body {
+  /* Match AppShell's comments sidebar (outer 12px padding + panel body padding). */
+  padding: 22px 24px 32px 24px;
 }
 
 .webclipper-inpage-comments-panel__quote {

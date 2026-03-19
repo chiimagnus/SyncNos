@@ -59,6 +59,10 @@ type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
   showHeader?: boolean;
+  // When `true`, opening the overlay panel will "dock" the host page content by
+  // applying right padding to `document.documentElement` so the page is not
+  // covered by the sidebar. Intended for inpage content-scripts only.
+  dockPage?: boolean;
 };
 
 export function mountThreadedCommentsPanel(
@@ -69,6 +73,116 @@ export function mountThreadedCommentsPanel(
   if (options.overlay) el.setAttribute('data-overlay', '1');
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
   const showHeader = options.showHeader !== false;
+  const dockPage = options.dockPage === true && options.overlay === true;
+
+  const DOCK_STYLE_ID = 'webclipper-inpage-comments-panel__dock-style';
+
+  function ensureDockStyle() {
+    if (!dockPage) return;
+    try {
+      if (document.getElementById(DOCK_STYLE_ID)) return;
+      const style = document.createElement('style');
+      style.id = DOCK_STYLE_ID;
+      style.textContent = [
+        "html[data-webclipper-comments-dock='1'] {",
+        '  box-sizing: border-box !important;',
+        '  padding-right: var(--webclipper-comments-dock-width, 0px) !important;',
+        '  overflow-x: hidden !important;',
+        '}',
+        "html[data-webclipper-comments-dock='1'] body {",
+        '  box-sizing: border-box !important;',
+        '}',
+      ].join('\n');
+      (document.head || document.documentElement).appendChild(style);
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function readDockWidthPx(): number {
+    try {
+      const rect = el.getBoundingClientRect?.();
+      const w = Number(rect?.width || 0);
+      if (Number.isFinite(w) && w > 0) return w;
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      const computed = getComputedStyle(el);
+      const w = Number.parseFloat(String((computed as any)?.width || '').replace('px', '').trim());
+      if (Number.isFinite(w) && w > 0) return w;
+    } catch (_e) {
+      // ignore
+    }
+    return 420;
+  }
+
+  let dockRaf: number | null = null;
+  const dockResize = () => {
+    try {
+      if (!dockPage) return;
+      if (el.getAttribute('data-open') !== '1') return;
+      const width = Math.round(readDockWidthPx());
+      document.documentElement.style.setProperty('--webclipper-comments-dock-width', `${width}px`, 'important');
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  function setDockOpen(open: boolean) {
+    if (!dockPage) return;
+    const root = document.documentElement;
+    if (!root) return;
+
+    if (open) {
+      ensureDockStyle();
+      try {
+        root.setAttribute('data-webclipper-comments-dock', '1');
+      } catch (_e) {
+        // ignore
+      }
+
+      // Set it once synchronously, then again on next frame so layout has settled.
+      dockResize();
+      try {
+        if (dockRaf != null) cancelAnimationFrame(dockRaf);
+        dockRaf = requestAnimationFrame(() => {
+          dockRaf = null;
+          dockResize();
+        });
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        globalThis.addEventListener?.('resize', dockResize, { passive: true } as any);
+      } catch (_e) {
+        // ignore
+      }
+      return;
+    }
+
+    try {
+      if (dockRaf != null) cancelAnimationFrame(dockRaf);
+    } catch (_e) {
+      // ignore
+    }
+    dockRaf = null;
+    try {
+      globalThis.removeEventListener?.('resize', dockResize as any);
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      root.removeAttribute('data-webclipper-comments-dock');
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      root.style.removeProperty('--webclipper-comments-dock-width');
+    } catch (_e) {
+      // ignore
+    }
+  }
 
   const syncThemeAttr = () => {
     const theme = document.documentElement?.getAttribute?.('data-theme');
@@ -206,9 +320,11 @@ export function mountThreadedCommentsPanel(
     if (open) {
       el.setAttribute('data-open', '1');
       setImportantStyle(el, 'display', 'block');
+      setDockOpen(true);
     } else {
       el.removeAttribute('data-open');
       setImportantStyle(el, 'display', 'none');
+      setDockOpen(false);
     }
   }
 
@@ -496,6 +612,12 @@ export function mountThreadedCommentsPanel(
   host.appendChild(el);
 
   const cleanup = () => {
+    // Ensure we restore page layout even if the panel is removed while open.
+    try {
+      setDockOpen(false);
+    } catch (_e) {
+      // ignore
+    }
     try {
       themeObserver?.disconnect?.();
     } catch (_e) {
