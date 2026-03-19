@@ -30,10 +30,6 @@ function ensurePanel(): { el: HTMLElement; api: ThreadedCommentsPanelApi } {
 const apiRef: InpageCommentsPanelApi = {
   open(input) {
     const { api } = ensurePanel();
-    if (api.isOpen()) {
-      api.close();
-      return;
-    }
     api.open({ focusComposer: input?.focusEditor === true });
   },
   close() {

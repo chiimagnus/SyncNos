@@ -43,7 +43,7 @@ describe('inpage comments sidebar toggle', () => {
     cleanupDom();
   });
 
-  it('renders as a docked sidebar without the legacy close button and toggles closed on repeat open', () => {
+  it('renders as a docked sidebar with a collapse button; repeat open keeps it open', () => {
     const api = getInpageCommentsPanelApi();
 
     api.open({ focusEditor: true });
@@ -55,11 +55,15 @@ describe('inpage comments sidebar toggle', () => {
 
     const shadow = host?.shadowRoot;
     expect(shadow).toBeTruthy();
-    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__close')).toBeFalsy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__header-title')).toBeTruthy();
+    const collapse = shadow?.querySelector('.webclipper-inpage-comments-panel__collapse') as HTMLButtonElement | null;
+    expect(collapse).toBeTruthy();
 
     api.open({ focusEditor: true });
 
+    expect(api.isOpen()).toBe(true);
+
+    collapse?.click();
     expect(api.isOpen()).toBe(false);
   });
 });

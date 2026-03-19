@@ -167,11 +167,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
       // ignore
     }
 
-    if (api.isOpen()) {
-      api.close();
-      return;
-    }
-
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
     activeQuoteText = quoteText;

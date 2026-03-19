@@ -70,6 +70,7 @@
 
 .webclipper-inpage-comments-panel__header-title {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -77,6 +78,10 @@
   font-size: 13px;
   font-weight: 900;
   letter-spacing: -0.01em;
+}
+
+.webclipper-inpage-comments-panel__collapse {
+  margin-left: auto;
 }
 
 .webclipper-inpage-comments-panel__body {

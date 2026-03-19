@@ -222,6 +222,24 @@ export function mountThreadedCommentsPanel(
     headerTitle.className = 'webclipper-inpage-comments-panel__header-title';
     headerTitle.textContent = t('articleCommentsHeading');
     header.appendChild(headerTitle);
+
+    if (options.overlay) {
+      const collapse = document.createElement('button');
+      collapse.type = 'button';
+      collapse.className =
+        'webclipper-inpage-comments-panel__collapse webclipper-btn webclipper-btn--icon webclipper-btn--icon-sm webclipper-btn--tone-muted';
+      const collapseLabel = t('closeCommentsSidebar');
+      collapse.setAttribute('aria-label', collapseLabel);
+      collapse.setAttribute('title', collapseLabel);
+      collapse.innerHTML = [
+        '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">',
+        '<path d="M6.25 3.25L9.5 6.5L6.25 9.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />',
+        '<path d="M9.3 6.5H3.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />',
+        '</svg>',
+      ].join('');
+      collapse.addEventListener('click', () => apiRef.close());
+      header.appendChild(collapse);
+    }
   }
 
   const body = document.createElement('div');
@@ -355,9 +373,10 @@ export function mountThreadedCommentsPanel(
 
   const apiRef: ThreadedCommentsPanelApi = {
     open(input) {
+      const wasOpen = el.getAttribute('data-open') === '1';
       setOpen(true);
       try {
-        body.scrollTop = 0;
+        if (!wasOpen) body.scrollTop = 0;
       } catch (_e) {
         // ignore
       }
