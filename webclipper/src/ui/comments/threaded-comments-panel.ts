@@ -89,10 +89,6 @@ export function mountThreadedCommentsPanel(
   style.textContent = PANEL_SHADOW_CSS;
   shadow.appendChild(style);
 
-  const backdrop = document.createElement('div');
-  backdrop.className = 'webclipper-inpage-comments-panel__backdrop';
-  shadow.appendChild(backdrop);
-
   const surface = document.createElement('div');
   surface.className = 'webclipper-inpage-comments-panel__surface';
   shadow.appendChild(surface);
@@ -170,10 +166,6 @@ export function mountThreadedCommentsPanel(
     },
   };
 
-  function isOverlay(): boolean {
-    return el.getAttribute('data-overlay') === '1';
-  }
-
   function refreshButtons() {
     const text = String((composerTextarea as any).value || '').trim();
     composerSend.disabled = state.busy || !text;
@@ -214,10 +206,6 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  backdrop.addEventListener('click', () => {
-    if (!isOverlay()) return;
-    apiRef.close();
-  });
   closeBtn.addEventListener('click', () => apiRef.close());
 
   composerTextarea.addEventListener('input', () => refreshButtons());
@@ -506,16 +494,6 @@ export function mountThreadedCommentsPanel(
       refreshButtons();
     },
   };
-
-  function syncOverlayVisibility() {
-    try {
-      backdrop.style.display = 'none';
-      closeBtn.style.display = 'inline-flex';
-    } catch (_e) {
-      // ignore
-    }
-  }
-  syncOverlayVisibility();
 
   if (!options.overlay) {
     // Embedded mode: keep it visible by default.

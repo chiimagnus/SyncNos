@@ -4,8 +4,6 @@
   --panel-text: var(--text-primary, rgb(44 48 56));
   --panel-text-muted: var(--text-secondary, rgb(99 107 120));
   --panel-border: var(--border, rgb(216 220 226));
-  --panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-  --panel-backdrop: var(--bg-overlay, rgba(0, 0, 0, 0.45));
   --panel-accent: var(--accent, rgb(255 198 173));
   --panel-accent-foreground: var(--accent-foreground, var(--panel-text));
   --panel-danger: var(--error, rgb(229 62 62));
@@ -30,13 +28,6 @@
   isolation: isolate;
 }
 
-.webclipper-inpage-comments-panel__backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--panel-backdrop);
-  display: none;
-}
-
 .webclipper-inpage-comments-panel__surface {
   position: relative;
   inset: auto;
@@ -59,10 +50,6 @@
   z-index: 2147483647;
 }
 
-:host([data-overlay='1']) .webclipper-inpage-comments-panel__backdrop {
-  display: none;
-}
-
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__surface {
   position: absolute;
   inset: 0;
@@ -78,10 +65,6 @@
   padding: 10px 10px 0 10px;
   border-bottom: 0;
   background: transparent;
-}
-
-.webclipper-inpage-comments-panel__title {
-  display: none;
 }
 
 .webclipper-inpage-comments-panel__close {
