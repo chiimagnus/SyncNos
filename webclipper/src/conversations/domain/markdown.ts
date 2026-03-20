@@ -17,8 +17,10 @@ function formatIso(ts?: number) {
 export function sanitizeFilenamePart(value: unknown, fallback: string, maxLen: number = 80) {
   const raw = String(value ?? '').trim();
   const cleaned = raw
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/\s+/g, ' ')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .trim();
   const limit = Number.isFinite(Number(maxLen)) ? Math.max(1, Math.floor(Number(maxLen))) : 80;
   return cleaned.slice(0, limit) || fallback;
