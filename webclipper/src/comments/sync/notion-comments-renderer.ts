@@ -45,16 +45,21 @@ function paragraphBlock(content: string) {
   } as any;
 }
 
-function bulletedItemBlock(content: string, continuation?: string[]) {
-  const children = Array.isArray(continuation) && continuation.length
-    ? continuation.map((p) => paragraphBlock(p))
-    : undefined;
+function bulletedItemBlock(content: string, continuation?: string[], extraChildren?: any[]) {
+  const children: any[] = [];
+  if (Array.isArray(continuation) && continuation.length) {
+    children.push(...continuation.map((p) => paragraphBlock(p)));
+  }
+  if (Array.isArray(extraChildren) && extraChildren.length) {
+    children.push(...extraChildren);
+  }
+  const resolvedChildren = children.length ? children : undefined;
   return {
     object: 'block',
     type: 'bulleted_list_item',
     bulleted_list_item: {
       rich_text: [textRich(content)],
-      ...(children ? { children } : null),
+      ...(resolvedChildren ? { children: resolvedChildren } : null),
     },
   } as any;
 }
@@ -95,21 +100,24 @@ export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
 
     const rootText = safeString(root.commentText);
     const rootParts = splitText(rootText);
-    if (rootParts.length) {
-      items += 1;
-      blocks.push(bulletedItemBlock(rootParts[0]!, rootParts.slice(1)));
-    }
-
     const replies = byParentId.get(Number(root.id)) || [];
+    const replyBlocks: any[] = [];
     for (const reply of replies) {
       const replyText = safeString(reply?.commentText);
       const replyParts = splitText(replyText);
       if (!replyParts.length) continue;
       items += 1;
-      blocks.push(bulletedItemBlock(`↳ ${replyParts[0]}`, replyParts.slice(1)));
+      replyBlocks.push(bulletedItemBlock(replyParts[0]!, replyParts.slice(1)));
+    }
+
+    if (rootParts.length) {
+      items += 1;
+      blocks.push(bulletedItemBlock(rootParts[0]!, rootParts.slice(1), replyBlocks));
+    } else if (replyBlocks.length) {
+      // No root comment text: keep replies visible as a top-level bullet group.
+      blocks.push(...replyBlocks);
     }
   }
 
   return { blocks, threads, items };
 }
-
