@@ -10,6 +10,9 @@
 
   --quote-bg: color-mix(in srgb, var(--tertiary, rgb(232 200 106)) 18%, transparent);
   --quote-border: color-mix(in srgb, var(--tertiary, rgb(232 200 106)) 55%, var(--panel-border));
+  --comments-panel-body-padding-x: 12px;
+  --comments-panel-body-padding-y: 10px;
+  --comments-panel-body-padding-bottom: 20px;
 
   position: relative;
   width: 100%;
@@ -38,6 +41,10 @@
 }
 
 :host([data-overlay='1']) {
+  --comments-panel-body-padding-x: 24px;
+  --comments-panel-body-padding-y: 22px;
+  --comments-panel-body-padding-bottom: 32px;
+
   position: fixed;
   top: 0;
   right: 0;
@@ -88,12 +95,11 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 10px 12px 20px 12px;
-}
-
-:host([data-overlay='1']) .webclipper-inpage-comments-panel__body {
-  /* Match AppShell's comments sidebar (outer 12px padding + panel body padding). */
-  padding: 22px 24px 32px 24px;
+  padding:
+    var(--comments-panel-body-padding-y)
+    var(--comments-panel-body-padding-x)
+    var(--comments-panel-body-padding-bottom)
+    var(--comments-panel-body-padding-x);
 }
 
 .webclipper-inpage-comments-panel__quote {

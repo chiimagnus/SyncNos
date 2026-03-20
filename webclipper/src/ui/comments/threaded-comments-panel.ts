@@ -72,6 +72,7 @@ type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
   showHeader?: boolean;
+  showCollapseButton?: boolean;
   // When `true`, opening the overlay panel will "dock" the host page content by
   // applying right padding to `document.documentElement` so the page is not
   // covered by the sidebar. Intended for inpage content-scripts only.
@@ -86,6 +87,7 @@ export function mountThreadedCommentsPanel(
   if (options.overlay) el.setAttribute('data-overlay', '1');
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
   const showHeader = options.showHeader !== false;
+  const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
   const dockPage = options.dockPage === true && options.overlay === true;
 
   const DOCK_STYLE_ID = 'webclipper-inpage-comments-panel__dock-style';
@@ -236,7 +238,7 @@ export function mountThreadedCommentsPanel(
     headerTitle.textContent = t('articleCommentsHeading');
     header.appendChild(headerTitle);
 
-    if (options.overlay) {
+    if (showCollapseButton) {
       const collapse = document.createElement('button');
       collapse.type = 'button';
       collapse.className =
