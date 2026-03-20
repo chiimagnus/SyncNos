@@ -90,7 +90,7 @@ vi.mock('../../src/ui/conversations/ArticleCommentsSidebar', () => ({
       },
       createElement(
         'button',
-        { type: 'button', onClick: onClose, 'aria-label': 'Collapse comments sidebar' },
+        { type: 'button', onClick: onClose, 'aria-label': 'mock-close-sidebar' },
         'close-sidebar',
       ),
       createElement('div', null, 'comments-sidebar'),
@@ -172,7 +172,7 @@ describe('AppShell comments sidebar', () => {
     expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-focus-signal')).toBe('2');
 
-    const closeBtn = document.querySelector('[aria-label="Collapse comments sidebar"]') as HTMLButtonElement | null;
+    const closeBtn = document.querySelector('[aria-label="mock-close-sidebar"]') as HTMLButtonElement | null;
     expect(closeBtn).toBeTruthy();
 
     act(() => {
