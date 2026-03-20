@@ -597,7 +597,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             source: convo.source,
             messagesList: messages
           });
-          const blocks = built.blocks;
+          const blocks = Array.isArray(built.blocks) ? built.blocks : [];
           if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
@@ -662,7 +662,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             source: convo.source,
             messagesList: messages
           });
-          const blocks = built.blocks;
+          const blocks = Array.isArray(built.blocks) ? built.blocks : [];
           if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
@@ -710,7 +710,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             source: convo.source,
             messagesList: inc.newMessages
           });
-          const blocks = built.blocks;
+          const blocks = Array.isArray(built.blocks) ? built.blocks : [];
           if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
           if (blocks.length) {
             trace.mark("append children");
