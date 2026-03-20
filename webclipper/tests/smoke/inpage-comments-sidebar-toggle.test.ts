@@ -46,7 +46,7 @@ describe('inpage comments sidebar toggle', () => {
   it('renders as a docked sidebar with a collapse button; repeat open keeps it open', () => {
     const api = getInpageCommentsPanelApi();
 
-    api.open({ focusEditor: true });
+    api.open({ focusComposer: true });
 
     expect(api.isOpen()).toBe(true);
 
@@ -59,7 +59,7 @@ describe('inpage comments sidebar toggle', () => {
     const collapse = shadow?.querySelector('.webclipper-inpage-comments-panel__collapse') as HTMLButtonElement | null;
     expect(collapse).toBeTruthy();
 
-    api.open({ focusEditor: true });
+    api.open({ focusComposer: true });
 
     expect(api.isOpen()).toBe(true);
 
