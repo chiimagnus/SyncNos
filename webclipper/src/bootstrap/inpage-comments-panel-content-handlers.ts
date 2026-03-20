@@ -43,7 +43,7 @@ function pickQuoteFromSelection(fallback: unknown): string {
 }
 
 export type InpageCommentsPanelController = {
-  open: (input?: { tabId?: number | null; selectionText?: string | null; focusEditor?: boolean; ensureArticle?: boolean }) => Promise<void>;
+  open: (input?: { tabId?: number | null; selectionText?: string | null; focusComposer?: boolean; ensureArticle?: boolean }) => Promise<void>;
 };
 
 export function createInpageCommentsPanelController(runtime: RuntimeClient | null): InpageCommentsPanelController {
@@ -160,7 +160,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
   bindPanelHandlers();
 
-  async function open(input?: { tabId?: number | null; selectionText?: string | null; focusEditor?: boolean; ensureArticle?: boolean }) {
+  async function open(input?: { tabId?: number | null; selectionText?: string | null; focusComposer?: boolean; ensureArticle?: boolean }) {
     // Only handle on top frame to avoid duplicate panels.
     try {
       if (globalThis.top && globalThis.top !== globalThis.self) return;
@@ -171,7 +171,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
     sidebarSession.setQuoteText(quoteText);
-    sidebarSession.requestOpen({ focusComposer: input?.focusEditor === true, source: 'inpage' });
+    sidebarSession.requestOpen({ focusComposer: input?.focusComposer === true, source: 'inpage' });
 
     const ensureArticle = input?.ensureArticle !== false;
     sidebarSession.setBusy(true);
@@ -213,7 +213,7 @@ export function registerInpageCommentsPanelContentHandlers(runtime: RuntimeClien
       .open({
         tabId: normalizeConversationId(msg?.payload?.tabId) || null,
         selectionText: msg?.payload?.selectionText,
-        focusEditor: true,
+        focusComposer: true,
         ensureArticle: true,
       })
       .finally(() => {

@@ -4,7 +4,6 @@ import type { CommentSidebarPanelApi } from '../../comments/sidebar/comment-side
 export type InpageCommentItem = ThreadedCommentItem;
 export type InpageCommentsPanelOpenInput = {
   focusComposer?: boolean;
-  focusEditor?: boolean;
 };
 
 export type InpageCommentsPanelApi = Omit<CommentSidebarPanelApi, 'open'> & {
@@ -25,7 +24,13 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   }
 
   const host = document.documentElement;
-  const { el, api } = mountThreadedCommentsPanel(host, { overlay: true, dockPage: true, initiallyOpen: false });
+  const { el, api } = mountThreadedCommentsPanel(host, {
+    overlay: true,
+    dockPage: true,
+    initiallyOpen: false,
+    showHeader: true,
+    showCollapseButton: true,
+  });
   el.id = PANEL_ID;
 
   (el as any).__webclipperPanelApi = api;
@@ -36,7 +41,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
 const apiRef: InpageCommentsPanelApi = {
   open(input) {
     const { api } = ensurePanel();
-    api.open({ focusComposer: input?.focusComposer === true || input?.focusEditor === true });
+    api.open({ focusComposer: input?.focusComposer === true });
   },
   close() {
     if (!singleton) return;
