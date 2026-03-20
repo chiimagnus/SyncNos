@@ -50,6 +50,7 @@
   - 历史会话不会自动补齐；需在 detail header 手动触发 `cache-images` 工具动作回填。
   - `article` 会话不显示该工具动作。
 - 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId，不进入 Notion / Obsidian / Zip v2。
+- 文章评论 / 注释线程现在由 `comments/sidebar/comment-sidebar-session.ts` 统一 open / close / quote / focus / busy 语义；不要再假定存在锚点定位消息或 `inpage-comments-locate-content-handlers.ts`。
 - 安装后引导策略：`src/entrypoints/background.ts` 仅在 `details.reason === 'install'` 时自动打开 `Settings -> About`；扩展更新后不再自动弹出设置页。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
 - Settings section 分组真源在 `src/ui/settings/types.ts`：

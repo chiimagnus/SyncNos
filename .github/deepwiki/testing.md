@@ -49,7 +49,7 @@
 1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
 2. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开 popup、多击提示、popup 列表刷新。
 3. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
-4. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除、锚点定位都可用；刷新后评论仍在本地；如果从外部恢复备份，注意当前版本不会带回 `article_comments`。
+4. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除都可用；刷新后评论仍在本地；如果从外部恢复备份，注意当前版本不会带回 `article_comments`。
 5. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save / AI chat cache images` 设置行为。
 6. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
 7. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。

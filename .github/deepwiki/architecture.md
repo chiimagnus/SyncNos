@@ -44,7 +44,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | --- | --- | --- | --- |
 | collectors | `src/collectors/` | 站点识别、DOM 抽取、消息标准化 | `register-all.ts`, 各站点 collector |
 | conversations | `src/conversations/` | IndexedDB CRUD、本地事实源、UI 读取面 | `storage-idb.ts`, background handlers |
-| comments | `src/comments/` | article 详情评论线程、回复 / 删除、锚点定位 | `background/handlers.ts`, `data/storage-idb.ts`, `ArticleCommentsSection.tsx` |
+| comments | `src/comments/` | article 详情评论线程、回复 / 删除、shared session 与 inpage 面板 | `background/handlers.ts`, `data/storage-idb.ts`, `ArticleCommentsSection.tsx` |
 | sync | `src/sync/` | Notion / Obsidian / 备份的编排层 | `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
 | ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层，以及主题模式、窄屏 list/detail 路由和会话级动作解析 | `ConversationsScene.tsx`, `SettingsScene.tsx`, `useThemeMode.ts`, `pending-open.ts` |
 | messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts`（含 `BACKFILL_CONVERSATION_IMAGES`） |
@@ -144,7 +144,7 @@ flowchart TB
 - `webclipper/src/ui/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
+- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
 - `webclipper/src/integrations/detail-header-actions.ts`

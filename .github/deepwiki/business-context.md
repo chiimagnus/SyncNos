@@ -119,7 +119,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/ui/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
+- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
 - `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`

@@ -40,7 +40,7 @@
 | `ai_chat_cache_images_enabled` | 控制 chat 消息采集时是否尝试图片内联的设置键 | `useSettingsSceneController.ts`, `conversations/background/handlers.ts` |
 | detail header `tools` slot | 会话详情头的工具动作槽位，和 `open / chat-with` 并列 | `detail-header-action-types.ts`, `DetailHeaderActionBar.tsx` |
 | `cache-images` | chat detail 中触发历史消息图片回填的工具动作 id | `conversations-context.tsx` |
-| `OPEN_INPAGE_COMMENTS_PANEL` / `LOCATE_INPAGE_COMMENT_ANCHOR` | 打开页面内评论面板与定位正文锚点的内容脚本消息 | `message-contracts.ts`, `inpage-comments-panel-content-handlers.ts`, `inpage-comments-locate-content-handlers.ts` |
+| `OPEN_INPAGE_COMMENTS_PANEL` | 打开页面内评论面板的内容脚本消息 | `message-contracts.ts`, `inpage-comments-panel-content-handlers.ts` |
 | `adaptiveMaxHeight` | `SelectMenu` 的动态面板高度开关；启用后菜单高度由当前可视区域计算而不是固定值 | `SelectMenu.tsx`, `ConversationListPane.tsx` |
 | clipping rect | `SelectMenu` 计算可用高度时找到的最近 overflow 裁剪容器矩形 | `findNearestClippingRect()` |
 
@@ -89,7 +89,7 @@
 - `webclipper/src/ui/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
+- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/integrations/detail-header-action-types.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
