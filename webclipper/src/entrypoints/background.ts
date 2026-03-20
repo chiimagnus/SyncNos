@@ -16,6 +16,7 @@ import { registerObsidianSettingsHandlers } from '../sync/obsidian/settings-back
 import { onInstalled } from '../platform/runtime/runtime';
 import { openOrFocusExtensionAppTab } from '../platform/webext/extension-app';
 import { registerClipperContextMenu } from '../platform/context-menus/clipper-context-menu';
+import { storageRemove } from '../platform/storage/local';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -62,6 +63,8 @@ export default defineBackground(() => {
     ensureDefaultNotionOAuthClientId().catch(() => {});
     setupNotionOAuthNavigationListener();
     registerClipperContextMenu();
+    // Feature removed: purge legacy Notion AI model index setting.
+    storageRemove(['notion_ai_preferred_model_index']).catch(() => {});
     onInstalled((details) => {
       ensureDefaultNotionOAuthClientId().catch(() => {});
       // Do not auto-open tabs after extension updates.

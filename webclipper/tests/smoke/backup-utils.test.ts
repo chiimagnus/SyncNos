@@ -11,7 +11,6 @@ describe("backup-utils", () => {
       notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings",
       popup_source_filter_key: "all",
-      notion_ai_preferred_model_index: 3,
       last_backup_export_at: 1700000000000,
       notion_oauth_token_v1: { accessToken: "secret" },
       obsidian_api_key: "obsidian-key"
@@ -23,7 +22,6 @@ describe("backup-utils", () => {
       notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings",
       popup_source_filter_key: "all",
-      notion_ai_preferred_model_index: 3,
       last_backup_export_at: 1700000000000,
       obsidian_api_key: "obsidian-key"
     });

@@ -14,7 +14,6 @@ import { BackupSection } from './sections/BackupSection';
 import { ChatWithAiSection } from './sections/ChatWithAiSection';
 import { InsightSection } from './sections/InsightSection';
 import { InpageSection } from './sections/InpageSection';
-import { NotionAISection } from './sections/NotionAISection';
 import { NotionOAuthSection } from './sections/NotionOAuthSection';
 import { ObsidianSettingsSection } from './sections/ObsidianSettingsSection';
 
@@ -60,21 +59,16 @@ export function SettingsScene(props: SettingsSceneProps) {
     notionConnected,
     pollingNotion,
     loadingNotionPages,
-    notionParentPageId,
-    notionPageOptions,
-    notionStatusText,
-    notionAiModelIndex,
-    setNotionAiModelIndex,
-    onNotionConnectOrDisconnect,
-    onSaveNotionParentPage,
-    onLoadNotionPages,
-    onSaveNotionAiModelIndex,
-    onResetNotionAiModelIndex,
-    notionAiRef,
+	    notionParentPageId,
+	    notionPageOptions,
+	    notionStatusText,
+	    onNotionConnectOrDisconnect,
+	    onSaveNotionParentPage,
+	    onLoadNotionPages,
 
-    chatWithPromptTemplate,
-    setChatWithPromptTemplate,
-    chatWithMaxChars,
+	    chatWithPromptTemplate,
+	    setChatWithPromptTemplate,
+	    chatWithMaxChars,
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
@@ -132,9 +126,9 @@ export function SettingsScene(props: SettingsSceneProps) {
 
   const renderDetailContent = () => (
     <section className={`route-scroll tw-mx-auto tw-grid tw-w-full ${detailMaxWidthClassName} tw-gap-4 tw-pr-1`}>
-      {activeSection === 'notion' ? (
-        <>
-          <NotionOAuthSection
+	      {activeSection === 'notion' ? (
+	        <>
+	          <NotionOAuthSection
             busy={busy}
             syncEnabled={notionSyncEnabled}
             notionStatusText={notionStatusText}
@@ -153,26 +147,12 @@ export function SettingsScene(props: SettingsSceneProps) {
             onSaveNotionParentPage={(id) => {
               void onSaveNotionParentPage(id);
             }}
-            onLoadNotionPages={() => {
-              void onLoadNotionPages();
-            }}
-          />
-
-          <div ref={notionAiRef} id="settings-notion-ai">
-            <NotionAISection
-              busy={busy}
-              modelIndex={notionAiModelIndex}
-              onChangeModelIndex={setNotionAiModelIndex}
-              onSave={() => {
-                void onSaveNotionAiModelIndex();
-              }}
-              onReset={() => {
-                void onResetNotionAiModelIndex();
-              }}
-            />
-          </div>
-        </>
-      ) : null}
+	            onLoadNotionPages={() => {
+	              void onLoadNotionPages();
+	            }}
+	          />
+	        </>
+	      ) : null}
 
       {activeSection === 'chat_with' ? (
         <ChatWithAiSection
