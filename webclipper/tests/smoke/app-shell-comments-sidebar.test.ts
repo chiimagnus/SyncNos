@@ -71,13 +71,13 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
     ),
 }));
 
-vi.mock('../../src/ui/conversations/ArticleCommentsSidebar', () => ({
-  ArticleCommentsSidebar: ({
-    onClose,
+vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
+  ArticleCommentsSection: ({
+    onRequestClose,
     quoteText,
     focusComposerSignal,
   }: {
-    onClose: () => void;
+    onRequestClose: () => void;
     quoteText?: string;
     focusComposerSignal?: number;
   }) =>
@@ -90,7 +90,7 @@ vi.mock('../../src/ui/conversations/ArticleCommentsSidebar', () => ({
       },
       createElement(
         'button',
-        { type: 'button', onClick: onClose, 'aria-label': 'mock-close-sidebar' },
+        { type: 'button', onClick: onRequestClose, 'aria-label': 'mock-close-sidebar' },
         'close-sidebar',
       ),
       createElement('div', null, 'comments-sidebar'),

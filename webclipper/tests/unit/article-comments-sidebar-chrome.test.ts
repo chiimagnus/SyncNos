@@ -27,7 +27,7 @@ vi.mock('../../src/platform/runtime/ports', () => ({
   }),
 }));
 
-import { ArticleCommentsSidebar } from '../../src/ui/conversations/ArticleCommentsSidebar';
+import { ArticleCommentsSection } from '../../src/ui/conversations/ArticleCommentsSection';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -62,7 +62,7 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
-describe('ArticleCommentsSidebar shared chrome', () => {
+describe('ArticleCommentsSection shared chrome', () => {
   let root: ReactDOM.Root | null = null;
 
   beforeEach(() => {
@@ -81,10 +81,10 @@ describe('ArticleCommentsSidebar shared chrome', () => {
   it('renders the shared panel header and collapse control inside the sidebar shell', async () => {
     await act(async () => {
       root!.render(
-        createElement(ArticleCommentsSidebar, {
+        createElement(ArticleCommentsSection, {
           conversationId: 21,
           canonicalUrl: 'https://example.com/article',
-          onClose: vi.fn(),
+          onRequestClose: vi.fn(),
         }),
       );
     });
@@ -97,6 +97,6 @@ describe('ArticleCommentsSidebar shared chrome', () => {
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__header-title')?.textContent).toBe('Comments');
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__collapse')).toBeTruthy();
     expect(document.querySelector('[aria-label="Collapse comments sidebar"]')).toBeFalsy();
-    expect(document.querySelector('[aria-label="Comments"]')).toBeTruthy();
+    expect(document.querySelector('section')).toBeTruthy();
   });
 });

@@ -6,7 +6,7 @@ import { CapturedListSidebar } from './conversations/CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
-import { ArticleCommentsSidebar } from '../conversations/ArticleCommentsSidebar';
+import { ArticleCommentsSection } from '../conversations/ArticleCommentsSection';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
@@ -240,12 +240,13 @@ export default function AppShell() {
 
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0 tw-w-[min(420px,36vw)] tw-min-w-[340px] tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
-                  <ArticleCommentsSidebar
+                  <ArticleCommentsSection
                     conversationId={Number((selectedConversation as any)?.id || 0)}
                     canonicalUrl={canonicalUrl}
                     quoteText={commentsSidebarSnapshot.quoteText}
                     focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
-                    onClose={() => commentsSidebarSession.requestClose()}
+                    containerClassName="tw-h-full tw-min-h-0 tw-flex-1"
+                    onRequestClose={() => commentsSidebarSession.requestClose()}
                   />
                 </div>
               ) : null}
