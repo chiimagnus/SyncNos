@@ -10,7 +10,7 @@ import notionApiDefault from './notion-api.ts';
 import notionFilesApiDefault from './notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '../../platform/storage/local';
-import { buildNotionCommentsBlocks } from '../../comments/sync/notion-comments-renderer';
+import { buildNotionCommentsBlocks, computeNotionCommentsDigest } from '../../comments/sync/notion-comments-renderer';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -666,11 +666,23 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           trace.mark("build blocks");
           let blocks: any[] = [];
           let built: any = null;
+          let webArticleCommentsDigest: string | null = null;
           if (isWebArticleConversation(convo)) {
-            const comments =
-              storage && typeof storage.getArticleCommentsByConversationId === 'function'
-                ? await storage.getArticleCommentsByConversationId(id)
-                : [];
+            let comments: any[] = [];
+            if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
+              try {
+                const url = String(convo?.url || '').trim();
+                if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
+                  // eslint-disable-next-line no-await-in-loop
+                  await storage.attachOrphanArticleCommentsToConversation(url, id);
+                }
+              } catch (_e) {
+                // ignore
+              }
+              // eslint-disable-next-line no-await-in-loop
+              comments = await storage.getArticleCommentsByConversationId(id);
+              webArticleCommentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
+            }
             // eslint-disable-next-line no-await-in-loop
             built = await buildNotionWebArticlePageBlocks({
               notionSyncService,
@@ -706,7 +718,17 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
-            await storage.setSyncCursor(id, nextCursor);
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              ...(isWebArticleConversation(convo)
+                ? {
+                  notionWebArticleLayoutVersion: 1,
+                  ...(typeof webArticleCommentsDigest === 'string'
+                    ? { notionCommentsDigest: webArticleCommentsDigest }
+                    : null),
+                }
+                : null),
+            });
           }
           setResultAt(index, {
             conversationId: id,
@@ -732,6 +754,33 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
         }
 
+        let articleComments: any[] | null = null;
+        let articleCommentsDigest: string | null = null;
+        let shouldRebuildForArticleLayout = false;
+        if (isWebArticleConversation(convo) && storage) {
+          const canListComments = typeof storage.getArticleCommentsByConversationId === 'function';
+          if (canListComments) {
+            try {
+              const url = String(convo?.url || '').trim();
+              if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
+                // eslint-disable-next-line no-await-in-loop
+                await storage.attachOrphanArticleCommentsToConversation(url, id);
+              }
+            } catch (_e) {
+              // ignore
+            }
+
+            // eslint-disable-next-line no-await-in-loop
+            articleComments = await storage.getArticleCommentsByConversationId(id);
+            articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+            const prevDigest = String(mapping?.notionCommentsDigest || '');
+            const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
+            const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 1;
+            shouldRebuildForArticleLayout = !layoutApplied || prevDigest !== String(articleCommentsDigest || '');
+            if (shouldRebuildForArticleLayout) shouldRebuild = true;
+          }
+        }
+
         if (shouldRebuild) {
           if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
           await writeRunningJob({
@@ -752,10 +801,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           let blocks: any[] = [];
           let built: any = null;
           if (isWebArticleConversation(convo)) {
-            const comments =
-              storage && typeof storage.getArticleCommentsByConversationId === 'function'
-                ? await storage.getArticleCommentsByConversationId(id)
-                : [];
+            const comments = articleComments != null ? articleComments : [];
             // eslint-disable-next-line no-await-in-loop
             built = await buildNotionWebArticlePageBlocks({
               notionSyncService,
@@ -791,7 +837,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
-            await storage.setSyncCursor(id, nextCursor);
+            await storage.setSyncCursor(id, {
+              ...nextCursor,
+              ...(isWebArticleConversation(convo)
+                ? {
+                  notionWebArticleLayoutVersion: 1,
+                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
+                }
+                : null),
+            });
           }
           setResultAt(index, {
             conversationId: id,

@@ -121,3 +121,27 @@ export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
 
   return { blocks, threads, items };
 }
+
+function fnv1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  // >>> 0 to make unsigned
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+export function computeNotionCommentsDigest(comments: ArticleComment[]): string {
+  const list = Array.isArray(comments) ? comments.slice() : [];
+  list.sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0));
+  const normalized = list.map((c) => ({
+    id: Number(c?.id || 0),
+    parentId: c?.parentId == null ? null : Number(c.parentId),
+    createdAt: Number(c?.createdAt || 0),
+    updatedAt: Number(c?.updatedAt || 0),
+    quoteText: safeString(c?.quoteText),
+    commentText: safeString(c?.commentText),
+  }));
+  return fnv1a32(JSON.stringify(normalized));
+}

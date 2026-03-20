@@ -82,4 +82,35 @@ describe('notion article comments blocks', () => {
     expect(children.length).toBeGreaterThan(0);
     expect(children.every((c: any) => c && c.type === 'paragraph')).toBe(true);
   });
+
+  it('computes stable digest for comments and changes on deletion', async () => {
+    const renderer = await loadNotionCommentsRenderer();
+    const comments = [
+      {
+        id: 1,
+        parentId: null,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        quoteText: 'Quoted',
+        commentText: 'A',
+        createdAt: 100,
+        updatedAt: 100,
+      },
+      {
+        id: 2,
+        parentId: 1,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        quoteText: '',
+        commentText: 'B',
+        createdAt: 110,
+        updatedAt: 110,
+      },
+    ];
+
+    const d1 = renderer.computeNotionCommentsDigest(comments);
+    const d2 = renderer.computeNotionCommentsDigest(comments.slice(0, 1));
+    expect(String(d1)).not.toBe(String(d2));
+    expect(renderer.computeNotionCommentsDigest(comments)).toBe(d1);
+  });
 });

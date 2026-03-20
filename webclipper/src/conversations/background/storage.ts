@@ -10,6 +10,10 @@ import {
   syncConversationMessages,
   upsertConversation,
 } from '../data/storage-idb';
+import {
+  attachOrphanCommentsToConversation as attachOrphanArticleCommentsToConversation,
+  listArticleCommentsByConversationId as getArticleCommentsByConversationId,
+} from '../../comments/data/storage';
 
 export const backgroundStorage = {
   upsertConversation,
@@ -22,4 +26,6 @@ export const backgroundStorage = {
   getSyncMappingByConversation,
   setSyncCursor,
   clearSyncCursor,
+  getArticleCommentsByConversationId,
+  attachOrphanArticleCommentsToConversation,
 };
