@@ -2,7 +2,7 @@
 
 ## 职责
 - 为 WebClipper 的 article 会话提供本地优先的 threaded comments。
-- 允许用户在 article detail 或 inpage comments panel 中添加、回复、删除评论，并把评论锚定到正文文本。
+- 允许用户在 article detail 或 inpage comments panel 中添加、回复、删除评论；当前只提供本地 threaded comments 与面板状态管理，不再做正文高亮回显。
 - 当前定位是**本地注释层**：它是 article 会话的一部分，但不进入 Notion / Obsidian / Zip v2 导出。
 
 ## 关键文件
@@ -15,9 +15,9 @@
 | `src/ui/conversations/ArticleCommentsSection.tsx` | article 详情评论区 | 在 article detail 中展示和刷新本地评论线程 |
 | `src/ui/comments/threaded-comments-panel.ts` | threaded comments 渲染器 | 负责评论树、编辑器、按钮状态与面板交互 |
 | `src/ui/inpage/inpage-comments-panel-shadow.ts` | inpage comments 面板壳 | 让页面内评论面板运行在独立 shadow root 中 |
-| `src/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments content bridge | 负责打开 panel、解析选区、首次解析 article 后附着 orphan 评论 |
-| `src/bootstrap/inpage-comments-locate-content-handlers.ts` | 评论锚点定位桥 | 把 quoteText + quoteContext 转成 DOM 高亮定位 |
-| `src/platform/messaging/message-contracts.ts` | 消息契约 | 定义 `COMMENTS_MESSAGE_TYPES`、`CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL`、`LOCATE_INPAGE_COMMENT_ANCHOR` |
+| `src/comments/sidebar/comment-sidebar-session.ts` | 评论侧边栏共享会话 | 统一 open / close / quote / focus / busy 语义，让 app 与 inpage 共用同一协议 |
+| `src/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments content bridge | 负责打开 panel、解析选区、首次解析 article 后附着 orphan 评论，并通过 shared session 管理状态 |
+| `src/platform/messaging/message-contracts.ts` | 消息契约 | 定义 `COMMENTS_MESSAGE_TYPES` 与 `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` |
 | `src/platform/idb/schema.ts` | IndexedDB schema | 在 `DB_VERSION = 7` 时创建 `article_comments` store 和索引 |
 | `tests/storage/article-comments-idb.test.ts` | 存储测试 | 覆盖 add / list / delete / replies / orphan attachment |
 
@@ -34,7 +34,7 @@
 
 - `article_comments` 是 article 的本地注释层，不参与 Notion / Obsidian 的增量同步。
 - 目前 Zip v2 备份不会带回 `article_comments`；如果用户依赖恢复，这一点要单独提醒。
-- `quoteContext` 只保存少量前后文（`prefix` / `suffix`），用于锚点定位时提高命中率，但不是全文备份。
+- 评论线程现在只保存 quoteText 与 threaded reply 结构；不再依赖正文定位上下文。
 
 ## 运行流程
 
@@ -72,7 +72,7 @@ sequenceDiagram
 1. 用户从页面内入口打开评论面板。
 2. `inpage-comments-panel-content-handlers.ts` 先解析选区 / quoteText，再尝试解析 article 对应的 `canonicalUrl` 和 `conversationId`。
 3. 若 article 还没建立 conversation，系统会先捕获/解析 article，再把 orphan 评论附着到新的 conversation。
-4. 面板内的“定位”动作会把 `quoteText + quoteContext` 交给内容脚本里的 text-quote 定位器，高亮正文锚点。
+4. 面板的 open / close / quote / focus / busy 状态现在由 `comment-sidebar-session.ts` 统一调度，不再做正文高亮回显。
 
 ## 消息契约
 
@@ -83,7 +83,6 @@ sequenceDiagram
 | `COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT` | 删除评论 | article detail, inpage comments panel |
 | `COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS` | 把先前无 conversation 的评论附着到 article | inpage comments panel |
 | `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` | 打开页面内评论面板 | context menu / content bridge |
-| `CONTENT_MESSAGE_TYPES.LOCATE_INPAGE_COMMENT_ANCHOR` | 定位正文锚点 | `ArticleCommentsSection.tsx`, inpage comments panel |
 
 - 评论相关消息会通过 background handlers 统一落库，而不是直接在 UI 中操作 IndexedDB。
 - `COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS` 支持按 `canonicalUrl` 或 `conversationId` 读取，方便 article detail 与 orphan attach 两条路径共用。
@@ -96,13 +95,13 @@ sequenceDiagram
 | `tests/storage/article-comments-idb.test.ts` | add / list / delete / replies / orphan attachment | 当前最直接的存储回归入口 |
 
 - 评论线程改动至少要跑 `tests/storage/article-comments-idb.test.ts`。
-- 若涉及锚点定位或 inpage 面板，建议再做一次 article detail + 页面内面板的人工冒烟。
+- 若涉及 article comments 或 inpage 面板，建议再做一次 article detail + 页面内面板的人工冒烟。
 - 备份 / 导入未覆盖 `article_comments`，因此如果你在做恢复链路改动，要把这条缺口放进验证清单。
 
 ## 修改热点
 - **改评论数据结构**：先看 `comments/data/storage-idb.ts`、`src/platform/idb/schema.ts`、`tests/storage/article-comments-idb.test.ts`。
 - **改 article detail UI**：先看 `ArticleCommentsSection.tsx`、`threaded-comments-panel.ts`。
-- **改页面内评论面板**：先看 `inpage-comments-panel-shadow.ts`、`inpage-comments-panel-content-handlers.ts`、`inpage-comments-locate-content-handlers.ts`。
+- **改页面内评论面板**：先看 `inpage-comments-panel-shadow.ts`、`inpage-comments-panel-content-handlers.ts`、`comments/sidebar/comment-sidebar-session.ts`。
 - **改消息契约**：先看 `message-contracts.ts` 和 background handlers，确保 UI / background / content 三端契约一致。
 
 ## 来源引用（Source References）
@@ -111,7 +110,7 @@ sequenceDiagram
 - `webclipper/src/comments/data/storage-idb.ts`
 - `webclipper/src/comments/anchor/text-quote-dom.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
+- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`

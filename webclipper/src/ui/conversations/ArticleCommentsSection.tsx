@@ -135,7 +135,11 @@ export function ArticleCommentsSection({
     if (apiRef.current) return;
     const host = hostRef.current;
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, {
+      overlay: false,
+      showHeader: true,
+      showCollapseButton: typeof onRequestClose === 'function',
+    });
     apiRef.current = mounted.api;
     mounted.api.setQuoteText(String(quoteTextRef.current || ''));
     mounted.api.setHandlers({

@@ -1,25 +1,36 @@
-import { mountThreadedCommentsPanel, type ThreadedCommentItem, type ThreadedCommentsPanelApi } from '../comments/threaded-comments-panel';
+import { mountThreadedCommentsPanel, type ThreadedCommentItem } from '../comments/threaded-comments-panel';
+import type { CommentSidebarPanelApi } from '../../comments/sidebar/comment-sidebar-contract';
 
 export type InpageCommentItem = ThreadedCommentItem;
-export type InpageCommentsPanelApi = Omit<ThreadedCommentsPanelApi, 'open'> & {
-  open: (input?: { focusEditor?: boolean }) => void;
+export type InpageCommentsPanelOpenInput = {
+  focusComposer?: boolean;
+};
+
+export type InpageCommentsPanelApi = Omit<CommentSidebarPanelApi, 'open'> & {
+  open: (input?: InpageCommentsPanelOpenInput) => void;
 };
 
 const PANEL_ID = 'webclipper-inpage-comments-panel';
 
-let singleton: { el: HTMLElement; api: ThreadedCommentsPanelApi } | null = null;
+let singleton: { el: HTMLElement; api: CommentSidebarPanelApi } | null = null;
 
-function ensurePanel(): { el: HTMLElement; api: ThreadedCommentsPanelApi } {
+function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
 
   const existing = document.getElementById(PANEL_ID) as HTMLElement | null;
   if (existing && (existing as any).__webclipperPanelApi) {
-    singleton = { el: existing, api: (existing as any).__webclipperPanelApi as ThreadedCommentsPanelApi };
+    singleton = { el: existing, api: (existing as any).__webclipperPanelApi as CommentSidebarPanelApi };
     return singleton;
   }
 
   const host = document.documentElement;
-  const { el, api } = mountThreadedCommentsPanel(host, { overlay: true, dockPage: true, initiallyOpen: false });
+  const { el, api } = mountThreadedCommentsPanel(host, {
+    overlay: true,
+    dockPage: true,
+    initiallyOpen: false,
+    showHeader: true,
+    showCollapseButton: true,
+  });
   el.id = PANEL_ID;
 
   (el as any).__webclipperPanelApi = api;
@@ -30,7 +41,7 @@ function ensurePanel(): { el: HTMLElement; api: ThreadedCommentsPanelApi } {
 const apiRef: InpageCommentsPanelApi = {
   open(input) {
     const { api } = ensurePanel();
-    api.open({ focusComposer: input?.focusEditor === true });
+    api.open({ focusComposer: input?.focusComposer === true });
   },
   close() {
     if (!singleton) return;

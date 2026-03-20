@@ -61,7 +61,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
         'button',
         {
           type: 'button',
-          onClick: () => onTriggerCommentsSidebar?.(''),
+          onClick: () => onTriggerCommentsSidebar?.('Selected quote'),
           'aria-label': 'Comment',
           'aria-pressed': commentsSidebarOpen ? 'true' : 'false',
         },
@@ -71,14 +71,26 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
     ),
 }));
 
-vi.mock('../../src/ui/conversations/ArticleCommentsSidebar', () => ({
-  ArticleCommentsSidebar: ({ onClose }: { onClose: () => void }) =>
+vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
+  ArticleCommentsSection: ({
+    onRequestClose,
+    quoteText,
+    focusComposerSignal,
+  }: {
+    onRequestClose: () => void;
+    quoteText?: string;
+    focusComposerSignal?: number;
+  }) =>
     createElement(
       'aside',
-      { 'aria-label': 'Comments sidebar' },
+      {
+        'aria-label': 'Comments sidebar',
+        'data-quote-text': quoteText || '',
+        'data-focus-signal': String(focusComposerSignal || 0),
+      },
       createElement(
         'button',
-        { type: 'button', onClick: onClose, 'aria-label': 'Collapse comments sidebar' },
+        { type: 'button', onClick: onRequestClose, 'aria-label': 'mock-close-sidebar' },
         'close-sidebar',
       ),
       createElement('div', null, 'comments-sidebar'),
@@ -150,14 +162,17 @@ describe('AppShell comments sidebar', () => {
 
     expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
     expect(document.querySelector('aside')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-quote-text')).toBe('Selected quote');
+    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-focus-signal')).toBe('1');
 
     act(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
     expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-focus-signal')).toBe('2');
 
-    const closeBtn = document.querySelector('[aria-label="Collapse comments sidebar"]') as HTMLButtonElement | null;
+    const closeBtn = document.querySelector('[aria-label="mock-close-sidebar"]') as HTMLButtonElement | null;
     expect(closeBtn).toBeTruthy();
 
     act(() => {

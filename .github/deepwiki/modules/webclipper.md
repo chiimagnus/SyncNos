@@ -22,14 +22,14 @@
 | `src/conversations/data/storage-idb.ts` | 本地会话数据层 | 承载 IndexedDB 事实源 |
 | `src/conversations/background/handlers.ts` | 会话消息与图片回填路由 | 控制 `SYNC_CONVERSATION_MESSAGES` 的图片内联与 `BACKFILL_CONVERSATION_IMAGES` 消息处理 |
 | `src/conversations/background/image-backfill-job.ts` | 历史消息图片补全任务 | 复扫 conversation 消息并按 diff 增量回写 `contentMarkdown` |
-| `src/comments/background/handlers.ts` | 文章评论消息路由 | 处理评论增删改、回复、锚点定位与 inpage panel 通信 |
+| `src/comments/background/handlers.ts` | 文章评论消息路由 | 处理评论增删改、回复与 inpage panel 通信 |
 | `src/comments/data/storage-idb.ts` | 文章评论存储层 | 承载 `article_comments` 的本地读写与查询 |
 | `src/comments/client/repo.ts` | 文章评论客户端仓库 | 为 UI 提供 comments 读写 API |
 | `src/ui/conversations/ArticleCommentsSection.tsx` | 文章详情评论区 | 在 article detail 中展示本地评论线程 |
 | `src/ui/comments/threaded-comments-panel.ts` | threaded comments 面板 | 负责 comments 的线程渲染与交互 |
 | `src/ui/inpage/inpage-comments-panel-shadow.ts` | inpage comments 面板壳 | 让页面内评论面板运行在独立 shadow root 中 |
-| `src/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments 内容脚手架 | 连接 content script 与 comments panel 逻辑 |
-| `src/bootstrap/inpage-comments-locate-content-handlers.ts` | 评论锚点定位脚手架 | 负责把 quoteText / quoteContext 解析成正文高亮定位 |
+| `src/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments 内容脚手架 | 连接 content script 与 comments panel 逻辑，并通过 shared session 统一状态 |
+| `src/comments/sidebar/comment-sidebar-session.ts` | 评论侧边栏共享会话 | 统一 open / close / quote / focus / busy 语义 |
 | `src/platform/idb/schema.ts` | DB schema 与迁移 | 处理 NotionAI stable key migration 与 `article_comments`（DB_VERSION = 7） |
 | `src/sync/notion/notion-sync-orchestrator.ts` | Notion 同步编排 | 控制 DB / page / cursor / rebuild |
 | `src/sync/obsidian/obsidian-sync-orchestrator.ts` | Obsidian 同步编排 | 控制 append / rebuild / rename / fallback |
@@ -64,13 +64,13 @@
 | 普通网页文章 | 任意 `http(s)` 页面 | 手动抓取时注入 `readability.js` 提取正文 |
 | inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击开 popup、多击彩蛋提示 |
 | Popup 当前页抓取 | `usePopupCurrentPageCapture.ts` + `current-page-capture.ts` | 先判断当前页可抓取，再用统一按钮触发 chat / article 抓取 |
-| 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除、锚点定位；不属于新的抓取站点 |
+| 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除；不属于新的抓取站点 |
 
 - `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
-- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，但当前**不进入 Notion / Obsidian / Zip v2**；如果你改 comments 流程，一定同时看 storage、background handler 和 inpage 面板。
+- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，但当前**不进入 Notion / Obsidian / Zip v2**；如果你改 comments 流程，一定同时看 storage、background handler、shared session 和 inpage 面板。
 
 ## 本地数据与同步结构
 
@@ -175,7 +175,7 @@
 - `webclipper/src/comments/client/repo.ts`
 - `webclipper/src/comments/data/storage-idb.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
+- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/conversations/client/repo.ts`
 - `webclipper/src/i18n/index.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`

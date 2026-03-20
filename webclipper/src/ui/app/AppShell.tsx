@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '../../i18n';
 import Settings from './routes/Settings';
@@ -6,12 +6,14 @@ import { CapturedListSidebar } from './conversations/CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { ConversationDetailPane } from '../conversations/ConversationDetailPane';
-import { ArticleCommentsSidebar } from '../conversations/ArticleCommentsSidebar';
+import { ArticleCommentsSection } from '../conversations/ArticleCommentsSection';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useThemeMode } from '../shared/hooks/useThemeMode';
 import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conversation-loc';
+import { createCommentSidebarSession } from '../../comments/sidebar/comment-sidebar-session';
+import type { CommentSidebarSession } from '../../comments/sidebar/comment-sidebar-contract';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
@@ -54,9 +56,16 @@ export default function AppShell() {
   function AppShellFrame() {
     useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
-    const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false);
-    const [commentsSidebarQuoteText, setCommentsSidebarQuoteText] = useState('');
-    const [commentsSidebarFocusSignal, setCommentsSidebarFocusSignal] = useState(0);
+    const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
+    if (!commentsSidebarSessionRef.current) {
+      commentsSidebarSessionRef.current = createCommentSidebarSession();
+    }
+    const commentsSidebarSession = commentsSidebarSessionRef.current;
+    const commentsSidebarSnapshot = useSyncExternalStore(
+      (listener) => commentsSidebarSession.subscribe(listener),
+      () => commentsSidebarSession.getSnapshot(),
+      () => commentsSidebarSession.getSnapshot(),
+    );
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
@@ -70,7 +79,7 @@ export default function AppShell() {
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? state?.backgroundLocation ?? null : null;
-    const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarOpen && !showSettingsSheet;
+    const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarSnapshot.openRequested && !showSettingsSheet;
 
     const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
@@ -82,14 +91,13 @@ export default function AppShell() {
 
     useEffect(() => {
       if (isArticleConversation && canonicalUrl) return;
-      setCommentsSidebarOpen(false);
-      setCommentsSidebarQuoteText('');
-    }, [canonicalUrl, isArticleConversation]);
+      commentsSidebarSession.requestClose();
+      commentsSidebarSession.setQuoteText('');
+    }, [canonicalUrl, commentsSidebarSession, isArticleConversation]);
 
     const triggerCommentsSidebar = (quoteText: string) => {
-      setCommentsSidebarQuoteText(String(quoteText || '').trim());
-      setCommentsSidebarOpen(true);
-      setCommentsSidebarFocusSignal((prev) => prev + 1);
+      commentsSidebarSession.setQuoteText(String(quoteText || '').trim());
+      commentsSidebarSession.requestOpen({ focusComposer: true, source: 'app' });
     };
 
     useEffect(() => {
@@ -232,12 +240,13 @@ export default function AppShell() {
 
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0 tw-w-[min(420px,36vw)] tw-min-w-[340px] tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
-                  <ArticleCommentsSidebar
+                  <ArticleCommentsSection
                     conversationId={Number((selectedConversation as any)?.id || 0)}
                     canonicalUrl={canonicalUrl}
-                    quoteText={commentsSidebarQuoteText}
-                    focusComposerSignal={commentsSidebarFocusSignal}
-                    onClose={() => setCommentsSidebarOpen(false)}
+                    quoteText={commentsSidebarSnapshot.quoteText}
+                    focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
+                    containerClassName="tw-h-full tw-min-h-0 tw-flex-1"
+                    onRequestClose={() => commentsSidebarSession.requestClose()}
                   />
                 </div>
               ) : null}

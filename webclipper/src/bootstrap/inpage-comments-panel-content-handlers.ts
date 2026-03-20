@@ -1,4 +1,5 @@
 import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CONTENT_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
+import { createCommentSidebarSession } from '../comments/sidebar/comment-sidebar-session';
 import { getInpageCommentsPanelApi } from '../ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -42,35 +43,34 @@ function pickQuoteFromSelection(fallback: unknown): string {
 }
 
 export type InpageCommentsPanelController = {
-  open: (input?: { tabId?: number | null; selectionText?: string | null; focusEditor?: boolean; ensureArticle?: boolean }) => Promise<void>;
+  open: (input?: { tabId?: number | null; selectionText?: string | null; focusComposer?: boolean; ensureArticle?: boolean }) => Promise<void>;
 };
 
 export function createInpageCommentsPanelController(runtime: RuntimeClient | null): InpageCommentsPanelController {
   const rt = runtime;
-  const api = getInpageCommentsPanelApi();
+  const sidebarSession = createCommentSidebarSession(getInpageCommentsPanelApi());
 
   let activeCanonicalUrl = '';
   let activeConversationId: number | null = null;
-  let activeQuoteText = '';
   let lastTabId: number | null = null;
 
   async function refreshCommentsList() {
     const canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
     if (!canonicalUrl) {
-      api.setComments([]);
+      sidebarSession.setComments([]);
       return;
     }
     if (!rt?.send) {
-      api.setComments([]);
+      sidebarSession.setComments([]);
       return;
     }
     const res = await rt.send(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, { canonicalUrl });
     if (!res?.ok) {
-      api.setComments([]);
+      sidebarSession.setComments([]);
       return;
     }
     const items = Array.isArray(res?.data) ? res.data : [];
-    api.setComments(
+    sidebarSession.setComments(
       items.map((c: any) => ({
         id: Number(c?.id),
         parentId: c?.parentId != null ? Number(c.parentId) : null,
@@ -95,11 +95,12 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
   }
 
   function bindPanelHandlers() {
-    api.setHandlers({
+    sidebarSession.setHandlers({
       onSave: async (text) => {
         if (!rt?.send) return;
         let canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
         if (!canonicalUrl) return;
+        const quoteText = sidebarSession.getSnapshot().quoteText;
 
         if (!activeConversationId) {
           const resolved = await resolveOrCaptureArticle(lastTabId);
@@ -117,7 +118,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
         const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
           canonicalUrl,
           conversationId: activeConversationId,
-          quoteText: activeQuoteText,
+          quoteText,
           commentText: text,
         } as any);
         if (res?.ok) await refreshCommentsList();
@@ -159,7 +160,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
   bindPanelHandlers();
 
-  async function open(input?: { tabId?: number | null; selectionText?: string | null; focusEditor?: boolean; ensureArticle?: boolean }) {
+  async function open(input?: { tabId?: number | null; selectionText?: string | null; focusComposer?: boolean; ensureArticle?: boolean }) {
     // Only handle on top frame to avoid duplicate panels.
     try {
       if (globalThis.top && globalThis.top !== globalThis.self) return;
@@ -169,12 +170,11 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
-    activeQuoteText = quoteText;
-    api.setQuoteText(quoteText);
-    api.open({ focusEditor: input?.focusEditor === true });
+    sidebarSession.setQuoteText(quoteText);
+    sidebarSession.requestOpen({ focusComposer: input?.focusComposer === true, source: 'inpage' });
 
     const ensureArticle = input?.ensureArticle !== false;
-    api.setBusy(true);
+    sidebarSession.setBusy(true);
     try {
       if (ensureArticle) {
         const resolved = await resolveOrCaptureArticle(lastTabId);
@@ -192,7 +192,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
       }
       await refreshCommentsList();
     } finally {
-      api.setBusy(false);
+      sidebarSession.setBusy(false);
     }
   }
 
@@ -213,7 +213,7 @@ export function registerInpageCommentsPanelContentHandlers(runtime: RuntimeClien
       .open({
         tabId: normalizeConversationId(msg?.payload?.tabId) || null,
         selectionText: msg?.payload?.selectionText,
-        focusEditor: true,
+        focusComposer: true,
         ensureArticle: true,
       })
       .finally(() => {

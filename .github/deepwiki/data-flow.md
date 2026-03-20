@@ -7,7 +7,7 @@
 | App 阅读同步 | 本地数据库、登录态、OCR 输入 | Services → Adapter → `NotionSyncEngine` | Notion 页面 / 数据库 | 基于条目时间戳、已同步映射与统一高亮结构 |
 | WebClipper 自动采集 | 支持站点 DOM | content controller → collectors → background storage | IndexedDB conversations / messages | 基于 runtime observer 与增量快照 |
 | WebClipper 手动保存网页 | 当前普通网页 | `Readability` 抽取 → article conversation | IndexedDB `article` 会话 | 重新抓取后按 `updatedAt` 决定下游是否重建 |
-| WebClipper 文章评论 / 注释线程 | article detail / inpage comments panel | comments handlers → `article_comments` store → panel refresh | IndexedDB `article_comments` + 正文锚点定位 | local-first / orphan attach |
+| WebClipper 文章评论 / 注释线程 | article detail / inpage comments panel | comments handlers → `article_comments` store → panel refresh | IndexedDB `article_comments` + shared session panel refresh | local-first / orphan attach |
 | WebClipper 外部同步 | popup / app 中选中的会话 | Notion / Obsidian orchestrator | Notion 页面、Obsidian 文件、导出文件 | 基于 cursor、目标存在性和目标结构决定 append / rebuild |
 
 ## SyncNos App：从来源到 Notion
@@ -54,7 +54,7 @@
 1. 用户在 article detail 或 inpage comments panel 中打开评论区。
 2. `ArticleCommentsSection.tsx` 先按 canonical URL 读取 `article_comments`，并把结果交给 threaded panel。
 3. 新评论、回复、删除与 orphan attach 都通过 comments background handlers 统一落库；`conversationId` 解析出来后会刷新 detail。
-4. “定位”动作会把 `quoteText + quoteContext` 送去内容脚本里的正文锚点定位器，在页面上高亮对应片段。
+4. 面板的 open / close / quote / focus / busy 由 shared session 统一调度；评论线程只保留本地回复与刷新语义，不再做正文高亮定位。
 
 ## WebClipper：从本地会话到外部目标
 
@@ -77,7 +77,7 @@
 | WebClipper `sync_mappings` | IndexedDB | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt` | 决定 Notion / Obsidian 是否可增量追加 |
 | WebClipper conversation | IndexedDB | `sourceType`, `source`, `conversationKey`, `lastCapturedAt` | UI 排序、导出、同步、备份的基础 |
 | WebClipper message | IndexedDB | `messageKey`, `sequence`, `updatedAt`, `contentMarkdown` | 生成 Notion blocks / Markdown / Obsidian 内容；图片可在实时采集或 backfill 时内联更新 |
-| WebClipper `article_comments` | IndexedDB | `canonicalUrl`, `conversationId`, `parentId`, `quoteText`, `quoteContext`, `commentText` | article 详情页的本地评论线程与锚点定位 |
+| WebClipper `article_comments` | IndexedDB | `canonicalUrl`, `conversationId`, `parentId`, `quoteText`, `quoteContext`, `commentText` | article 详情页的本地评论线程与回复 / 删除 |
 | WebClipper 图片缓存开关 | `chrome.storage.local` | `ai_chat_cache_images_enabled` | 控制 chat 消息图片内联策略；历史消息需手动触发 backfill |
 
 ## 图表
@@ -131,7 +131,7 @@ flowchart LR
 - `webclipper/src/ui/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/bootstrap/inpage-comments-locate-content-handlers.ts`
+- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/collectors/gemini/gemini-collector.ts`
 - `webclipper/src/collectors/kimi/kimi-collector.ts`
