@@ -98,6 +98,40 @@ describe("notion-sync-service rate limit", () => {
     expect(timeoutSpy.mock.calls.some((call) => Number(call[1]) >= 150)).toBe(true);
   });
 
+  it("still appends children when the source array has a broken slice implementation", async () => {
+    const notionSyncService = await loadNotionSyncService();
+    const appendBodies: any[] = [];
+    const fetchMock = vi.fn(async (_url: string, init?: { method?: string; body?: string }) => {
+      if (String(init?.method || "").toUpperCase() === "PATCH") {
+        appendBodies.push(JSON.parse(String(init?.body || "{}")));
+      }
+      return notionResponse({ ok: true, status: 200, body: { results: [] } });
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    class BadSliceArray<T> extends Array<T> {
+      override slice(start?: number, end?: number) {
+        if (start === undefined && end === undefined) {
+          return {
+            length: 1,
+            slice() {
+              return undefined;
+            },
+          } as any;
+        }
+        return super.slice(start, end);
+      }
+    }
+
+    const blocks = new BadSliceArray(paragraphBlock(0), paragraphBlock(1));
+
+    await expect(notionSyncService.appendChildren("token", "page_5", blocks as any)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(Array.isArray(appendBodies[0]?.children)).toBe(true);
+    expect(appendBodies[0]?.children).toHaveLength(2);
+  });
+
   it("retries clearPageChildren deletes on 503 using the shared backoff path", async () => {
     vi.useFakeTimers();
     const notionSyncService = await loadNotionSyncService();

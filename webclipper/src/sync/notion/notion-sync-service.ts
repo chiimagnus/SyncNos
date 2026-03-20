@@ -22,6 +22,11 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  function normalizeBlockList(blocks) {
+    if (!Array.isArray(blocks)) return [];
+    return Array.from(blocks).filter((block) => block && typeof block === "object");
+  }
+
   function parseHttpStatus(error) {
     const raw = error && error.status != null ? Number(error.status) : NaN;
     if (Number.isFinite(raw) && raw > 0) return raw;
@@ -199,6 +204,8 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
   }
 
   async function appendBatchWithRetry(accessToken, pageId, batch) {
+    const children = normalizeBlockList(batch);
+    if (!children.length) return {};
     const notionFetch = getNotionFetch();
     let attempt = 0;
     for (;;) {
@@ -209,7 +216,7 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
           accessToken,
           method: "PATCH",
           path: `/v1/blocks/${pageId}/children`,
-          body: { children: batch }
+          body: { children }
         });
       } catch (error) {
         const status = parseHttpStatus(error);
@@ -251,7 +258,7 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
   }
 
   async function appendChildren(accessToken, pageId, blocks) {
-    let remaining = Array.isArray(blocks) ? blocks.slice() : [];
+    let remaining = normalizeBlockList(blocks);
     while (remaining.length) {
       const batch = remaining.slice(0, APPEND_BATCH);
       remaining = remaining.slice(APPEND_BATCH);

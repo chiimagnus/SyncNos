@@ -42,11 +42,14 @@ export function ArticleCommentsSection({
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
   const quoteTextRef = useRef<string>(String(quoteText || ''));
   quoteTextRef.current = String(quoteText || '');
+  const onRequestCloseRef = useRef<(() => void) | undefined>(onRequestClose);
+  onRequestCloseRef.current = onRequestClose;
   const focusSignal = Number(focusComposerSignal || 0);
   const lastFocusSignalRef = useRef<number>(0);
   const pendingFocusRef = useRef<boolean>(false);
 
   const normalizedUrl = useMemo(() => normalizeHttpUrl(canonicalUrl), [canonicalUrl]);
+  const canClose = typeof onRequestClose === 'function';
 
   const refresh = async () => {
     if (!normalizedUrl) return;
@@ -138,13 +141,13 @@ export function ArticleCommentsSection({
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
       showHeader: true,
-      showCollapseButton: typeof onRequestClose === 'function',
+      showCollapseButton: canClose,
     });
     apiRef.current = mounted.api;
     mounted.api.setQuoteText(String(quoteTextRef.current || ''));
     mounted.api.setHandlers({
       onClose: () => {
-        if (typeof onRequestClose === 'function') onRequestClose();
+        onRequestCloseRef.current?.();
       },
       onSave: async (text) => {
         if (!normalizedUrl) return;
@@ -195,6 +198,20 @@ export function ArticleCommentsSection({
       },
     });
 
+    mounted.api.setComments(
+      (Array.isArray(items) ? items : []).map(
+        (c: any): ThreadedCommentItem => ({
+          id: Number(c?.id),
+          parentId: c?.parentId != null ? Number(c.parentId) : null,
+          authorName: 'You',
+          createdAt: Number(c?.createdAt) || null,
+          quoteText: String(c?.quoteText || ''),
+          commentText: String(c?.commentText || ''),
+        }),
+      ),
+    );
+    mounted.api.setBusy(loading);
+
     if (pendingFocusRef.current || focusSignal > 0) {
       pendingFocusRef.current = false;
       mounted.api.open({ focusComposer: true });
@@ -205,7 +222,7 @@ export function ArticleCommentsSection({
       apiRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, normalizedUrl, onRequestClose]);
+  }, [conversationId, normalizedUrl, canClose]);
 
   useEffect(() => {
     const api = apiRef.current;
@@ -243,10 +260,12 @@ export function ArticleCommentsSection({
     api.setBusy(loading);
   }, [items, loading]);
 
+  const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
+
   return (
-    <section className={containerClassName || ''}>
+    <section className={sectionClassName}>
       {error ? <p className="tw-mb-2 tw-text-xs tw-font-semibold tw-text-[var(--error)]">{error}</p> : null}
-      <div ref={hostRef} />
+      <div ref={hostRef} className="tw-min-h-0 tw-flex-1" />
     </section>
   );
 }
