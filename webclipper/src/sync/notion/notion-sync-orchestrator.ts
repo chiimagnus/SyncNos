@@ -676,12 +676,18 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   // eslint-disable-next-line no-await-in-loop
                   await storage.attachOrphanArticleCommentsToConversation(url, id);
                 }
-              } catch (_e) {
-                // ignore
+                // eslint-disable-next-line no-await-in-loop
+                comments = await storage.getArticleCommentsByConversationId(id);
+                webArticleCommentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
+              } catch (e) {
+                warnings.push({
+                  code: "notion_article_comments_fetch_failed",
+                  message: "Failed to load local article comments; syncing article body only.",
+                  extra: { error: e && e.message ? String(e.message) : String(e) },
+                });
+                comments = [];
+                webArticleCommentsDigest = null;
               }
-              // eslint-disable-next-line no-await-in-loop
-              comments = await storage.getArticleCommentsByConversationId(id);
-              webArticleCommentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
             }
             // eslint-disable-next-line no-await-in-loop
             built = await buildNotionWebArticlePageBlocks({
@@ -738,7 +744,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             mode: "created",
             appended: messages.length,
             warnings,
-            ...(isWebArticleConversation(convo) && built ? { comments: { threads: built.commentThreads || 0, items: built.commentItems || 0 } } : null)
+            ...(isWebArticleConversation(convo) && built
+              ? {
+                comments: {
+                  updated: true,
+                  threads: built.commentThreads || 0,
+                  items: built.commentItems || 0,
+                },
+              }
+              : null)
           });
           trace.flush({ mode: "created", ok: true, blockCount: blocks.length });
           return;
@@ -770,14 +784,25 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               // ignore
             }
 
-            // eslint-disable-next-line no-await-in-loop
-            articleComments = await storage.getArticleCommentsByConversationId(id);
-            articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
-            const prevDigest = String(mapping?.notionCommentsDigest || '');
-            const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
-            const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 1;
-            shouldRebuildForArticleLayout = !layoutApplied || prevDigest !== String(articleCommentsDigest || '');
-            if (shouldRebuildForArticleLayout) shouldRebuild = true;
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              articleComments = await storage.getArticleCommentsByConversationId(id);
+              articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+              const prevDigest = String(mapping?.notionCommentsDigest || '');
+              const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
+              const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 1;
+              shouldRebuildForArticleLayout = !layoutApplied || prevDigest !== String(articleCommentsDigest || '');
+              if (shouldRebuildForArticleLayout) shouldRebuild = true;
+            } catch (e) {
+              warnings.push({
+                code: "notion_article_comments_fetch_failed",
+                message: "Failed to load local article comments; skipping comment sync in this run.",
+                extra: { error: e && e.message ? String(e.message) : String(e) },
+              });
+              articleComments = null;
+              articleCommentsDigest = null;
+              shouldRebuildForArticleLayout = false;
+            }
           }
         }
 
@@ -855,7 +880,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             mode: "rebuilt",
             appended: messages.length,
             warnings,
-            ...(isWebArticleConversation(convo) && built ? { comments: { threads: built.commentThreads || 0, items: built.commentItems || 0 } } : null)
+            ...(isWebArticleConversation(convo) && built
+              ? {
+                comments: {
+                  updated: true,
+                  threads: built.commentThreads || 0,
+                  items: built.commentItems || 0,
+                },
+              }
+              : null)
           });
           trace.flush({ mode: "rebuilt", ok: true, blockCount: blocks.length });
         } else if (inc.newMessages && inc.newMessages.length) {
