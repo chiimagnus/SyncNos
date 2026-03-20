@@ -60,7 +60,6 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       }
     },
     incrementalUpdater: null,
-    notionAiModelPicker: null,
   });
   controller.start();
 

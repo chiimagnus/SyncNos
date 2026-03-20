@@ -133,10 +133,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
-  const notionAiRef = useRef<HTMLDivElement | null>(null);
-
-  // Notion AI
-  const [notionAiModelIndex, setNotionAiModelIndex] = useState<string>('');
 
   // Inpage
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
@@ -205,7 +201,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'notion_oauth_last_error',
           'notion_parent_page_id',
           'notion_parent_page_title',
-          'notion_ai_preferred_model_index',
           NOTION_SYNC_PROVIDER_ENABLED_KEY,
           OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
           'inpage_display_mode',
@@ -227,7 +222,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setNotionLastError(String(local?.notion_oauth_last_error || ''));
       setNotionParentPageId(String(local?.notion_parent_page_id || ''));
       setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
-      setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || ''));
       setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
       setObsidianSyncEnabled(local?.[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY] !== false);
 
@@ -561,30 +555,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask]
   );
 
-  const onSaveNotionAiModelIndex = useCallback(async () => {
-    await runTask(async () => {
-      const raw = String(notionAiModelIndex || '').trim();
-      const value = raw ? Number(raw) : NaN;
-
-      if (!raw) {
-        await storageSet({ notion_ai_preferred_model_index: '' });
-      } else if (!Number.isFinite(value) || value <= 0) {
-        throw new Error('Invalid model index');
-      } else {
-        await storageSet({ notion_ai_preferred_model_index: Math.floor(value) });
-      }
-
-      await refresh();
-    });
-  }, [notionAiModelIndex, refresh, runTask]);
-
-  const onResetNotionAiModelIndex = useCallback(async () => {
-    await runTask(async () => {
-      await storageSet({ notion_ai_preferred_model_index: '' });
-      await refresh();
-    });
-  }, [refresh, runTask]);
-
   useEffect(() => {
     if (!chatWithHydratedRef.current) return;
 
@@ -763,12 +733,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     backupImportRef.current?.scrollIntoView({ block: 'start' });
   }, [activeSection, focusKey]);
 
-  useEffect(() => {
-    if (activeSection !== 'notion') return;
-    if (focusKey !== 'notion-ai') return;
-    notionAiRef.current?.scrollIntoView({ block: 'start' });
-  }, [activeSection, focusKey]);
-
   return {
     busy,
     error,
@@ -782,14 +746,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     notionParentPageId,
     notionPageOptions,
     notionStatusText,
-    notionAiModelIndex,
-    setNotionAiModelIndex,
     onNotionConnectOrDisconnect,
     onSaveNotionParentPage,
     onLoadNotionPages,
-    onSaveNotionAiModelIndex,
-    onResetNotionAiModelIndex,
-    notionAiRef,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,

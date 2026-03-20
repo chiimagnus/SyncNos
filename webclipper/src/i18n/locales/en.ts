@@ -81,15 +81,6 @@ export const en = {
   refreshPagesAria: 'Refresh pages',
   connectNotionFirst: 'Connect Notion first',
 
-  // NotionAISection
-  notionAI: 'Notion AI',
-  modelIndex: 'Model Index',
-  save: 'Save',
-  reset: 'Reset',
-  note: 'Note',
-  notionAiModelNote:
-    'Applies only when Notion AI model is set to Auto. Menu order may change in Notion.',
-
   // ObsidianSettingsSection
   obsidianLocalRestApi: 'Obsidian Local REST API',
   baseUrl: 'Base URL',
@@ -97,6 +88,7 @@ export const en = {
   authHeader: 'Auth Header',
   test: 'Test',
   status: 'Status',
+  note: 'Note',
   obsidianInstallNote: 'Install and configure Obsidian Local REST API first.',
   openSetupGuide: 'Open Setup Guide',
   obsidianPaths: 'Obsidian Paths',

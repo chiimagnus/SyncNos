@@ -70,7 +70,6 @@ function createHarness(options?: {
         return { changed: false };
       }
     },
-    notionAiModelPicker: null,
   });
   controller.start();
 

@@ -48,7 +48,6 @@ type Deps = {
   inpageTip: InpageTipApi | null;
   runtimeObserver: RuntimeObserverApi | null;
   incrementalUpdater: { computeIncremental?: (snapshot: unknown) => any } | null;
-  notionAiModelPicker: { maybeApply?: () => void } | null;
 };
 
 const CORE_MESSAGE_TYPES = Object.freeze({
@@ -96,7 +95,6 @@ export function createContentController(deps: Deps) {
   const inpageTip = deps.inpageTip;
   const runtimeObserver = deps.runtimeObserver;
   const incrementalUpdater = deps.incrementalUpdater;
-  const notionAiModelPicker = deps.notionAiModelPicker;
 
   function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
     const value = String(kind || '').trim().toLowerCase();
@@ -332,8 +330,6 @@ export function createContentController(deps: Deps) {
       if (stopped) return;
 
       try {
-        notionAiModelPicker?.maybeApply?.();
-
         const collector = refreshInpageButton();
         if (!collector || typeof collector.capture !== 'function') return;
         if (collector.id === 'googleaistudio') return;

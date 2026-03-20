@@ -14,6 +14,8 @@ const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
   'notion_oauth_token_v1',
   // Not used by default (ensureDefaultNotionOAuthClientId removes it), but keep it out of backups.
   'notion_oauth_client_secret',
+  // Feature removed (2026-03): legacy Notion AI model index setting.
+  'notion_ai_preferred_model_index',
 ]);
 
 function shouldIncludeStorageKeyInBackup(key: string): boolean {
