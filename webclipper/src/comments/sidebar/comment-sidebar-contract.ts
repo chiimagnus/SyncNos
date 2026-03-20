@@ -35,6 +35,7 @@ export type CommentSidebarSessionSnapshot = {
   busy: boolean;
   openRequested: boolean;
   focusRequested: boolean;
+  focusComposerSignal: number;
   quoteText: string;
   commentCount: number;
   hasHandlers: boolean;
@@ -44,6 +45,7 @@ export type CommentSidebarSessionSnapshot = {
 export type CommentSidebarSession = {
   attachPanel: (panel: CommentSidebarPanelApi) => void;
   detachPanel: () => void;
+  subscribe: (listener: () => void) => () => void;
   requestOpen: (input?: CommentSidebarOpenInput) => void;
   requestClose: () => void;
   setQuoteText: (text: string) => void;

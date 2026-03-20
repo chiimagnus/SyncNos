@@ -80,6 +80,7 @@ describe('comment-sidebar-session', () => {
       busy: true,
       openRequested: true,
       focusRequested: true,
+      focusComposerSignal: 1,
       quoteText: ' first\nsecond ',
       commentCount: 1,
       hasHandlers: true,
@@ -100,6 +101,7 @@ describe('comment-sidebar-session', () => {
       busy: true,
       openRequested: true,
       focusRequested: true,
+      focusComposerSignal: 1,
       lastOpenSource: 'inpage',
     });
 
@@ -113,6 +115,7 @@ describe('comment-sidebar-session', () => {
       busy: false,
       openRequested: false,
       focusRequested: false,
+      focusComposerSignal: 1,
       lastOpenSource: 'inpage',
     });
   });
@@ -133,6 +136,7 @@ describe('comment-sidebar-session', () => {
       busy: true,
       openRequested: false,
       focusRequested: false,
+      focusComposerSignal: 1,
       lastOpenSource: null,
     });
 
@@ -146,6 +150,7 @@ describe('comment-sidebar-session', () => {
       busy: false,
       openRequested: false,
       focusRequested: false,
+      focusComposerSignal: 1,
       lastOpenSource: null,
     });
   });
@@ -163,6 +168,7 @@ describe('comment-sidebar-session', () => {
       busy: true,
       openRequested: true,
       focusRequested: true,
+      focusComposerSignal: 1,
       lastOpenSource: 'app',
     });
 
@@ -178,6 +184,7 @@ describe('comment-sidebar-session', () => {
       busy: false,
       openRequested: false,
       focusRequested: false,
+      focusComposerSignal: 1,
       lastOpenSource: 'app',
     });
   });

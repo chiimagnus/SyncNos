@@ -32,7 +32,40 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   let handlers: CommentSidebarHandlers = {};
   let openRequested = false;
   let focusRequested = false;
+  let focusComposerSignal = 0;
   let lastOpenSource: string | null = null;
+  const listeners = new Set<() => void>();
+  let snapshotCache: CommentSidebarSessionSnapshot = buildSnapshot();
+
+  function notify() {
+    for (const listener of listeners) {
+      try {
+        listener();
+      } catch (_e) {
+        // ignore
+      }
+    }
+  }
+
+  function buildSnapshot(): CommentSidebarSessionSnapshot {
+    return {
+      attached: !!panel,
+      isOpen: !!panel?.isOpen?.(),
+      busy,
+      openRequested,
+      focusRequested,
+      focusComposerSignal,
+      quoteText,
+      commentCount: comments.length,
+      hasHandlers: hasAnyHandlers(handlers),
+      lastOpenSource,
+    };
+  }
+
+  function commit() {
+    snapshotCache = buildSnapshot();
+    notify();
+  }
 
   function syncPanelState() {
     if (!panel) return;
@@ -74,17 +107,31 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     panel = nextPanel;
     syncPanelState();
     flushOpenRequest();
+    commit();
   }
 
   function detachPanel() {
     panel = null;
+    commit();
+  }
+
+  function subscribe(listener: () => void) {
+    if (typeof listener !== 'function') return () => {};
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }
 
   function requestOpen(input?: CommentSidebarOpenInput) {
     openRequested = true;
     lastOpenSource = normalizeSource(input?.source);
-    if (input?.focusComposer) focusRequested = true;
+    if (input?.focusComposer) {
+      focusRequested = true;
+      focusComposerSignal += 1;
+    }
     flushOpenRequest();
+    commit();
   }
 
   function requestClose() {
@@ -96,6 +143,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     } catch (_e) {
       // ignore
     }
+    commit();
   }
 
   function setQuoteText(text: string) {
@@ -105,6 +153,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     } catch (_e) {
       // ignore
     }
+    commit();
   }
 
   function setBusy(nextBusy: boolean) {
@@ -115,6 +164,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
       // ignore
     }
     if (!busy) flushOpenRequest();
+    commit();
   }
 
   function setComments(items: CommentSidebarItem[]) {
@@ -124,6 +174,7 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     } catch (_e) {
       // ignore
     }
+    commit();
   }
 
   function setHandlers(nextHandlers: CommentSidebarHandlers) {
@@ -133,30 +184,23 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     } catch (_e) {
       // ignore
     }
+    commit();
   }
 
   function getSnapshot(): CommentSidebarSessionSnapshot {
-    return {
-      attached: !!panel,
-      isOpen: !!panel?.isOpen?.(),
-      busy,
-      openRequested,
-      focusRequested,
-      quoteText,
-      commentCount: comments.length,
-      hasHandlers: hasAnyHandlers(handlers),
-      lastOpenSource,
-    };
+    return snapshotCache;
   }
 
   if (panel) {
     syncPanelState();
     flushOpenRequest();
+    snapshotCache = buildSnapshot();
   }
 
   return {
     attachPanel,
     detachPanel,
+    subscribe,
     requestOpen,
     requestClose,
     setQuoteText,
