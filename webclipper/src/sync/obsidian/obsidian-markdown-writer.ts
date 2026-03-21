@@ -63,7 +63,6 @@ function normalizeRole(role: unknown) {
 function buildMessageChunk(message: any) {
   const m = message || {};
   const seq = Number.isFinite(Number(m.sequence)) ? Number(m.sequence) : 0;
-  const key = safeString(m.messageKey) || '';
   const role = normalizeRole(m.role);
   const body = safeString(m.contentMarkdown) || safeString(m.contentText) || '';
   const header = `## ${seq} ${role}`.trim();
@@ -177,7 +176,6 @@ function buildFullNoteMarkdown({
   comments?: ArticleComment[];
 }) {
   const c = conversation || {};
-  const title = safeString(c.title) || 'Untitled';
   const url = safeString(c.url);
   const sourceType = safeString(c.sourceType);
 
