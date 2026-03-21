@@ -12,73 +12,6 @@ function normalizeNewlines(input: unknown) {
   return String(input || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
-function escapeRegExp(input: string) {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function findLevel2HeadingRanges(lines: string[], heading: string) {
-  const ranges: Array<{ headingIndex: number; bodyStart: number; bodyEnd: number }> = [];
-  const target = safeString(heading);
-  if (!target) return ranges;
-  const headingRe = new RegExp(`^##\\s+${escapeRegExp(target)}\\s*$`);
-  const endRe = /^(#{1,2})\s+/;
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i] || '';
-    if (!headingRe.test(line.trimEnd())) continue;
-    const bodyStart = i + 1;
-    let bodyEnd = lines.length;
-    for (let j = bodyStart; j < lines.length; j += 1) {
-      const nextLine = lines[j] || '';
-      if (endRe.test(nextLine)) {
-        bodyEnd = j;
-        break;
-      }
-    }
-    ranges.push({ headingIndex: i, bodyStart, bodyEnd });
-    i = bodyEnd - 1;
-  }
-  return ranges;
-}
-
-function buildSectionBodyLines(markdownBody: string) {
-  const trimmed = normalizeNewlines(markdownBody).trim();
-  const out: string[] = [''];
-  if (trimmed) out.push(...trimmed.split('\n'));
-  out.push('');
-  return out;
-}
-
-function replaceLevel2HeadingSectionInMarkdown({
-  sourceMarkdown,
-  heading,
-  bodyMarkdown,
-  dedupe,
-}: {
-  sourceMarkdown: unknown;
-  heading: string;
-  bodyMarkdown: string;
-  dedupe?: boolean;
-}) {
-  const src = normalizeNewlines(sourceMarkdown);
-  const lines = src.split('\n');
-  const ranges = findLevel2HeadingRanges(lines, heading);
-  if (!ranges.length) return { ok: false, markdown: src, error: 'heading_not_found' };
-
-  if (dedupe) {
-    for (let i = ranges.length - 1; i >= 1; i -= 1) {
-      const r = ranges[i]!;
-      lines.splice(r.headingIndex, r.bodyEnd - r.headingIndex);
-    }
-  }
-
-  const nextRanges = findLevel2HeadingRanges(lines, heading);
-  if (!nextRanges.length) return { ok: false, markdown: lines.join('\n'), error: 'heading_not_found' };
-  const primary = nextRanges[0]!;
-  const bodyLines = buildSectionBodyLines(bodyMarkdown);
-  lines.splice(primary.bodyStart, primary.bodyEnd - primary.bodyStart, ...bodyLines);
-  return { ok: true, markdown: lines.join('\n') };
-}
-
 function yamlEscapeString(value: unknown) {
   const text = safeString(value);
   return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -130,7 +63,6 @@ function normalizeRole(role: unknown) {
 function buildMessageChunk(message: any) {
   const m = message || {};
   const seq = Number.isFinite(Number(m.sequence)) ? Number(m.sequence) : 0;
-  const key = safeString(m.messageKey) || '';
   const role = normalizeRole(m.role);
   const body = safeString(m.contentMarkdown) || safeString(m.contentText) || '';
   const header = `## ${seq} ${role}`.trim();
@@ -244,7 +176,6 @@ function buildFullNoteMarkdown({
   comments?: ArticleComment[];
 }) {
   const c = conversation || {};
-  const title = safeString(c.title) || 'Untitled';
   const url = safeString(c.url);
   const sourceType = safeString(c.sourceType);
 
@@ -270,120 +201,21 @@ function buildFullNoteMarkdown({
   );
 }
 
-function buildIncrementalAppendMarkdown({ newMessages }: { newMessages?: any[] }) {
-  return buildMessagesMarkdown(newMessages || []);
-}
-
-async function appendUnderMessagesHeading({
-  client,
-  filePath,
-  markdown,
-}: {
-  client: any;
-  filePath: string;
-  markdown: string;
-}) {
-  return client.patchVaultFile(filePath, {
-    operation: 'append',
-    targetType: 'heading',
-    target: MESSAGES_HEADING,
-    createTargetIfMissing: true,
-    body: String(markdown || ''),
-    contentType: 'text/markdown',
-  });
-}
-
-async function replaceUnderHeading({
-  client,
-  filePath,
-  heading,
-  markdown,
-}: {
-  client: any;
-  filePath: string;
-  heading: string;
-  markdown: string;
-}) {
-  return client.patchVaultFile(filePath, {
-    operation: 'replace',
-    targetType: 'heading',
-    target: safeString(heading),
-    createTargetIfMissing: true,
-    body: String(markdown || ''),
-    contentType: 'text/markdown',
-  });
-}
-
-async function replaceUnderArticleHeading({
-  client,
-  filePath,
-  markdown,
-}: {
-  client: any;
-  filePath: string;
-  markdown: string;
-}) {
-  return replaceUnderHeading({ client, filePath, heading: ARTICLE_HEADING, markdown });
-}
-
-async function replaceUnderCommentsHeading({
-  client,
-  filePath,
-  markdown,
-}: {
-  client: any;
-  filePath: string;
-  markdown: string;
-}) {
-  return replaceUnderHeading({ client, filePath, heading: COMMENTS_HEADING, markdown });
-}
-
-async function replaceSyncnosFrontmatter({
-  client,
-  filePath,
-  syncnosObject,
-}: {
-  client: any;
-  filePath: string;
-  syncnosObject: any;
-}) {
-  return client.patchVaultFile(filePath, {
-    operation: 'replace',
-    targetType: 'frontmatter',
-    target: 'syncnos',
-    createTargetIfMissing: true,
-    body: JSON.stringify(syncnosObject || {}),
-    contentType: 'application/json',
-  });
-}
-
 const api = {
   MESSAGES_HEADING,
   ARTICLE_HEADING,
   COMMENTS_HEADING,
-  replaceLevel2HeadingSectionInMarkdown,
   buildArticleBodyMarkdown,
   buildObsidianCommentsMarkdown,
   buildFullNoteMarkdown,
-  buildIncrementalAppendMarkdown,
-  appendUnderMessagesHeading,
-  replaceUnderArticleHeading,
-  replaceUnderCommentsHeading,
-  replaceSyncnosFrontmatter,
 };
 
 export {
   MESSAGES_HEADING,
   ARTICLE_HEADING,
   COMMENTS_HEADING,
-  replaceLevel2HeadingSectionInMarkdown,
   buildArticleBodyMarkdown,
   buildObsidianCommentsMarkdown,
   buildFullNoteMarkdown,
-  buildIncrementalAppendMarkdown,
-  appendUnderMessagesHeading,
-  replaceUnderArticleHeading,
-  replaceUnderCommentsHeading,
-  replaceSyncnosFrontmatter,
 };
 export default api;

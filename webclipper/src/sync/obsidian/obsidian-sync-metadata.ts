@@ -34,46 +34,28 @@ function readSyncnosObject(frontmatter: unknown) {
       source,
       conversationKey,
       schemaVersion,
-      lastSyncedSequence: safeNumberOrNull(obj.lastSyncedSequence),
-      lastSyncedMessageKey: safeString(obj.lastSyncedMessageKey) || '',
-      lastSyncedMessageUpdatedAt: safeNumberOrNull(obj.lastSyncedMessageUpdatedAt),
       lastSyncedAt: safeNumberOrNull(obj.lastSyncedAt),
-      articleDigest: safeString(obj.articleDigest) || '',
-      commentsDigest: safeString(obj.commentsDigest) || '',
     },
   };
 }
 
 function buildSyncnosObject({
   conversation,
-  cursor,
-  articleDigest,
-  commentsDigest,
+  lastSyncedAt,
 }: {
   conversation?: any;
-  cursor?: any;
-  articleDigest?: unknown;
-  commentsDigest?: unknown;
+  lastSyncedAt?: unknown;
 } = {}) {
   const c = conversation || {};
   const source = safeString(c.source);
   const conversationKey = safeString(c.conversationKey);
   if (!source || !conversationKey) throw new Error('missing source or conversationKey');
 
-  const cur = cursor || {};
-  const lastSyncedSequence = safeNumberOrNull(cur.lastSyncedSequence);
-  const lastSyncedMessageKey = safeString(cur.lastSyncedMessageKey);
-
   return {
     source,
     conversationKey,
     schemaVersion: SCHEMA_VERSION,
-    lastSyncedSequence,
-    lastSyncedMessageKey,
-    lastSyncedMessageUpdatedAt: safeNumberOrNull(cur.lastSyncedMessageUpdatedAt),
-    lastSyncedAt: safeNumberOrNull(cur.lastSyncedAt),
-    ...(safeString(articleDigest) ? { articleDigest: safeString(articleDigest) } : null),
-    ...(safeString(commentsDigest) ? { commentsDigest: safeString(commentsDigest) } : null),
+    lastSyncedAt: safeNumberOrNull(lastSyncedAt),
   };
 }
 

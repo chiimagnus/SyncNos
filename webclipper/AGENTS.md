@@ -49,7 +49,7 @@
   - 开启后：对 `sourceType='chat'` 的后续采集尝试内联图片，失败不阻塞保存主链路。
   - 历史会话不会自动补齐；需在 detail header 手动触发 `cache-images` 工具动作回填。
   - `article` 会话不显示该工具动作。
-- 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId，不进入 Notion / Obsidian / Zip v2。
+- 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入（Zip v2 目前仍不包含）。
 - 文章评论 / 注释线程现在由 `comments/sidebar/comment-sidebar-session.ts` 统一 open / close / quote / focus / busy 语义；不要再假定存在锚点定位消息或 `inpage-comments-locate-content-handlers.ts`。
 - 安装后引导策略：`src/entrypoints/background.ts` 仅在 `details.reason === 'install'` 时自动打开 `Settings -> About`；扩展更新后不再自动弹出设置页。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
@@ -118,7 +118,7 @@
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch.ts` + `src/collectors/web/article-fetch-background-handlers.ts`
   - background 侧通过 `scriptingExecuteScript`（`src/platform/webext/scripting.ts`）注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **文章评论 / 注释线程**：`src/comments/` + `src/ui/conversations/ArticleCommentsSection.tsx`
-  - `article_comments` 是 article detail 与 inpage comments panel 的本地线程，不进入 Notion / Obsidian / Zip v2；改它时先看 storage、background handler 和 shadow panel。
+  - `article_comments` 是 article detail 与 inpage comments panel 的本地线程；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入（Zip v2 目前仍不包含）；改它时先看 storage、background handler 和 shadow panel。
 - **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
 - **UI：主题模式（共享）**：`src/ui/shared/hooks/useThemeMode.ts`
@@ -161,9 +161,10 @@ Phase 3（JS→TS）收口状态：
 - 文件名格式：`<source>-<title>-<stableId10>.md`，其中 `stableId10` 基于 `source + conversationKey` 的稳定 hash（用于唯一性与定位旧文件）。
 - 当 `title` 变化导致文件名变化时：同步会在 Obsidian 侧自动“重命名”（写入新文件并删除旧文件）。
 - 同步策略（平台主导）：
-  - Obsidian 端不存在文件：全量重建（PUT）
-  - Obsidian 端存在文件且 frontmatter 兼容：增量追加（PATCH 追加到 heading `SyncNos::Messages`），并 PATCH frontmatter 更新游标
-  - 若检测到冲突或 PATCH 失败：自动回退全量重建（PUT）
+  - 每次同步都全量重建（PUT 覆盖整个 `.md` 文件，包括 frontmatter 与正文）
+  - 正文结构：
+    - chat：`# Conversations` + `## {seq} {role}`
+    - article：`## Article` + `## Comments`
 - 本期仅支持 Obsidian Local REST API 的 HTTP insecure 模式（默认 `http://127.0.0.1:27123`）；不支持 `https://127.0.0.1:27124` 自签名证书模式。
   - popup 配置项默认自动保存（`blur` 保存；`Enter` 可立即保存）。
 

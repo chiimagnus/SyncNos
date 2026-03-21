@@ -267,48 +267,6 @@ function createClient({
     return request('POST', `/open/${encoded}`, { accept: 'application/json' });
   }
 
-  function patchVaultFile(
-    filePath: string,
-    {
-      operation,
-      targetType,
-      target,
-      delimiter,
-      trimTargetWhitespace,
-      createTargetIfMissing,
-      body,
-      contentType,
-    }: {
-      operation?: unknown;
-      targetType?: unknown;
-      target?: unknown;
-      delimiter?: unknown;
-      trimTargetWhitespace?: unknown;
-      createTargetIfMissing?: unknown;
-      body?: unknown;
-      contentType?: string;
-    } = {},
-  ) {
-    const encoded = encodeVaultPath(filePath);
-    const headers: Record<string, string> = {};
-    if (operation) headers.Operation = String(operation);
-    if (targetType) headers['Target-Type'] = String(targetType);
-    if (target != null) headers.Target = String(target);
-    if (delimiter) headers['Target-Delimiter'] = String(delimiter);
-    if (trimTargetWhitespace != null) {
-      headers['Trim-Target-Whitespace'] = trimTargetWhitespace ? 'true' : 'false';
-    }
-    if (createTargetIfMissing != null) {
-      headers['Create-Target-If-Missing'] = createTargetIfMissing ? 'true' : 'false';
-    }
-    return request('PATCH', `/vault/${encoded}`, {
-      headers,
-      body,
-      contentType: contentType || 'text/markdown',
-      accept: 'application/json',
-    });
-  }
-
   function getServerStatus() {
     return request('GET', '/', { accept: 'application/json' });
   }
@@ -324,7 +282,6 @@ function createClient({
     putVaultBinaryFile,
     deleteVaultFile,
     openVaultFile,
-    patchVaultFile,
   };
 }
 
