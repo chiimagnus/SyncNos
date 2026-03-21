@@ -294,15 +294,23 @@ export function mountThreadedCommentsPanel(
     }
   }
 
+  const THEME_SOURCE_ATTR = 'data-webclipper-theme-source';
+
   const syncThemeAttr = () => {
+    const themeSource = String(el.getAttribute(THEME_SOURCE_ATTR) || '').trim().toLowerCase();
+    // When an embedding environment explicitly provides a theme (for example, the inpage content-script
+    // reading `ui_theme_mode`), do not overwrite it with host page styles.
+    if (themeSource && themeSource !== 'document') return;
     const theme =
       document.documentElement?.getAttribute?.('data-theme') ||
       document.body?.getAttribute?.('data-theme') ||
       host.closest?.('[data-theme]')?.getAttribute?.('data-theme');
     if (theme === 'light' || theme === 'dark') {
       el.setAttribute('data-theme', theme);
+      el.setAttribute(THEME_SOURCE_ATTR, 'document');
     } else {
       el.removeAttribute('data-theme');
+      if (themeSource === 'document') el.removeAttribute(THEME_SOURCE_ATTR);
     }
   };
   syncThemeAttr();

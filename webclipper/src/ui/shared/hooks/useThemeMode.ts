@@ -2,15 +2,10 @@ import { useEffect } from 'react';
 
 import { storageGet, storageOnChanged } from '../../../platform/storage/local';
 
-export type ThemeMode = 'system' | 'light' | 'dark';
+import { normalizeThemeMode, THEME_MODE_STORAGE_KEY, type ThemeMode } from '../theme-mode';
 
-export const THEME_MODE_STORAGE_KEY = 'ui_theme_mode';
-
-function normalizeThemeMode(value: unknown): ThemeMode {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'light' || raw === 'dark' || raw === 'system') return raw as ThemeMode;
-  return 'system';
-}
+export { THEME_MODE_STORAGE_KEY };
+export type { ThemeMode };
 
 export function applyThemeMode(mode: ThemeMode) {
   const root = globalThis.document?.documentElement;
@@ -56,4 +51,3 @@ export function useThemeMode() {
     };
   }, []);
 }
-
