@@ -161,9 +161,10 @@ Phase 3（JS→TS）收口状态：
 - 文件名格式：`<source>-<title>-<stableId10>.md`，其中 `stableId10` 基于 `source + conversationKey` 的稳定 hash（用于唯一性与定位旧文件）。
 - 当 `title` 变化导致文件名变化时：同步会在 Obsidian 侧自动“重命名”（写入新文件并删除旧文件）。
 - 同步策略（平台主导）：
-  - Obsidian 端不存在文件：全量重建（PUT）
-  - Obsidian 端存在文件且 frontmatter 兼容：增量追加（PATCH 追加到 heading `SyncNos::Messages`），并 PATCH frontmatter 更新游标
-  - 若检测到冲突或 PATCH 失败：自动回退全量重建（PUT）
+  - 每次同步都全量重建（PUT 覆盖整个 `.md` 文件，包括 frontmatter 与正文）
+  - 正文结构：
+    - chat：`# Conversations` + `## {seq} {role}`
+    - article：`## Article` + `## Comments`
 - 本期仅支持 Obsidian Local REST API 的 HTTP insecure 模式（默认 `http://127.0.0.1:27123`）；不支持 `https://127.0.0.1:27124` 自签名证书模式。
   - popup 配置项默认自动保存（`blur` 保存；`Enter` 可立即保存）。
 

@@ -131,14 +131,14 @@ describe("obsidian-sync-orchestrator", () => {
     expect(syncRes.results[0].ok).toBe(true);
   });
 
-	  it("decides incremental append when remote has cursor and there are new messages", async () => {
-    setupChromeStorage();
-    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
+	  it("rebuilds chat note when remote exists", async () => {
+	    setupChromeStorage();
+	    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+	    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
       id: 1,
@@ -152,43 +152,44 @@ describe("obsidian-sync-orchestrator", () => {
       { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
     ]);
 
-    const calls: any[] = [];
-    // @ts-expect-error test global
-	    globalThis.fetch = async (_url: any, init: any) => {
-	      calls.push({ url: _url, init });
-	      const method = String(init?.method || "GET").toUpperCase();
-	      if (method === "GET") {
-	        return new Response(JSON.stringify({
-	          frontmatter: {
-	            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
-	          },
-	          content: "# Conversations\n\n## 1 assistant\n\nhi\n"
-	        }), { status: 200, headers: { "content-type": "application/json" } });
-	      }
-	      if (method === "PATCH") {
-	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-	      }
-      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
-    };
+	    let putBody = "";
+	    // @ts-expect-error test global
+		    globalThis.fetch = async (_url: any, init: any) => {
+		      const method = String(init?.method || "GET").toUpperCase();
+		      if (method === "GET") {
+		        return new Response(JSON.stringify({
+		          frontmatter: {
+		            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
+		          },
+		          content: "# Conversations\n\n## 1 assistant\n\nhi\n"
+		        }), { status: 200, headers: { "content-type": "application/json" } });
+		      }
+		      if (method === "PUT") {
+		        putBody = String(init?.body || "");
+		        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+		      }
+	      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+	    };
 
-    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
-    expect(syncRes.results[0].mode).toBe("incremental_append");
-    expect(syncRes.results[0].appended).toBe(1);
-    expect(syncRes.results[0].ok).toBe(true);
+	    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+	    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+	    expect(syncRes.results[0].mode).toBe("full_rebuild");
+	    expect(syncRes.results[0].appended).toBe(2);
+	    expect(syncRes.results[0].ok).toBe(true);
+	    expect(putBody).toContain("# Conversations");
+	    expect(putBody).toContain("## 1 assistant");
 
-    const status = await orch.getSyncStatus({ instanceId: "x" });
-    expect(status.job?.status).toBe("done");
-  });
+	    const status = await orch.getSyncStatus({ instanceId: "x" });
+	    expect(status.job?.status).toBe("done");
+	  });
 
-	  it("replaces Article/Comments sections when remote sections diverge (no new messages)", async () => {
-    setupChromeStorage();
-    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
-    const writer = await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
+	  it("rebuilds article note when remote exists", async () => {
+	    setupChromeStorage();
+	    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+	    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     const convo = {
       id: 1,
@@ -203,72 +204,49 @@ describe("obsidian-sync-orchestrator", () => {
       { messageKey: "article_body", sequence: 1, contentMarkdown: "Body", updatedAt: 1 },
     ]);
     backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockResolvedValue({ ok: true });
-    backgroundStorageMocks.getArticleCommentsByConversationId.mockResolvedValue([
-      { id: 1, parentId: null, conversationId: 1, canonicalUrl: "https://example.com", quoteText: "Quoted", commentText: "Root", createdAt: 1, updatedAt: 1 },
-    ]);
+	    backgroundStorageMocks.getArticleCommentsByConversationId.mockResolvedValue([
+	      { id: 1, parentId: null, conversationId: 1, canonicalUrl: "https://example.com", quoteText: "Quoted", commentText: "Root", createdAt: 1, updatedAt: 1 },
+	    ]);
+		    let putCount = 0;
+		    let putBody = "";
+		    // @ts-expect-error test global
+		    globalThis.fetch = async (_url: any, init: any) => {
+		      const method = String(init?.method || "GET").toUpperCase();
+		      if (method === "GET") {
+		        return new Response(
+		          JSON.stringify({
+		            frontmatter: {
+		              syncnos: {
+	                source: "goodlinks",
+	                conversationKey: "k1",
+	                schemaVersion: 1,
+	                lastSyncedSequence: 1,
+	                lastSyncedMessageKey: "article_body",
+		              },
+	            },
+		            content: "x",
+		          }),
+		          { status: 200, headers: { "content-type": "application/json" } },
+		        );
+		      }
+		      if (method === "PUT") {
+		        putCount += 1;
+		        putBody = String(init?.body || "");
+		        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+		      }
+		      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+		    };
 
-    const localArticleMd = writer.buildArticleBodyMarkdown([
-      { messageKey: "article_body", sequence: 1, contentMarkdown: "Body", updatedAt: 1 },
-    ]);
-    const localCommentsMd = writer.buildObsidianCommentsMarkdown([
-      { id: 1, parentId: null, conversationId: 1, canonicalUrl: "https://example.com", quoteText: "Quoted", commentText: "Root", createdAt: 1, updatedAt: 1 },
-    ]);
-    const articleDigest = computeDigest(localArticleMd);
-    const commentsDigest = computeDigest(localCommentsMd);
+	    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+		    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+		    expect(syncRes.results[0].ok).toBe(true);
+		    expect(syncRes.results[0].mode).toBe("full_rebuild");
+		    expect(putCount).toBe(1);
+		    expect(putBody).toContain("## Article");
+		    expect(putBody).toContain("## Comments");
+		  });
 
-	    let patchCount = 0;
-	    let putCount = 0;
-	    const remoteMarkdown = `# t\n\n## Article\n\n\n## Comments\n\n`;
-	    // @ts-expect-error test global
-	    globalThis.fetch = async (_url: any, init: any) => {
-	      const method = String(init?.method || "GET").toUpperCase();
-	      const headers = init?.headers as Headers;
-	      const accept = headers?.get("Accept") || "";
-	      if (method === "GET") {
-	        if (accept.includes("text/markdown")) {
-	          return new Response(remoteMarkdown, { status: 200, headers: { "content-type": "text/markdown" } });
-	        }
-	        return new Response(
-	          JSON.stringify({
-	            frontmatter: {
-	              syncnos: {
-                source: "goodlinks",
-                conversationKey: "k1",
-                schemaVersion: 1,
-                lastSyncedSequence: 1,
-                lastSyncedMessageKey: "article_body",
-                lastSyncedMessageUpdatedAt: 1,
-                articleDigest,
-                commentsDigest,
-              },
-            },
-	            // headings exist but bodies are empty (remote divergence)
-	            content: remoteMarkdown,
-	          }),
-	          { status: 200, headers: { "content-type": "application/json" } },
-	        );
-	      }
-	      if (method === "PATCH") {
-	        patchCount += 1;
-	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-	      }
-	      if (method === "PUT") {
-	        putCount += 1;
-	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-	      }
-	      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
-	    };
-
-    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
-	    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
-	    expect(syncRes.results[0].ok).toBe(true);
-	    expect(syncRes.results[0].mode).toBe("sections_replace");
-	    expect(putCount).toBe(1);
-	    // frontmatter replace
-	    expect(patchCount).toBe(1);
-	  });
-
-  it("falls back to full rebuild when cursor updatedAt mismatches local history", async () => {
+  it("rebuilds chat note even when remote cursor mismatches", async () => {
     setupChromeStorage();
     const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -289,7 +267,7 @@ describe("obsidian-sync-orchestrator", () => {
       { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
     ]);
 
-    // GET returns cursor with mismatched updatedAt -> should rebuild (PUT)
+    // Remote syncnos cursor is stale/mismatched.
     // @ts-expect-error test global
     globalThis.fetch = async (_url: any, init: any) => {
       const method = String(init?.method || "GET").toUpperCase();

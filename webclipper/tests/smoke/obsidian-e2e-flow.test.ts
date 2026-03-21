@@ -41,7 +41,7 @@ function setupChromeStorage() {
 }
 
 describe("obsidian local rest api sync e2e flow (mock)", () => {
-  it("full -> incremental -> delete -> rebuild, and handles auth failure", async () => {
+  it("rebuilds notes on every sync, and handles auth failure", async () => {
     setupChromeStorage();
 
     const settingsStore = await load("../../src/sync/obsidian/settings-store.ts");
@@ -70,7 +70,6 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     let remoteExists = false;
     let remoteFrontmatter: any = null;
     let remoteContent = "";
-    let appendDedupOnce = false;
     let authFail = false;
 
     // @ts-expect-error test global
@@ -94,26 +93,6 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
       }
 
-      if (method === "PATCH") {
-        const headers = init?.headers as Headers;
-        const targetType = headers?.get("Target-Type") || "";
-        const target = headers?.get("Target") || "";
-        if (targetType === "heading" && target === "Conversations") {
-          if (appendDedupOnce) {
-            appendDedupOnce = false;
-            return new Response(JSON.stringify({ errorCode: 40080, message: "content-already-preexists-in-target" }), { status: 400, headers: { "content-type": "application/json" } });
-          }
-          remoteContent = (remoteContent || "") + String(init?.body || "");
-          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-        }
-        if (targetType === "frontmatter" && target === "syncnos") {
-          const body = String(init?.body || "");
-          remoteFrontmatter = { syncnos: JSON.parse(body) };
-          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-        }
-        return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected patch target" }), { status: 400, headers: { "content-type": "application/json" } });
-      }
-
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected method" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
@@ -122,47 +101,27 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     expect(r1.okCount).toBe(1);
     expect(r1.results[0].mode).toBe("full_rebuild");
 
-    // Simulate what the written note now contains in frontmatter for next run.
-    remoteFrontmatter = {
-      syncnos: {
-        source: "chatgpt",
-        conversationKey: "k1",
-        schemaVersion: 1,
-        lastSyncedSequence: 1,
-        lastSyncedMessageKey: "m1",
-        lastSyncedMessageUpdatedAt: 1,
-        lastSyncedAt: 1
-      }
-    };
-
-    // 2) Add one new message locally -> incremental append
+    // 2) Add one new message locally -> rebuild again
     messages = [
       ...messages,
       { messageKey: "m2", sequence: 2, role: "assistant", contentMarkdown: "b", updatedAt: 2 }
     ];
     const r2 = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(r2.okCount).toBe(1);
-    expect(r2.results[0].mode).toBe("incremental_append");
-    expect(r2.results[0].appended).toBe(1);
-    expect(remoteFrontmatter?.syncnos?.lastSyncedSequence).toBe(2);
+    expect(r2.results[0].mode).toBe("full_rebuild");
+    expect(r2.results[0].appended).toBe(2);
 
-    // 3) Repeat incremental, but server says content already exists -> still ok (idempotent)
-    appendDedupOnce = true;
+    // 3) Remote deleted -> rebuild again
+    remoteExists = false;
     const r3 = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(r3.okCount).toBe(1);
-    expect(r3.results[0].mode).toBe("no_changes");
+    expect(r3.results[0].mode).toBe("full_rebuild");
 
-    // 4) Remote deleted -> rebuild again
-    remoteExists = false;
-    const r4 = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
-    expect(r4.okCount).toBe(1);
-    expect(r4.results[0].mode).toBe("full_rebuild");
-
-    // 5) Auth fails -> failure result
+    // 4) Auth fails -> failure result
     authFail = true;
-    const r5 = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
-    expect(r5.failCount).toBe(1);
-    expect(r5.results[0].mode).toBe("failed");
+    const r4 = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+    expect(r4.failCount).toBe(1);
+    expect(r4.results[0].mode).toBe("failed");
   });
 });
 
