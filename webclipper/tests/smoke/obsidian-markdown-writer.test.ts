@@ -9,11 +9,12 @@ describe("obsidian-markdown-writer", () => {
   it("builds full markdown with frontmatter and stable heading", async () => {
     const w = await loadWriter();
     const md = w.buildFullNoteMarkdown({
-      conversation: { title: "T", source: "s", sourceType: "chat", conversationKey: "k" },
+      conversation: { title: "T", source: "s", sourceType: "chat", conversationKey: "k", url: "https://example.com/chat" },
       messages: [{ messageKey: "m1", sequence: 1, role: "assistant", contentMarkdown: "hi" }],
       syncnosObject: { source: "s", conversationKey: "k", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
     });
     expect(md).toContain("---");
+    expect(md).toContain("url:");
     expect(md).toContain("syncnos:");
     expect(md).toContain(`# ${w.MESSAGES_HEADING}`);
     expect(md).toContain("## 1 assistant");

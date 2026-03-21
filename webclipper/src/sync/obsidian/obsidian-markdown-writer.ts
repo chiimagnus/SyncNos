@@ -246,15 +246,10 @@ function buildFullNoteMarkdown({
   const c = conversation || {};
   const title = safeString(c.title) || 'Untitled';
   const url = safeString(c.url);
-  const source = safeString(c.source);
-  const conversationKey = safeString(c.conversationKey);
   const sourceType = safeString(c.sourceType);
 
   const frontmatter = {
-    title,
-    source,
-    sourceType,
-    conversationKey,
+    ...(url ? { url } : null),
     syncnos: syncnosObject || null,
   };
 
