@@ -448,7 +448,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   );
 
   const onSaveNotionAiModelIndex = useCallback(async () => {
-    await runTask(async () => {
+    const ok = await runTask(async () => {
       const raw = String(notionAiModelIndex || '').trim();
       const value = raw ? Number(raw) : NaN;
 
@@ -459,16 +459,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       } else {
         await storageSet({ notion_ai_preferred_model_index: Math.floor(value) });
       }
-
-      await refresh();
     });
+
+    if (ok) await refresh();
   }, [notionAiModelIndex, refresh, runTask]);
 
   const onResetNotionAiModelIndex = useCallback(async () => {
-    await runTask(async () => {
+    const ok = await runTask(async () => {
       await storageSet({ notion_ai_preferred_model_index: '' });
-      await refresh();
     });
+
+    if (ok) await refresh();
   }, [refresh, runTask]);
 
   const onSaveObsidianSettings = useCallback(
