@@ -33,6 +33,11 @@ function toHostTokensCss(css: string) {
   return css.replaceAll(':root', ':host');
 }
 
+const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1';
+const COMMENTS_SIDEBAR_WIDTH_DEFAULT_PX = 420;
+const COMMENTS_SIDEBAR_WIDTH_MIN_PX = 320;
+const COMMENTS_SIDEBAR_WIDTH_MAX_PX = 720;
+
 const PANEL_SHADOW_CSS = [
   toHostTokensCss(String(tokensCssRaw || '')),
   String(buttonsCssRaw || ''),
@@ -43,6 +48,10 @@ const PANEL_SHADOW_CSS = [
 
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
 }
 
 function isEditableTarget(target: unknown): boolean {
@@ -93,7 +102,8 @@ export function mountThreadedCommentsPanel(
   options: MountOptions = {},
 ): { el: HTMLElement; api: ThreadedCommentsPanelApi; cleanup: () => void } {
   const el = document.createElement('webclipper-threaded-comments-panel') as any as HTMLElement;
-  if (options.overlay) el.setAttribute('data-overlay', '1');
+  const isOverlay = options.overlay === true;
+  if (isOverlay) el.setAttribute('data-overlay', '1');
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
   const showHeader = options.showHeader !== false;
   const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
@@ -152,6 +162,75 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
   };
+
+  const widthState = {
+    widthPx: null as number | null,
+    dragging: false,
+    pointerId: null as number | null,
+  };
+
+  const OVERLAY_WIDTH_CSS_VAR = '--webclipper-comments-panel-width';
+
+  function readPersistedOverlayWidthPx(): number | null {
+    try {
+      const raw = localStorage.getItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY);
+      const parsed = Number.parseFloat(String(raw || '').trim());
+      if (!Number.isFinite(parsed) || parsed <= 0) return null;
+      return Math.round(parsed);
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  function persistOverlayWidthPx(widthPx: number) {
+    try {
+      localStorage.setItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(widthPx)));
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function clampOverlayWidthPx(widthPx: number): number {
+    const viewport = Math.max(
+      1,
+      Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
+    );
+    const maxCap = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.floor(viewport * 0.92));
+    const max = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.min(COMMENTS_SIDEBAR_WIDTH_MAX_PX, maxCap));
+    return Math.round(clamp(widthPx, COMMENTS_SIDEBAR_WIDTH_MIN_PX, max));
+  }
+
+  function setOverlayWidthPx(widthPx: number | null, input?: { persist?: boolean }) {
+    if (!isOverlay) return;
+    if (widthPx == null) {
+      widthState.widthPx = null;
+      try {
+        el.style.removeProperty(OVERLAY_WIDTH_CSS_VAR);
+      } catch (_e) {
+        // ignore
+      }
+      dockResize();
+      return;
+    }
+
+    const clamped = clampOverlayWidthPx(widthPx);
+    widthState.widthPx = clamped;
+    try {
+      el.style.setProperty(OVERLAY_WIDTH_CSS_VAR, `${clamped}px`, 'important');
+    } catch (_e) {
+      // ignore
+    }
+    if (input?.persist !== false) persistOverlayWidthPx(clamped);
+    dockResize();
+  }
+
+  if (isOverlay) {
+    const persistedWidth = readPersistedOverlayWidthPx();
+    if (persistedWidth != null) {
+      widthState.widthPx = clampOverlayWidthPx(persistedWidth);
+      setOverlayWidthPx(widthState.widthPx, { persist: false });
+    }
+  }
 
   function setDockOpen(open: boolean) {
     if (!dockPage) return;
@@ -245,6 +324,128 @@ export function mountThreadedCommentsPanel(
   const surface = document.createElement('div');
   surface.className = 'webclipper-inpage-comments-panel__surface';
   shadow.appendChild(surface);
+
+  let cleanupOverlayResize: (() => void) | null = null;
+  if (isOverlay) {
+    const handle = document.createElement('div');
+    handle.className = 'webclipper-inpage-comments-panel__resize-handle';
+    surface.appendChild(handle);
+
+    const stopEvent = (event: Event) => {
+      try {
+        (event as any).preventDefault?.();
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        (event as any).stopPropagation?.();
+      } catch (_e) {
+        // ignore
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!widthState.dragging) return;
+      if (widthState.pointerId != null && e.pointerId !== widthState.pointerId) return;
+      stopEvent(e);
+      const viewport = Math.max(
+        1,
+        Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
+      );
+      const nextWidth = viewport - e.clientX;
+      setOverlayWidthPx(nextWidth, { persist: false });
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (!widthState.dragging) return;
+      if (widthState.pointerId != null && e.pointerId !== widthState.pointerId) return;
+      stopEvent(e);
+      widthState.dragging = false;
+      widthState.pointerId = null;
+      try {
+        el.removeAttribute('data-resizing');
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        (handle as any).releasePointerCapture?.(e.pointerId);
+      } catch (_e) {
+        // ignore
+      }
+      if (widthState.widthPx != null) persistOverlayWidthPx(widthState.widthPx);
+      try {
+        globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
+        globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
+        globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
+      } catch (_e) {
+        // ignore
+      }
+      dockResize();
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if ((e as any).button != null && (e as any).button !== 0) return;
+      stopEvent(e);
+      widthState.dragging = true;
+      widthState.pointerId = e.pointerId;
+      try {
+        el.setAttribute('data-resizing', '1');
+      } catch (_e) {
+        // ignore
+      }
+      if (widthState.widthPx == null) {
+        const measured = readDockWidthPx();
+        setOverlayWidthPx(measured, { persist: false });
+      }
+      try {
+        (handle as any).setPointerCapture?.(e.pointerId);
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        globalThis.addEventListener?.('pointermove', onPointerMove as any, true);
+        globalThis.addEventListener?.('pointerup', onPointerUp as any, true);
+        globalThis.addEventListener?.('pointercancel', onPointerUp as any, true);
+      } catch (_e) {
+        // ignore
+      }
+    };
+
+    handle.addEventListener('pointerdown', onPointerDown);
+
+    const onViewportResize = () => {
+      if (widthState.widthPx == null) return;
+      const clamped = clampOverlayWidthPx(widthState.widthPx);
+      if (clamped === widthState.widthPx) return;
+      setOverlayWidthPx(clamped, { persist: true });
+    };
+
+    try {
+      globalThis.addEventListener?.('resize', onViewportResize as any, { passive: true } as any);
+    } catch (_e) {
+      // ignore
+    }
+
+    cleanupOverlayResize = () => {
+      try {
+        handle.removeEventListener('pointerdown', onPointerDown);
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
+        globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
+        globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        globalThis.removeEventListener?.('resize', onViewportResize as any);
+      } catch (_e) {
+        // ignore
+      }
+    };
+  }
 
   if (showHeader) {
     const header = document.createElement('div');
@@ -730,6 +931,12 @@ export function mountThreadedCommentsPanel(
     } catch (_e) {
       // ignore
     }
+    try {
+      cleanupOverlayResize?.();
+    } catch (_e) {
+      // ignore
+    }
+    cleanupOverlayResize = null;
     try {
       themeObserver?.disconnect?.();
     } catch (_e) {

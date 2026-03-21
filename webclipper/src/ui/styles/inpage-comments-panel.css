@@ -51,7 +51,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: min(420px, 92vw);
+  width: min(var(--webclipper-comments-panel-width, 420px), 92vw);
   height: 100vh;
   z-index: 2147483647;
   background: var(--bg-sunken, var(--panel-bg));
@@ -63,6 +63,41 @@
   position: absolute;
   inset: 0;
   background: transparent;
+}
+
+.webclipper-inpage-comments-panel__resize-handle {
+  display: none;
+}
+
+:host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  background: transparent;
+}
+
+:host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--panel-border);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+:host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle:hover::after,
+:host([data-overlay='1'][data-resizing='1']) .webclipper-inpage-comments-panel__resize-handle::after {
+  opacity: 1;
 }
 
 .webclipper-inpage-comments-panel__header {
