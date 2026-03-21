@@ -159,6 +159,15 @@ async function startNotionSync(router: any, jobStore: { __getJob: () => any }, c
   return await waitForJobDone(jobStore);
 }
 
+function notionHttpResponse(body: any, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (_name: string) => null },
+    text: async () => JSON.stringify(body ?? {}),
+  } as any;
+}
+
 describe('background-router notion sync', () => {
   it('disconnect clears notion token and cached notion routing keys', async () => {
     const chromeMock = mockChromeStorage();
@@ -294,6 +303,129 @@ describe('background-router notion sync', () => {
     expect(blocksFromCount).toBe(1);
     expect(calls.some((c) => c.op === 'clear')).toBe(false);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
+  });
+
+  it('updates web article comments without rebuilding the whole page', async () => {
+    const calls: any[] = [];
+    const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
+
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET' && String(url).includes('/v1/blocks/p1/children')) {
+        return notionHttpResponse({
+          results: [
+            {
+              object: 'block',
+              id: 'b_article',
+              type: 'heading_2',
+              heading_2: {
+                is_toggleable: true,
+                rich_text: [{ type: 'text', text: { content: 'Article' }, plain_text: 'Article' }],
+              },
+            },
+            {
+              object: 'block',
+              id: 'b_comments',
+              type: 'heading_2',
+              heading_2: {
+                is_toggleable: true,
+                rich_text: [{ type: 'text', text: { content: 'Comments' }, plain_text: 'Comments' }],
+              },
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        });
+      }
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: {
+              id: 1,
+              title: 'Seeded Example Article',
+              url: 'https://example.com/',
+              source: 'web',
+              sourceType: 'article',
+              notionPageId: 'p1',
+            },
+            mapping: {
+              notionPageId: 'p1',
+              lastSyncedMessageKey: 'article_body',
+              lastSyncedSequence: 1,
+              lastSyncedAt: 10,
+              notionWebArticleLayoutVersion: 2,
+              notionCommentsDigest: 'old',
+            },
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'article_body', role: 'article', contentMarkdown: '# Hello', sequence: 1, updatedAt: 1 },
+          ],
+          getArticleCommentsByConversationId: async () => [
+            {
+              id: 11,
+              parentId: null,
+              conversationId: 1,
+              canonicalUrl: 'https://example.com/',
+              quoteText: 'Quote',
+              commentText: 'Root',
+              createdAt: 100,
+              updatedAt: 100,
+            },
+            {
+              id: 12,
+              parentId: 11,
+              conversationId: 1,
+              canonicalUrl: 'https://example.com/',
+              quoteText: '',
+              commentText: 'Reply',
+              createdAt: 110,
+              updatedAt: 110,
+            },
+          ],
+          attachOrphanArticleCommentsToConversation: async () => true,
+          setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
+        },
+        syncService: {
+          getPage: async () => ({ id: 'p1', parent: { database_id: 'db1' }, properties: {} }),
+          updatePageProperties: async () => ({ ok: true }),
+          clearPageChildren: async (_t: string, targetId: string) => {
+            calls.push({ op: 'clear', targetId });
+            return { ok: true };
+          },
+          appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
+            calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
+            return { results: [], count: 0 };
+          },
+          messagesToBlocks: (_messages: any[]) => [],
+          isPageUsableForDatabase: () => true,
+          pageBelongsToDatabase: () => true,
+        },
+        jobStore,
+      },
+    });
+
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.okCount).toBe(1);
+    expect(job.perConversation[0].ok).toBe(true);
+    expect(job.perConversation[0].mode).toBe('updated_properties');
+
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'p1')).toBe(false);
+    expect(calls.some((c) => c.op === 'append' && c.targetId === 'p1')).toBe(false);
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_comments')).toBe(true);
+    expect(calls.some((c) => c.op === 'append' && c.targetId === 'b_comments')).toBe(true);
+
+    const cursorCall = calls.find((c) => c.op === 'setCursor');
+    expect(cursorCall?.cursor?.notionWebArticleLayoutVersion).toBe(2);
+    expect(String(cursorCall?.cursor?.notionCommentsDigest || '')).not.toBe('old');
   });
 
   it('updates page properties without rebuilding body when article content is unchanged', async () => {

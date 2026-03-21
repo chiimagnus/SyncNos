@@ -11,7 +11,11 @@ import notionFilesApiDefault from './notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '../../platform/storage/local';
 import { buildNotionCommentsBlocks, computeNotionCommentsDigest } from '../../comments/sync/notion-comments-renderer';
-import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from './notion-section-blocks.ts';
+import {
+  buildToggleHeadingBlock as buildNotionToggleHeadingBlock,
+  findToggleHeadingBlock as findNotionToggleHeadingBlock,
+  listBlockChildren as listNotionBlockChildren,
+} from './notion-section-blocks.ts';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -831,12 +835,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
         }
 
-        let articleComments: any[] | null = null;
-        let articleCommentsDigest: string | null = null;
-        let shouldRebuildForArticleLayout = false;
-        if (isWebArticleConversation(convo) && storage) {
-          const canListComments = typeof storage.getArticleCommentsByConversationId === 'function';
-          if (canListComments) {
+	        let articleComments: any[] | null = null;
+	        let articleCommentsDigest: string | null = null;
+	        let shouldRebuildForArticleLayout = false;
+	        let shouldSyncArticleCommentsSection = false;
+	        if (isWebArticleConversation(convo) && storage) {
+	          const canListComments = typeof storage.getArticleCommentsByConversationId === 'function';
+	          if (canListComments) {
             try {
               const url = String(convo?.url || '').trim();
               if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
@@ -847,29 +852,32 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               // ignore
             }
 
-            try {
-              // eslint-disable-next-line no-await-in-loop
-              articleComments = await storage.getArticleCommentsByConversationId(id);
-              articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
-              const prevDigest = String(mapping?.notionCommentsDigest || '');
+	            try {
+	              // eslint-disable-next-line no-await-in-loop
+	              articleComments = await storage.getArticleCommentsByConversationId(id);
+	              articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+	              const prevDigest = String(mapping?.notionCommentsDigest || '');
 	              const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
 	              const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 2;
-	              shouldRebuildForArticleLayout = !layoutApplied || prevDigest !== String(articleCommentsDigest || '');
+	              const digestChanged = prevDigest !== String(articleCommentsDigest || '');
+	              shouldRebuildForArticleLayout = !layoutApplied;
+	              shouldSyncArticleCommentsSection = layoutApplied && digestChanged;
 	              if (shouldRebuildForArticleLayout) shouldRebuild = true;
-            } catch (e) {
-              warnings.push({
-                code: "notion_article_comments_fetch_failed",
-                message: "Failed to load local article comments; skipping comment sync in this run.",
+	            } catch (e) {
+	              warnings.push({
+	                code: "notion_article_comments_fetch_failed",
+	                message: "Failed to load local article comments; skipping comment sync in this run.",
                 extra: { error: e && e.message ? String(e.message) : String(e) },
               });
-              articleComments = null;
-              articleCommentsDigest = null;
-              shouldRebuildForArticleLayout = false;
-            }
-          }
-        }
+	              articleComments = null;
+	              articleCommentsDigest = null;
+	              shouldRebuildForArticleLayout = false;
+	              shouldSyncArticleCommentsSection = false;
+	            }
+	          }
+	        }
 
-        if (shouldRebuild) {
+	        if (shouldRebuild) {
           if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
           await writeRunningJob({
             currentConversationId: id,
@@ -950,7 +958,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	                : null),
             });
           }
-          setResultAt(index, {
+	          setResultAt(index, {
             conversationId: id,
             conversationTitle,
             ok: true,
@@ -969,10 +977,162 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               : null)
 	          });
 	          trace.flush({ mode: "rebuilt", ok: true, blockCount: appendedBlockCount || blocks.length });
+	        } else if (shouldSyncArticleCommentsSection) {
+	          if (!articleComments || !articleCommentsDigest) {
+	            setResultAt(index, {
+	              conversationId: id,
+	              conversationTitle,
+	              ok: true,
+	              notionPageId: pageId,
+	              mode: "no_changes",
+	              appended: 0,
+	              warnings,
+	            });
+	            trace.flush({ mode: "no_changes", ok: true, blockCount: 0 });
+	            return;
+	          }
+
+	          await writeRunningJob({
+	            currentConversationId: id,
+	            currentConversationTitle: toCurrentConversationTitle(convo, id),
+	            currentStage: "uploading_message_blocks",
+	          });
+	          trace.mark("sync comments section");
+
+	          const pageChildren = await listNotionBlockChildren(token.accessToken, pageId);
+	          const commentsHeading = findNotionToggleHeadingBlock(pageChildren, SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE);
+	          const commentsHeadingId = commentsHeading && commentsHeading.id ? String(commentsHeading.id).trim() : "";
+	          if (!commentsHeadingId) {
+	            warnings.push({
+	              code: "notion_article_comments_section_missing",
+	              message: "Comments section heading not found; falling back to full rebuild.",
+	              extra: { pageId, title: SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE },
+	            });
+	            await writeRunningJob({
+	              currentConversationId: id,
+	              currentConversationTitle: toCurrentConversationTitle(convo, id),
+	              currentStage: "rebuilding_destination_page",
+	            });
+	            trace.mark("fallback full rebuild");
+	            // eslint-disable-next-line no-await-in-loop
+	            await notionSyncService.updatePageProperties(token.accessToken, {
+	              pageId,
+	              properties: pageSpec.buildUpdateProperties(convo),
+	            });
+	            trace.mark("clear page children");
+	            // eslint-disable-next-line no-await-in-loop
+	            await notionSyncService.clearPageChildren(token.accessToken, pageId);
+	            trace.mark("build blocks");
+
+	            // eslint-disable-next-line no-await-in-loop
+	            const rebuilt = await buildNotionWebArticlePageBlocks({
+	              notionSyncService,
+	              accessToken: token.accessToken,
+	              source: convo.source,
+	              messages,
+	              comments: Array.isArray(articleComments) ? articleComments : [],
+	              warnings,
+	            });
+
+	            const appended = await appendNotionWebArticlePageBlocks({
+	              notionSyncService,
+	              accessToken: token.accessToken,
+	              pageId,
+	              headingBlocks: rebuilt?.headingBlocks,
+	              articleBlocks: rebuilt?.articleBlocks,
+	              commentBlocks: rebuilt?.commentBlocks,
+	              warnings,
+	            });
+	            const nextCursor = lastMessageCursor(messages);
+	            if (storage.setSyncCursor) {
+	              await writeRunningJob({
+	                currentConversationId: id,
+	                currentConversationTitle: toCurrentConversationTitle(convo, id),
+	                currentStage: "saving_sync_cursor",
+	              });
+	              trace.mark("save cursor");
+	              // eslint-disable-next-line no-await-in-loop
+	              await storage.setSyncCursor(id, {
+	                ...nextCursor,
+	                notionWebArticleLayoutVersion: 2,
+	                notionCommentsDigest: String(articleCommentsDigest || ""),
+	              });
+	            }
+
+	            setResultAt(index, {
+	              conversationId: id,
+	              conversationTitle,
+	              ok: true,
+	              notionPageId: pageId,
+	              mode: "rebuilt",
+	              appended: 0,
+	              warnings,
+	              comments: {
+	                updated: true,
+	                threads: rebuilt?.commentThreads || 0,
+	                items: rebuilt?.commentItems || 0,
+	              },
+	            });
+	            trace.flush({
+	              mode: "rebuilt",
+	              ok: true,
+	              blockCount: Number(appended?.appendedBlocks) || 0,
+	            });
+	            return;
+	          } else {
+	            if (typeof notionSyncService.clearPageChildren === "function") {
+	              trace.mark("clear comments children");
+	              // eslint-disable-next-line no-await-in-loop
+	              await notionSyncService.clearPageChildren(token.accessToken, commentsHeadingId);
+	            } else {
+	              throw new Error("notion sync service missing clearPageChildren");
+	            }
+
+	            const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
+	            const commentBlocks = Array.isArray(builtComments.blocks) ? builtComments.blocks : [];
+	            if (commentBlocks.length) {
+	              trace.mark("append comments children");
+	              // eslint-disable-next-line no-await-in-loop
+	              await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
+	            }
+
+	            const nextCursor = lastMessageCursor(messages);
+	            if (storage.setSyncCursor) {
+	              await writeRunningJob({
+	                currentConversationId: id,
+	                currentConversationTitle: toCurrentConversationTitle(convo, id),
+	                currentStage: "saving_sync_cursor",
+	              });
+	              trace.mark("save cursor");
+	              // eslint-disable-next-line no-await-in-loop
+	              await storage.setSyncCursor(id, {
+	                ...nextCursor,
+	                notionWebArticleLayoutVersion: 2,
+	                notionCommentsDigest: String(articleCommentsDigest || ""),
+	              });
+	            }
+
+	            setResultAt(index, {
+	              conversationId: id,
+	              conversationTitle,
+	              ok: true,
+	              notionPageId: pageId,
+	              mode: "updated_properties",
+	              appended: 0,
+	              warnings,
+	              comments: {
+	                updated: true,
+	                threads: Number(builtComments.threads) || 0,
+	                items: Number(builtComments.items) || 0,
+	              },
+	            });
+	            trace.flush({ mode: "updated_properties", ok: true, blockCount: commentBlocks.length });
+	            return;
+	          }
 	        } else if (inc.newMessages && inc.newMessages.length) {
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: toCurrentConversationTitle(convo, id),
+	          await writeRunningJob({
+	            currentConversationId: id,
+	            currentConversationTitle: toCurrentConversationTitle(convo, id),
             currentStage: "appending_new_messages"
           });
           trace.mark("update page properties");
