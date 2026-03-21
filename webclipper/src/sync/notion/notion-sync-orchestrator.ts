@@ -314,8 +314,8 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return String(markdown || '').trim();
   }
 
-	  const SYNCNOS_WEB_ARTICLE_SECTION_TITLE = 'SyncNos::Article';
-	  const SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE = 'SyncNos::Comments';
+	  const SYNCNOS_WEB_ARTICLE_SECTION_TITLE = 'Article';
+	  const SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE = 'Comments';
 
 	  function buildWebArticleSectionHeadings() {
 	    return [
@@ -789,14 +789,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, {
               ...nextCursor,
-              ...(isWebArticleConversation(convo)
-                ? {
-                  notionWebArticleLayoutVersion: 1,
-                  ...(typeof webArticleCommentsDigest === 'string'
-                    ? { notionCommentsDigest: webArticleCommentsDigest }
-                    : null),
-                }
-                : null),
+	              ...(isWebArticleConversation(convo)
+	                ? {
+	                  notionWebArticleLayoutVersion: 2,
+	                  ...(typeof webArticleCommentsDigest === 'string'
+	                    ? { notionCommentsDigest: webArticleCommentsDigest }
+	                    : null),
+	                }
+	                : null),
             });
           }
 	          setResultAt(index, {
@@ -852,10 +852,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               articleComments = await storage.getArticleCommentsByConversationId(id);
               articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
               const prevDigest = String(mapping?.notionCommentsDigest || '');
-              const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
-              const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 1;
-              shouldRebuildForArticleLayout = !layoutApplied || prevDigest !== String(articleCommentsDigest || '');
-              if (shouldRebuildForArticleLayout) shouldRebuild = true;
+	              const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
+	              const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 2;
+	              shouldRebuildForArticleLayout = !layoutApplied || prevDigest !== String(articleCommentsDigest || '');
+	              if (shouldRebuildForArticleLayout) shouldRebuild = true;
             } catch (e) {
               warnings.push({
                 code: "notion_article_comments_fetch_failed",
@@ -942,12 +942,12 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, {
               ...nextCursor,
-              ...(isWebArticleConversation(convo)
-                ? {
-                  notionWebArticleLayoutVersion: 1,
-                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
-                }
-                : null),
+	              ...(isWebArticleConversation(convo)
+	                ? {
+	                  notionWebArticleLayoutVersion: 2,
+	                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
+	                }
+	                : null),
             });
           }
           setResultAt(index, {

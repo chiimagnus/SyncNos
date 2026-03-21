@@ -16,10 +16,10 @@ async function loadNotionCommentsRenderer() {
 describe('notion article comments blocks', () => {
   it('builds toggle heading blocks for SyncNos sections', async () => {
     const notionSections = await loadNotionSectionBlocks();
-    const block = notionSections.buildToggleHeadingBlock('SyncNos::Article', 2);
+    const block = notionSections.buildToggleHeadingBlock('Article', 2);
     expect(block?.type).toBe('heading_2');
     expect(block?.heading_2?.is_toggleable).toBe(true);
-    expect(block?.heading_2?.rich_text?.[0]?.text?.content).toBe('SyncNos::Article');
+    expect(block?.heading_2?.rich_text?.[0]?.text?.content).toBe('Article');
   });
 
   it('renders comments into quote + bullet blocks', async () => {

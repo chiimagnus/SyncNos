@@ -3,8 +3,8 @@ import { notionFetch } from './notion-api';
 export type ToggleHeadingLevel = 1 | 2 | 3;
 
 export const SYNCNOS_NOTION_SECTION_TITLES = {
-  article: 'SyncNos::Article',
-  comments: 'SyncNos::Comments',
+  article: 'Article',
+  comments: 'Comments',
 } as const;
 
 function safeString(value: unknown): string {
@@ -122,4 +122,3 @@ export async function findOrCreateToggleHeadingBlockId(args: {
   if (!createdId) throw new Error(`failed to create notion section "${title}"`);
   return { blockId: createdId, created: true };
 }
-
