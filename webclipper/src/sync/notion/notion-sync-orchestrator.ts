@@ -16,6 +16,11 @@ import {
   findToggleHeadingBlock as findNotionToggleHeadingBlock,
   listBlockChildren as listNotionBlockChildren,
 } from './notion-section-blocks.ts';
+import {
+  ensureSectionHeadingBlockId,
+  layoutSpecForConversationKind,
+  rebuildSectionByArchivingHeading,
+} from './notion-managed-sections.ts';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -852,14 +857,245 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               }
               : null)
 	          });
-	          trace.flush({ mode: "created", ok: true, blockCount: appendedBlockCount || blocks.length });
+		          trace.flush({ mode: "created", ok: true, blockCount: appendedBlockCount || blocks.length });
+		          return;
+		        }
+
+	        if (isWebArticleConversation(convo)) {
+	          await writeRunningJob({
+	            currentConversationId: id,
+	            currentConversationTitle: toCurrentConversationTitle(convo, id),
+	            currentStage: "uploading_message_blocks",
+	          });
+
+	          trace.mark("update page properties");
+	          // eslint-disable-next-line no-await-in-loop
+	          await notionSyncService.updatePageProperties(token.accessToken, {
+	            pageId,
+	            properties: pageSpec.buildUpdateProperties(convo),
+	          });
+
+	          const layout = layoutSpecForConversationKind("article");
+	          const articleSection = (layout.sections || []).find((s) => s && String(s.id) === "article");
+	          const commentsSection = (layout.sections || []).find((s) => s && String(s.id) === "comments");
+	          if (!articleSection || !commentsSection) throw new Error("missing web article layout sections");
+
+	          let articleDigest: string | null = null;
+	          try {
+	            articleDigest = computeNotionArticleDigest(messages);
+	          } catch (_e) {
+	            articleDigest = null;
+	          }
+	          const prevArticleDigest = mapping ? String(mapping.notionArticleDigest || "") : "";
+	          const shouldUpdateArticle = typeof articleDigest === "string" && String(articleDigest || "") !== prevArticleDigest;
+
+	          let articleComments: any[] = [];
+	          let commentsDigest: string | null = null;
+	          let commentThreads = 0;
+	          let commentItems = 0;
+	          if (storage && typeof storage.getArticleCommentsByConversationId === "function") {
+	            try {
+	              const url = String(convo?.url || "").trim();
+	              if (url && typeof storage.attachOrphanArticleCommentsToConversation === "function") {
+	                // eslint-disable-next-line no-await-in-loop
+	                await storage.attachOrphanArticleCommentsToConversation(url, id);
+	              }
+	              // eslint-disable-next-line no-await-in-loop
+	              articleComments = await storage.getArticleCommentsByConversationId(id);
+	              commentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+	            } catch (e) {
+	              warnings.push({
+	                code: "notion_article_comments_fetch_failed",
+	                message: "Failed to load local article comments; skipping comment sync in this run.",
+	                extra: { error: e && e.message ? String(e.message) : String(e) },
+	              });
+	              articleComments = [];
+	              commentsDigest = null;
+	            }
+	          }
+	          const prevCommentsDigest = mapping ? String(mapping.notionCommentsDigest || "") : "";
+	          const shouldUpdateComments =
+	            typeof commentsDigest === "string" && String(commentsDigest || "") !== prevCommentsDigest;
+
+	          const mappingSections = mapping && mapping.notionSections && typeof mapping.notionSections === "object" ? mapping.notionSections : {};
+	          const hasArticleAnchor = !!(mappingSections.article && mappingSections.article.headingBlockId);
+	          const hasCommentsAnchor = !!(mappingSections.comments && mappingSections.comments.headingBlockId);
+	          const shouldEnsureAnchors = (!hasArticleAnchor || !hasCommentsAnchor) && typeof storage.patchSyncMapping === "function";
+
+	          let articleHeadingBlockId = hasArticleAnchor ? String(mappingSections.article.headingBlockId || "") : "";
+	          let commentsHeadingBlockId = hasCommentsAnchor ? String(mappingSections.comments.headingBlockId || "") : "";
+
+	          if (shouldEnsureAnchors) {
+	            trace.mark("ensure section anchors");
+	            const resolvedArticle = await ensureSectionHeadingBlockId({
+	              accessToken: token.accessToken,
+	              pageId,
+	              section: articleSection,
+	              mapping,
+	              notionSyncService,
+	              storage,
+	              conversationId: id,
+	            });
+	            articleHeadingBlockId = resolvedArticle.headingBlockId;
+	            const resolvedComments = await ensureSectionHeadingBlockId({
+	              accessToken: token.accessToken,
+	              pageId,
+	              section: commentsSection,
+	              mapping,
+	              notionSyncService,
+	              storage,
+	              conversationId: id,
+	            });
+	            commentsHeadingBlockId = resolvedComments.headingBlockId;
+	          }
+
+	          if (shouldUpdateArticle || shouldUpdateComments) {
+	            trace.mark("build web article blocks");
+	            let articleBlocks: any[] = [];
+	            let commentBlocks: any[] = [];
+
+	            if (shouldUpdateArticle) {
+	              // eslint-disable-next-line no-await-in-loop
+	              const built = await buildNotionWebArticlePageBlocks({
+	                notionSyncService,
+	                accessToken: token.accessToken,
+	                source: convo.source,
+	                messages,
+	                comments: Array.isArray(articleComments) ? articleComments : [],
+	                warnings,
+	              });
+	              articleBlocks = Array.isArray(built?.articleBlocks) ? built.articleBlocks : [];
+	              if (shouldUpdateComments) {
+	                commentBlocks = Array.isArray(built?.commentBlocks) ? built.commentBlocks : [];
+	                commentThreads = Number(built?.commentThreads) || 0;
+	                commentItems = Number(built?.commentItems) || 0;
+	              }
+	            } else if (shouldUpdateComments) {
+	              const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
+	              commentBlocks = Array.isArray(builtComments?.blocks) ? builtComments.blocks : [];
+	              commentThreads = Number(builtComments?.threads) || 0;
+	              commentItems = Number(builtComments?.items) || 0;
+	            }
+
+	            if (shouldUpdateArticle) {
+	              if (!articleHeadingBlockId) {
+	                const resolved = await ensureSectionHeadingBlockId({
+	                  accessToken: token.accessToken,
+	                  pageId,
+	                  section: articleSection,
+	                  mapping,
+	                  notionSyncService,
+	                  storage,
+	                  conversationId: id,
+	                });
+	                articleHeadingBlockId = resolved.headingBlockId;
+	              }
+	              await writeRunningJob({
+	                currentConversationId: id,
+	                currentConversationTitle: toCurrentConversationTitle(convo, id),
+	                currentStage: "rebuilding_destination_page",
+	              });
+	              trace.mark("rebuild article section");
+	              const rebuilt = await rebuildSectionByArchivingHeading({
+	                accessToken: token.accessToken,
+	                pageId,
+	                section: articleSection,
+	                currentHeadingBlockId: articleHeadingBlockId,
+	                desiredBlocks: articleBlocks,
+	                notionSyncService,
+	              });
+	              articleHeadingBlockId = rebuilt.headingBlockId;
+	              if (storage && typeof storage.patchSyncMapping === "function") {
+	                // eslint-disable-next-line no-await-in-loop
+	                await storage.patchSyncMapping(id, {
+	                  notionSections: { article: { headingBlockId: articleHeadingBlockId } },
+	                });
+	              }
+	            }
+
+	            if (shouldUpdateComments) {
+	              if (!commentsHeadingBlockId) {
+	                const resolved = await ensureSectionHeadingBlockId({
+	                  accessToken: token.accessToken,
+	                  pageId,
+	                  section: commentsSection,
+	                  mapping,
+	                  notionSyncService,
+	                  storage,
+	                  conversationId: id,
+	                });
+	                commentsHeadingBlockId = resolved.headingBlockId;
+	              }
+	              await writeRunningJob({
+	                currentConversationId: id,
+	                currentConversationTitle: toCurrentConversationTitle(convo, id),
+	                currentStage: "rebuilding_destination_page",
+	              });
+	              trace.mark("rebuild comments section");
+	              const rebuilt = await rebuildSectionByArchivingHeading({
+	                accessToken: token.accessToken,
+	                pageId,
+	                section: commentsSection,
+	                currentHeadingBlockId: commentsHeadingBlockId,
+	                desiredBlocks: commentBlocks,
+	                notionSyncService,
+	              });
+	              commentsHeadingBlockId = rebuilt.headingBlockId;
+	              if (storage && typeof storage.patchSyncMapping === "function") {
+	                // eslint-disable-next-line no-await-in-loop
+	                await storage.patchSyncMapping(id, {
+	                  notionSections: { comments: { headingBlockId: commentsHeadingBlockId } },
+	                });
+	              }
+	            }
+	          }
+
+	          const nextCursor = lastMessageCursor(messages);
+	          if (storage.setSyncCursor) {
+	            await writeRunningJob({
+	              currentConversationId: id,
+	              currentConversationTitle: toCurrentConversationTitle(convo, id),
+	              currentStage: "saving_sync_cursor",
+	            });
+	            trace.mark("save cursor");
+	            // eslint-disable-next-line no-await-in-loop
+	            await storage.setSyncCursor(id, {
+	              ...nextCursor,
+	              notionWebArticleLayoutVersion: 2,
+	              ...(typeof articleDigest === "string" ? { notionArticleDigest: String(articleDigest || "") } : null),
+	              ...(typeof commentsDigest === "string" ? { notionCommentsDigest: String(commentsDigest || "") } : null),
+	            });
+	          }
+
+	          setResultAt(index, {
+	            conversationId: id,
+	            conversationTitle,
+	            ok: true,
+	            notionPageId: pageId,
+	            mode: shouldUpdateArticle || shouldUpdateComments ? "rebuilt" : "no_changes",
+	            appended: 0,
+	            warnings,
+	            ...(shouldUpdateComments
+	              ? {
+	                comments: {
+	                  updated: true,
+	                  threads: commentThreads,
+	                  items: commentItems,
+	                },
+	              }
+	              : null),
+	          });
+	          trace.flush({
+	            mode: shouldUpdateArticle || shouldUpdateComments ? "rebuilt" : "no_changes",
+	            ok: true,
+	          });
 	          return;
 	        }
 
-        const inc = computeNewMessages(messages, cursor);
-        let shouldRebuild = !!inc.rebuild;
-        if (!shouldRebuild && pageSpec && typeof pageSpec.shouldRebuild === "function") {
-          try {
+	        const inc = computeNewMessages(messages, cursor);
+	        let shouldRebuild = !!inc.rebuild;
+	        if (!shouldRebuild && pageSpec && typeof pageSpec.shouldRebuild === "function") {
+	          try {
             shouldRebuild = !!pageSpec.shouldRebuild({ conversation: convo, messages, mapping });
           } catch (_e) {
             // ignore

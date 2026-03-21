@@ -684,7 +684,10 @@ export async function setConversationNotionPageId(
   if (source && conversationKey) {
     const idx = stores.sync_mappings.index('by_source_conversationKey');
     const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+    const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
+    if (preserved && typeof preserved === 'object') delete preserved.id;
     const payload: any = withOptionalId(existing && existing.id, {
+      ...preserved,
       source,
       conversationKey,
       notionPageId: notionPageId || '',
@@ -725,7 +728,10 @@ export async function setSyncCursor(
   const idx = stores.sync_mappings.index('by_source_conversationKey');
   const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
   const now = Date.now();
+  const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
+  if (preserved && typeof preserved === 'object') delete preserved.id;
   const payload: any = withOptionalId(existing && existing.id, {
+    ...preserved,
     source,
     conversationKey,
     notionPageId: String(existing?.notionPageId || conversation.notionPageId || ''),
