@@ -1,7 +1,8 @@
 import { t } from '../../i18n';
 import inpageCommentsPanelCssRaw from '../styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '../styles/buttons.css?raw';
-import tokensCssRaw from '../styles/tokens.css?raw';
+import { SHADOW_HOST_TOKENS_CSS } from '../shared/shadow-tokens';
+import { THEME_SOURCE_ATTR, THEME_SOURCE_DOCUMENT } from '../shared/theme-mode';
 
 export type ThreadedCommentItem = {
   id: number;
@@ -27,12 +28,6 @@ export type ThreadedCommentsPanelApi = {
   }) => void;
 };
 
-function toHostTokensCss(css: string) {
-  // Scope tokens to the Shadow DOM host so inpage panels still use our design system.
-  // `tokens.css` uses `:root` selectors; in Shadow DOM we want `:host`.
-  return css.replaceAll(':root', ':host');
-}
-
 const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1';
 const COMMENTS_SIDEBAR_WIDTH_DEFAULT_PX = 420;
 const COMMENTS_SIDEBAR_WIDTH_MIN_PX = 320;
@@ -40,7 +35,7 @@ const COMMENTS_SIDEBAR_WIDTH_MAX_PX = 720;
 const COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX = 360;
 
 const PANEL_SHADOW_CSS = [
-  toHostTokensCss(String(tokensCssRaw || '')),
+  String(SHADOW_HOST_TOKENS_CSS || ''),
   String(buttonsCssRaw || ''),
   String(inpageCommentsPanelCssRaw || ''),
 ]
@@ -294,23 +289,21 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  const THEME_SOURCE_ATTR = 'data-webclipper-theme-source';
-
   const syncThemeAttr = () => {
     const themeSource = String(el.getAttribute(THEME_SOURCE_ATTR) || '').trim().toLowerCase();
     // When an embedding environment explicitly provides a theme (for example, the inpage content-script
     // reading `ui_theme_mode`), do not overwrite it with host page styles.
-    if (themeSource && themeSource !== 'document') return;
+    if (themeSource && themeSource !== THEME_SOURCE_DOCUMENT) return;
     const theme =
       document.documentElement?.getAttribute?.('data-theme') ||
       document.body?.getAttribute?.('data-theme') ||
       host.closest?.('[data-theme]')?.getAttribute?.('data-theme');
     if (theme === 'light' || theme === 'dark') {
       el.setAttribute('data-theme', theme);
-      el.setAttribute(THEME_SOURCE_ATTR, 'document');
+      el.setAttribute(THEME_SOURCE_ATTR, THEME_SOURCE_DOCUMENT);
     } else {
       el.removeAttribute('data-theme');
-      if (themeSource === 'document') el.removeAttribute(THEME_SOURCE_ATTR);
+      if (themeSource === THEME_SOURCE_DOCUMENT) el.removeAttribute(THEME_SOURCE_ATTR);
     }
   };
   syncThemeAttr();
