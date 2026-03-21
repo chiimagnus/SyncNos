@@ -1,11 +1,6 @@
 import { notionFetch } from './notion-api';
 
-export type ToggleHeadingLevel = 1 | 2 | 3;
-
-export const SYNCNOS_NOTION_SECTION_TITLES = {
-  article: 'Article',
-  comments: 'Comments',
-} as const;
+type ToggleHeadingLevel = 1 | 2 | 3;
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
@@ -93,41 +88,4 @@ export function findToggleHeadingBlock(children: any[], title: string): any | nu
     if (toggleHeadingTitle(block) === needle) return block;
   }
   return null;
-}
-
-export async function findOrCreateToggleHeadingBlockId(args: {
-  accessToken: string;
-  pageId: string;
-  title: string;
-  level?: ToggleHeadingLevel;
-  appendChildren: (accessToken: string, blockId: string, blocks: any[]) => Promise<any>;
-  preferredBlockId?: string | null;
-}): Promise<{ blockId: string; created: boolean }> {
-  const accessToken = safeString(args.accessToken);
-  const pageId = safeString(args.pageId);
-  const title = safeString(args.title);
-  if (!accessToken) throw new Error('missing notion accessToken');
-  if (!pageId) throw new Error('missing notion pageId');
-  if (!title) throw new Error('missing section title');
-
-  const children = await listBlockChildren(accessToken, pageId);
-  const preferred = safeString(args.preferredBlockId);
-  if (preferred) {
-    const existingPreferred = children.find((b) => b && typeof b === 'object' && safeString((b as any).id) === preferred);
-    if (existingPreferred && isToggleHeadingBlock(existingPreferred) && toggleHeadingTitle(existingPreferred) === title) {
-      return { blockId: preferred, created: false };
-    }
-  }
-
-  const existing = findToggleHeadingBlock(children, title);
-  if (existing && existing.id) return { blockId: safeString(existing.id), created: false };
-
-  const next = buildToggleHeadingBlock(title, args.level || 2);
-  await args.appendChildren(accessToken, pageId, [next]);
-
-  const refreshed = await listBlockChildren(accessToken, pageId);
-  const created = findToggleHeadingBlock(refreshed, title);
-  const createdId = safeString(created?.id);
-  if (!createdId) throw new Error(`failed to create notion section "${title}"`);
-  return { blockId: createdId, created: true };
 }
