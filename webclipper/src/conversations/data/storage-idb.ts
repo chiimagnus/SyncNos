@@ -708,9 +708,6 @@ export async function setSyncCursor(
     lastSyncedSequence?: number | null;
     lastSyncedAt?: number | null;
     lastSyncedMessageUpdatedAt?: number | null;
-    notionCommentsDigest?: string;
-    notionArticleDigest?: string;
-    notionWebArticleLayoutVersion?: number | null;
     notionSectionCursors?: Record<string, unknown>;
     notionSectionDigests?: Record<string, unknown>;
     notionSections?: Record<string, unknown>;
@@ -733,6 +730,9 @@ export async function setSyncCursor(
   const now = Date.now();
   const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
   if (preserved && typeof preserved === 'object') delete preserved.id;
+  delete preserved.notionCommentsDigest;
+  delete preserved.notionArticleDigest;
+  delete preserved.notionWebArticleLayoutVersion;
   const mergeNestedRecord = (prev: any, incoming: any): any | null => {
     if (!incoming || typeof incoming !== 'object') return null;
     const base = prev && typeof prev === 'object' ? prev : {};
@@ -765,19 +765,6 @@ export async function setSyncCursor(
     lastSyncedMessageUpdatedAt: Number.isFinite(Number(input?.lastSyncedMessageUpdatedAt))
       ? Number(input?.lastSyncedMessageUpdatedAt)
       : null,
-    notionCommentsDigest:
-      input?.notionCommentsDigest != null
-        ? String(input.notionCommentsDigest || '')
-        : String(existing?.notionCommentsDigest || ''),
-    notionArticleDigest:
-      input?.notionArticleDigest != null
-        ? String(input.notionArticleDigest || '')
-        : String(existing?.notionArticleDigest || ''),
-    notionWebArticleLayoutVersion: Number.isFinite(Number(input?.notionWebArticleLayoutVersion))
-      ? Number(input?.notionWebArticleLayoutVersion)
-      : Number.isFinite(Number(existing?.notionWebArticleLayoutVersion))
-        ? Number(existing?.notionWebArticleLayoutVersion)
-        : null,
     ...(mergedNotionSections ? { notionSections: mergedNotionSections } : null),
     ...(mergedNotionSectionCursors ? { notionSectionCursors: mergedNotionSectionCursors } : null),
     ...(mergedNotionSectionDigests ? { notionSectionDigests: mergedNotionSectionDigests } : null),

@@ -11,11 +11,7 @@ import notionFilesApiDefault from './notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '../../platform/storage/local';
 import { buildNotionCommentsBlocks, computeNotionCommentsDigest } from '../../comments/sync/notion-comments-renderer';
-import {
-  buildToggleHeadingBlock as buildNotionToggleHeadingBlock,
-  findToggleHeadingBlock as findNotionToggleHeadingBlock,
-  listBlockChildren as listNotionBlockChildren,
-} from './notion-section-blocks.ts';
+import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from './notion-section-blocks.ts';
 import {
   ensureSectionHeadingBlockId,
   layoutSpecForConversationKind,
@@ -318,9 +314,12 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return nextBlocks;
   }
 
-  function isWebArticleConversation(conversation) {
-    return String((conversation && conversation.sourceType) || '').trim().toLowerCase() === 'article';
-  }
+	  function pickArticleBodyMessages(messagesList) {
+	    const list = Array.isArray(messagesList) ? messagesList : [];
+	    const preferred = list.filter((m) => m && String(m.messageKey || "").trim() === "article_body");
+	    if (preferred.length) return preferred;
+	    return list;
+	  }
 
 	  function pickArticleBodyMarkdown(messagesList) {
 	    const list = Array.isArray(messagesList) ? messagesList : [];
@@ -347,16 +346,6 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
 	    return fnv1a32(JSON.stringify({ markdown }));
 	  }
 
-	  const SYNCNOS_WEB_ARTICLE_SECTION_TITLE = 'Article';
-	  const SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE = 'Comments';
-
-	  function buildWebArticleSectionHeadings() {
-	    return [
-	      buildNotionToggleHeadingBlock(SYNCNOS_WEB_ARTICLE_SECTION_TITLE, 2),
-	      buildNotionToggleHeadingBlock(SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE, 2),
-	    ];
-	  }
-
   function stripLeadingArticleRoleHeading(blocks) {
     const list = Array.isArray(blocks) ? blocks.slice() : [];
     if (!list.length) return list;
@@ -367,84 +356,6 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     if (String(label || '').trim().toLowerCase() !== 'article') return list;
     return list.slice(1);
   }
-
-	  async function buildNotionWebArticlePageBlocks({ notionSyncService, accessToken, source, messages, comments, warnings }) {
-	    const articleMessages = Array.isArray(messages) ? messages.filter((m) => m && String(m.messageKey || '').trim() === 'article_body') : [];
-	    const baseMessages = articleMessages.length ? articleMessages : Array.isArray(messages) ? messages : [];
-	    const built = await buildBlocksForSync({
-	      notionSyncService,
-	      accessToken,
-	      source,
-	      messagesList: baseMessages,
-	    });
-	    const articleBlocks = stripLeadingArticleRoleHeading(Array.isArray(built.blocks) ? built.blocks : []);
-	    if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
-
-	    const builtComments = buildNotionCommentsBlocks(Array.isArray(comments) ? comments : []);
-	    const commentBlocks = Array.isArray(builtComments.blocks) ? builtComments.blocks : [];
-	    return {
-	      headingBlocks: buildWebArticleSectionHeadings(),
-	      articleBlocks,
-	      commentBlocks,
-	      commentThreads: Number(builtComments.threads) || 0,
-	      commentItems: Number(builtComments.items) || 0,
-	    };
-	  }
-
-	  async function appendNotionWebArticlePageBlocks({
-	    notionSyncService,
-	    accessToken,
-	    pageId,
-	    headingBlocks,
-	    articleBlocks,
-	    commentBlocks,
-	    warnings,
-	  }) {
-	    const headingsRes = await notionSyncService.appendChildren(accessToken, pageId, Array.isArray(headingBlocks) ? headingBlocks : []);
-	    const headingResults = Array.isArray(headingsRes && headingsRes.results) ? headingsRes.results : [];
-	    const articleHeadingId = headingResults[0] && headingResults[0].id ? String(headingResults[0].id) : '';
-	    const commentsHeadingId = headingResults[1] && headingResults[1].id ? String(headingResults[1].id) : '';
-
-	    if (!articleHeadingId || !commentsHeadingId) {
-	      warnings.push({
-	        code: 'notion_article_sections_degraded',
-	        message: 'Failed to locate toggle heading blocks; falling back to flat blocks (no nested sections).',
-	        extra: {
-	          articleHeadingId,
-	          commentsHeadingId,
-	          headingCount: Array.isArray(headingResults) ? headingResults.length : 0,
-	        },
-	      });
-	      const flat = [
-	        ...(Array.isArray(articleBlocks) ? articleBlocks : []),
-	        ...(Array.isArray(commentBlocks) ? commentBlocks : []),
-	      ];
-	      if (flat.length) await notionSyncService.appendChildren(accessToken, pageId, flat);
-	      return {
-	        appendedBlocks:
-	          (Array.isArray(headingBlocks) ? headingBlocks.length : 0) +
-	          (Array.isArray(flat) ? flat.length : 0),
-	        nested: false,
-	      };
-	    }
-
-	    if (Array.isArray(articleBlocks) && articleBlocks.length) {
-	      await notionSyncService.appendChildren(accessToken, articleHeadingId, articleBlocks);
-	    }
-	    if (Array.isArray(commentBlocks) && commentBlocks.length) {
-	      await notionSyncService.appendChildren(accessToken, commentsHeadingId, commentBlocks);
-	    }
-
-	    return {
-	      appendedBlocks:
-	        (Array.isArray(headingBlocks) ? headingBlocks.length : 0) +
-	        (Array.isArray(articleBlocks) ? articleBlocks.length : 0) +
-	        (Array.isArray(commentBlocks) ? commentBlocks.length : 0),
-	      nested: true,
-	      articleHeadingId,
-	      commentsHeadingId,
-	    };
-	  }
 
   async function getNotionParentPageId() {
     const res = await storageGet(['notion_parent_page_id']);
@@ -740,190 +651,219 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           // eslint-disable-next-line no-await-in-loop
           await storage.setConversationNotionPageId(id, pageId);
 
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "uploading_message_blocks"
-          });
-	          trace.mark("build blocks");
-	          let blocks: any[] = [];
-	          let built: any = null;
-	          let appendedBlockCount = 0;
-	          let webArticleCommentsDigest: string | null = null;
-	          if (isWebArticleConversation(convo)) {
-	            let comments: any[] = [];
-	            if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
-              try {
-                const url = String(convo?.url || '').trim();
-                if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                  // eslint-disable-next-line no-await-in-loop
-                  await storage.attachOrphanArticleCommentsToConversation(url, id);
-                }
-                // eslint-disable-next-line no-await-in-loop
-                comments = await storage.getArticleCommentsByConversationId(id);
-                webArticleCommentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
-              } catch (e) {
-                warnings.push({
-                  code: "notion_article_comments_fetch_failed",
-                  message: "Failed to load local article comments; syncing article body only.",
-                  extra: { error: e && e.message ? String(e.message) : String(e) },
-                });
-                comments = [];
-                webArticleCommentsDigest = null;
-              }
-            }
-            // eslint-disable-next-line no-await-in-loop
-	            built = await buildNotionWebArticlePageBlocks({
-	              notionSyncService,
-	              accessToken: token.accessToken,
-	              source: convo.source,
-	              messages,
-	              comments,
-	              warnings,
-	            });
-	            blocks = Array.isArray(built.headingBlocks) ? built.headingBlocks : [];
-	          } else {
-	            // eslint-disable-next-line no-await-in-loop
-	            built = await buildBlocksForSync({
-	              notionSyncService,
-              accessToken: token.accessToken,
-              source: convo.source,
-              messagesList: messages
-            });
-	            blocks = Array.isArray(built.blocks) ? built.blocks : [];
-	            if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
-	          }
-	          if (blocks.length) {
-	            trace.mark("append children");
-		            if (isWebArticleConversation(convo)) {
-		              const appended = await appendNotionWebArticlePageBlocks({
-		                notionSyncService,
-		                accessToken: token.accessToken,
-		                pageId,
-	                headingBlocks: blocks,
-	                articleBlocks: built?.articleBlocks,
-	                commentBlocks: built?.commentBlocks,
-		                warnings,
-		              });
-		              appendedBlockCount = Number(appended?.appendedBlocks) || 0;
-		              if (storage && typeof storage.patchSyncMapping === 'function') {
-		                const articleHeadingId = appended && appended.articleHeadingId ? String(appended.articleHeadingId).trim() : '';
-		                const commentsHeadingId = appended && appended.commentsHeadingId ? String(appended.commentsHeadingId).trim() : '';
-		                if (articleHeadingId || commentsHeadingId) {
-		                  // Cache section anchors to avoid scanning page children on subsequent updates.
-		                  // eslint-disable-next-line no-await-in-loop
-		                  await storage.patchSyncMapping(id, {
-		                    notionSections: {
-		                      ...(articleHeadingId ? { article: { headingBlockId: articleHeadingId } } : null),
-		                      ...(commentsHeadingId ? { comments: { headingBlockId: commentsHeadingId } } : null),
-		                    },
-		                  });
-		                }
-		              }
-			            } else {
-			              const layout = layoutSpecForConversationKind(kind.id);
-			              const conversationsSection =
-			                (layout.sections || []).find((s) => s && String(s.id) === "conversations") || layout.sections?.[0];
-			              if (!conversationsSection) throw new Error("missing conversations section spec");
-			              // Create the toggle heading first, then append message blocks under it (heading blocks cannot carry children in a single payload).
-			              // eslint-disable-next-line no-await-in-loop
-			              const headingRes = await notionSyncService.appendChildren(token.accessToken, pageId, [
-			                buildNotionToggleHeadingBlock(conversationsSection.title, conversationsSection.level),
-			              ]);
-			              const headingResults = Array.isArray(headingRes && headingRes.results) ? headingRes.results : [];
-			              const conversationsHeadingId =
-			                headingResults[0] && headingResults[0].id ? String(headingResults[0].id).trim() : "";
-			              if (!conversationsHeadingId) throw new Error("failed to create conversations section");
-			              if (storage && typeof storage.patchSyncMapping === "function") {
-			                // eslint-disable-next-line no-await-in-loop
-			                await storage.patchSyncMapping(id, {
-			                  notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
-			                });
-			              }
-			              // eslint-disable-next-line no-await-in-loop
-			              await notionSyncService.appendChildren(token.accessToken, conversationsHeadingId, blocks);
-			              appendedBlockCount = blocks.length;
-			            }
-			          }
-	          const nextCursor = lastMessageCursor(messages);
-	          const webArticleDigest = isWebArticleConversation(convo) ? computeNotionArticleDigest(messages) : null;
-	          if (storage.setSyncCursor) {
-	            await writeRunningJob({
-	              currentConversationId: id,
-	              currentConversationTitle: toCurrentConversationTitle(convo, id),
-	              currentStage: "saving_sync_cursor"
-	            });
-            trace.mark("save cursor");
-            // eslint-disable-next-line no-await-in-loop
-		            await storage.setSyncCursor(id, {
-		              ...nextCursor,
-		              ...(!isWebArticleConversation(convo)
-		                ? {
-		                  notionSectionCursors: {
-		                    conversations: {
-		                      lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-		                      lastSyncedSequence: nextCursor.lastSyncedSequence,
-		                      lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-		                    },
-		                  },
-		                }
-		                : null),
-			              ...(isWebArticleConversation(convo)
-			                ? {
-			                  notionWebArticleLayoutVersion: 2,
-			                  ...(typeof webArticleDigest === 'string' ? { notionArticleDigest: webArticleDigest } : null),
-			                  ...(typeof webArticleCommentsDigest === 'string'
-			                    ? { notionCommentsDigest: webArticleCommentsDigest }
-			                    : null),
-			                  ...(typeof webArticleDigest === 'string' || typeof webArticleCommentsDigest === 'string'
-			                    ? {
-			                      notionSectionDigests: {
-			                        ...(typeof webArticleDigest === 'string'
-			                          ? { article: { digest: String(webArticleDigest || ''), lastSyncedAt: Date.now() } }
-			                          : null),
-			                        ...(typeof webArticleCommentsDigest === 'string'
-			                          ? {
-			                            comments: {
-			                              digest: String(webArticleCommentsDigest || ''),
-			                              lastSyncedAt: Date.now(),
-			                            },
-			                          }
-			                          : null),
-			                      },
-			                    }
-			                    : null),
-			                }
-			                : null),
-		            });
-	          }
-	          setResultAt(index, {
-            conversationId: id,
-            conversationTitle,
-            ok: true,
-            notionPageId: pageId,
-            mode: "created",
-            appended: messages.length,
-            warnings,
-            ...(isWebArticleConversation(convo) && built
-              ? {
-                comments: {
-                  updated: true,
-                  threads: built.commentThreads || 0,
-                  items: built.commentItems || 0,
-                },
-              }
-              : null)
-	          });
-		          trace.flush({ mode: "created", ok: true, blockCount: appendedBlockCount || blocks.length });
-		          return;
-		        }
-
-	        if (isWebArticleConversation(convo)) {
 	          await writeRunningJob({
 	            currentConversationId: id,
 	            currentConversationTitle: toCurrentConversationTitle(convo, id),
-	            currentStage: "uploading_message_blocks",
+	            currentStage: "uploading_message_blocks"
 	          });
+	          trace.mark("build blocks");
+
+	          const layout = layoutSpecForConversationKind(kind.id);
+	          const sections = Array.isArray(layout?.sections) ? layout.sections : [];
+	          if (!sections.length) throw new Error("missing layout sections");
+
+	          const nextCursor = lastMessageCursor(messages);
+	          let appendedBlockCount = 0;
+
+	          if (kind.id === "article") {
+	            const articleSection = sections.find((s) => s && String(s.id) === "article");
+	            const commentsSection = sections.find((s) => s && String(s.id) === "comments");
+	            if (!articleSection || !commentsSection) throw new Error("missing web article layout sections");
+
+	            let comments: any[] = [];
+	            let commentsDigest: string | null = null;
+	            let commentThreads = 0;
+	            let commentItems = 0;
+	            if (storage && typeof storage.getArticleCommentsByConversationId === "function") {
+	              try {
+	                const url = String(convo?.url || "").trim();
+	                if (url && typeof storage.attachOrphanArticleCommentsToConversation === "function") {
+	                  // eslint-disable-next-line no-await-in-loop
+	                  await storage.attachOrphanArticleCommentsToConversation(url, id);
+	                }
+	                // eslint-disable-next-line no-await-in-loop
+	                comments = await storage.getArticleCommentsByConversationId(id);
+	                commentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
+	              } catch (e) {
+	                warnings.push({
+	                  code: "notion_article_comments_fetch_failed",
+	                  message: "Failed to load local article comments; syncing article body only.",
+	                  extra: { error: e && e.message ? String(e.message) : String(e) },
+	                });
+	                comments = [];
+	                commentsDigest = null;
+	              }
+	            }
+
+	            const articleDigest = computeNotionArticleDigest(messages);
+	            // eslint-disable-next-line no-await-in-loop
+	            const builtArticle = await buildBlocksForSync({
+	              notionSyncService,
+	              accessToken: token.accessToken,
+	              source: convo.source,
+	              messagesList: pickArticleBodyMessages(messages),
+	            });
+	            const articleBlocks = stripLeadingArticleRoleHeading(
+	              Array.isArray(builtArticle?.blocks) ? builtArticle.blocks : [],
+	            );
+	            if (Array.isArray(builtArticle?.warnings) && builtArticle.warnings.length) warnings.push(...builtArticle.warnings);
+
+	            const builtComments = buildNotionCommentsBlocks(Array.isArray(comments) ? comments : []);
+	            const commentBlocks = Array.isArray(builtComments?.blocks) ? builtComments.blocks : [];
+	            commentThreads = Number(builtComments?.threads) || 0;
+	            commentItems = Number(builtComments?.items) || 0;
+
+	            trace.mark("create section headings");
+	            // eslint-disable-next-line no-await-in-loop
+	            const headingRes = await notionSyncService.appendChildren(
+	              token.accessToken,
+	              pageId,
+	              sections.map((s) => buildNotionToggleHeadingBlock(s.title, s.level)),
+	            );
+	            const headingResults = Array.isArray(headingRes && headingRes.results) ? headingRes.results : [];
+	            const headingIdBySectionId: Record<string, string> = {};
+	            for (let i = 0; i < sections.length; i += 1) {
+	              const section = sections[i];
+	              const result = headingResults[i];
+	              const sectionId = section && section.id != null ? String(section.id) : "";
+	              const headingId = result && result.id ? String(result.id).trim() : "";
+	              if (sectionId && headingId) headingIdBySectionId[sectionId] = headingId;
+	            }
+
+	            const articleHeadingId = String(headingIdBySectionId.article || "").trim();
+	            const commentsHeadingId = String(headingIdBySectionId.comments || "").trim();
+	            if (!articleHeadingId || !commentsHeadingId) throw new Error("failed to create section headings");
+
+	            if (storage && typeof storage.patchSyncMapping === "function") {
+	              // eslint-disable-next-line no-await-in-loop
+	              await storage.patchSyncMapping(id, {
+	                notionSections: {
+	                  article: { headingBlockId: articleHeadingId },
+	                  comments: { headingBlockId: commentsHeadingId },
+	                },
+	              });
+	            }
+
+	            trace.mark("append children");
+	            if (articleBlocks.length) {
+	              // eslint-disable-next-line no-await-in-loop
+	              await notionSyncService.appendChildren(token.accessToken, articleHeadingId, articleBlocks);
+	            }
+	            if (commentBlocks.length) {
+	              // eslint-disable-next-line no-await-in-loop
+	              await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
+	            }
+	            appendedBlockCount = sections.length + articleBlocks.length + commentBlocks.length;
+
+	            if (storage?.setSyncCursor) {
+	              await writeRunningJob({
+	                currentConversationId: id,
+	                currentConversationTitle: toCurrentConversationTitle(convo, id),
+	                currentStage: "saving_sync_cursor",
+	              });
+	              trace.mark("save cursor");
+	              // eslint-disable-next-line no-await-in-loop
+	              await storage.setSyncCursor(id, {
+	                ...nextCursor,
+	                notionSectionDigests: {
+	                  article: { digest: String(articleDigest || ""), lastSyncedAt: Date.now() },
+	                  ...(typeof commentsDigest === "string"
+	                    ? { comments: { digest: String(commentsDigest || ""), lastSyncedAt: Date.now() } }
+	                    : null),
+	                },
+	              });
+	            }
+
+	            setResultAt(index, {
+	              conversationId: id,
+	              conversationTitle,
+	              ok: true,
+	              notionPageId: pageId,
+	              mode: "created",
+	              appended: 0,
+	              warnings,
+	              comments: { updated: true, threads: commentThreads, items: commentItems },
+	            });
+	            trace.flush({ mode: "created", ok: true, blockCount: appendedBlockCount });
+	            return;
+	          }
+
+	          const conversationsSection =
+	            sections.find((s) => s && String(s.id) === "conversations") || sections[0];
+	          if (!conversationsSection) throw new Error("missing conversations section spec");
+
+	          // eslint-disable-next-line no-await-in-loop
+	          const built = await buildBlocksForSync({
+	            notionSyncService,
+	            accessToken: token.accessToken,
+	            source: convo.source,
+	            messagesList: messages,
+	          });
+	          const blocks = Array.isArray(built?.blocks) ? built.blocks : [];
+	          if (Array.isArray(built?.warnings) && built.warnings.length) warnings.push(...built.warnings);
+
+	          trace.mark("create section heading");
+	          // eslint-disable-next-line no-await-in-loop
+	          const headingRes = await notionSyncService.appendChildren(token.accessToken, pageId, [
+	            buildNotionToggleHeadingBlock(conversationsSection.title, conversationsSection.level),
+	          ]);
+	          const headingResults = Array.isArray(headingRes && headingRes.results) ? headingRes.results : [];
+	          const conversationsHeadingId =
+	            headingResults[0] && headingResults[0].id ? String(headingResults[0].id).trim() : "";
+	          if (!conversationsHeadingId) throw new Error("failed to create conversations section");
+
+	          if (storage && typeof storage.patchSyncMapping === "function") {
+	            // eslint-disable-next-line no-await-in-loop
+	            await storage.patchSyncMapping(id, {
+	              notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
+	            });
+	          }
+	          if (blocks.length) {
+	            trace.mark("append children");
+	            // eslint-disable-next-line no-await-in-loop
+	            await notionSyncService.appendChildren(token.accessToken, conversationsHeadingId, blocks);
+	            appendedBlockCount = blocks.length + 1;
+	          }
+
+	          if (storage?.setSyncCursor) {
+	            await writeRunningJob({
+	              currentConversationId: id,
+	              currentConversationTitle: toCurrentConversationTitle(convo, id),
+	              currentStage: "saving_sync_cursor",
+	            });
+	            trace.mark("save cursor");
+	            // eslint-disable-next-line no-await-in-loop
+	            await storage.setSyncCursor(id, {
+	              ...nextCursor,
+	              notionSectionCursors: {
+	                conversations: {
+	                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+	                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+	                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
+	                },
+	              },
+	            });
+	          }
+
+	          setResultAt(index, {
+	            conversationId: id,
+	            conversationTitle,
+	            ok: true,
+	            notionPageId: pageId,
+	            mode: "created",
+	            appended: messages.length,
+	            warnings,
+	          });
+	          trace.flush({ mode: "created", ok: true, blockCount: appendedBlockCount });
+	          return;
+	        }
+
+		        if (kind.id === "article") {
+		          await writeRunningJob({
+		            currentConversationId: id,
+		            currentConversationTitle: toCurrentConversationTitle(convo, id),
+		            currentStage: "uploading_message_blocks",
+		          });
 
 	          trace.mark("update page properties");
 	          // eslint-disable-next-line no-await-in-loop
@@ -932,7 +872,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	            properties: pageSpec.buildUpdateProperties(convo),
 	          });
 
-	          const layout = layoutSpecForConversationKind("article");
+				const layout = layoutSpecForConversationKind(kind.id);
 	          const articleSection = (layout.sections || []).find((s) => s && String(s.id) === "article");
 	          const commentsSection = (layout.sections || []).find((s) => s && String(s.id) === "comments");
 	          if (!articleSection || !commentsSection) throw new Error("missing web article layout sections");
@@ -943,17 +883,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	          } catch (_e) {
 	            articleDigest = null;
 	          }
-	          const prevArticleDigest =
-	            mapping &&
-	            mapping.notionSectionDigests &&
-	            typeof mapping.notionSectionDigests === "object" &&
-	            (mapping.notionSectionDigests as any).article &&
-	            typeof (mapping.notionSectionDigests as any).article === "object" &&
-	            (mapping.notionSectionDigests as any).article.digest != null
-	              ? String((mapping.notionSectionDigests as any).article.digest || "")
-	              : mapping
-	                ? String(mapping.notionArticleDigest || "")
-	                : "";
+		          const prevArticleDigest =
+		            mapping &&
+		            mapping.notionSectionDigests &&
+		            typeof mapping.notionSectionDigests === "object" &&
+		            (mapping.notionSectionDigests as any).article &&
+		            typeof (mapping.notionSectionDigests as any).article === "object" &&
+		            (mapping.notionSectionDigests as any).article.digest != null
+		              ? String((mapping.notionSectionDigests as any).article.digest || "")
+		              : "";
 	          const shouldUpdateArticle = typeof articleDigest === "string" && String(articleDigest || "") !== prevArticleDigest;
 
 	          let articleComments: any[] = [];
@@ -980,17 +918,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              commentsDigest = null;
 	            }
 	          }
-	          const prevCommentsDigest =
-	            mapping &&
-	            mapping.notionSectionDigests &&
-	            typeof mapping.notionSectionDigests === "object" &&
-	            (mapping.notionSectionDigests as any).comments &&
-	            typeof (mapping.notionSectionDigests as any).comments === "object" &&
-	            (mapping.notionSectionDigests as any).comments.digest != null
-	              ? String((mapping.notionSectionDigests as any).comments.digest || "")
-	              : mapping
-	                ? String(mapping.notionCommentsDigest || "")
-	                : "";
+		          const prevCommentsDigest =
+		            mapping &&
+		            mapping.notionSectionDigests &&
+		            typeof mapping.notionSectionDigests === "object" &&
+		            (mapping.notionSectionDigests as any).comments &&
+		            typeof (mapping.notionSectionDigests as any).comments === "object" &&
+		            (mapping.notionSectionDigests as any).comments.digest != null
+		              ? String((mapping.notionSectionDigests as any).comments.digest || "")
+		              : "";
 	          const shouldUpdateComments =
 	            typeof commentsDigest === "string" && String(commentsDigest || "") !== prevCommentsDigest;
 
@@ -1026,33 +962,32 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	            commentsHeadingBlockId = resolvedComments.headingBlockId;
 	          }
 
-	          if (shouldUpdateArticle || shouldUpdateComments) {
-	            trace.mark("build web article blocks");
-	            let articleBlocks: any[] = [];
-	            let commentBlocks: any[] = [];
+		          if (shouldUpdateArticle || shouldUpdateComments) {
+		            trace.mark("build web article blocks");
+		            let articleBlocks: any[] = [];
+		            let commentBlocks: any[] = [];
 
-	            if (shouldUpdateArticle) {
-	              // eslint-disable-next-line no-await-in-loop
-	              const built = await buildNotionWebArticlePageBlocks({
-	                notionSyncService,
-	                accessToken: token.accessToken,
-	                source: convo.source,
-	                messages,
-	                comments: Array.isArray(articleComments) ? articleComments : [],
-	                warnings,
-	              });
-	              articleBlocks = Array.isArray(built?.articleBlocks) ? built.articleBlocks : [];
-	              if (shouldUpdateComments) {
-	                commentBlocks = Array.isArray(built?.commentBlocks) ? built.commentBlocks : [];
-	                commentThreads = Number(built?.commentThreads) || 0;
-	                commentItems = Number(built?.commentItems) || 0;
-	              }
-	            } else if (shouldUpdateComments) {
-	              const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
-	              commentBlocks = Array.isArray(builtComments?.blocks) ? builtComments.blocks : [];
-	              commentThreads = Number(builtComments?.threads) || 0;
-	              commentItems = Number(builtComments?.items) || 0;
-	            }
+		            if (shouldUpdateArticle) {
+		              // eslint-disable-next-line no-await-in-loop
+		              const builtArticle = await buildBlocksForSync({
+		                notionSyncService,
+		                accessToken: token.accessToken,
+		                source: convo.source,
+		                messagesList: pickArticleBodyMessages(messages),
+		              });
+		              articleBlocks = stripLeadingArticleRoleHeading(
+		                Array.isArray(builtArticle?.blocks) ? builtArticle.blocks : [],
+		              );
+		              if (Array.isArray(builtArticle?.warnings) && builtArticle.warnings.length) {
+		                warnings.push(...builtArticle.warnings);
+		              }
+		            }
+		            if (shouldUpdateComments) {
+		              const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
+		              commentBlocks = Array.isArray(builtComments?.blocks) ? builtComments.blocks : [];
+		              commentThreads = Number(builtComments?.threads) || 0;
+		              commentItems = Number(builtComments?.items) || 0;
+		            }
 
 	            if (shouldUpdateArticle) {
 	              if (!articleHeadingBlockId) {
@@ -1163,17 +1098,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              currentStage: "saving_sync_cursor",
 	            });
 	            trace.mark("save cursor");
-	            // eslint-disable-next-line no-await-in-loop
-		            await storage.setSyncCursor(id, {
-		              ...nextCursor,
-		              notionWebArticleLayoutVersion: 2,
-		              ...(typeof articleDigest === "string" ? { notionArticleDigest: String(articleDigest || "") } : null),
-		              ...(typeof commentsDigest === "string" ? { notionCommentsDigest: String(commentsDigest || "") } : null),
-		              ...(typeof articleDigest === "string" || typeof commentsDigest === "string"
-		                ? {
-		                  notionSectionDigests: {
-		                    ...(typeof articleDigest === "string"
-		                      ? { article: { digest: String(articleDigest || ""), lastSyncedAt: Date.now() } }
+			            // eslint-disable-next-line no-await-in-loop
+			            await storage.setSyncCursor(id, {
+			              ...nextCursor,
+			              ...(typeof articleDigest === "string" || typeof commentsDigest === "string"
+			                ? {
+			                  notionSectionDigests: {
+			                    ...(typeof articleDigest === "string"
+			                      ? { article: { digest: String(articleDigest || ""), lastSyncedAt: Date.now() } }
 		                      : null),
 		                    ...(typeof commentsDigest === "string"
 		                      ? { comments: { digest: String(commentsDigest || ""), lastSyncedAt: Date.now() } }
@@ -1211,275 +1143,48 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
 	        const inc = computeNewMessages(messages, cursor);
 	        let shouldRebuild = !!inc.rebuild;
-		        if (!shouldRebuild && pageSpec && typeof pageSpec.shouldRebuild === "function") {
-		          try {
-	            shouldRebuild = !!pageSpec.shouldRebuild({ conversation: convo, messages, mapping });
-	          } catch (_e) {
-	            // ignore
-	          }
-	        }
+	        const layout = layoutSpecForConversationKind(kind.id);
+	        const conversationsSection =
+	          (layout.sections || []).find((s) => s && String(s.id) === "conversations") || layout.sections?.[0];
+	        if (!conversationsSection) throw new Error("missing conversations section spec");
 
-	        // Chats: migrate legacy pages (no Conversations section anchor) by forcing a rebuild once,
+	        // Migrate legacy pages (no Conversations section anchor) by forcing a rebuild once,
 	        // so subsequent syncs can append under the section without scanning page children.
 	        // Also rebuild when local edits happen without new messages (append cannot fix historical edits).
-	        if (!isWebArticleConversation(convo)) {
-	          const mappingSections =
-	            mapping && mapping.notionSections && typeof mapping.notionSections === "object" ? mapping.notionSections : {};
-	          const hasConversationsAnchor = !!(
-	            mappingSections.conversations && String(mappingSections.conversations.headingBlockId || "").trim()
-	          );
-	          if (!hasConversationsAnchor) {
-	            shouldRebuild = true;
-	          } else if (!shouldRebuild && !(inc.newMessages && inc.newMessages.length)) {
-	            let maxUpdatedAt = 0;
-	            for (const m of Array.isArray(messages) ? messages : []) {
-	              const at = Number(m && (m.updatedAt as any));
-	              if (Number.isFinite(at)) maxUpdatedAt = Math.max(maxUpdatedAt, at);
-	            }
-	            const lastSyncedUpdatedAt = Number(mapping && (mapping.lastSyncedMessageUpdatedAt as any));
-	            const lastSyncedAt = Number(mapping && (mapping.lastSyncedAt as any));
-	            const baseline = Number.isFinite(lastSyncedUpdatedAt)
-	              ? lastSyncedUpdatedAt
-	              : Number.isFinite(lastSyncedAt)
-	                ? lastSyncedAt
-	                : 0;
-	            if (maxUpdatedAt > baseline) shouldRebuild = true;
+	        const mappingSections =
+	          mapping && mapping.notionSections && typeof mapping.notionSections === "object" ? mapping.notionSections : {};
+	        const hasConversationsAnchor = !!(
+	          mappingSections.conversations && String(mappingSections.conversations.headingBlockId || "").trim()
+	        );
+	        if (!hasConversationsAnchor) {
+	          shouldRebuild = true;
+	        } else if (!shouldRebuild && !(inc.newMessages && inc.newMessages.length)) {
+	          let maxUpdatedAt = 0;
+	          for (const m of Array.isArray(messages) ? messages : []) {
+	            const at = Number(m && (m.updatedAt as any));
+	            if (Number.isFinite(at)) maxUpdatedAt = Math.max(maxUpdatedAt, at);
 	          }
+
+	          const cursorInSection =
+	            mapping &&
+	            mapping.notionSectionCursors &&
+	            typeof mapping.notionSectionCursors === "object" &&
+	            (mapping.notionSectionCursors as any).conversations &&
+	            typeof (mapping.notionSectionCursors as any).conversations === "object"
+	              ? (mapping.notionSectionCursors as any).conversations
+	              : null;
+	          const lastSyncedUpdatedAt = Number(cursorInSection && (cursorInSection.lastSyncedMessageUpdatedAt as any));
+	          const lastSyncedAt = Number(mapping && (mapping.lastSyncedAt as any));
+	          const baseline = Number.isFinite(lastSyncedUpdatedAt)
+	            ? lastSyncedUpdatedAt
+	            : Number.isFinite(lastSyncedAt)
+	              ? lastSyncedAt
+	              : 0;
+	          if (maxUpdatedAt > baseline) shouldRebuild = true;
 	        }
-
-			        let articleComments: any[] | null = null;
-			        let articleCommentsDigest: string | null = null;
-			        let articleDigest: string | null = null;
-		        let shouldRebuildForArticleLayout = false;
-		        let shouldSyncArticleSection = false;
-		        let shouldSyncArticleCommentsSection = false;
-		        if (isWebArticleConversation(convo) && storage) {
-		          const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
-		          const articleLayoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 2;
-		          shouldRebuildForArticleLayout = !articleLayoutApplied;
-
-		          try {
-		            articleDigest = computeNotionArticleDigest(messages);
-		            const prevArticleDigest = String(mapping?.notionArticleDigest || '');
-		            const digestChanged = prevArticleDigest !== String(articleDigest || '');
-		            shouldSyncArticleSection = articleLayoutApplied && digestChanged;
-		          } catch (_e) {
-		            articleDigest = null;
-		            shouldSyncArticleSection = false;
-		          }
-
-		          if (shouldRebuildForArticleLayout) shouldRebuild = true;
-
-		          const canListComments = typeof storage.getArticleCommentsByConversationId === 'function';
-		          if (canListComments) {
-		            try {
-		              const url = String(convo?.url || '').trim();
-		              if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-		                // eslint-disable-next-line no-await-in-loop
-		                await storage.attachOrphanArticleCommentsToConversation(url, id);
-		              }
-		            } catch (_e) {
-		              // ignore
-		            }
-
-		            try {
-		              // eslint-disable-next-line no-await-in-loop
-		              articleComments = await storage.getArticleCommentsByConversationId(id);
-		              articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
-		              const prevDigest = String(mapping?.notionCommentsDigest || '');
-		              const digestChanged = prevDigest !== String(articleCommentsDigest || '');
-		              shouldSyncArticleCommentsSection = articleLayoutApplied && digestChanged;
-		            } catch (e) {
-		              warnings.push({
-		                code: "notion_article_comments_fetch_failed",
-		                message: "Failed to load local article comments; skipping comment sync in this run.",
-		                extra: { error: e && e.message ? String(e.message) : String(e) },
-		              });
-		              articleComments = null;
-		              articleCommentsDigest = null;
-		              shouldSyncArticleCommentsSection = false;
-		            }
-		          }
-		        }
-
 		        if (shouldRebuild) {
-		          if (!messages.length && !isWebArticleConversation(convo)) {
+		          if (!messages.length) {
 		            throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
-		          }
-
-		          // Web articles can be updated section-by-section once layout v2 is applied:
-		          // - Article changes -> rebuild only the Article section
-		          // - Comment changes -> rebuild only the Comments section
-		          // - Cursor drift -> refresh cursor/digests without touching the page
-		          if (
-		            isWebArticleConversation(convo) &&
-		            !shouldRebuildForArticleLayout &&
-		            typeof notionSyncService.clearPageChildren === "function"
-		          ) {
-		            await writeRunningJob({
-		              currentConversationId: id,
-		              currentConversationTitle: toCurrentConversationTitle(convo, id),
-		              currentStage: "uploading_message_blocks",
-		            });
-
-		            trace.mark("update page properties");
-		            // eslint-disable-next-line no-await-in-loop
-		            await notionSyncService.updatePageProperties(token.accessToken, {
-		              pageId,
-		              properties: pageSpec.buildUpdateProperties(convo),
-		            });
-
-		            const shouldUpdateArticle = !!shouldSyncArticleSection;
-		            const shouldUpdateComments = !!shouldSyncArticleCommentsSection;
-
-		            if (shouldUpdateArticle || shouldUpdateComments) {
-		              trace.mark("rebuild sections");
-		              const pageChildren = await listNotionBlockChildren(token.accessToken, pageId);
-		              const articleHeading = findNotionToggleHeadingBlock(pageChildren, SYNCNOS_WEB_ARTICLE_SECTION_TITLE);
-		              const commentsHeading = findNotionToggleHeadingBlock(pageChildren, SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE);
-		              const articleHeadingId = articleHeading && articleHeading.id ? String(articleHeading.id).trim() : "";
-		              const commentsHeadingId = commentsHeading && commentsHeading.id ? String(commentsHeading.id).trim() : "";
-
-		              if (shouldUpdateArticle && !articleHeadingId) {
-		                warnings.push({
-		                  code: "notion_article_section_missing",
-		                  message: "Article section heading not found; falling back to full rebuild.",
-		                  extra: { pageId, title: SYNCNOS_WEB_ARTICLE_SECTION_TITLE },
-		                });
-		              } else if (shouldUpdateComments && !commentsHeadingId) {
-		                warnings.push({
-		                  code: "notion_article_comments_section_missing",
-		                  message: "Comments section heading not found; falling back to full rebuild.",
-		                  extra: { pageId, title: SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE },
-		                });
-		              } else {
-		                let commentThreads = 0;
-		                let commentItems = 0;
-		                let articleBlocks: any[] = [];
-		                let commentBlocks: any[] = [];
-
-		                if (shouldUpdateArticle) {
-		                  const built = await buildNotionWebArticlePageBlocks({
-		                    notionSyncService,
-		                    accessToken: token.accessToken,
-		                    source: convo.source,
-		                    messages,
-		                    comments: Array.isArray(articleComments) ? articleComments : [],
-		                    warnings,
-		                  });
-		                  articleBlocks = Array.isArray(built.articleBlocks) ? built.articleBlocks : [];
-		                  if (shouldUpdateComments) {
-		                    commentBlocks = Array.isArray(built.commentBlocks) ? built.commentBlocks : [];
-		                    commentThreads = Number(built.commentThreads) || 0;
-		                    commentItems = Number(built.commentItems) || 0;
-		                  }
-		                } else if (shouldUpdateComments) {
-		                  const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
-		                  commentBlocks = Array.isArray(builtComments.blocks) ? builtComments.blocks : [];
-		                  commentThreads = Number(builtComments.threads) || 0;
-		                  commentItems = Number(builtComments.items) || 0;
-		                }
-
-		                if (shouldUpdateArticle && articleHeadingId) {
-		                  trace.mark("clear article children");
-		                  // eslint-disable-next-line no-await-in-loop
-		                  await notionSyncService.clearPageChildren(token.accessToken, articleHeadingId);
-		                  if (articleBlocks.length) {
-		                    trace.mark("append article children");
-		                    // eslint-disable-next-line no-await-in-loop
-		                    await notionSyncService.appendChildren(token.accessToken, articleHeadingId, articleBlocks);
-		                  }
-		                }
-
-		                if (shouldUpdateComments && commentsHeadingId) {
-		                  trace.mark("clear comments children");
-		                  // eslint-disable-next-line no-await-in-loop
-		                  await notionSyncService.clearPageChildren(token.accessToken, commentsHeadingId);
-		                  if (commentBlocks.length) {
-		                    trace.mark("append comments children");
-		                    // eslint-disable-next-line no-await-in-loop
-		                    await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
-		                  }
-		                }
-
-		                const nextCursor = lastMessageCursor(messages);
-		                if (storage.setSyncCursor) {
-		                  await writeRunningJob({
-		                    currentConversationId: id,
-		                    currentConversationTitle: toCurrentConversationTitle(convo, id),
-		                    currentStage: "saving_sync_cursor",
-		                  });
-		                  trace.mark("save cursor");
-		                  // eslint-disable-next-line no-await-in-loop
-		                  await storage.setSyncCursor(id, {
-		                    ...nextCursor,
-		                    notionWebArticleLayoutVersion: 2,
-		                    ...(typeof articleDigest === "string" ? { notionArticleDigest: String(articleDigest || "") } : null),
-		                    ...(typeof articleCommentsDigest === "string"
-		                      ? { notionCommentsDigest: String(articleCommentsDigest || "") }
-		                      : null),
-		                  });
-		                }
-
-		                setResultAt(index, {
-		                  conversationId: id,
-		                  conversationTitle,
-		                  ok: true,
-		                  notionPageId: pageId,
-		                  mode: "updated_properties",
-		                  appended: 0,
-		                  warnings,
-		                  ...(shouldUpdateComments
-		                    ? {
-		                      comments: {
-		                        updated: true,
-		                        threads: commentThreads,
-		                        items: commentItems,
-		                      },
-		                    }
-		                    : null),
-		                });
-		                trace.flush({ mode: "updated_properties", ok: true, blockCount: 0 });
-		                return;
-		              }
-		              // Fall through to full rebuild when required headings are missing.
-		            }
-
-			            if (!shouldUpdateArticle && !shouldUpdateComments) {
-			              // Cursor drift / metadata-only rebuild: update cursor and digests without touching blocks.
-			              const nextCursor = lastMessageCursor(messages);
-			              if (storage.setSyncCursor) {
-			                await writeRunningJob({
-			                  currentConversationId: id,
-			                  currentConversationTitle: toCurrentConversationTitle(convo, id),
-			                  currentStage: "saving_sync_cursor",
-			                });
-			                trace.mark("save cursor");
-			                // eslint-disable-next-line no-await-in-loop
-			                await storage.setSyncCursor(id, {
-			                  ...nextCursor,
-			                  notionWebArticleLayoutVersion: 2,
-			                  ...(typeof articleDigest === "string"
-			                    ? { notionArticleDigest: String(articleDigest || "") }
-			                    : null),
-			                  ...(typeof articleCommentsDigest === "string"
-			                    ? { notionCommentsDigest: String(articleCommentsDigest || "") }
-			                    : null),
-			                });
-			              }
-
-			              setResultAt(index, {
-			                conversationId: id,
-			                conversationTitle,
-			                ok: true,
-			                notionPageId: pageId,
-			                mode: "updated_properties",
-			                appended: 0,
-			                warnings,
-			              });
-			              trace.flush({ mode: "updated_properties", ok: true, blockCount: 0 });
-			              return;
-			            }
 		          }
 
 		          await writeRunningJob({
@@ -1504,76 +1209,44 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	          const blocks = Array.isArray(built.blocks) ? built.blocks : [];
 	          if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
 
-	          const layout = layoutSpecForConversationKind(kind.id);
-	          const conversationsSection =
-	            (layout.sections || []).find((s) => s && String(s.id) === "conversations") || layout.sections?.[0];
-	          if (!conversationsSection) throw new Error("missing conversations section spec");
+	          trace.mark("rebuild conversations section");
+	          let rebuilt;
+	          try {
+	            const resolved = await ensureSectionHeadingBlockId({
+	              accessToken: token.accessToken,
+	              pageId,
+	              section: conversationsSection,
+	              mapping,
+	              notionSyncService,
+	              storage,
+	              conversationId: id,
+	            });
+	            rebuilt = await rebuildSectionByArchivingHeading({
+	              accessToken: token.accessToken,
+	              pageId,
+	              section: conversationsSection,
+	              currentHeadingBlockId: resolved.headingBlockId,
+	              desiredBlocks: blocks,
+	              notionSyncService,
+	            });
+	          } catch (e) {
+	            if (!isStaleBlockAnchorError(e)) throw e;
+	            trace.mark("recover conversations rebuild");
+	            rebuilt = await rebuildSectionByArchivingHeading({
+	              accessToken: token.accessToken,
+	              pageId,
+	              section: conversationsSection,
+	              currentHeadingBlockId: "",
+	              desiredBlocks: blocks,
+	              notionSyncService,
+	            });
+	          }
 
-	          const mappingSections = mapping && mapping.notionSections && typeof mapping.notionSections === "object" ? mapping.notionSections : {};
-	          let conversationsHeadingId =
-	            mappingSections.conversations && mappingSections.conversations.headingBlockId
-	              ? String(mappingSections.conversations.headingBlockId || "").trim()
-	              : "";
-	          const needsFullPageReset = !conversationsHeadingId;
-
-	          let appendedBlockCount = 0;
-	          if (needsFullPageReset) {
-	            trace.mark("clear page children");
+	          if (storage && typeof storage.patchSyncMapping === "function") {
 	            // eslint-disable-next-line no-await-in-loop
-	            await notionSyncService.clearPageChildren(token.accessToken, pageId);
-	            trace.mark("create conversations section");
-	            // eslint-disable-next-line no-await-in-loop
-	            const headingRes = await notionSyncService.appendChildren(token.accessToken, pageId, [
-	              buildNotionToggleHeadingBlock(conversationsSection.title, conversationsSection.level),
-	            ]);
-	            const headingResults = Array.isArray(headingRes && headingRes.results) ? headingRes.results : [];
-	            conversationsHeadingId =
-	              headingResults[0] && headingResults[0].id ? String(headingResults[0].id).trim() : "";
-	            if (!conversationsHeadingId) throw new Error("failed to create conversations section");
-	            if (storage && typeof storage.patchSyncMapping === "function") {
-	              // eslint-disable-next-line no-await-in-loop
-	              await storage.patchSyncMapping(id, {
-	                notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
-	              });
-	            }
-	            if (blocks.length) {
-	              trace.mark("append children");
-	              // eslint-disable-next-line no-await-in-loop
-	              await notionSyncService.appendChildren(token.accessToken, conversationsHeadingId, blocks);
-	              appendedBlockCount = blocks.length;
-	            }
-		          } else {
-		            trace.mark("rebuild conversations section");
-		            let rebuilt;
-		            try {
-		              rebuilt = await rebuildSectionByArchivingHeading({
-		                accessToken: token.accessToken,
-		                pageId,
-		                section: conversationsSection,
-		                currentHeadingBlockId: conversationsHeadingId,
-		                desiredBlocks: blocks,
-		                notionSyncService,
-		              });
-		            } catch (e) {
-		              if (!isStaleBlockAnchorError(e)) throw e;
-		              trace.mark("recover conversations rebuild");
-		              rebuilt = await rebuildSectionByArchivingHeading({
-		                accessToken: token.accessToken,
-		                pageId,
-		                section: conversationsSection,
-		                currentHeadingBlockId: "",
-		                desiredBlocks: blocks,
-		                notionSyncService,
-		              });
-		            }
-		            conversationsHeadingId = rebuilt.headingBlockId;
-		            if (storage && typeof storage.patchSyncMapping === "function") {
-		              // eslint-disable-next-line no-await-in-loop
-		              await storage.patchSyncMapping(id, {
-	                notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
-	              });
-	            }
-	            appendedBlockCount = blocks.length;
+	            await storage.patchSyncMapping(id, {
+	              notionSections: { conversations: { headingBlockId: rebuilt.headingBlockId } },
+	            });
 	          }
           const nextCursor = lastMessageCursor(messages);
           if (storage.setSyncCursor) {
@@ -1586,24 +1259,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
 	            await storage.setSyncCursor(id, {
 	              ...nextCursor,
-	              ...(!isWebArticleConversation(convo)
-	                ? {
-	                  notionSectionCursors: {
-	                    conversations: {
-	                      lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
-	                      lastSyncedSequence: nextCursor.lastSyncedSequence,
-	                      lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
-	                    },
-	                  },
-	                }
-	                : null),
-			              ...(isWebArticleConversation(convo)
-			                ? {
-			                  notionWebArticleLayoutVersion: 2,
-			                  ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
-		                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
-		                }
-		                : null),
+	              notionSectionCursors: {
+	                conversations: {
+	                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+	                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+	                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
+	                },
+	              },
 	            });
           }
 	          setResultAt(index, {
@@ -1614,171 +1276,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	            mode: "rebuilt",
 	            appended: 0,
 	            warnings,
-	            ...(isWebArticleConversation(convo) && built
-	              ? {
-	                comments: {
-                  updated: true,
-                  threads: built.commentThreads || 0,
-                  items: built.commentItems || 0,
-                },
-              }
-              : null)
 	          });
-	          trace.flush({ mode: "rebuilt", ok: true, blockCount: appendedBlockCount || blocks.length });
-	        } else if (shouldSyncArticleCommentsSection) {
-	          if (!articleComments || !articleCommentsDigest) {
-	            setResultAt(index, {
-	              conversationId: id,
-	              conversationTitle,
-	              ok: true,
-	              notionPageId: pageId,
-	              mode: "no_changes",
-	              appended: 0,
-	              warnings,
-	            });
-	            trace.flush({ mode: "no_changes", ok: true, blockCount: 0 });
-	            return;
-	          }
-
-	          await writeRunningJob({
-	            currentConversationId: id,
-	            currentConversationTitle: toCurrentConversationTitle(convo, id),
-	            currentStage: "uploading_message_blocks",
-	          });
-	          trace.mark("sync comments section");
-
-	          const pageChildren = await listNotionBlockChildren(token.accessToken, pageId);
-	          const commentsHeading = findNotionToggleHeadingBlock(pageChildren, SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE);
-	          const commentsHeadingId = commentsHeading && commentsHeading.id ? String(commentsHeading.id).trim() : "";
-	          if (!commentsHeadingId) {
-	            warnings.push({
-	              code: "notion_article_comments_section_missing",
-	              message: "Comments section heading not found; falling back to full rebuild.",
-	              extra: { pageId, title: SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE },
-	            });
-	            await writeRunningJob({
-	              currentConversationId: id,
-	              currentConversationTitle: toCurrentConversationTitle(convo, id),
-	              currentStage: "rebuilding_destination_page",
-	            });
-	            trace.mark("fallback full rebuild");
-	            // eslint-disable-next-line no-await-in-loop
-	            await notionSyncService.updatePageProperties(token.accessToken, {
-	              pageId,
-	              properties: pageSpec.buildUpdateProperties(convo),
-	            });
-	            trace.mark("clear page children");
-	            // eslint-disable-next-line no-await-in-loop
-	            await notionSyncService.clearPageChildren(token.accessToken, pageId);
-	            trace.mark("build blocks");
-
-	            // eslint-disable-next-line no-await-in-loop
-	            const rebuilt = await buildNotionWebArticlePageBlocks({
-	              notionSyncService,
-	              accessToken: token.accessToken,
-	              source: convo.source,
-	              messages,
-	              comments: Array.isArray(articleComments) ? articleComments : [],
-	              warnings,
-	            });
-
-	            const appended = await appendNotionWebArticlePageBlocks({
-	              notionSyncService,
-	              accessToken: token.accessToken,
-	              pageId,
-	              headingBlocks: rebuilt?.headingBlocks,
-	              articleBlocks: rebuilt?.articleBlocks,
-	              commentBlocks: rebuilt?.commentBlocks,
-	              warnings,
-	            });
-	            const nextCursor = lastMessageCursor(messages);
-	            if (storage.setSyncCursor) {
-	              await writeRunningJob({
-	                currentConversationId: id,
-	                currentConversationTitle: toCurrentConversationTitle(convo, id),
-	                currentStage: "saving_sync_cursor",
-	              });
-	              trace.mark("save cursor");
-	              // eslint-disable-next-line no-await-in-loop
-		              await storage.setSyncCursor(id, {
-		                ...nextCursor,
-		                notionWebArticleLayoutVersion: 2,
-		                ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
-		                notionCommentsDigest: String(articleCommentsDigest || ""),
-		              });
-		            }
-
-	            setResultAt(index, {
-	              conversationId: id,
-	              conversationTitle,
-	              ok: true,
-	              notionPageId: pageId,
-	              mode: "rebuilt",
-	              appended: 0,
-	              warnings,
-	              comments: {
-	                updated: true,
-	                threads: rebuilt?.commentThreads || 0,
-	                items: rebuilt?.commentItems || 0,
-	              },
-	            });
-	            trace.flush({
-	              mode: "rebuilt",
-	              ok: true,
-	              blockCount: Number(appended?.appendedBlocks) || 0,
-	            });
-	            return;
-	          } else {
-	            if (typeof notionSyncService.clearPageChildren === "function") {
-	              trace.mark("clear comments children");
-	              // eslint-disable-next-line no-await-in-loop
-	              await notionSyncService.clearPageChildren(token.accessToken, commentsHeadingId);
-	            } else {
-	              throw new Error("notion sync service missing clearPageChildren");
-	            }
-
-	            const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
-	            const commentBlocks = Array.isArray(builtComments.blocks) ? builtComments.blocks : [];
-	            if (commentBlocks.length) {
-	              trace.mark("append comments children");
-	              // eslint-disable-next-line no-await-in-loop
-	              await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
-	            }
-
-	            const nextCursor = lastMessageCursor(messages);
-	            if (storage.setSyncCursor) {
-	              await writeRunningJob({
-	                currentConversationId: id,
-	                currentConversationTitle: toCurrentConversationTitle(convo, id),
-	                currentStage: "saving_sync_cursor",
-	              });
-	              trace.mark("save cursor");
-	              // eslint-disable-next-line no-await-in-loop
-		              await storage.setSyncCursor(id, {
-		                ...nextCursor,
-		                notionWebArticleLayoutVersion: 2,
-		                ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
-		                notionCommentsDigest: String(articleCommentsDigest || ""),
-		              });
-		            }
-
-	            setResultAt(index, {
-	              conversationId: id,
-	              conversationTitle,
-	              ok: true,
-	              notionPageId: pageId,
-	              mode: "updated_properties",
-	              appended: 0,
-	              warnings,
-	              comments: {
-	                updated: true,
-	                threads: Number(builtComments.threads) || 0,
-	                items: Number(builtComments.items) || 0,
-	              },
-	            });
-	            trace.flush({ mode: "updated_properties", ok: true, blockCount: commentBlocks.length });
-	            return;
-	          }
+	          trace.flush({ mode: "rebuilt", ok: true, blockCount: blocks.length });
+	          return;
 	        } else if (inc.newMessages && inc.newMessages.length) {
 	          await writeRunningJob({
 	            currentConversationId: id,
