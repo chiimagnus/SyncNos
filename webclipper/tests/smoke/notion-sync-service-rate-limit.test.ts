@@ -123,9 +123,12 @@ describe("notion-sync-service rate limit", () => {
       }
     }
 
-    const blocks = new BadSliceArray(paragraphBlock(0), paragraphBlock(1));
+	    const blocks = new BadSliceArray(paragraphBlock(0), paragraphBlock(1));
 
-    await expect(notionSyncService.appendChildren("token", "page_5", blocks as any)).resolves.toBeUndefined();
+	    await expect(notionSyncService.appendChildren("token", "page_5", blocks as any)).resolves.toEqual({
+	      results: [],
+	      count: 0,
+	    });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(Array.isArray(appendBodies[0]?.children)).toBe(true);

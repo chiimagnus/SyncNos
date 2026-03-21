@@ -25,6 +25,8 @@ export type NotionBackgroundStorage = {
   getMessagesByConversationId: (conversationId: number) => Promise<any[]>;
   setConversationNotionPageId?: (conversationId: number, pageId: string) => Promise<any>;
   setSyncCursor?: (conversationId: number, cursor: any) => Promise<any>;
+  getArticleCommentsByConversationId?: (conversationId: number) => Promise<any[]>;
+  attachOrphanArticleCommentsToConversation?: (canonicalUrl: string, conversationId: number) => Promise<any>;
 };
 
 export type NotionDbManager = {

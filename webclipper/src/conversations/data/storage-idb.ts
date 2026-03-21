@@ -644,6 +644,9 @@ export async function setSyncCursor(
     lastSyncedSequence?: number | null;
     lastSyncedAt?: number | null;
     lastSyncedMessageUpdatedAt?: number | null;
+    notionCommentsDigest?: string;
+    notionArticleDigest?: string;
+    notionWebArticleLayoutVersion?: number | null;
   },
 ): Promise<true> {
   const id = Number(conversationId);
@@ -675,6 +678,19 @@ export async function setSyncCursor(
     lastSyncedMessageUpdatedAt: Number.isFinite(Number(input?.lastSyncedMessageUpdatedAt))
       ? Number(input?.lastSyncedMessageUpdatedAt)
       : null,
+    notionCommentsDigest:
+      input?.notionCommentsDigest != null
+        ? String(input.notionCommentsDigest || '')
+        : String(existing?.notionCommentsDigest || ''),
+    notionArticleDigest:
+      input?.notionArticleDigest != null
+        ? String(input.notionArticleDigest || '')
+        : String(existing?.notionArticleDigest || ''),
+    notionWebArticleLayoutVersion: Number.isFinite(Number(input?.notionWebArticleLayoutVersion))
+      ? Number(input?.notionWebArticleLayoutVersion)
+      : Number.isFinite(Number(existing?.notionWebArticleLayoutVersion))
+        ? Number(existing?.notionWebArticleLayoutVersion)
+        : null,
     updatedAt: now,
   });
   if (existing) await reqToPromise(stores.sync_mappings.put(payload));
