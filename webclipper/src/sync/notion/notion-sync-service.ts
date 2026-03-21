@@ -257,14 +257,18 @@ import notionMarkdownBlocks from './notion-markdown-blocks.ts';
     }, CLEAR_DELETE_CONCURRENCY);
   }
 
-  async function appendChildren(accessToken, pageId, blocks) {
-    let remaining = normalizeBlockList(blocks);
-    while (remaining.length) {
-      const batch = remaining.slice(0, APPEND_BATCH);
-      remaining = remaining.slice(APPEND_BATCH);
-      await appendBatchWithRetry(accessToken, pageId, batch);
-    }
-  }
+	  async function appendChildren(accessToken, pageId, blocks) {
+	    let remaining = normalizeBlockList(blocks);
+	    const appended = [];
+	    while (remaining.length) {
+	      const batch = remaining.slice(0, APPEND_BATCH);
+	      remaining = remaining.slice(APPEND_BATCH);
+	      const res = await appendBatchWithRetry(accessToken, pageId, batch);
+	      const results = Array.isArray(res && res.results) ? res.results : [];
+	      if (results.length) appended.push(...results);
+	    }
+	    return { results: appended, count: appended.length };
+	  }
 
   function buildPageProperties({ title, url, ai, includeDate, capturedAt }) {
     function coerceHttpUrlOrNull(input) {
