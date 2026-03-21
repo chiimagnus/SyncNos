@@ -9,7 +9,6 @@ export type NotionManagedSectionSpec = {
 };
 
 export type NotionManagedLayoutSpec = {
-  schemaVersion: 1;
   sections: NotionManagedSectionSpec[];
 };
 
@@ -47,7 +46,6 @@ export function layoutSpecForConversationKind(kindId: string): NotionManagedLayo
   const id = safeString(kindId).toLowerCase();
   if (id === 'article') {
     return {
-      schemaVersion: 1,
       sections: [
         { id: 'article', title: 'Article', level: 2 },
         { id: 'comments', title: 'Comments', level: 2 },
@@ -55,7 +53,6 @@ export function layoutSpecForConversationKind(kindId: string): NotionManagedLayo
     };
   }
   return {
-    schemaVersion: 1,
     sections: [{ id: 'conversations', title: 'Conversations', level: 2 }],
   };
 }
