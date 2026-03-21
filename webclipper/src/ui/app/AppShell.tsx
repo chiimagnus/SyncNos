@@ -16,6 +16,7 @@ import { createCommentSidebarSession } from '../../comments/sidebar/comment-side
 import type { CommentSidebarSession } from '../../comments/sidebar/comment-sidebar-contract';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
+const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
 
 function normalizeHttpUrl(raw: unknown): string {
@@ -35,6 +36,8 @@ function normalizeHttpUrl(raw: unknown): string {
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const [commentsSidebarCollapsed, setCommentsSidebarCollapsed] = useState(false);
+
   useEffect(() => {
     try {
       const v = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
@@ -44,10 +47,28 @@ export default function AppShell() {
     }
   }, []);
 
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY);
+      if (v === '1') setCommentsSidebarCollapsed(true);
+    } catch (_e) {
+      // ignore
+    }
+  }, []);
+
   const setCollapsed = (collapsed: boolean) => {
     setSidebarCollapsed(collapsed);
     try {
       localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  const setCommentsCollapsed = (collapsed: boolean) => {
+    setCommentsSidebarCollapsed(collapsed);
+    try {
+      localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
     } catch (_e) {
       // ignore
     }
@@ -95,9 +116,24 @@ export default function AppShell() {
       commentsSidebarSession.setQuoteText('');
     }, [canonicalUrl, commentsSidebarSession, isArticleConversation]);
 
+    useEffect(() => {
+      if (showSettingsSheet) return;
+      if (!canToggleCommentsSidebar) return;
+      if (commentsSidebarCollapsed) return;
+      if (commentsSidebarSnapshot.openRequested) return;
+      commentsSidebarSession.requestOpen({ source: 'app-default' });
+    }, [
+      canToggleCommentsSidebar,
+      commentsSidebarCollapsed,
+      commentsSidebarSession,
+      commentsSidebarSnapshot.openRequested,
+      showSettingsSheet,
+    ]);
+
     const triggerCommentsSidebar = (quoteText: string) => {
       commentsSidebarSession.setQuoteText(String(quoteText || '').trim());
       commentsSidebarSession.requestOpen({ focusComposer: true, source: 'app' });
+      setCommentsCollapsed(false);
     };
 
     useEffect(() => {
@@ -246,7 +282,10 @@ export default function AppShell() {
                     quoteText={commentsSidebarSnapshot.quoteText}
                     focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
                     containerClassName="tw-h-full tw-min-h-0 tw-flex-1"
-                    onRequestClose={() => commentsSidebarSession.requestClose()}
+                    onRequestClose={() => {
+                      commentsSidebarSession.requestClose();
+                      setCommentsCollapsed(true);
+                    }}
                   />
                 </div>
               ) : null}

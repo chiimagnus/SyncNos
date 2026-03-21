@@ -68,6 +68,15 @@ function formatTime(ts: number | null | undefined): string {
   }
 }
 
+function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
+  const ta = Number((a as any)?.createdAt) || 0;
+  const tb = Number((b as any)?.createdAt) || 0;
+  if (tb !== ta) return tb - ta;
+  const ia = Number((a as any)?.id) || 0;
+  const ib = Number((b as any)?.id) || 0;
+  return ib - ia;
+}
+
 type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
@@ -200,7 +209,10 @@ export function mountThreadedCommentsPanel(
   }
 
   const syncThemeAttr = () => {
-    const theme = document.documentElement?.getAttribute?.('data-theme');
+    const theme =
+      document.documentElement?.getAttribute?.('data-theme') ||
+      document.body?.getAttribute?.('data-theme') ||
+      host.closest?.('[data-theme]')?.getAttribute?.('data-theme');
     if (theme === 'light' || theme === 'dark') {
       el.setAttribute('data-theme', theme);
     } else {
@@ -210,13 +222,19 @@ export function mountThreadedCommentsPanel(
   syncThemeAttr();
 
   let themeObserver: MutationObserver | null = null;
+  let bodyThemeObserver: MutationObserver | null = null;
   try {
     if (typeof MutationObserver !== 'undefined') {
       themeObserver = new MutationObserver(() => syncThemeAttr());
       themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      if (document.body) {
+        bodyThemeObserver = new MutationObserver(() => syncThemeAttr());
+        bodyThemeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+      }
     }
   } catch (_e) {
     themeObserver = null;
+    bodyThemeObserver = null;
   }
 
   const shadow = el.attachShadow({ mode: 'open' });
@@ -466,7 +484,7 @@ export function mountThreadedCommentsPanel(
         return;
       }
 
-      const roots = normalized.filter((it) => !it.parentId);
+      const roots = normalized.filter((it) => !it.parentId).sort(compareCommentTimeDesc);
       const repliesByRoot = new Map<number, ThreadedCommentItem[]>();
       for (const it of normalized) {
         if (!it.parentId) continue;
@@ -474,6 +492,10 @@ export function mountThreadedCommentsPanel(
         const list = repliesByRoot.get(rootId) || [];
         list.push(it);
         repliesByRoot.set(rootId, list);
+      }
+
+      for (const [rootId, list] of repliesByRoot) {
+        repliesByRoot.set(rootId, list.sort(compareCommentTimeDesc));
       }
 
       for (const root of roots) {
@@ -714,6 +736,12 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     themeObserver = null;
+    try {
+      bodyThemeObserver?.disconnect?.();
+    } catch (_e) {
+      // ignore
+    }
+    bodyThemeObserver = null;
     try {
       shadow.removeEventListener('keydown', stopShortcutKeyPropagation, true);
       shadow.removeEventListener('keypress', stopShortcutKeyPropagation, true);
