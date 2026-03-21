@@ -25,29 +25,10 @@ describe("conversation-kinds", () => {
     expect(chat.notion.dbSpec.storageKey).toBe("notion_db_id_syncnos_ai_chats");
   });
 
-  it("article pageSpec.shouldRebuild triggers when the synced article body updatedAt moves forward", () => {
+  it("does not expose pageSpec.shouldRebuild (rebuild strategy is handled by orchestrator)", () => {
     const kinds = loadConversationKinds();
     const kind = kinds.pick({ sourceType: "article" });
-    const should = kind.notion.pageSpec.shouldRebuild({
-      conversation: { sourceType: "article" },
-      mapping: { lastSyncedMessageKey: "article_body", lastSyncedMessageUpdatedAt: 1000 },
-      messages: [{ messageKey: "article_body", updatedAt: 1001 }]
-    });
-    expect(should).toBe(true);
-  });
-
-  it("article pageSpec.shouldRebuild stays false when cursor points at an older body and newer messages can append", () => {
-    const kinds = loadConversationKinds();
-    const kind = kinds.pick({ sourceType: "article" });
-    const should = kind.notion.pageSpec.shouldRebuild({
-      conversation: { sourceType: "article" },
-      mapping: { lastSyncedMessageKey: "article_body", lastSyncedMessageUpdatedAt: 1000 },
-      messages: [
-        { messageKey: "article_body", updatedAt: 1000, sequence: 1 },
-        { messageKey: "article_extra", updatedAt: 2000, sequence: 2 },
-      ]
-    });
-    expect(should).toBe(false);
+    expect((kind.notion.pageSpec as any).shouldRebuild).toBeUndefined();
   });
 
   it("exposes notion storage keys from registry (used by infra like disconnect/backup)", () => {

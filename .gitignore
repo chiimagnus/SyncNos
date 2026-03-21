@@ -40,6 +40,7 @@ xcuserdata/
 node_modules/
 .output/
 .wxt/
+.vite/
 stats.html
 stats-*.json
 web-ext.config.ts

@@ -11,7 +11,6 @@ export type ConversationKindDefinition = {
     pageSpec: {
       buildCreateProperties: (conversation: any) => Record<string, unknown>;
       buildUpdateProperties: (conversation: any) => Record<string, unknown>;
-      shouldRebuild?: (input: { conversation: any; messages: any[]; mapping: any }) => boolean;
     };
   };
   obsidian: {
@@ -57,12 +56,6 @@ export function assertKindDef(definition: unknown): ConversationKindDefinition {
   }
   if (typeof normalized.notion.pageSpec.buildUpdateProperties !== 'function') {
     throw new Error(`kind ${normalized.id} missing notion.pageSpec.buildUpdateProperties()`);
-  }
-  if (
-    normalized.notion.pageSpec.shouldRebuild &&
-    typeof normalized.notion.pageSpec.shouldRebuild !== 'function'
-  ) {
-    throw new Error(`kind ${normalized.id} notion.pageSpec.shouldRebuild must be a function`);
   }
 
   if (!normalized.obsidian || typeof normalized.obsidian !== 'object') {

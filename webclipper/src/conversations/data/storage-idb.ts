@@ -603,6 +603,67 @@ export async function getSyncMappingByConversation(
   return { conversation, mapping: mapping || null };
 }
 
+export async function patchSyncMapping(
+  conversationId: number,
+  patch: Record<string, unknown>,
+): Promise<true> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+  if (!patch || typeof patch !== 'object') throw new Error('invalid patch');
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
+  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
+  if (!conversation) throw new Error('conversation not found');
+
+  const source = String(conversation.source || '').trim();
+  const conversationKey = String(conversation.conversationKey || '').trim();
+  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
+
+  const idx = stores.sync_mappings.index('by_source_conversationKey');
+  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+  const now = Date.now();
+  const patchObj: any = { ...patch };
+  const incomingSections =
+    patchObj.notionSections && typeof patchObj.notionSections === 'object' ? patchObj.notionSections : null;
+  if (incomingSections) delete patchObj.notionSections;
+  const existingSections =
+    existing && typeof existing === 'object' && existing.notionSections && typeof existing.notionSections === 'object'
+      ? existing.notionSections
+      : null;
+  const mergedSections = incomingSections
+    ? {
+        ...(existingSections || {}),
+        ...Object.fromEntries(
+          Object.entries(incomingSections).map(([key, value]) => [
+            key,
+            {
+              ...((existingSections && (existingSections as any)[key] && typeof (existingSections as any)[key] === 'object'
+                ? (existingSections as any)[key]
+                : null) || {}),
+              ...((value && typeof value === 'object' ? value : null) || {}),
+            },
+          ]),
+        ),
+      }
+    : null;
+  const next = {
+    ...(existing && typeof existing === 'object' ? existing : null),
+    ...patchObj,
+    source,
+    conversationKey,
+    notionPageId: String((patch as any)?.notionPageId || existing?.notionPageId || conversation.notionPageId || ''),
+    ...(mergedSections ? { notionSections: mergedSections } : null),
+    updatedAt: now,
+  } as any;
+  const payload: any = withOptionalId(existing && existing.id, next);
+  if (existing) await reqToPromise(stores.sync_mappings.put(payload));
+  else await reqToPromise(stores.sync_mappings.add(payload));
+
+  await txDone(t);
+  return true;
+}
+
 export async function setConversationNotionPageId(
   conversationId: number,
   notionPageId: string,
@@ -623,7 +684,10 @@ export async function setConversationNotionPageId(
   if (source && conversationKey) {
     const idx = stores.sync_mappings.index('by_source_conversationKey');
     const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+    const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
+    if (preserved && typeof preserved === 'object') delete preserved.id;
     const payload: any = withOptionalId(existing && existing.id, {
+      ...preserved,
       source,
       conversationKey,
       notionPageId: notionPageId || '',
@@ -644,9 +708,9 @@ export async function setSyncCursor(
     lastSyncedSequence?: number | null;
     lastSyncedAt?: number | null;
     lastSyncedMessageUpdatedAt?: number | null;
-    notionCommentsDigest?: string;
-    notionArticleDigest?: string;
-    notionWebArticleLayoutVersion?: number | null;
+    notionSectionCursors?: Record<string, unknown>;
+    notionSectionDigests?: Record<string, unknown>;
+    notionSections?: Record<string, unknown>;
   },
 ): Promise<true> {
   const id = Number(conversationId);
@@ -664,7 +728,27 @@ export async function setSyncCursor(
   const idx = stores.sync_mappings.index('by_source_conversationKey');
   const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
   const now = Date.now();
+  const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
+  if (preserved && typeof preserved === 'object') delete preserved.id;
+  const mergeNestedRecord = (prev: any, incoming: any): any | null => {
+    if (!incoming || typeof incoming !== 'object') return null;
+    const base = prev && typeof prev === 'object' ? prev : {};
+    const out: any = { ...base };
+    for (const [key, value] of Object.entries(incoming)) {
+      const k = String(key || '').trim();
+      if (!k) continue;
+      out[k] = {
+        ...((base as any)[k] && typeof (base as any)[k] === 'object' ? (base as any)[k] : {}),
+        ...(value && typeof value === 'object' ? value : {}),
+      };
+    }
+    return out;
+  };
+  const mergedNotionSections = mergeNestedRecord(preserved.notionSections, input?.notionSections);
+  const mergedNotionSectionCursors = mergeNestedRecord(preserved.notionSectionCursors, input?.notionSectionCursors);
+  const mergedNotionSectionDigests = mergeNestedRecord(preserved.notionSectionDigests, input?.notionSectionDigests);
   const payload: any = withOptionalId(existing && existing.id, {
+    ...preserved,
     source,
     conversationKey,
     notionPageId: String(existing?.notionPageId || conversation.notionPageId || ''),
@@ -678,19 +762,9 @@ export async function setSyncCursor(
     lastSyncedMessageUpdatedAt: Number.isFinite(Number(input?.lastSyncedMessageUpdatedAt))
       ? Number(input?.lastSyncedMessageUpdatedAt)
       : null,
-    notionCommentsDigest:
-      input?.notionCommentsDigest != null
-        ? String(input.notionCommentsDigest || '')
-        : String(existing?.notionCommentsDigest || ''),
-    notionArticleDigest:
-      input?.notionArticleDigest != null
-        ? String(input.notionArticleDigest || '')
-        : String(existing?.notionArticleDigest || ''),
-    notionWebArticleLayoutVersion: Number.isFinite(Number(input?.notionWebArticleLayoutVersion))
-      ? Number(input?.notionWebArticleLayoutVersion)
-      : Number.isFinite(Number(existing?.notionWebArticleLayoutVersion))
-        ? Number(existing?.notionWebArticleLayoutVersion)
-        : null,
+    ...(mergedNotionSections ? { notionSections: mergedNotionSections } : null),
+    ...(mergedNotionSectionCursors ? { notionSectionCursors: mergedNotionSectionCursors } : null),
+    ...(mergedNotionSectionDigests ? { notionSectionDigests: mergedNotionSectionDigests } : null),
     updatedAt: now,
   });
   if (existing) await reqToPromise(stores.sync_mappings.put(payload));

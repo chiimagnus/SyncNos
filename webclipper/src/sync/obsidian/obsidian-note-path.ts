@@ -266,7 +266,6 @@ const api = {
   buildStableNotePath,
   buildLegacyHashNotePath,
   resolveExistingNotePath,
-  stableConversationHash16,
   stableConversationId10,
 };
 
@@ -277,7 +276,6 @@ export {
   buildStableNotePath,
   buildLegacyHashNotePath,
   resolveExistingNotePath,
-  stableConversationHash16,
   stableConversationId10,
 };
 export default api;
