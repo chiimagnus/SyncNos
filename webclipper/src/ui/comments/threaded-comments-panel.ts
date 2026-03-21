@@ -37,6 +37,7 @@ const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1
 const COMMENTS_SIDEBAR_WIDTH_DEFAULT_PX = 420;
 const COMMENTS_SIDEBAR_WIDTH_MIN_PX = 320;
 const COMMENTS_SIDEBAR_WIDTH_MAX_PX = 720;
+const COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX = 360;
 
 const PANEL_SHADOW_CSS = [
   toHostTokensCss(String(tokensCssRaw || '')),
@@ -91,6 +92,7 @@ type MountOptions = {
   initiallyOpen?: boolean;
   showHeader?: boolean;
   showCollapseButton?: boolean;
+  variant?: 'embedded' | 'sidebar';
   // When `true`, opening the overlay panel will "dock" the host page content by
   // applying right padding to `document.documentElement` so the page is not
   // covered by the sidebar. Intended for inpage content-scripts only.
@@ -104,6 +106,8 @@ export function mountThreadedCommentsPanel(
   const el = document.createElement('webclipper-threaded-comments-panel') as any as HTMLElement;
   const isOverlay = options.overlay === true;
   if (isOverlay) el.setAttribute('data-overlay', '1');
+  const variant = options.variant === 'sidebar' ? 'sidebar' : 'embedded';
+  if (variant === 'sidebar') el.setAttribute('data-variant', 'sidebar');
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
   const showHeader = options.showHeader !== false;
   const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
@@ -169,9 +173,9 @@ export function mountThreadedCommentsPanel(
     pointerId: null as number | null,
   };
 
-  const OVERLAY_WIDTH_CSS_VAR = '--webclipper-comments-panel-width';
+  const SIDEBAR_WIDTH_CSS_VAR = '--webclipper-comments-panel-width';
 
-  function readPersistedOverlayWidthPx(): number | null {
+  function readPersistedSidebarWidthPx(): number | null {
     try {
       const raw = localStorage.getItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY);
       const parsed = Number.parseFloat(String(raw || '').trim());
@@ -182,7 +186,7 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  function persistOverlayWidthPx(widthPx: number) {
+  function persistSidebarWidthPx(widthPx: number) {
     try {
       localStorage.setItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(widthPx)));
     } catch (_e) {
@@ -190,22 +194,25 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  function clampOverlayWidthPx(widthPx: number): number {
+  function clampSidebarWidthPx(widthPx: number): number {
     const viewport = Math.max(
       1,
       Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
     );
-    const maxCap = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.floor(viewport * 0.92));
+    const maxCap = Math.max(
+      COMMENTS_SIDEBAR_WIDTH_MIN_PX,
+      isOverlay ? Math.floor(viewport * 0.92) : viewport - COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX,
+    );
     const max = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.min(COMMENTS_SIDEBAR_WIDTH_MAX_PX, maxCap));
     return Math.round(clamp(widthPx, COMMENTS_SIDEBAR_WIDTH_MIN_PX, max));
   }
 
-  function setOverlayWidthPx(widthPx: number | null, input?: { persist?: boolean }) {
-    if (!isOverlay) return;
+  function setSidebarWidthPx(widthPx: number | null, input?: { persist?: boolean }) {
+    if (variant !== 'sidebar') return;
     if (widthPx == null) {
       widthState.widthPx = null;
       try {
-        el.style.removeProperty(OVERLAY_WIDTH_CSS_VAR);
+        el.style.removeProperty(SIDEBAR_WIDTH_CSS_VAR);
       } catch (_e) {
         // ignore
       }
@@ -213,22 +220,22 @@ export function mountThreadedCommentsPanel(
       return;
     }
 
-    const clamped = clampOverlayWidthPx(widthPx);
+    const clamped = clampSidebarWidthPx(widthPx);
     widthState.widthPx = clamped;
     try {
-      el.style.setProperty(OVERLAY_WIDTH_CSS_VAR, `${clamped}px`, 'important');
+      el.style.setProperty(SIDEBAR_WIDTH_CSS_VAR, `${clamped}px`, 'important');
     } catch (_e) {
       // ignore
     }
-    if (input?.persist !== false) persistOverlayWidthPx(clamped);
+    if (input?.persist !== false) persistSidebarWidthPx(clamped);
     dockResize();
   }
 
-  if (isOverlay) {
-    const persistedWidth = readPersistedOverlayWidthPx();
+  if (variant === 'sidebar') {
+    const persistedWidth = readPersistedSidebarWidthPx();
     if (persistedWidth != null) {
-      widthState.widthPx = clampOverlayWidthPx(persistedWidth);
-      setOverlayWidthPx(widthState.widthPx, { persist: false });
+      widthState.widthPx = clampSidebarWidthPx(persistedWidth);
+      setSidebarWidthPx(widthState.widthPx, { persist: false });
     }
   }
 
@@ -325,8 +332,8 @@ export function mountThreadedCommentsPanel(
   surface.className = 'webclipper-inpage-comments-panel__surface';
   shadow.appendChild(surface);
 
-  let cleanupOverlayResize: (() => void) | null = null;
-  if (isOverlay) {
+  let cleanupSidebarResize: (() => void) | null = null;
+  if (variant === 'sidebar') {
     const handle = document.createElement('div');
     handle.className = 'webclipper-inpage-comments-panel__resize-handle';
     surface.appendChild(handle);
@@ -353,7 +360,7 @@ export function mountThreadedCommentsPanel(
         Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
       );
       const nextWidth = viewport - e.clientX;
-      setOverlayWidthPx(nextWidth, { persist: false });
+      setSidebarWidthPx(nextWidth, { persist: false });
     };
 
     const onPointerUp = (e: PointerEvent) => {
@@ -372,7 +379,7 @@ export function mountThreadedCommentsPanel(
       } catch (_e) {
         // ignore
       }
-      if (widthState.widthPx != null) persistOverlayWidthPx(widthState.widthPx);
+      if (widthState.widthPx != null) persistSidebarWidthPx(widthState.widthPx);
       try {
         globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
         globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
@@ -395,7 +402,7 @@ export function mountThreadedCommentsPanel(
       }
       if (widthState.widthPx == null) {
         const measured = readDockWidthPx();
-        setOverlayWidthPx(measured, { persist: false });
+        setSidebarWidthPx(measured, { persist: false });
       }
       try {
         (handle as any).setPointerCapture?.(e.pointerId);
@@ -415,9 +422,9 @@ export function mountThreadedCommentsPanel(
 
     const onViewportResize = () => {
       if (widthState.widthPx == null) return;
-      const clamped = clampOverlayWidthPx(widthState.widthPx);
+      const clamped = clampSidebarWidthPx(widthState.widthPx);
       if (clamped === widthState.widthPx) return;
-      setOverlayWidthPx(clamped, { persist: true });
+      setSidebarWidthPx(clamped, { persist: true });
     };
 
     try {
@@ -426,7 +433,7 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
 
-    cleanupOverlayResize = () => {
+    cleanupSidebarResize = () => {
       try {
         handle.removeEventListener('pointerdown', onPointerDown);
       } catch (_e) {
@@ -932,11 +939,11 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     try {
-      cleanupOverlayResize?.();
+      cleanupSidebarResize?.();
     } catch (_e) {
       // ignore
     }
-    cleanupOverlayResize = null;
+    cleanupSidebarResize = null;
     try {
       themeObserver?.disconnect?.();
     } catch (_e) {
