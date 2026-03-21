@@ -20,6 +20,7 @@ import {
   ensureSectionHeadingBlockId,
   layoutSpecForConversationKind,
   rebuildSectionByArchivingHeading,
+  recoverSectionHeadingBlockId,
 } from './notion-managed-sections.ts';
 
 const SYNC_PROVIDER = 'notion';
@@ -165,6 +166,14 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
       return `${notionMessage || rawMessage}${retryHint}`.trim();
     }
     return notionMessage || rawMessage;
+  }
+
+  function isStaleBlockAnchorError(error) {
+    const code = parseNotionErrorCode(error);
+    if (code === "object_not_found") return true;
+    const msg = normalizeNotionSyncError(error).toLowerCase();
+    if (!msg) return false;
+    return msg.includes("archived") || msg.includes("in_trash");
   }
 
   function toCurrentConversationTitle(convo, id) {
@@ -1009,24 +1018,38 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	                });
 	                articleHeadingBlockId = resolved.headingBlockId;
 	              }
-	              await writeRunningJob({
-	                currentConversationId: id,
-	                currentConversationTitle: toCurrentConversationTitle(convo, id),
-	                currentStage: "rebuilding_destination_page",
-	              });
-	              trace.mark("rebuild article section");
-	              const rebuilt = await rebuildSectionByArchivingHeading({
-	                accessToken: token.accessToken,
-	                pageId,
-	                section: articleSection,
-	                currentHeadingBlockId: articleHeadingBlockId,
-	                desiredBlocks: articleBlocks,
-	                notionSyncService,
-	              });
-	              articleHeadingBlockId = rebuilt.headingBlockId;
-	              if (storage && typeof storage.patchSyncMapping === "function") {
-	                // eslint-disable-next-line no-await-in-loop
-	                await storage.patchSyncMapping(id, {
+		              await writeRunningJob({
+		                currentConversationId: id,
+		                currentConversationTitle: toCurrentConversationTitle(convo, id),
+		                currentStage: "rebuilding_destination_page",
+		              });
+		              trace.mark("rebuild article section");
+		              let rebuilt;
+		              try {
+		                rebuilt = await rebuildSectionByArchivingHeading({
+		                  accessToken: token.accessToken,
+		                  pageId,
+		                  section: articleSection,
+		                  currentHeadingBlockId: articleHeadingBlockId,
+		                  desiredBlocks: articleBlocks,
+		                  notionSyncService,
+		                });
+		              } catch (e) {
+		                if (!isStaleBlockAnchorError(e)) throw e;
+		                trace.mark("recover article rebuild");
+		                rebuilt = await rebuildSectionByArchivingHeading({
+		                  accessToken: token.accessToken,
+		                  pageId,
+		                  section: articleSection,
+		                  currentHeadingBlockId: "",
+		                  desiredBlocks: articleBlocks,
+		                  notionSyncService,
+		                });
+		              }
+		              articleHeadingBlockId = rebuilt.headingBlockId;
+		              if (storage && typeof storage.patchSyncMapping === "function") {
+		                // eslint-disable-next-line no-await-in-loop
+		                await storage.patchSyncMapping(id, {
 	                  notionSections: { article: { headingBlockId: articleHeadingBlockId } },
 	                });
 	              }
@@ -1045,24 +1068,38 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	                });
 	                commentsHeadingBlockId = resolved.headingBlockId;
 	              }
-	              await writeRunningJob({
-	                currentConversationId: id,
-	                currentConversationTitle: toCurrentConversationTitle(convo, id),
-	                currentStage: "rebuilding_destination_page",
-	              });
-	              trace.mark("rebuild comments section");
-	              const rebuilt = await rebuildSectionByArchivingHeading({
-	                accessToken: token.accessToken,
-	                pageId,
-	                section: commentsSection,
-	                currentHeadingBlockId: commentsHeadingBlockId,
-	                desiredBlocks: commentBlocks,
-	                notionSyncService,
-	              });
-	              commentsHeadingBlockId = rebuilt.headingBlockId;
-	              if (storage && typeof storage.patchSyncMapping === "function") {
-	                // eslint-disable-next-line no-await-in-loop
-	                await storage.patchSyncMapping(id, {
+		              await writeRunningJob({
+		                currentConversationId: id,
+		                currentConversationTitle: toCurrentConversationTitle(convo, id),
+		                currentStage: "rebuilding_destination_page",
+		              });
+		              trace.mark("rebuild comments section");
+		              let rebuilt;
+		              try {
+		                rebuilt = await rebuildSectionByArchivingHeading({
+		                  accessToken: token.accessToken,
+		                  pageId,
+		                  section: commentsSection,
+		                  currentHeadingBlockId: commentsHeadingBlockId,
+		                  desiredBlocks: commentBlocks,
+		                  notionSyncService,
+		                });
+		              } catch (e) {
+		                if (!isStaleBlockAnchorError(e)) throw e;
+		                trace.mark("recover comments rebuild");
+		                rebuilt = await rebuildSectionByArchivingHeading({
+		                  accessToken: token.accessToken,
+		                  pageId,
+		                  section: commentsSection,
+		                  currentHeadingBlockId: "",
+		                  desiredBlocks: commentBlocks,
+		                  notionSyncService,
+		                });
+		              }
+		              commentsHeadingBlockId = rebuilt.headingBlockId;
+		              if (storage && typeof storage.patchSyncMapping === "function") {
+		                // eslint-disable-next-line no-await-in-loop
+		                await storage.patchSyncMapping(id, {
 	                  notionSections: { comments: { headingBlockId: commentsHeadingBlockId } },
 	                });
 	              }
@@ -1444,20 +1481,34 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              await notionSyncService.appendChildren(token.accessToken, conversationsHeadingId, blocks);
 	              appendedBlockCount = blocks.length;
 	            }
-	          } else {
-	            trace.mark("rebuild conversations section");
-	            const rebuilt = await rebuildSectionByArchivingHeading({
-	              accessToken: token.accessToken,
-	              pageId,
-	              section: conversationsSection,
-	              currentHeadingBlockId: conversationsHeadingId,
-	              desiredBlocks: blocks,
-	              notionSyncService,
-	            });
-	            conversationsHeadingId = rebuilt.headingBlockId;
-	            if (storage && typeof storage.patchSyncMapping === "function") {
-	              // eslint-disable-next-line no-await-in-loop
-	              await storage.patchSyncMapping(id, {
+		          } else {
+		            trace.mark("rebuild conversations section");
+		            let rebuilt;
+		            try {
+		              rebuilt = await rebuildSectionByArchivingHeading({
+		                accessToken: token.accessToken,
+		                pageId,
+		                section: conversationsSection,
+		                currentHeadingBlockId: conversationsHeadingId,
+		                desiredBlocks: blocks,
+		                notionSyncService,
+		              });
+		            } catch (e) {
+		              if (!isStaleBlockAnchorError(e)) throw e;
+		              trace.mark("recover conversations rebuild");
+		              rebuilt = await rebuildSectionByArchivingHeading({
+		                accessToken: token.accessToken,
+		                pageId,
+		                section: conversationsSection,
+		                currentHeadingBlockId: "",
+		                desiredBlocks: blocks,
+		                notionSyncService,
+		              });
+		            }
+		            conversationsHeadingId = rebuilt.headingBlockId;
+		            if (storage && typeof storage.patchSyncMapping === "function") {
+		              // eslint-disable-next-line no-await-in-loop
+		              await storage.patchSyncMapping(id, {
 	                notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
 	              });
 	            }
@@ -1693,8 +1744,27 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              storage,
 	              conversationId: id,
 	            });
-	            // eslint-disable-next-line no-await-in-loop
-	            await notionSyncService.appendChildren(token.accessToken, resolved.headingBlockId, blocks);
+	            try {
+	              // eslint-disable-next-line no-await-in-loop
+	              await notionSyncService.appendChildren(token.accessToken, resolved.headingBlockId, blocks);
+	            } catch (e) {
+	              if (!isStaleBlockAnchorError(e)) throw e;
+	              trace.mark("recover conversations anchor");
+	              const recoveredId = await recoverSectionHeadingBlockId({
+	                accessToken: token.accessToken,
+	                pageId,
+	                section: conversationsSection,
+	                notionSyncService,
+	              });
+	              if (storage && typeof storage.patchSyncMapping === "function") {
+	                // eslint-disable-next-line no-await-in-loop
+	                await storage.patchSyncMapping(id, {
+	                  notionSections: { conversations: { headingBlockId: recoveredId } },
+	                });
+	              }
+	              // eslint-disable-next-line no-await-in-loop
+	              await notionSyncService.appendChildren(token.accessToken, recoveredId, blocks);
+	            }
 	          }
           const nextCursor = lastMessageCursor(messages);
           if (storage.setSyncCursor) {

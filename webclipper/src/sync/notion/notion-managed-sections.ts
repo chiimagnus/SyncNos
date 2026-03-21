@@ -136,3 +136,23 @@ export async function rebuildSectionByArchivingHeading(input: {
   return { headingBlockId };
 }
 
+export async function recoverSectionHeadingBlockId(input: {
+  accessToken: string;
+  pageId: string;
+  section: NotionManagedSectionSpec;
+  notionSyncService: { appendChildren: (accessToken: string, blockId: string, blocks: any[]) => Promise<any> };
+}): Promise<string> {
+  const title = safeString(input?.section?.title);
+  if (!title) throw new Error('invalid section spec');
+  const children = await listBlockChildren(input.accessToken, input.pageId);
+  const found = findToggleHeadingBlock(children, title);
+  const foundId = safeString(found?.id);
+  if (foundId) return foundId;
+  const appended = await input.notionSyncService.appendChildren(input.accessToken, input.pageId, [
+    buildToggleHeadingBlock(title, input.section.level),
+  ]);
+  const results = Array.isArray((appended as any)?.results) ? (appended as any).results : [];
+  const createdId = safeString(results?.[0]?.id);
+  if (!createdId) throw new Error('failed to create section heading');
+  return createdId;
+}
