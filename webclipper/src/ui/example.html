@@ -38,7 +38,8 @@
   }
 
   /* ===== Dark Mode ===== */
-  [data-theme="dark"] {
+  @media (prefers-color-scheme: dark) {
+    :root {
     --bg-primary: #1A1C20;
     --bg-sunken: #141618;
     --bg-card: #262830;
@@ -67,6 +68,7 @@
     --gradient-end: #22242A;
     --card-shadow: none;
     --card-border: 1px solid rgba(255,255,255,0.06);
+    }
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -86,12 +88,6 @@
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 48px; }
   .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
   .header h1 span { color: var(--accent); }
-  .theme-toggle {
-    background: var(--bg-card); border: var(--card-border); color: var(--text-primary);
-    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;
-  }
-  .theme-toggle:hover { background: var(--accent-hover); }
-
   /* Section */
   .section { margin-bottom: 40px; }
   .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 16px; }
@@ -194,7 +190,6 @@
   <!-- Header -->
   <div class="header">
     <h1>Sync<span>Nos</span> Design System</h1>
-    <button class="theme-toggle" onclick="toggleTheme()">&#x1F313; Toggle Theme</button>
   </div>
 
   <!-- Surface Levels -->
@@ -299,18 +294,5 @@
 
 </div>
 
-<script>
-function toggleTheme() {
-  const html = document.documentElement;
-  if (html.getAttribute('data-theme') === 'dark') {
-    html.removeAttribute('data-theme');
-  } else {
-    html.setAttribute('data-theme', 'dark');
-  }
-}
-if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-  document.documentElement.setAttribute('data-theme', 'dark');
-}
-</script>
 </body>
 </html>
