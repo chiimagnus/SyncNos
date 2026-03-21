@@ -391,10 +391,10 @@ export async function importBackupZipV2Merge(
 
   const articleCommentsIndexPath =
     manifest && (manifest as any).assets ? String((manifest as any).assets.articleCommentsIndexPath || '').trim() : '';
-  const articleCommentsDeclared = Boolean(articleCommentsIndexPath);
-  const articleCommentsMissing = articleCommentsDeclared && !entries.has(articleCommentsIndexPath);
   const articleCommentsIndexDoc =
-    articleCommentsIndexPath && !articleCommentsMissing ? readJsonEntry(entries, articleCommentsIndexPath) : null;
+    articleCommentsIndexPath && entries.has(articleCommentsIndexPath)
+      ? readJsonEntry(entries, articleCommentsIndexPath)
+      : null;
   if (articleCommentsIndexDoc) {
     const commentsValidation = validateArticleCommentsIndexDocument(articleCommentsIndexDoc);
     if (!commentsValidation.ok) throw new Error(commentsValidation.error || 'Invalid article comments index');

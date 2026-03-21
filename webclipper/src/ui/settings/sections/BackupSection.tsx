@@ -15,6 +15,11 @@ function ImportStatsList(props: { stats: any }) {
       <li>
         {t('statsMessages')} {t('statsAdded')} {stats.messagesAdded} · {t('statsUpdated')} {stats.messagesUpdated} ({t('skipped')} {stats.messagesSkipped})
       </li>
+      {'commentsAdded' in stats ? (
+        <li>
+          {t('statsComments')} {t('statsAdded')} {stats.commentsAdded} · {t('statsUpdated')} {stats.commentsUpdated} ({t('skipped')} {stats.commentsSkipped})
+        </li>
+      ) : null}
       <li>
         {t('statsMappings')} {t('statsAdded')} {stats.mappingsAdded} · {t('statsUpdated')} {stats.mappingsUpdated}
       </li>

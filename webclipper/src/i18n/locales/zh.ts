@@ -69,6 +69,7 @@ export const zh: { [K in TranslationKey]: string } = {
   statsAdded: '新增',
   statsUpdated: '更新',
   statsMessages: '消息：',
+  statsComments: '评论：',
   statsMappings: '映射：',
   statsSettingsApplied: '应用设置：',
 
