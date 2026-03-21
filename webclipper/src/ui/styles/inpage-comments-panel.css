@@ -75,7 +75,7 @@
   gap: 8px;
   padding: 12px 12px;
   border-bottom: 1px solid var(--panel-border);
-  background: var(--panel-bg);
+  background: var(--bg-sunken, var(--panel-bg));
 }
 
 .webclipper-inpage-comments-panel__header-title {

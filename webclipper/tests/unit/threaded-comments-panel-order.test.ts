@@ -77,4 +77,25 @@ describe('Threaded comments panel ordering', () => {
 
     mounted.cleanup();
   });
+
+  it('mirrors theme overrides from the document root', async () => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel?.getAttribute('data-theme')).toBe('dark');
+
+    document.documentElement.setAttribute('data-theme', 'light');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(panel?.getAttribute('data-theme')).toBe('light');
+
+    document.documentElement.removeAttribute('data-theme');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(panel?.hasAttribute('data-theme')).toBe(false);
+
+    mounted.cleanup();
+  });
 });
