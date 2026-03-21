@@ -730,9 +730,6 @@ export async function setSyncCursor(
   const now = Date.now();
   const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
   if (preserved && typeof preserved === 'object') delete preserved.id;
-  delete preserved.notionCommentsDigest;
-  delete preserved.notionArticleDigest;
-  delete preserved.notionWebArticleLayoutVersion;
   const mergeNestedRecord = (prev: any, incoming: any): any | null => {
     if (!incoming || typeof incoming !== 'object') return null;
     const base = prev && typeof prev === 'object' ? prev : {};
