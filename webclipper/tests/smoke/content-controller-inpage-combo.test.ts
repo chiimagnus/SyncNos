@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createContentController } from "../../src/bootstrap/content-controller.ts";
 import { createCurrentPageCaptureService } from "../../src/bootstrap/current-page-capture.ts";
 
-type TickFn = (() => Promise<void>) | null;
+type TickFn = (() => void | Promise<void>) | null;
 
 function createHarness(options?: {
   sendImpl?: (type: string, payload?: any) => Promise<any>;
@@ -48,7 +48,7 @@ function createHarness(options?: {
     collectorsRegistry,
     currentPageCapture,
     inpageTip: {
-      showSaveTip: (text: string, opts: any) => {
+      showSaveTip: (text: unknown, opts: any) => {
         tipCalls.push({ text, opts });
       }
     },
@@ -59,8 +59,8 @@ function createHarness(options?: {
       cleanupButtons: () => {},
     },
     runtimeObserver: {
-      createObserver: ({ onTick }: { onTick: () => Promise<void> }) => {
-        tickRef = onTick;
+      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+        tickRef = onTick || null;
         return { start: () => {}, stop: () => {} };
       }
     },
@@ -70,6 +70,7 @@ function createHarness(options?: {
         return { changed: false };
       }
     },
+    notionAiModelPicker: null,
   });
   controller.start();
 
@@ -318,8 +319,8 @@ describe("content-controller inpage combo", () => {
   });
 
   it("ignores repeated manual clicks while a save is still in progress", async () => {
-    let resolveUpsert: ((value: any) => void) | null = null;
-    const upsertPending = new Promise((resolve) => {
+    let resolveUpsert!: (value: void | PromiseLike<void>) => void;
+    const upsertPending = new Promise<void>((resolve) => {
       resolveUpsert = resolve;
     });
 
@@ -351,7 +352,7 @@ describe("content-controller inpage combo", () => {
 
     expect(harness.sendCalls.filter((c) => c.type === "upsertConversation")).toHaveLength(1);
 
-    resolveUpsert && resolveUpsert({});
+    resolveUpsert(undefined);
     await firstClick;
     await secondClick;
 

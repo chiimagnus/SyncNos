@@ -82,6 +82,14 @@ export const en = {
   refreshPagesAria: 'Refresh pages',
   connectNotionFirst: 'Connect Notion first',
 
+  // NotionAISection
+  notionAI: 'Notion AI',
+  modelIndex: 'Model Index',
+  save: 'Save',
+  reset: 'Reset',
+  notionAiModelNote:
+    'Applies only when Notion AI model is set to Auto. Menu order may change in Notion.',
+
   // ObsidianSettingsSection
   obsidianLocalRestApi: 'Obsidian Local REST API',
   baseUrl: 'Base URL',

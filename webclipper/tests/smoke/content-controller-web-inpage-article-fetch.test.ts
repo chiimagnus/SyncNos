@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createContentController } from "../../src/bootstrap/content-controller.ts";
 import { createCurrentPageCaptureService } from "../../src/bootstrap/current-page-capture.ts";
 
-type TickFn = (() => Promise<void>) | null;
+type TickFn = (() => void | Promise<void>) | null;
 
 function createHarness(options?: { sendImpl?: (type: string, payload?: any) => Promise<any> }) {
   let tickRef: TickFn = null;
@@ -43,7 +43,7 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
     collectorsRegistry,
     currentPageCapture,
     inpageTip: {
-      showSaveTip: (text: string, opts: any) => {
+      showSaveTip: (text: unknown, opts: any) => {
         tipCalls.push({ text, opts });
       }
     },
@@ -54,12 +54,13 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       cleanupButtons: () => {},
     },
     runtimeObserver: {
-      createObserver: ({ onTick }: { onTick: () => Promise<void> }) => {
-        tickRef = onTick;
+      createObserver: ({ onTick }: { onTick?: () => void | Promise<void> }) => {
+        tickRef = onTick || null;
         return { start: () => {}, stop: () => {} };
       }
     },
     incrementalUpdater: null,
+    notionAiModelPicker: null,
   });
   controller.start();
 

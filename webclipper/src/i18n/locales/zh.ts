@@ -84,6 +84,13 @@ export const zh: { [K in TranslationKey]: string } = {
   refreshPagesAria: '刷新页面列表',
   connectNotionFirst: '请先连接 Notion',
 
+  // NotionAISection
+  notionAI: 'Notion AI',
+  modelIndex: '模型序号',
+  save: '保存',
+  reset: '重置',
+  notionAiModelNote: '仅在 Notion AI 模型设置为自动时有效。Notion 中的菜单顺序可能会变化。',
+
   // ObsidianSettingsSection
   obsidianLocalRestApi: 'Obsidian 本地 REST API',
   baseUrl: '基础 URL',
