@@ -79,13 +79,12 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 12px;
+  width: 10px;
   cursor: ew-resize;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   background: transparent;
-  transform: translateX(-50%);
   z-index: 3;
 }
 
@@ -93,13 +92,12 @@
   content: '';
   position: absolute;
   top: 0;
-  left: 50%;
+  left: 0;
   bottom: 0;
   width: 1px;
   background: var(--panel-border);
   opacity: 0;
   transition: opacity 120ms ease;
-  transform: translateX(-50%);
 }
 
 :host([data-variant='sidebar']) .webclipper-inpage-comments-panel__resize-handle:hover::after,
