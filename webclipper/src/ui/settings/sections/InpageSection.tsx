@@ -8,8 +8,6 @@ type InpageDisplayMode = 'supported' | 'all' | 'off';
 
 export function InpageSection(props: {
   busy: boolean;
-  themeMode: 'system' | 'light' | 'dark';
-  onChangeThemeMode: (next: 'system' | 'light' | 'dark') => void;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
   aiChatAutoSaveEnabled: boolean;
@@ -19,8 +17,6 @@ export function InpageSection(props: {
   }) {
   const {
     busy,
-    themeMode,
-    onChangeThemeMode,
     displayMode,
     onChangeDisplayMode,
     aiChatAutoSaveEnabled,
@@ -29,53 +25,8 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
   } = props;
 
-  const themeModeButtonClassName = () => buttonTintClassName();
-
   return (
     <div className="tw-grid tw-gap-4">
-      <section className={cardClassName} aria-label={t('appearanceHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('appearanceHeading')}</h2>
-        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('themeModeLabel')}</label>
-            <div
-              role="group"
-              aria-label={t('themeModeLabel')}
-              className="tw-inline-flex tw-items-center tw-gap-2"
-            >
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onChangeThemeMode('system')}
-                className={themeModeButtonClassName()}
-                aria-pressed={themeMode === 'system'}
-              >
-                {t('themeModeSystem')}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onChangeThemeMode('light')}
-                className={themeModeButtonClassName()}
-                aria-pressed={themeMode === 'light'}
-              >
-                {t('themeModeLight')}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onChangeThemeMode('dark')}
-                className={themeModeButtonClassName()}
-                aria-pressed={themeMode === 'dark'}
-              >
-                {t('themeModeDark')}
-              </button>
-            </div>
-          </div>
-          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('themeModeHint')}</div>
-        </div>
-      </section>
-
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('inpageButtonHeading')}</h2>
         <div className="tw-mt-2.5 tw-grid tw-gap-1.5">

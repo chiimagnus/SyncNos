@@ -38,7 +38,7 @@
 | `src/ui/settings/sections/insight-stats.ts` | Insight 聚合引擎 | 从 IndexedDB 的 `conversations` + `messages` 现算本地 clip 统计 |
 | `src/ui/settings/sections/InsightSection.tsx` | Insight 状态容器 | 管理 loading / error / empty / populated 四类状态 |
 | `src/ui/settings/sections/InsightPanel.tsx` | Insight 统计视图 | 用 `recharts` 渲染来源分布、文章域名分布与 Top 3 conversation |
-| `src/ui/shared/hooks/useThemeMode.ts` | 主题模式应用 | 把 `ui_theme_mode` 转成 `data-theme` 覆盖，驱动 popup / app 同步换肤 |
+| `src/ui/styles/tokens.css` | 主题 tokens | 用 `prefers-color-scheme` 统一驱动亮/暗 token，popup / app / inpage 一致 |
 | `src/ui/shared/SelectMenu.tsx` | 共享下拉菜单组件 | 统一选项菜单键盘行为，并在 `adaptiveMaxHeight` 打开时按可裁剪容器动态计算高度 |
 | `src/ui/conversations/ConversationListPane.tsx` | 列表筛选、批量动作与来源持久化 | 控制 `source filter`、today/total 统计、导出/同步/删除菜单 |
 | `src/ui/conversations/DetailNavigationHeader.tsx` | 窄屏详情头动作容器 | 让 popup / app 窄屏 detail header 与主详情页共用同一套动作槽位策略 |
@@ -105,7 +105,7 @@
 | popup 打开 | `ui-background-handlers.ts` | 双击 inpage 按钮时尝试 `openPopup()`，失败则回退提示 |
 
 - Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, `ai_chat_cache_images_enabled`，以及 Obsidian 连接参数。
-- `General` 分区现在承接了原来分散的“外观 + inpage + 自动保存”设置：主题模式使用 `ui_theme_mode`（`system / light / dark`），并由 `useThemeMode()` 把结果应用到 popup / app 根节点。
+- `General` 分区现在承接了原来分散的“inpage + 自动保存”等设置；主题仅跟随系统 `prefers-color-scheme`（不再提供手动切换）。
 - `ai_chat_cache_images_enabled` 是 `General` 分区里的独立开关：默认 `false`，仅影响 `sourceType='chat'` 的图片内联；article 会话不会显示该工具动作。
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
 - detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
@@ -131,7 +131,7 @@
 - **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
 - **改 Insight 统计 / 排行 / 图表**：先看 `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `useSettingsSceneController.ts`；这里决定 Top N、Other 分桶、空态 / 错误态和图表布局。
 - **改列表筛选下拉 / 菜单裁切**：先看 `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx`；不要再回退固定 `maxHeight`，否则容易在底部条或窄窗口出现无谓滚动条。
-- **改主题模式 / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `useThemeMode.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略状态来源。
+- **改主题 tokens / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略 token 真源。
 - **改 detail header 动作分发**：先看 `src/integrations/detail-header-action-types.ts`, `src/integrations/detail-header-actions.ts`, `conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
 - **改图片缓存补全流程（cache-images）**：先看 `conversations-context.tsx`, `conversations/client/repo.ts`, `conversations/background/handlers.ts`, `image-backfill-job.ts`；确认仅 chat 会话显示动作，并核对回填后 detail 刷新与计数反馈。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
@@ -200,7 +200,7 @@
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
-- `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/styles/tokens.css`
 - `webclipper/src/ui/shared/MenuPopover.tsx`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`

@@ -63,7 +63,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | **Insight 只读，不成为新事实源** | WebClipper Settings | 统计页如果写回缓存或引入额外 schema，会把“观察数据”变成“业务状态” | `Settings → Insight` 每次只读聚合 `conversations` / `messages`，失败时显示错误或空态 |
 | **Chat with AI 是“复制 + 跳转”，不是后台代聊** | detail header + settings | 这样才能保持用户对 prompt 与目标平台的控制权，也避免扩展暗中持有额外会话状态 | 没有 detail messages、平台未启用或 URL 无效时，动作直接不出现 |
 | **图片缓存是“可选增强”，不是采集成功前提** | `ai_chat_cache_images_enabled` + detail tools | 用户希望“离线可读”时可开启，但不应因图片链路失败影响文本采集 | 实时采集里的图片内联失败不会阻断保存；历史会话可手动触发 `cache-images` 回填 |
-| **主题默认跟随系统，但允许手动覆盖** | `ui_theme_mode` + `useThemeMode()` | 现在 WebClipper 不再只依赖 `prefers-color-scheme`；用户可以在 Settings 里强制 light / dark | popup 与 app 会监听 `chrome.storage.local` 变化并应用 `data-theme` 覆盖 |
+| **主题仅跟随系统** | `prefers-color-scheme` + `tokens.css` | 避免维护额外的主题切换状态与 UI；所有 UI 统一随系统暗色设置 | popup / app / inpage 全部只依赖 CSS 媒体查询，不再有 `data-theme` 手动覆盖 |
 | **升级不应打断当前会话** | `background.ts` 的 `onInstalled` 行为 | 扩展升级后自动弹设置页会打断正在进行的阅读/对话流程 | 当前仅首次安装自动打开 About；更新保持静默 |
 | **敏感信息尽量不出本机** | App Keychain、扩展备份 | 站点 Cookie、加密密钥、Notion OAuth token 都不能随意进备份或明文落盘 | 备份显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret` |
 | **采集站点 ≠ UI 一定显示** | WebClipper inpage 逻辑 | 扩展虽然对所有 `http(s)` 注入 content script，但 inpage 按钮是否启动还受 `inpage_display_mode` 控制 | 切换该设置后必须刷新或新开页面；旧 `inpage_supported_only` 只做兼容回读 |
@@ -136,7 +136,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/ui/settings/sections/insight-stats.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
 - `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
-- `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/styles/tokens.css`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/popup/PopupShell.tsx`

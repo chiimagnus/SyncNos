@@ -23,7 +23,7 @@
 | --- | --- | --- | --- |
 | 构建可用性 | `xcodebuild` 成功 | `npm run compile && npm run build` 成功 | 每次改动 |
 | 核心链路可用性 | 至少一条来源可同步到 Notion | 至少一个 chat/article 可落本地并可手动同步 | 每次改动 |
-| 配置写入有效性 | onboarding/autoSync/IAP 状态切换正常 | `inpage_display_mode`、`ui_theme_mode`、`chat_with_*` 写入可回读 | 每次改动 |
+| 配置写入有效性 | onboarding/autoSync/IAP 状态切换正常 | `inpage_display_mode`、`ai_chat_auto_save_enabled`、`ai_chat_cache_images_enabled`、`chat_with_*` 写入可回读 | 每次改动 |
 | 备份恢复可用性 | - | Zip v2 导出与导入（merge）正常，且 `article_comments` 能往返 | 每个里程碑 |
 | 发布一致性 | - | `manifest.version == tag 去掉 v` | 每次发版 |
 

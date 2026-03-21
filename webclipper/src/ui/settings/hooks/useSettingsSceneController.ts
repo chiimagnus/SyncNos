@@ -144,9 +144,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
 
-  // Appearance
-  const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
-
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
   const [chatWithMaxChars, setChatWithMaxChars] = useState<string>(String(DEFAULT_CHAT_WITH_MAX_CHARS));
@@ -213,7 +210,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
           'ai_chat_cache_images_enabled',
-          'ui_theme_mode',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
@@ -238,12 +234,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
-      const rawThemeMode = String(local?.ui_theme_mode || '').trim().toLowerCase();
-      setThemeMode(
-        rawThemeMode === 'light' || rawThemeMode === 'dark' || rawThemeMode === 'system'
-          ? (rawThemeMode as any)
-          : 'system'
-      );
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
 
       const obsidianSettings = unwrap(obsidianRes);
@@ -576,17 +566,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask]
   );
 
-  const onChangeThemeMode = useCallback(
-    async (next: 'system' | 'light' | 'dark') => {
-      await runTask(async () => {
-        const normalized = next === 'light' || next === 'dark' || next === 'system' ? next : 'system';
-        await storageSet({ ui_theme_mode: normalized });
-        setThemeMode(normalized);
-      });
-    },
-    [runTask]
-  );
-
   useEffect(() => {
     if (!chatWithHydratedRef.current) return;
 
@@ -830,8 +809,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
-    themeMode,
-    onChangeThemeMode,
 
     insightStats,
     insightLoading,

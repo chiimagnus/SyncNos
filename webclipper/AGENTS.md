@@ -32,7 +32,7 @@
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 - 对话删除必须显式二次确认，避免误删。
 - 版本号、DB schema 版本、迁移链路等事实以 `wxt.config.ts`、`schema.ts` 和 workflow 为准；文档优先保留稳定边界，避免多处写死临时版本信息。
-- 外观主题使用 `ui_theme_mode`（`system / light / dark`）持久化到 `chrome.storage.local`；popup 与 app 统一通过 `src/ui/shared/hooks/useThemeMode.ts` 应用 `data-theme` 覆盖，禁止在单个页面里偷偷做另一套主题切换状态。
+- 外观主题仅跟随系统：依赖 CSS 的 `prefers-color-scheme`（token 真源：`src/ui/styles/tokens.css`）；不要引入/持久化主题切换状态。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
 - inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。
 - inpage 显示范围设置：`inpage_display_mode`（`chrome.storage.local`）。
@@ -121,8 +121,6 @@
   - `article_comments` 是 article detail 与 inpage comments panel 的本地线程；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入，且 Zip v2 备份 / 恢复会保留它；改它时先看 storage、background handler、backup 导出 / 导入和 shadow panel。
 - **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
-- **UI：主题模式（共享）**：`src/ui/shared/hooks/useThemeMode.ts`
-  - popup 与 app 都通过同一个 hook 监听 `ui_theme_mode`，并把 `light / dark / system` 应用到根节点 `data-theme`；token 真源在 `src/ui/styles/tokens.css`。
 - **会话详情头部动作（共享协议）**：`src/integrations/detail-header-actions.ts` + `src/integrations/detail-header-action-types.ts` + `src/ui/conversations/DetailHeaderActionBar.tsx`
   - popup 与 app 的主详情页、窄屏 `DetailNavigationHeader` 都应消费同一套 action resolver，并按 `open / chat-with / tools` 槽位分发。
   - 槽位内规则：单动作直出按钮，多动作显示菜单；不要在 popup/app 各自写一套“按钮数量判断”逻辑。

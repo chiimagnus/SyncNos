@@ -294,35 +294,6 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  const syncThemeAttr = () => {
-    const theme =
-      document.documentElement?.getAttribute?.('data-theme') ||
-      document.body?.getAttribute?.('data-theme') ||
-      host.closest?.('[data-theme]')?.getAttribute?.('data-theme');
-    if (theme === 'light' || theme === 'dark') {
-      el.setAttribute('data-theme', theme);
-    } else {
-      el.removeAttribute('data-theme');
-    }
-  };
-  syncThemeAttr();
-
-  let themeObserver: MutationObserver | null = null;
-  let bodyThemeObserver: MutationObserver | null = null;
-  try {
-    if (typeof MutationObserver !== 'undefined') {
-      themeObserver = new MutationObserver(() => syncThemeAttr());
-      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-      if (document.body) {
-        bodyThemeObserver = new MutationObserver(() => syncThemeAttr());
-        bodyThemeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
-      }
-    }
-  } catch (_e) {
-    themeObserver = null;
-    bodyThemeObserver = null;
-  }
-
   const shadow = el.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = PANEL_SHADOW_CSS;
@@ -944,18 +915,6 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     cleanupSidebarResize = null;
-    try {
-      themeObserver?.disconnect?.();
-    } catch (_e) {
-      // ignore
-    }
-    themeObserver = null;
-    try {
-      bodyThemeObserver?.disconnect?.();
-    } catch (_e) {
-      // ignore
-    }
-    bodyThemeObserver = null;
     try {
       shadow.removeEventListener('keydown', stopShortcutKeyPropagation, true);
       shadow.removeEventListener('keypress', stopShortcutKeyPropagation, true);

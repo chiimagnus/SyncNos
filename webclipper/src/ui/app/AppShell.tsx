@@ -10,7 +10,6 @@ import { ArticleCommentsSection } from '../conversations/ArticleCommentsSection'
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
-import { useThemeMode } from '../shared/hooks/useThemeMode';
 import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conversation-loc';
 import { createCommentSidebarSession } from '../../comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '../../comments/sidebar/comment-sidebar-contract';
@@ -75,7 +74,6 @@ export default function AppShell() {
   };
 
   function AppShellFrame() {
-    useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
     if (!commentsSidebarSessionRef.current) {

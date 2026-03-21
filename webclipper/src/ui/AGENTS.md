@@ -263,22 +263,21 @@
 | **渐变** | 背景微渐变提升质感 | 纯色即可，渐变在小面板上感知不到 |
 | **交互状态** | 无 | 需要 hover / active / disabled / focus 状态 |
 | **无障碍** | 装饰文字可稍放松 | 所有功能文字必须过 WCAG AA（4.5:1） |
-| **主题切换** | 亮暗各出一版截图 | 默认跟随系统；运行时也支持通过 `ui_theme_mode` 强制 `light / dark` |
+| **主题** | 亮暗各出一版截图 | 仅跟随系统 `prefers-color-scheme`（不提供手动切换） |
 
 ## B4 · 暗色模式工程注意事项
 
 1. **阴影换微光** — 亮色模式 `box-shadow` 做投影，暗色模式改用极细亮边（1px `rgba(255,255,255,0.06)`）
 2. **层级靠 Surface 梯度** — `bg-sunken`（#141618）→ `bg-primary`（#1A1C20）→ `bg-card`（#262830），逐级提亮
 3. **语义色用暗色版** — `--error` 在暗色下自动切为 `#FC8181`，不要硬编码亮色值
-4. **系统优先，但允许手动覆盖** — `tokens.css` 仍保留 `prefers-color-scheme: dark` 作为默认暗色来源；当 `ui_theme_mode` 写入 `chrome.storage.local` 时，由 `useThemeMode()` 给根节点加 `data-theme='light'/'dark'` 覆盖系统主题
+4. **系统优先（唯一来源）** — 主题仅由 `prefers-color-scheme` 决定；不要引入 `data-theme` 覆盖或持久化主题开关
 5. **On-Color 一致性** — 按钮文字永远用 `var(--accent-foreground)` 而不是硬编码黑/白，确保主题切换时自动适配
 
 ### B4.1 · 主题实现边界
 
-- **默认行为**：没有手动偏好时，主题仍跟随系统 `prefers-color-scheme`
-- **手动覆盖行为**：当 `ui_theme_mode = light / dark` 时，根节点会出现 `:root[data-theme='light'/'dark']`，优先级高于媒体查询
-- **实现真源**：`src/ui/shared/hooks/useThemeMode.ts` + `src/ui/styles/tokens.css`
-- **工程约束**：新增组件必须同时兼容媒体查询和 `:root[data-theme='light'/'dark']`，不要把主题状态私有化到某个页面组件
+- **唯一行为**：主题跟随系统 `prefers-color-scheme`
+- **实现真源**：`src/ui/styles/tokens.css`（inpage Shadow DOM 通过 `toHostTokensCss()` 把 `:root` 作用域替换为 `:host`）
+- **工程约束**：新增组件按 token 写样式即可；不要引入页面私有的主题状态或额外的 theme switch 逻辑
 
 ## B5 · 下拉菜单可视区域策略（SelectMenu）
 
