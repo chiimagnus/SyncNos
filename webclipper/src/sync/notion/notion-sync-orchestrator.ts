@@ -780,21 +780,35 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	          }
 	          if (blocks.length) {
 	            trace.mark("append children");
-	            if (isWebArticleConversation(convo)) {
-	              const appended = await appendNotionWebArticlePageBlocks({
-	                notionSyncService,
-	                accessToken: token.accessToken,
-	                pageId,
+		            if (isWebArticleConversation(convo)) {
+		              const appended = await appendNotionWebArticlePageBlocks({
+		                notionSyncService,
+		                accessToken: token.accessToken,
+		                pageId,
 	                headingBlocks: blocks,
 	                articleBlocks: built?.articleBlocks,
 	                commentBlocks: built?.commentBlocks,
-	                warnings,
-	              });
-	              appendedBlockCount = Number(appended?.appendedBlocks) || 0;
-	            } else {
-	              // eslint-disable-next-line no-await-in-loop
-	              await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
-	              appendedBlockCount = blocks.length;
+		                warnings,
+		              });
+		              appendedBlockCount = Number(appended?.appendedBlocks) || 0;
+		              if (storage && typeof storage.patchSyncMapping === 'function') {
+		                const articleHeadingId = appended && appended.articleHeadingId ? String(appended.articleHeadingId).trim() : '';
+		                const commentsHeadingId = appended && appended.commentsHeadingId ? String(appended.commentsHeadingId).trim() : '';
+		                if (articleHeadingId || commentsHeadingId) {
+		                  // Cache section anchors to avoid scanning page children on subsequent updates.
+		                  // eslint-disable-next-line no-await-in-loop
+		                  await storage.patchSyncMapping(id, {
+		                    notionSections: {
+		                      ...(articleHeadingId ? { article: { headingBlockId: articleHeadingId } } : null),
+		                      ...(commentsHeadingId ? { comments: { headingBlockId: commentsHeadingId } } : null),
+		                    },
+		                  });
+		                }
+		              }
+		            } else {
+		              // eslint-disable-next-line no-await-in-loop
+		              await notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+		              appendedBlockCount = blocks.length;
 	            }
 	          }
 	          const nextCursor = lastMessageCursor(messages);

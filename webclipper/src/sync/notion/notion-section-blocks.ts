@@ -64,6 +64,13 @@ export async function listBlockChildren(accessToken: string, blockId: string): P
   return out;
 }
 
+export async function archiveBlock(accessToken: string, blockId: string): Promise<any> {
+  const id = safeString(blockId);
+  if (!id) throw new Error('missing blockId');
+  // Notion uses DELETE to archive blocks.
+  return notionFetch({ accessToken, method: 'DELETE', path: `/v1/blocks/${id}` } as any);
+}
+
 function isToggleHeadingBlock(block: any): boolean {
   if (isArchivedBlock(block)) return false;
   const type = safeString(block?.type);

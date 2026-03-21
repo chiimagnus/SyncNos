@@ -603,6 +603,67 @@ export async function getSyncMappingByConversation(
   return { conversation, mapping: mapping || null };
 }
 
+export async function patchSyncMapping(
+  conversationId: number,
+  patch: Record<string, unknown>,
+): Promise<true> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+  if (!patch || typeof patch !== 'object') throw new Error('invalid patch');
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
+  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
+  if (!conversation) throw new Error('conversation not found');
+
+  const source = String(conversation.source || '').trim();
+  const conversationKey = String(conversation.conversationKey || '').trim();
+  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
+
+  const idx = stores.sync_mappings.index('by_source_conversationKey');
+  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+  const now = Date.now();
+  const patchObj: any = { ...patch };
+  const incomingSections =
+    patchObj.notionSections && typeof patchObj.notionSections === 'object' ? patchObj.notionSections : null;
+  if (incomingSections) delete patchObj.notionSections;
+  const existingSections =
+    existing && typeof existing === 'object' && existing.notionSections && typeof existing.notionSections === 'object'
+      ? existing.notionSections
+      : null;
+  const mergedSections = incomingSections
+    ? {
+        ...(existingSections || {}),
+        ...Object.fromEntries(
+          Object.entries(incomingSections).map(([key, value]) => [
+            key,
+            {
+              ...((existingSections && (existingSections as any)[key] && typeof (existingSections as any)[key] === 'object'
+                ? (existingSections as any)[key]
+                : null) || {}),
+              ...((value && typeof value === 'object' ? value : null) || {}),
+            },
+          ]),
+        ),
+      }
+    : null;
+  const next = {
+    ...(existing && typeof existing === 'object' ? existing : null),
+    ...patchObj,
+    source,
+    conversationKey,
+    notionPageId: String((patch as any)?.notionPageId || existing?.notionPageId || conversation.notionPageId || ''),
+    ...(mergedSections ? { notionSections: mergedSections } : null),
+    updatedAt: now,
+  } as any;
+  const payload: any = withOptionalId(existing && existing.id, next);
+  if (existing) await reqToPromise(stores.sync_mappings.put(payload));
+  else await reqToPromise(stores.sync_mappings.add(payload));
+
+  await txDone(t);
+  return true;
+}
+
 export async function setConversationNotionPageId(
   conversationId: number,
   notionPageId: string,
