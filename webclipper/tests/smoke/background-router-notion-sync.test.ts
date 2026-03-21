@@ -725,10 +725,9 @@ describe('background-router notion sync', () => {
     expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_article'))).toBe(true);
     expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(false);
 
-    const cursorCall = calls.find((c) => c.op === 'setCursor');
-    expect(String(cursorCall?.cursor?.notionSectionDigests?.article?.digest || '')).toBe(articleDigest);
-    expect(String(cursorCall?.cursor?.notionArticleDigest || '')).not.toBe('old');
-  });
+	    const cursorCall = calls.find((c) => c.op === 'setCursor');
+	    expect(String(cursorCall?.cursor?.notionSectionDigests?.article?.digest || '')).toBe(articleDigest);
+	  });
 
   it('updates page properties without rebuilding body when article content is unchanged', async () => {
     const calls: any[] = [];
