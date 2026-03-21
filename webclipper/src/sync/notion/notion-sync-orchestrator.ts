@@ -1607,16 +1607,16 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	            });
           }
 	          setResultAt(index, {
-            conversationId: id,
-            conversationTitle,
-            ok: true,
-            notionPageId: pageId,
-            mode: "rebuilt",
-            appended: messages.length,
-            warnings,
-            ...(isWebArticleConversation(convo) && built
-              ? {
-                comments: {
+	            conversationId: id,
+	            conversationTitle,
+	            ok: true,
+	            notionPageId: pageId,
+	            mode: "rebuilt",
+	            appended: 0,
+	            warnings,
+	            ...(isWebArticleConversation(convo) && built
+	              ? {
+	                comments: {
                   updated: true,
                   threads: built.commentThreads || 0,
                   items: built.commentItems || 0,
