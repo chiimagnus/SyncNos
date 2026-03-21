@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { registerNotionSettingsHandlers } from '../../src/sync/notion/settings-background-handlers';
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
@@ -127,6 +127,26 @@ function createRouter({
     }),
   });
 
+  // The Notion section engine expects `appendChildren()` to return created block ids when
+  // it appends toggle headings. Many unit tests don't care about the ids, so provide a
+  // compatibility wrapper here to keep mocks minimal.
+  if (notionServices?.syncService && typeof notionServices.syncService.appendChildren === 'function') {
+    let appendCounter = 0;
+    const originalAppend = notionServices.syncService.appendChildren.bind(notionServices.syncService);
+    notionServices.syncService.appendChildren = async (accessToken: string, blockId: string, blocks: any[]) => {
+      const res = await originalAppend(accessToken, blockId, blocks);
+      const count = Array.isArray(blocks) ? blocks.length : 0;
+      const existingResults = res && typeof res === 'object' ? (res as any).results : null;
+      if (Array.isArray(existingResults) && existingResults.length >= count) return res;
+      const nextResults = Array.isArray(existingResults) ? existingResults.slice() : [];
+      while (nextResults.length < count) nextResults.push({ id: `test_block_${appendCounter++}` });
+      return {
+        ...(res && typeof res === 'object' ? res : {}),
+        results: nextResults,
+      };
+    };
+  }
+
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     ...notionServices,
     conversationKinds,
@@ -168,7 +188,39 @@ function notionHttpResponse(body: any, status = 200) {
   } as any;
 }
 
+function fnv1a32(input: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function computeArticleDigest(markdown: string) {
+  return fnv1a32(JSON.stringify({ markdown: String(markdown || '') }));
+}
+
 describe('background-router notion sync', () => {
+  beforeEach(() => {
+    // Default Notion HTTP mock for notionFetch-based helpers (`listBlockChildren` / `archiveBlock`).
+    // Individual tests may override `(globalThis as any).fetch` with more specific behavior.
+    (globalThis as any).fetch = vi.fn(async (url: string, init?: { method?: string }) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      const href = String(url);
+      if (method === 'GET' && href.includes('/v1/blocks/') && href.includes('/children')) {
+        return notionHttpResponse({ results: [], has_more: false, next_cursor: null });
+      }
+      if (method === 'DELETE' && href.includes('/v1/blocks/')) {
+        return notionHttpResponse({ ok: true });
+      }
+      if (method === 'GET' && href.includes('/v1/pages/')) {
+        return notionHttpResponse({ id: 'p1', parent: { type: 'database_id', database_id: 'db1' }, archived: false, in_trash: false });
+      }
+      return notionHttpResponse({ ok: true });
+    });
+  });
+
   it('disconnect clears notion token and cached notion routing keys', async () => {
     const chromeMock = mockChromeStorage();
     chromeMock.storage.local.set(
@@ -271,7 +323,14 @@ describe('background-router notion sync', () => {
         storage: {
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
-            mapping: { notionPageId: 'p1', lastSyncedMessageKey: 'm1' },
+            mapping: {
+              notionPageId: 'p1',
+              lastSyncedMessageKey: 'm1',
+              notionSections: { conversations: { headingBlockId: 'b_conversations' } },
+              notionSectionCursors: {
+                conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1, lastSyncedMessageUpdatedAt: 1 },
+              },
+            },
           }),
           getMessagesByConversationId: async () => [
             { messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 },
@@ -310,6 +369,8 @@ describe('background-router notion sync', () => {
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();
 
+    const articleDigest = computeArticleDigest('# Hello');
+
     const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
       const method = String(init?.method || 'GET').toUpperCase();
       if (method === 'GET' && String(url).includes('/v1/blocks/p1/children')) {
@@ -338,6 +399,9 @@ describe('background-router notion sync', () => {
           next_cursor: null,
         });
       }
+      if (method === 'DELETE' && String(url).includes('/v1/blocks/')) {
+        return notionHttpResponse({ ok: true });
+      }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });
     (globalThis as any).fetch = fetchMock;
@@ -359,11 +423,10 @@ describe('background-router notion sync', () => {
             },
             mapping: {
               notionPageId: 'p1',
-              lastSyncedMessageKey: 'article_body',
-              lastSyncedSequence: 1,
-              lastSyncedAt: 10,
-              notionWebArticleLayoutVersion: 2,
-              notionCommentsDigest: 'old',
+              notionSectionDigests: {
+                article: { digest: articleDigest, lastSyncedAt: 10 },
+                comments: { digest: 'old', lastSyncedAt: 10 },
+              },
             },
           }),
           getMessagesByConversationId: async () => [
@@ -416,16 +479,18 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.okCount).toBe(1);
     expect(job.perConversation[0].ok).toBe(true);
-    expect(job.perConversation[0].mode).toBe('updated_properties');
+    expect(job.perConversation[0].mode).toBe('rebuilt');
 
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'p1')).toBe(false);
-    expect(calls.some((c) => c.op === 'append' && c.targetId === 'p1')).toBe(false);
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_comments')).toBe(true);
-    expect(calls.some((c) => c.op === 'append' && c.targetId === 'b_comments')).toBe(true);
+    const archivedIds = (((globalThis as any).fetch as any)?.mock?.calls || [])
+      .map((args: any[]) => ({ url: String(args?.[0] || ''), method: String(args?.[1]?.method || 'GET').toUpperCase() }))
+      .filter((c: any) => c.method === 'DELETE')
+      .map((c: any) => c.url);
+    expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(true);
+    expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_article'))).toBe(false);
 
+    expect(calls.some((c) => c.op === 'append' && c.targetId === 'p1')).toBe(true);
     const cursorCall = calls.find((c) => c.op === 'setCursor');
-    expect(cursorCall?.cursor?.notionWebArticleLayoutVersion).toBe(2);
-    expect(String(cursorCall?.cursor?.notionCommentsDigest || '')).not.toBe('old');
+    expect(String(cursorCall?.cursor?.notionSectionDigests?.comments?.digest || '')).not.toBe('old');
   });
 
   it('avoids clearing the whole page when cursor is missing and only comments changed (web articles)', async () => {
@@ -433,15 +498,7 @@ describe('background-router notion sync', () => {
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();
 
-    function fnv1a32(input: string) {
-      let hash = 0x811c9dc5;
-      for (let i = 0; i < input.length; i += 1) {
-        hash ^= input.charCodeAt(i);
-        hash = Math.imul(hash, 0x01000193);
-      }
-      return (hash >>> 0).toString(16).padStart(8, '0');
-    }
-    const articleDigest = fnv1a32(JSON.stringify({ markdown: '# Hello' }));
+    const articleDigest = computeArticleDigest('# Hello');
 
     const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
       const method = String(init?.method || 'GET').toUpperCase();
@@ -471,6 +528,9 @@ describe('background-router notion sync', () => {
           next_cursor: null,
         });
       }
+      if (method === 'DELETE' && String(url).includes('/v1/blocks/')) {
+        return notionHttpResponse({ ok: true });
+      }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });
     (globalThis as any).fetch = fetchMock;
@@ -492,9 +552,10 @@ describe('background-router notion sync', () => {
             },
             mapping: {
               notionPageId: 'p1',
-              notionWebArticleLayoutVersion: 2,
-              notionArticleDigest: articleDigest,
-              notionCommentsDigest: 'old',
+              notionSectionDigests: {
+                article: { digest: articleDigest, lastSyncedAt: 10 },
+                comments: { digest: 'old', lastSyncedAt: 10 },
+              },
             },
           }),
           getMessagesByConversationId: async () => [
@@ -542,24 +603,26 @@ describe('background-router notion sync', () => {
 
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.okCount).toBe(1);
-    expect(job.perConversation[0].mode).toBe('updated_properties');
+    expect(job.perConversation[0].mode).toBe('rebuilt');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
-
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'p1')).toBe(false);
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_article')).toBe(false);
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_comments')).toBe(true);
-    expect(calls.some((c) => c.op === 'append' && c.targetId === 'b_comments')).toBe(true);
+    const archivedIds = (((globalThis as any).fetch as any)?.mock?.calls || [])
+      .map((args: any[]) => ({ url: String(args?.[0] || ''), method: String(args?.[1]?.method || 'GET').toUpperCase() }))
+      .filter((c: any) => c.method === 'DELETE')
+      .map((c: any) => c.url);
+    expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(true);
+    expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_article'))).toBe(false);
 
     const cursorCall = calls.find((c) => c.op === 'setCursor');
-    expect(cursorCall?.cursor?.notionWebArticleLayoutVersion).toBe(2);
-    expect(String(cursorCall?.cursor?.notionArticleDigest || '')).toBe(articleDigest);
-    expect(String(cursorCall?.cursor?.notionCommentsDigest || '')).not.toBe('old');
+    expect(String(cursorCall?.cursor?.notionSectionDigests?.article?.digest || '')).toBe(articleDigest);
+    expect(String(cursorCall?.cursor?.notionSectionDigests?.comments?.digest || '')).not.toBe('old');
   });
 
   it('avoids clearing the whole page when cursor is missing and only article changed (web articles)', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();
+
+    const articleDigest = computeArticleDigest('# Hello');
 
     const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
       const method = String(init?.method || 'GET').toUpperCase();
@@ -589,6 +652,9 @@ describe('background-router notion sync', () => {
           next_cursor: null,
         });
       }
+      if (method === 'DELETE' && String(url).includes('/v1/blocks/')) {
+        return notionHttpResponse({ ok: true });
+      }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });
     (globalThis as any).fetch = fetchMock;
@@ -610,8 +676,9 @@ describe('background-router notion sync', () => {
             },
             mapping: {
               notionPageId: 'p1',
-              notionWebArticleLayoutVersion: 2,
-              notionArticleDigest: 'old',
+              notionSectionDigests: {
+                article: { digest: 'old', lastSyncedAt: 10 },
+              },
             },
           }),
           getMessagesByConversationId: async () => [
@@ -649,15 +716,17 @@ describe('background-router notion sync', () => {
 
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.okCount).toBe(1);
-    expect(job.perConversation[0].mode).toBe('updated_properties');
+    expect(job.perConversation[0].mode).toBe('rebuilt');
 
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'p1')).toBe(false);
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_article')).toBe(true);
-    expect(calls.some((c) => c.op === 'append' && c.targetId === 'b_article')).toBe(true);
-    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_comments')).toBe(false);
+    const archivedIds = (((globalThis as any).fetch as any)?.mock?.calls || [])
+      .map((args: any[]) => ({ url: String(args?.[0] || ''), method: String(args?.[1]?.method || 'GET').toUpperCase() }))
+      .filter((c: any) => c.method === 'DELETE')
+      .map((c: any) => c.url);
+    expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_article'))).toBe(true);
+    expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(false);
 
     const cursorCall = calls.find((c) => c.op === 'setCursor');
-    expect(cursorCall?.cursor?.notionWebArticleLayoutVersion).toBe(2);
+    expect(String(cursorCall?.cursor?.notionSectionDigests?.article?.digest || '')).toBe(articleDigest);
     expect(String(cursorCall?.cursor?.notionArticleDigest || '')).not.toBe('old');
   });
 
@@ -684,7 +753,9 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'article_body',
               lastSyncedMessageUpdatedAt: 1000,
-              notionWebArticleLayoutVersion: 2,
+              notionSectionDigests: {
+                article: { digest: computeArticleDigest('same body'), lastSyncedAt: 1000 },
+              },
             },
           }),
           getMessagesByConversationId: async () => [
@@ -764,6 +835,10 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'm1',
               lastSyncedMessageUpdatedAt: 1000,
+              notionSections: { conversations: { headingBlockId: 'b_conversations' } },
+              notionSectionCursors: {
+                conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1, lastSyncedMessageUpdatedAt: 1000 },
+              },
             },
           }),
           getMessagesByConversationId: async () => [
@@ -831,7 +906,15 @@ describe('background-router notion sync', () => {
         storage: {
           getSyncMappingByConversation: async () => ({
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
-            mapping: { notionPageId: 'p1', lastSyncedMessageKey: 'old_key', lastSyncedSequence: 1 },
+            mapping: {
+              notionPageId: 'p1',
+              lastSyncedMessageKey: 'old_key',
+              lastSyncedSequence: 1,
+              notionSections: { conversations: { headingBlockId: 'b_conversations' } },
+              notionSectionCursors: {
+                conversations: { lastSyncedMessageKey: 'old_key', lastSyncedSequence: 1, lastSyncedMessageUpdatedAt: 1 },
+              },
+            },
           }),
           getMessagesByConversationId: async () => [
             { messageKey: 'new_key', role: 'user', contentText: 'hi', sequence: 1, updatedAt: 1 },
@@ -888,7 +971,9 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'article_body',
               lastSyncedMessageUpdatedAt: 1000,
-              notionWebArticleLayoutVersion: 2,
+              notionSectionDigests: {
+                article: { digest: computeArticleDigest('same body'), lastSyncedAt: 1000 },
+              },
             },
           }),
           getMessagesByConversationId: async () => [
@@ -971,7 +1056,18 @@ describe('background-router notion sync', () => {
               source: 'chatgpt',
               notionPageId: `p_${conversationId}`,
             },
-            mapping: { notionPageId: `p_${conversationId}`, lastSyncedMessageKey: `m0_${conversationId}` },
+            mapping: {
+              notionPageId: `p_${conversationId}`,
+              lastSyncedMessageKey: `m0_${conversationId}`,
+              notionSections: { conversations: { headingBlockId: `h_${conversationId}` } },
+              notionSectionCursors: {
+                conversations: {
+                  lastSyncedMessageKey: `m0_${conversationId}`,
+                  lastSyncedSequence: 1,
+                  lastSyncedMessageUpdatedAt: 1,
+                },
+              },
+            },
           }),
           getMessagesByConversationId: async (conversationId: number) => [
             { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
@@ -1052,7 +1148,10 @@ describe('background-router notion sync', () => {
           getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false }),
           updatePageProperties: async () => ({ ok: true }),
           clearPageChildren: async () => ({ ok: true }),
-          appendChildren: async () => ({ ok: true }),
+          appendChildren: async (_t: string, _blockId: string, blocks: any[]) => ({
+            ok: true,
+            results: Array.isArray(blocks) ? blocks.map((_b, i) => ({ id: `test_block_${_blockId}_${i}` })) : [],
+          }),
           messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
           isPageUsableForDatabase: () => true,
           pageBelongsToDatabase: () => true,
@@ -1111,8 +1210,13 @@ describe('background-router notion sync', () => {
 
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('rebuilt');
-    expect(calls.some((c) => c.op === 'clear')).toBe(true);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
+    expect(calls.some((c) => c.op === 'clear')).toBe(false);
+    const fetchCalls = (((globalThis as any).fetch as any)?.mock?.calls || []).map((args: any[]) => ({
+      url: String(args?.[0] || ''),
+      method: String(args?.[1]?.method || 'GET').toUpperCase(),
+    }));
+    expect(fetchCalls.some((c: any) => c.method === 'DELETE' && c.url.includes('/v1/blocks/'))).toBe(true);
   });
 
   it('exposes sync job status for popup recovery', async () => {

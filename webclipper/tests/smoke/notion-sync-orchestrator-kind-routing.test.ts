@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createNotionSyncOrchestrator } from "../../src/sync/notion/notion-sync-orchestrator.ts";
 import { conversationKinds } from "../../src/protocols/conversation-kinds.ts";
+
+let notionFetchImpl: ((req: any) => Promise<any>) | null = null;
+
+vi.mock("../../src/sync/notion/notion-api.ts", () => {
+  const notionFetch = (req: any) => {
+    if (!notionFetchImpl) throw new Error("notionFetchImpl not set");
+    return notionFetchImpl(req);
+  };
+  return {
+    notionFetch,
+    default: { NOTION_VERSION: "2022-06-28", notionFetch },
+  };
+});
 
 function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
@@ -26,6 +39,10 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
 }
 
 describe("notion-sync-orchestrator kind routing", () => {
+  beforeEach(() => {
+    notionFetchImpl = null;
+  });
+
   it("routes chat/article to different dbSpec and avoids AI for article", async () => {
     const ensureCalls: any[] = [];
     const createCalls: any[] = [];
@@ -88,8 +105,10 @@ describe("notion-sync-orchestrator kind routing", () => {
         updateCalls.push(req);
         return { ok: true };
       },
-      clearPageChildren: async () => ({ ok: true }),
-      appendChildren: async () => ({ ok: true }),
+      appendChildren: async (_t: string, _blockId: string, blocks: any[]) => {
+        const results = Array.isArray(blocks) ? blocks.map((_, i) => ({ id: `b_${i}_${Math.random().toString(16).slice(2)}` })) : [];
+        return { ok: true, results };
+      },
       messagesToBlocks: (messages: any[]) => [{ kind: "blocks", count: messages.length }]
     };
 
@@ -124,7 +143,7 @@ describe("notion-sync-orchestrator kind routing", () => {
     expect(updateCalls.length).toBe(0);
   });
 
-  it("forces rebuild for article when the synced article body updatedAt changes (even if cursor matches)", async () => {
+  it("rebuilds article section when digest changes", async () => {
     const calls: any[] = [];
 
     // @ts-expect-error test global
@@ -145,9 +164,8 @@ describe("notion-sync-orchestrator kind routing", () => {
         conversation: { id: 1, sourceType: "article", title: "A", url: "https://a", lastCapturedAt: 1000, notionPageId: "p1" },
         mapping: {
           notionPageId: "p1",
-          lastSyncedMessageKey: "article_body",
-          lastSyncedAt: 1000,
-          lastSyncedMessageUpdatedAt: 1000,
+          notionSections: { article: { headingBlockId: "h_article" } },
+          notionSectionDigests: { article: { digest: "old" } },
         }
       }),
       getMessagesByConversationId: async () => [{
@@ -162,6 +180,12 @@ describe("notion-sync-orchestrator kind routing", () => {
       setSyncCursor: async () => true
     };
 
+    notionFetchImpl = async (req: any) => {
+      calls.push({ op: "fetch", req });
+      if (req.method === "DELETE" && req.path === "/v1/blocks/h_article") return { ok: true };
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
     const syncService = {
       getPage: async () => ({ id: "p1", parent: { type: "database_id", database_id: "db_articles" }, archived: false, in_trash: false }),
       isPageUsableForDatabase: () => true,
@@ -169,13 +193,10 @@ describe("notion-sync-orchestrator kind routing", () => {
         calls.push({ op: "updateProps", req });
         return { ok: true };
       },
-      clearPageChildren: async () => {
-        calls.push({ op: "clear" });
-        return { ok: true };
-      },
-      appendChildren: async () => {
-        calls.push({ op: "append" });
-        return { ok: true };
+      appendChildren: async (_t: string, blockId: string, blocks: any[]) => {
+        calls.push({ op: "append", blockId, count: Array.isArray(blocks) ? blocks.length : 0 });
+        const results = Array.isArray(blocks) ? blocks.map((_, i) => ({ id: `${blockId}_c_${i}` })) : [];
+        return { ok: true, results };
       },
       messagesToBlocks: () => [{ kind: "blocks", count: 1 }]
     };
@@ -193,7 +214,7 @@ describe("notion-sync-orchestrator kind routing", () => {
     const res = await orchestrator.syncConversations({ conversationIds: [1], instanceId: "i" });
     expect(res.okCount).toBe(1);
     expect(res.results[0].mode).toBe("rebuilt");
-    expect(calls.some((c) => c.op === "clear")).toBe(true);
+    expect(calls.some((c) => c.op === "fetch" && c.req?.method === "DELETE")).toBe(true);
     expect(calls.some((c) => c.op === "append")).toBe(true);
   });
 });

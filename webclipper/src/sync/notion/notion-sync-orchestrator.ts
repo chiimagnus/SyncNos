@@ -865,12 +865,16 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 		            currentStage: "uploading_message_blocks",
 		          });
 
-	          trace.mark("update page properties");
-	          // eslint-disable-next-line no-await-in-loop
-	          await notionSyncService.updatePageProperties(token.accessToken, {
-	            pageId,
-	            properties: pageSpec.buildUpdateProperties(convo),
-	          });
+	          const desiredProperties = pageSpec.buildUpdateProperties(convo);
+	          const needsPropertyUpdate = pagePropertiesNeedUpdate(existingPage, desiredProperties);
+	          if (needsPropertyUpdate) {
+	            trace.mark("update page properties");
+	            // eslint-disable-next-line no-await-in-loop
+	            await notionSyncService.updatePageProperties(token.accessToken, {
+	              pageId,
+	              properties: desiredProperties,
+	            });
+	          }
 
 				const layout = layoutSpecForConversationKind(kind.id);
 	          const articleSection = (layout.sections || []).find((s) => s && String(s.id) === "article");
@@ -1116,12 +1120,18 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 		            });
 		          }
 
+	          const resultMode = shouldUpdateArticle || shouldUpdateComments
+	            ? "rebuilt"
+	            : needsPropertyUpdate
+	              ? "updated_properties"
+	              : "no_changes";
+
 	          setResultAt(index, {
 	            conversationId: id,
 	            conversationTitle,
 	            ok: true,
 	            notionPageId: pageId,
-	            mode: shouldUpdateArticle || shouldUpdateComments ? "rebuilt" : "no_changes",
+	            mode: resultMode,
 	            appended: 0,
 	            warnings,
 	            ...(shouldUpdateComments
@@ -1135,7 +1145,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              : null),
 	          });
 	          trace.flush({
-	            mode: shouldUpdateArticle || shouldUpdateComments ? "rebuilt" : "no_changes",
+	            mode: resultMode,
 	            ok: true,
 	          });
 	          return;
