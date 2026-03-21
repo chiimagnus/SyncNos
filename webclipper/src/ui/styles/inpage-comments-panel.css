@@ -29,7 +29,7 @@
 }
 
 :host([data-variant='sidebar']) {
-  --comments-panel-body-padding-x: 16px;
+  --comments-panel-body-padding-x: 12px;
   --comments-panel-body-padding-y: 12px;
   --comments-panel-body-padding-bottom: 20px;
 
