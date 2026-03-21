@@ -17,7 +17,12 @@ import type { CommentSidebarSession } from '../../comments/sidebar/comment-sideb
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
+const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1';
 const SIDEBAR_WIDTH_DEFAULT = 370;
+const COMMENTS_SIDEBAR_WIDTH_DEFAULT = 420;
+const COMMENTS_SIDEBAR_MIN_WIDTH_PX = 340;
+const COMMENTS_SIDEBAR_MAX_WIDTH_PX = 720;
+const COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX = 360;
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -77,6 +82,8 @@ export default function AppShell() {
   function AppShellFrame() {
     useThemeMode();
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
+    const [commentsSidebarWidthPx, setCommentsSidebarWidthPx] = useState<number>(COMMENTS_SIDEBAR_WIDTH_DEFAULT);
+    const [commentsSidebarResizing, setCommentsSidebarResizing] = useState(false);
     const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
     if (!commentsSidebarSessionRef.current) {
       commentsSidebarSessionRef.current = createCommentSidebarSession();
@@ -101,6 +108,59 @@ export default function AppShell() {
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? state?.backgroundLocation ?? null : null;
     const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarSnapshot.openRequested && !showSettingsSheet;
+
+    const clampCommentsSidebarWidth = (widthPx: number) => {
+      const viewportWidth = Math.max(
+        1,
+        Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
+      );
+      const min = COMMENTS_SIDEBAR_MIN_WIDTH_PX;
+      const maxByViewport = Math.max(min, viewportWidth - COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX);
+      const max = Math.max(min, Math.min(COMMENTS_SIDEBAR_MAX_WIDTH_PX, maxByViewport));
+      return Math.round(Math.max(min, Math.min(max, Number(widthPx) || 0)));
+    };
+
+    const persistCommentsSidebarWidth = (widthPx: number) => {
+      try {
+        localStorage.setItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(widthPx)));
+      } catch (_e) {
+        // ignore
+      }
+    };
+
+    useEffect(() => {
+      try {
+        const raw = localStorage.getItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY);
+        const parsed = Number.parseFloat(String(raw || '').trim());
+        if (!Number.isFinite(parsed) || parsed <= 0) return;
+        setCommentsSidebarWidthPx(clampCommentsSidebarWidth(parsed));
+      } catch (_e) {
+        // ignore
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+      const onResize = () => {
+        setCommentsSidebarWidthPx((prev) => {
+          const next = clampCommentsSidebarWidth(prev);
+          return next === prev ? prev : next;
+        });
+      };
+      try {
+        globalThis.addEventListener?.('resize', onResize as any, { passive: true } as any);
+      } catch (_e) {
+        // ignore
+      }
+      return () => {
+        try {
+          globalThis.removeEventListener?.('resize', onResize as any);
+        } catch (_e) {
+          // ignore
+        }
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
@@ -134,6 +194,75 @@ export default function AppShell() {
       commentsSidebarSession.setQuoteText(String(quoteText || '').trim());
       commentsSidebarSession.requestOpen({ focusComposer: true, source: 'app' });
       setCommentsCollapsed(false);
+    };
+
+    const onStartResizeCommentsSidebar = (e: any) => {
+      if ((e as any).button != null && (e as any).button !== 0) return;
+      try {
+        e.preventDefault?.();
+      } catch (_e2) {
+        // ignore
+      }
+      try {
+        e.stopPropagation?.();
+      } catch (_e2) {
+        // ignore
+      }
+
+      const pointerId = Number((e as any).pointerId);
+      if (!Number.isFinite(pointerId)) return;
+
+      setCommentsSidebarResizing(true);
+
+      const stopEvent = (event: any) => {
+        try {
+          event?.preventDefault?.();
+        } catch (_e3) {
+          // ignore
+        }
+        try {
+          event?.stopPropagation?.();
+        } catch (_e3) {
+          // ignore
+        }
+      };
+
+      const onPointerMove = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        stopEvent(ev);
+        const viewportWidth = Math.max(
+          1,
+          Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
+        );
+        const nextWidth = viewportWidth - ev.clientX;
+        setCommentsSidebarWidthPx(clampCommentsSidebarWidth(nextWidth));
+      };
+
+      const onPointerUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        stopEvent(ev);
+        setCommentsSidebarResizing(false);
+        try {
+          globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
+          globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
+          globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
+        } catch (_e3) {
+          // ignore
+        }
+        setCommentsSidebarWidthPx((prev) => {
+          const clamped = clampCommentsSidebarWidth(prev);
+          persistCommentsSidebarWidth(clamped);
+          return clamped;
+        });
+      };
+
+      try {
+        globalThis.addEventListener?.('pointermove', onPointerMove as any, true);
+        globalThis.addEventListener?.('pointerup', onPointerUp as any, true);
+        globalThis.addEventListener?.('pointercancel', onPointerUp as any, true);
+      } catch (_e2) {
+        // ignore
+      }
     };
 
     useEffect(() => {
@@ -275,19 +404,47 @@ export default function AppShell() {
               </div>
 
               {showCommentsSidebar ? (
-                <div className="tw-h-full tw-min-h-0 tw-shrink-0 tw-w-[min(420px,36vw)] tw-min-w-[340px] tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
-                  <ArticleCommentsSection
-                    conversationId={Number((selectedConversation as any)?.id || 0)}
-                    canonicalUrl={canonicalUrl}
-                    quoteText={commentsSidebarSnapshot.quoteText}
-                    focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
-                    containerClassName="tw-h-full tw-min-h-0 tw-flex-1"
-                    onRequestClose={() => {
-                      commentsSidebarSession.requestClose();
-                      setCommentsCollapsed(true);
+                <>
+                  <div
+                    className="tw-group tw-relative tw-h-full tw-min-h-0 tw-shrink-0 tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]"
+                    style={{
+                      width: `${commentsSidebarWidthPx}px`,
+                      minWidth: `${COMMENTS_SIDEBAR_MIN_WIDTH_PX}px`,
                     }}
-                  />
-                </div>
+                  >
+                    <div
+                      className="tw-absolute tw-inset-y-0 tw-left-0 tw-bg-transparent tw-cursor-ew-resize"
+                      style={{
+                        width: '8px',
+                        touchAction: 'none',
+                        transform: 'translateX(-50%)',
+                      }}
+                      onPointerDown={onStartResizeCommentsSidebar}
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize comments sidebar"
+                    >
+                      <div
+                        className={[
+                          'tw-absolute tw-inset-y-0 tw-left-1/2 tw-w-px tw-bg-[var(--border)] tw-transition-opacity',
+                          commentsSidebarResizing ? 'tw-opacity-100' : 'tw-opacity-0 group-hover:tw-opacity-100',
+                        ].join(' ')}
+                        style={{ transform: 'translateX(-50%)' }}
+                      />
+                    </div>
+                    <ArticleCommentsSection
+                      conversationId={Number((selectedConversation as any)?.id || 0)}
+                      canonicalUrl={canonicalUrl}
+                      quoteText={commentsSidebarSnapshot.quoteText}
+                      focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
+                      containerClassName="tw-h-full tw-min-h-0 tw-flex-1"
+                      onRequestClose={() => {
+                        commentsSidebarSession.requestClose();
+                        setCommentsCollapsed(true);
+                      }}
+                    />
+                  </div>
+                </>
               ) : null}
             </div>
           )}
