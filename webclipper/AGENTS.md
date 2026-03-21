@@ -49,7 +49,7 @@
   - 开启后：对 `sourceType='chat'` 的后续采集尝试内联图片，失败不阻塞保存主链路。
   - 历史会话不会自动补齐；需在 detail header 手动触发 `cache-images` 工具动作回填。
   - `article` 会话不显示该工具动作。
-- 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId，不进入 Notion / Obsidian / Zip v2。
+- 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入（Zip v2 目前仍不包含）。
 - 文章评论 / 注释线程现在由 `comments/sidebar/comment-sidebar-session.ts` 统一 open / close / quote / focus / busy 语义；不要再假定存在锚点定位消息或 `inpage-comments-locate-content-handlers.ts`。
 - 安装后引导策略：`src/entrypoints/background.ts` 仅在 `details.reason === 'install'` 时自动打开 `Settings -> About`；扩展更新后不再自动弹出设置页。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
@@ -118,7 +118,7 @@
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch.ts` + `src/collectors/web/article-fetch-background-handlers.ts`
   - background 侧通过 `scriptingExecuteScript`（`src/platform/webext/scripting.ts`）注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **文章评论 / 注释线程**：`src/comments/` + `src/ui/conversations/ArticleCommentsSection.tsx`
-  - `article_comments` 是 article detail 与 inpage comments panel 的本地线程，不进入 Notion / Obsidian / Zip v2；改它时先看 storage、background handler 和 shadow panel。
+  - `article_comments` 是 article detail 与 inpage comments panel 的本地线程；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入（Zip v2 目前仍不包含）；改它时先看 storage、background handler 和 shadow panel。
 - **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
 - **UI：主题模式（共享）**：`src/ui/shared/hooks/useThemeMode.ts`

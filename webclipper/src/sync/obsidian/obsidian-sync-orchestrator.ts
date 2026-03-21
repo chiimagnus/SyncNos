@@ -8,11 +8,7 @@ import {
   createClient as createDefaultObsidianClient,
 } from './obsidian-local-rest-client.ts';
 import {
-  buildArticleBodyMarkdown as buildDefaultArticleBodyMarkdown,
-  buildObsidianCommentsMarkdown as buildDefaultObsidianCommentsMarkdown,
   buildFullNoteMarkdown as buildDefaultFullNoteMarkdown,
-  COMMENTS_HEADING as COMMENTS_HEADING_DEFAULT,
-  ARTICLE_HEADING as ARTICLE_HEADING_DEFAULT,
 } from './obsidian-markdown-writer.ts';
 import {
   buildStableNotePath as buildDefaultStableNotePath,
@@ -32,25 +28,6 @@ const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
-}
-
-function normalizeNewlines(input: unknown) {
-  return String(input || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-}
-
-function fnv1a32(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-function computeMarkdownDigest(markdown: unknown): string {
-  const normalized = normalizeNewlines(markdown).trim();
-  if (!normalized) return '';
-  return fnv1a32(normalized);
 }
 
 function stripAngleBrackets(url: unknown) {
@@ -269,20 +246,6 @@ function toCurrentConversationTitle(convo: any, conversationId: number) {
   return '';
 }
 
-function pickLocalCursor(messages: any[]) {
-  const list = Array.isArray(messages) ? messages : [];
-  if (!list.length) return { lastSyncedSequence: null, lastSyncedMessageKey: '' };
-  const last = list[list.length - 1] || {};
-  return {
-    lastSyncedSequence: Number.isFinite(Number(last.sequence)) ? Number(last.sequence) : null,
-    lastSyncedMessageKey: safeString(last.messageKey),
-    lastSyncedMessageUpdatedAt: Number.isFinite(Number(last.updatedAt))
-      ? Number(last.updatedAt)
-      : null,
-    lastSyncedAt: Date.now(),
-  };
-}
-
 function getBackgroundStorageModule() {
   return defaultBackgroundStorage;
 }
@@ -319,10 +282,6 @@ function getSyncMetadataModule() {
 
 function getMarkdownWriterModule() {
   return {
-    ARTICLE_HEADING: ARTICLE_HEADING_DEFAULT,
-    COMMENTS_HEADING: COMMENTS_HEADING_DEFAULT,
-    buildArticleBodyMarkdown: buildDefaultArticleBodyMarkdown,
-    buildObsidianCommentsMarkdown: buildDefaultObsidianCommentsMarkdown,
     buildFullNoteMarkdown: buildDefaultFullNoteMarkdown,
   };
 }
@@ -688,19 +647,9 @@ async function syncConversations({
             currentConversationTitle: currentTitle,
             currentStage: decision.mode === 'full_rebuild_rename' ? 'renaming_note' : 'writing_full_note',
           });
-          const articleMd =
-            safeString(decision?.convo?.sourceType) === 'article'
-              ? writer.buildArticleBodyMarkdown(decision.messages || [])
-              : '';
-          const commentsMd =
-            safeString(decision?.convo?.sourceType) === 'article'
-              ? writer.buildObsidianCommentsMarkdown((decision as any).comments || [])
-              : '';
           const syncnosObject = metaMod.buildSyncnosObject({
             conversation: decision.convo,
-            cursor: pickLocalCursor(decision.messages),
-            articleDigest: computeMarkdownDigest(articleMd),
-            commentsDigest: computeMarkdownDigest(commentsMd),
+            lastSyncedAt: Date.now(),
           });
           const rawMarkdown = writer.buildFullNoteMarkdown({
             conversation: decision.convo,
