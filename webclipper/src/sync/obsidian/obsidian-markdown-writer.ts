@@ -139,10 +139,11 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
   function renderThreadItems(comment: ArticleComment, depth: number): string[] {
     const lines: string[] = [];
     const text = safeString(comment?.commentText);
-    if (text) lines.push(buildBulletItem(text, depth));
+    const hasText = !!text;
+    if (hasText) lines.push(buildBulletItem(text, depth));
     const replies = byParentId.get(Number(comment?.id)) || [];
     for (const reply of replies) {
-      lines.push(...renderThreadItems(reply, depth + 1));
+      lines.push(...renderThreadItems(reply, hasText ? depth + 1 : depth));
     }
     return lines.filter((x) => !!x);
   }
