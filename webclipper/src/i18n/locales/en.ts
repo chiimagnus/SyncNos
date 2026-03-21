@@ -67,6 +67,7 @@ export const en = {
   statsAdded: 'Added',
   statsUpdated: 'Updated',
   statsMessages: 'Messages:',
+  statsComments: 'Comments:',
   statsMappings: 'Mappings:',
   statsSettingsApplied: 'Settings applied:',
 

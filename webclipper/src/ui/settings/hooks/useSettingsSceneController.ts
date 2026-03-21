@@ -629,7 +629,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         anchor.click();
 
         setExportStatus(
-          `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages})`
+          `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages}, ${t('statsComments')} ${result.counts.article_comments})`
         );
         setLastBackupExportAt(Date.parse(result.exportedAt) || Date.now());
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
