@@ -10,7 +10,7 @@ import { navIconButtonClassName } from '../../shared/nav-styles';
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
   const routerLocation = useLocation();
   const navigate = useNavigate();
-  const logoUrl = runtimeGetURL('icons/icon-48.png');
+  const logoUrl = runtimeGetURL('icons/icon-128.png');
 
   const state: any = (routerLocation as any)?.state ?? {};
   const settingsOpen = routerLocation.pathname === '/settings';
