@@ -711,6 +711,9 @@ export async function setSyncCursor(
     notionCommentsDigest?: string;
     notionArticleDigest?: string;
     notionWebArticleLayoutVersion?: number | null;
+    notionSectionCursors?: Record<string, unknown>;
+    notionSectionDigests?: Record<string, unknown>;
+    notionSections?: Record<string, unknown>;
   },
 ): Promise<true> {
   const id = Number(conversationId);
@@ -730,6 +733,23 @@ export async function setSyncCursor(
   const now = Date.now();
   const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
   if (preserved && typeof preserved === 'object') delete preserved.id;
+  const mergeNestedRecord = (prev: any, incoming: any): any | null => {
+    if (!incoming || typeof incoming !== 'object') return null;
+    const base = prev && typeof prev === 'object' ? prev : {};
+    const out: any = { ...base };
+    for (const [key, value] of Object.entries(incoming)) {
+      const k = String(key || '').trim();
+      if (!k) continue;
+      out[k] = {
+        ...((base as any)[k] && typeof (base as any)[k] === 'object' ? (base as any)[k] : {}),
+        ...(value && typeof value === 'object' ? value : {}),
+      };
+    }
+    return out;
+  };
+  const mergedNotionSections = mergeNestedRecord(preserved.notionSections, input?.notionSections);
+  const mergedNotionSectionCursors = mergeNestedRecord(preserved.notionSectionCursors, input?.notionSectionCursors);
+  const mergedNotionSectionDigests = mergeNestedRecord(preserved.notionSectionDigests, input?.notionSectionDigests);
   const payload: any = withOptionalId(existing && existing.id, {
     ...preserved,
     source,
@@ -758,6 +778,9 @@ export async function setSyncCursor(
       : Number.isFinite(Number(existing?.notionWebArticleLayoutVersion))
         ? Number(existing?.notionWebArticleLayoutVersion)
         : null,
+    ...(mergedNotionSections ? { notionSections: mergedNotionSections } : null),
+    ...(mergedNotionSectionCursors ? { notionSectionCursors: mergedNotionSectionCursors } : null),
+    ...(mergedNotionSectionDigests ? { notionSectionDigests: mergedNotionSectionDigests } : null),
     updatedAt: now,
   });
   if (existing) await reqToPromise(stores.sync_mappings.put(payload));

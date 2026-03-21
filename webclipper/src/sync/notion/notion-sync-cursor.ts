@@ -7,14 +7,25 @@ export type NotionSyncCursor = {
 
 export function extractCursor(
   mapping: unknown,
+  sectionId?: string | null,
 ): Pick<NotionSyncCursor, 'lastSyncedMessageKey' | 'lastSyncedSequence' | 'lastSyncedMessageUpdatedAt'> {
   const m = mapping && typeof mapping === 'object' ? (mapping as any) : {};
+  const sectionKey = sectionId && String(sectionId).trim() ? String(sectionId).trim() : '';
+  const section =
+    sectionKey &&
+    m.notionSectionCursors &&
+    typeof m.notionSectionCursors === 'object' &&
+    (m.notionSectionCursors as any)[sectionKey] &&
+    typeof (m.notionSectionCursors as any)[sectionKey] === 'object'
+      ? (m.notionSectionCursors as any)[sectionKey]
+      : null;
+  const base = section || m;
   const lastSyncedMessageKey =
-    m.lastSyncedMessageKey && String(m.lastSyncedMessageKey).trim()
-      ? String(m.lastSyncedMessageKey).trim()
+    base.lastSyncedMessageKey && String(base.lastSyncedMessageKey).trim()
+      ? String(base.lastSyncedMessageKey).trim()
       : '';
-  const lastSyncedSequence = Number(m.lastSyncedSequence);
-  const lastSyncedMessageUpdatedAt = Number(m.lastSyncedMessageUpdatedAt);
+  const lastSyncedSequence = Number(base.lastSyncedSequence);
+  const lastSyncedMessageUpdatedAt = Number(base.lastSyncedMessageUpdatedAt);
   const seq = Number.isFinite(lastSyncedSequence) ? lastSyncedSequence : null;
   return {
     lastSyncedMessageKey,

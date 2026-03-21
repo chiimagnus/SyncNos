@@ -660,9 +660,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         trace.mark("ensure database");
         let dbId = await ensureDbForKind(kind);
 
-        // eslint-disable-next-line no-await-in-loop
-        const messages = await storage.getMessagesByConversationId(id);
-        const cursor = extractCursor(mapping);
+	        // eslint-disable-next-line no-await-in-loop
+	        const messages = await storage.getMessagesByConversationId(id);
+	        const cursorSectionId = kind && kind.id === "chat" ? "conversations" : null;
+	        const cursor = extractCursor(mapping, cursorSectionId);
 
         let pageId = "";
         if (mapping && mapping.notionPageId) pageId = String(mapping.notionPageId || "");
@@ -854,18 +855,46 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	            });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
-	            await storage.setSyncCursor(id, {
-	              ...nextCursor,
-		              ...(isWebArticleConversation(convo)
+		            await storage.setSyncCursor(id, {
+		              ...nextCursor,
+		              ...(!isWebArticleConversation(convo)
 		                ? {
-		                  notionWebArticleLayoutVersion: 2,
-		                  ...(typeof webArticleDigest === 'string' ? { notionArticleDigest: webArticleDigest } : null),
-		                  ...(typeof webArticleCommentsDigest === 'string'
-		                    ? { notionCommentsDigest: webArticleCommentsDigest }
-		                    : null),
+		                  notionSectionCursors: {
+		                    conversations: {
+		                      lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+		                      lastSyncedSequence: nextCursor.lastSyncedSequence,
+		                      lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
+		                    },
+		                  },
 		                }
 		                : null),
-	            });
+			              ...(isWebArticleConversation(convo)
+			                ? {
+			                  notionWebArticleLayoutVersion: 2,
+			                  ...(typeof webArticleDigest === 'string' ? { notionArticleDigest: webArticleDigest } : null),
+			                  ...(typeof webArticleCommentsDigest === 'string'
+			                    ? { notionCommentsDigest: webArticleCommentsDigest }
+			                    : null),
+			                  ...(typeof webArticleDigest === 'string' || typeof webArticleCommentsDigest === 'string'
+			                    ? {
+			                      notionSectionDigests: {
+			                        ...(typeof webArticleDigest === 'string'
+			                          ? { article: { digest: String(webArticleDigest || ''), lastSyncedAt: Date.now() } }
+			                          : null),
+			                        ...(typeof webArticleCommentsDigest === 'string'
+			                          ? {
+			                            comments: {
+			                              digest: String(webArticleCommentsDigest || ''),
+			                              lastSyncedAt: Date.now(),
+			                            },
+			                          }
+			                          : null),
+			                      },
+			                    }
+			                    : null),
+			                }
+			                : null),
+		            });
 	          }
 	          setResultAt(index, {
             conversationId: id,
@@ -914,7 +943,17 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	          } catch (_e) {
 	            articleDigest = null;
 	          }
-	          const prevArticleDigest = mapping ? String(mapping.notionArticleDigest || "") : "";
+	          const prevArticleDigest =
+	            mapping &&
+	            mapping.notionSectionDigests &&
+	            typeof mapping.notionSectionDigests === "object" &&
+	            (mapping.notionSectionDigests as any).article &&
+	            typeof (mapping.notionSectionDigests as any).article === "object" &&
+	            (mapping.notionSectionDigests as any).article.digest != null
+	              ? String((mapping.notionSectionDigests as any).article.digest || "")
+	              : mapping
+	                ? String(mapping.notionArticleDigest || "")
+	                : "";
 	          const shouldUpdateArticle = typeof articleDigest === "string" && String(articleDigest || "") !== prevArticleDigest;
 
 	          let articleComments: any[] = [];
@@ -941,7 +980,17 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              commentsDigest = null;
 	            }
 	          }
-	          const prevCommentsDigest = mapping ? String(mapping.notionCommentsDigest || "") : "";
+	          const prevCommentsDigest =
+	            mapping &&
+	            mapping.notionSectionDigests &&
+	            typeof mapping.notionSectionDigests === "object" &&
+	            (mapping.notionSectionDigests as any).comments &&
+	            typeof (mapping.notionSectionDigests as any).comments === "object" &&
+	            (mapping.notionSectionDigests as any).comments.digest != null
+	              ? String((mapping.notionSectionDigests as any).comments.digest || "")
+	              : mapping
+	                ? String(mapping.notionCommentsDigest || "")
+	                : "";
 	          const shouldUpdateComments =
 	            typeof commentsDigest === "string" && String(commentsDigest || "") !== prevCommentsDigest;
 
@@ -1115,13 +1164,25 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	            });
 	            trace.mark("save cursor");
 	            // eslint-disable-next-line no-await-in-loop
-	            await storage.setSyncCursor(id, {
-	              ...nextCursor,
-	              notionWebArticleLayoutVersion: 2,
-	              ...(typeof articleDigest === "string" ? { notionArticleDigest: String(articleDigest || "") } : null),
-	              ...(typeof commentsDigest === "string" ? { notionCommentsDigest: String(commentsDigest || "") } : null),
-	            });
-	          }
+		            await storage.setSyncCursor(id, {
+		              ...nextCursor,
+		              notionWebArticleLayoutVersion: 2,
+		              ...(typeof articleDigest === "string" ? { notionArticleDigest: String(articleDigest || "") } : null),
+		              ...(typeof commentsDigest === "string" ? { notionCommentsDigest: String(commentsDigest || "") } : null),
+		              ...(typeof articleDigest === "string" || typeof commentsDigest === "string"
+		                ? {
+		                  notionSectionDigests: {
+		                    ...(typeof articleDigest === "string"
+		                      ? { article: { digest: String(articleDigest || ""), lastSyncedAt: Date.now() } }
+		                      : null),
+		                    ...(typeof commentsDigest === "string"
+		                      ? { comments: { digest: String(commentsDigest || ""), lastSyncedAt: Date.now() } }
+		                      : null),
+		                  },
+		                }
+		                : null),
+		            });
+		          }
 
 	          setResultAt(index, {
 	            conversationId: id,
@@ -1523,12 +1584,23 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
-            await storage.setSyncCursor(id, {
-              ...nextCursor,
-		              ...(isWebArticleConversation(convo)
-		                ? {
-		                  notionWebArticleLayoutVersion: 2,
-		                  ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
+	            await storage.setSyncCursor(id, {
+	              ...nextCursor,
+	              ...(!isWebArticleConversation(convo)
+	                ? {
+	                  notionSectionCursors: {
+	                    conversations: {
+	                      lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+	                      lastSyncedSequence: nextCursor.lastSyncedSequence,
+	                      lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
+	                    },
+	                  },
+	                }
+	                : null),
+			              ...(isWebArticleConversation(convo)
+			                ? {
+			                  notionWebArticleLayoutVersion: 2,
+			                  ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
 		                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
 		                }
 		                : null),
@@ -1773,10 +1845,19 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentConversationTitle: toCurrentConversationTitle(convo, id),
               currentStage: "saving_sync_cursor"
             });
-            trace.mark("save cursor");
-            // eslint-disable-next-line no-await-in-loop
-            await storage.setSyncCursor(id, nextCursor);
-          }
+	            trace.mark("save cursor");
+	            // eslint-disable-next-line no-await-in-loop
+	            await storage.setSyncCursor(id, {
+	              ...nextCursor,
+	              notionSectionCursors: {
+	                conversations: {
+	                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+	                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+	                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
+	                },
+	              },
+	            });
+	          }
           setResultAt(index, {
             conversationId: id,
             conversationTitle,
@@ -1811,11 +1892,20 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
           }
           const nextCursor = lastMessageCursor(messages);
-          if (storage.setSyncCursor && inc && inc.ok) {
-            trace.mark("save cursor");
-            // eslint-disable-next-line no-await-in-loop
-            await storage.setSyncCursor(id, nextCursor);
-          }
+	          if (storage.setSyncCursor && inc && inc.ok) {
+	            trace.mark("save cursor");
+	            // eslint-disable-next-line no-await-in-loop
+	            await storage.setSyncCursor(id, {
+	              ...nextCursor,
+	              notionSectionCursors: {
+	                conversations: {
+	                  lastSyncedMessageKey: nextCursor.lastSyncedMessageKey,
+	                  lastSyncedSequence: nextCursor.lastSyncedSequence,
+	                  lastSyncedMessageUpdatedAt: nextCursor.lastSyncedMessageUpdatedAt,
+	                },
+	              },
+	            });
+	          }
           setResultAt(index, {
             conversationId: id,
             conversationTitle,
