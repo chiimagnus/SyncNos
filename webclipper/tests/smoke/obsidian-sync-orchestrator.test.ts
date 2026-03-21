@@ -131,7 +131,7 @@ describe("obsidian-sync-orchestrator", () => {
     expect(syncRes.results[0].ok).toBe(true);
   });
 
-  it("decides incremental append when remote has cursor and there are new messages", async () => {
+	  it("decides incremental append when remote has cursor and there are new messages", async () => {
     setupChromeStorage();
     const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -154,20 +154,20 @@ describe("obsidian-sync-orchestrator", () => {
 
     const calls: any[] = [];
     // @ts-expect-error test global
-    globalThis.fetch = async (_url: any, init: any) => {
-      calls.push({ url: _url, init });
-      const method = String(init?.method || "GET").toUpperCase();
-      if (method === "GET") {
-        return new Response(JSON.stringify({
-          frontmatter: {
-            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
-          },
-          content: "x"
-        }), { status: 200, headers: { "content-type": "application/json" } });
-      }
-      if (method === "PATCH") {
-        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-      }
+	    globalThis.fetch = async (_url: any, init: any) => {
+	      calls.push({ url: _url, init });
+	      const method = String(init?.method || "GET").toUpperCase();
+	      if (method === "GET") {
+	        return new Response(JSON.stringify({
+	          frontmatter: {
+	            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
+	          },
+	          content: "# Conversations\n\n## 1 assistant\n\nhi\n"
+	        }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
+	      if (method === "PATCH") {
+	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
@@ -181,7 +181,7 @@ describe("obsidian-sync-orchestrator", () => {
     expect(status.job?.status).toBe("done");
   });
 
-  it("replaces Article/Comments sections when remote sections diverge (no new messages)", async () => {
+	  it("replaces Article/Comments sections when remote sections diverge (no new messages)", async () => {
     setupChromeStorage();
     const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
     await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
@@ -216,15 +216,22 @@ describe("obsidian-sync-orchestrator", () => {
     const articleDigest = computeDigest(localArticleMd);
     const commentsDigest = computeDigest(localCommentsMd);
 
-    let patchCount = 0;
-    // @ts-expect-error test global
-    globalThis.fetch = async (_url: any, init: any) => {
-      const method = String(init?.method || "GET").toUpperCase();
-      if (method === "GET") {
-        return new Response(
-          JSON.stringify({
-            frontmatter: {
-              syncnos: {
+	    let patchCount = 0;
+	    let putCount = 0;
+	    const remoteMarkdown = `# t\n\n## Article\n\n\n## Comments\n\n`;
+	    // @ts-expect-error test global
+	    globalThis.fetch = async (_url: any, init: any) => {
+	      const method = String(init?.method || "GET").toUpperCase();
+	      const headers = init?.headers as Headers;
+	      const accept = headers?.get("Accept") || "";
+	      if (method === "GET") {
+	        if (accept.includes("text/markdown")) {
+	          return new Response(remoteMarkdown, { status: 200, headers: { "content-type": "text/markdown" } });
+	        }
+	        return new Response(
+	          JSON.stringify({
+	            frontmatter: {
+	              syncnos: {
                 source: "goodlinks",
                 conversationKey: "k1",
                 schemaVersion: 1,
@@ -235,26 +242,31 @@ describe("obsidian-sync-orchestrator", () => {
                 commentsDigest,
               },
             },
-            // headings exist but bodies are empty (remote divergence)
-            content: `# t\n\n## Article\n\n\n## Comments\n\n`,
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
-      }
-      if (method === "PATCH") {
-        patchCount += 1;
-        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-      }
-      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
-    };
+	            // headings exist but bodies are empty (remote divergence)
+	            content: remoteMarkdown,
+	          }),
+	          { status: 200, headers: { "content-type": "application/json" } },
+	        );
+	      }
+	      if (method === "PATCH") {
+	        patchCount += 1;
+	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
+	      if (method === "PUT") {
+	        putCount += 1;
+	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
+	      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+	    };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
-    expect(syncRes.results[0].ok).toBe(true);
-    expect(syncRes.results[0].mode).toBe("sections_replace");
-    // Article replace + Comments replace + frontmatter replace
-    expect(patchCount).toBe(3);
-  });
+	    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+	    expect(syncRes.results[0].ok).toBe(true);
+	    expect(syncRes.results[0].mode).toBe("sections_replace");
+	    expect(putCount).toBe(1);
+	    // frontmatter replace
+	    expect(patchCount).toBe(1);
+	  });
 
   it("falls back to full rebuild when cursor updatedAt mismatches local history", async () => {
     setupChromeStorage();
@@ -301,14 +313,14 @@ describe("obsidian-sync-orchestrator", () => {
     expect(syncRes.results[0].mode).toBe("full_rebuild");
   });
 
-  it("falls back to full rebuild when PATCH fails with PatchFailed (non-dedup)", async () => {
-    setupChromeStorage();
-    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
-    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
-    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
+	  it("forces full rebuild when remote chat note uses legacy SyncNos::Messages heading", async () => {
+	    setupChromeStorage();
+	    const settingsStore = await loadModule("../../src/sync/obsidian/settings-store.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-note-path.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+	    await loadModule("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+	    const orch = await loadModule("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
       id: 1,
@@ -317,39 +329,43 @@ describe("obsidian-sync-orchestrator", () => {
       conversationKey: "k1",
       title: "t",
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
-      { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
-      { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
-    ]);
+	    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+	      { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+	      { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 },
+	    ]);
 
-    let patchCount = 0;
-    // @ts-expect-error test global
-    globalThis.fetch = async (_url: any, init: any) => {
-      const method = String(init?.method || "GET").toUpperCase();
-      if (method === "GET") {
-        return new Response(JSON.stringify({
-          frontmatter: {
-            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1", lastSyncedMessageUpdatedAt: 1 }
-          },
-          content: "x"
-        }), { status: 200, headers: { "content-type": "application/json" } });
-      }
-      if (method === "PATCH") {
-        patchCount += 1;
-        return new Response(JSON.stringify({ errorCode: 40080, message: "PatchFailed: something else" }), { status: 400, headers: { "content-type": "application/json" } });
-      }
-      if (method === "PUT") {
-        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
-      }
-      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
-    };
+	    let patchCount = 0;
+	    let putBody = "";
+	    // @ts-expect-error test global
+	    globalThis.fetch = async (_url: any, init: any) => {
+	      const method = String(init?.method || "GET").toUpperCase();
+	      if (method === "GET") {
+	        return new Response(JSON.stringify({
+	          frontmatter: {
+	            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1", lastSyncedMessageUpdatedAt: 1 }
+	          },
+	          content: "# t\n\n## SyncNos::Messages\n\n#### 1 assistant m1\n\nhi\n"
+	        }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
+	      if (method === "PATCH") {
+	        patchCount += 1;
+	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
+	      if (method === "PUT") {
+	        putBody = String(init?.body || "");
+	        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+	      }
+	      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+	    };
 
-    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
-    expect(patchCount).toBe(1);
-    expect(syncRes.results[0].ok).toBe(true);
-    expect(syncRes.results[0].mode).toBe("full_rebuild_fallback");
-  });
+	    await settingsStore.saveObsidianSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+	    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+	    expect(syncRes.results[0].ok).toBe(true);
+	    expect(syncRes.results[0].mode).toBe("full_rebuild");
+	    expect(patchCount).toBe(0);
+	    expect(putBody).toContain("# Conversations");
+	    expect(putBody).toContain("## 1 assistant");
+	  });
 
   it("renames note when title changes by rebuilding new file and deleting old file", async () => {
     setupChromeStorage();

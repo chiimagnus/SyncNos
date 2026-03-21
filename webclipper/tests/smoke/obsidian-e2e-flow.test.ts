@@ -69,6 +69,7 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     // Remote state
     let remoteExists = false;
     let remoteFrontmatter: any = null;
+    let remoteContent = "";
     let appendDedupOnce = false;
     let authFail = false;
 
@@ -84,11 +85,12 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
         if (!remoteExists) {
           return new Response(JSON.stringify({ errorCode: 40400, message: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
         }
-        return new Response(JSON.stringify({ frontmatter: remoteFrontmatter || {}, content: "x" }), { status: 200, headers: { "content-type": "application/json" } });
+        return new Response(JSON.stringify({ frontmatter: remoteFrontmatter || {}, content: remoteContent || "" }), { status: 200, headers: { "content-type": "application/json" } });
       }
 
       if (method === "PUT") {
         remoteExists = true;
+        remoteContent = String(init?.body || "");
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
       }
 
@@ -96,11 +98,12 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
         const headers = init?.headers as Headers;
         const targetType = headers?.get("Target-Type") || "";
         const target = headers?.get("Target") || "";
-        if (targetType === "heading" && target === "SyncNos::Messages") {
+        if (targetType === "heading" && target === "Conversations") {
           if (appendDedupOnce) {
             appendDedupOnce = false;
             return new Response(JSON.stringify({ errorCode: 40080, message: "content-already-preexists-in-target" }), { status: 400, headers: { "content-type": "application/json" } });
           }
+          remoteContent = (remoteContent || "") + String(init?.body || "");
           return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
         }
         if (targetType === "frontmatter" && target === "syncnos") {

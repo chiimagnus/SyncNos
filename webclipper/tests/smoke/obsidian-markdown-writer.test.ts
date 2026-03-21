@@ -15,8 +15,8 @@ describe("obsidian-markdown-writer", () => {
     });
     expect(md).toContain("---");
     expect(md).toContain("syncnos:");
-    expect(md).toContain(`## ${w.MESSAGES_HEADING}`);
-    expect(md).toContain("#### 1 assistant m1");
+    expect(md).toContain(`# ${w.MESSAGES_HEADING}`);
+    expect(md).toContain("## 1 assistant");
     expect(md).toContain("hi");
   });
 

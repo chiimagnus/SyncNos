@@ -1,6 +1,6 @@
 import type { ArticleComment } from '../../comments/domain/models';
 
-const MESSAGES_HEADING = 'SyncNos::Messages';
+const MESSAGES_HEADING = 'Conversations';
 const ARTICLE_HEADING = 'Article';
 const COMMENTS_HEADING = 'Comments';
 
@@ -133,7 +133,7 @@ function buildMessageChunk(message: any) {
   const key = safeString(m.messageKey) || '';
   const role = normalizeRole(m.role);
   const body = safeString(m.contentMarkdown) || safeString(m.contentText) || '';
-  const header = `#### ${seq} ${role} ${key}`.trim();
+  const header = `## ${seq} ${role}`.trim();
   return `${header}\n\n${body}\n\n`;
 }
 
@@ -258,11 +258,10 @@ function buildFullNoteMarkdown({
     syncnos: syncnosObject || null,
   };
 
-  const headerLines = [`# ${title}`];
-  if (url) headerLines.push(`Source URL: ${url}`);
-
   const isArticle = sourceType === 'article';
   if (isArticle) {
+    const headerLines = [`# ${title}`];
+    if (url) headerLines.push(`Source URL: ${url}`);
     const articleMd = buildArticleBodyMarkdown(messages || []);
     const commentsMd = buildObsidianCommentsMarkdown(comments || []);
     const sections: string[] = [];
@@ -273,8 +272,7 @@ function buildFullNoteMarkdown({
   const messagesMd = buildMessagesMarkdown(messages || []);
   return (
     buildFrontmatterBlock(frontmatter) +
-    `${headerLines.join('\n')}\n\n` +
-    `## ${MESSAGES_HEADING}\n\n` +
+    `# ${MESSAGES_HEADING}\n\n` +
     messagesMd
   );
 }

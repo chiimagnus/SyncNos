@@ -35,6 +35,7 @@ import { getImageCacheAssetById } from '../../conversations/data/image-cache-rea
 
 const SYNC_PROVIDER = 'obsidian';
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
+const LEGACY_CHAT_HEADING = 'SyncNos::Messages';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -57,6 +58,25 @@ function computeMarkdownDigest(markdown: unknown): string {
   const normalized = normalizeNewlines(markdown).trim();
   if (!normalized) return '';
   return fnv1a32(normalized);
+}
+
+function countHeadingLines(content: unknown, headingLevel: number, headingText: string) {
+  const src = normalizeNewlines(content);
+  if (!src) return 0;
+  const hashes = '#'.repeat(Math.max(1, Math.min(6, headingLevel)));
+  const re = new RegExp(`^${escapeRegExp(hashes)}\\s+${escapeRegExp(safeString(headingText))}\\s*$`);
+  return src
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => re.test(line)).length;
+}
+
+function isLegacyChatMarkdown(noteContent: unknown) {
+  const src = normalizeNewlines(noteContent);
+  if (!src) return true;
+  if (src.includes(LEGACY_CHAT_HEADING)) return true;
+  const conversationsCount = countHeadingLines(src, 1, 'Conversations');
+  return conversationsCount !== 1;
 }
 
 function escapeRegExp(input: string) {
@@ -643,6 +663,13 @@ async function decideSyncModeForConversation({
     safeString(parsedData.conversationKey) !== safeString(convo.conversationKey)
   ) {
     return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
+  }
+
+  if (!isArticle) {
+    const noteContent = note ? (note as any).content : '';
+    if (isLegacyChatMarkdown(noteContent)) {
+      return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
+    }
   }
 
   const delta = computeDelta(messages, parsedData);
