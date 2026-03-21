@@ -255,13 +255,11 @@ function buildFullNoteMarkdown({
 
   const isArticle = sourceType === 'article';
   if (isArticle) {
-    const headerLines = [`# ${title}`];
-    if (url) headerLines.push(`Source URL: ${url}`);
     const articleMd = buildArticleBodyMarkdown(messages || []);
     const commentsMd = buildObsidianCommentsMarkdown(comments || []);
     const sections: string[] = [];
     sections.push(`## ${ARTICLE_HEADING}`, '', articleMd || '', '', `## ${COMMENTS_HEADING}`, '', commentsMd || '');
-    return buildFrontmatterBlock(frontmatter) + `${headerLines.join('\n')}\n\n` + `${sections.join('\n').trim()}\n`;
+    return buildFrontmatterBlock(frontmatter) + `${sections.join('\n').trim()}\n`;
   }
 
   const messagesMd = buildMessagesMarkdown(messages || []);
