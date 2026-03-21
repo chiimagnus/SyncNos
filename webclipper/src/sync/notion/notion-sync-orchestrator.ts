@@ -1185,10 +1185,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              : null;
 	          const lastSyncedUpdatedAt = Number(cursorInSection && (cursorInSection.lastSyncedMessageUpdatedAt as any));
 	          const lastSyncedAt = Number(mapping && (mapping.lastSyncedAt as any));
-	          const baseline = Number.isFinite(lastSyncedUpdatedAt)
-	            ? lastSyncedUpdatedAt
-	            : Number.isFinite(lastSyncedAt)
-	              ? lastSyncedAt
+	          // Prefer sync-time baseline to avoid endless rebuilds when earlier messages are edited.
+	          const baseline = Number.isFinite(lastSyncedAt)
+	            ? lastSyncedAt
+	            : Number.isFinite(lastSyncedUpdatedAt)
+	              ? lastSyncedUpdatedAt
 	              : 0;
 	          if (maxUpdatedAt > baseline) shouldRebuild = true;
 	        }
