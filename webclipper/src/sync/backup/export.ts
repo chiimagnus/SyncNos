@@ -15,6 +15,7 @@ type AnyRecord = Record<string, any>;
 
 const IMAGE_CACHE_INDEX_PATH = 'assets/image-cache/index.json';
 const IMAGE_CACHE_BLOBS_PREFIX = 'assets/image-cache/blobs/';
+const ARTICLE_COMMENTS_INDEX_PATH = 'assets/article-comments/index.json';
 
 function sanitizeZipPathPart(input: unknown, fallback: string) {
   const text = String(input || '').trim();
@@ -159,16 +160,23 @@ export type BackupZipV2ExportResult = {
   filename: string;
   blob: Blob;
   exportedAt: string;
-  counts: { conversations: number; messages: number; sync_mappings: number };
+  counts: {
+    conversations: number;
+    messages: number;
+    sync_mappings: number;
+    image_cache: number;
+    article_comments: number;
+  };
 };
 
 export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readonly');
+  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'], 'readonly');
   const conversations = (await reqToPromise(stores.conversations.getAll() as any)) as AnyRecord[];
   const messages = (await reqToPromise(stores.messages.getAll() as any)) as AnyRecord[];
   const syncMappings = (await reqToPromise(stores.sync_mappings.getAll() as any)) as AnyRecord[];
   const imageCache = (await reqToPromise(stores.image_cache.getAll() as any)) as AnyRecord[];
+  const articleComments = (await reqToPromise(stores.article_comments.getAll() as any)) as AnyRecord[];
   await txDone(t);
 
   const rawStorage = await storageGetAll();
@@ -181,6 +189,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const allMessages = Array.isArray(messages) ? messages : [];
   const allMappings = Array.isArray(syncMappings) ? syncMappings : [];
   const allImageCache = Array.isArray(imageCache) ? imageCache : [];
+  const allArticleComments = Array.isArray(articleComments) ? articleComments : [];
 
   const messagesByConversationId = new Map<number, AnyRecord[]>();
   for (const m of allMessages) {
@@ -372,6 +381,48 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     lastModified: exportedAt,
   });
 
+  const articleCommentItems: AnyRecord[] = [];
+  for (const row of allArticleComments) {
+    const commentId = Number(row && (row as any).id);
+    if (!Number.isFinite(commentId) || commentId <= 0) continue;
+    const parentRaw = Number(row && (row as any).parentId);
+    const parentCommentId = Number.isFinite(parentRaw) && parentRaw > 0 ? parentRaw : null;
+
+    const conversationIdRaw = Number(row && (row as any).conversationId);
+    const uniqueKey =
+      Number.isFinite(conversationIdRaw) && conversationIdRaw > 0
+        ? uniqueKeyByConversationId.get(conversationIdRaw) || ''
+        : '';
+
+    const canonicalUrl = row && (row as any).canonicalUrl ? String((row as any).canonicalUrl).trim() : '';
+    if (!canonicalUrl) continue;
+
+    const quoteText = row && (row as any).quoteText ? String((row as any).quoteText) : '';
+    const commentText = row && (row as any).commentText ? String((row as any).commentText).trim() : '';
+    if (!commentText) continue;
+
+    const createdAt = Number(row && (row as any).createdAt) || 0;
+    const updatedAt = Number(row && (row as any).updatedAt) || createdAt || 0;
+
+    articleCommentItems.push({
+      commentId,
+      parentCommentId,
+      uniqueKey,
+      canonicalUrl,
+      quoteText,
+      commentText,
+      createdAt,
+      updatedAt,
+    });
+  }
+
+  const articleCommentsIndexDoc = { schemaVersion: 1, comments: articleCommentItems };
+  files.push({
+    name: ARTICLE_COMMENTS_INDEX_PATH,
+    data: JSON.stringify(articleCommentsIndexDoc, null, 2),
+    lastModified: exportedAt,
+  });
+
   const manifest = {
     backupSchemaVersion: BACKUP_ZIP_SCHEMA_VERSION,
     exportedAt,
@@ -381,11 +432,12 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
       messages: allMessages.length,
       sync_mappings: allMappings.length,
       image_cache: imageCacheAssets.length,
+      article_comments: articleCommentItems.length,
     },
     config: { storageLocalPath: 'config/storage-local.json' },
     index: { conversationsCsvPath: 'sources/conversations.csv' },
     sources: manifestSources,
-    assets: { imageCacheIndexPath: IMAGE_CACHE_INDEX_PATH },
+    assets: { imageCacheIndexPath: IMAGE_CACHE_INDEX_PATH, articleCommentsIndexPath: ARTICLE_COMMENTS_INDEX_PATH },
   };
   files.unshift({
     name: 'manifest.json',

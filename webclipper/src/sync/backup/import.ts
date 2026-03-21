@@ -2,6 +2,7 @@ import { storageSet } from '../../platform/storage/local';
 import {
   filterStorageForBackup,
   validateImageCacheIndexDocument,
+  validateArticleCommentsIndexDocument,
   mergeConversationRecord,
   mergeMessageRecord,
   mergeSyncMappingRecord,
@@ -76,6 +77,9 @@ export type ImportStats = {
   messagesSkipped: number;
   mappingsAdded: number;
   mappingsUpdated: number;
+  commentsAdded: number;
+  commentsUpdated: number;
+  commentsSkipped: number;
   settingsApplied: number;
 };
 
@@ -100,8 +104,47 @@ function makeStats(): ImportStats {
     messagesSkipped: 0,
     mappingsAdded: 0,
     mappingsUpdated: 0,
+    commentsAdded: 0,
+    commentsUpdated: 0,
+    commentsSkipped: 0,
     settingsApplied: 0,
   };
+}
+
+function safeString(value: unknown): string {
+  return String(value == null ? '' : value).trim();
+}
+
+function normalizeHttpUrl(raw: unknown): string {
+  const text = safeString(raw);
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = safeString(url.protocol).toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
+
+function commentBaseKey(input: {
+  canonicalUrl: string;
+  createdAt: number;
+  quoteText: string;
+  commentText: string;
+}): string {
+  return [
+    safeString(input.canonicalUrl),
+    String(Number(input.createdAt) || 0),
+    String(input.quoteText || ''),
+    String(input.commentText || ''),
+  ].join('||');
+}
+
+function commentFingerprint(input: { baseKey: string; parentBaseKey: string }): string {
+  return `${input.baseKey}||parent=${input.parentBaseKey || ''}`;
 }
 
 export async function importBackupLegacyJsonMerge(
@@ -346,6 +389,21 @@ export async function importBackupZipV2Merge(
   const imageCacheAssets: AnyRecord[] =
     imageCacheIndexDoc && Array.isArray((imageCacheIndexDoc as any).assets) ? (imageCacheIndexDoc as any).assets : [];
 
+  const articleCommentsIndexPath =
+    manifest && (manifest as any).assets ? String((manifest as any).assets.articleCommentsIndexPath || '').trim() : '';
+  const articleCommentsDeclared = Boolean(articleCommentsIndexPath);
+  const articleCommentsMissing = articleCommentsDeclared && !entries.has(articleCommentsIndexPath);
+  const articleCommentsIndexDoc =
+    articleCommentsIndexPath && !articleCommentsMissing ? readJsonEntry(entries, articleCommentsIndexPath) : null;
+  if (articleCommentsIndexDoc) {
+    const commentsValidation = validateArticleCommentsIndexDocument(articleCommentsIndexDoc);
+    if (!commentsValidation.ok) throw new Error(commentsValidation.error || 'Invalid article comments index');
+  }
+  const articleCommentItems: AnyRecord[] =
+    articleCommentsIndexDoc && Array.isArray((articleCommentsIndexDoc as any).comments)
+      ? (articleCommentsIndexDoc as any).comments
+      : [];
+
   const incomingConversations: AnyRecord[] = [];
   const messagesByUniqueKey = new Map<string, AnyRecord[]>();
   const incomingMappings: AnyRecord[] = [];
@@ -431,7 +489,13 @@ export async function importBackupZipV2Merge(
   const stats = makeStats();
   const progress: ImportProgress = {
     done: 0,
-    total: incomingConversations.length + totalMessages + incomingMappings.length + settingsKeys.length + imageCacheAssets.length,
+    total:
+      incomingConversations.length +
+      totalMessages +
+      incomingMappings.length +
+      settingsKeys.length +
+      imageCacheAssets.length +
+      articleCommentItems.length,
     stage: '',
   };
   const report = () => onProgress?.({ ...progress });
@@ -443,7 +507,7 @@ export async function importBackupZipV2Merge(
   const db = await openDb();
   const uniqueToLocalId = new Map<string, number>();
 
-  // 1) Upsert conversations by (source, conversationKey).
+	  // 1) Upsert conversations by (source, conversationKey).
   {
     const { t, stores: s } = tx(db, ['conversations'], 'readwrite');
     const idx = s.conversations.index('by_source_conversationKey');
@@ -481,6 +545,235 @@ export async function importBackupZipV2Merge(
 
       if (i % 20 === 0) report();
       bump(1, 'Conversations');
+    }
+
+    await txDone(t);
+  }
+
+  // 1.25) Restore article comments (merge-only, dedupe by fingerprint).
+  if (articleCommentItems.length) {
+    const normalizedIncoming: Array<{
+      commentId: number;
+      parentCommentId: number | null;
+      uniqueKey: string;
+      canonicalUrl: string;
+      quoteText: string;
+      commentText: string;
+      createdAt: number;
+      updatedAt: number;
+      baseKey: string;
+      parentBaseKey: string;
+      fingerprint: string;
+    }> = [];
+
+    const incomingById = new Map<number, any>();
+    const baseKeyByIncomingId = new Map<number, string>();
+    const canonicalUrls = new Set<string>();
+    let commentProgressTick = 0;
+
+    for (const raw of articleCommentItems) {
+      const commentId = Number(raw && (raw as any).commentId);
+      if (!Number.isFinite(commentId) || commentId <= 0) {
+        stats.commentsSkipped += 1;
+        bump(1, 'Comments');
+        commentProgressTick += 1;
+        if (commentProgressTick % 40 === 0) report();
+        continue;
+      }
+      const canonicalUrl = normalizeHttpUrl(raw && (raw as any).canonicalUrl);
+      const commentText = safeString(raw && (raw as any).commentText);
+      if (!canonicalUrl || !commentText) {
+        stats.commentsSkipped += 1;
+        bump(1, 'Comments');
+        commentProgressTick += 1;
+        if (commentProgressTick % 40 === 0) report();
+        continue;
+      }
+
+      const parentRaw = raw && (raw as any).parentCommentId;
+      const parentIdNum = parentRaw == null ? null : Number(parentRaw);
+      const parentCommentId =
+        parentIdNum != null && Number.isFinite(parentIdNum) && parentIdNum > 0 ? parentIdNum : null;
+
+      const uniqueKey = safeString(raw && (raw as any).uniqueKey);
+      const quoteText = raw && (raw as any).quoteText ? String((raw as any).quoteText) : '';
+      const createdAt = Number(raw && (raw as any).createdAt) || 0;
+      const updatedAt = Number(raw && (raw as any).updatedAt) || createdAt || 0;
+
+      const baseKey = commentBaseKey({ canonicalUrl, createdAt, quoteText, commentText });
+      baseKeyByIncomingId.set(commentId, baseKey);
+      canonicalUrls.add(canonicalUrl);
+
+      const item = {
+        commentId,
+        parentCommentId,
+        uniqueKey,
+        canonicalUrl,
+        quoteText,
+        commentText,
+        createdAt,
+        updatedAt,
+        baseKey,
+        parentBaseKey: '',
+        fingerprint: '',
+      };
+      incomingById.set(commentId, item);
+      normalizedIncoming.push(item);
+    }
+
+    for (const item of normalizedIncoming) {
+      const parentBaseKey = item.parentCommentId ? baseKeyByIncomingId.get(item.parentCommentId) || '' : '';
+      item.parentBaseKey = parentBaseKey;
+      item.fingerprint = commentFingerprint({ baseKey: item.baseKey, parentBaseKey });
+    }
+
+    const localConversationIdByCanonicalUrl = new Map<string, number>();
+    for (const convo of incomingConversations) {
+      const uk = uniqueConversationKey(convo);
+      const localId = uk ? uniqueToLocalId.get(uk) : null;
+      if (!localId) continue;
+      const url = normalizeHttpUrl(convo && (convo as any).url);
+      if (!url) continue;
+      if (!localConversationIdByCanonicalUrl.has(url)) localConversationIdByCanonicalUrl.set(url, localId);
+    }
+
+    const existingByFingerprint = new Map<string, AnyRecord>();
+    const baseKeyByExistingId = new Map<number, string>();
+    const existingRows: AnyRecord[] = [];
+
+    const { t, stores: s } = tx(db, ['article_comments'], 'readwrite');
+    const store = s.article_comments;
+    const idx = store.index('by_canonicalUrl_createdAt');
+
+    progress.stage = 'Comments';
+    report();
+
+    for (const canonicalUrl of canonicalUrls) {
+      if (!canonicalUrl) continue;
+      const range = globalThis.IDBKeyRange?.bound
+        ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
+        : null;
+      const rows = range ? ((await reqToPromise<any[]>(idx.getAll(range) as any)) || []) : [];
+      for (const row of rows) {
+        if (!row || typeof row !== 'object') continue;
+        const id = Number((row as any).id);
+        if (!Number.isFinite(id) || id <= 0) continue;
+
+        const url = normalizeHttpUrl((row as any).canonicalUrl);
+        if (!url) continue;
+
+        const createdAt = Number((row as any).createdAt) || 0;
+        const quoteText = (row as any).quoteText ? String((row as any).quoteText) : '';
+        const commentText = safeString((row as any).commentText);
+        if (!commentText) continue;
+
+        const baseKey = commentBaseKey({ canonicalUrl: url, createdAt, quoteText, commentText });
+        baseKeyByExistingId.set(id, baseKey);
+        existingRows.push(row);
+      }
+    }
+
+    for (const row of existingRows) {
+      const id = Number((row as any).id);
+      const baseKey = baseKeyByExistingId.get(id) || '';
+      if (!baseKey) continue;
+      const parentIdRaw = Number((row as any).parentId);
+      const parentBaseKey =
+        Number.isFinite(parentIdRaw) && parentIdRaw > 0 ? baseKeyByExistingId.get(parentIdRaw) || '' : '';
+      const fingerprint = commentFingerprint({ baseKey, parentBaseKey });
+      if (!existingByFingerprint.has(fingerprint)) existingByFingerprint.set(fingerprint, row);
+    }
+
+    const ordered: typeof normalizedIncoming = [];
+    const visited = new Set<number>();
+    const visiting = new Set<number>();
+    const visit = (id: number) => {
+      if (visited.has(id)) return;
+      if (visiting.has(id)) return;
+      visiting.add(id);
+      const item = incomingById.get(id);
+      if (item && item.parentCommentId) visit(item.parentCommentId);
+      if (item) {
+        visited.add(id);
+        ordered.push(item);
+      }
+      visiting.delete(id);
+    };
+    for (const item of normalizedIncoming) visit(item.commentId);
+
+    const incomingIdToLocalId = new Map<number, number>();
+    const now = Date.now();
+
+    for (const item of ordered) {
+      const existing = existingByFingerprint.get(item.fingerprint) || null;
+      const parentId =
+        item.parentCommentId && incomingIdToLocalId.has(item.parentCommentId)
+          ? incomingIdToLocalId.get(item.parentCommentId)!
+          : null;
+
+      const uniqueKey = safeString(item.uniqueKey);
+      const mappedConversationId =
+        uniqueKey && uniqueToLocalId.has(uniqueKey)
+          ? uniqueToLocalId.get(uniqueKey)!
+          : localConversationIdByCanonicalUrl.get(item.canonicalUrl) || null;
+
+      if (existing && (existing as any).id) {
+        const existingId = Number((existing as any).id);
+        if (Number.isFinite(existingId) && existingId > 0) incomingIdToLocalId.set(item.commentId, existingId);
+
+        const existingUpdatedAt = Number((existing as any).updatedAt) || 0;
+        const incomingUpdatedAt = Number(item.updatedAt) || 0;
+        const shouldUpdateText =
+          incomingUpdatedAt > existingUpdatedAt &&
+          (safeString((existing as any).commentText) !== item.commentText ||
+            String((existing as any).quoteText || '') !== String(item.quoteText || ''));
+        const shouldAttachConversation =
+          mappedConversationId != null &&
+          (!Number.isFinite(Number((existing as any).conversationId)) || Number((existing as any).conversationId) <= 0);
+        const shouldAttachParent =
+          parentId != null &&
+          (!Number.isFinite(Number((existing as any).parentId)) || Number((existing as any).parentId) <= 0);
+
+        if (shouldUpdateText || shouldAttachConversation || shouldAttachParent) {
+          const next = {
+            ...existing,
+            canonicalUrl: item.canonicalUrl,
+            quoteText: String(item.quoteText || ''),
+            commentText: item.commentText,
+            conversationId:
+              shouldAttachConversation && mappedConversationId != null ? mappedConversationId : (existing as any).conversationId,
+            parentId: shouldAttachParent && parentId != null ? parentId : (existing as any).parentId,
+            createdAt: Number((existing as any).createdAt) || Number(item.createdAt) || now,
+            updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt, now),
+          };
+          // eslint-disable-next-line no-await-in-loop
+          await reqToPromise(store.put(next as any));
+          stats.commentsUpdated += 1;
+        }
+
+        bump(1, 'Comments');
+        commentProgressTick += 1;
+        if (commentProgressTick % 40 === 0) report();
+        continue;
+      }
+
+      const record = {
+        parentId,
+        conversationId: mappedConversationId,
+        canonicalUrl: item.canonicalUrl,
+        quoteText: String(item.quoteText || ''),
+        commentText: item.commentText,
+        createdAt: Number(item.createdAt) || now,
+        updatedAt: Number(item.updatedAt) || Number(item.createdAt) || now,
+      };
+      // eslint-disable-next-line no-await-in-loop
+      const newId = await reqToPromise(store.add(record as any) as any);
+      const localId = Number(newId);
+      if (Number.isFinite(localId) && localId > 0) incomingIdToLocalId.set(item.commentId, localId);
+      stats.commentsAdded += 1;
+      bump(1, 'Comments');
+      commentProgressTick += 1;
+      if (commentProgressTick % 40 === 0) report();
     }
 
     await txDone(t);
