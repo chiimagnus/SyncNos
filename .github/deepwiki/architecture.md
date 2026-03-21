@@ -46,7 +46,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | conversations | `src/conversations/` | IndexedDB CRUD、本地事实源、UI 读取面 | `storage-idb.ts`, background handlers |
 | comments | `src/comments/` | article 详情评论线程、回复 / 删除、shared session 与 inpage 面板 | `background/handlers.ts`, `data/storage-idb.ts`, `ArticleCommentsSection.tsx` |
 | sync | `src/sync/` | Notion / Obsidian / 备份的编排层 | `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
-| ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层，以及主题模式、窄屏 list/detail 路由和会话级动作解析 | `ConversationsScene.tsx`, `SettingsScene.tsx`, `useThemeMode.ts`, `pending-open.ts` |
+| ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层，以及主题 token（`prefers-color-scheme`）、窄屏 list/detail 路由和会话级动作解析 | `ConversationsScene.tsx`, `SettingsScene.tsx`, `styles/tokens.css`, `pending-open.ts` |
 | messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts`（含 `BACKFILL_CONVERSATION_IMAGES`） |
 
 - `content.ts` 把 content runtime 组装成“collectors registry + controller + inpage button/tip + runtime observer + incremental updater + notionAiModelPicker”的组合体。
@@ -72,7 +72,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | `conversation-kinds.ts` | `webclipper/src/protocols/conversation-kinds.ts` | Notion / Obsidian orchestrator | 决定 chat/article 的 DB、folder 与重建规则 |
 | `chatwith-settings.ts` | `webclipper/src/integrations/chatwith/chatwith-settings.ts` | detail header、SettingsScene controller、backup tests | 统一 `Chat with AI` 的模板、平台列表、字符截断与存储键 |
 | `detail-header-action-types.ts` | `webclipper/src/integrations/detail-header-action-types.ts` | `ConversationDetailPane`, `DetailNavigationHeader`, `DetailHeaderActionBar` | 统一定义详情动作槽位（`open / chat-with / tools`）与触发接口 |
-| `useThemeMode.ts` | `webclipper/src/ui/shared/hooks/useThemeMode.ts` | popup/app 壳层、SettingsScene | 统一 `ui_theme_mode` → `data-theme` 的主题应用逻辑 |
+| `tokens.css` | `webclipper/src/ui/styles/tokens.css` | popup/app/inpage UI | 统一设计 token，并用 `prefers-color-scheme` 做亮暗切换 |
 | `SelectMenu` 自适应高度约束 | `webclipper/src/ui/shared/SelectMenu.tsx` | `ConversationListPane` 等下拉触发点 | `adaptiveMaxHeight` 会结合 `side` 与最近可裁剪容器动态计算 `panelMaxHeight` |
 | Zip v2 备份契约 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | 备份与恢复流程 | 约束 manifest、CSV、分源 JSON、storage-local.json 的结构 |
 
@@ -116,7 +116,7 @@ flowchart TB
 - **App 门控热点**：`RootView.swift`、`OnboardingViewModel.swift`、`IAPService.swift`、`PayWallViewModel.swift`。
 - **扩展采集热点**：`content.ts`、`bootstrap/content-controller.ts`、`collectors/`、`article-fetch.ts`。
 - **扩展同步热点**：`storage-idb.ts`、`schema.ts`、`notion-sync-orchestrator.ts`、`obsidian-sync-orchestrator.ts`、`conversation-kinds.ts`。
-- **扩展设置 / 主题 / 会话 UI 热点**：`SettingsScene.tsx`、`useSettingsSceneController.ts`、`useThemeMode.ts`、`ConversationListPane.tsx`、`ConversationsScene.tsx`、`pending-open.ts`、`conversations-context.tsx`、`DetailHeaderActionBar.tsx`、`DetailNavigationHeader.tsx`、`src/integrations/detail-header-actions.ts`、`src/integrations/detail-header-action-types.ts`。
+- **扩展设置 / 会话 UI 热点**：`SettingsScene.tsx`、`useSettingsSceneController.ts`、`tokens.css`、`ConversationListPane.tsx`、`ConversationsScene.tsx`、`pending-open.ts`、`conversations-context.tsx`、`DetailHeaderActionBar.tsx`、`DetailNavigationHeader.tsx`、`src/integrations/detail-header-actions.ts`、`src/integrations/detail-header-action-types.ts`。
 - **发布热点**：`wxt.config.ts`、`package.json`、`.github/workflows/webclipper-*.yml`、`.github/scripts/webclipper/*.mjs`。
 
 ## 来源引用（Source References）

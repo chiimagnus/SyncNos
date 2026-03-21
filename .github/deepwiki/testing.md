@@ -120,7 +120,7 @@
 - `webclipper/src/sync/backup/import.ts`
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/src/ui/settings/sections/BackupSection.tsx`
-- `webclipper/src/ui/shared/hooks/useThemeMode.ts`
+- `webclipper/src/ui/styles/tokens.css`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`

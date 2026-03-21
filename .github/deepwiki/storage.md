@@ -9,7 +9,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | UserDefaults | SyncNos App | macOS 偏好 | onboarding、自动同步、IAP 状态、提醒态、试用期辅助信息 | `SyncNosApp.swift`, `IAPService.swift` |
 | Keychain | SyncNos App | 系统安全存储 | 站点 Cookie、加密密钥、首次启动 / 设备指纹备份、Notion OAuth 相关敏感信息 | `SiteLoginsStore.swift`, `EncryptionService.swift`, `IAPService.swift` |
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings、image_cache、article_comments | `schema.ts`, `storage-idb.ts`, `comments/data/storage-idb.ts` |
-| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `ui_theme_mode` / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | SettingsScene controller、settings stores |
+| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | SettingsScene controller、settings stores |
 | `localStorage` | WebClipper | 本地 Web Storage | 设置页当前 section、会话来源筛选、App sidebar UI 偏好 | `types.ts`, `ConversationListPane.tsx`, `AppShell.tsx` |
 | `sessionStorage` | WebClipper | 本地 Web Storage | 窄屏 list/detail 路由中的待打开 conversation | `pending-open.ts` |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、image-cache、article-comments、manifest | `backup/export.ts`, `backup/import.ts` |
@@ -52,7 +52,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | `sync_mappings` | object store | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt`, `updatedAt` | 决定是否能增量同步 |
 | `image_cache` | object store | `conversationId + url` 唯一索引、`opfsPath` 等元数据 | 本地图片缓存读取与回填加速 |
 | `article_comments` | object store | `canonicalUrl`, `conversationId`, `parentId`, `quoteText`, `quoteContext`, `commentText`, `createdAt`, `updatedAt` | article 详情页的本地评论线程、回复与删除 |
-| `chrome.storage.local` | KV | `inpage_display_mode`, `ai_chat_auto_save_enabled`, `ai_chat_cache_images_enabled`, `ui_theme_mode`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
+| `chrome.storage.local` | KV | `inpage_display_mode`, `ai_chat_auto_save_enabled`, `ai_chat_cache_images_enabled`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
 
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
