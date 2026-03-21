@@ -9,8 +9,14 @@ import {
 } from './obsidian-local-rest-client.ts';
 import {
   appendUnderMessagesHeading as appendDefaultUnderMessagesHeading,
+  buildArticleBodyMarkdown as buildDefaultArticleBodyMarkdown,
+  buildObsidianCommentsMarkdown as buildDefaultObsidianCommentsMarkdown,
   buildFullNoteMarkdown as buildDefaultFullNoteMarkdown,
   buildIncrementalAppendMarkdown as buildDefaultIncrementalAppendMarkdown,
+  COMMENTS_HEADING as COMMENTS_HEADING_DEFAULT,
+  ARTICLE_HEADING as ARTICLE_HEADING_DEFAULT,
+  replaceUnderArticleHeading as replaceDefaultUnderArticleHeading,
+  replaceUnderCommentsHeading as replaceDefaultUnderCommentsHeading,
   replaceSyncnosFrontmatter as replaceDefaultSyncnosFrontmatter,
 } from './obsidian-markdown-writer.ts';
 import {
@@ -31,6 +37,66 @@ const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
+}
+
+function normalizeNewlines(input: unknown) {
+  return String(input || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function fnv1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function computeMarkdownDigest(markdown: unknown): string {
+  const normalized = normalizeNewlines(markdown).trim();
+  if (!normalized) return '';
+  return fnv1a32(normalized);
+}
+
+function escapeRegExp(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractHeadingSectionMarkdown(content: unknown, heading: string): { found: boolean; markdown: string } {
+  const src = normalizeNewlines(content);
+  if (!src) return { found: false, markdown: '' };
+
+  const target = safeString(heading);
+  if (!target) return { found: false, markdown: '' };
+
+  const lines = src.split('\n');
+  const headingRe = new RegExp(`^#{1,6}\\s+${escapeRegExp(target)}\\s*$`);
+  let start = -1;
+  let startLevel = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] || '';
+    if (!headingRe.test(line.trimEnd())) continue;
+    const m = /^(#{1,6})\s+/.exec(line);
+    startLevel = m ? m[1]!.length : 0;
+    start = i + 1;
+    break;
+  }
+  if (start < 0) return { found: false, markdown: '' };
+
+  let end = lines.length;
+  for (let i = start; i < lines.length; i += 1) {
+    const line = lines[i] || '';
+    const headingMatch = /^(#{1,6})\s+/.exec(line);
+    if (!headingMatch) continue;
+    const level = headingMatch[1]!.length;
+    if (startLevel && level <= startLevel) {
+      end = i;
+      break;
+    }
+  }
+
+  const body = lines.slice(start, end).join('\n').trim();
+  return { found: true, markdown: body };
 }
 
 function stripAngleBrackets(url: unknown) {
@@ -333,11 +399,44 @@ function getSyncMetadataModule() {
 
 function getMarkdownWriterModule() {
   return {
+    ARTICLE_HEADING: ARTICLE_HEADING_DEFAULT,
+    COMMENTS_HEADING: COMMENTS_HEADING_DEFAULT,
+    buildArticleBodyMarkdown: buildDefaultArticleBodyMarkdown,
+    buildObsidianCommentsMarkdown: buildDefaultObsidianCommentsMarkdown,
     buildFullNoteMarkdown: buildDefaultFullNoteMarkdown,
     buildIncrementalAppendMarkdown: buildDefaultIncrementalAppendMarkdown,
     appendUnderMessagesHeading: appendDefaultUnderMessagesHeading,
+    replaceUnderArticleHeading: replaceDefaultUnderArticleHeading,
+    replaceUnderCommentsHeading: replaceDefaultUnderCommentsHeading,
     replaceSyncnosFrontmatter: replaceDefaultSyncnosFrontmatter,
   };
+}
+
+function isObsidianPatchIdempotentDup(patchRes: any) {
+  return (
+    patchRes &&
+    !patchRes.ok &&
+    patchRes.error &&
+    patchRes.error.code === 'bad_request' &&
+    patchRes.error.body &&
+    typeof patchRes.error.body === 'object' &&
+    String(patchRes.error.body.message || '').includes('content-already-preexists-in-target')
+  );
+}
+
+function isObsidianPatchFailed(patchRes: any) {
+  const patchFailedCode =
+    patchRes && patchRes.error && patchRes.error.body && typeof patchRes.error.body === 'object'
+      ? Number(patchRes.error.body.errorCode)
+      : null;
+  return (
+    patchRes &&
+    !patchRes.ok &&
+    (patchFailedCode === 40080 ||
+      String((patchRes.error && patchRes.error.body && patchRes.error.body.message) || '').includes(
+        'PatchFailed',
+      ))
+  );
 }
 
 async function buildClient() {
@@ -409,6 +508,19 @@ async function decideSyncModeForConversation({
         at: Date.now(),
       }),
     };
+  }
+
+  const isArticle = safeString(convo?.sourceType) === 'article';
+  let articleComments: any[] = [];
+  if (isArticle) {
+    const canonicalUrl = safeString(convo?.url);
+    if (canonicalUrl && typeof (storage as any).attachOrphanArticleCommentsToConversation === 'function') {
+      await (storage as any).attachOrphanArticleCommentsToConversation(canonicalUrl, conversationId);
+    }
+    if (typeof (storage as any).getArticleCommentsByConversationId === 'function') {
+      articleComments = await (storage as any).getArticleCommentsByConversationId(conversationId);
+      if (!Array.isArray(articleComments)) articleComments = [];
+    }
   }
 
   const notePathMod = getNotePathModule();
@@ -485,6 +597,7 @@ async function decideSyncModeForConversation({
       convo,
       filePath: desiredFilePath,
       messages,
+      comments: articleComments,
       mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild',
     };
   }
@@ -498,12 +611,21 @@ async function decideSyncModeForConversation({
       filePath: desiredFilePath,
       deleteAfterFilePath,
       messages,
+      comments: articleComments,
       mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
     };
   }
 
   if (forceFull) {
-    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild_forced' };
+    return {
+      isFinal: false,
+      conversationId,
+      convo,
+      filePath: desiredFilePath,
+      messages,
+      comments: articleComments,
+      mode: 'full_rebuild_forced',
+    };
   }
 
   const note = existingRemote.data && typeof existingRemote.data === 'object' ? existingRemote.data : null;
@@ -512,20 +634,83 @@ async function decideSyncModeForConversation({
   const parsed = metaMod.readSyncnosObject(frontmatter);
   const parsedData = parsed && parsed.ok && parsed.data ? parsed.data : null;
   if (!parsedData) {
-    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
   }
   if (
     safeString(parsedData.source) !== safeString(convo.source) ||
     safeString(parsedData.conversationKey) !== safeString(convo.conversationKey)
   ) {
-    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
   }
 
   const delta = computeDelta(messages, parsedData);
   if (!delta.ok) {
-    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, mode: 'full_rebuild' };
+    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
   }
   const newMessages = Array.isArray(delta.newMessages) ? delta.newMessages : [];
+
+  if (isArticle) {
+    const writer = getMarkdownWriterModule();
+    const articleMarkdown = writer.buildArticleBodyMarkdown(messages || []);
+    const commentsMarkdown = writer.buildObsidianCommentsMarkdown(articleComments || []);
+    const articleDigest = computeMarkdownDigest(articleMarkdown);
+    const commentsDigest = computeMarkdownDigest(commentsMarkdown);
+
+    const noteContent = note ? (note as any).content : '';
+    const articleSection = extractHeadingSectionMarkdown(noteContent, writer.ARTICLE_HEADING);
+    const commentsSection = extractHeadingSectionMarkdown(noteContent, writer.COMMENTS_HEADING);
+    if (!articleSection.found || !commentsSection.found) {
+      return {
+        isFinal: false,
+        conversationId,
+        convo,
+        filePath: desiredFilePath,
+        messages,
+        comments: articleComments,
+        mode: 'full_rebuild',
+      };
+    }
+
+    const remoteArticleDigest = computeMarkdownDigest(articleSection.markdown);
+    const remoteCommentsDigest = computeMarkdownDigest(commentsSection.markdown);
+    const storedArticleDigest = safeString(parsedData.articleDigest);
+    const storedCommentsDigest = safeString(parsedData.commentsDigest);
+
+    const needsArticleReplace =
+      articleDigest !== storedArticleDigest || articleDigest !== remoteArticleDigest || !!newMessages.length;
+    const needsCommentsReplace = commentsDigest !== storedCommentsDigest || commentsDigest !== remoteCommentsDigest;
+
+    if (!needsArticleReplace && !needsCommentsReplace) {
+      return {
+        isFinal: true,
+        row: buildPerConversationResult({
+          conversationId: Number(conversationId),
+          conversationTitle: toCurrentConversationTitle(convo, conversationId),
+          ok: true,
+          mode: 'no_changes',
+          appended: 0,
+          error: '',
+          at: Date.now(),
+        }),
+      };
+    }
+
+    return {
+      isFinal: false,
+      conversationId,
+      convo,
+      filePath: desiredFilePath,
+      messages,
+      comments: articleComments,
+      mode: 'sections_replace',
+      articleMarkdown,
+      commentsMarkdown,
+      sectionDigests: { articleDigest, commentsDigest },
+      replaceSections: { article: needsArticleReplace, comments: needsCommentsReplace },
+      nextCursor: pickLocalCursor(messages),
+    };
+  }
+
   if (!newMessages.length) {
     return {
       isFinal: true,
@@ -708,14 +893,25 @@ async function syncConversations({
             currentConversationTitle: currentTitle,
             currentStage: decision.mode === 'full_rebuild_rename' ? 'renaming_note' : 'writing_full_note',
           });
+          const articleMd =
+            safeString(decision?.convo?.sourceType) === 'article'
+              ? writer.buildArticleBodyMarkdown(decision.messages || [])
+              : '';
+          const commentsMd =
+            safeString(decision?.convo?.sourceType) === 'article'
+              ? writer.buildObsidianCommentsMarkdown((decision as any).comments || [])
+              : '';
           const syncnosObject = metaMod.buildSyncnosObject({
             conversation: decision.convo,
             cursor: pickLocalCursor(decision.messages),
+            articleDigest: computeMarkdownDigest(articleMd),
+            commentsDigest: computeMarkdownDigest(commentsMd),
           });
           const rawMarkdown = writer.buildFullNoteMarkdown({
             conversation: decision.convo,
             messages: decision.messages,
             syncnosObject,
+            comments: (decision as any).comments || [],
           });
           const markdown = await materializeMarkdownAssetsForObsidian({
             client,
@@ -776,6 +972,173 @@ async function syncConversations({
               });
             }
           }
+        } else if (decision.mode === 'sections_replace') {
+          await persistCurrentJob({
+            currentConversationId: conversationId,
+            currentConversationTitle: currentTitle,
+            currentStage: 'patching_sections',
+          });
+
+          const replaceSections = (decision as any).replaceSections || {};
+          const shouldReplaceArticle = !!replaceSections.article;
+          const shouldReplaceComments = !!replaceSections.comments;
+
+          const digests = (decision as any).sectionDigests || {};
+          const syncnosObjectScope = metaMod.buildSyncnosObject({
+            conversation: decision.convo,
+            cursor: pickLocalCursor(decision.messages),
+            articleDigest: safeString(digests.articleDigest),
+            commentsDigest: safeString(digests.commentsDigest),
+          });
+          const scopeMarkdown = writer.buildFullNoteMarkdown({
+            conversation: decision.convo,
+            messages: decision.messages,
+            syncnosObject: syncnosObjectScope,
+            comments: (decision as any).comments || [],
+          });
+
+          async function fallBackToFullRebuild(mode: string) {
+            await persistCurrentJob({
+              currentConversationId: conversationId,
+              currentConversationTitle: currentTitle,
+              currentStage: 'falling_back_to_full_rebuild',
+            });
+            const markdown = await materializeMarkdownAssetsForObsidian({
+              client,
+              filePath: decision.filePath,
+              markdown: scopeMarkdown,
+              indexScopeMarkdown: scopeMarkdown,
+            });
+            const putRes = await client.putVaultFile(decision.filePath, markdown);
+            if (!putRes || !putRes.ok) {
+              return buildPerConversationResult({
+                conversationId,
+                conversationTitle: currentTitle,
+                ok: false,
+                mode: 'failed',
+                appended: 0,
+                error: putRes && putRes.error && putRes.error.message ? putRes.error.message : 'put failed',
+                at: Date.now(),
+              });
+            }
+            return buildPerConversationResult({
+              conversationId,
+              conversationTitle: currentTitle,
+              ok: true,
+              mode,
+              appended: 0,
+              error: '',
+              at: Date.now(),
+            });
+          }
+
+          if (shouldReplaceArticle) {
+            const articleChunkRaw = safeString((decision as any).articleMarkdown);
+            const articleChunk = await materializeMarkdownAssetsForObsidian({
+              client,
+              filePath: decision.filePath,
+              markdown: articleChunkRaw,
+              indexScopeMarkdown: scopeMarkdown,
+            });
+            const patchRes = await writer.replaceUnderArticleHeading({
+              client,
+              filePath: decision.filePath,
+              markdown: articleChunk,
+            });
+            const isIdempotentDup = isObsidianPatchIdempotentDup(patchRes);
+            const isPatchFailed = isObsidianPatchFailed(patchRes);
+            if (!patchRes.ok && isPatchFailed && !isIdempotentDup) {
+              row = await fallBackToFullRebuild('full_rebuild_fallback');
+            } else if (!patchRes.ok && !isIdempotentDup) {
+              row = buildPerConversationResult({
+                conversationId,
+                conversationTitle: currentTitle,
+                ok: false,
+                mode: 'failed',
+                appended: 0,
+                error: patchRes.error && patchRes.error.message ? patchRes.error.message : 'patch failed',
+                at: Date.now(),
+              });
+            }
+          }
+
+          if (!row && shouldReplaceComments) {
+            const commentsChunkRaw = safeString((decision as any).commentsMarkdown);
+            const commentsChunk = await materializeMarkdownAssetsForObsidian({
+              client,
+              filePath: decision.filePath,
+              markdown: commentsChunkRaw,
+              indexScopeMarkdown: scopeMarkdown,
+            });
+            const patchRes = await writer.replaceUnderCommentsHeading({
+              client,
+              filePath: decision.filePath,
+              markdown: commentsChunk,
+            });
+            const isIdempotentDup = isObsidianPatchIdempotentDup(patchRes);
+            const isPatchFailed = isObsidianPatchFailed(patchRes);
+            if (!patchRes.ok && isPatchFailed && !isIdempotentDup) {
+              row = await fallBackToFullRebuild('full_rebuild_fallback');
+            } else if (!patchRes.ok && !isIdempotentDup) {
+              row = buildPerConversationResult({
+                conversationId,
+                conversationTitle: currentTitle,
+                ok: false,
+                mode: 'failed',
+                appended: 0,
+                error: patchRes.error && patchRes.error.message ? patchRes.error.message : 'patch failed',
+                at: Date.now(),
+              });
+            }
+          }
+
+          if (!row) {
+            await persistCurrentJob({
+              currentConversationId: conversationId,
+              currentConversationTitle: currentTitle,
+              currentStage: 'updating_sync_metadata',
+            });
+            const syncnosObject = metaMod.buildSyncnosObject({
+              conversation: decision.convo,
+              cursor: (decision as any).nextCursor || pickLocalCursor(decision.messages),
+              articleDigest: safeString(digests.articleDigest),
+              commentsDigest: safeString(digests.commentsDigest),
+            });
+            const fmRes = await writer.replaceSyncnosFrontmatter({
+              client,
+              filePath: decision.filePath,
+              syncnosObject,
+            });
+            if (!fmRes || !fmRes.ok) {
+              row = buildPerConversationResult({
+                conversationId,
+                conversationTitle: currentTitle,
+                ok: false,
+                mode: 'failed',
+                appended: 0,
+                error: fmRes && fmRes.error && fmRes.error.message
+                  ? fmRes.error.message
+                  : 'frontmatter patch failed',
+                at: Date.now(),
+              });
+            } else {
+              const mode =
+                shouldReplaceArticle && shouldReplaceComments
+                  ? 'sections_replace'
+                  : shouldReplaceArticle
+                    ? 'article_replace'
+                    : 'comments_replace';
+              row = buildPerConversationResult({
+                conversationId,
+                conversationTitle: currentTitle,
+                ok: true,
+                mode,
+                appended: 0,
+                error: '',
+                at: Date.now(),
+              });
+            }
+          }
         } else if (decision.mode === 'incremental_append') {
           await persistCurrentJob({
             currentConversationId: conversationId,
@@ -803,23 +1166,8 @@ async function syncConversations({
             filePath: decision.filePath,
             markdown: chunk,
           });
-          const isIdempotentDup =
-            !patchRes.ok &&
-            patchRes.error &&
-            patchRes.error.code === 'bad_request' &&
-            patchRes.error.body &&
-            typeof patchRes.error.body === 'object' &&
-            String(patchRes.error.body.message || '').includes('content-already-preexists-in-target');
-          const patchFailedCode =
-            patchRes && patchRes.error && patchRes.error.body && typeof patchRes.error.body === 'object'
-              ? Number(patchRes.error.body.errorCode)
-              : null;
-          const isPatchFailed =
-            !patchRes.ok &&
-            (patchFailedCode === 40080 ||
-              String(
-                (patchRes.error && patchRes.error.body && patchRes.error.body.message) || '',
-              ).includes('PatchFailed'));
+          const isIdempotentDup = isObsidianPatchIdempotentDup(patchRes);
+          const isPatchFailed = isObsidianPatchFailed(patchRes);
 
           if (!patchRes.ok && !isIdempotentDup && !isPatchFailed) {
             row = buildPerConversationResult({
