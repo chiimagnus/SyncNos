@@ -38,11 +38,23 @@ function readSyncnosObject(frontmatter: unknown) {
       lastSyncedMessageKey: safeString(obj.lastSyncedMessageKey) || '',
       lastSyncedMessageUpdatedAt: safeNumberOrNull(obj.lastSyncedMessageUpdatedAt),
       lastSyncedAt: safeNumberOrNull(obj.lastSyncedAt),
+      articleDigest: safeString(obj.articleDigest) || '',
+      commentsDigest: safeString(obj.commentsDigest) || '',
     },
   };
 }
 
-function buildSyncnosObject({ conversation, cursor }: { conversation?: any; cursor?: any } = {}) {
+function buildSyncnosObject({
+  conversation,
+  cursor,
+  articleDigest,
+  commentsDigest,
+}: {
+  conversation?: any;
+  cursor?: any;
+  articleDigest?: unknown;
+  commentsDigest?: unknown;
+} = {}) {
   const c = conversation || {};
   const source = safeString(c.source);
   const conversationKey = safeString(c.conversationKey);
@@ -60,6 +72,8 @@ function buildSyncnosObject({ conversation, cursor }: { conversation?: any; curs
     lastSyncedMessageKey,
     lastSyncedMessageUpdatedAt: safeNumberOrNull(cur.lastSyncedMessageUpdatedAt),
     lastSyncedAt: safeNumberOrNull(cur.lastSyncedAt),
+    ...(safeString(articleDigest) ? { articleDigest: safeString(articleDigest) } : null),
+    ...(safeString(commentsDigest) ? { commentsDigest: safeString(commentsDigest) } : null),
   };
 }
 
