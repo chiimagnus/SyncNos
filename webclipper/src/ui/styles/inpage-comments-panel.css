@@ -75,24 +75,27 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 6px;
+  width: 12px;
   cursor: ew-resize;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   background: transparent;
+  transform: translateX(-50%);
+  z-index: 3;
 }
 
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle::after {
   content: '';
   position: absolute;
   top: 0;
-  right: 0;
+  left: 50%;
   bottom: 0;
   width: 1px;
   background: var(--panel-border);
   opacity: 0;
   transition: opacity 120ms ease;
+  transform: translateX(-50%);
 }
 
 :host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle:hover::after,
