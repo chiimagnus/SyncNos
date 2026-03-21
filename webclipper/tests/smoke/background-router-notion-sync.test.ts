@@ -428,6 +428,239 @@ describe('background-router notion sync', () => {
     expect(String(cursorCall?.cursor?.notionCommentsDigest || '')).not.toBe('old');
   });
 
+  it('avoids clearing the whole page when cursor is missing and only comments changed (web articles)', async () => {
+    const calls: any[] = [];
+    const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
+
+    function fnv1a32(input: string) {
+      let hash = 0x811c9dc5;
+      for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+      }
+      return (hash >>> 0).toString(16).padStart(8, '0');
+    }
+    const articleDigest = fnv1a32(JSON.stringify({ markdown: '# Hello' }));
+
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET' && String(url).includes('/v1/blocks/p1/children')) {
+        return notionHttpResponse({
+          results: [
+            {
+              object: 'block',
+              id: 'b_article',
+              type: 'heading_2',
+              heading_2: {
+                is_toggleable: true,
+                rich_text: [{ type: 'text', text: { content: 'Article' }, plain_text: 'Article' }],
+              },
+            },
+            {
+              object: 'block',
+              id: 'b_comments',
+              type: 'heading_2',
+              heading_2: {
+                is_toggleable: true,
+                rich_text: [{ type: 'text', text: { content: 'Comments' }, plain_text: 'Comments' }],
+              },
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        });
+      }
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: {
+              id: 1,
+              title: 'Seeded Example Article',
+              url: 'https://example.com/',
+              source: 'web',
+              sourceType: 'article',
+              notionPageId: 'p1',
+            },
+            mapping: {
+              notionPageId: 'p1',
+              notionWebArticleLayoutVersion: 2,
+              notionArticleDigest: articleDigest,
+              notionCommentsDigest: 'old',
+            },
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'article_body', role: 'article', contentMarkdown: '# Hello', sequence: 1, updatedAt: 1 },
+          ],
+          getArticleCommentsByConversationId: async () => [
+            {
+              id: 11,
+              parentId: null,
+              conversationId: 1,
+              canonicalUrl: 'https://example.com/',
+              quoteText: 'Quote',
+              commentText: 'Root',
+              createdAt: 100,
+              updatedAt: 100,
+            },
+          ],
+          attachOrphanArticleCommentsToConversation: async () => true,
+          setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
+        },
+        syncService: {
+          getPage: async () => ({ id: 'p1', parent: { database_id: 'db1' }, properties: {} }),
+          updatePageProperties: async (_t: string, req: any) => {
+            calls.push({ op: 'updateProps', req });
+            return { ok: true };
+          },
+          clearPageChildren: async (_t: string, targetId: string) => {
+            calls.push({ op: 'clear', targetId });
+            return { ok: true };
+          },
+          appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
+            calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
+            return { results: [], count: 0 };
+          },
+          messagesToBlocks: () => {
+            calls.push({ op: 'messagesToBlocks' });
+            return [];
+          },
+          isPageUsableForDatabase: () => true,
+          pageBelongsToDatabase: () => true,
+        },
+        jobStore,
+      },
+    });
+
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.okCount).toBe(1);
+    expect(job.perConversation[0].mode).toBe('updated_properties');
+    expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
+
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'p1')).toBe(false);
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_article')).toBe(false);
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_comments')).toBe(true);
+    expect(calls.some((c) => c.op === 'append' && c.targetId === 'b_comments')).toBe(true);
+
+    const cursorCall = calls.find((c) => c.op === 'setCursor');
+    expect(cursorCall?.cursor?.notionWebArticleLayoutVersion).toBe(2);
+    expect(String(cursorCall?.cursor?.notionArticleDigest || '')).toBe(articleDigest);
+    expect(String(cursorCall?.cursor?.notionCommentsDigest || '')).not.toBe('old');
+  });
+
+  it('avoids clearing the whole page when cursor is missing and only article changed (web articles)', async () => {
+    const calls: any[] = [];
+    const chromeMock = mockChromeStorage();
+    const jobStore = createInMemoryJobStore();
+
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET' && String(url).includes('/v1/blocks/p1/children')) {
+        return notionHttpResponse({
+          results: [
+            {
+              object: 'block',
+              id: 'b_article',
+              type: 'heading_2',
+              heading_2: {
+                is_toggleable: true,
+                rich_text: [{ type: 'text', text: { content: 'Article' }, plain_text: 'Article' }],
+              },
+            },
+            {
+              object: 'block',
+              id: 'b_comments',
+              type: 'heading_2',
+              heading_2: {
+                is_toggleable: true,
+                rich_text: [{ type: 'text', text: { content: 'Comments' }, plain_text: 'Comments' }],
+              },
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        });
+      }
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+        storage: {
+          getSyncMappingByConversation: async () => ({
+            conversation: {
+              id: 1,
+              title: 'Seeded Example Article',
+              url: 'https://example.com/',
+              source: 'web',
+              sourceType: 'article',
+              notionPageId: 'p1',
+            },
+            mapping: {
+              notionPageId: 'p1',
+              notionWebArticleLayoutVersion: 2,
+              notionArticleDigest: 'old',
+            },
+          }),
+          getMessagesByConversationId: async () => [
+            { messageKey: 'article_body', role: 'article', contentMarkdown: '# Hello', sequence: 1, updatedAt: 1 },
+          ],
+          setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
+        },
+        syncService: {
+          getPage: async () => ({ id: 'p1', parent: { database_id: 'db1' }, properties: {} }),
+          updatePageProperties: async (_t: string, req: any) => {
+            calls.push({ op: 'updateProps', req });
+            return { ok: true };
+          },
+          clearPageChildren: async (_t: string, targetId: string) => {
+            calls.push({ op: 'clear', targetId });
+            return { ok: true };
+          },
+          appendChildren: async (_t: string, targetId: string, blocks: any[]) => {
+            calls.push({ op: 'append', targetId, count: Array.isArray(blocks) ? blocks.length : 0 });
+            return { results: [], count: 0 };
+          },
+          messagesToBlocks: () => [
+            {
+              object: 'block',
+              type: 'paragraph',
+              paragraph: { rich_text: [{ type: 'text', text: { content: 'Body' } }] },
+            },
+          ],
+          isPageUsableForDatabase: () => true,
+          pageBelongsToDatabase: () => true,
+        },
+        jobStore,
+      },
+    });
+
+    const job = await startNotionSync(router, jobStore, [1]);
+    expect(job.okCount).toBe(1);
+    expect(job.perConversation[0].mode).toBe('updated_properties');
+
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'p1')).toBe(false);
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_article')).toBe(true);
+    expect(calls.some((c) => c.op === 'append' && c.targetId === 'b_article')).toBe(true);
+    expect(calls.some((c) => c.op === 'clear' && c.targetId === 'b_comments')).toBe(false);
+
+    const cursorCall = calls.find((c) => c.op === 'setCursor');
+    expect(cursorCall?.cursor?.notionWebArticleLayoutVersion).toBe(2);
+    expect(String(cursorCall?.cursor?.notionArticleDigest || '')).not.toBe('old');
+  });
+
   it('updates page properties without rebuilding body when article content is unchanged', async () => {
     const calls: any[] = [];
     const chromeMock = mockChromeStorage();
@@ -451,6 +684,7 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'article_body',
               lastSyncedMessageUpdatedAt: 1000,
+              notionWebArticleLayoutVersion: 2,
             },
           }),
           getMessagesByConversationId: async () => [
@@ -654,6 +888,7 @@ describe('background-router notion sync', () => {
               notionPageId: 'p1',
               lastSyncedMessageKey: 'article_body',
               lastSyncedMessageUpdatedAt: 1000,
+              notionWebArticleLayoutVersion: 2,
             },
           }),
           getMessagesByConversationId: async () => [

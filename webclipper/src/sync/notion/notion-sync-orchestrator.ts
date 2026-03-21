@@ -308,15 +308,30 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return String((conversation && conversation.sourceType) || '').trim().toLowerCase() === 'article';
   }
 
-  function pickArticleBodyMarkdown(messagesList) {
-    const list = Array.isArray(messagesList) ? messagesList : [];
-    const preferred = list.find((m) => m && String(m.messageKey || '').trim() === 'article_body');
-    const picked = preferred || list.find((m) => m && String(m.role || '').trim().toLowerCase() === 'article') || list[0] || null;
-    const markdown = picked && picked.contentMarkdown && String(picked.contentMarkdown).trim()
-      ? String(picked.contentMarkdown)
-      : String((picked && (picked.contentText || '')) || '');
-    return String(markdown || '').trim();
-  }
+	  function pickArticleBodyMarkdown(messagesList) {
+	    const list = Array.isArray(messagesList) ? messagesList : [];
+	    const preferred = list.find((m) => m && String(m.messageKey || '').trim() === 'article_body');
+	    const picked = preferred || list.find((m) => m && String(m.role || '').trim().toLowerCase() === 'article') || list[0] || null;
+	    const markdown = picked && picked.contentMarkdown && String(picked.contentMarkdown).trim()
+	      ? String(picked.contentMarkdown)
+	      : String((picked && (picked.contentText || '')) || '');
+	    return String(markdown || '').trim();
+	  }
+
+	  function fnv1a32(input) {
+	    const text = String(input || '');
+	    let hash = 0x811c9dc5;
+	    for (let i = 0; i < text.length; i += 1) {
+	      hash ^= text.charCodeAt(i);
+	      hash = Math.imul(hash, 0x01000193);
+	    }
+	    return (hash >>> 0).toString(16).padStart(8, '0');
+	  }
+
+	  function computeNotionArticleDigest(messagesList) {
+	    const markdown = pickArticleBodyMarkdown(messagesList);
+	    return fnv1a32(JSON.stringify({ markdown }));
+	  }
 
 	  const SYNCNOS_WEB_ARTICLE_SECTION_TITLE = 'Article';
 	  const SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE = 'Comments';
@@ -782,27 +797,29 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              appendedBlockCount = blocks.length;
 	            }
 	          }
-          const nextCursor = lastMessageCursor(messages);
-          if (storage.setSyncCursor) {
-            await writeRunningJob({
-              currentConversationId: id,
-              currentConversationTitle: toCurrentConversationTitle(convo, id),
-              currentStage: "saving_sync_cursor"
-            });
+	          const nextCursor = lastMessageCursor(messages);
+	          const webArticleDigest = isWebArticleConversation(convo) ? computeNotionArticleDigest(messages) : null;
+	          if (storage.setSyncCursor) {
+	            await writeRunningJob({
+	              currentConversationId: id,
+	              currentConversationTitle: toCurrentConversationTitle(convo, id),
+	              currentStage: "saving_sync_cursor"
+	            });
             trace.mark("save cursor");
             // eslint-disable-next-line no-await-in-loop
-            await storage.setSyncCursor(id, {
-              ...nextCursor,
-	              ...(isWebArticleConversation(convo)
-	                ? {
-	                  notionWebArticleLayoutVersion: 2,
-	                  ...(typeof webArticleCommentsDigest === 'string'
-	                    ? { notionCommentsDigest: webArticleCommentsDigest }
-	                    : null),
-	                }
-	                : null),
-            });
-          }
+	            await storage.setSyncCursor(id, {
+	              ...nextCursor,
+		              ...(isWebArticleConversation(convo)
+		                ? {
+		                  notionWebArticleLayoutVersion: 2,
+		                  ...(typeof webArticleDigest === 'string' ? { notionArticleDigest: webArticleDigest } : null),
+		                  ...(typeof webArticleCommentsDigest === 'string'
+		                    ? { notionCommentsDigest: webArticleCommentsDigest }
+		                    : null),
+		                }
+		                : null),
+	            });
+	          }
 	          setResultAt(index, {
             conversationId: id,
             conversationTitle,
@@ -835,54 +852,245 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
         }
 
-	        let articleComments: any[] | null = null;
-	        let articleCommentsDigest: string | null = null;
-	        let shouldRebuildForArticleLayout = false;
-	        let shouldSyncArticleCommentsSection = false;
-	        if (isWebArticleConversation(convo) && storage) {
-	          const canListComments = typeof storage.getArticleCommentsByConversationId === 'function';
-	          if (canListComments) {
-            try {
-              const url = String(convo?.url || '').trim();
-              if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                // eslint-disable-next-line no-await-in-loop
-                await storage.attachOrphanArticleCommentsToConversation(url, id);
-              }
-            } catch (_e) {
-              // ignore
-            }
+		        let articleComments: any[] | null = null;
+		        let articleCommentsDigest: string | null = null;
+		        let articleDigest: string | null = null;
+		        let shouldRebuildForArticleLayout = false;
+		        let shouldSyncArticleSection = false;
+		        let shouldSyncArticleCommentsSection = false;
+		        if (isWebArticleConversation(convo) && storage) {
+		          const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
+		          const articleLayoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 2;
+		          shouldRebuildForArticleLayout = !articleLayoutApplied;
 
-	            try {
-	              // eslint-disable-next-line no-await-in-loop
-	              articleComments = await storage.getArticleCommentsByConversationId(id);
-	              articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
-	              const prevDigest = String(mapping?.notionCommentsDigest || '');
-	              const prevLayoutVersion = Number(mapping?.notionWebArticleLayoutVersion);
-	              const layoutApplied = Number.isFinite(prevLayoutVersion) && prevLayoutVersion >= 2;
-	              const digestChanged = prevDigest !== String(articleCommentsDigest || '');
-	              shouldRebuildForArticleLayout = !layoutApplied;
-	              shouldSyncArticleCommentsSection = layoutApplied && digestChanged;
-	              if (shouldRebuildForArticleLayout) shouldRebuild = true;
-	            } catch (e) {
-	              warnings.push({
-	                code: "notion_article_comments_fetch_failed",
-	                message: "Failed to load local article comments; skipping comment sync in this run.",
-                extra: { error: e && e.message ? String(e.message) : String(e) },
-              });
-	              articleComments = null;
-	              articleCommentsDigest = null;
-	              shouldRebuildForArticleLayout = false;
-	              shouldSyncArticleCommentsSection = false;
-	            }
-	          }
-	        }
+		          try {
+		            articleDigest = computeNotionArticleDigest(messages);
+		            const prevArticleDigest = String(mapping?.notionArticleDigest || '');
+		            const digestChanged = prevArticleDigest !== String(articleDigest || '');
+		            shouldSyncArticleSection = articleLayoutApplied && digestChanged;
+		          } catch (_e) {
+		            articleDigest = null;
+		            shouldSyncArticleSection = false;
+		          }
 
-	        if (shouldRebuild) {
-          if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
-          await writeRunningJob({
-            currentConversationId: id,
-            currentConversationTitle: toCurrentConversationTitle(convo, id),
-            currentStage: "rebuilding_destination_page"
+		          if (shouldRebuildForArticleLayout) shouldRebuild = true;
+
+		          const canListComments = typeof storage.getArticleCommentsByConversationId === 'function';
+		          if (canListComments) {
+		            try {
+		              const url = String(convo?.url || '').trim();
+		              if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
+		                // eslint-disable-next-line no-await-in-loop
+		                await storage.attachOrphanArticleCommentsToConversation(url, id);
+		              }
+		            } catch (_e) {
+		              // ignore
+		            }
+
+		            try {
+		              // eslint-disable-next-line no-await-in-loop
+		              articleComments = await storage.getArticleCommentsByConversationId(id);
+		              articleCommentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+		              const prevDigest = String(mapping?.notionCommentsDigest || '');
+		              const digestChanged = prevDigest !== String(articleCommentsDigest || '');
+		              shouldSyncArticleCommentsSection = articleLayoutApplied && digestChanged;
+		            } catch (e) {
+		              warnings.push({
+		                code: "notion_article_comments_fetch_failed",
+		                message: "Failed to load local article comments; skipping comment sync in this run.",
+		                extra: { error: e && e.message ? String(e.message) : String(e) },
+		              });
+		              articleComments = null;
+		              articleCommentsDigest = null;
+		              shouldSyncArticleCommentsSection = false;
+		            }
+		          }
+		        }
+
+		        if (shouldRebuild) {
+		          if (!messages.length && !isWebArticleConversation(convo)) {
+		            throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
+		          }
+
+		          // Web articles can be updated section-by-section once layout v2 is applied:
+		          // - Article changes -> rebuild only the Article section
+		          // - Comment changes -> rebuild only the Comments section
+		          // - Cursor drift -> refresh cursor/digests without touching the page
+		          if (
+		            isWebArticleConversation(convo) &&
+		            !shouldRebuildForArticleLayout &&
+		            typeof notionSyncService.clearPageChildren === "function"
+		          ) {
+		            await writeRunningJob({
+		              currentConversationId: id,
+		              currentConversationTitle: toCurrentConversationTitle(convo, id),
+		              currentStage: "uploading_message_blocks",
+		            });
+
+		            trace.mark("update page properties");
+		            // eslint-disable-next-line no-await-in-loop
+		            await notionSyncService.updatePageProperties(token.accessToken, {
+		              pageId,
+		              properties: pageSpec.buildUpdateProperties(convo),
+		            });
+
+		            const shouldUpdateArticle = !!shouldSyncArticleSection;
+		            const shouldUpdateComments = !!shouldSyncArticleCommentsSection;
+
+		            if (shouldUpdateArticle || shouldUpdateComments) {
+		              trace.mark("rebuild sections");
+		              const pageChildren = await listNotionBlockChildren(token.accessToken, pageId);
+		              const articleHeading = findNotionToggleHeadingBlock(pageChildren, SYNCNOS_WEB_ARTICLE_SECTION_TITLE);
+		              const commentsHeading = findNotionToggleHeadingBlock(pageChildren, SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE);
+		              const articleHeadingId = articleHeading && articleHeading.id ? String(articleHeading.id).trim() : "";
+		              const commentsHeadingId = commentsHeading && commentsHeading.id ? String(commentsHeading.id).trim() : "";
+
+		              if (shouldUpdateArticle && !articleHeadingId) {
+		                warnings.push({
+		                  code: "notion_article_section_missing",
+		                  message: "Article section heading not found; falling back to full rebuild.",
+		                  extra: { pageId, title: SYNCNOS_WEB_ARTICLE_SECTION_TITLE },
+		                });
+		              } else if (shouldUpdateComments && !commentsHeadingId) {
+		                warnings.push({
+		                  code: "notion_article_comments_section_missing",
+		                  message: "Comments section heading not found; falling back to full rebuild.",
+		                  extra: { pageId, title: SYNCNOS_WEB_ARTICLE_COMMENTS_SECTION_TITLE },
+		                });
+		              } else {
+		                let commentThreads = 0;
+		                let commentItems = 0;
+		                let articleBlocks: any[] = [];
+		                let commentBlocks: any[] = [];
+
+		                if (shouldUpdateArticle) {
+		                  const built = await buildNotionWebArticlePageBlocks({
+		                    notionSyncService,
+		                    accessToken: token.accessToken,
+		                    source: convo.source,
+		                    messages,
+		                    comments: Array.isArray(articleComments) ? articleComments : [],
+		                    warnings,
+		                  });
+		                  articleBlocks = Array.isArray(built.articleBlocks) ? built.articleBlocks : [];
+		                  if (shouldUpdateComments) {
+		                    commentBlocks = Array.isArray(built.commentBlocks) ? built.commentBlocks : [];
+		                    commentThreads = Number(built.commentThreads) || 0;
+		                    commentItems = Number(built.commentItems) || 0;
+		                  }
+		                } else if (shouldUpdateComments) {
+		                  const builtComments = buildNotionCommentsBlocks(Array.isArray(articleComments) ? articleComments : []);
+		                  commentBlocks = Array.isArray(builtComments.blocks) ? builtComments.blocks : [];
+		                  commentThreads = Number(builtComments.threads) || 0;
+		                  commentItems = Number(builtComments.items) || 0;
+		                }
+
+		                if (shouldUpdateArticle && articleHeadingId) {
+		                  trace.mark("clear article children");
+		                  // eslint-disable-next-line no-await-in-loop
+		                  await notionSyncService.clearPageChildren(token.accessToken, articleHeadingId);
+		                  if (articleBlocks.length) {
+		                    trace.mark("append article children");
+		                    // eslint-disable-next-line no-await-in-loop
+		                    await notionSyncService.appendChildren(token.accessToken, articleHeadingId, articleBlocks);
+		                  }
+		                }
+
+		                if (shouldUpdateComments && commentsHeadingId) {
+		                  trace.mark("clear comments children");
+		                  // eslint-disable-next-line no-await-in-loop
+		                  await notionSyncService.clearPageChildren(token.accessToken, commentsHeadingId);
+		                  if (commentBlocks.length) {
+		                    trace.mark("append comments children");
+		                    // eslint-disable-next-line no-await-in-loop
+		                    await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
+		                  }
+		                }
+
+		                const nextCursor = lastMessageCursor(messages);
+		                if (storage.setSyncCursor) {
+		                  await writeRunningJob({
+		                    currentConversationId: id,
+		                    currentConversationTitle: toCurrentConversationTitle(convo, id),
+		                    currentStage: "saving_sync_cursor",
+		                  });
+		                  trace.mark("save cursor");
+		                  // eslint-disable-next-line no-await-in-loop
+		                  await storage.setSyncCursor(id, {
+		                    ...nextCursor,
+		                    notionWebArticleLayoutVersion: 2,
+		                    ...(typeof articleDigest === "string" ? { notionArticleDigest: String(articleDigest || "") } : null),
+		                    ...(typeof articleCommentsDigest === "string"
+		                      ? { notionCommentsDigest: String(articleCommentsDigest || "") }
+		                      : null),
+		                  });
+		                }
+
+		                setResultAt(index, {
+		                  conversationId: id,
+		                  conversationTitle,
+		                  ok: true,
+		                  notionPageId: pageId,
+		                  mode: "updated_properties",
+		                  appended: 0,
+		                  warnings,
+		                  ...(shouldUpdateComments
+		                    ? {
+		                      comments: {
+		                        updated: true,
+		                        threads: commentThreads,
+		                        items: commentItems,
+		                      },
+		                    }
+		                    : null),
+		                });
+		                trace.flush({ mode: "updated_properties", ok: true, blockCount: 0 });
+		                return;
+		              }
+		              // Fall through to full rebuild when required headings are missing.
+		            }
+
+			            if (!shouldUpdateArticle && !shouldUpdateComments) {
+			              // Cursor drift / metadata-only rebuild: update cursor and digests without touching blocks.
+			              const nextCursor = lastMessageCursor(messages);
+			              if (storage.setSyncCursor) {
+			                await writeRunningJob({
+			                  currentConversationId: id,
+			                  currentConversationTitle: toCurrentConversationTitle(convo, id),
+			                  currentStage: "saving_sync_cursor",
+			                });
+			                trace.mark("save cursor");
+			                // eslint-disable-next-line no-await-in-loop
+			                await storage.setSyncCursor(id, {
+			                  ...nextCursor,
+			                  notionWebArticleLayoutVersion: 2,
+			                  ...(typeof articleDigest === "string"
+			                    ? { notionArticleDigest: String(articleDigest || "") }
+			                    : null),
+			                  ...(typeof articleCommentsDigest === "string"
+			                    ? { notionCommentsDigest: String(articleCommentsDigest || "") }
+			                    : null),
+			                });
+			              }
+
+			              setResultAt(index, {
+			                conversationId: id,
+			                conversationTitle,
+			                ok: true,
+			                notionPageId: pageId,
+			                mode: "updated_properties",
+			                appended: 0,
+			                warnings,
+			              });
+			              trace.flush({ mode: "updated_properties", ok: true, blockCount: 0 });
+			              return;
+			            }
+		          }
+
+		          await writeRunningJob({
+		            currentConversationId: id,
+		            currentConversationTitle: toCurrentConversationTitle(convo, id),
+	            currentStage: "rebuilding_destination_page"
           });
           trace.mark("rebuild page properties");
           // eslint-disable-next-line no-await-in-loop
@@ -950,13 +1158,14 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             // eslint-disable-next-line no-await-in-loop
             await storage.setSyncCursor(id, {
               ...nextCursor,
-	              ...(isWebArticleConversation(convo)
-	                ? {
-	                  notionWebArticleLayoutVersion: 2,
-	                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
-	                }
-	                : null),
-            });
+		              ...(isWebArticleConversation(convo)
+		                ? {
+		                  notionWebArticleLayoutVersion: 2,
+		                  ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
+		                  ...(articleCommentsDigest != null ? { notionCommentsDigest: articleCommentsDigest } : null),
+		                }
+		                : null),
+	            });
           }
 	          setResultAt(index, {
             conversationId: id,
@@ -1052,12 +1261,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              });
 	              trace.mark("save cursor");
 	              // eslint-disable-next-line no-await-in-loop
-	              await storage.setSyncCursor(id, {
-	                ...nextCursor,
-	                notionWebArticleLayoutVersion: 2,
-	                notionCommentsDigest: String(articleCommentsDigest || ""),
-	              });
-	            }
+		              await storage.setSyncCursor(id, {
+		                ...nextCursor,
+		                notionWebArticleLayoutVersion: 2,
+		                ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
+		                notionCommentsDigest: String(articleCommentsDigest || ""),
+		              });
+		            }
 
 	            setResultAt(index, {
 	              conversationId: id,
@@ -1105,12 +1315,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 	              });
 	              trace.mark("save cursor");
 	              // eslint-disable-next-line no-await-in-loop
-	              await storage.setSyncCursor(id, {
-	                ...nextCursor,
-	                notionWebArticleLayoutVersion: 2,
-	                notionCommentsDigest: String(articleCommentsDigest || ""),
-	              });
-	            }
+		              await storage.setSyncCursor(id, {
+		                ...nextCursor,
+		                notionWebArticleLayoutVersion: 2,
+		                ...(typeof articleDigest === 'string' ? { notionArticleDigest: String(articleDigest || '') } : null),
+		                notionCommentsDigest: String(articleCommentsDigest || ""),
+		              });
+		            }
 
 	            setResultAt(index, {
 	              conversationId: id,

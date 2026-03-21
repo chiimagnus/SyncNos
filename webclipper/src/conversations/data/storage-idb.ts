@@ -645,6 +645,7 @@ export async function setSyncCursor(
     lastSyncedAt?: number | null;
     lastSyncedMessageUpdatedAt?: number | null;
     notionCommentsDigest?: string;
+    notionArticleDigest?: string;
     notionWebArticleLayoutVersion?: number | null;
   },
 ): Promise<true> {
@@ -681,6 +682,10 @@ export async function setSyncCursor(
       input?.notionCommentsDigest != null
         ? String(input.notionCommentsDigest || '')
         : String(existing?.notionCommentsDigest || ''),
+    notionArticleDigest:
+      input?.notionArticleDigest != null
+        ? String(input.notionArticleDigest || '')
+        : String(existing?.notionArticleDigest || ''),
     notionWebArticleLayoutVersion: Number.isFinite(Number(input?.notionWebArticleLayoutVersion))
       ? Number(input?.notionWebArticleLayoutVersion)
       : Number.isFinite(Number(existing?.notionWebArticleLayoutVersion))
