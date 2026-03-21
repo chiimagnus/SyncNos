@@ -68,6 +68,15 @@ function formatTime(ts: number | null | undefined): string {
   }
 }
 
+function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
+  const ta = Number((a as any)?.createdAt) || 0;
+  const tb = Number((b as any)?.createdAt) || 0;
+  if (tb !== ta) return tb - ta;
+  const ia = Number((a as any)?.id) || 0;
+  const ib = Number((b as any)?.id) || 0;
+  return ib - ia;
+}
+
 type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
@@ -466,7 +475,7 @@ export function mountThreadedCommentsPanel(
         return;
       }
 
-      const roots = normalized.filter((it) => !it.parentId);
+      const roots = normalized.filter((it) => !it.parentId).sort(compareCommentTimeDesc);
       const repliesByRoot = new Map<number, ThreadedCommentItem[]>();
       for (const it of normalized) {
         if (!it.parentId) continue;
@@ -474,6 +483,10 @@ export function mountThreadedCommentsPanel(
         const list = repliesByRoot.get(rootId) || [];
         list.push(it);
         repliesByRoot.set(rootId, list);
+      }
+
+      for (const [rootId, list] of repliesByRoot) {
+        repliesByRoot.set(rootId, list.sort(compareCommentTimeDesc));
       }
 
       for (const root of roots) {
