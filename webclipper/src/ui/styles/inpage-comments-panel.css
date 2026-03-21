@@ -28,6 +28,16 @@
   isolation: isolate;
 }
 
+:host([data-variant='sidebar']) {
+  --comments-panel-body-padding-x: 16px;
+  --comments-panel-body-padding-y: 12px;
+  --comments-panel-body-padding-bottom: 20px;
+
+  width: min(var(--webclipper-comments-panel-width, 420px), 92vw);
+  background: var(--bg-sunken, var(--panel-bg));
+  border-left: 1px solid var(--panel-border);
+}
+
 .webclipper-inpage-comments-panel__surface {
   position: relative;
   inset: auto;
@@ -44,18 +54,12 @@
 }
 
 :host([data-overlay='1']) {
-  --comments-panel-body-padding-x: 24px;
-  --comments-panel-body-padding-y: 22px;
-  --comments-panel-body-padding-bottom: 32px;
-
   position: fixed;
   top: 0;
   right: 0;
   width: min(var(--webclipper-comments-panel-width, 420px), 92vw);
   height: 100vh;
   z-index: 2147483647;
-  background: var(--bg-sunken, var(--panel-bg));
-  border-left: 1px solid var(--panel-border);
   box-shadow: none;
 }
 
@@ -69,7 +73,7 @@
   display: none;
 }
 
-:host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle {
+:host([data-variant='sidebar']) .webclipper-inpage-comments-panel__resize-handle {
   display: block;
   position: absolute;
   top: 0;
@@ -85,7 +89,7 @@
   z-index: 3;
 }
 
-:host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle::after {
+:host([data-variant='sidebar']) .webclipper-inpage-comments-panel__resize-handle::after {
   content: '';
   position: absolute;
   top: 0;
@@ -98,8 +102,8 @@
   transform: translateX(-50%);
 }
 
-:host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle:hover::after,
-:host([data-overlay='1'][data-resizing='1']) .webclipper-inpage-comments-panel__resize-handle::after {
+:host([data-variant='sidebar']) .webclipper-inpage-comments-panel__resize-handle:hover::after,
+:host([data-variant='sidebar'][data-resizing='1']) .webclipper-inpage-comments-panel__resize-handle::after {
   opacity: 1;
 }
 
@@ -111,7 +115,7 @@
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  padding: 12px 12px;
+  padding: 12px var(--comments-panel-body-padding-x);
   border-bottom: 1px solid var(--panel-border);
   background: var(--bg-sunken, var(--panel-bg));
 }
@@ -145,7 +149,7 @@
 
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
-  padding: 10px 10px;
+  padding: var(--comments-panel-body-padding-y);
   border-radius: 16px;
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
@@ -229,13 +233,13 @@
 .webclipper-inpage-comments-panel__thread {
   border: 1px solid var(--panel-border);
   border-radius: 16px;
-  padding: 10px;
+  padding: var(--comments-panel-body-padding-y);
   background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
 }
 
 .webclipper-inpage-comments-panel__thread-quote {
   margin: 0 0 8px 0;
-  padding: 8px 10px;
+  padding: calc(var(--comments-panel-body-padding-y) - 2px) var(--comments-panel-body-padding-y);
   border-radius: 16px;
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
@@ -341,7 +345,7 @@
   resize: none;
   min-height: 34px;
   max-height: 140px;
-  padding: 8px 10px;
+  padding: calc(var(--comments-panel-body-padding-y) - 2px) var(--comments-panel-body-padding-y);
   border-radius: 16px;
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
@@ -355,7 +359,7 @@
 }
 
 .webclipper-inpage-comments-panel__empty {
-  padding: 14px 10px;
+  padding: calc(var(--comments-panel-body-padding-y) + 4px) var(--comments-panel-body-padding-y);
   border: 1px dashed var(--panel-border);
   border-radius: 16px;
   color: var(--panel-text-muted);

@@ -25,6 +25,7 @@ export function ArticleCommentsSection({
   quoteText,
   focusComposerSignal,
   containerClassName,
+  variant,
   onRequestClose,
 }: {
   conversationId: number;
@@ -32,6 +33,7 @@ export function ArticleCommentsSection({
   quoteText?: string;
   focusComposerSignal?: number;
   containerClassName?: string;
+  variant?: 'embedded' | 'sidebar';
   onRequestClose?: () => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -140,6 +142,7 @@ export function ArticleCommentsSection({
 
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
+      variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
       showHeader: true,
       showCollapseButton: canClose,
     });

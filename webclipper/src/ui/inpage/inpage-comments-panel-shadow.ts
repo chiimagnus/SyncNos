@@ -28,6 +28,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     overlay: true,
     dockPage: true,
     initiallyOpen: false,
+    variant: 'sidebar',
     showHeader: true,
     showCollapseButton: true,
   });
