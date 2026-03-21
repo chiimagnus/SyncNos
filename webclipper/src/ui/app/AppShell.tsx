@@ -406,23 +406,32 @@ export default function AppShell() {
               {showCommentsSidebar ? (
                 <>
                   <div
-                    className={[
-                      'tw-h-full tw-shrink-0 tw-cursor-ew-resize tw-bg-transparent',
-                      commentsSidebarResizing ? 'tw-bg-[var(--bg-sunken)]' : 'hover:tw-bg-[var(--bg-sunken)]',
-                    ].join(' ')}
-                    style={{ width: '10px', touchAction: 'none' }}
-                    onPointerDown={onStartResizeCommentsSidebar}
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label="Resize comments sidebar"
-                  />
-                  <div
-                    className="tw-h-full tw-min-h-0 tw-shrink-0 tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]"
+                    className="tw-group tw-relative tw-h-full tw-min-h-0 tw-shrink-0 tw-border-l tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]"
                     style={{
                       width: `${commentsSidebarWidthPx}px`,
                       minWidth: `${COMMENTS_SIDEBAR_MIN_WIDTH_PX}px`,
                     }}
                   >
+                    <div
+                      className="tw-absolute tw-inset-y-0 tw-left-0 tw-bg-transparent tw-cursor-ew-resize"
+                      style={{
+                        width: '8px',
+                        touchAction: 'none',
+                        transform: 'translateX(-50%)',
+                      }}
+                      onPointerDown={onStartResizeCommentsSidebar}
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize comments sidebar"
+                    >
+                      <div
+                        className={[
+                          'tw-absolute tw-inset-y-0 tw-left-1/2 tw-w-px tw-bg-[var(--border)] tw-transition-opacity',
+                          commentsSidebarResizing ? 'tw-opacity-100' : 'tw-opacity-0 group-hover:tw-opacity-100',
+                        ].join(' ')}
+                        style={{ transform: 'translateX(-50%)' }}
+                      />
+                    </div>
                     <ArticleCommentsSection
                       conversationId={Number((selectedConversation as any)?.id || 0)}
                       canonicalUrl={canonicalUrl}
