@@ -11,6 +11,14 @@ function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
 }
 
+function isArchivedBlock(block: any): boolean {
+  try {
+    return (block as any)?.archived === true || (block as any)?.in_trash === true;
+  } catch (_e) {
+    return false;
+  }
+}
+
 function readPlainTextFromRichText(items: unknown): string {
   const list = Array.isArray(items) ? items : [];
   return list
@@ -62,6 +70,7 @@ export async function listBlockChildren(accessToken: string, blockId: string): P
 }
 
 function isToggleHeadingBlock(block: any): boolean {
+  if (isArchivedBlock(block)) return false;
   const type = safeString(block?.type);
   if (type !== 'heading_1' && type !== 'heading_2' && type !== 'heading_3') return false;
   const payload = (block as any)?.[type];

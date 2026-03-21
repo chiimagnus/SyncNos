@@ -22,6 +22,31 @@ describe('notion article comments blocks', () => {
     expect(block?.heading_2?.rich_text?.[0]?.text?.content).toBe('Article');
   });
 
+  it('ignores archived toggle heading blocks when locating section headings', async () => {
+    const notionSections = await loadNotionSectionBlocks();
+    const archived = {
+      object: 'block',
+      id: 'b1',
+      archived: true,
+      type: 'heading_2',
+      heading_2: {
+        is_toggleable: true,
+        rich_text: [{ type: 'text', text: { content: 'Comments' }, plain_text: 'Comments' }],
+      },
+    };
+    const active = {
+      object: 'block',
+      id: 'b2',
+      type: 'heading_2',
+      heading_2: {
+        is_toggleable: true,
+        rich_text: [{ type: 'text', text: { content: 'Comments' }, plain_text: 'Comments' }],
+      },
+    };
+    const picked = notionSections.findToggleHeadingBlock([archived, active], 'Comments');
+    expect(picked?.id).toBe('b2');
+  });
+
   it('renders comments into quote + bullet blocks', async () => {
     const renderer = await loadNotionCommentsRenderer();
     const res = renderer.buildNotionCommentsBlocks([
