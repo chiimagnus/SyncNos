@@ -22,7 +22,7 @@
 | --- | --- | --- | --- |
 | `permissions` | `storage/contextMenus/tabs/webNavigation/activeTab/scripting` | 过度权限可能扩大攻击面 | 仅保留采集与同步所需能力 |
 | `host_permissions` | 支持站点 + Notion + `http(s)://*/*` | 覆盖面广 | 运行时再由 `inpage_display_mode` 与支持站点 gating 控制实际启用 |
-| `web_accessible_resources` | 仅图标资源 | 跨站资源暴露 | 限定 `resources` 与 `matches` |
+| `web_accessible_resources` | 仅 `icon-128.png` 图标资源 | 跨站资源暴露 | 限定 `resources` 与 `matches` |
 
 ## OAuth 与令牌交换安全
 

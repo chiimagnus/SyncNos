@@ -88,3 +88,4 @@
 - 2026-03-19：Coverage Gaps 增加专项文档可点击链接，便于从索引直接跳转到仓库内技术文档。
 - 2026-03-19：补齐 `api.md`、`operations.md`、`security.md` 与 `glossary.md` 的索引级可达链接，消除页面可见性缺口。
 - 2026-03-19：新增 `modules/comments.md`，用于承载 WebClipper 文章评论 / 注释线程的本地事实层说明。
+- 2026-03-21：同步 WebClipper 文章评论线程进入 Zip v2 备份 / 导入说明，并补齐 `configuration.md` / `security.md` 的单一 `icon-128.png` 图标配置说明。

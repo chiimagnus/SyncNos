@@ -8,7 +8,7 @@
 | 产品线 | 主目录 | 运行时 | 主要输入 | 主要输出 |
 | --- | --- | --- | --- | --- |
 | SyncNos App | `macOS/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
-| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、Settings Insight、主题/行为偏好、本地导出、Notion 页面、Obsidian 文件 |
+| WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、Settings Insight、主题/行为偏好、本地导出、Zip v2 备份（含 `article_comments`）、Notion 页面、Obsidian 文件 |
 
 ## 顶层目录地图
 
@@ -101,6 +101,9 @@ flowchart LR
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/comments/background/handlers.ts`
 - `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/sync/backup/export.ts`
+- `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

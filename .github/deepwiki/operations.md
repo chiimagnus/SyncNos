@@ -24,7 +24,7 @@
 | 构建可用性 | `xcodebuild` 成功 | `npm run compile && npm run build` 成功 | 每次改动 |
 | 核心链路可用性 | 至少一条来源可同步到 Notion | 至少一个 chat/article 可落本地并可手动同步 | 每次改动 |
 | 配置写入有效性 | onboarding/autoSync/IAP 状态切换正常 | `inpage_display_mode`、`ui_theme_mode`、`chat_with_*` 写入可回读 | 每次改动 |
-| 备份恢复可用性 | - | Zip v2 导出与导入（merge）正常 | 每个里程碑 |
+| 备份恢复可用性 | - | Zip v2 导出与导入（merge）正常，且 `article_comments` 能往返 | 每个里程碑 |
 | 发布一致性 | - | `manifest.version == tag 去掉 v` | 每次发版 |
 
 ## 同步作业生命周期
@@ -50,10 +50,10 @@ flowchart LR
 
 | 场景 | 操作入口 | 预期结果 | 备注 |
 | --- | --- | --- | --- |
-| 导出备份 | `exportBackupZipV2()` | 生成 `SyncNos-Backup-*.zip` | 含 manifest、sources、config、image-cache |
-| 导入 Zip v2 | `importBackupZipV2Merge()` | merge 到本地库，不强制覆盖 | 丢失 bundle 时会 fallback 扫描 `sources/**/*.json` |
+| 导出备份 | `exportBackupZipV2()` | 生成 `SyncNos-Backup-*.zip` | 含 manifest、sources、config、image-cache、`article-comments/index.json` |
+| 导入 Zip v2 | `importBackupZipV2Merge()` | merge 到本地库，不强制覆盖 | 丢失 bundle 时会 fallback 扫描 `sources/**/*.json`，并恢复 `article_comments` |
 | 导入 legacy JSON | `importBackupLegacyJsonMerge()` | 与现有数据合并 | 保留本地非空字段优先 |
-| 恢复后核验 | Settings + 列表 + Insight | 会话/消息数量与 UI 可见结果一致 | Insight 只读，不回写新状态 |
+| 恢复后核验 | Settings + 列表 + Insight | 会话/消息/评论数量与 UI 可见结果一致 | Insight 只读，不回写新状态 |
 
 ## 事件与故障处置 Runbook
 
@@ -82,6 +82,7 @@ flowchart LR
 - `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/sync/backup/export.ts`
 - `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/src/sync/notion/auth/oauth.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
 - `.github/workflows/webclipper-release.yml`

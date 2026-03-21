@@ -7,7 +7,7 @@
 | App 启动与门控 | `SyncNosApp.swift`, `RootView.swift` | UserDefaults | 控制 onboarding、自动同步、调试开关 |
 | App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
 | App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
-| WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions |
+| WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions、manifest icons（当前仅 `icon-128.png`）与 `web_accessible_resources` |
 | WebClipper 运行时设置 | SettingsScene + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、`ui_theme_mode`、`inpage_display_mode`、`ai_chat_auto_save_enabled`、`ai_chat_cache_images_enabled`、Chat with AI、Notion AI 模型偏好 |
 | WebClipper UI-only 状态 | `localStorage` / `sessionStorage` | 浏览器本地 Web Storage | 控制设置页当前 section、来源筛选、窄屏下待打开的 conversation |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
@@ -56,6 +56,7 @@
 - 主题模式不是只靠 CSS 媒体查询：`useThemeMode()` 会监听 `chrome.storage.local` 的 `ui_theme_mode`，并把 `data-theme='light'/'dark'` 覆盖写到根节点；`system` 模式才回退到 `prefers-color-scheme`。
 - Insight 不写入新的 `chrome.storage.local` 键；统计只在用户打开 `Settings → Insight` 时从 IndexedDB 现算，失败时回到错误态或空态。
 - `ai_chat_cache_images_enabled` 只影响 `sourceType='chat'` 的消息内联，article 流程不受影响；它也不会回写新的设置键到 Insight 或列表筛选状态。
+- `wxt.config.ts` 里 WebClipper 的图标配置现在只保留 `icon-128.png`；`icon-16.png` / `icon-48.png` 已删除，`web_accessible_resources` 也只暴露 `icon-128.png`。
 
 ## 发布参数
 
