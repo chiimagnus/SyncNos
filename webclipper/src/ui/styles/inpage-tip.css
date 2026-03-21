@@ -2,9 +2,9 @@
   --bubble-arrow-size: 7px;
   --bubble-shift-x: 0px;
   --bubble-shift-y: 0px;
-  --bubble-surface-bg: rgba(24, 24, 26, 0.92);
-  --bubble-surface-border: rgba(255, 255, 255, 0.18);
-  --bubble-surface-text: rgb(255 255 255);
+  --bubble-surface-bg: color-mix(in srgb, var(--bg-card, rgb(255 255 255)) 92%, transparent);
+  --bubble-surface-border: color-mix(in srgb, var(--border, rgb(216 220 226)) 72%, transparent);
+  --bubble-surface-text: var(--text-primary, rgb(44 48 56));
   --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 
   --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, rgb(229 62 62)));
@@ -19,14 +19,6 @@
 }
 
 .webclipper-inpage-bubble__surface {
-  all: initial;
-  --bubble-surface-bg: rgba(24, 24, 26, 0.92);
-  --bubble-surface-border: rgba(255, 255, 255, 0.18);
-  --bubble-surface-text: rgb(255 255 255);
-  --bubble-surface-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-
-  --bubble-error-bg: color-mix(in srgb, var(--bubble-surface-bg) 84%, var(--error, rgb(229 62 62)));
-  --bubble-error-border: color-mix(in srgb, var(--error, rgb(229 62 62)) 74%, transparent);
   box-sizing: border-box;
   display: block;
   max-width: min(300px, 100vw);

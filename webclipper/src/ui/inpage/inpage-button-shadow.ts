@@ -1,4 +1,6 @@
 import inpageButtonCssRaw from '../styles/inpage-button.css?raw';
+import { SHADOW_HOST_TOKENS_CSS } from '../shared/shadow-tokens';
+import { registerInpageThemeTarget } from './inpage-theme';
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
@@ -29,7 +31,9 @@ function toButtonHostCss(css: string) {
     .replace(/\.webclipper-inpage-btn(?!_)/g, ':host');
 }
 
-const BUTTON_SHADOW_CSS = toButtonHostCss(String(inpageButtonCssRaw || ''));
+const BUTTON_SHADOW_CSS = [String(SHADOW_HOST_TOKENS_CSS || ''), toButtonHostCss(String(inpageButtonCssRaw || ''))]
+  .filter(Boolean)
+  .join('\n');
 
 let runtime: InpageRuntime = null;
 
@@ -187,6 +191,14 @@ function destroyButton(el: HTMLElement | null) {
       // ignore
     }
   }
+  const themeCleanup = (el as any).__webclipperThemeCleanup;
+  if (typeof themeCleanup === 'function') {
+    try {
+      themeCleanup();
+    } catch (_e) {
+      // ignore
+    }
+  }
   el.remove();
 }
 
@@ -253,6 +265,13 @@ function ensureInpageButton({
       } catch (_e) {
         // ignore
       }
+      try {
+        if (!(existing as any).__webclipperThemeCleanup) {
+          (existing as any).__webclipperThemeCleanup = registerInpageThemeTarget(existing, { markSource: true });
+        }
+      } catch (_e) {
+        // ignore
+      }
       return;
     }
     destroyButton(existing);
@@ -270,6 +289,11 @@ function ensureInpageButton({
   applyButtonHostLayoutStyles(btn);
 
   ensureButtonShadow(btn);
+  try {
+    (btn as any).__webclipperThemeCleanup = registerInpageThemeTarget(btn, { markSource: true });
+  } catch (_e) {
+    // ignore
+  }
 
   let snappedState: any = null;
 

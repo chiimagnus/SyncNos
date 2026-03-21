@@ -1,11 +1,13 @@
 import inpageTipCssRaw from '../styles/inpage-tip.css?raw';
+import { SHADOW_HOST_TOKENS_CSS } from '../shared/shadow-tokens';
+import { registerInpageThemeTarget } from './inpage-theme';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
-const BUBBLE_SHADOW_CSS = String(inpageTipCssRaw || '');
+const BUBBLE_SHADOW_CSS = [String(SHADOW_HOST_TOKENS_CSS || ''), String(inpageTipCssRaw || '')].filter(Boolean).join('\n');
 
 type TipKind = 'default' | 'error';
 
@@ -114,7 +116,16 @@ function ensureBubble() {
   if (!doc || !doc.documentElement) return null;
 
   const existing = doc.getElementById(BUBBLE_ID) as HTMLElement | null;
-  if (existing) return existing;
+  if (existing) {
+    try {
+      if (!(existing as any).__webclipperThemeCleanup) {
+        (existing as any).__webclipperThemeCleanup = registerInpageThemeTarget(existing, { markSource: true });
+      }
+    } catch (_e) {
+      // ignore
+    }
+    return existing;
+  }
 
   const bubble = document.createElement('webclipper-inpage-bubble');
   bubble.id = BUBBLE_ID;
@@ -122,6 +133,11 @@ function ensureBubble() {
   bubble.setAttribute('role', 'status');
   bubble.setAttribute('aria-live', 'polite');
   applyBubbleHostLayoutStyles(bubble);
+  try {
+    (bubble as any).__webclipperThemeCleanup = registerInpageThemeTarget(bubble, { markSource: true });
+  } catch (_e) {
+    // ignore
+  }
 
   const shadow = bubble.attachShadow({ mode: 'open' });
 
@@ -227,6 +243,11 @@ function removeBubble() {
   const doc = getDoc();
   if (!doc) return;
   const el = doc.getElementById(BUBBLE_ID);
+  try {
+    (el as any)?.__webclipperThemeCleanup?.();
+  } catch (_e) {
+    // ignore
+  }
   if (el && el.parentNode) el.parentNode.removeChild(el);
 }
 

@@ -1,7 +1,6 @@
 import { mountThreadedCommentsPanel, type ThreadedCommentItem } from '../comments/threaded-comments-panel';
 import type { CommentSidebarPanelApi } from '../../comments/sidebar/comment-sidebar-contract';
-import { storageGet, storageOnChanged } from '../../platform/storage/local';
-import { THEME_MODE_STORAGE_KEY, type ThemeMode, normalizeThemeMode } from '../shared/theme-mode';
+import { registerInpageThemeTarget } from './inpage-theme';
 
 export type InpageCommentItem = ThreadedCommentItem;
 export type InpageCommentsPanelOpenInput = {
@@ -13,65 +12,8 @@ export type InpageCommentsPanelApi = Omit<CommentSidebarPanelApi, 'open'> & {
 };
 
 const PANEL_ID = 'webclipper-inpage-comments-panel';
-const PANEL_THEME_SOURCE_ATTR = 'data-webclipper-theme-source';
-const PANEL_THEME_SOURCE_STORAGE = 'storage';
 
 let singleton: { el: HTMLElement; api: CommentSidebarPanelApi; cleanup?: () => void } | null = null;
-
-function applyPanelThemeMode(el: HTMLElement, mode: ThemeMode) {
-  try {
-    el.setAttribute(PANEL_THEME_SOURCE_ATTR, PANEL_THEME_SOURCE_STORAGE);
-  } catch (_e) {
-    // ignore
-  }
-
-  if (mode === 'dark') {
-    el.setAttribute('data-theme', 'dark');
-    return;
-  }
-
-  if (mode === 'light') {
-    el.setAttribute('data-theme', 'light');
-    return;
-  }
-
-  // system
-  try {
-    el.removeAttribute('data-theme');
-  } catch (_e) {
-    // ignore
-  }
-}
-
-function ensurePanelThemeSync(el: HTMLElement) {
-  const anyEl = el as any;
-  if (anyEl.__webclipperThemeReady === true) return;
-  anyEl.__webclipperThemeReady = true;
-
-  let disposed = false;
-
-  void (async () => {
-    try {
-      const stored = await storageGet([THEME_MODE_STORAGE_KEY]);
-      if (disposed) return;
-      applyPanelThemeMode(el, normalizeThemeMode(stored?.[THEME_MODE_STORAGE_KEY]));
-    } catch (_e) {
-      // ignore
-    }
-  })();
-
-  const unsubscribe = storageOnChanged((changes, areaName) => {
-    if (areaName !== 'local') return;
-    const change = changes?.[THEME_MODE_STORAGE_KEY];
-    if (!change) return;
-    applyPanelThemeMode(el, normalizeThemeMode(change?.newValue));
-  });
-
-  anyEl.__webclipperThemeCleanup = () => {
-    disposed = true;
-    unsubscribe();
-  };
-}
 
 function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) !== singleton.el) {
@@ -91,7 +33,9 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
 
   const existing = document.getElementById(PANEL_ID) as HTMLElement | null;
   if (existing && (existing as any).__webclipperPanelApi) {
-    ensurePanelThemeSync(existing);
+    if (!(existing as any).__webclipperThemeCleanup) {
+      (existing as any).__webclipperThemeCleanup = registerInpageThemeTarget(existing, { markSource: true });
+    }
     singleton = { el: existing, api: (existing as any).__webclipperPanelApi as CommentSidebarPanelApi };
     return singleton;
   }
@@ -109,7 +53,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   el.id = PANEL_ID;
 
   (el as any).__webclipperPanelApi = api;
-  ensurePanelThemeSync(el);
+  (el as any).__webclipperThemeCleanup = registerInpageThemeTarget(el, { markSource: true });
   singleton = { el, api, cleanup: mounted.cleanup };
   return singleton;
 }
