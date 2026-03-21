@@ -22,7 +22,7 @@ export function AboutSection() {
     <>
       <section className={cardClassName} aria-label={t('aboutSectionAria')}>
         <div className="tw-flex tw-items-center tw-gap-3">
-          <img className="tw-size-10 tw-rounded-2xl tw-object-contain" src={getURL('icons/icon-48.png' as any)} alt="" draggable={false} />
+          <img className="tw-size-10 tw-rounded-2xl tw-object-contain" src={getURL('icons/icon-128.png' as any)} alt="" draggable={false} />
           <div className="tw-min-w-0 tw-flex-1">
             <div className="tw-text-base tw-font-black tw-text-[var(--text-primary)]">SyncNos WebClipper</div>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]" id="aboutVersion">

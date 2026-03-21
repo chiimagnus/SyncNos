@@ -102,7 +102,7 @@ function PopupShellFrame() {
             <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
               <img
                 className="tw-size-7 tw-rounded-lg tw-object-contain"
-                src={getURL('icons/icon-48.png' as any)}
+                src={getURL('icons/icon-128.png' as any)}
                 alt=""
                 draggable={false}
               />
