@@ -85,7 +85,7 @@
 | --- | --- |
 | **Notion** | OAuth 授权后一键同步。AI 对话 → `SyncNos-AI Chats` 数据库；网页文章 → `SyncNos-Web Articles` 数据库。 |
 | **Obsidian** | 通过 [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) 插件直接写入 vault。本地到本地，不经网络。 |
-| **Markdown / Zip** | 单文件或批量导出，随时备份完整数据。 |
+| **Markdown / Zip** | 单文件或批量导出，随时备份完整数据（含文章评论线程）。 |
 
 ---
 
@@ -97,7 +97,7 @@
 - **Insight 仪表盘**：总 clips、来源分布、最长对话——让你的知识积累看得见。
 - **Chat with AI**：一键复制本地内容到剪贴板，跳转到你常用的 AI 平台继续深聊。
 - **图片缓存**：可选开启 AI 对话图片本地缓存，支持详情页手动补全历史图片。
-- **数据库备份 / 恢复**：完整导出和导入本地会话库，敏感信息（OAuth token 等）自动排除。
+- **数据库备份 / 恢复**：完整导出和导入本地会话库（包含 article_comments 评论线程），敏感信息（OAuth token 等）自动排除。
 - **主题模式**：跟随系统 / 手动切换 Light / Dark。
 - **Inpage 按钮**：可配置显示范围（所有站点 / 仅支持站点 / 关闭）。
 

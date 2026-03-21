@@ -70,7 +70,7 @@
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
-- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，但当前**不进入 Notion / Obsidian / Zip v2**；如果你改 comments 流程，一定同时看 storage、background handler、shared session 和 inpage 面板。
+- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，**不进入 Notion / Obsidian 同步**，但会进入 Zip v2 备份 / 恢复；如果你改 comments 流程，一定同时看 storage、background handler、shared session、inpage 面板和 backup 目录。
 
 ## 本地数据与同步结构
 
@@ -82,7 +82,7 @@
 | 文章评论线程 | `comments/data/storage-idb.ts`, `comments/background/handlers.ts` | `article_comments` 负责 article 详情页的本地评论、回复与删除 |
 | Notion 同步 | `notion-sync-orchestrator.ts` | 需要 token + `notion_parent_page_id`，cursor 命中 append，否则 rebuild |
 | Obsidian 同步 | `obsidian-sync-orchestrator.ts` | 支持 `incremental_append`、`full_rebuild`、rename；PATCH 失败回退 `full_rebuild_fallback` |
-| 备份导入导出 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | Zip v2、敏感键排除、merge import |
+| 备份导入导出 | `backup/export.ts`, `backup/import.ts`, `backup-utils.ts` | Zip v2、敏感键排除、merge import；会把 `article_comments` 一并归档 / 恢复 |
 
 - article 会话通过 `sourceType='article'` 标记，并保存单条 `article_body` 正文消息。
 - article 评论通过 `article_comments` 独立存储，并以 `canonicalUrl` + `conversationId` 组织线程；它是 article 会话的本地注释层，而不是新的远端同步目标。
@@ -114,6 +114,7 @@
 - `conversations-context.tsx` 会为非 article 会话注入 `cache-images` 工具动作：点击后调用 `backfillConversationImages()`，后台复扫消息并在成功后刷新当前 detail，同时反馈 `updatedMessages / downloadedCount / fromCacheCount`。
 - `useSettingsSceneController.ts` 只在 `activeSection === 'insight'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。
 - `SettingsScene.tsx` 会为 Insight 分区放宽 detail 宽度到 `1120px`，因为这一页需要容纳双栏图表与排行布局。
+- `BackupSection.tsx` 的导入统计现在会展示 comments 相关数量，因此恢复验证时不能只看会话和图片缓存。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
 - `ConversationListPane.tsx` 会把来源筛选写入 `localStorage`（`webclipper_conversations_source_filter_key`），因此“为什么列表下次打开还停在 ChatGPT 过滤条件”是预期行为，不是脏状态。
 - `ConversationListPane.tsx` 的 `source/site` 筛选已启用 `SelectMenu` 的 `adaptiveMaxHeight`：`SelectMenu` 会通过 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再按 `side='top'|'bottom'` 计算可用高度（最小 `80px`），所以 popup 底部条里的菜单高度会随可视区域动态变化。
@@ -176,6 +177,10 @@
 - `webclipper/src/comments/data/storage-idb.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
 - `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
+- `webclipper/src/sync/backup/export.ts`
+- `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
+- `webclipper/src/ui/settings/sections/BackupSection.tsx`
 - `webclipper/src/conversations/client/repo.ts`
 - `webclipper/src/i18n/index.ts`
 - `webclipper/src/integrations/chatwith/chatwith-settings.ts`
@@ -215,5 +220,7 @@
 - `webclipper/tests/smoke/detail-header-actions.test.ts`
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
 - `webclipper/tests/storage/article-comments-idb.test.ts`
+- `webclipper/tests/domains/backup-service.test.ts`
+- `webclipper/tests/domains/backup-article-comments.test.ts`
 - `webclipper/tests/storage/insight-stats.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`

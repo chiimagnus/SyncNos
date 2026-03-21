@@ -85,7 +85,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 | --- | --- |
 | **Notion** | One-click sync after OAuth. AI chats → `SyncNos-AI Chats` database; web articles → `SyncNos-Web Articles` database. |
 | **Obsidian** | Writes directly to your vault via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Local-to-local, no network involved. |
-| **Markdown / Zip** | Single file or bulk export. Keep an offline copy of everything, always. |
+| **Markdown / Zip** | Single file or bulk export. Keep an offline copy of everything, including article comment threads. |
 
 ---
 
@@ -97,7 +97,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Insight dashboard** — total clips, source breakdown, longest conversations — see your knowledge accumulate.
 - **Chat with AI** — copy any local conversation or article to your clipboard and jump to your favorite AI platform to continue the discussion.
 - **Image caching** — optionally cache AI conversation images locally. Backfill historical images from the detail page.
-- **Database backup / restore** — full export and import of your local session database. Sensitive data (OAuth tokens, etc.) is automatically excluded.
+- **Database backup / restore** — full export and import of your local session database, including article comment threads. Sensitive data (OAuth tokens, etc.) is automatically excluded.
 - **Theme mode** — follow system / manually switch Light / Dark.
 - **Inpage button** — configurable display scope (all sites / supported sites only / off).
 

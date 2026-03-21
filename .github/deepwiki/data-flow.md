@@ -55,6 +55,7 @@
 2. `ArticleCommentsSection.tsx` 先按 canonical URL 读取 `article_comments`，并把结果交给 threaded panel。
 3. 新评论、回复、删除与 orphan attach 都通过 comments background handlers 统一落库；`conversationId` 解析出来后会刷新 detail。
 4. 面板的 open / close / quote / focus / busy 由 shared session 统一调度；评论线程只保留本地回复与刷新语义，不再做正文高亮定位。
+5. Zip v2 备份会把 `article_comments` 写入 `assets/article-comments/index.json`，导入时按 merge 规则把评论线程恢复回本地库。
 
 ## WebClipper：从本地会话到外部目标
 
@@ -63,7 +64,7 @@
 | Notion | 本地 conversation + messages + mapping + kind 定义 | `conversation-kinds.ts` 决定 DB / page schema；cursor 匹配则 append，不匹配或目标要求重建则 full rebuild | `SyncNos-AI Chats` / `SyncNos-Web Articles` 等数据库与页面 |
 | Obsidian | 本地 conversation + messages + settings | 先决定 `incremental_append` 还是 `full_rebuild`；PATCH 失败时回退 full rebuild | `SyncNos-AIChats` / `SyncNos-WebArticles` 目录下笔记 |
 | Markdown / Zip 导出 | 本地 conversation + messages | 不依赖外部 API，直接按本地事实生成 | 用户本地文件系统 |
-| 备份导入导出 | IndexedDB + `chrome.storage.local` | 以 Zip v2 为主，导入是 merge 而不是覆盖 | 供迁移 / 恢复使用的本地备份 |
+| 备份导入导出 | IndexedDB + `chrome.storage.local` | 以 Zip v2 为主，导入是 merge 而不是覆盖；会一并保留 `image_cache` 与 `article_comments` | 供迁移 / 恢复使用的本地备份 |
 
 - 对 WebClipper 而言，外部目标都不是事实源；**事实源只有 IndexedDB 与非敏感 `chrome.storage.local`**。
 - `conversationKinds` 当前定义了 `chat` 和 `article` 两种 kind：前者默认进入 `SyncNos-AI Chats` / `SyncNos-AIChats`，后者进入 `SyncNos-Web Articles` / `SyncNos-WebArticles`。
@@ -107,7 +108,7 @@ flowchart LR
 | 登录态过期 | App 在线来源 | WeRead / Dedao 无法抓取 | 重新登录并更新 `SiteLoginsStore` |
 | article 抽取失败 | WebClipper article fetch | `No article content detected` | 检查页面是否有足够正文或改用支持站点保存 |
 | 缓存图片按钮不可见或“点了没变化” | WebClipper detail tools / backfill job | article 会话无按钮，或回填结果 `updatedMessages=0` | 先确认是 chat 会话，再检查消息里是否存在可下载图片链接 |
-| 文章评论恢复后丢失 | WebClipper comments / backup | `article_comments` 不在 Zip v2 里，恢复后看不到评论线程 | 需要单独升级备份 / 导入链路；当前先看 `comments/data/storage-idb.ts` 与 `backup/export.ts` |
+| 旧版或被裁剪的备份不含文章评论 | WebClipper comments / backup | 旧备份或缺失 `assets/article-comments/index.json` 时，恢复后看不到评论线程 | 当前版本的 Zip v2 已覆盖该链路；若遇到旧备份，先确认是否缺少该索引文件 |
 | cursor 缺失或不匹配 | WebClipper Notion / Obsidian | 从 append 退回 rebuild | 检查本地 mapping 和目标文件 / 页面状态 |
 | Obsidian PATCH 失败 | Obsidian orchestrator | 增量追加失败 | orchestrator 自动回退 full rebuild |
 | 发布版本不一致 | workflow | `manifest version mismatch` | 检查 `wxt.config.ts` 与 tag |
@@ -133,6 +134,9 @@ flowchart LR
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
 - `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/sync/backup/export.ts`
+- `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/src/collectors/gemini/gemini-collector.ts`
 - `webclipper/src/collectors/kimi/kimi-collector.ts`
 - `webclipper/src/collectors/zai/zai-collector.ts`

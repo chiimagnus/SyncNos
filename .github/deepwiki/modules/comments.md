@@ -3,7 +3,7 @@
 ## 职责
 - 为 WebClipper 的 article 会话提供本地优先的 threaded comments。
 - 允许用户在 article detail 或 inpage comments panel 中添加、回复、删除评论；当前只提供本地 threaded comments 与面板状态管理，不再做正文高亮回显。
-- 当前定位是**本地注释层**：它是 article 会话的一部分，但不进入 Notion / Obsidian / Zip v2 导出。
+- 当前定位是**本地注释层**：它是 article 会话的一部分，不进入 Notion / Obsidian 同步，但会跟随 Zip v2 备份 / 导入保留。
 
 ## 关键文件
 
@@ -19,7 +19,9 @@
 | `src/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments content bridge | 负责打开 panel、解析选区、首次解析 article 后附着 orphan 评论，并通过 shared session 管理状态 |
 | `src/platform/messaging/message-contracts.ts` | 消息契约 | 定义 `COMMENTS_MESSAGE_TYPES` 与 `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` |
 | `src/platform/idb/schema.ts` | IndexedDB schema | 在 `DB_VERSION = 7` 时创建 `article_comments` store 和索引 |
+| `src/sync/backup/export.ts` / `src/sync/backup/import.ts` | 备份导出 / 导入 | Zip v2 会把 `article_comments` 归档到 `assets/article-comments/index.json` 并在 merge import 时恢复 |
 | `tests/storage/article-comments-idb.test.ts` | 存储测试 | 覆盖 add / list / delete / replies / orphan attachment |
+| `tests/domains/backup-article-comments.test.ts` | 备份清单测试 | 覆盖 `articleCommentsIndexPath` 与 `counts.article_comments` 的 manifest 校验 |
 
 ## 存储模型
 
@@ -32,8 +34,8 @@
 | 线程关系 | `parentId` | `null` 表示 root comment；非空表示 reply |
 | orphan 处理 | `conversationId = null` | 页面未解析出会话时先落本地，随后 attach |
 
-- `article_comments` 是 article 的本地注释层，不参与 Notion / Obsidian 的增量同步。
-- 目前 Zip v2 备份不会带回 `article_comments`；如果用户依赖恢复，这一点要单独提醒。
+- `article_comments` 是 article 的本地注释层，不参与 Notion / Obsidian 的增量同步，但会随 Zip v2 备份 / 导入一起保留。
+- 旧版或被裁剪的 Zip v2 备份如果缺少 `assets/article-comments/index.json`，恢复时仍会丢失评论线程；排查时先看 manifest。
 - 评论线程现在只保存 quoteText 与 threaded reply 结构；不再依赖正文定位上下文。
 
 ## 运行流程
@@ -96,10 +98,11 @@ sequenceDiagram
 
 - 评论线程改动至少要跑 `tests/storage/article-comments-idb.test.ts`。
 - 若涉及 article comments 或 inpage 面板，建议再做一次 article detail + 页面内面板的人工冒烟。
-- 备份 / 导入未覆盖 `article_comments`，因此如果你在做恢复链路改动，要把这条缺口放进验证清单。
+- 备份 / 导入现在覆盖 `article_comments`；如果你在做恢复链路改动，要验证 `assets/article-comments/index.json` 与 `counts.article_comments` 都能正确往返。
 
 ## 修改热点
 - **改评论数据结构**：先看 `comments/data/storage-idb.ts`、`src/platform/idb/schema.ts`、`tests/storage/article-comments-idb.test.ts`。
+- **改备份 / 恢复评论线程**：先看 `src/sync/backup/export.ts`、`src/sync/backup/import.ts`、`src/sync/backup/backup-utils.ts`、`tests/domains/backup-article-comments.test.ts`。
 - **改 article detail UI**：先看 `ArticleCommentsSection.tsx`、`threaded-comments-panel.ts`。
 - **改页面内评论面板**：先看 `inpage-comments-panel-shadow.ts`、`inpage-comments-panel-content-handlers.ts`、`comments/sidebar/comment-sidebar-session.ts`。
 - **改消息契约**：先看 `message-contracts.ts` 和 background handlers，确保 UI / background / content 三端契约一致。
@@ -111,9 +114,13 @@ sequenceDiagram
 - `webclipper/src/comments/anchor/text-quote-dom.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
 - `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
+- `webclipper/src/sync/backup/export.ts`
+- `webclipper/src/sync/backup/import.ts`
+- `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
 - `webclipper/src/ui/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/tests/storage/article-comments-idb.test.ts`
+- `webclipper/tests/domains/backup-article-comments.test.ts`

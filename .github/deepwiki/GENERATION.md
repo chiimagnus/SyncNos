@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `bbeeafc8efe87a4c58cbee9eaa5cfed6eb50b51e` |
-| Branch name | `xy` |
-| Generation timestamp | `2026-03-19 23:22:35 CST` |
+| Commit hash | `e45d3aac6f217dd11341bf7edeb4f9880b552a04` |
+| Branch name | `crh2` |
+| Generation timestamp | `2026-03-21 18:47:11 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental sync update |
@@ -46,18 +46,14 @@
 - `assets/setting-screenshots.png`
 
 ## What Changed In This Update
-- 在 `configuration.md` 同步 `manifest.version=1.3.5`，并补充 App `AutoSyncService.intervalSeconds=5*60` 的配置事实。
-- 在 `dependencies.md` 补充 Notion OAuth Worker 作为外部集成边界，明确 token exchange 由 Worker 侧持有密钥完成。
-- 在 `api.md` 新增 Notion OAuth Worker 交换流程（授权、回调校验、code exchange、token 入库）与关键参数矩阵。
-- 在 `INDEX.md` 的 Coverage Gaps 中补充 OCR 与键盘焦点专项文档的可点击链接。
-- 在 `INDEX.md` 与 `GENERATION.md` 补齐 `api.md` / `operations.md` / `security.md` / `glossary.md` 的页面可达性与清单一致性。
-- 新增 `modules/comments.md`，并同步 `modules/webclipper.md`、`storage.md`、`testing.md`、`architecture.md`、`data-flow.md`、`business-context.md`、`workflow.md`、`overview.md`、`glossary.md` 以覆盖 article comments / 注释线程。
-- 纠正 WebClipper 本地数据库版本到 `DB_VERSION = 7`，并明确 `article_comments` 仍未纳入 Zip v2 备份 / 导入。
+- 在 `modules/comments.md`、`modules/webclipper.md`、`business-context.md`、`overview.md`、`operations.md`、`security.md`、`glossary.md`、`storage.md`、`data-flow.md`、`testing.md` 中同步 `article_comments` 已纳入 Zip v2 备份 / 导入，并补齐恢复验证入口。
+- 在 `configuration.md` 与 `security.md` 同步 WebClipper 图标配置收敛为单一 `icon-128.png`，并更新 `web_accessible_resources` 的暴露边界说明。
+- 在 `INDEX.md` 与 `GENERATION.md` 补齐页面可达性、元数据与页面清单的一致性。
 
 ## Coverage Notes
-- 本次重点是“事实同步 + comments 模块页 / 外部集成边界补强”；页面集合有小幅增加，其余页面保持稳定。
+- 本次重点是“事实同步 + comments 模块页 / 备份边界 / 图标配置补强”；页面集合有小幅增加，其余页面保持稳定。
 - deepwiki 继续覆盖双产品线、配置、数据流、存储、测试、发布与排障；并强化“代码/配置优先于文档摘要”的写作约束。
-- 仍保留的 Coverage Gaps：App Store 提交流程缺少仓库内自动化证据；OCR 与键盘焦点专项文档尚未拆为 deepwiki 独立专题页；`article_comments` 目前仍是本地注释层，未纳入 Zip v2 备份 / 导入。
+- 仍保留的 Coverage Gaps：App Store 提交流程缺少仓库内自动化证据；OCR 与键盘焦点专项文档尚未拆为 deepwiki 独立专题页。
 
 ## Audit Basis
 

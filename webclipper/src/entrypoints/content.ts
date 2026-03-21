@@ -10,6 +10,7 @@ import { registerAllCollectors } from '../collectors/register-all.ts';
 import { createCollectorsRegistry } from '../collectors/registry.ts';
 import runtimeObserverApi from '../collectors/runtime-observer.ts';
 import incrementalUpdaterApi from '../conversations/content/incremental-updater.ts';
+import notionAiModelPickerApi from '../integrations/notionai-auto-picker/notionai-model-picker.ts';
 import normalizeApi from '../shared/normalize.ts';
 import { inpageButtonApi } from '../ui/inpage/inpage-button-shadow.ts';
 import { inpageTipApi } from '../ui/inpage/inpage-tip-shadow.ts';
@@ -66,6 +67,7 @@ export default defineContentScript({
       inpageTip: inpageTipApi,
       runtimeObserver: runtimeObserverApi,
       incrementalUpdater: incrementalUpdaterApi,
+      notionAiModelPicker: notionAiModelPickerApi,
     });
     startContentBootstrap({
       runtime,

@@ -1,6 +1,6 @@
 # SyncNos WebClipper（浏览器扩展）Agent 指南
 
-[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（Markdown）、添加到 Obsidian、本地数据库备份/恢复（备份导出为 Zip v2；导入支持 Zip v2 + legacy JSON，且为合并导入），以及手动同步到 Notion。
+[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（Markdown）、添加到 Obsidian、本地数据库备份/恢复（备份导出为 Zip v2；导入支持 Zip v2 + legacy JSON，且为合并导入，Zip v2 还包含 `article_comments`），以及手动同步到 Notion。
 
 ## 阅读入口（先读）
 
@@ -26,7 +26,7 @@
 - 修改应聚焦在：采集 -> 本地持久化 -> 导出/Obsidian/备份/导入 -> 手动 Notion 同步。
 - 权限保持最小且明确；避免添加 `*://*/*` 或无关的 Chrome API。
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
-- 备份 Zip v2 结构固定为 `manifest.json + sources/conversations.csv + sources/... + config/storage-local.json + assets/image-cache/index.json + assets/image-cache/blobs/*`（用于备份已缓存的图片附件）。
+- 备份 Zip v2 结构固定为 `manifest.json + sources/conversations.csv + sources/... + config/storage-local.json + assets/image-cache/index.json + assets/image-cache/blobs/* + assets/article-comments/index.json`（用于备份已缓存的图片附件与 `article_comments`）。
 - 备份 `chrome.storage.local` 默认采用“全量非敏感键”策略；敏感键（`notion_oauth_token*`、`notion_oauth_client_secret`）必须排除。
 - 备份导入入口统一在 `Settings -> Data -> Backup`（含 Firefox popup）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
@@ -49,7 +49,7 @@
   - 开启后：对 `sourceType='chat'` 的后续采集尝试内联图片，失败不阻塞保存主链路。
   - 历史会话不会自动补齐；需在 detail header 手动触发 `cache-images` 工具动作回填。
   - `article` 会话不显示该工具动作。
-- 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入（Zip v2 目前仍不包含）。
+- 文章评论 / 注释线程是 local-first 的 article 补充层：它只依赖 canonical URL 与 conversationId；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入，且 Zip v2 备份 / 恢复会保留 `article_comments`。
 - 文章评论 / 注释线程现在由 `comments/sidebar/comment-sidebar-session.ts` 统一 open / close / quote / focus / busy 语义；不要再假定存在锚点定位消息或 `inpage-comments-locate-content-handlers.ts`。
 - 安装后引导策略：`src/entrypoints/background.ts` 仅在 `details.reason === 'install'` 时自动打开 `Settings -> About`；扩展更新后不再自动弹出设置页。
 - 浏览器右键菜单快捷入口：页面右键 -> `SyncNos WebClipper`，可一键“保存当前页面/AI 对话”，并快速切换 inpage 显示范围与 AI 自动保存开关。
@@ -118,7 +118,7 @@
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch.ts` + `src/collectors/web/article-fetch-background-handlers.ts`
   - background 侧通过 `scriptingExecuteScript`（`src/platform/webext/scripting.ts`）注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **文章评论 / 注释线程**：`src/comments/` + `src/ui/conversations/ArticleCommentsSection.tsx`
-  - `article_comments` 是 article detail 与 inpage comments panel 的本地线程；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入（Zip v2 目前仍不包含）；改它时先看 storage、background handler 和 shadow panel。
+  - `article_comments` 是 article detail 与 inpage comments panel 的本地线程；同步到 Notion / Obsidian 时会作为 article note 的 `Comments` 分区写入，且 Zip v2 备份 / 恢复会保留它；改它时先看 storage、background handler、backup 导出 / 导入和 shadow panel。
 - **UI：消息气泡与 Markdown 渲染（共享）**：`src/ui/shared/ChatMessageBubble.tsx` + `src/ui/shared/markdown.ts`
   - popup 与 app 共用同一套 bubble + renderer，避免“同一条消息在两处渲染不一致”。
 - **UI：主题模式（共享）**：`src/ui/shared/hooks/useThemeMode.ts`
