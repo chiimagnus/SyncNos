@@ -15,6 +15,7 @@ import {
   buildIncrementalAppendMarkdown as buildDefaultIncrementalAppendMarkdown,
   COMMENTS_HEADING as COMMENTS_HEADING_DEFAULT,
   ARTICLE_HEADING as ARTICLE_HEADING_DEFAULT,
+  replaceLevel2HeadingSectionInMarkdown as replaceLevel2HeadingSectionInMarkdownDefault,
   replaceUnderArticleHeading as replaceDefaultUnderArticleHeading,
   replaceUnderCommentsHeading as replaceDefaultUnderCommentsHeading,
   replaceSyncnosFrontmatter as replaceDefaultSyncnosFrontmatter,
@@ -401,6 +402,7 @@ function getMarkdownWriterModule() {
   return {
     ARTICLE_HEADING: ARTICLE_HEADING_DEFAULT,
     COMMENTS_HEADING: COMMENTS_HEADING_DEFAULT,
+    replaceLevel2HeadingSectionInMarkdown: replaceLevel2HeadingSectionInMarkdownDefault,
     buildArticleBodyMarkdown: buildDefaultArticleBodyMarkdown,
     buildObsidianCommentsMarkdown: buildDefaultObsidianCommentsMarkdown,
     buildFullNoteMarkdown: buildDefaultFullNoteMarkdown,
@@ -1032,63 +1034,96 @@ async function syncConversations({
             });
           }
 
-          if (shouldReplaceArticle) {
-            const articleChunkRaw = safeString((decision as any).articleMarkdown);
-            const articleChunk = await materializeMarkdownAssetsForObsidian({
-              client,
-              filePath: decision.filePath,
-              markdown: articleChunkRaw,
-              indexScopeMarkdown: scopeMarkdown,
+          if (shouldReplaceArticle || shouldReplaceComments) {
+            await persistCurrentJob({
+              currentConversationId: conversationId,
+              currentConversationTitle: currentTitle,
+              currentStage: 'fetching_remote_markdown',
             });
-            const patchRes = await writer.replaceUnderArticleHeading({
-              client,
-              filePath: decision.filePath,
-              markdown: articleChunk,
-            });
-            const isIdempotentDup = isObsidianPatchIdempotentDup(patchRes);
-            const isPatchFailed = isObsidianPatchFailed(patchRes);
-            if (!patchRes.ok && isPatchFailed && !isIdempotentDup) {
+            const remoteMdRes = await client.getVaultFile(decision.filePath, { accept: 'text/markdown' });
+            if (!remoteMdRes || !remoteMdRes.ok) {
               row = await fallBackToFullRebuild('full_rebuild_fallback');
-            } else if (!patchRes.ok && !isIdempotentDup) {
-              row = buildPerConversationResult({
-                conversationId,
-                conversationTitle: currentTitle,
-                ok: false,
-                mode: 'failed',
-                appended: 0,
-                error: patchRes.error && patchRes.error.message ? patchRes.error.message : 'patch failed',
-                at: Date.now(),
-              });
-            }
-          }
+            } else {
+              let updatedMarkdown = normalizeNewlines(remoteMdRes.data);
 
-          if (!row && shouldReplaceComments) {
-            const commentsChunkRaw = safeString((decision as any).commentsMarkdown);
-            const commentsChunk = await materializeMarkdownAssetsForObsidian({
-              client,
-              filePath: decision.filePath,
-              markdown: commentsChunkRaw,
-              indexScopeMarkdown: scopeMarkdown,
-            });
-            const patchRes = await writer.replaceUnderCommentsHeading({
-              client,
-              filePath: decision.filePath,
-              markdown: commentsChunk,
-            });
-            const isIdempotentDup = isObsidianPatchIdempotentDup(patchRes);
-            const isPatchFailed = isObsidianPatchFailed(patchRes);
-            if (!patchRes.ok && isPatchFailed && !isIdempotentDup) {
-              row = await fallBackToFullRebuild('full_rebuild_fallback');
-            } else if (!patchRes.ok && !isIdempotentDup) {
-              row = buildPerConversationResult({
-                conversationId,
-                conversationTitle: currentTitle,
-                ok: false,
-                mode: 'failed',
-                appended: 0,
-                error: patchRes.error && patchRes.error.message ? patchRes.error.message : 'patch failed',
-                at: Date.now(),
+              const articleBody = (() => {
+                if (shouldReplaceArticle) return '';
+                const existing = extractHeadingSectionMarkdown(updatedMarkdown, writer.ARTICLE_HEADING);
+                return existing.found ? existing.markdown : '';
+              })();
+              const commentsBody = (() => {
+                if (shouldReplaceComments) return '';
+                const existing = extractHeadingSectionMarkdown(updatedMarkdown, writer.COMMENTS_HEADING);
+                return existing.found ? existing.markdown : '';
+              })();
+
+              let nextArticleBody = articleBody;
+              if (shouldReplaceArticle) {
+                const articleChunkRaw = safeString((decision as any).articleMarkdown);
+                nextArticleBody = await materializeMarkdownAssetsForObsidian({
+                  client,
+                  filePath: decision.filePath,
+                  markdown: articleChunkRaw,
+                  indexScopeMarkdown: scopeMarkdown,
+                });
+              }
+
+              let nextCommentsBody = commentsBody;
+              if (shouldReplaceComments) {
+                const commentsChunkRaw = safeString((decision as any).commentsMarkdown);
+                nextCommentsBody = await materializeMarkdownAssetsForObsidian({
+                  client,
+                  filePath: decision.filePath,
+                  markdown: commentsChunkRaw,
+                  indexScopeMarkdown: scopeMarkdown,
+                });
+              }
+
+              const articleReplaceRes = writer.replaceLevel2HeadingSectionInMarkdown({
+                sourceMarkdown: updatedMarkdown,
+                heading: writer.ARTICLE_HEADING,
+                bodyMarkdown: nextArticleBody,
+                dedupe: true,
               });
+              if (!articleReplaceRes.ok) {
+                row = await fallBackToFullRebuild('full_rebuild_fallback');
+              } else {
+                updatedMarkdown = articleReplaceRes.markdown;
+              }
+
+              if (!row) {
+                const commentsReplaceRes = writer.replaceLevel2HeadingSectionInMarkdown({
+                  sourceMarkdown: updatedMarkdown,
+                  heading: writer.COMMENTS_HEADING,
+                  bodyMarkdown: nextCommentsBody,
+                  dedupe: true,
+                });
+                if (!commentsReplaceRes.ok) {
+                  row = await fallBackToFullRebuild('full_rebuild_fallback');
+                } else {
+                  updatedMarkdown = commentsReplaceRes.markdown;
+                }
+              }
+
+              if (!row) {
+                await persistCurrentJob({
+                  currentConversationId: conversationId,
+                  currentConversationTitle: currentTitle,
+                  currentStage: 'writing_updated_markdown',
+                });
+                const putRes = await client.putVaultFile(decision.filePath, updatedMarkdown);
+                if (!putRes || !putRes.ok) {
+                  row = buildPerConversationResult({
+                    conversationId,
+                    conversationTitle: currentTitle,
+                    ok: false,
+                    mode: 'failed',
+                    appended: 0,
+                    error: putRes && putRes.error && putRes.error.message ? putRes.error.message : 'put failed',
+                    at: Date.now(),
+                  });
+                }
+              }
             }
           }
 

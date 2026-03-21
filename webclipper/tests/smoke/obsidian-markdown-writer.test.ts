@@ -68,4 +68,48 @@ describe("obsidian-markdown-writer", () => {
     expect(calls[3].payload.target).toBe("syncnos");
     expect(calls[3].payload.contentType).toBe("application/json");
   });
+
+  it("dedupes and replaces level-2 heading sections in existing markdown", async () => {
+    const w = await loadWriter();
+    const src = [
+      "---",
+      "title: \"T\"",
+      "---",
+      "",
+      "# T",
+      "",
+      "## Article",
+      "",
+      "Old article",
+      "",
+      "## Comments",
+      "",
+      "> Quoted",
+      "",
+      "- Old",
+      "",
+      "## Comments",
+      "",
+      "- Newer duplicate",
+      "",
+      "## Tail",
+      "",
+      "Keep me",
+      "",
+    ].join("\n");
+    const res = w.replaceLevel2HeadingSectionInMarkdown({
+      sourceMarkdown: src,
+      heading: w.COMMENTS_HEADING,
+      bodyMarkdown: "- Replaced",
+      dedupe: true,
+    });
+    expect(res.ok).toBe(true);
+    const out = String(res.markdown || "");
+    expect(out.match(/^##\s+Comments\s*$/gm)?.length || 0).toBe(1);
+    expect(out).toContain("- Replaced");
+    expect(out).not.toContain("- Old");
+    expect(out).not.toContain("- Newer duplicate");
+    expect(out).toContain("## Tail");
+    expect(out).toContain("Keep me");
+  });
 });

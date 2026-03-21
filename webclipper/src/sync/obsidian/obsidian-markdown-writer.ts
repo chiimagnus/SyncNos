@@ -12,6 +12,73 @@ function normalizeNewlines(input: unknown) {
   return String(input || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
+function escapeRegExp(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findLevel2HeadingRanges(lines: string[], heading: string) {
+  const ranges: Array<{ headingIndex: number; bodyStart: number; bodyEnd: number }> = [];
+  const target = safeString(heading);
+  if (!target) return ranges;
+  const headingRe = new RegExp(`^##\\s+${escapeRegExp(target)}\\s*$`);
+  const endRe = /^(#{1,2})\s+/;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] || '';
+    if (!headingRe.test(line.trimEnd())) continue;
+    const bodyStart = i + 1;
+    let bodyEnd = lines.length;
+    for (let j = bodyStart; j < lines.length; j += 1) {
+      const nextLine = lines[j] || '';
+      if (endRe.test(nextLine)) {
+        bodyEnd = j;
+        break;
+      }
+    }
+    ranges.push({ headingIndex: i, bodyStart, bodyEnd });
+    i = bodyEnd - 1;
+  }
+  return ranges;
+}
+
+function buildSectionBodyLines(markdownBody: string) {
+  const trimmed = normalizeNewlines(markdownBody).trim();
+  const out: string[] = [''];
+  if (trimmed) out.push(...trimmed.split('\n'));
+  out.push('');
+  return out;
+}
+
+function replaceLevel2HeadingSectionInMarkdown({
+  sourceMarkdown,
+  heading,
+  bodyMarkdown,
+  dedupe,
+}: {
+  sourceMarkdown: unknown;
+  heading: string;
+  bodyMarkdown: string;
+  dedupe?: boolean;
+}) {
+  const src = normalizeNewlines(sourceMarkdown);
+  const lines = src.split('\n');
+  const ranges = findLevel2HeadingRanges(lines, heading);
+  if (!ranges.length) return { ok: false, markdown: src, error: 'heading_not_found' };
+
+  if (dedupe) {
+    for (let i = ranges.length - 1; i >= 1; i -= 1) {
+      const r = ranges[i]!;
+      lines.splice(r.headingIndex, r.bodyEnd - r.headingIndex);
+    }
+  }
+
+  const nextRanges = findLevel2HeadingRanges(lines, heading);
+  if (!nextRanges.length) return { ok: false, markdown: lines.join('\n'), error: 'heading_not_found' };
+  const primary = nextRanges[0]!;
+  const bodyLines = buildSectionBodyLines(bodyMarkdown);
+  lines.splice(primary.bodyStart, primary.bodyEnd - primary.bodyStart, ...bodyLines);
+  return { ok: true, markdown: lines.join('\n') };
+}
+
 function yamlEscapeString(value: unknown) {
   const text = safeString(value);
   return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -303,6 +370,7 @@ const api = {
   MESSAGES_HEADING,
   ARTICLE_HEADING,
   COMMENTS_HEADING,
+  replaceLevel2HeadingSectionInMarkdown,
   buildArticleBodyMarkdown,
   buildObsidianCommentsMarkdown,
   buildFullNoteMarkdown,
@@ -317,6 +385,7 @@ export {
   MESSAGES_HEADING,
   ARTICLE_HEADING,
   COMMENTS_HEADING,
+  replaceLevel2HeadingSectionInMarkdown,
   buildArticleBodyMarkdown,
   buildObsidianCommentsMarkdown,
   buildFullNoteMarkdown,
