@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 
 import { t } from '@i18n';
 import type { ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
-import { buttonClassName, cardClassName, checkboxClassName, dangerButtonClassName, textInputClassName } from '../ui';
-import { SettingsFormRow } from './SettingsFormRow';
+import { buttonClassName, cardClassName, checkboxClassName, dangerButtonClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 const textareaClassName =
   'tw-min-h-[140px] tw-w-full tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2.5 tw-py-2 tw-text-sm tw-text-[var(--text-primary)] focus-visible:tw-border-[var(--focus-ring)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]';

@@ -5,7 +5,7 @@ import {
   deleteArticleCommentById,
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
-} from '../data/storage';
+} from '@services/comments/data/storage';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

@@ -1,4 +1,4 @@
-import { createZipBlob } from '../backup/zip-utils';
+import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
 import type { Conversation } from '@services/conversations/domain/models';

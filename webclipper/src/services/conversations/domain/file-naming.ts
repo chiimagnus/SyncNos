@@ -1,4 +1,4 @@
-import { sanitizeFilenamePart } from './markdown';
+import { sanitizeFilenamePart } from '@services/conversations/domain/markdown';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();

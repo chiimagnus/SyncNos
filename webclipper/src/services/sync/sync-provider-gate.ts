@@ -1,6 +1,6 @@
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 import type { SyncProviderId } from '@services/protocols/sync-provider-contract';
-import { listSyncProviders } from './sync-provider-registry';
+import { listSyncProviders } from '@services/sync/sync-provider-registry';
 
 export type SyncProviderGateDisabledExtra = {
   code: 'sync_provider_disabled';

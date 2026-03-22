@@ -5,7 +5,7 @@ import type {
   CommentSidebarPanelApi,
   CommentSidebarSession,
   CommentSidebarSessionSnapshot,
-} from './comment-sidebar-contract';
+} from '@services/comments/sidebar/comment-sidebar-contract';
 
 export function normalizeCommentSidebarQuoteText(text: unknown): string {
   return String(text ?? '').replace(/\r\n?/g, '\n');

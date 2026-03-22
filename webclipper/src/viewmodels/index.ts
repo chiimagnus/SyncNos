@@ -1,2 +1,2 @@
-export * from './shared/useOpenExtensionAppTab';
-export * from './shared/useStorageOnChanged';
+export * from '@viewmodels/shared/useOpenExtensionAppTab';
+export * from '@viewmodels/shared/useStorageOnChanged';

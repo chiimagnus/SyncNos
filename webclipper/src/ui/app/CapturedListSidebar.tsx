@@ -4,8 +4,8 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { getURL as runtimeGetURL } from '@services/shared/runtime';
 
 import { t } from '@i18n';
-import { ConversationListPane } from '../conversations/ConversationListPane';
-import { navIconButtonClassName } from '../shared/nav-styles';
+import { ConversationListPane } from '@ui/conversations/ConversationListPane';
+import { navIconButtonClassName } from '@ui/shared/nav-styles';
 
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
   const routerLocation = useLocation();

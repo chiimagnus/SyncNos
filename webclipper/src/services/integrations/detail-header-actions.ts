@@ -1,13 +1,13 @@
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { launchObsidianApp } from '@services/sync/obsidian/obsidian-app-launch';
-import type { DetailHeaderAction, DetailHeaderActionPort } from './detail-header-action-types';
-import { openExternalUrl } from './open-external-url';
-import { reportObsidianOpenError, waitForDelay } from './openin/obsidian-open-target';
-import { resolveOpenInDetailHeaderActions } from './openin/openin-detail-header-actions';
-import { resolveChatWithDetailHeaderActions } from './chatwith/chatwith-detail-header-actions';
+import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
+import { openExternalUrl } from '@services/integrations/open-external-url';
+import { reportObsidianOpenError, waitForDelay } from '@services/integrations/openin/obsidian-open-target';
+import { resolveOpenInDetailHeaderActions } from '@services/integrations/openin/openin-detail-header-actions';
+import { resolveChatWithDetailHeaderActions } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 
-export { DETAIL_HEADER_ACTION_LABELS } from './openin/openin-detail-header-actions';
-export type { DetailHeaderAction, DetailHeaderActionPort } from './detail-header-action-types';
+export { DETAIL_HEADER_ACTION_LABELS } from '@services/integrations/openin/openin-detail-header-actions';
+export type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 
 export type ResolveDetailHeaderActionsInput = {
   conversation: Conversation | null | undefined;

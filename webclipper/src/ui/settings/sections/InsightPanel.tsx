@@ -11,9 +11,9 @@ import {
   type InsightStats,
   type InsightTopConversation,
   INSIGHT_UNKNOWN_DATE_LABEL,
-} from './insight-stats';
-import type { InsightTimeRange } from './insight-stats';
-import { buttonClassName, cardClassName } from '../ui';
+} from '@ui/settings/sections/insight-stats';
+import type { InsightTimeRange } from '@ui/settings/sections/insight-stats';
+import { buttonClassName, cardClassName } from '@ui/settings/ui';
 import { useConversationsApp } from '@ui/conversations/conversations-context';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '@ui/shared/SelectMenu';

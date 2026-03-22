@@ -1,4 +1,4 @@
-import * as idb from './storage-idb';
+import * as idb from '@services/conversations/data/storage-idb';
 
 export async function listConversations() {
   return await idb.getConversations();

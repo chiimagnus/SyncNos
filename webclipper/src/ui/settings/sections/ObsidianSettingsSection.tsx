@@ -1,8 +1,8 @@
 import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
-import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '../ui';
-import { SettingsFormRow } from './SettingsFormRow';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
   busy: boolean;

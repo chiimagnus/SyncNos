@@ -1,6 +1,6 @@
 import { t } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { cardClassName, checkboxClassName } from '../ui';
+import { cardClassName, checkboxClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 

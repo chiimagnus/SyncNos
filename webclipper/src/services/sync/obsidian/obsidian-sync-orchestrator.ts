@@ -2,25 +2,25 @@ import { backgroundStorage as defaultBackgroundStorage } from '@services/convers
 import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
-} from './settings-store';
+} from '@services/sync/obsidian/settings-store';
 import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
-} from './obsidian-local-rest-client.ts';
+} from '@services/sync/obsidian/obsidian-local-rest-client.ts';
 import {
   buildFullNoteMarkdown as buildDefaultFullNoteMarkdown,
-} from './obsidian-markdown-writer.ts';
+} from '@services/sync/obsidian/obsidian-markdown-writer.ts';
 import {
   buildStableNotePath as buildDefaultStableNotePath,
   buildLegacyHashNotePath as buildDefaultLegacyHashNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
   stableConversationId10 as stableConversationId10Default,
-} from './obsidian-note-path.ts';
+} from '@services/sync/obsidian/obsidian-note-path.ts';
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
-} from './obsidian-sync-metadata.ts';
-import obsidianSyncJobStore from './obsidian-sync-job-store.ts';
+} from '@services/sync/obsidian/obsidian-sync-metadata.ts';
+import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
 const SYNC_PROVIDER = 'obsidian';

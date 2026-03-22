@@ -1,4 +1,4 @@
-import { createAutoSaveIncrementalEngine } from './autosave-incremental-engine.ts';
+import { createAutoSaveIncrementalEngine } from '@services/conversations/content/autosave-incremental-engine.ts';
 
 const engine = createAutoSaveIncrementalEngine();
 

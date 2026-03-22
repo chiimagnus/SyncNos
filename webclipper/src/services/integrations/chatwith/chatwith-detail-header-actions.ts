@@ -1,11 +1,11 @@
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
-import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
+import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
 import {
   buildChatWithPayload,
   loadChatWithSettings,
   truncateForChatWith,
   type ChatWithAiPlatform,
-} from './chatwith-settings';
+} from '@services/integrations/chatwith/chatwith-settings';
 
 async function writeTextToClipboard(value: string): Promise<boolean> {
   const text = String(value ?? '');

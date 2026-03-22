@@ -1,5 +1,5 @@
-import { getMessagesByConversationId, syncConversationMessages } from '../data/storage-idb';
-import { inlineChatImagesInMessages } from '../data/image-inline';
+import { getMessagesByConversationId, syncConversationMessages } from '@services/conversations/data/storage-idb';
+import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 
 export type BackfillConversationImagesResult = {
   scannedMessages: number;

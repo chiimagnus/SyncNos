@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { createMarkdownRenderer } from './markdown';
+import { createMarkdownRenderer } from '@ui/shared/markdown';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
 type BubbleRole = 'user' | 'assistant' | 'other';

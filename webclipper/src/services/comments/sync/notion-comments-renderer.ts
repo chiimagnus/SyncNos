@@ -1,4 +1,4 @@
-import type { ArticleComment } from '../domain/models';
+import type { ArticleComment } from '@services/comments/domain/models';
 
 const MAX_TEXT = 1900;
 

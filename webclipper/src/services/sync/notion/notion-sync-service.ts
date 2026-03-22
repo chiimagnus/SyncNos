@@ -1,8 +1,8 @@
 // @ts-nocheck
-import { optionNameForSource as defaultOptionNameForSource } from './notion-ai.ts';
-import { notionFetch as defaultNotionFetch } from './notion-api.ts';
-import notionImageUploadUpgrader from './notion-image-upload-upgrader.ts';
-import notionMarkdownBlocks from './notion-markdown-blocks.ts';
+import { optionNameForSource as defaultOptionNameForSource } from '@services/sync/notion/notion-ai.ts';
+import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
+import notionImageUploadUpgrader from '@services/sync/notion/notion-image-upload-upgrader.ts';
+import notionMarkdownBlocks from '@services/sync/notion/notion-markdown-blocks.ts';
 
   const MAX_TEXT = 1900;
   const APPEND_BATCH = 90;

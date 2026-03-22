@@ -1,4 +1,4 @@
-import inpageTipCssRaw from '../styles/inpage-tip.css?raw';
+import inpageTipCssRaw from '@ui/styles/inpage-tip.css?raw';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const VISIBLE_MS = 1800;

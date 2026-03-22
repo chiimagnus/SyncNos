@@ -1,8 +1,8 @@
 import { t } from '@i18n';
-import type { InsightStats, InsightTimeRange } from './insight-stats';
-import { hasInsightData } from './insight-stats';
-import { InsightPanel } from './InsightPanel';
-import { cardClassName } from '../ui';
+import type { InsightStats, InsightTimeRange } from '@ui/settings/sections/insight-stats';
+import { hasInsightData } from '@ui/settings/sections/insight-stats';
+import { InsightPanel } from '@ui/settings/sections/InsightPanel';
+import { cardClassName } from '@ui/settings/ui';
 
 function InsightStateCard(props: {
   title: string;

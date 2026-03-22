@@ -1,4 +1,4 @@
-import type { AddArticleCommentInput, ArticleComment } from '../domain/models';
+import type { AddArticleCommentInput, ArticleComment } from '@services/comments/domain/models';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;

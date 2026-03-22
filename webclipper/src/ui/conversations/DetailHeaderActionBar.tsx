@@ -3,8 +3,8 @@ import { BookOpen, ExternalLink, FileText, ImageDown, Link2Off, Sparkles } from 
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { t } from '@i18n';
-import { buttonMenuItemClassName } from '../shared/button-styles';
-import { MenuPopover } from '../shared/MenuPopover';
+import { buttonMenuItemClassName } from '@ui/shared/button-styles';
+import { MenuPopover } from '@ui/shared/MenuPopover';
 
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];

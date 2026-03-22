@@ -1,5 +1,5 @@
-import type { Conversation } from '../domain/models';
-import { syncConversationMessages, syncConversationMessagesAppendOnly, upsertConversation } from './storage';
+import type { Conversation } from '@services/conversations/domain/models';
+import { syncConversationMessages, syncConversationMessagesAppendOnly, upsertConversation } from '@services/conversations/data/storage';
 
 export async function writeConversationSnapshot(payload: any): Promise<Conversation> {
   return upsertConversation(payload);

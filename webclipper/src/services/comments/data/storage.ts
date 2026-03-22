@@ -1,4 +1,4 @@
-import * as idb from './storage-idb';
+import * as idb from '@services/comments/data/storage-idb';
 
 export async function addArticleComment(payload: any) {
   return await idb.addArticleComment(payload);

@@ -1,5 +1,5 @@
 import { OBSIDIAN_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { getObsidianSettings, saveObsidianSettings } from './settings-store';
+import { getObsidianSettings, saveObsidianSettings } from '@services/sync/obsidian/settings-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

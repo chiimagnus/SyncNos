@@ -1,6 +1,6 @@
 import { CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { send } from '@platform/runtime/runtime';
-import type { Conversation, ConversationDetail } from '../domain/models';
+import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };

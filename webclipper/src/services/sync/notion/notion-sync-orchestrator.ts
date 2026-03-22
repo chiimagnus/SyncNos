@@ -1,23 +1,23 @@
 // @ts-nocheck
-import type { NotionServices } from './notion-services.ts';
+import type { NotionServices } from '@services/sync/notion/notion-services.ts';
 import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
-import { getNotionOAuthToken } from './auth/token-store';
+import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
-import notionDbManagerDefault from './notion-db-manager.ts';
-import notionSyncJobStoreDefault from './notion-sync-job-store.ts';
-import notionSyncServiceDefault from './notion-sync-service.ts';
-import notionApiDefault from './notion-api.ts';
-import notionFilesApiDefault from './notion-files-api.ts';
-import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
+import notionDbManagerDefault from '@services/sync/notion/notion-db-manager.ts';
+import notionSyncJobStoreDefault from '@services/sync/notion/notion-sync-job-store.ts';
+import notionSyncServiceDefault from '@services/sync/notion/notion-sync-service.ts';
+import notionApiDefault from '@services/sync/notion/notion-api.ts';
+import notionFilesApiDefault from '@services/sync/notion/notion-files-api.ts';
+import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '@platform/storage/local';
 import { buildNotionCommentsBlocks, computeNotionCommentsDigest } from '@services/comments/sync/notion-comments-renderer';
-import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from './notion-section-blocks.ts';
+import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from '@services/sync/notion/notion-section-blocks.ts';
 import {
   ensureSectionHeadingBlockId,
   layoutSpecForConversationKind,
   rebuildSectionByArchivingHeading,
   recoverSectionHeadingBlockId,
-} from './notion-managed-sections.ts';
+} from '@services/sync/notion/notion-managed-sections.ts';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;

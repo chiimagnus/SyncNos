@@ -1,8 +1,8 @@
-import type { CurrentPageCaptureService } from './current-page-capture';
+import type { CurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 import { t } from '@i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
-import { buildCaptureSuccessTipMessage } from '../shared/capture-tip';
+import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 

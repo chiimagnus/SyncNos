@@ -1,5 +1,5 @@
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
-import { setNotionOAuthToken, type NotionOAuthTokenV1 } from './token-store';
+import { setNotionOAuthToken, type NotionOAuthTokenV1 } from '@services/sync/notion/auth/token-store';
 import { tabsRemove } from '@platform/webext/tabs';
 import { webNavigationOnCommittedAddListener } from '@platform/webext/web-navigation';
 

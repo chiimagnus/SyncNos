@@ -10,7 +10,7 @@ import {
   setSyncCursor,
   syncConversationMessages,
   upsertConversation,
-} from '../data/storage-idb';
+} from '@services/conversations/data/storage-idb';
 import {
   attachOrphanCommentsToConversation as attachOrphanArticleCommentsToConversation,
   listArticleCommentsByConversationId as getArticleCommentsByConversationId,

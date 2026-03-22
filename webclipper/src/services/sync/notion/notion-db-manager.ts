@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { buildAiOptions as buildDefaultAiOptions } from './notion-ai.ts';
-import { notionFetch as defaultNotionFetch } from './notion-api.ts';
+import { buildAiOptions as buildDefaultAiOptions } from '@services/sync/notion/notion-ai.ts';
+import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
 import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 

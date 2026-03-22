@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { notionFetch as defaultNotionFetch } from './notion-api.ts';
+import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
 
   const FILE_UPLOAD_VERSION = "2025-09-03";
   const DEFAULT_POLL_INTERVAL_MS = 800;

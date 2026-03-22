@@ -1,7 +1,7 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet } from '@platform/storage/local';
-import { getNotionOAuthToken } from './notion/auth/token-store';
-import { ensureSyncProviderEnabled } from './sync-provider-gate';
+import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { ensureSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

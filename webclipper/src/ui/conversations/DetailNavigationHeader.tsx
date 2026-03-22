@@ -2,9 +2,9 @@ import { ChevronLeft } from 'lucide-react';
 
 import { t } from '@i18n';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
-import { DetailHeaderActionBar } from './DetailHeaderActionBar';
-import { navIconButtonClassName } from '../shared/nav-styles';
-import { buttonTintClassName } from '../shared/button-styles';
+import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
+import { navIconButtonClassName } from '@ui/shared/nav-styles';
+import { buttonTintClassName } from '@ui/shared/button-styles';
 
 export type DetailNavigationHeaderProps = {
   title: string;

@@ -4,7 +4,7 @@ import {
   getSyncJob,
   isRunningSyncJob,
   setSyncJob,
-} from '../sync-job-store.ts';
+} from '@services/sync/sync-job-store.ts';
 
 export const NOTION_SYNC_JOB_KEY = SYNC_JOB_STORAGE_KEYS.notion;
 

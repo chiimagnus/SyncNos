@@ -1,4 +1,4 @@
-import { setPendingOpenConversationId } from './pending-open';
+import { setPendingOpenConversationId } from '@ui/conversations/pending-open';
 
 export type OpenConversationDeps = {
   setActiveId: (id: number | null) => void;

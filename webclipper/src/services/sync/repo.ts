@@ -1,6 +1,6 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { send } from '@platform/runtime/runtime';
-import type { NotionSyncJobStatus, ObsidianSyncStatus, SyncProvider } from './models';
+import type { NotionSyncJobStatus, ObsidianSyncStatus, SyncProvider } from '@services/sync/models';
 
 export type SyncStartAck = {
   provider: SyncProvider;

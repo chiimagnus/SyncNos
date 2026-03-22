@@ -11,8 +11,8 @@ import {
   validateBackupManifest,
   validateConversationBundle,
   validateStorageLocalDocument,
-} from './backup-utils';
-import { openDb, reqToPromise, tx, txDone } from './idb';
+} from '@services/sync/backup/backup-utils';
+import { openDb, reqToPromise, tx, txDone } from '@services/sync/backup/idb';
 
 type AnyRecord = Record<string, any>;
 

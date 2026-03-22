@@ -1,4 +1,4 @@
-import { webextApis, webextError, webextLastErrorMessage } from './base';
+import { webextApis, webextError, webextLastErrorMessage } from '@platform/webext/base';
 
 type AnyWindow = { id?: number; focused?: boolean };
 

@@ -1,6 +1,6 @@
 import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
-import { buildCaptureSuccessTipMessage } from '../shared/capture-tip';
+import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;

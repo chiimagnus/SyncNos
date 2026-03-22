@@ -1,5 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
-import type { SyncJobSnapshot, SyncProvider } from './models';
+import type { SyncJobSnapshot, SyncProvider } from '@services/sync/models';
 
 const DEFAULT_STALE_MS = 20 * 60 * 1000;
 

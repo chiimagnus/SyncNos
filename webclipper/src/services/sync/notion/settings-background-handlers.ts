@@ -1,6 +1,6 @@
 import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageRemove } from '@platform/storage/local';
-import { clearNotionOAuthToken, getNotionOAuthToken } from './auth/token-store';
+import { clearNotionOAuthToken, getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

@@ -1,8 +1,8 @@
 import type { RefObject } from 'react';
 
 import { t } from '@i18n';
-import { formatTime } from '../utils';
-import { buttonClassName, cardClassName } from '../ui';
+import { formatTime } from '@ui/settings/utils';
+import { buttonClassName, cardClassName } from '@ui/settings/ui';
 
 function ImportStatsList(props: { stats: any }) {
   const stats = props.stats;

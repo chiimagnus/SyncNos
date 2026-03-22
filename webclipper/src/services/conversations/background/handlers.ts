@@ -5,13 +5,13 @@ import {
   getConversationDetail,
   hasConversation,
   listConversations,
-} from '../data/storage';
+} from '@services/conversations/data/storage';
 import {
   writeConversationMessagesSnapshot,
   writeConversationSnapshot,
-} from '../data/write';
-import { inlineChatImagesInMessages } from '../data/image-inline';
-import { backfillConversationImages } from './image-backfill-job';
+} from '@services/conversations/data/write';
+import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

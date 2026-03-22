@@ -4,10 +4,10 @@ import {
   filterStorageForBackup,
   LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
   uniqueConversationKey,
-} from './backup-utils';
+} from '@services/sync/backup/backup-utils';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
-import { openDb, reqToPromise, tx, txDone } from './idb';
-import { createZipBlob } from './zip-utils';
+import { openDb, reqToPromise, tx, txDone } from '@services/sync/backup/idb';
+import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { DB_NAME, DB_VERSION } from '@platform/idb/schema';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 

@@ -1,7 +1,7 @@
 import { t } from '@i18n';
-import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES } from '../messaging/message-contracts';
-import { storageGet, storageOnChanged, storageSet } from '../storage/local';
-import { tabsQuery, tabsSendMessage } from '../webext/tabs';
+import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { storageGet, storageOnChanged, storageSet } from '@platform/storage/local';
+import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 

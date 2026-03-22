@@ -1,6 +1,6 @@
 import { t } from '@i18n';
-import { buttonClassName, cardClassName, textInputClassName } from '../ui';
-import { SettingsFormRow } from './SettingsFormRow';
+import { buttonClassName, cardClassName, textInputClassName } from '@ui/settings/ui';
+import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function NotionAISection(props: {
   busy: boolean;

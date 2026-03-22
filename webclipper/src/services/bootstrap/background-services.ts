@@ -16,7 +16,7 @@ import {
   testConnection as testObsidianConnection,
 } from '@services/sync/obsidian/obsidian-sync-orchestrator.ts';
 
-import { conversationKinds } from '../protocols/conversation-kinds.ts';
+import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 
 export type NotionSyncOrchestrator = {
   syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) => Promise<unknown>;

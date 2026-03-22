@@ -1,4 +1,4 @@
-import { notionFetch } from './notion-api';
+import { notionFetch } from '@services/sync/notion/notion-api';
 
 type ToggleHeadingLevel = 1 | 2 | 3;
 

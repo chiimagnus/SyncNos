@@ -1,4 +1,4 @@
-import type { Conversation, ConversationMessage } from '../domain/models';
+import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;

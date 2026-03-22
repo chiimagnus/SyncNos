@@ -1,4 +1,4 @@
-import { createZipBlob, extractZipEntries, isUnsafeZipEntryName } from '../backup/zip-utils';
+import { createZipBlob, extractZipEntries, isUnsafeZipEntryName } from '@services/sync/backup/zip-utils';
 
 const api = { createZipBlob, extractZipEntries, isUnsafeZipEntryName };
 
