@@ -41,6 +41,9 @@ jobs:
       - name: Install WebClipper deps
         run: npm ci --prefix webclipper
 
+      - name: WebClipper gate (lint/format/compile/test)
+        run: npm run --prefix webclipper gate:ci
+
       - name: Build WebClipper Chrome zip
         run: |
           set -euo pipefail
