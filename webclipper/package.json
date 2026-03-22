@@ -10,7 +10,7 @@
     "build": "wxt build --mv3",
     "build:firefox": "wxt build -b firefox --mv3",
     "prepare": "wxt prepare",
-    "compile": "tsc --noEmit",
+    "compile": "tsc -p tsconfig.compile.json --noEmit",
     "check": "npm run build && node ../.github/scripts/webclipper/check-dist.mjs --root=webclipper/.output/chrome-mv3",
     "test": "vitest run"
   },
