@@ -14,9 +14,9 @@
 | `src/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_display_mode`（兼容旧 `inpage_supported_only`）与支持站点如何影响 UI 启动 |
 | `src/bootstrap/current-page-capture.ts` | 当前页抓取服务 | 统一判断当前标签页可否抓取，并区分 chat / article 两条手动抓取路径 |
 | `src/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击开 popup、article fetch、Google AI Studio 手动保存都在这里 |
-| `src/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
-| `src/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
-| `src/integrations/detail-header-action-types.ts` | 详情头动作槽位契约 | 定义 `open / chat-with / tools` 三类槽位，约束 popup / app 的动作分发 |
+| `src/services/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
+| `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
+| `src/services/integrations/detail-header-action-types.ts` | 详情头动作槽位契约 | 定义 `open / chat-with / tools` 三类槽位，约束 popup / app 的动作分发 |
 | `src/i18n/index.ts` | 扩展内 UI 文案入口 | 按 `navigator.language` 在英文 / 中文翻译表间切换 |
 | `src/collectors/` | 站点采集适配器 | 新 AI 站点通常从这里扩展 |
 | `src/conversations/data/storage-idb.ts` | 本地会话数据层 | 承载 IndexedDB 事实源 |
@@ -34,8 +34,8 @@
 | `src/sync/notion/notion-sync-orchestrator.ts` | Notion 同步编排 | 控制 DB / page / cursor / rebuild |
 | `src/sync/obsidian/obsidian-sync-orchestrator.ts` | Obsidian 同步编排 | 控制 append / rebuild / rename / fallback |
 | `src/ui/settings/SettingsScene.tsx` | 设置页总入口 | 管理 Notion、Notion AI、Obsidian、Backup、Chat with AI、Insight、Inpage、About |
-| `src/ui/settings/hooks/useSettingsSceneController.ts` | 设置页状态控制器 | 统一管理存储读写、连接状态、备份动作，并按需懒加载 Insight |
-| `src/ui/settings/sections/insight-stats.ts` | Insight 聚合引擎 | 从 IndexedDB 的 `conversations` + `messages` 现算本地 clip 统计 |
+| `src/viewmodels/settings/useSettingsSceneController.ts` | 设置页状态控制器 | 统一管理存储读写、连接状态、备份动作，并按需懒加载 Insight |
+| `src/viewmodels/settings/insight-stats.ts` | Insight 聚合引擎 | 从 IndexedDB 的 `conversations` + `messages` 现算本地 clip 统计 |
 | `src/ui/settings/sections/InsightSection.tsx` | Insight 状态容器 | 管理 loading / error / empty / populated 四类状态 |
 | `src/ui/settings/sections/InsightPanel.tsx` | Insight 统计视图 | 用 `recharts` 渲染来源分布、文章域名分布与 Top 3 conversation |
 | `src/ui/styles/tokens.css` | 主题 tokens | 用 `prefers-color-scheme` 统一驱动亮/暗 token，popup / app / inpage 一致 |
@@ -94,7 +94,7 @@
 
 | UI 区域 | 主要实现 | 说明 |
 | --- | --- | --- |
-| 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `DetailNavigationHeader.tsx`, `conversations-context.tsx`, `src/integrations/detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 动作解析逻辑（含窄屏头部） |
+| 会话列表 / 详情 | `ConversationsScene.tsx`, `ConversationDetailPane.tsx`, `DetailNavigationHeader.tsx`, `conversations-context.tsx`, `src/services/integrations/detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 动作解析逻辑（含窄屏头部） |
 | 文章评论区 | `ConversationDetailPane.tsx`, `ArticleCommentsSection.tsx`, `threaded-comments-panel.ts`, `inpage-comments-panel-shadow.ts` | article detail / inpage comments panel 共享本地 threaded comments 线程 |
 | 设置页 | `SettingsScene.tsx`, `SettingsSidebarNav.tsx`, `types.ts` | 真实设置中枢，按 `Features / Data / About` 分组组织 `General`、`Chat with AI`、`Backup`、`Notion`、`Obsidian`、`Insight`、`About` |
 | Markdown 渲染 | `ui/shared/markdown.ts`, `ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
@@ -112,7 +112,7 @@
 - article comments 只在 article detail 和 inpage panel 中出现；它们是本地评论线程，不占用 `Chat with AI`、`tools` 或 `open` 的动作槽位。
 - detail header 的动作槽位由 `detail-header-action-types.ts` 统一定义为 `open / chat-with / tools`；`ConversationDetailPane` 与 `DetailNavigationHeader` 都按同一槽位拆分渲染。
 - `conversations-context.tsx` 会为非 article 会话注入 `cache-images` 工具动作：点击后调用 `backfillConversationImages()`，后台复扫消息并在成功后刷新当前 detail，同时反馈 `updatedMessages / downloadedCount / fromCacheCount`。
-- `useSettingsSceneController.ts` 只在 `activeSection === 'insight'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。
+- `src/viewmodels/settings/useSettingsSceneController.ts` 只在 `activeSection === 'insight'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。
 - `SettingsScene.tsx` 会为 Insight 分区放宽 detail 宽度到 `1120px`，因为这一页需要容纳双栏图表与排行布局。
 - `BackupSection.tsx` 的导入统计现在会展示 comments 相关数量，因此恢复验证时不能只看会话和图片缓存。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
@@ -129,10 +129,10 @@
 - **新增支持站点**：先改 `collectors/` 和 `register-all.ts`，不要把站点判断散落到 popup 或 background。
 - **改 inpage 体验**：先看 `content-controller.ts`, `bootstrap/content.ts`, `inpage-button-shadow.ts`, `inpage-tip-shadow.ts`。
 - **改会话结构 / 本地持久化**：先看 `storage-idb.ts`, `schema.ts`, `tests/storage/*`。
-- **改 Insight 统计 / 排行 / 图表**：先看 `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `useSettingsSceneController.ts`；这里决定 Top N、Other 分桶、空态 / 错误态和图表布局。
+- **改 Insight 统计 / 排行 / 图表**：先看 `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `src/viewmodels/settings/useSettingsSceneController.ts`；这里决定 Top N、Other 分桶、空态 / 错误态和图表布局。
 - **改列表筛选下拉 / 菜单裁切**：先看 `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx`；不要再回退固定 `maxHeight`，否则容易在底部条或窄窗口出现无谓滚动条。
-- **改主题 tokens / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `useSettingsSceneController.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略 token 真源。
-- **改 detail header 动作分发**：先看 `src/integrations/detail-header-action-types.ts`, `src/integrations/detail-header-actions.ts`, `conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
+- **改主题 tokens / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `src/viewmodels/settings/useSettingsSceneController.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略 token 真源。
+- **改 detail header 动作分发**：先看 `src/services/integrations/detail-header-action-types.ts`, `src/services/integrations/detail-header-actions.ts`, `conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
 - **改图片缓存补全流程（cache-images）**：先看 `conversations-context.tsx`, `conversations/client/repo.ts`, `conversations/background/handlers.ts`, `image-backfill-job.ts`；确认仅 chat 会话显示动作，并核对回填后 detail 刷新与计数反馈。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
@@ -183,23 +183,23 @@
 - `webclipper/src/ui/settings/sections/BackupSection.tsx`
 - `webclipper/src/conversations/client/repo.ts`
 - `webclipper/src/i18n/index.ts`
-- `webclipper/src/integrations/chatwith/chatwith-settings.ts`
-- `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
-- `webclipper/src/integrations/detail-header-actions.ts`
-- `webclipper/src/integrations/detail-header-action-types.ts`
+- `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/services/integrations/chatwith/chatwith-detail-header-actions.ts`
+- `webclipper/src/services/integrations/detail-header-actions.ts`
+- `webclipper/src/services/integrations/detail-header-action-types.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/platform/messaging/ui-background-handlers.ts`
 - `webclipper/src/protocols/conversation-kinds.ts`
 - `webclipper/src/sync/notion/notion-sync-orchestrator.ts`
 - `webclipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
-- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
 - `webclipper/src/ui/settings/SettingsSidebarNav.tsx`
-- `webclipper/src/ui/settings/types.ts`
+- `webclipper/src/viewmodels/settings/types.ts`
 - `webclipper/src/ui/settings/sections/ChatWithAiSection.tsx`
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
-- `webclipper/src/ui/settings/sections/insight-stats.ts`
+- `webclipper/src/viewmodels/settings/insight-stats.ts`
 - `webclipper/src/ui/styles/tokens.css`
 - `webclipper/src/ui/shared/MenuPopover.tsx`
 - `webclipper/src/ui/shared/SelectMenu.tsx`

@@ -10,7 +10,7 @@
 | 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
 | WebClipper 页面内按钮没出现 | content script / `inpage_display_mode` / 不支持页面 | `content.ts`, `bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
 | WebClipper 底部 `source/site` 筛选下拉出现多余滚动条或被裁切 | `SelectMenu` 自适应高度 / 容器裁剪边界 | `ConversationListPane.tsx`, `SelectMenu.tsx` | 检查 `adaptiveMaxHeight`、`side` 与 `findNearestClippingRect()` 是否生效 |
-| Chat 会话图片一直是外链 / 缓存图片按钮无效 | `ai_chat_cache_images_enabled` / detail tools / backfill job | `useSettingsSceneController.ts`, `conversations-context.tsx`, `image-backfill-job.ts` | 先确认是 chat 会话，再看开关、路由消息和回填计数 |
+| Chat 会话图片一直是外链 / 缓存图片按钮无效 | `ai_chat_cache_images_enabled` / detail tools / backfill job | `src/viewmodels/settings/useSettingsSceneController.ts`, `conversations-context.tsx`, `image-backfill-job.ts` | 先确认是 chat 会话，再看开关、路由消息和回填计数 |
 | Google AI Studio 自动保存不完整 | collector 虚拟化渲染 | `googleaistudio-collector.ts`, `content-controller.ts` | 该来源更依赖手动保存 |
 | 网页文章抓取失败 | `Readability` / 页面正文不足 | `article-fetch.ts` | 常见报错是 `No article content detected` |
 | 升级扩展后没有自动跳设置页 | `onInstalled` 行为策略 | `background.ts` | 当前仅首次安装自动打开 About，更新不会自动弹页 |

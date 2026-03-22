@@ -98,7 +98,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Chat with AI** — copy any local conversation or article to your clipboard and jump to your favorite AI platform to continue the discussion.
 - **Image caching** — optionally cache AI conversation images locally. Backfill historical images from the detail page.
 - **Database backup / restore** — full export and import of your local session database, including article comment threads. Sensitive data (OAuth tokens, etc.) is automatically excluded.
-- **Theme mode** — follow system / manually switch Light / Dark.
+- **Theme** — follows system `prefers-color-scheme` only.
 - **Inpage button** — configurable display scope (all sites / supported sites only / off).
 
 ---

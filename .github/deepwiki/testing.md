@@ -45,14 +45,14 @@
 | `tests/collectors/kimi-collector.test.ts`, `tests/collectors/zai-collector.test.ts` | 用户上传附件卡片图片抓取 | 防止附件图片只出现在页面而未进入本地会话 markdown |
 | `tests/smoke/background-router-current-page-capture.test.ts` | popup 当前页抓取与 background relay | 保证当前页抓取不会只在 UI 上“看起来能点” |
 | `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI 详情头动作解析（含 clipboard + external jump） | 覆盖 `open` / `chat-with` 主路径，保证详情头动作协议不回退 |
-| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（`Features = general + chat_with`，`About = insight + about`） | 防止 Settings 导航回退或新分区被错误挪位 |
+| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（`Features = general + chat_with`，`Data = backup + notion + obsidian`，`About = insight + about`） | 防止 Settings 导航回退或新分区被错误挪位 |
 
 ## 手动冒烟建议
 1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
 2. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开 popup、多击提示、popup 列表刷新。
 3. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
 4. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除都可用；刷新后评论仍在本地；如果从外部恢复备份，确认评论线程也能一起恢复；旧备份若不含 `assets/article-comments/index.json` 则仍会缺失。
-5. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `theme mode / inpage display mode / AI auto-save / AI chat cache images` 设置行为。
+5. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `inpage display mode / AI auto-save / AI chat cache images` 设置行为，以及系统主题随 `prefers-color-scheme` 切换的表现。
 6. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
 7. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。
 8. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
@@ -104,8 +104,8 @@
 - `webclipper/tests/smoke/detail-header-actions.test.ts`
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`
-- `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
-- `webclipper/src/integrations/detail-header-action-types.ts`
+- `webclipper/src/services/integrations/chatwith/chatwith-detail-header-actions.ts`
+- `webclipper/src/services/integrations/detail-header-action-types.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
 - `webclipper/src/conversations/background/handlers.ts`
@@ -124,6 +124,6 @@
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
-- `webclipper/src/ui/settings/sections/insight-stats.ts`
+- `webclipper/src/viewmodels/settings/insight-stats.ts`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`

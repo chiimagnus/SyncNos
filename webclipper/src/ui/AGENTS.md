@@ -318,11 +318,11 @@
 
 | 槽位 | 典型动作 | 真源 | UI 约束 |
 | --- | --- | --- | --- |
-| `open` | Open in Notion / Open in Obsidian | `src/integrations/openin/*`, `src/integrations/detail-header-actions.ts` | 单动作直出，多动作菜单 |
-| `chat-with` | Chat with ChatGPT / Claude / ... | `src/integrations/chatwith/chatwith-detail-header-actions.ts` | 先复制 payload，再跳转外链 |
+| `open` | Open in Notion / Open in Obsidian | `src/services/integrations/openin/*`, `src/services/integrations/detail-header-actions.ts` | 单动作直出，多动作菜单 |
+| `chat-with` | Chat with ChatGPT / Claude / ... | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | 先复制 payload，再跳转外链 |
 | `tools` | `cache-images`（仅 chat） | `src/ui/conversations/conversations-context.tsx` | article 不显示；触发后应回馈计数并刷新 detail |
 
-- 槽位契约定义在 `src/integrations/detail-header-action-types.ts`，不要在组件内硬编码“动作分组字符串”。
+- 槽位契约定义在 `src/services/integrations/detail-header-action-types.ts`，不要在组件内硬编码“动作分组字符串”。
 - 主详情页与窄屏 header 必须共享同一分发行为：
   - 主详情：`ConversationDetailPane.tsx`
   - 窄屏 header：`DetailNavigationHeader.tsx`（由 `PopupShell.tsx` / `AppShell.tsx` 承载）

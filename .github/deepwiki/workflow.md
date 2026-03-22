@@ -39,7 +39,7 @@
 | 3 | 默认按 `compile` → `test` → `build` 验证 | 先查类型，再查逻辑，再查产物 |
 | 4 | 涉及 Firefox / 商店发布 / manifest 重写时补 `build:firefox` 和 `check` | 防止渠道特定错误 |
 | 5 | collector 改动要同时考虑自动采集、手动保存、popup 列表和同步下游 | 采集不是孤立层 |
-| 6 | Settings / Conversations UI 改动要同时检查 `types.ts`、`useSettingsSceneController.ts`、`tokens.css`、`SelectMenu.tsx`、`PopupShell.tsx` / `AppShell.tsx`、`ConversationListPane.tsx` / `ConversationsScene.tsx`、`conversations-context.tsx`、`DetailHeaderActionBar.tsx` / `DetailNavigationHeader.tsx` | 这些文件共同定义设置分组与关键存储键（含 `ai_chat_cache_images_enabled`）、主题 token（`prefers-color-scheme`）、详情头动作槽位、下拉可视高度策略、Insight 跳转入口、筛选持久化与窄屏路由桥接 |
+| 6 | Settings / Conversations UI 改动要同时检查 `src/viewmodels/settings/types.ts`、`src/viewmodels/settings/useSettingsSceneController.ts`、`src/viewmodels/settings/insight-stats.ts`、`src/services/integrations/chatwith/chatwith-settings.ts`、`tokens.css`、`SelectMenu.tsx`、`PopupShell.tsx` / `AppShell.tsx`、`ConversationListPane.tsx` / `ConversationsScene.tsx`、`conversations-context.tsx`、`DetailHeaderActionBar.tsx` / `DetailNavigationHeader.tsx` | 这些文件共同定义设置分组与关键存储键（含 `ai_chat_cache_images_enabled`）、主题 token（`prefers-color-scheme`）、详情头动作槽位、下拉可视高度策略、Insight 跳转入口、筛选持久化与窄屏路由桥接 |
 
 ## Deepwiki / 文档维护工作流
 
@@ -79,7 +79,7 @@
 - `webclipper/AGENTS.md`
 - `webclipper/package.json`
 - `webclipper/wxt.config.ts`
-- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`

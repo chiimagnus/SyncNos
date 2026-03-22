@@ -14,7 +14,7 @@
 | macOS App | SwiftUI + AppKit | `SyncNosApp.swift`, `AppDelegate.swift` | onboarding/paywall 状态、自动同步开关、IAP 状态 | 登录态过期、同步中断、用户强退 |
 | WebClipper 内容侧 | content script | `src/entrypoints/content.ts` | inpage 显示模式、自动保存开关 | 页面未刷新导致开关未生效、采集不完整 |
 | WebClipper 后台侧 | MV3 service worker | `src/entrypoints/background.ts` | 消息路由、sync job 状态、OAuth 回调监听 | 多实例残留 job、消息类型漂移 |
-| WebClipper 设置侧 | popup/app UI | `SettingsScene.tsx`, `useSettingsSceneController.ts` | Notion/Obsidian 设置、备份导入导出、Insight 只读统计 | 设置与真实存储不一致 |
+| WebClipper 设置侧 | popup/app UI | `SettingsScene.tsx`, `src/viewmodels/settings/useSettingsSceneController.ts` | Notion/Obsidian 设置、备份导入导出、Insight 只读统计 | 设置与真实存储不一致 |
 | CI/CD 发布侧 | GitHub Actions | `.github/workflows/webclipper-*.yml` | tag、manifest.version、渠道凭据 | 版本不一致、商店凭据缺失 |
 
 ## 日常运行检查清单
@@ -77,7 +77,7 @@ flowchart LR
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/bootstrap/content.ts`
-- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/sync/backup/export.ts`

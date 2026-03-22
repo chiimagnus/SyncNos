@@ -109,7 +109,7 @@ flowchart LR
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
-- `webclipper/src/ui/settings/sections/insight-stats.ts`
+- `webclipper/src/viewmodels/settings/insight-stats.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `macOS/Resource/flows.svg`
