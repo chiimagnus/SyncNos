@@ -16,7 +16,6 @@
     "jsx": "react-jsx"
   },
   "exclude": [
-    "tests",
     "dist",
     "dist-edge",
     "dist-firefox",
