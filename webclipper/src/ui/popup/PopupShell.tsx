@@ -11,7 +11,7 @@ import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/Con
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName, navPillButtonClassName } from '@ui/shared/nav-styles';
-import { usePopupCurrentPageCapture } from '@ui/popup/usePopupCurrentPageCapture';
+import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 
 const POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_notion_sync_open_tab_dont_show_v1';
 

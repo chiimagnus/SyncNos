@@ -57,7 +57,7 @@ vi.mock('../../src/ui/conversations/conversations-context', () => ({
   }),
 }));
 
-vi.mock('../../src/ui/popup/usePopupCurrentPageCapture', () => ({
+vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
   usePopupCurrentPageCapture: () => ({
     buttonDisabled: false,
     buttonLabel: 'Fetch AI Chat',
