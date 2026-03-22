@@ -164,7 +164,7 @@ async function listChildren(accessToken, blockId) {
   let cursor = null;
   for (;;) {
     const qs = cursor ? `?page_size=100&start_cursor=${encodeURIComponent(String(cursor))}` : '?page_size=100';
-    // eslint-disable-next-line no-await-in-loop
+
     const res = await notionFetch({
       accessToken,
       method: 'GET',
@@ -190,13 +190,12 @@ async function archiveBlockWithRetry(accessToken, blockId) {
   for (;;) {
     attempt += 1;
     try {
-      // eslint-disable-next-line no-await-in-loop
       return await archiveBlock(accessToken, blockId);
     } catch (error) {
       const status = parseHttpStatus(error);
       const retryable = status === 429 || status === 503;
       if (!retryable || attempt >= CLEAR_DELETE_MAX_ATTEMPTS) throw error;
-      // eslint-disable-next-line no-await-in-loop
+
       await sleep(retryDelayMs(error, attempt));
     }
   }
@@ -210,7 +209,6 @@ async function appendBatchWithRetry(accessToken, pageId, batch) {
   for (;;) {
     attempt += 1;
     try {
-      // eslint-disable-next-line no-await-in-loop
       return await notionFetch({
         accessToken,
         method: 'PATCH',
@@ -221,7 +219,7 @@ async function appendBatchWithRetry(accessToken, pageId, batch) {
       const status = parseHttpStatus(error);
       const retryable = status === 429 || status === 503;
       if (!retryable || attempt >= APPEND_MAX_ATTEMPTS) throw error;
-      // eslint-disable-next-line no-await-in-loop
+
       await sleep(retryDelayMs(error, attempt));
     }
   }
@@ -238,7 +236,7 @@ async function parallelEach(items, worker, concurrency) {
         for (;;) {
           const item = queue.shift();
           if (item == null) return;
-          // eslint-disable-next-line no-await-in-loop
+
           await worker(item);
         }
       })(),

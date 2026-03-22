@@ -573,7 +573,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
       try {
         trace.mark('load conversation');
-        // eslint-disable-next-line no-await-in-loop
+
         const mapped = await (storage.getSyncMappingByConversation
           ? storage.getSyncMappingByConversation(id)
           : Promise.resolve(null));
@@ -610,7 +610,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         trace.mark('ensure database');
         let dbId = await ensureDbForKind(kind);
 
-        // eslint-disable-next-line no-await-in-loop
         const messages = await storage.getMessagesByConversationId(id);
         const cursorSectionId = kind && kind.id === 'chat' ? 'conversations' : null;
         const cursor = extractCursor(mapping, cursorSectionId);
@@ -629,7 +628,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           });
           trace.mark('check destination page');
           try {
-            // eslint-disable-next-line no-await-in-loop
             const page = await notionSyncService.getPage(token.accessToken, pageId);
             existingPage = page;
             pageUsable = notionSyncService.isPageUsableForDatabase
@@ -650,7 +648,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           });
           trace.mark('create destination page');
           try {
-            // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
               properties: pageSpec.buildCreateProperties(convo),
@@ -667,7 +664,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             });
             trace.mark('rebuild database');
             // Rebuild once per storage key and share the recovery across concurrent conversations.
-            // eslint-disable-next-line no-await-in-loop
+
             dbId =
               recoveredMissingDbByStorageKey.has(recoveredStorageKey) && dbIdByKindId.get(kind.id)
                 ? String(dbIdByKindId.get(kind.id) || '')
@@ -678,7 +675,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentStage: 'creating_destination_page',
             });
             trace.mark('create destination page');
-            // eslint-disable-next-line no-await-in-loop
+
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
               properties: pageSpec.buildCreateProperties(convo),
@@ -688,7 +685,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           pageId = created && created.id ? created.id : '';
           if (!pageId) throw new Error('create page failed');
 
-          // eslint-disable-next-line no-await-in-loop
           await storage.setConversationNotionPageId(id, pageId);
 
           await writeRunningJob({
@@ -718,10 +714,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               try {
                 const url = String(convo?.url || '').trim();
                 if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                  // eslint-disable-next-line no-await-in-loop
                   await storage.attachOrphanArticleCommentsToConversation(url, id);
                 }
-                // eslint-disable-next-line no-await-in-loop
+
                 comments = await storage.getArticleCommentsByConversationId(id);
                 commentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
               } catch (e) {
@@ -736,7 +731,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             }
 
             const articleDigest = computeNotionArticleDigest(messages);
-            // eslint-disable-next-line no-await-in-loop
+
             const builtArticle = await buildBlocksForSync({
               notionSyncService,
               accessToken: token.accessToken,
@@ -755,7 +750,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             commentItems = Number(builtComments?.items) || 0;
 
             trace.mark('create section headings');
-            // eslint-disable-next-line no-await-in-loop
+
             const headingRes = await notionSyncService.appendChildren(
               token.accessToken,
               pageId,
@@ -776,7 +771,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             if (!articleHeadingId || !commentsHeadingId) throw new Error('failed to create section headings');
 
             if (storage && typeof storage.patchSyncMapping === 'function') {
-              // eslint-disable-next-line no-await-in-loop
               await storage.patchSyncMapping(id, {
                 notionSections: {
                   article: { headingBlockId: articleHeadingId },
@@ -787,11 +781,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
             trace.mark('append children');
             if (articleBlocks.length) {
-              // eslint-disable-next-line no-await-in-loop
               await notionSyncService.appendChildren(token.accessToken, articleHeadingId, articleBlocks);
             }
             if (commentBlocks.length) {
-              // eslint-disable-next-line no-await-in-loop
               await notionSyncService.appendChildren(token.accessToken, commentsHeadingId, commentBlocks);
             }
             appendedBlockCount = sections.length + articleBlocks.length + commentBlocks.length;
@@ -803,7 +795,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 currentStage: 'saving_sync_cursor',
               });
               trace.mark('save cursor');
-              // eslint-disable-next-line no-await-in-loop
+
               await storage.setSyncCursor(id, {
                 ...nextCursor,
                 notionSectionDigests: {
@@ -832,7 +824,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           const conversationsSection = sections.find((s) => s && String(s.id) === 'conversations') || sections[0];
           if (!conversationsSection) throw new Error('missing conversations section spec');
 
-          // eslint-disable-next-line no-await-in-loop
           const built = await buildBlocksForSync({
             notionSyncService,
             accessToken: token.accessToken,
@@ -843,7 +834,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           if (Array.isArray(built?.warnings) && built.warnings.length) warnings.push(...built.warnings);
 
           trace.mark('create section heading');
-          // eslint-disable-next-line no-await-in-loop
+
           const headingRes = await notionSyncService.appendChildren(token.accessToken, pageId, [
             buildNotionToggleHeadingBlock(conversationsSection.title, conversationsSection.level),
           ]);
@@ -853,14 +844,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           if (!conversationsHeadingId) throw new Error('failed to create conversations section');
 
           if (storage && typeof storage.patchSyncMapping === 'function') {
-            // eslint-disable-next-line no-await-in-loop
             await storage.patchSyncMapping(id, {
               notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
             });
           }
           if (blocks.length) {
             trace.mark('append children');
-            // eslint-disable-next-line no-await-in-loop
+
             await notionSyncService.appendChildren(token.accessToken, conversationsHeadingId, blocks);
             appendedBlockCount = blocks.length + 1;
           }
@@ -872,7 +862,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentStage: 'saving_sync_cursor',
             });
             trace.mark('save cursor');
-            // eslint-disable-next-line no-await-in-loop
+
             await storage.setSyncCursor(id, {
               ...nextCursor,
               notionSectionCursors: {
@@ -909,7 +899,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           const needsPropertyUpdate = pagePropertiesNeedUpdate(existingPage, desiredProperties);
           if (needsPropertyUpdate) {
             trace.mark('update page properties');
-            // eslint-disable-next-line no-await-in-loop
+
             await notionSyncService.updatePageProperties(token.accessToken, {
               pageId,
               properties: desiredProperties,
@@ -947,10 +937,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             try {
               const url = String(convo?.url || '').trim();
               if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                // eslint-disable-next-line no-await-in-loop
                 await storage.attachOrphanArticleCommentsToConversation(url, id);
               }
-              // eslint-disable-next-line no-await-in-loop
+
               articleComments = await storage.getArticleCommentsByConversationId(id);
               commentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
             } catch (e) {
@@ -1017,7 +1006,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             let commentBlocks: any[] = [];
 
             if (shouldUpdateArticle) {
-              // eslint-disable-next-line no-await-in-loop
               const builtArticle = await buildBlocksForSync({
                 notionSyncService,
                 accessToken: token.accessToken,
@@ -1081,7 +1069,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               }
               articleHeadingBlockId = rebuilt.headingBlockId;
               if (storage && typeof storage.patchSyncMapping === 'function') {
-                // eslint-disable-next-line no-await-in-loop
                 await storage.patchSyncMapping(id, {
                   notionSections: { article: { headingBlockId: articleHeadingBlockId } },
                 });
@@ -1131,7 +1118,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               }
               commentsHeadingBlockId = rebuilt.headingBlockId;
               if (storage && typeof storage.patchSyncMapping === 'function') {
-                // eslint-disable-next-line no-await-in-loop
                 await storage.patchSyncMapping(id, {
                   notionSections: { comments: { headingBlockId: commentsHeadingBlockId } },
                 });
@@ -1147,7 +1133,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentStage: 'saving_sync_cursor',
             });
             trace.mark('save cursor');
-            // eslint-disable-next-line no-await-in-loop
+
             await storage.setSyncCursor(id, {
               ...nextCursor,
               ...(typeof articleDigest === 'string' || typeof commentsDigest === 'string'
@@ -1250,13 +1236,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentStage: 'rebuilding_destination_page',
           });
           trace.mark('rebuild page properties');
-          // eslint-disable-next-line no-await-in-loop
+
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
             properties: pageSpec.buildUpdateProperties(convo),
           });
           trace.mark('build blocks');
-          // eslint-disable-next-line no-await-in-loop
+
           const built = await buildBlocksForSync({
             notionSyncService,
             accessToken: token.accessToken,
@@ -1300,7 +1286,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
 
           if (storage && typeof storage.patchSyncMapping === 'function') {
-            // eslint-disable-next-line no-await-in-loop
             await storage.patchSyncMapping(id, {
               notionSections: { conversations: { headingBlockId: rebuilt.headingBlockId } },
             });
@@ -1313,7 +1298,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentStage: 'saving_sync_cursor',
             });
             trace.mark('save cursor');
-            // eslint-disable-next-line no-await-in-loop
+
             await storage.setSyncCursor(id, {
               ...nextCursor,
               notionSectionCursors: {
@@ -1343,13 +1328,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentStage: 'appending_new_messages',
           });
           trace.mark('update page properties');
-          // eslint-disable-next-line no-await-in-loop
+
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
             properties: pageSpec.buildUpdateProperties(convo),
           });
           trace.mark('build blocks');
-          // eslint-disable-next-line no-await-in-loop
+
           const built = await buildBlocksForSync({
             notionSyncService,
             accessToken: token.accessToken,
@@ -1374,7 +1359,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               conversationId: id,
             });
             try {
-              // eslint-disable-next-line no-await-in-loop
               await notionSyncService.appendChildren(token.accessToken, resolved.headingBlockId, blocks);
             } catch (e) {
               if (!isStaleBlockAnchorError(e)) throw e;
@@ -1386,12 +1370,11 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 notionSyncService,
               });
               if (storage && typeof storage.patchSyncMapping === 'function') {
-                // eslint-disable-next-line no-await-in-loop
                 await storage.patchSyncMapping(id, {
                   notionSections: { conversations: { headingBlockId: recoveredId } },
                 });
               }
-              // eslint-disable-next-line no-await-in-loop
+
               await notionSyncService.appendChildren(token.accessToken, recoveredId, blocks);
             }
           }
@@ -1403,7 +1386,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentStage: 'saving_sync_cursor',
             });
             trace.mark('save cursor');
-            // eslint-disable-next-line no-await-in-loop
+
             await storage.setSyncCursor(id, {
               ...nextCursor,
               notionSectionCursors: {
@@ -1435,7 +1418,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               currentStage: 'updating_page_properties',
             });
             trace.mark('update page properties');
-            // eslint-disable-next-line no-await-in-loop
+
             await notionSyncService.updatePageProperties(token.accessToken, {
               pageId,
               properties: desiredProperties,
@@ -1451,7 +1434,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           const nextCursor = lastMessageCursor(messages);
           if (storage.setSyncCursor && inc && inc.ok) {
             trace.mark('save cursor');
-            // eslint-disable-next-line no-await-in-loop
+
             await storage.setSyncCursor(id, {
               ...nextCursor,
               notionSectionCursors: {

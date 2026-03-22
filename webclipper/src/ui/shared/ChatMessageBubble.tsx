@@ -104,7 +104,6 @@ export function ChatMessageBubble({
       const next = new Map<number, string>();
       try {
         for (const id of ids) {
-          // eslint-disable-next-line no-await-in-loop
           const asset = await getImageCacheAssetById({ id, conversationId });
           if (!asset || disposed) continue;
           let url: string | null = null;
@@ -115,7 +114,6 @@ export function ChatMessageBubble({
             url = null;
           }
           if (!url) {
-            // eslint-disable-next-line no-await-in-loop
             const dataUrl = await blobToDataUrl(asset.blob);
             if (disposed) continue;
             url = dataUrl;

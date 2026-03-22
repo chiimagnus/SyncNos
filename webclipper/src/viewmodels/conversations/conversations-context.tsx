@@ -108,7 +108,6 @@ async function materializeSyncnosAssetsForExport(input: {
   let index = 0;
 
   for (const assetId of orderedAssetIds) {
-    // eslint-disable-next-line no-await-in-loop
     const asset = await getImageCacheAssetById({
       id: assetId,
       conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
@@ -561,7 +560,6 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         if (mergeSingle) {
           const docs: string[] = [];
           for (const c of selectedConversations) {
-            // eslint-disable-next-line no-await-in-loop
             const d = await getConversationDetail(Number(c.id));
             docs.push(formatConversationMarkdown(c, d.messages || []));
           }
@@ -575,10 +573,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           for (const attachment of mergedMaterialized.attachments) files.push(attachment);
         } else {
           for (const c of selectedConversations) {
-            // eslint-disable-next-line no-await-in-loop
             const d = await getConversationDetail(Number(c.id));
             const basename = buildConversationBasename(c);
-            // eslint-disable-next-line no-await-in-loop
+
             const materialized = await materializeSyncnosAssetsForExport({
               markdown: formatConversationMarkdown(c, d.messages || []),
               markdownBasename: basename,

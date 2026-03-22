@@ -502,7 +502,6 @@ async function extractArticleOnTab(tabId: number) {
             return;
           }
 
-          // eslint-disable-next-line no-await-in-loop
           await new Promise((resolve) => setTimeout(resolve, 350));
         }
       }
@@ -522,7 +521,7 @@ async function extractArticleOnTab(tabId: number) {
           else stableTicks = 0;
           lastCount = count;
           if (stableTicks >= 2) return;
-          // eslint-disable-next-line no-await-in-loop
+
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
       }

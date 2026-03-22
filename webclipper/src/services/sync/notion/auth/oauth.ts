@@ -86,7 +86,7 @@ async function exchangeNotionCodeForToken(code: string, { fetchImpl = fetch }: {
       const msg = String((e as any)?.message || e || '');
       const transient = /aborted|timeout|network|fetch/i.test(msg);
       if (attempt >= 2 || !transient) break;
-      // eslint-disable-next-line no-await-in-loop
+
       await sleep(700);
     }
   }

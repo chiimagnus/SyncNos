@@ -281,7 +281,7 @@ export async function materializeMarkdownAssetPaths(input: {
   const replacements = new Map<string, string>();
   for (let i = 0; i < orderedUrls.length; i += 1) {
     const url = orderedUrls[i]!;
-    // eslint-disable-next-line no-await-in-loop
+
     const ext = await inferMaterializedImageExt(url);
     replacements.set(url, `${basename}-${i + 1}.${ext}`);
   }

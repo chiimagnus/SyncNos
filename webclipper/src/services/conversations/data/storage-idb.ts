@@ -328,7 +328,7 @@ export async function syncConversationMessages(
     for (const key of upsertKeys) {
       const m = byKey.get(key);
       if (!m) continue;
-      // eslint-disable-next-line no-await-in-loop
+
       const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
       const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
       const baseRecord = {
@@ -342,10 +342,8 @@ export async function syncConversationMessages(
       };
       const record: any = withOptionalId(existing && existing.id, baseRecord);
       if (existing) {
-        // eslint-disable-next-line no-await-in-loop
         await reqToPromise(stores.messages.put(record));
       } else {
-        // eslint-disable-next-line no-await-in-loop
         const id = await reqToPromise(stores.messages.add(record));
         record.id = id as any;
       }
@@ -354,11 +352,10 @@ export async function syncConversationMessages(
 
     let deleted = 0;
     for (const key of removedKeys) {
-      // eslint-disable-next-line no-await-in-loop
       const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
       const id = Number(existing && existing.id);
       if (!Number.isFinite(id) || id <= 0) continue;
-      // eslint-disable-next-line no-await-in-loop
+
       await reqToPromise(stores.messages.delete(id));
       deleted += 1;
     }
@@ -373,7 +370,7 @@ export async function syncConversationMessages(
   for (const m of messages || []) {
     if (!m || !m.messageKey) continue;
     presentKeys.add(String(m.messageKey));
-    // eslint-disable-next-line no-await-in-loop
+
     const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
     const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
     const baseRecord = {
@@ -387,10 +384,8 @@ export async function syncConversationMessages(
     };
     const record: any = withOptionalId(existing && existing.id, baseRecord);
     if (existing) {
-      // eslint-disable-next-line no-await-in-loop
       await reqToPromise(stores.messages.put(record));
     } else {
-      // eslint-disable-next-line no-await-in-loop
       const id = await reqToPromise(stores.messages.add(record));
       record.id = id as any;
     }
@@ -491,14 +486,13 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   const imageCacheIdx = stores.image_cache.index('by_conversationId');
 
   for (const id of ids) {
-    // eslint-disable-next-line no-await-in-loop
     const convo: any = await reqToPromise(stores.conversations.get(id));
     if (!convo) continue;
 
     // Delete messages under this conversation.
     const range = IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
     const cursorReq = msgIdx.openCursor(range);
-    // eslint-disable-next-line no-await-in-loop
+
     await new Promise<void>((resolve, reject) => {
       cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
       cursorReq.onsuccess = () => {
@@ -514,10 +508,8 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
     const source = convo.source || '';
     const conversationKey = convo.conversationKey || '';
     if (source && conversationKey) {
-      // eslint-disable-next-line no-await-in-loop
       const mapping: any = await reqToPromise(mappingIdx.get([source, conversationKey]) as any);
       if (mapping && mapping.id) {
-        // eslint-disable-next-line no-await-in-loop
         await reqToPromise(stores.sync_mappings.delete(mapping.id));
         deletedMappings += 1;
       }
@@ -529,7 +521,7 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
     // Delete cached images under this conversation.
     const imgRange = IDBKeyRange.only(id);
     const imgCursorReq = imageCacheIdx.openCursor(imgRange);
-    // eslint-disable-next-line no-await-in-loop
+
     await new Promise<void>((resolve, reject) => {
       imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
       imgCursorReq.onsuccess = () => {

@@ -152,7 +152,7 @@ async function materializeMarkdownAssetsForObsidian({
   for (const assetId of targetIds) {
     const index = indexByAssetId.get(assetId);
     if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
-    // eslint-disable-next-line no-await-in-loop
+
     const asset = await getImageCacheAssetById({ id: assetId });
     if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
@@ -161,9 +161,9 @@ async function materializeMarkdownAssetsForObsidian({
     attachmentNameByAssetId.set(assetId, attachmentName);
 
     const contentType = safeString(asset.contentType || asset.blob.type) || `image/${ext}`;
-    // eslint-disable-next-line no-await-in-loop
+
     const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-    // eslint-disable-next-line no-await-in-loop
+
     const putRes = await client.putVaultBinaryFile(buildAttachmentPath(filePath, attachmentName), bytes, {
       contentType,
     });

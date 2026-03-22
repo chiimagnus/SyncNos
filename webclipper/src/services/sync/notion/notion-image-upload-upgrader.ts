@@ -284,7 +284,6 @@ async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
     if (!uploadId) {
       if (isDataImageUrl(url)) {
         try {
-          // eslint-disable-next-line no-await-in-loop
           uploadId = await uploadFromDataUrl(files, accessToken, url);
           if (uploadId) cache.set(url, uploadId);
         } catch (e) {
@@ -298,7 +297,6 @@ async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
         }
       } else if (isSyncnosAssetUrl(url)) {
         try {
-          // eslint-disable-next-line no-await-in-loop
           uploadId = await uploadFromSyncnosAsset(files, accessToken, url);
           if (uploadId) cache.set(url, uploadId);
         } catch (e) {
@@ -312,7 +310,6 @@ async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
         }
       } else {
         try {
-          // eslint-disable-next-line no-await-in-loop
           uploadId = await uploadFromExternalUrl(files, accessToken, url);
           if (uploadId) cache.set(url, uploadId);
         } catch (e) {
@@ -324,7 +321,6 @@ async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
             // ignore
           }
           try {
-            // eslint-disable-next-line no-await-in-loop
             uploadId = await uploadFromBytes(files, accessToken, url);
             if (uploadId) cache.set(url, uploadId);
           } catch (e2) {

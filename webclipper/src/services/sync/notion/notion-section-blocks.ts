@@ -53,7 +53,7 @@ export async function listBlockChildren(accessToken: string, blockId: string): P
   let cursor: string | null = null;
   for (;;) {
     const qs = cursor ? `?page_size=100&start_cursor=${encodeURIComponent(String(cursor))}` : '?page_size=100';
-    // eslint-disable-next-line no-await-in-loop
+
     const res = await notionFetch({ accessToken, method: 'GET', path: `/v1/blocks/${blockId}/children${qs}` } as any);
     const results = Array.isArray((res as any)?.results) ? (res as any).results : [];
     out.push(...results);

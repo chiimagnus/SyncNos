@@ -144,7 +144,6 @@ async function waitUntilUploaded({ accessToken, id, pollIntervalMs, maxAttempts 
   const attempts = Number.isFinite(Number(maxAttempts)) ? Math.max(1, Number(maxAttempts)) : DEFAULT_MAX_ATTEMPTS;
 
   for (let i = 1; i <= attempts; i += 1) {
-    // eslint-disable-next-line no-await-in-loop
     const upload = await retrieveUpload({ accessToken, id: uploadId });
     const status = upload && upload.status ? String(upload.status) : '';
     if (status === 'uploaded') return upload;
@@ -155,7 +154,6 @@ async function waitUntilUploaded({ accessToken, id, pollIntervalMs, maxAttempts 
     if (status === 'expired') throw new Error('file upload expired');
     if (status !== 'pending') throw new Error(`file upload unknown status: ${status || 'unknown'}`);
     if (i < attempts) {
-      // eslint-disable-next-line no-await-in-loop
       await sleep(interval);
     }
   }

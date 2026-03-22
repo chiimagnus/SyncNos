@@ -207,18 +207,16 @@ export async function importBackupLegacyJsonMerge(
         continue;
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
       const merged = mergeConversationRecord(existing, incoming);
 
       if (existing && existing.id) {
         merged.id = existing.id;
-        // eslint-disable-next-line no-await-in-loop
+
         await reqToPromise(s.conversations.put(merged as any));
         stats.conversationsUpdated += 1;
         uniqueToLocalId.set(`${source}||${conversationKey}`, Number(existing.id));
       } else {
-        // eslint-disable-next-line no-await-in-loop
         const id = await reqToPromise(s.conversations.add(merged as any) as any);
         stats.conversationsAdded += 1;
         uniqueToLocalId.set(`${source}||${conversationKey}`, Number(id));
@@ -258,7 +256,6 @@ export async function importBackupLegacyJsonMerge(
         continue;
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
       const base = { ...(incoming || {}), conversationId: localConversationId, messageKey };
       const merged = mergeMessageRecord(existing, base);
@@ -267,11 +264,10 @@ export async function importBackupLegacyJsonMerge(
 
       if (existing && existing.id) {
         merged.id = existing.id;
-        // eslint-disable-next-line no-await-in-loop
+
         await reqToPromise(s.messages.put(merged as any));
         stats.messagesUpdated += 1;
       } else {
-        // eslint-disable-next-line no-await-in-loop
         await reqToPromise(s.messages.add(merged as any));
         stats.messagesAdded += 1;
       }
@@ -304,28 +300,25 @@ export async function importBackupLegacyJsonMerge(
         continue;
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
       const merged = mergeSyncMappingRecord(existing, incoming);
 
       if (existing && existing.id) {
         merged.id = existing.id;
-        // eslint-disable-next-line no-await-in-loop
+
         await reqToPromise(s.sync_mappings.put(merged as any));
         stats.mappingsUpdated += 1;
       } else {
-        // eslint-disable-next-line no-await-in-loop
         await reqToPromise(s.sync_mappings.add(merged as any));
         stats.mappingsAdded += 1;
       }
 
       const notionPageId = merged.notionPageId ? String(merged.notionPageId) : '';
       if (notionPageId) {
-        // eslint-disable-next-line no-await-in-loop
         const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
         if (convo && convo.id && (!convo.notionPageId || !String(convo.notionPageId).trim())) {
           convo.notionPageId = notionPageId;
-          // eslint-disable-next-line no-await-in-loop
+
           await reqToPromise(s.conversations.put(convo));
         }
       }
@@ -519,7 +512,6 @@ export async function importBackupZipV2Merge(
         continue;
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
       const merged = mergeConversationRecord(existing, incoming);
       merged.source = source;
@@ -528,12 +520,11 @@ export async function importBackupZipV2Merge(
       const uk = uniqueConversationKey(merged);
       if (existing && existing.id) {
         merged.id = existing.id;
-        // eslint-disable-next-line no-await-in-loop
+
         await reqToPromise(s.conversations.put(merged as any));
         uniqueToLocalId.set(uk, Number(existing.id));
         stats.conversationsUpdated += 1;
       } else {
-        // eslint-disable-next-line no-await-in-loop
         const id = await reqToPromise(s.conversations.add(merged as any) as any);
         uniqueToLocalId.set(uk, Number(id));
         stats.conversationsAdded += 1;
@@ -744,7 +735,7 @@ export async function importBackupZipV2Merge(
             createdAt: Number((existing as any).createdAt) || Number(item.createdAt) || now,
             updatedAt: Math.max(existingUpdatedAt, incomingUpdatedAt, now),
           };
-          // eslint-disable-next-line no-await-in-loop
+
           await reqToPromise(store.put(next as any));
           stats.commentsUpdated += 1;
         }
@@ -764,7 +755,7 @@ export async function importBackupZipV2Merge(
         createdAt: Number(item.createdAt) || now,
         updatedAt: Number(item.updatedAt) || Number(item.createdAt) || now,
       };
-      // eslint-disable-next-line no-await-in-loop
+
       const newId = await reqToPromise(store.add(record as any) as any);
       const localId = Number(newId);
       if (Number.isFinite(localId) && localId > 0) incomingIdToLocalId.set(item.commentId, localId);
@@ -862,7 +853,6 @@ export async function importBackupZipV2Merge(
         continue;
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, safeUrl]) as any);
       if (existing && existing.id) {
         const existingId = Number(existing.id);
@@ -887,7 +877,7 @@ export async function importBackupZipV2Merge(
           createdAt: Number(existing.createdAt) || Number(asset.createdAt) || now,
           updatedAt: now,
         };
-        // eslint-disable-next-line no-await-in-loop
+
         await reqToPromise(s.image_cache.put(next as any));
         if (i % 20 === 0) report();
         bump(1, 'Assets');
@@ -903,7 +893,7 @@ export async function importBackupZipV2Merge(
         createdAt: Number(asset.createdAt) || now,
         updatedAt: now,
       };
-      // eslint-disable-next-line no-await-in-loop
+
       const newId = await reqToPromise(s.image_cache.add(record as any) as any);
       const nextId = Number(newId);
       if (Number.isFinite(nextId) && nextId > 0) assetIdRemap.set(assetId, nextId);
@@ -961,7 +951,6 @@ export async function importBackupZipV2Merge(
           continue;
         }
 
-        // eslint-disable-next-line no-await-in-loop
         const existing: AnyRecord = await reqToPromise(idx.get([localConversationId, messageKey]) as any);
         const base = { ...(incoming || {}), conversationId: localConversationId, messageKey };
         const merged = mergeMessageRecord(existing, base);
@@ -970,11 +959,10 @@ export async function importBackupZipV2Merge(
 
         if (existing && existing.id) {
           merged.id = existing.id;
-          // eslint-disable-next-line no-await-in-loop
+
           await reqToPromise(s.messages.put(merged as any));
           stats.messagesUpdated += 1;
         } else {
-          // eslint-disable-next-line no-await-in-loop
           await reqToPromise(s.messages.add(merged as any));
           stats.messagesAdded += 1;
         }
@@ -1005,7 +993,6 @@ export async function importBackupZipV2Merge(
         continue;
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
       const merged = mergeSyncMappingRecord(existing, incoming);
       merged.source = source;
@@ -1013,22 +1000,20 @@ export async function importBackupZipV2Merge(
 
       if (existing && existing.id) {
         merged.id = existing.id;
-        // eslint-disable-next-line no-await-in-loop
+
         await reqToPromise(s.sync_mappings.put(merged as any));
         stats.mappingsUpdated += 1;
       } else {
-        // eslint-disable-next-line no-await-in-loop
         await reqToPromise(s.sync_mappings.add(merged as any));
         stats.mappingsAdded += 1;
       }
 
       const notionPageId = merged.notionPageId ? String(merged.notionPageId) : '';
       if (notionPageId) {
-        // eslint-disable-next-line no-await-in-loop
         const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
         if (convo && convo.id && (!convo.notionPageId || !String(convo.notionPageId).trim())) {
           convo.notionPageId = notionPageId;
-          // eslint-disable-next-line no-await-in-loop
+
           await reqToPromise(s.conversations.put(convo));
         }
       }

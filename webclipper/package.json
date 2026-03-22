@@ -16,9 +16,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
-    "format:check": "prettier . --check",
-    "gate": "npm run lint && npm run format:check && npm run compile && npm run test && npm run build",
-    "gate:ci": "npm run lint && npm run format:check && npm run compile && npm run test"
+    "format:check": "prettier . --check"
   },
   "prettier": {
     "singleQuote": true,

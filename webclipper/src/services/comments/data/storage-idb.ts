@@ -257,7 +257,7 @@ export async function attachOrphanCommentsToConversation(
     if (current) continue;
     row.conversationId = normalizedConversationId;
     row.updatedAt = now;
-    // eslint-disable-next-line no-await-in-loop
+
     await reqToPromise(store.put(row));
     updated += 1;
   }

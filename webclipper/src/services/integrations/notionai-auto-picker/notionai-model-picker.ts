@@ -240,7 +240,7 @@ async function maybeApply() {
   } catch (e) {
     if (t - lastErrorAt > 15000) {
       lastErrorAt = t;
-      // eslint-disable-next-line no-console
+
       console.warn('WebClipper NotionAI model picker failed:', e);
     }
   }
