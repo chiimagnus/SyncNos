@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
 import { t } from '../../src/ui/i18n';
-import { ConversationsProvider } from '../../src/ui/conversations/conversations-context';
+import { ConversationsProvider } from '../../src/viewmodels/conversations/conversations-context';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
 const listConversations = vi.fn();

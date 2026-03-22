@@ -1,6 +1,6 @@
 import { t } from '@i18n';
-import type { InsightStats, InsightTimeRange } from '@ui/settings/sections/insight-stats';
-import { hasInsightData } from '@ui/settings/sections/insight-stats';
+import type { InsightStats, InsightTimeRange } from '@viewmodels/settings/insight-stats';
+import { hasInsightData } from '@viewmodels/settings/insight-stats';
 import { InsightPanel } from '@ui/settings/sections/InsightPanel';
 import { cardClassName } from '@ui/settings/ui';
 

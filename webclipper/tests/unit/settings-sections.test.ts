@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/ui/settings/types';
+import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels/settings/types';
 
 describe('settings section definitions', () => {
   it('keeps the flattened settings navigation order stable', () => {

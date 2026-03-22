@@ -72,7 +72,7 @@ vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
   CapturedListSidebar: () => createElement('div', null, 'sidebar'),
 }));
 
-vi.mock('../../src/ui/conversations/conversations-context', () => ({
+vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: React.ReactNode }) => children,
   useConversationsApp: () => currentState,
 }));

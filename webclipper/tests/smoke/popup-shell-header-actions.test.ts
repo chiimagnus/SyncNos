@@ -16,7 +16,7 @@ vi.mock('../../src/platform/webext/tabs', () => ({
   tabsCreate: vi.fn(),
 }));
 
-vi.mock('../../src/ui/conversations/conversations-context', () => ({
+vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: ReactNode }) => children,
   useConversationsApp: () => ({
     items: [],
@@ -57,7 +57,7 @@ vi.mock('../../src/ui/conversations/conversations-context', () => ({
   }),
 }));
 
-vi.mock('../../src/ui/popup/usePopupCurrentPageCapture', () => ({
+vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
   usePopupCurrentPageCapture: () => ({
     buttonDisabled: false,
     buttonLabel: 'Fetch AI Chat',

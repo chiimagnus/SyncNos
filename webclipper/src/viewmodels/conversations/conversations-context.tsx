@@ -13,7 +13,7 @@ import { resolveDetailHeaderActions } from '@services/integrations/detail-header
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
 import { t } from '@i18n';
-import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from '@ui/conversations/useConversationSyncFeedback';
+import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from '@viewmodels/conversations/useConversationSyncFeedback';
 
 const LIST_SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
 const LIST_SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';

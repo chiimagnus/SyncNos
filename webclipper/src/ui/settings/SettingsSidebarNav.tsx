@@ -1,7 +1,7 @@
 import { t } from '@i18n';
 import { navGroupTitleClassName, navItemClassName } from '@ui/shared/nav-styles';
-import type { SettingsSectionKey } from '@ui/settings/types';
-import { SETTINGS_SECTION_GROUPS } from '@ui/settings/types';
+import type { SettingsSectionKey } from '@viewmodels/settings/types';
+import { SETTINGS_SECTION_GROUPS } from '@viewmodels/settings/types';
 
 function sectionLabel(key: SettingsSectionKey): string {
   return t(`section_${key}_label` as Parameters<typeof t>[0]);

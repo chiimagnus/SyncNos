@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 
 import { t } from '@i18n';
-import { formatTime } from '@ui/settings/utils';
+import { formatTime } from '@viewmodels/settings/utils';
 import { buttonClassName, cardClassName } from '@ui/settings/ui';
 
 function ImportStatsList(props: { stats: any }) {

@@ -3,7 +3,7 @@ import { ChevronLeft } from 'lucide-react';
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
 import { t, formatConversationTitle } from '@i18n';
-import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';

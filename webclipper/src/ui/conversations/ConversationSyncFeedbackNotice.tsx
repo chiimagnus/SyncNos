@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { t } from '@i18n';
-import type { ConversationSyncFeedbackState } from '@ui/conversations/useConversationSyncFeedback';
+import type { ConversationSyncFeedbackState } from '@viewmodels/conversations/useConversationSyncFeedback';
 import { buttonIconCircleCardClassName } from '@ui/shared/button-styles';
 import type { TranslationKey } from '@i18n/locales/en';
 
