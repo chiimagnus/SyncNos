@@ -65,6 +65,30 @@
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
 
+### UI / ViewModel / Service 分层边界（强约束）
+
+目标：`src/ui/**` 只负责 UI；业务逻辑与平台交互集中到 `src/services/**`；UI 状态编排集中到 `src/viewmodels/**`。
+
+- **UI（`src/ui/**`）**
+  - 只放 UI 组件与样式（React / DOM / Shadow DOM）
+  - 允许非常薄的事件转发（点击 -> 调用 viewmodel），不承载业务流程与数据处理
+  - **禁止**直接 import `src/platform/**`（例如 `send/connectPort/storageGet/storageSet/tabsCreate` 等）
+- **ViewModel（`src/viewmodels/**`）**
+  - 只做 UI 状态编排（loading/error/state），并调用 service
+  - **禁止**直接 import `src/platform/**`
+  - **禁止**反向依赖 `src/ui/**`（避免 UI 逻辑渗入 viewmodel）
+- **Service（`src/services/**`）**
+  - 承接业务流程与用例编排（例如捕获当前页、导出、同步、偏好读写等）
+  - **允许**调用 `src/platform/**`（runtime/ports/storage/webext 等）
+  - **禁止**依赖 `src/ui/**` 与 `src/viewmodels/**`
+
+**依赖方向：** `ui -> viewmodels -> services -> (platform, domain, client, sync, ...)`。
+
+**边界验证（手动命令）：**
+- UI 禁止 platform：`rg -n "src/platform|/platform/" webclipper/src/ui`
+- ViewModel 禁止 platform：`rg -n "src/platform|/platform/" webclipper/src/viewmodels`
+- 编译检查：`npm --prefix webclipper run compile`
+
 ### 通用原则
 - **SOLID（适配到本项目的 JS 架构）**
   - **S（单一职责）**：UI（popup）、数据层（IndexedDB/storage）、抓取（collectors）、同步（notion sync）分离；避免“一个模块既抓又存又同步又渲染”。

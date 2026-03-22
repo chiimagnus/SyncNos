@@ -153,6 +153,24 @@
 
 色板 token 定义见 Part A（A4 亮色 / A5 暗色），本节只讲插件侧的工程实现。
 
+## B0 · UI 分层边界（强约束）
+
+`webclipper/src/ui/**` 只负责 UI（组件/样式/DOM 面板），不承载业务流程与平台交互。
+
+- **UI 允许：**
+  - React 组件、样式、布局、交互事件绑定
+  - 极薄的 UI glue（将事件/输入转发给 viewmodel）
+- **UI 禁止：**
+  - 直接 import `webclipper/src/platform/**`（例如 `runtime.send`、`connectPort`、`storageGet/storageSet`、`tabsCreate` 等）
+  - 在 UI 文件中做可复用业务逻辑（应下沉到 `src/services/**`）
+- **ViewModel 与 Service：**
+  - ViewModel 放在 `webclipper/src/viewmodels/**`：只做 UI 状态编排并调用 service
+  - Service 放在 `webclipper/src/services/**`：承接业务流程与平台交互
+
+验证命令（手动）：
+- `rg -n "src/platform|/platform/" webclipper/src/ui`
+- `npm --prefix webclipper run compile`
+
 ## B1 · CSS Variables
 
 ```css
