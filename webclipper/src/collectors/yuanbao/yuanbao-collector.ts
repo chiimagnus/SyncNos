@@ -1,12 +1,12 @@
-import type { CollectorDefinition } from '../collector-contract.ts';
-import type { CollectorEnv } from '../collector-env.ts';
+import type { CollectorDefinition } from '@collectors/collector-contract.ts';
+import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   conversationKeyFromLocation,
   extractImageUrlsFromElement,
   inEditMode as inEditModeUtil,
-} from '../collector-utils.ts';
-import yuanbaoMarkdown from './yuanbao-markdown.ts';
+} from '@collectors/collector-utils.ts';
+import yuanbaoMarkdown from '@collectors/yuanbao/yuanbao-markdown.ts';
 
 export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {

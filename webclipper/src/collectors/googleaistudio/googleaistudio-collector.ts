@@ -1,12 +1,12 @@
-import type { CollectorDefinition } from '../collector-contract.ts';
-import type { CollectorEnv } from '../collector-env.ts';
+import type { CollectorDefinition } from '@collectors/collector-contract.ts';
+import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   conversationKeyFromLocation,
   extractImageUrlsFromElement,
   inEditMode as inEditModeUtil,
-} from '../collector-utils.ts';
-import geminiMarkdown from '../gemini/gemini-markdown.ts';
+} from '@collectors/collector-utils.ts';
+import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
 
 let manualTurnCache: Map<string, any> | null = null;
 let manualCacheConversationKey: string = '';

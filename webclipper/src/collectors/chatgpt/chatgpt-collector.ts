@@ -1,7 +1,7 @@
-import type { CollectorDefinition } from '../collector-contract.ts';
-import type { CollectorEnv } from '../collector-env.ts';
-import { appendImageMarkdown, extractImageUrlsFromElement } from '../collector-utils.ts';
-import chatgptMarkdown from './chatgpt-markdown.ts';
+import type { CollectorDefinition } from '@collectors/collector-contract.ts';
+import type { CollectorEnv } from '@collectors/collector-env.ts';
+import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
+import chatgptMarkdown from '@collectors/chatgpt/chatgpt-markdown.ts';
 
 export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinition {
   const DEEP_RESEARCH_MESSAGE_TYPES = Object.freeze({

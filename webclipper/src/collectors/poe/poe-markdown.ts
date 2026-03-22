@@ -1,5 +1,5 @@
 import { normalizeText as normalizeTextShared } from '@services/shared/normalize.ts';
-import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
+import { replaceMathElementsWithLatexText } from '@collectors/formula-utils.ts';
 
   function isThinkingLabelText(text: any): any {
     const raw = String(text || "").trim();

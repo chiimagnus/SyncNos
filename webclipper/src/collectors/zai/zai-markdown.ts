@@ -1,5 +1,5 @@
 import { normalizeText as normalizeTextShared } from '@services/shared/normalize.ts';
-import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
+import { replaceMathElementsWithLatexText } from '@collectors/formula-utils.ts';
 
   function removeThinkingNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;

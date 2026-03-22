@@ -1,5 +1,5 @@
 import { normalizeText as normalizeTextShared } from '@services/shared/normalize.ts';
-import { replaceMathElementsWithLatexText } from '../formula-utils.ts';
+import { replaceMathElementsWithLatexText } from '@collectors/formula-utils.ts';
 
   function normalizeMarkdown(markdown: any): any {
     const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");

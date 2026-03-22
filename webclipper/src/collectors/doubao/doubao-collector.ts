@@ -1,12 +1,12 @@
-import type { CollectorDefinition } from '../collector-contract.ts';
-import type { CollectorEnv } from '../collector-env.ts';
+import type { CollectorDefinition } from '@collectors/collector-contract.ts';
+import type { CollectorEnv } from '@collectors/collector-env.ts';
 import {
   appendImageMarkdown,
   conversationKeyFromLocation,
   extractImageUrlsFromElement,
   inEditMode as inEditModeUtil,
-} from '../collector-utils.ts';
-import doubaoMarkdown from './doubao-markdown.ts';
+} from '@collectors/collector-utils.ts';
+import doubaoMarkdown from '@collectors/doubao/doubao-markdown.ts';
 
 export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition {
   const INLINE_BLOB_IMAGES_MAX_COUNT = 12;
