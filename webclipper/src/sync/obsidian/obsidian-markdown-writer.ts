@@ -1,4 +1,4 @@
-import type { ArticleComment } from '../../comments/domain/models';
+import type { ArticleComment } from '@services/comments/domain/models';
 
 const MESSAGES_HEADING = 'Conversations';
 const ARTICLE_HEADING = 'Article';

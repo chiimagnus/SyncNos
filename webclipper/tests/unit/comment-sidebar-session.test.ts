@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createCommentSidebarSession,
   normalizeCommentSidebarQuoteText,
-} from '../../src/comments/sidebar/comment-sidebar-session';
+} from '@services/comments/sidebar/comment-sidebar-session';
 import type {
   CommentSidebarHandlers,
   CommentSidebarItem,
   CommentSidebarPanelApi,
-} from '../../src/comments/sidebar/comment-sidebar-contract';
+} from '@services/comments/sidebar/comment-sidebar-contract';
 
 function createPanelMock() {
   let open = false;

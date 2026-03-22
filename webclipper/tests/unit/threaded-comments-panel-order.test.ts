@@ -5,7 +5,7 @@ vi.mock('../../src/i18n', () => ({
   t: (key: string) => key,
 }));
 
-import { mountThreadedCommentsPanel } from '../../src/comments/threaded-comments-panel';
+import { mountThreadedCommentsPanel } from '@services/comments/threaded-comments-panel';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {

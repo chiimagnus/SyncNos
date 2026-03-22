@@ -10,7 +10,7 @@ import notionApiDefault from './notion-api.ts';
 import notionFilesApiDefault from './notion-files-api.ts';
 import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
 import { storageGet, storageRemove } from '../../platform/storage/local';
-import { buildNotionCommentsBlocks, computeNotionCommentsDigest } from '../../comments/sync/notion-comments-renderer';
+import { buildNotionCommentsBlocks, computeNotionCommentsDigest } from '@services/comments/sync/notion-comments-renderer';
 import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from './notion-section-blocks.ts';
 import {
   ensureSectionHeadingBlockId,

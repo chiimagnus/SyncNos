@@ -1,5 +1,5 @@
 import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { createCommentSidebarSession } from '../../comments/sidebar/comment-sidebar-session';
+import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import { getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {

@@ -10,7 +10,7 @@ import {
   hasAnyArticleCommentsForCanonicalUrl,
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
-} from "../../src/comments/data/storage-idb";
+} from "@services/comments/data/storage-idb";
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {

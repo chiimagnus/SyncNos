@@ -13,7 +13,7 @@ vi.mock('../../src/i18n', () => ({
   },
 }));
 
-vi.mock('../../src/comments/client/repo', () => ({
+vi.mock('@services/comments/client/repo', () => ({
   addArticleComment: vi.fn(async () => ({ ok: true, data: {} })),
   deleteArticleCommentById: vi.fn(async () => ({ ok: true, data: {} })),
   listArticleCommentsByCanonicalUrl: vi.fn(async () => []),

@@ -11,8 +11,8 @@ import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader'
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
-import { createCommentSidebarSession } from '../../comments/sidebar/comment-sidebar-session';
-import type { CommentSidebarSession } from '../../comments/sidebar/comment-sidebar-contract';
+import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
+import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';

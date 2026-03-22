@@ -10,7 +10,7 @@ async function loadNotionSectionBlocks() {
 }
 
 async function loadNotionCommentsRenderer() {
-  return loadFresh('../../src/comments/sync/notion-comments-renderer.ts');
+  return loadFresh('@services/comments/sync/notion-comments-renderer.ts');
 }
 
 describe('notion article comments blocks', () => {

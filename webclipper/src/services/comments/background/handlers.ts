@@ -1,4 +1,4 @@
-import { COMMENTS_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
+import { COMMENTS_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import {
   addArticleComment,
   attachOrphanCommentsToConversation,
