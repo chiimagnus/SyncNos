@@ -60,6 +60,42 @@ module.exports = [
   },
 
   {
+    files: ['src/ui/**/*.{ts,tsx}', 'src/viewmodels/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@platform', '@platform/*', '@platform/**'],
+        },
+      ],
+    },
+  },
+
+  {
+    files: ['src/services/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@ui', '@ui/*', '@ui/**', '@viewmodels', '@viewmodels/*', '@viewmodels/**'],
+        },
+      ],
+    },
+  },
+
+  // Bootstrap and Shadow-DOM panel mounting are glue layers that currently reuse UI modules/styles.
+  // Keep them unblocked by the strict service -> ui restriction, but avoid introducing new deps elsewhere.
+  {
+    files: [
+      'src/services/bootstrap/**/*.{ts,tsx}',
+      'src/services/comments/threaded-comments-panel.ts',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+
+  {
     files: ['tests/**/*.{ts,tsx}'],
     rules: {
       // Tests sometimes embed escape-heavy strings; keep the rule enabled for src when re-enabled.
