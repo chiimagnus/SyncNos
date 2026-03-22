@@ -6,10 +6,10 @@ import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgres
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
-import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
-import { send } from '../../../platform/runtime/runtime';
-import { storageGet, storageOnChanged, storageSet } from '../../../platform/storage/local';
-import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { send } from '@services/shared/runtime';
+import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import {
   DEFAULT_CHAT_WITH_MAX_CHARS,

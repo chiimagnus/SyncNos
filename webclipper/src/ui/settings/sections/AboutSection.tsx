@@ -1,5 +1,5 @@
-import { getManifest, getURL } from '../../../platform/runtime/runtime';
-import { tabsCreate } from '../../../platform/webext/tabs';
+import { getManifest, getURL } from '@services/shared/runtime';
+import { tabsCreate } from '@services/shared/webext';
 
 import { t } from '../../../i18n';
 import { buttonClassName, cardClassName } from '../ui';
