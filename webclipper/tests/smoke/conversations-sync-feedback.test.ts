@@ -3,7 +3,7 @@ import { JSDOM } from 'jsdom';
 import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
-import { t } from '../../src/i18n';
+import { t } from '../../src/ui/i18n';
 import { ConversationsProvider } from '../../src/ui/conversations/conversations-context';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 

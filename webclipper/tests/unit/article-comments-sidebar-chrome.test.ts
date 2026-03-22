@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-vi.mock('../../src/i18n', () => ({
+vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
       articleCommentsHeading: 'Comments',

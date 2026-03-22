@@ -47,7 +47,7 @@ const currentState = {
   },
 };
 
-vi.mock('../../src/i18n', () => ({
+vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
       collapseSidebar: 'Collapse sidebar',

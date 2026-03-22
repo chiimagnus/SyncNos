@@ -40,7 +40,7 @@ vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
   ArticleCommentsSection: () => createElement('div', null, 'comments-section'),
 }));
 
-vi.mock('../../src/i18n', () => ({
+vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
       conversationDetailAria: 'Conversation detail',

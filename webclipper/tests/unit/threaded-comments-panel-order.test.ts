@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 
-vi.mock('../../src/i18n', () => ({
+vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => key,
 }));
 
