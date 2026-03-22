@@ -27,7 +27,7 @@ vi.mock('@services/conversations/client/repo', () => ({
   deleteConversations: (...args: any[]) => deleteConversations(...args),
 }));
 
-vi.mock('../../src/sync/repo', () => ({
+vi.mock('@services/sync/repo', () => ({
   clearNotionSyncJobStatus: (...args: any[]) => clearNotionSyncJobStatus(...args),
   clearObsidianSyncStatus: (...args: any[]) => clearObsidianSyncStatus(...args),
   syncNotionConversations: (...args: any[]) => syncNotionConversations(...args),

@@ -28,14 +28,14 @@ describe('sync provider gate', () => {
   });
 
   it('defaults to enabled when key is missing', async () => {
-    const { getEnabledSyncProviders, isSyncProviderEnabled } = await import('../../src/sync/sync-provider-gate');
+    const { getEnabledSyncProviders, isSyncProviderEnabled } = await import('@services/sync/sync-provider-gate');
     expect(await isSyncProviderEnabled('notion')).toBe(true);
     expect(await isSyncProviderEnabled('obsidian')).toBe(true);
     expect(await getEnabledSyncProviders()).toEqual(['obsidian', 'notion']);
   });
 
   it('reads/writes disabled state via storage (explicit false only)', async () => {
-    const { ensureSyncProviderEnabled, isSyncProviderEnabled, setSyncProviderEnabled } = await import('../../src/sync/sync-provider-gate');
+    const { ensureSyncProviderEnabled, isSyncProviderEnabled, setSyncProviderEnabled } = await import('@services/sync/sync-provider-gate');
     expect(await ensureSyncProviderEnabled('notion')).toBe(null);
 
     await setSyncProviderEnabled('notion', false);

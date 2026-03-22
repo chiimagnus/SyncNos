@@ -2,7 +2,7 @@
 import { buildAiOptions as buildDefaultAiOptions } from './notion-ai.ts';
 import { notionFetch as defaultNotionFetch } from './notion-api.ts';
 import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
-import { storageGet, storageRemove, storageSet } from '../../platform/storage/local';
+import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
   const DEFAULT_DB_TITLE = "SyncNos-AI Chats";
   const DEFAULT_DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";

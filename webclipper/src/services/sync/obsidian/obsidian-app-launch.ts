@@ -1,4 +1,4 @@
-import { tabsCreate } from '../../platform/webext/tabs';
+import { tabsCreate } from '@platform/webext/tabs';
 
 export const OBSIDIAN_APP_LAUNCH_URL = 'obsidian://open';
 

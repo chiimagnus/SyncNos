@@ -8,8 +8,8 @@ import { storageOnChanged } from '../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
 
 import { t, formatConversationTitle } from '../../i18n';
-import type { SyncProvider } from '../../sync/models';
-import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '../../sync/sync-provider-gate';
+import type { SyncProvider } from '@services/sync/models';
+import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { useConversationsApp } from './conversations-context';
 import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
 import { navItemClassName } from '../shared/nav-styles';

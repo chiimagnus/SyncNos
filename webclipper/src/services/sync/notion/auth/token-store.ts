@@ -1,4 +1,4 @@
-import { storageGet, storageRemove, storageSet } from '../../../platform/storage/local';
+import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
 export const NOTION_OAUTH_TOKEN_KEY = 'notion_oauth_token_v1';
 

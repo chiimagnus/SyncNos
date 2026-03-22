@@ -1,4 +1,4 @@
-import { OBSIDIAN_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
+import { OBSIDIAN_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { getObsidianSettings, saveObsidianSettings } from './settings-store';
 
 type AnyRouter = {
@@ -35,4 +35,3 @@ export function registerObsidianSettingsHandlers(router: AnyRouter, deps: Deps) 
     return router.ok(data);
   });
 }
-

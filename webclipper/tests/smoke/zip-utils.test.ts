@@ -2,7 +2,7 @@ import { deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
 async function loadZipUtils() {
-  const mod = await import("../../src/sync/local/zip-utils.ts");
+  const mod = await import("@services/sync/local/zip-utils.ts");
   return mod.default || mod;
 }
 

@@ -1,4 +1,4 @@
-import { storageGet, storageRemove, storageSet } from '../platform/storage/local';
+import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 import type { SyncProviderId } from '@services/protocols/sync-provider-contract';
 import { listSyncProviders } from './sync-provider-registry';
 

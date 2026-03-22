@@ -1,4 +1,4 @@
-import { storageGet, storageSet } from '../../platform/storage/local';
+import { storageGet, storageSet } from '@platform/storage/local';
 
 export const OBSIDIAN_STORAGE_KEYS = Object.freeze({
   apiBaseUrl: 'obsidian_api_base_url',

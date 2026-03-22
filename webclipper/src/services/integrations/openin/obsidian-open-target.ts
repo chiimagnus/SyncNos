@@ -2,21 +2,21 @@ import type { Conversation } from '@services/conversations/domain/models';
 import {
   getObsidianConnectionConfig as getDefaultObsidianConnectionConfig,
   getObsidianPathConfig as getDefaultObsidianPathConfig,
-} from '../../../sync/obsidian/settings-store';
+} from '@services/sync/obsidian/settings-store';
 import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
-} from '../../../sync/obsidian/obsidian-local-rest-client';
+} from '@services/sync/obsidian/obsidian-local-rest-client';
 import {
   launchObsidianApp,
   OBSIDIAN_APP_LAUNCH_URL,
   shouldLaunchObsidianApp,
-} from '../../../sync/obsidian/obsidian-app-launch';
+} from '@services/sync/obsidian/obsidian-app-launch';
 import {
   buildStableNotePath as buildDefaultStableNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
-} from '../../../sync/obsidian/obsidian-note-path';
-import { readSyncnosObject as readDefaultSyncnosObject } from '../../../sync/obsidian/obsidian-sync-metadata';
+} from '@services/sync/obsidian/obsidian-note-path';
+import { readSyncnosObject as readDefaultSyncnosObject } from '@services/sync/obsidian/obsidian-sync-metadata';
 export const DEFAULT_OBSIDIAN_OPEN_RETRY_POLICY = Object.freeze({
   maxAttempts: 3,
   launchDelayMs: 1200,

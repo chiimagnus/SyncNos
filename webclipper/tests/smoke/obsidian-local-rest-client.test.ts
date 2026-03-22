@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 async function loadClient() {
-  const mod = await import("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+  const mod = await import("@services/sync/obsidian/obsidian-local-rest-client.ts");
   return mod.default || mod;
 }
 

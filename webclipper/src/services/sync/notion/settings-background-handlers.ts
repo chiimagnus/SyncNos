@@ -1,5 +1,5 @@
-import { NOTION_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
-import { storageRemove } from '../../platform/storage/local';
+import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { storageRemove } from '@platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from './auth/token-store';
 
 type AnyRouter = {
@@ -51,4 +51,3 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
     return router.ok({ disconnected: true, clearedKeys });
   });
 }
-

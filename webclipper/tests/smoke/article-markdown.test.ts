@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 async function loadArticleMarkdown() {
-  const mod = await import("../../src/sync/local/article-markdown.ts");
+  const mod = await import("@services/sync/local/article-markdown.ts");
   return mod.default || mod;
 }
 

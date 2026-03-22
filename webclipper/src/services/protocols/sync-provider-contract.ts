@@ -1,4 +1,4 @@
-import type { SyncProvider } from '../../sync/models';
+import type { SyncProvider } from '@services/sync/models';
 
 export type SyncProviderId = SyncProvider;
 

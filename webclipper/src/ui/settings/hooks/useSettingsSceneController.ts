@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '../../../sync/backup/export';
-import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '../../../sync/backup/backup-utils';
-import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgress, type ImportStats } from '../../../sync/backup/import';
-import { extractZipEntries } from '../../../sync/backup/zip-utils';
-import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
-import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
+import { exportBackupZipV2 } from '@services/sync/backup/export';
+import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
+import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
+import { extractZipEntries } from '@services/sync/backup/zip-utils';
+import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
+import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
 import { send } from '../../../platform/runtime/runtime';
 import { storageGet, storageOnChanged, storageSet } from '../../../platform/storage/local';
 import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
-import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '../../../sync/sync-provider-gate';
+import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import {
   DEFAULT_CHAT_WITH_MAX_CHARS,
   DEFAULT_CHAT_WITH_PLATFORMS,

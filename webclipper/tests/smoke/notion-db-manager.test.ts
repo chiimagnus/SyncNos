@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let notionFetchImpl: ((req: any) => Promise<any>) | null = null;
 
-vi.mock('../../src/sync/notion/notion-api.ts', () => {
+vi.mock('@services/sync/notion/notion-api.ts', () => {
   const notionFetch = (req: any) => {
     if (!notionFetchImpl) throw new Error('notionFetchImpl not set');
     return notionFetchImpl(req);
@@ -14,7 +14,7 @@ vi.mock('../../src/sync/notion/notion-api.ts', () => {
   };
 });
 
-import notionDbManager from '../../src/sync/notion/notion-db-manager.ts';
+import notionDbManager from '@services/sync/notion/notion-db-manager.ts';
 
 function mockChromeStorage({ initial = {} as Record<string, unknown> } = {}) {
   const store: Record<string, unknown> = { ...initial };

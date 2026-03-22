@@ -1,5 +1,5 @@
-import { NOTION_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
-import { send } from '../../../platform/runtime/runtime';
+import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { send } from '@platform/runtime/runtime';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
@@ -21,4 +21,3 @@ export async function disconnectNotion(): Promise<void> {
   const res = await send<ApiResponse<{ disconnected: boolean }>>(NOTION_MESSAGE_TYPES.DISCONNECT);
   unwrap(res);
 }
-

@@ -4,7 +4,7 @@ import {
   BACKUP_ZIP_SCHEMA_VERSION,
   validateArticleCommentsIndexDocument,
   validateBackupManifest,
-} from '../../src/sync/backup/backup-utils';
+} from '@services/sync/backup/backup-utils';
 
 describe('backup article comments', () => {
   it('validates article comments index documents', () => {

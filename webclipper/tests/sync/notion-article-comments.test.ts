@@ -6,7 +6,7 @@ async function loadFresh(rel: string) {
 }
 
 async function loadNotionSectionBlocks() {
-  return loadFresh('../../src/sync/notion/notion-section-blocks.ts');
+  return loadFresh('@services/sync/notion/notion-section-blocks.ts');
 }
 
 async function loadNotionCommentsRenderer() {

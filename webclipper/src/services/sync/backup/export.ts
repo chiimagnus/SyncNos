@@ -1,4 +1,4 @@
-import { storageGetAll, storageSet } from '../../platform/storage/local';
+import { storageGetAll, storageSet } from '@platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
   filterStorageForBackup,
@@ -8,7 +8,7 @@ import {
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
-import { DB_NAME, DB_VERSION } from '../../platform/idb/schema.ts';
+import { DB_NAME, DB_VERSION } from '@platform/idb/schema';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 
 type AnyRecord = Record<string, any>;

@@ -44,12 +44,12 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
   it("rebuilds notes on every sync, and handles auth failure", async () => {
     setupChromeStorage();
 
-    const settingsStore = await load("../../src/sync/obsidian/settings-store.ts");
-    await load("../../src/sync/obsidian/obsidian-local-rest-client.ts");
-    await load("../../src/sync/obsidian/obsidian-note-path.ts");
-    await load("../../src/sync/obsidian/obsidian-sync-metadata.ts");
-    await load("../../src/sync/obsidian/obsidian-markdown-writer.ts");
-    const orch = await load("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
+    const settingsStore = await load("@services/sync/obsidian/settings-store.ts");
+    await load("@services/sync/obsidian/obsidian-local-rest-client.ts");
+    await load("@services/sync/obsidian/obsidian-note-path.ts");
+    await load("@services/sync/obsidian/obsidian-sync-metadata.ts");
+    await load("@services/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await load("@services/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     // Local data
     let messages: any[] = [

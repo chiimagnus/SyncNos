@@ -1,7 +1,7 @@
-import { storageGet, storageRemove, storageSet } from '../../../platform/storage/local';
+import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 import { setNotionOAuthToken, type NotionOAuthTokenV1 } from './token-store';
-import { tabsRemove } from '../../../platform/webext/tabs';
-import { webNavigationOnCommittedAddListener } from '../../../platform/webext/web-navigation';
+import { tabsRemove } from '@platform/webext/tabs';
+import { webNavigationOnCommittedAddListener } from '@platform/webext/web-navigation';
 
 const DEFAULT_NOTION_OAUTH_CLIENT_ID = '2a8d872b-594c-8060-9a2b-00377c27ec32';
 

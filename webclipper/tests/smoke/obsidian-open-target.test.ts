@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { OBSIDIAN_APP_LAUNCH_URL } from '../../src/sync/obsidian/obsidian-app-launch';
+import { OBSIDIAN_APP_LAUNCH_URL } from '@services/sync/obsidian/obsidian-app-launch';
 import {
   openObsidianTarget,
   resolveObsidianOpenTarget,

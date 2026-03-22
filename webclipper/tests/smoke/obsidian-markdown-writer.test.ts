@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 async function loadWriter() {
-  const mod = await import("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+  const mod = await import("@services/sync/obsidian/obsidian-markdown-writer.ts");
   return mod.default || mod;
 }
 

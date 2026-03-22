@@ -4,7 +4,7 @@ import type { Conversation, ConversationDetail } from '@services/conversations/d
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
-import { createZipBlob } from '../../sync/backup/zip-utils';
+import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import { deleteConversations, getConversationDetail, listConversations } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';

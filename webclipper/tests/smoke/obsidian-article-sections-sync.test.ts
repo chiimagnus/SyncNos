@@ -54,12 +54,12 @@ describe("obsidian article sync replaces sections without duplicating headings",
   it("dedupes duplicate Comments heading when syncing updates", async () => {
     setupChromeStorage();
 
-    const settingsStore = await load("../../src/sync/obsidian/settings-store.ts");
-    await load("../../src/sync/obsidian/obsidian-local-rest-client.ts");
-    await load("../../src/sync/obsidian/obsidian-note-path.ts");
-    await load("../../src/sync/obsidian/obsidian-sync-metadata.ts");
-    await load("../../src/sync/obsidian/obsidian-markdown-writer.ts");
-    const orch = await load("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
+    const settingsStore = await load("@services/sync/obsidian/settings-store.ts");
+    await load("@services/sync/obsidian/obsidian-local-rest-client.ts");
+    await load("@services/sync/obsidian/obsidian-note-path.ts");
+    await load("@services/sync/obsidian/obsidian-sync-metadata.ts");
+    await load("@services/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await load("@services/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     backgroundStorageMocks.getConversationById.mockResolvedValue({
       id: 1,
