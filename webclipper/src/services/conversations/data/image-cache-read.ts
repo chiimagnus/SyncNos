@@ -156,7 +156,11 @@ export async function getImageCacheAssetById(input: {
   if (!Number.isFinite(conversationId) || conversationId <= 0) return null;
 
   const expectedConversationId = Number(input.conversationId);
-  if (Number.isFinite(expectedConversationId) && expectedConversationId > 0 && expectedConversationId !== conversationId) {
+  if (
+    Number.isFinite(expectedConversationId) &&
+    expectedConversationId > 0 &&
+    expectedConversationId !== conversationId
+  ) {
     return null;
   }
 
@@ -180,7 +184,9 @@ export async function getImageCacheAssetById(input: {
   const byteSize = Number(row.byteSize) || blob.size || 0;
   if (byteSize <= 0) return null;
 
-  const contentType = String(row.contentType || blob.type || '').trim().toLowerCase();
+  const contentType = String(row.contentType || blob.type || '')
+    .trim()
+    .toLowerCase();
   return {
     id,
     conversationId,

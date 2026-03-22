@@ -22,4 +22,3 @@ export function consumePendingOpenConversationId(): number | null {
     return null;
   }
 }
-

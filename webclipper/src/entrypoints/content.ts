@@ -16,32 +16,6 @@ import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
 import { inpageTipApi } from '@ui/inpage/inpage-tip-shadow.ts';
 import { createRuntimeClient } from '@platform/runtime/client.ts';
 
-function safeString(value: unknown): string {
-  return String(value || '').trim();
-}
-
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
-
-function isTopFrame(): boolean {
-  try {
-    return !globalThis.top || globalThis.top === globalThis.self;
-  } catch (_e) {
-    return true;
-  }
-}
-
 export default defineContentScript({
   // Inpage visibility is controlled at runtime by `inpage_display_mode` (and legacy `inpage_supported_only`).
   // This avoids browser-specific dynamic content-script registration support gaps.

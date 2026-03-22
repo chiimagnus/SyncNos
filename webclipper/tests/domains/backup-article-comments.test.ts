@@ -34,9 +34,7 @@ describe('backup article comments', () => {
       ],
     };
     expect(validateArticleCommentsIndexDocument(doc).ok).toBe(true);
-    expect(
-      validateArticleCommentsIndexDocument({ schemaVersion: 1, comments: [{ commentId: 1 }] }).ok,
-    ).toBe(false);
+    expect(validateArticleCommentsIndexDocument({ schemaVersion: 1, comments: [{ commentId: 1 }] }).ok).toBe(false);
   });
 
   it('accepts manifests with articleCommentsIndexPath', () => {
@@ -62,4 +60,3 @@ describe('backup article comments', () => {
     ).toBe(false);
   });
 });
-

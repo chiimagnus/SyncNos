@@ -65,14 +65,8 @@ export async function getObsidianSettings() {
   const apiBaseUrl = normalizeBaseUrl(values[OBSIDIAN_STORAGE_KEYS.apiBaseUrl]);
   const apiKey = safeString(values[OBSIDIAN_STORAGE_KEYS.apiKey]);
   const authHeaderName = normalizeAuthHeaderName(values[OBSIDIAN_STORAGE_KEYS.authHeaderName]);
-  const chatFolder = normalizeFolder(
-    values[OBSIDIAN_STORAGE_KEYS.chatFolder],
-    OBSIDIAN_DEFAULTS.chatFolder,
-  );
-  const articleFolder = normalizeFolder(
-    values[OBSIDIAN_STORAGE_KEYS.articleFolder],
-    OBSIDIAN_DEFAULTS.articleFolder,
-  );
+  const chatFolder = normalizeFolder(values[OBSIDIAN_STORAGE_KEYS.chatFolder], OBSIDIAN_DEFAULTS.chatFolder);
+  const articleFolder = normalizeFolder(values[OBSIDIAN_STORAGE_KEYS.articleFolder], OBSIDIAN_DEFAULTS.articleFolder);
 
   return {
     apiBaseUrl,
@@ -99,16 +93,10 @@ export async function getObsidianConnectionConfig() {
 }
 
 export async function getObsidianPathConfig() {
-  const values = await storageGet([
-    OBSIDIAN_STORAGE_KEYS.chatFolder,
-    OBSIDIAN_STORAGE_KEYS.articleFolder,
-  ]);
+  const values = await storageGet([OBSIDIAN_STORAGE_KEYS.chatFolder, OBSIDIAN_STORAGE_KEYS.articleFolder]);
   return {
     chatFolder: normalizeFolder(values[OBSIDIAN_STORAGE_KEYS.chatFolder], OBSIDIAN_DEFAULTS.chatFolder),
-    articleFolder: normalizeFolder(
-      values[OBSIDIAN_STORAGE_KEYS.articleFolder],
-      OBSIDIAN_DEFAULTS.articleFolder,
-    ),
+    articleFolder: normalizeFolder(values[OBSIDIAN_STORAGE_KEYS.articleFolder], OBSIDIAN_DEFAULTS.articleFolder),
     defaults: {
       chatFolder: OBSIDIAN_DEFAULTS.chatFolder,
       articleFolder: OBSIDIAN_DEFAULTS.articleFolder,
@@ -128,10 +116,7 @@ export async function saveObsidianSettings(input: SaveSettingsInput = {}) {
     payload[OBSIDIAN_STORAGE_KEYS.apiKey] = safeString(input.apiKey);
   }
   if (input.chatFolder != null) {
-    payload[OBSIDIAN_STORAGE_KEYS.chatFolder] = normalizeFolder(
-      input.chatFolder,
-      OBSIDIAN_DEFAULTS.chatFolder,
-    );
+    payload[OBSIDIAN_STORAGE_KEYS.chatFolder] = normalizeFolder(input.chatFolder, OBSIDIAN_DEFAULTS.chatFolder);
   }
   if (input.articleFolder != null) {
     payload[OBSIDIAN_STORAGE_KEYS.articleFolder] = normalizeFolder(

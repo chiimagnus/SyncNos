@@ -406,17 +406,17 @@ export async function inlineChatImagesInMessages(input: {
           else warningFlags.add('inline_images_download_failed');
           continue;
         }
-        if ((inlinedBytes + parsedDataUrl.byteSize) > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
+        if (inlinedBytes + parsedDataUrl.byteSize > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
           warningFlags.add('inline_images_total_bytes_limit_reached');
           continue;
         }
         cacheLookupUrl = parsedDataUrl.cacheKey;
       }
 
-      // eslint-disable-next-line no-await-in-loop
-      const cached = (await getCachedImage(conversationId, cacheLookupUrl)) || (isDataUrl ? await getCachedImage(conversationId, url) : null);
+      const cached =
+        (await getCachedImage(conversationId, cacheLookupUrl)) ||
+        (isDataUrl ? await getCachedImage(conversationId, url) : null);
       if (cached) {
-        // eslint-disable-next-line no-await-in-loop
         const cachedAsset = await ensureCachedAssetRecord(cached);
         if (cachedAsset) {
           replacements.set(url, toSyncnosAssetUrl(cachedAsset.id));
@@ -431,7 +431,7 @@ export async function inlineChatImagesInMessages(input: {
       if (isDataUrl) {
         const parsed = parsedDataUrl && parsedDataUrl.ok ? parsedDataUrl : null;
         if (!parsed) continue;
-        // eslint-disable-next-line no-await-in-loop
+
         nextAsset = await upsertCachedImageAsset({
           conversationId,
           url: parsed.cacheKey,
@@ -440,7 +440,6 @@ export async function inlineChatImagesInMessages(input: {
           contentType: parsed.contentType,
         });
       } else {
-        // eslint-disable-next-line no-await-in-loop
         const downloaded = await downloadImageAsBlob({
           url,
           referrer: input.conversationUrl,
@@ -451,11 +450,11 @@ export async function inlineChatImagesInMessages(input: {
           else warningFlags.add('inline_images_download_failed');
           continue;
         }
-        if ((inlinedBytes + downloaded.byteSize) > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
+        if (inlinedBytes + downloaded.byteSize > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
           warningFlags.add('inline_images_total_bytes_limit_reached');
           continue;
         }
-        // eslint-disable-next-line no-await-in-loop
+
         nextAsset = await upsertCachedImageAsset({
           conversationId,
           url,

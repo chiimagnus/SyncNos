@@ -1,16 +1,16 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it, vi } from "vitest";
-import normalizeApi from "@services/shared/normalize.ts";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createKimiCollectorDef } from "../../src/collectors/kimi/kimi-collector.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it, vi } from 'vitest';
+import normalizeApi from '@services/shared/normalize.ts';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createKimiCollectorDef } from '../../src/collectors/kimi/kimi-collector.ts';
 
 function setupKimiDom(html: string, url: string) {
   const dom = new JSDOM(`<body>${html}</body>`, { url });
   return dom;
 }
 
-describe("kimi-collector", () => {
-  it("captures user uploaded images from attachment list", () => {
+describe('kimi-collector', () => {
+  it('captures user uploaded images from attachment list', () => {
     const html = `
       <main class="chat-content">
         <div class="chat-content-item chat-content-item-user">
@@ -32,7 +32,7 @@ describe("kimi-collector", () => {
       </main>
     `;
 
-    const dom = setupKimiDom(html, "https://kimi.com/chat/img001");
+    const dom = setupKimiDom(html, 'https://kimi.com/chat/img001');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -43,12 +43,12 @@ describe("kimi-collector", () => {
     const snap = createKimiCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("user");
-    expect(snap.messages[0].contentMarkdown).toContain("这是什么");
-    expect(snap.messages[0].contentMarkdown).toContain("![](https://www.kimi.com/apiv2-files/sign-obj/");
+    expect(snap.messages[0].role).toBe('user');
+    expect(snap.messages[0].contentMarkdown).toContain('这是什么');
+    expect(snap.messages[0].contentMarkdown).toContain('![](https://www.kimi.com/apiv2-files/sign-obj/');
   });
 
-  it("extracts assistant contentMarkdown from semantic markdown DOM", async () => {
+  it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <main class="chat-content">
         <div class="chat-content-item chat-content-item-user">
@@ -95,7 +95,7 @@ describe("kimi-collector", () => {
       </main>
     `;
 
-    const dom = setupKimiDom(html, "https://kimi.com/chat/conv001");
+    const dom = setupKimiDom(html, 'https://kimi.com/chat/conv001');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -106,22 +106,22 @@ describe("kimi-collector", () => {
     const snap = createKimiCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentMarkdown).toContain("# GitHub Actions 自动化部署");
-    expect(assistant.contentMarkdown).toContain("> CI/CD 是现代开发的重要实践。");
-    expect(assistant.contentMarkdown).toContain("## 准备工作");
-    expect(assistant.contentMarkdown).toContain("1. 配置 `npm` 脚本");
-    expect(assistant.contentMarkdown).toContain("```yaml");
-    expect(assistant.contentMarkdown).toContain("branches: [ main ]");
-    expect(assistant.contentMarkdown).toContain("| 事件 | 说明 |");
-    expect(assistant.contentMarkdown).toContain("`push`");
-    expect(assistant.contentMarkdown).toContain("[Actions 文档](https://docs.github.com/en/actions)");
-    expect(assistant.contentMarkdown).toContain("---");
-    expect(assistant.contentMarkdown).not.toContain("复制");
+    expect(assistant.contentMarkdown).toContain('# GitHub Actions 自动化部署');
+    expect(assistant.contentMarkdown).toContain('> CI/CD 是现代开发的重要实践。');
+    expect(assistant.contentMarkdown).toContain('## 准备工作');
+    expect(assistant.contentMarkdown).toContain('1. 配置 `npm` 脚本');
+    expect(assistant.contentMarkdown).toContain('```yaml');
+    expect(assistant.contentMarkdown).toContain('branches: [ main ]');
+    expect(assistant.contentMarkdown).toContain('| 事件 | 说明 |');
+    expect(assistant.contentMarkdown).toContain('`push`');
+    expect(assistant.contentMarkdown).toContain('[Actions 文档](https://docs.github.com/en/actions)');
+    expect(assistant.contentMarkdown).toContain('---');
+    expect(assistant.contentMarkdown).not.toContain('复制');
   });
 
-  it("falls back to plain text markdown when markdown helper is unavailable", async () => {
+  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
     const html = `
       <main class="chat-content">
         <div class="chat-content-item chat-content-item-assistant">
@@ -131,10 +131,10 @@ describe("kimi-collector", () => {
     `;
 
     vi.resetModules();
-    vi.doMock("../../src/collectors/kimi/kimi-markdown.ts", () => ({ default: {} }));
+    vi.doMock('../../src/collectors/kimi/kimi-markdown.ts', () => ({ default: {} }));
 
-    const dom = setupKimiDom(html, "https://kimi.com/chat/fallback001");
-    const { createKimiCollectorDef: createDef } = await import("../../src/collectors/kimi/kimi-collector.ts");
+    const dom = setupKimiDom(html, 'https://kimi.com/chat/fallback001');
+    const { createKimiCollectorDef: createDef } = await import('../../src/collectors/kimi/kimi-collector.ts');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -145,8 +145,8 @@ describe("kimi-collector", () => {
     const snap = createDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentText).toBe("plain answer");
-    expect(snap.messages[0].contentMarkdown).toBe("plain answer");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 });

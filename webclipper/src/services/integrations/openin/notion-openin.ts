@@ -4,7 +4,9 @@ import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integ
 const NOTION_PAGE_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
 export function normalizeNotionPageId(pageId?: string | null): string {
-  const compact = String(pageId || '').trim().replace(/-/g, '');
+  const compact = String(pageId || '')
+    .trim()
+    .replace(/-/g, '');
   return NOTION_PAGE_ID_PATTERN.test(compact) ? compact.toLowerCase() : '';
 }
 

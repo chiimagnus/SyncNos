@@ -136,15 +136,15 @@ describe('Conversations sync feedback', () => {
 
   async function renderPane() {
     await act(async () => {
-      root!.render(
-        createElement(ConversationsProvider, null, createElement(ConversationListPane)),
-      );
+      root!.render(createElement(ConversationsProvider, null, createElement(ConversationListPane)));
       await flushMicrotasks();
     });
   }
 
   function selectFirstConversation() {
-    const checkbox = document.querySelector('[data-conversation-id="11"] input[type="checkbox"]') as HTMLInputElement | null;
+    const checkbox = document.querySelector(
+      '[data-conversation-id="11"] input[type="checkbox"]',
+    ) as HTMLInputElement | null;
     expect(checkbox).toBeTruthy();
     act(() => {
       checkbox!.click();
@@ -152,7 +152,9 @@ describe('Conversations sync feedback', () => {
   }
 
   function clickNotionButton() {
-    const button = Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim().startsWith('Notion')) as HTMLButtonElement | undefined;
+    const button = Array.from(document.querySelectorAll('button')).find((el) =>
+      el.textContent?.trim().startsWith('Notion'),
+    ) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
     act(() => {
       button!.click();
@@ -202,7 +204,11 @@ describe('Conversations sync feedback', () => {
     selectFirstConversation();
     clickNotionButton();
 
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: notionRunningJob() });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: notionRunningJob(),
+    });
 
     await act(async () => {
       await flushMicrotasks();
@@ -263,7 +269,11 @@ describe('Conversations sync feedback', () => {
   });
 
   it('hydrates an existing running notion job on mount', async () => {
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: notionRunningJob() });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: notionRunningJob(),
+    });
     await renderPane();
 
     const runningNotice = document.getElementById('conversationSyncFeedback');
@@ -275,13 +285,19 @@ describe('Conversations sync feedback', () => {
     expect(runningNotice?.textContent).toContain(t('syncStageUploadingMessageBlocks'));
     expect(runningNotice?.textContent).not.toContain(`${t('providerNotion')} ${t('phaseRunning').toLowerCase()} 1/2`);
 
-    const notionButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent?.trim().startsWith('Notion')) as HTMLButtonElement | undefined;
+    const notionButton = Array.from(document.querySelectorAll('button')).find((el) =>
+      el.textContent?.trim().startsWith('Notion'),
+    ) as HTMLButtonElement | undefined;
     expect(notionButton?.disabled).toBe(true);
   });
 
   it('attaches to the existing running notion job instead of showing sync already in progress as failure', async () => {
     syncNotionConversations.mockRejectedValue(new Error('sync already in progress'));
-    getNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', instanceId: 'notion-test', job: notionRunningJob() });
+    getNotionSyncJobStatus.mockResolvedValue({
+      provider: 'notion',
+      instanceId: 'notion-test',
+      job: notionRunningJob(),
+    });
 
     await renderPane();
     selectFirstConversation();

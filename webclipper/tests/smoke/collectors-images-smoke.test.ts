@@ -1,14 +1,13 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import normalizeApi from "@services/shared/normalize.ts";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createChatgptCollectorDef } from "../../src/collectors/chatgpt/chatgpt-collector.ts";
-import { createClaudeCollectorDef } from "../../src/collectors/claude/claude-collector.ts";
-import { createZaiCollectorDef } from "../../src/collectors/zai/zai-collector.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it } from 'vitest';
+import normalizeApi from '@services/shared/normalize.ts';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createChatgptCollectorDef } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
+import { createClaudeCollectorDef } from '../../src/collectors/claude/claude-collector.ts';
+import { createZaiCollectorDef } from '../../src/collectors/zai/zai-collector.ts';
 
-describe("collectors images (smoke)", () => {
-  it("chatgpt collector appends image markdown", async () => {
-
+describe('collectors images (smoke)', () => {
+  it('chatgpt collector appends image markdown', async () => {
     const dom = new JSDOM(
       `<body>
         <main>
@@ -24,7 +23,7 @@ describe("collectors images (smoke)", () => {
           </div>
         </main>
       </body>`,
-      { url: "https://chatgpt.com/c/conv1" }
+      { url: 'https://chatgpt.com/c/conv1' },
     );
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -32,15 +31,14 @@ describe("collectors images (smoke)", () => {
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true })) as any;
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    expect(snap.messages[0].contentMarkdown).toContain("![](https://img.test/u.png)");
-    expect(snap.messages[1].contentMarkdown).toContain("![](https://img.test/a2.png)");
+    expect(snap.messages[0].contentMarkdown).toContain('![](https://img.test/u.png)');
+    expect(snap.messages[1].contentMarkdown).toContain('![](https://img.test/a2.png)');
   });
 
-  it("claude collector appends image markdown", async () => {
-
+  it('claude collector appends image markdown', async () => {
     const dom = new JSDOM(
       `<body>
         <main>
@@ -56,7 +54,7 @@ describe("collectors images (smoke)", () => {
           </div>
         </main>
       </body>`,
-      { url: "https://claude.ai/chat/conv1" }
+      { url: 'https://claude.ai/chat/conv1' },
     );
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -67,12 +65,11 @@ describe("collectors images (smoke)", () => {
     const snap = createClaudeCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    expect(snap.messages[0].contentMarkdown).toContain("![](https://img.test/c-user.png)");
-    expect(snap.messages[1].contentMarkdown).toContain("![](https://img.test/c-ai.png)");
+    expect(snap.messages[0].contentMarkdown).toContain('![](https://img.test/c-user.png)');
+    expect(snap.messages[1].contentMarkdown).toContain('![](https://img.test/c-ai.png)');
   });
 
-  it("z.ai collector appends image markdown", async () => {
-
+  it('z.ai collector appends image markdown', async () => {
     const dom = new JSDOM(
       `<body>
         <main>
@@ -94,7 +91,7 @@ describe("collectors images (smoke)", () => {
           </div>
         </main>
       </body>`,
-      { url: "https://chat.z.ai/c/conv1" }
+      { url: 'https://chat.z.ai/c/conv1' },
     );
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -105,7 +102,7 @@ describe("collectors images (smoke)", () => {
     const snap = createZaiCollectorDef(env).collector.capture({ manual: true }) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    expect(snap.messages[0].contentMarkdown).toContain("![](https://img.test/z-user.png)");
-    expect(snap.messages[1].contentMarkdown).toContain("![](https://img.test/z-ai.png)");
+    expect(snap.messages[0].contentMarkdown).toContain('![](https://img.test/z-user.png)');
+    expect(snap.messages[1].contentMarkdown).toContain('![](https://img.test/z-ai.png)');
   });
 });

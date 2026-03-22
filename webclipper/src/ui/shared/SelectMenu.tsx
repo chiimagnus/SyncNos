@@ -139,13 +139,16 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     };
   }, [open]);
 
-  const triggerLabel = resolved.selected?.label ?? (resolved.safeOptions[0]?.label ?? '');
+  const triggerLabel = resolved.selected?.label ?? resolved.safeOptions[0]?.label ?? '';
   const menuItemButtonClassName = buttonMenuItemClassName();
   const triggerButtonClassName = buttonClassName || buttonTintClassName();
   const chevronClassName = menuChevronClassName();
   const resolvedTriggerLabelClassName = triggerLabelClassName || 'tw-min-w-0 tw-flex-1 tw-truncate tw-text-left';
   const resolvedChevronClassName = chevronOverlay
-    ? ['tw-absolute tw-right-2 tw-top-1/2 -tw-translate-y-1/2 tw-bg-transparent tw-pointer-events-none', chevronClassName].join(' ')
+    ? [
+        'tw-absolute tw-right-2 tw-top-1/2 -tw-translate-y-1/2 tw-bg-transparent tw-pointer-events-none',
+        chevronClassName,
+      ].join(' ')
     : ['tw-ml-1', chevronClassName].join(' ');
   const resolvedTriggerLayoutClassName = chevronOverlay
     ? 'tw-relative tw-inline-flex tw-items-center'
@@ -162,9 +165,10 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     const margin = 14;
     const clipRect = findNearestClippingRect(el);
 
-    const available = side === 'top'
-      ? rect.top - (clipRect?.top ?? 0) - gap - margin
-      : (clipRect?.bottom ?? window.innerHeight) - rect.bottom - gap - margin;
+    const available =
+      side === 'top'
+        ? rect.top - (clipRect?.top ?? 0) - gap - margin
+        : (clipRect?.bottom ?? window.innerHeight) - rect.bottom - gap - margin;
 
     const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 160));
     return next;
@@ -231,10 +235,16 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     event.preventDefault();
     setOpen(true);
     if (event.key === 'ArrowUp') {
-      const preferred = resolved.selectedIndex >= 0 && !resolved.safeOptions[resolved.selectedIndex]?.disabled ? resolved.selectedIndex : -1;
+      const preferred =
+        resolved.selectedIndex >= 0 && !resolved.safeOptions[resolved.selectedIndex]?.disabled
+          ? resolved.selectedIndex
+          : -1;
       setActiveIndex(preferred >= 0 ? preferred : findLastEnabledIndex(resolved.safeOptions));
     } else {
-      const preferred = resolved.selectedIndex >= 0 && !resolved.safeOptions[resolved.selectedIndex]?.disabled ? resolved.selectedIndex : -1;
+      const preferred =
+        resolved.selectedIndex >= 0 && !resolved.safeOptions[resolved.selectedIndex]?.disabled
+          ? resolved.selectedIndex
+          : -1;
       setActiveIndex(preferred >= 0 ? preferred : findFirstEnabledIndex(resolved.safeOptions));
     }
   };
@@ -287,7 +297,10 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
               onFocus={() => setActiveIndex(index)}
             >
               <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
-                <span className="tw-w-3 tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]" aria-hidden="true">
+                <span
+                  className="tw-w-3 tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                  aria-hidden="true"
+                >
                   {selected ? '✓' : ''}
                 </span>
                 <span className="tw-min-w-0 tw-flex-1 tw-truncate">{opt.label}</span>

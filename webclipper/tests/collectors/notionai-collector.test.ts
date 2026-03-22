@@ -1,9 +1,9 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createCollectorsRegistry } from "../../src/collectors/registry.ts";
-import { createNotionAiCollectorDef } from "../../src/collectors/notionai/notionai-collector.ts";
-import normalizeApi from "@services/shared/normalize.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it } from 'vitest';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createCollectorsRegistry } from '../../src/collectors/registry.ts';
+import { createNotionAiCollectorDef } from '../../src/collectors/notionai/notionai-collector.ts';
+import normalizeApi from '@services/shared/normalize.ts';
 
 function setupDom(dom: JSDOM) {
   // @ts-expect-error test global
@@ -34,43 +34,44 @@ function createCollectorHarness() {
   return { def, collector: def.collector as any, registry };
 }
 
-describe("notionai-collector", () => {
-  it("exposes inpageMatches for early UI eligibility", async () => {
-
-    const dom = new JSDOM("<body></body>", { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
+describe('notionai-collector', () => {
+  it('exposes inpageMatches for early UI eligibility', async () => {
+    const dom = new JSDOM('<body></body>', { url: 'https://www.notion.so/0123456789abcdef0123456789abcdef' });
     setupDom(dom);
     const { collector, registry } = createCollectorHarness();
 
-    expect(typeof collector.__test.inpageMatches).toBe("function");
-    expect(collector.__test.inpageMatches({ hostname: "www.notion.so", pathname: "/", href: "https://www.notion.so/" })).toBe(true);
-    expect(collector.__test.inpageMatches({ hostname: "example.com", pathname: "/", href: "https://example.com/" })).toBe(false);
+    expect(typeof collector.__test.inpageMatches).toBe('function');
+    expect(
+      collector.__test.inpageMatches({ hostname: 'www.notion.so', pathname: '/', href: 'https://www.notion.so/' }),
+    ).toBe(true);
+    expect(
+      collector.__test.inpageMatches({ hostname: 'example.com', pathname: '/', href: 'https://example.com/' }),
+    ).toBe(false);
 
     const active = registry.pickActive({
-      hostname: "www.notion.so",
-      pathname: "/0123456789abcdef0123456789abcdef",
-      href: "https://www.notion.so/0123456789abcdef0123456789abcdef"
+      hostname: 'www.notion.so',
+      pathname: '/0123456789abcdef0123456789abcdef',
+      href: 'https://www.notion.so/0123456789abcdef0123456789abcdef',
     });
     expect(active).toBe(null);
   });
 
-  it("becomes active only when chat turn signals exist", async () => {
-
+  it('becomes active only when chat turn signals exist', async () => {
     const html = `<div data-agent-chat-user-step-id="u1"></div>`;
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://www.notion.so/0123456789abcdef0123456789abcdef' });
     setupDom(dom);
     const { registry } = createCollectorHarness();
 
     const active = registry.pickActive({
-      hostname: "www.notion.so",
-      pathname: "/0123456789abcdef0123456789abcdef",
-      href: "https://www.notion.so/0123456789abcdef0123456789abcdef"
+      hostname: 'www.notion.so',
+      pathname: '/0123456789abcdef0123456789abcdef',
+      href: 'https://www.notion.so/0123456789abcdef0123456789abcdef',
     });
-    expect(active && active.id).toBe("notionai");
+    expect(active && active.id).toBe('notionai');
   });
 
-  it("uses thread id `t` as stable conversationKey and canonical /chat URL", async () => {
-
-    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+  it('uses thread id `t` as stable conversationKey and canonical /chat URL', async () => {
+    const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `
       <div data-agent-chat-user-step-id="u1">
         <div data-content-editable-leaf="true">你好</div>
@@ -83,7 +84,7 @@ describe("notionai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, {
-      url: `https://www.notion.so/chiimagnus/Some-Page-0123456789abcdef0123456789abcdef?t=${threadId}`
+      url: `https://www.notion.so/chiimagnus/Some-Page-0123456789abcdef0123456789abcdef?t=${threadId}`,
     });
     setupDom(dom);
     const { collector } = createCollectorHarness();
@@ -94,9 +95,8 @@ describe("notionai-collector", () => {
     expect(snap.conversation.url).toBe(`https://www.notion.so/chat?t=${threadId}&wfv=chat`);
   });
 
-  it("keeps notionai conversationKey stable across different page paths when `t` matches", async () => {
-
-    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+  it('keeps notionai conversationKey stable across different page paths when `t` matches', async () => {
+    const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `
       <div data-agent-chat-user-step-id="u1">
         <div data-content-editable-leaf="true">hi</div>
@@ -108,7 +108,7 @@ describe("notionai-collector", () => {
 
     const urls = [
       `https://www.notion.so/chiimagnus/Page-A-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?t=${threadId}`,
-      `https://www.notion.so/chiimagnus/Page-B-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb?t=${threadId}`
+      `https://www.notion.so/chiimagnus/Page-B-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb?t=${threadId}`,
     ];
 
     const keys: string[] = [];
@@ -125,9 +125,8 @@ describe("notionai-collector", () => {
     expect(keys[1]).toBe(`notionai_t_${threadId}`);
   });
 
-  it("captures user uploaded images (thread attachments) outside text leaf", async () => {
-
-    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+  it('captures user uploaded images (thread attachments) outside text leaf', async () => {
+    const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `
       <div class="autolayout-col autolayout-fill-width">
         <div style="overflow-x: scroll;">
@@ -147,22 +146,21 @@ describe("notionai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, {
-      url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`
+      url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`,
     });
     setupDom(dom);
     const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
-    const userMsg = snap.messages.find((m: any) => m && m.role === "user");
+    const userMsg = snap.messages.find((m: any) => m && m.role === 'user');
     expect(userMsg).toBeTruthy();
-    expect(userMsg.contentMarkdown).toContain("![](https://www.notion.so/image/attachment%3A");
-    expect(userMsg.contentMarkdown).toContain("table=thread");
+    expect(userMsg.contentMarkdown).toContain('![](https://www.notion.so/image/attachment%3A');
+    expect(userMsg.contentMarkdown).toContain('table=thread');
   });
 
-  it("does not capture left sidebar / page blocks outside chat turns", async () => {
-
-    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+  it('does not capture left sidebar / page blocks outside chat turns', async () => {
+    const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `
       <div id="sidebar">
         <div data-block-id="sidebar_block_1"><div data-content-editable-leaf="true">Sidebar content</div></div>
@@ -187,23 +185,22 @@ describe("notionai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, {
-      url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`
+      url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`,
     });
     setupDom(dom);
     const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
-    const texts = snap.messages.map((m: any) => m && m.contentText).join("\n");
-    expect(texts).toContain("User says hi");
-    expect(texts).toContain("Assistant replies ok");
-    expect(texts).not.toContain("Sidebar content");
-    expect(texts).not.toContain("Main page content");
+    const texts = snap.messages.map((m: any) => m && m.contentText).join('\n');
+    expect(texts).toContain('User says hi');
+    expect(texts).toContain('Assistant replies ok');
+    expect(texts).not.toContain('Sidebar content');
+    expect(texts).not.toContain('Main page content');
   });
 
-  it("pairs assistant replies as the next sibling container after each user turn", async () => {
-
-    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+  it('pairs assistant replies as the next sibling container after each user turn', async () => {
+    const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `
       <div id="outside">
         <div data-block-id="page_block_1"><div data-content-editable-leaf="true">Page block (should not capture)</div></div>
@@ -229,24 +226,23 @@ describe("notionai-collector", () => {
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, {
-      url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`
+      url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`,
     });
     setupDom(dom);
     const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
-    const pairs = snap.messages.map((m: any) => `${m.role}:${m.contentText}`).join("|");
-    expect(pairs).toContain("user:U1");
-    expect(pairs).toContain("assistant:A1");
-    expect(pairs).toContain("user:U2");
-    expect(pairs).toContain("assistant:A2");
-    expect(pairs).not.toContain("Page block (should not capture)");
+    const pairs = snap.messages.map((m: any) => `${m.role}:${m.contentText}`).join('|');
+    expect(pairs).toContain('user:U1');
+    expect(pairs).toContain('assistant:A1');
+    expect(pairs).toContain('user:U2');
+    expect(pairs).toContain('assistant:A2');
+    expect(pairs).not.toContain('Page block (should not capture)');
   });
 
-  it("captures nested list and fenced code markdown from assistant blocks", async () => {
-
-    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+  it('captures nested list and fenced code markdown from assistant blocks', async () => {
+    const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `
       <div class="autolayout-col autolayout-fill-width" id="turns_root">
         <div class="autolayout-col">
@@ -271,20 +267,20 @@ console.log(value);</div>
     `;
 
     const dom = new JSDOM(`<body>${html}</body>`, {
-      url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`
+      url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`,
     });
     setupDom(dom);
     const { collector } = createCollectorHarness();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
-    const assistant = snap.messages.find((m: any) => m && m.role === "assistant");
+    const assistant = snap.messages.find((m: any) => m && m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    const md = String(assistant.contentMarkdown || "");
-    expect(md).toContain("1. 父级条目");
-    expect(md).toContain("  - 子级条目");
-    expect(md).toContain("```");
-    expect(md).toContain("const value = 1;");
-    expect(md).toContain("console.log(value);");
+    const md = String(assistant.contentMarkdown || '');
+    expect(md).toContain('1. 父级条目');
+    expect(md).toContain('  - 子级条目');
+    expect(md).toContain('```');
+    expect(md).toContain('const value = 1;');
+    expect(md).toContain('console.log(value);');
   });
 });

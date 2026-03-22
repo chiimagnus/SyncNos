@@ -65,13 +65,7 @@ function buildObsidianPreflightFailure(preflight: any) {
 
 function normalizeIds(ids: unknown): number[] {
   if (!Array.isArray(ids)) return [];
-  return Array.from(
-    new Set(
-      ids
-        .map((x) => Number(x))
-        .filter((x) => Number.isFinite(x) && x > 0),
-    ),
-  );
+  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
@@ -189,12 +183,10 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
 
-      const preflight = await deps.obsidianSyncOrchestrator
-        .testConnection({ instanceId })
-        .catch((e: any) => ({
-          ok: false,
-          error: { code: 'network_error', message: e?.message ? String(e.message) : 'connection test failed' },
-        }));
+      const preflight = await deps.obsidianSyncOrchestrator.testConnection({ instanceId }).catch((e: any) => ({
+        ok: false,
+        error: { code: 'network_error', message: e?.message ? String(e.message) : 'connection test failed' },
+      }));
       if (!preflight || (preflight as any).ok !== true) {
         releaseLock();
         const failure = buildObsidianPreflightFailure(preflight);
@@ -202,7 +194,11 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       }
 
       const hub = router.eventsHub;
-      const run = deps.obsidianSyncOrchestrator.syncConversations({ conversationIds, forceFullConversationIds, instanceId });
+      const run = deps.obsidianSyncOrchestrator.syncConversations({
+        conversationIds,
+        forceFullConversationIds,
+        instanceId,
+      });
       obsidianDetachedRun = run;
       void run
         .finally(() => {

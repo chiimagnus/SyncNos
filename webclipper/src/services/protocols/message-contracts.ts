@@ -26,4 +26,3 @@ export type {
   UiPortName,
   MessageType,
 } from '@platform/messaging/message-contracts';
-

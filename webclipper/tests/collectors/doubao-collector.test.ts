@@ -1,16 +1,16 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it, vi } from "vitest";
-import normalizeApi from "@services/shared/normalize.ts";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createDoubaoCollectorDef } from "../../src/collectors/doubao/doubao-collector.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it, vi } from 'vitest';
+import normalizeApi from '@services/shared/normalize.ts';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createDoubaoCollectorDef } from '../../src/collectors/doubao/doubao-collector.ts';
 
 function setupDoubaoDom(html: string, url: string) {
   const dom = new JSDOM(`<body>${html}</body>`, { url });
   return dom;
 }
 
-describe("doubao-collector", () => {
-  it("extracts assistant contentMarkdown from semantic markdown DOM", async () => {
+describe('doubao-collector', () => {
+  it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <main data-testid="message_list">
         <div data-testid="union_message">
@@ -53,7 +53,7 @@ describe("doubao-collector", () => {
       </main>
     `;
 
-    const dom = setupDoubaoDom(html, "https://www.doubao.com/chat/conv001");
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/conv001');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -63,24 +63,24 @@ describe("doubao-collector", () => {
     const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentMarkdown).toContain("# 生活随笔");
-    expect(assistant.contentMarkdown).toContain("**温柔**");
-    expect(assistant.contentMarkdown).toContain("*热牛奶*");
-    expect(assistant.contentMarkdown).toContain("- 父级条目");
-    expect(assistant.contentMarkdown).toContain("  - 子级条目");
-    expect(assistant.contentMarkdown).toContain("> 心若向阳，目之所及皆是美好。");
-    expect(assistant.contentMarkdown).toContain("| 物品 | 用途 |");
-    expect(assistant.contentMarkdown).toContain("[生活分享平台](https://example.com/life)");
-    expect(assistant.contentMarkdown).toContain("```python");
-    expect(assistant.contentMarkdown).toContain("print(daily)");
-    expect(assistant.contentMarkdown).not.toContain("这是思考内容，不应被抓取");
-    expect(assistant.contentMarkdown).not.toContain("运行");
-    expect(assistant.contentMarkdown).not.toContain("复制");
+    expect(assistant.contentMarkdown).toContain('# 生活随笔');
+    expect(assistant.contentMarkdown).toContain('**温柔**');
+    expect(assistant.contentMarkdown).toContain('*热牛奶*');
+    expect(assistant.contentMarkdown).toContain('- 父级条目');
+    expect(assistant.contentMarkdown).toContain('  - 子级条目');
+    expect(assistant.contentMarkdown).toContain('> 心若向阳，目之所及皆是美好。');
+    expect(assistant.contentMarkdown).toContain('| 物品 | 用途 |');
+    expect(assistant.contentMarkdown).toContain('[生活分享平台](https://example.com/life)');
+    expect(assistant.contentMarkdown).toContain('```python');
+    expect(assistant.contentMarkdown).toContain('print(daily)');
+    expect(assistant.contentMarkdown).not.toContain('这是思考内容，不应被抓取');
+    expect(assistant.contentMarkdown).not.toContain('运行');
+    expect(assistant.contentMarkdown).not.toContain('复制');
   });
 
-  it("falls back to plain text markdown when markdown helper is unavailable", async () => {
+  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
     const html = `
       <main data-testid="message_list">
         <div data-testid="union_message">
@@ -92,10 +92,10 @@ describe("doubao-collector", () => {
     `;
 
     vi.resetModules();
-    vi.doMock("../../src/collectors/doubao/doubao-markdown.ts", () => ({ default: {} }));
+    vi.doMock('../../src/collectors/doubao/doubao-markdown.ts', () => ({ default: {} }));
 
-    const dom = setupDoubaoDom(html, "https://www.doubao.com/chat/fallback001");
-    const { createDoubaoCollectorDef: createDef } = await import("../../src/collectors/doubao/doubao-collector.ts");
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/fallback001');
+    const { createDoubaoCollectorDef: createDef } = await import('../../src/collectors/doubao/doubao-collector.ts');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -105,13 +105,13 @@ describe("doubao-collector", () => {
     const snap = (await Promise.resolve(createDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentText).toBe("plain answer");
-    expect(snap.messages[0].contentMarkdown).toBe("plain answer");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 
-  it("inlines blob: uploaded images as data:image urls", async () => {
-    const blobUrl = "blob:https://www.doubao.com/ee26c19d-9884-4cd8-8bcf-6b7ba6436f0f";
+  it('inlines blob: uploaded images as data:image urls', async () => {
+    const blobUrl = 'blob:https://www.doubao.com/ee26c19d-9884-4cd8-8bcf-6b7ba6436f0f';
     const data = new Uint8Array([0, 1, 2, 3, 4, 5]);
 
     const html = `
@@ -128,12 +128,12 @@ describe("doubao-collector", () => {
       </main>
     `;
 
-    const dom = setupDoubaoDom(html, "https://www.doubao.com/chat/blob001");
+    const dom = setupDoubaoDom(html, 'https://www.doubao.com/chat/blob001');
     (dom.window as any).fetch = vi.fn(async (url: string) => {
       if (url !== blobUrl) return { ok: false, blob: async () => new dom.window.Blob() };
       return {
         ok: true,
-        blob: async () => new dom.window.Blob([data], { type: "image/png" }),
+        blob: async () => new dom.window.Blob([data], { type: 'image/png' }),
       };
     });
 
@@ -147,8 +147,8 @@ describe("doubao-collector", () => {
     const snap = (await Promise.resolve(createDoubaoCollectorDef(env).collector.capture())) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    const user = snap.messages.find((m: { role: string }) => m.role === "user");
+    const user = snap.messages.find((m: { role: string }) => m.role === 'user');
     expect(user).toBeTruthy();
-    expect(user.contentMarkdown).toContain("![](data:image/png");
+    expect(user.contentMarkdown).toContain('![](data:image/png');
   });
 });

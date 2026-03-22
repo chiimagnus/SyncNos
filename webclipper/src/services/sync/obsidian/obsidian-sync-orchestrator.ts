@@ -1,15 +1,10 @@
 import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
-import {
-  getObsidianConnectionConfig,
-  getObsidianPathConfig,
-} from '@services/sync/obsidian/settings-store';
+import { getObsidianConnectionConfig, getObsidianPathConfig } from '@services/sync/obsidian/settings-store';
 import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
 } from '@services/sync/obsidian/obsidian-local-rest-client.ts';
-import {
-  buildFullNoteMarkdown as buildDefaultFullNoteMarkdown,
-} from '@services/sync/obsidian/obsidian-markdown-writer.ts';
+import { buildFullNoteMarkdown as buildDefaultFullNoteMarkdown } from '@services/sync/obsidian/obsidian-markdown-writer.ts';
 import {
   buildStableNotePath as buildDefaultStableNotePath,
   buildLegacyHashNotePath as buildDefaultLegacyHashNotePath,
@@ -91,10 +86,7 @@ function collectOrderedSyncnosAssetIds(markdown: unknown): number[] {
   return ordered;
 }
 
-function replaceSyncnosAssetsWithAttachmentNames(
-  markdown: unknown,
-  attachmentNameByAssetId: Map<number, string>,
-) {
+function replaceSyncnosAssetsWithAttachmentNames(markdown: unknown, attachmentNameByAssetId: Map<number, string>) {
   const text = String(markdown || '');
   if (!text || !attachmentNameByAssetId.size) return text;
   MARKDOWN_IMAGE_RE.lastIndex = 0;
@@ -160,7 +152,7 @@ async function materializeMarkdownAssetsForObsidian({
   for (const assetId of targetIds) {
     const index = indexByAssetId.get(assetId);
     if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
-    // eslint-disable-next-line no-await-in-loop
+
     const asset = await getImageCacheAssetById({ id: assetId });
     if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
@@ -169,14 +161,12 @@ async function materializeMarkdownAssetsForObsidian({
     attachmentNameByAssetId.set(assetId, attachmentName);
 
     const contentType = safeString(asset.contentType || asset.blob.type) || `image/${ext}`;
-    // eslint-disable-next-line no-await-in-loop
+
     const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-    // eslint-disable-next-line no-await-in-loop
-    const putRes = await client.putVaultBinaryFile(
-      buildAttachmentPath(filePath, attachmentName),
-      bytes,
-      { contentType },
-    );
+
+    const putRes = await client.putVaultBinaryFile(buildAttachmentPath(filePath, attachmentName), bytes, {
+      contentType,
+    });
     if (!putRes || !putRes.ok) {
       const message = putRes && putRes.error && putRes.error.message ? putRes.error.message : 'attachment put failed';
       throw new Error(String(message || 'attachment put failed'));
@@ -188,9 +178,7 @@ async function materializeMarkdownAssetsForObsidian({
 
 function normalizeIds(list: unknown) {
   const ids = Array.isArray(list) ? list : [];
-  return Array.from(
-    new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)),
-  );
+  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
 function buildPerConversationResult({
@@ -240,7 +228,7 @@ function buildAlreadyRunningError() {
   return error;
 }
 
-function toCurrentConversationTitle(convo: any, conversationId: number) {
+function toCurrentConversationTitle(convo: any, _conversationId: number) {
   const title = safeString(convo && convo.title);
   if (title) return title;
   return '';
@@ -298,8 +286,7 @@ async function buildClient() {
   if (!client || client.ok === false) {
     return {
       ok: false,
-      error:
-        client && client.error ? client.error : { code: 'invalid_client', message: 'invalid client' },
+      error: client && client.error ? client.error : { code: 'invalid_client', message: 'invalid client' },
     };
   }
   return {
@@ -427,7 +414,8 @@ async function decideSyncModeForConversation({
     };
   }
 
-  const desiredFilePath = safeString(pathResolution?.desiredFilePath) || notePathMod.buildStableNotePath(convo, { folderByKindId });
+  const desiredFilePath =
+    safeString(pathResolution?.desiredFilePath) || notePathMod.buildStableNotePath(convo, { folderByKindId });
   existingPath = safeString(pathResolution?.resolvedFilePath);
 
   if (pathResolution?.found && existingPath) {
@@ -481,16 +469,40 @@ async function decideSyncModeForConversation({
   const parsed = metaMod.readSyncnosObject(frontmatter);
   const parsedData = parsed && parsed.ok && parsed.data ? parsed.data : null;
   if (!parsedData) {
-    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
+    return {
+      isFinal: false,
+      conversationId,
+      convo,
+      filePath: desiredFilePath,
+      messages,
+      comments: articleComments,
+      mode: 'full_rebuild',
+    };
   }
   if (
     safeString(parsedData.source) !== safeString(convo.source) ||
     safeString(parsedData.conversationKey) !== safeString(convo.conversationKey)
   ) {
-    return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
+    return {
+      isFinal: false,
+      conversationId,
+      convo,
+      filePath: desiredFilePath,
+      messages,
+      comments: articleComments,
+      mode: 'full_rebuild',
+    };
   }
 
-  return { isFinal: false, conversationId, convo, filePath: desiredFilePath, messages, comments: articleComments, mode: 'full_rebuild' };
+  return {
+    isFinal: false,
+    conversationId,
+    convo,
+    filePath: desiredFilePath,
+    messages,
+    comments: articleComments,
+    mode: 'full_rebuild',
+  };
 }
 
 async function testConnection({ instanceId }: { instanceId?: string } = {}) {
@@ -569,7 +581,14 @@ async function syncConversations({
   const ids = normalizeIds(conversationIds);
   const forceFullIds = new Set(normalizeIds(forceFullConversationIds));
   if (!ids.length) {
-    return { provider: SYNC_PROVIDER, okCount: 0, failCount: 0, failures: [], results: [], instanceId: safeString(instanceId) };
+    return {
+      provider: SYNC_PROVIDER,
+      okCount: 0,
+      failCount: 0,
+      failures: [],
+      results: [],
+      instanceId: safeString(instanceId),
+    };
   }
 
   const safeInstanceId = safeString(instanceId);
@@ -676,7 +695,11 @@ async function syncConversations({
             });
           } else {
             const deleteAfter = decision.deleteAfterFilePath ? safeString(decision.deleteAfterFilePath) : '';
-            if (deleteAfter && deleteAfter !== safeString(decision.filePath) && typeof client.deleteVaultFile === 'function') {
+            if (
+              deleteAfter &&
+              deleteAfter !== safeString(decision.filePath) &&
+              typeof client.deleteVaultFile === 'function'
+            ) {
               await persistCurrentJob({
                 currentConversationId: conversationId,
                 currentConversationTitle: currentTitle,

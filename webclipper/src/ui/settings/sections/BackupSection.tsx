@@ -10,20 +10,25 @@ function ImportStatsList(props: { stats: any }) {
   return (
     <ul className="tw-m-0 tw-pl-[18px]">
       <li>
-        {t('statsConversations')} {t('statsAdded')} {stats.conversationsAdded} · {t('statsUpdated')} {stats.conversationsUpdated}
+        {t('statsConversations')} {t('statsAdded')} {stats.conversationsAdded} · {t('statsUpdated')}{' '}
+        {stats.conversationsUpdated}
       </li>
       <li>
-        {t('statsMessages')} {t('statsAdded')} {stats.messagesAdded} · {t('statsUpdated')} {stats.messagesUpdated} ({t('skipped')} {stats.messagesSkipped})
+        {t('statsMessages')} {t('statsAdded')} {stats.messagesAdded} · {t('statsUpdated')} {stats.messagesUpdated} (
+        {t('skipped')} {stats.messagesSkipped})
       </li>
       {'commentsAdded' in stats ? (
         <li>
-          {t('statsComments')} {t('statsAdded')} {stats.commentsAdded} · {t('statsUpdated')} {stats.commentsUpdated} ({t('skipped')} {stats.commentsSkipped})
+          {t('statsComments')} {t('statsAdded')} {stats.commentsAdded} · {t('statsUpdated')} {stats.commentsUpdated} (
+          {t('skipped')} {stats.commentsSkipped})
         </li>
       ) : null}
       <li>
         {t('statsMappings')} {t('statsAdded')} {stats.mappingsAdded} · {t('statsUpdated')} {stats.mappingsUpdated}
       </li>
-      <li>{t('statsSettingsApplied')} {stats.settingsApplied}</li>
+      <li>
+        {t('statsSettingsApplied')} {stats.settingsApplied}
+      </li>
     </ul>
   );
 }
@@ -59,7 +64,11 @@ export function BackupSection(props: {
     <section className={cardClassName} aria-label={t('databaseBackup')}>
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('databaseBackup')}</h2>
 
-      <div ref={backupImportRef} id="settings-backup-import" className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5">
+      <div
+        ref={backupImportRef}
+        id="settings-backup-import"
+        className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5"
+      >
         <button className={buttonClassName} onClick={onExport} disabled={busy}>
           {t('exportZip')}
         </button>
@@ -85,9 +94,15 @@ export function BackupSection(props: {
           }}
         />
       </div>
-      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('exportStatus')} {exportStatus}</div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('lastExport')} {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}</div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('importStatus')} {importStatus}</div>
+      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        {t('exportStatus')} {exportStatus}
+      </div>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        {t('lastExport')} {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}
+      </div>
+      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        {t('importStatus')} {importStatus}
+      </div>
       <div className="tw-mt-2.5">
         <ImportStatsList stats={importStats} />
       </div>

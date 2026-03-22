@@ -11,12 +11,12 @@ import zaiMarkdown from '@collectors/zai/zai-markdown.ts';
 export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
-    return hostname === "chat.z.ai";
+    return hostname === 'chat.z.ai';
   }
 
   function findConversationIdFromUrl(): any {
-    const m = String(env.location.pathname || "").match(/^\/c\/([^/?#]+)/);
-    return m && m[1] ? m[1] : "";
+    const m = String(env.location.pathname || '').match(/^\/c\/([^/?#]+)/);
+    return m && m[1] ? m[1] : '';
   }
 
   function isValidConversationUrl(): any {
@@ -32,11 +32,11 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   }
 
   function findTitle(): any {
-    return env.document.title || "z.ai";
+    return env.document.title || 'z.ai';
   }
 
   function getConversationRoot(): any {
-    return env.document.querySelector("main") || env.document.querySelector("[role='main']") || env.document.body;
+    return env.document.querySelector('main') || env.document.querySelector("[role='main']") || env.document.body;
   }
 
   function inEditMode(root: any): any {
@@ -59,34 +59,38 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   function isUserWrapper(wrapper: any): any {
     if (!wrapper) return false;
-    if (wrapper.classList && wrapper.classList.contains("user-message")) return true;
-    return !!(wrapper.querySelector && wrapper.querySelector(".user-message, .chat-user"));
+    if (wrapper.classList && wrapper.classList.contains('user-message')) return true;
+    return !!(wrapper.querySelector && wrapper.querySelector('.user-message, .chat-user'));
   }
 
   function isAssistantWrapper(wrapper: any): any {
     if (!wrapper) return false;
-    if (wrapper.classList && wrapper.classList.contains("chat-assistant")) return true;
-    return !!(wrapper.querySelector && wrapper.querySelector(".chat-assistant"));
+    if (wrapper.classList && wrapper.classList.contains('chat-assistant')) return true;
+    return !!(wrapper.querySelector && wrapper.querySelector('.chat-assistant'));
   }
 
   function extractAssistantMarkdown(wrapper: any): any {
-    if (typeof zaiMarkdown.extractAssistantMarkdown === "function") return zaiMarkdown.extractAssistantMarkdown(wrapper);
-    return "";
+    if (typeof zaiMarkdown.extractAssistantMarkdown === 'function')
+      return zaiMarkdown.extractAssistantMarkdown(wrapper);
+    return '';
   }
 
   function extractUserText(wrapper: any): any {
-    const node = (wrapper && wrapper.querySelector)
-      ? (wrapper.querySelector(".whitespace-pre-wrap") || wrapper)
-      : wrapper;
-    const text = node && ((node as any).innerText || node.textContent) ? ((node as any).innerText || node.textContent) : "";
+    const node = wrapper && wrapper.querySelector ? wrapper.querySelector('.whitespace-pre-wrap') || wrapper : wrapper;
+    const text =
+      node && ((node as any).innerText || node.textContent) ? (node as any).innerText || node.textContent : '';
     return env.normalize.normalizeText(text);
   }
 
   function extractAssistantText(wrapper: any): any {
-    if (typeof zaiMarkdown.extractAssistantText === "function") return zaiMarkdown.extractAssistantText(wrapper);
-    if (!wrapper || !wrapper.querySelector) return "";
-    const content = wrapper.querySelector("#response-content-container") || wrapper.querySelector(".chat-assistant") || wrapper;
-    const text = content && ((content as any).innerText || content.textContent) ? ((content as any).innerText || content.textContent) : "";
+    if (typeof zaiMarkdown.extractAssistantText === 'function') return zaiMarkdown.extractAssistantText(wrapper);
+    if (!wrapper || !wrapper.querySelector) return '';
+    const content =
+      wrapper.querySelector('#response-content-container') || wrapper.querySelector('.chat-assistant') || wrapper;
+    const text =
+      content && ((content as any).innerText || content.textContent)
+        ? (content as any).innerText || content.textContent
+        : '';
     return env.normalize.normalizeText(text);
   }
 
@@ -99,7 +103,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
   }
 
   function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
-    const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
+    const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute('id') || '') : '';
     if (id) return id;
     return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
   }
@@ -115,31 +119,34 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     const out = [];
     let seq = 0;
     for (const w of wrappers) {
-      const role = isUserWrapper(w) ? "user" : (isAssistantWrapper(w) ? "assistant" : "");
+      const role = isUserWrapper(w) ? 'user' : isAssistantWrapper(w) ? 'assistant' : '';
       if (!role) continue;
-      const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
+      const contentText = role === 'user' ? extractUserText(w) : extractAssistantText(w);
       const imageScope = (() => {
         if (!w || !w.querySelector) return w;
-        if (role === "user") {
+        if (role === 'user') {
           // User-uploaded images live in a "not-prose" attachment card above the text bubble.
           // Keep the scope at `.chat-user`/wrapper so we don't miss those `<img>` nodes.
-          return w.querySelector(".chat-user") || w;
+          return w.querySelector('.chat-user') || w;
         }
-        return w.querySelector("#response-content-container") || w.querySelector(".markdown-prose") || w.querySelector(".chat-assistant") || w;
+        return (
+          w.querySelector('#response-content-container') ||
+          w.querySelector('.markdown-prose') ||
+          w.querySelector('.chat-assistant') ||
+          w
+        );
       })();
       const imageUrls = extractImageUrlsFromElement(imageScope || w);
       if (!contentText && !imageUrls.length) continue;
-      const contentMarkdown = role === "assistant"
-        ? (extractAssistantMarkdown(w) || contentText)
-        : contentText;
-      const nextMarkdown = appendImageMarkdown(contentMarkdown || contentText || "", imageUrls);
+      const contentMarkdown = role === 'assistant' ? extractAssistantMarkdown(w) || contentText : contentText;
+      const nextMarkdown = appendImageMarkdown(contentMarkdown || contentText || '', imageUrls);
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
-        contentText: contentText || "",
+        contentText: contentText || '',
         contentMarkdown: nextMarkdown,
         sequence: seq,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       });
       seq += 1;
     }
@@ -152,15 +159,15 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     if (!messages.length) return null;
     return {
       conversation: {
-        sourceType: "chat",
-        source: "zai",
+        sourceType: 'chat',
+        source: 'zai',
         conversationKey: findConversationKey(),
         title: findTitle(),
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now()
+        lastCapturedAt: Date.now(),
       },
-      messages
+      messages,
     };
   }
 
@@ -175,5 +182,5 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     extractAssistantText: (zaiMarkdown as any).extractAssistantText,
   };
 
-  return { id: "zai", matches, collector };
+  return { id: 'zai', matches, collector };
 }

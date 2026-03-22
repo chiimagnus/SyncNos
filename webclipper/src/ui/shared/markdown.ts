@@ -98,8 +98,7 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}) {
     const assetId = parseSyncnosAssetId(safeSrc);
     if (assetId) {
       const envMap = env && typeof env === 'object' ? (env as any).syncnosAssetSrcById : null;
-      const resolved =
-        envMap && (typeof envMap.get === 'function' ? envMap.get(assetId) : (envMap as any)[assetId]);
+      const resolved = envMap && (typeof envMap.get === 'function' ? envMap.get(assetId) : (envMap as any)[assetId]);
       const safeResolved = typeof resolved === 'string' ? resolved.trim() : '';
       // Use a tiny valid image as fallback to avoid noisy console errors.
       const placeholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';

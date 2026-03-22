@@ -77,50 +77,62 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
     createElement(
       'div',
       null,
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({ mode: 'list' });
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({ mode: 'list' });
+          },
         },
-      }, 'show-list'),
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({
-            mode: 'detail',
-            title: 'Conversation',
-            subtitle: 'chatgpt · key',
-            actions: [
-              {
-                id: 'open-in-notion',
-                label: 'Open in Notion',
-                kind: 'external-link',
-                provider: 'notion',
-                slot: 'open',
-                href: 'https://www.notion.so/example',
-                onTrigger: async () => {},
+        'show-list',
+      ),
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({
+              mode: 'detail',
+              title: 'Conversation',
+              subtitle: 'chatgpt · key',
+              actions: [
+                {
+                  id: 'open-in-notion',
+                  label: 'Open in Notion',
+                  kind: 'external-link',
+                  provider: 'notion',
+                  slot: 'open',
+                  href: 'https://www.notion.so/example',
+                  onTrigger: async () => {},
+                },
+              ],
+              onBack: () => {
+                props.onPopupHeaderStateChange?.({ mode: 'list' });
               },
-            ],
-            onBack: () => {
-              props.onPopupHeaderStateChange?.({ mode: 'list' });
-            },
-          });
+            });
+          },
         },
-      }, 'show-detail'),
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({
-            mode: 'detail',
-            title: 'Conversation',
-            subtitle: 'chatgpt · key',
-            actions: [],
-            onBack: () => {
-              props.onPopupHeaderStateChange?.({ mode: 'list' });
-            },
-          });
+        'show-detail',
+      ),
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({
+              mode: 'detail',
+              title: 'Conversation',
+              subtitle: 'chatgpt · key',
+              actions: [],
+              onBack: () => {
+                props.onPopupHeaderStateChange?.({ mode: 'list' });
+              },
+            });
+          },
         },
-      }, 'show-detail-empty'),
+        'show-detail-empty',
+      ),
     ),
 }));
 
@@ -180,7 +192,9 @@ describe('AppShell narrow detail header actions', () => {
       root!.render(createElement(AppShell));
     });
 
-    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail') as HTMLButtonElement | undefined;
+    const detailButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'show-detail',
+    ) as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
 
     act(() => {
@@ -195,7 +209,9 @@ describe('AppShell narrow detail header actions', () => {
       root!.render(createElement(AppShell));
     });
 
-    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail-empty') as HTMLButtonElement | undefined;
+    const detailButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'show-detail-empty',
+    ) as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
 
     act(() => {

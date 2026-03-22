@@ -42,9 +42,7 @@ function unsupportedState(reason: string): CaptureState {
   };
 }
 
-export function usePopupCurrentPageCapture(input: {
-  onCaptured?: () => void | Promise<void>;
-}) {
+export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Promise<void> }) {
   const onCaptured = input.onCaptured;
   const [captureState, setCaptureState] = useState<CaptureState>(() => unsupportedState(t('checkingCurrentPage')));
   const [checking, setChecking] = useState(true);

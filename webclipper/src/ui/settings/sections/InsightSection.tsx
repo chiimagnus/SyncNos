@@ -4,11 +4,7 @@ import { hasInsightData } from '@viewmodels/settings/insight-stats';
 import { InsightPanel } from '@ui/settings/sections/InsightPanel';
 import { cardClassName } from '@ui/settings/ui';
 
-function InsightStateCard(props: {
-  title: string;
-  detail?: string;
-  tone?: 'default' | 'error';
-}) {
+function InsightStateCard(props: { title: string; detail?: string; tone?: 'default' | 'error' }) {
   const { title, detail, tone = 'default' } = props;
 
   return (
@@ -20,10 +16,19 @@ function InsightStateCard(props: {
       aria-label={t('insightHeading')}
     >
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightHeading')}</h2>
-      <div className={['tw-mt-3 tw-text-lg tw-font-black', tone === 'error' ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-primary)]'].join(' ')}>
+      <div
+        className={[
+          'tw-mt-3 tw-text-lg tw-font-black',
+          tone === 'error' ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-primary)]',
+        ].join(' ')}
+      >
         {title}
       </div>
-      {detail ? <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{detail}</div> : null}
+      {detail ? (
+        <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {detail}
+        </div>
+      ) : null}
     </section>
   );
 }

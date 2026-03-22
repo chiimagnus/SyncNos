@@ -8,7 +8,4 @@ export const webext = {
   },
 };
 
-export {
-  platformOpenOrFocusExtensionAppTab as openOrFocusExtensionAppTab,
-  platformTabsCreate as tabsCreate,
-};
+export { platformOpenOrFocusExtensionAppTab as openOrFocusExtensionAppTab, platformTabsCreate as tabsCreate };

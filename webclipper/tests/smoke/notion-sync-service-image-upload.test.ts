@@ -113,14 +113,22 @@ describe('notion-sync-service image uploads', () => {
       {
         object: 'block',
         type: 'image',
-        image: { type: 'external', external: { url: 'https://www.notion.so/image/attachment%3Aabc.png?table=thread&id=1' } },
+        image: {
+          type: 'external',
+          external: { url: 'https://www.notion.so/image/attachment%3Aabc.png?table=thread&id=1' },
+        },
       },
     ];
 
     const out = await notionSyncService.upgradeImageBlocksToFileUploads('t', blocks);
     expect(out[0]?.image?.type).toBe('file_upload');
     expect(out[0]?.image?.file_upload?.id).toBe('u2');
-    expect(calls.map((c) => c.op)).toEqual(['createExternalURLUpload', 'createFileUpload', 'sendFileUpload', 'waitUntilUploaded']);
+    expect(calls.map((c) => c.op)).toEqual([
+      'createExternalURLUpload',
+      'createFileUpload',
+      'sendFileUpload',
+      'waitUntilUploaded',
+    ]);
   });
 
   it('keeps original external url when all upload attempts fail', async () => {
@@ -154,7 +162,10 @@ describe('notion-sync-service image uploads', () => {
       {
         object: 'block',
         type: 'image',
-        image: { type: 'external', external: { url: 'https://www.notion.so/image/attachment%3Aabc.png?table=thread&id=1' } },
+        image: {
+          type: 'external',
+          external: { url: 'https://www.notion.so/image/attachment%3Aabc.png?table=thread&id=1' },
+        },
       },
     ];
 

@@ -19,23 +19,31 @@ type NoticeTones = {
 
 const NOTICE_TONE_CLASSES: Record<'info' | 'success' | 'warning' | 'error', NoticeTones> = {
   info: {
-    panel: 'tw-border-[color-mix(in_srgb,var(--info)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    badge: 'tw-border-[color-mix(in_srgb,var(--info)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    panel:
+      'tw-border-[color-mix(in_srgb,var(--info)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge:
+      'tw-border-[color-mix(in_srgb,var(--info)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
     progress: 'tw-bg-[var(--info)]',
   },
   success: {
-    panel: 'tw-border-[color-mix(in_srgb,var(--success)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    badge: 'tw-border-[color-mix(in_srgb,var(--success)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    panel:
+      'tw-border-[color-mix(in_srgb,var(--success)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge:
+      'tw-border-[color-mix(in_srgb,var(--success)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
     progress: 'tw-bg-[var(--success)]',
   },
   warning: {
-    panel: 'tw-border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    badge: 'tw-border-[color-mix(in_srgb,var(--warning)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    panel:
+      'tw-border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge:
+      'tw-border-[color-mix(in_srgb,var(--warning)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--warning)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
     progress: 'tw-bg-[var(--warning)]',
   },
   error: {
-    panel: 'tw-border-[color-mix(in_srgb,var(--error)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    badge: 'tw-border-[color-mix(in_srgb,var(--error)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    panel:
+      'tw-border-[color-mix(in_srgb,var(--error)_45%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    badge:
+      'tw-border-[color-mix(in_srgb,var(--error)_70%,var(--border))] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
     progress: 'tw-bg-[var(--error)]',
   },
 };
@@ -142,7 +150,9 @@ function SummaryBody(props: {
         >
           {provider}
         </span>
-        <span className="tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em]">{phaseLabel(feedback.phase)}</span>
+        <span className="tw-text-[11px] tw-font-black tw-uppercase tw-tracking-[0.08em]">
+          {phaseLabel(feedback.phase)}
+        </span>
         {feedback.total > 0 ? (
           <span className="tw-text-[11px] tw-font-semibold tw-opacity-80">
             {feedback.done}/{feedback.total}
@@ -161,7 +171,8 @@ function SummaryBody(props: {
               'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
             ].join(' ')}
           >
-            {issueCount} {issueCount === 1 ? t('issuesSingular') : t('issuesPlural')} · {detailsOpen ? t('hideDetails') : t('viewDetails')}
+            {issueCount} {issueCount === 1 ? t('issuesSingular') : t('issuesPlural')} ·{' '}
+            {detailsOpen ? t('hideDetails') : t('viewDetails')}
           </button>
         ) : null}
       </div>
@@ -277,21 +288,24 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
   const canDismiss = feedback.phase !== 'running';
   const iconCircleButtonClassName = buttonIconCircleCardClassName();
   const liveMode = feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'assertive' : 'polite';
-  const progressWidth = feedback.total > 0
-    ? feedback.done <= 0
-      ? 0
-      : Math.min(100, Math.max(8, Math.round((feedback.done / feedback.total) * 100) || 0))
-    : 0;
-  const currentItemLabel = feedback.currentConversationTitle.trim()
-    || (feedback.currentConversationId ? `${t('conversationLabel')} #${feedback.currentConversationId}` : '');
+  const progressWidth =
+    feedback.total > 0
+      ? feedback.done <= 0
+        ? 0
+        : Math.min(100, Math.max(8, Math.round((feedback.done / feedback.total) * 100) || 0))
+      : 0;
+  const currentItemLabel =
+    feedback.currentConversationTitle.trim() ||
+    (feedback.currentConversationId ? `${t('conversationLabel')} #${feedback.currentConversationId}` : '');
   const currentStageLabel = translateSyncStage(feedback.currentStage.trim());
-  const message = feedback.phase === 'running'
-    ? currentItemLabel
-      ? `${t('currentPrefix')} ${currentItemLabel}`
-      : currentStageLabel
-        ? `${t('stagePrefix')} ${currentStageLabel}`
-        : feedback.message
-    : feedback.message;
+  const message =
+    feedback.phase === 'running'
+      ? currentItemLabel
+        ? `${t('currentPrefix')} ${currentItemLabel}`
+        : currentStageLabel
+          ? `${t('stagePrefix')} ${currentStageLabel}`
+          : feedback.message
+      : feedback.message;
   const showRunningStageDetail = feedback.phase === 'running' && !!currentItemLabel && !!currentStageLabel;
 
   const onJump = (conversationId: unknown) => {
@@ -306,10 +320,9 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
       ref={containerRef}
       id="conversationSyncFeedback"
       data-phase={feedback.phase}
-      className={[
-        'tw-relative tw-mt-2 tw-rounded-2xl tw-border tw-px-3 tw-py-2.5 tw-shadow-none',
-        tones.panel,
-      ].join(' ')}
+      className={['tw-relative tw-mt-2 tw-rounded-2xl tw-border tw-px-3 tw-py-2.5 tw-shadow-none', tones.panel].join(
+        ' ',
+      )}
       role={feedback.phase === 'failed' || feedback.phase === 'partial-failed' ? 'alert' : 'status'}
       aria-live={liveMode}
     >
@@ -349,8 +362,10 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           aria-label={`${provider} ${t('syncDetails')}`}
           className="tw-absolute tw-bottom-[calc(100%+8px)] tw-left-0 tw-right-0 tw-z-30 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 tw-text-[var(--text-primary)] tw-shadow-none"
         >
-            <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-              <div className="tw-text-xs tw-font-extrabold">{provider} {t('syncDetails')}</div>
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+            <div className="tw-text-xs tw-font-extrabold">
+              {provider} {t('syncDetails')}
+            </div>
             <button
               type="button"
               onClick={() => setDetailsOpen(false)}
@@ -359,7 +374,7 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
             >
               ×
             </button>
-            </div>
+          </div>
 
           <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
             {feedback.message}

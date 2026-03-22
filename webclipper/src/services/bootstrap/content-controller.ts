@@ -14,7 +14,12 @@ type RuntimeClient = {
 
 type CollectorRegistry = {
   pickActive?: () => { id: string; collector: any } | null;
-  list?: () => Array<{ id: string; collector?: any; matches?: (loc: any) => boolean; inpageMatches?: (loc: any) => boolean }>;
+  list?: () => Array<{
+    id: string;
+    collector?: any;
+    matches?: (loc: any) => boolean;
+    inpageMatches?: (loc: any) => boolean;
+  }>;
 };
 
 type InpageButtonApi = {
@@ -100,7 +105,9 @@ export function createContentController(deps: Deps) {
   const notionAiModelPicker = deps.notionAiModelPicker;
 
   function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
-    const value = String(kind || '').trim().toLowerCase();
+    const value = String(kind || '')
+      .trim()
+      .toLowerCase();
     if (!value) return undefined;
     if (value === 'ok') return 'default';
     if (value === 'default' || value === 'error') return value;
@@ -150,17 +157,27 @@ export function createContentController(deps: Deps) {
 
   async function saveSnapshot(
     snapshot: any,
-    options?: { mode?: 'snapshot' | 'incremental' | 'append'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } },
+    options?: {
+      mode?: 'snapshot' | 'incremental' | 'append';
+      diff?: { added?: string[]; updated?: string[]; removed?: string[] };
+    },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
 
     if (options?.mode !== 'incremental') {
       try {
-        const isChatgpt = String(snapshot?.conversation?.source || '').trim().toLowerCase() === 'chatgpt';
+        const isChatgpt =
+          String(snapshot?.conversation?.source || '')
+            .trim()
+            .toLowerCase() === 'chatgpt';
         const hasDeepResearchPlaceholders =
           isChatgpt &&
           Array.isArray(snapshot?.messages) &&
-          snapshot.messages.some((m: any) => String(m?.contentText || m?.contentMarkdown || '').trim().startsWith('Deep Research (iframe):'));
+          snapshot.messages.some((m: any) =>
+            String(m?.contentText || m?.contentMarkdown || '')
+              .trim()
+              .startsWith('Deep Research (iframe):'),
+          );
         if (hasDeepResearchPlaceholders) {
           await hydrateChatgptDeepResearchSnapshot(snapshot, send);
         }
@@ -346,7 +363,10 @@ export function createContentController(deps: Deps) {
         const snapshot = await Promise.resolve(collector.capture());
         if (!snapshot) return;
 
-        const isChatgpt = String(collector.id || '').trim().toLowerCase() === 'chatgpt';
+        const isChatgpt =
+          String(collector.id || '')
+            .trim()
+            .toLowerCase() === 'chatgpt';
         if (isChatgpt && hasChatgptDeepResearchPlaceholderMessages(snapshot)) {
           // Deep Research reports load inside a cross-origin iframe and may initially be captured as a placeholder URL.
           // Poll and hydrate until the report becomes available, then proceed with incremental auto-save.
@@ -400,15 +420,16 @@ export function createContentController(deps: Deps) {
       }
     };
 
-    observer = runtimeObserver?.createObserver?.({
-      debounceMs: 600,
-      getRoot: () => {
-        if (stopped) return null;
-        const collector = getCollector();
-        return collector && typeof collector.getRoot === 'function' ? collector.getRoot() : null;
-      },
-      onTick: handleTick,
-    }) || null;
+    observer =
+      runtimeObserver?.createObserver?.({
+        debounceMs: 600,
+        getRoot: () => {
+          if (stopped) return null;
+          const collector = getCollector();
+          return collector && typeof collector.getRoot === 'function' ? collector.getRoot() : null;
+        },
+        onTick: handleTick,
+      }) || null;
 
     return {
       start() {

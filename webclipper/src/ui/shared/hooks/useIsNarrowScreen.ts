@@ -35,12 +35,9 @@ export function useIsNarrowScreen(opts: UseIsNarrowScreenOptions = {}): boolean 
     }
 
     // Safari < 14 + some older Chromium extension contexts.
-    // eslint-disable-next-line deprecation/deprecation
     mql.addListener(onChange);
-    // eslint-disable-next-line deprecation/deprecation
     return () => mql.removeListener(onChange);
   }, [breakpointPx, query]);
 
   return isNarrow;
 }
-

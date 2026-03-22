@@ -13,7 +13,10 @@ import { resolveDetailHeaderActions } from '@services/integrations/detail-header
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
 import { t } from '@i18n';
-import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from '@viewmodels/conversations/useConversationSyncFeedback';
+import {
+  useConversationSyncFeedback,
+  type ConversationSyncFeedbackState,
+} from '@viewmodels/conversations/useConversationSyncFeedback';
 
 const LIST_SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
 const LIST_SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
@@ -36,7 +39,9 @@ function parseSyncnosAssetId(url: unknown): number | null {
 }
 
 function normalizeImageExt(raw: unknown): string {
-  const text = String(raw || '').trim().toLowerCase();
+  const text = String(raw || '')
+    .trim()
+    .toLowerCase();
   if (!text) return 'png';
   if (text === 'jpeg') return 'jpg';
   if (text === 'svg+xml') return 'svg';
@@ -45,7 +50,9 @@ function normalizeImageExt(raw: unknown): string {
 }
 
 function inferImageExtFromAsset(asset: { contentType?: string; url?: string }): string {
-  const contentType = String(asset.contentType || '').trim().toLowerCase();
+  const contentType = String(asset.contentType || '')
+    .trim()
+    .toLowerCase();
   if (contentType.startsWith('image/')) {
     return normalizeImageExt(contentType.slice('image/'.length));
   }
@@ -101,7 +108,6 @@ async function materializeSyncnosAssetsForExport(input: {
   let index = 0;
 
   for (const assetId of orderedAssetIds) {
-    // eslint-disable-next-line no-await-in-loop
     const asset = await getImageCacheAssetById({
       id: assetId,
       conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
@@ -234,7 +240,13 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const { feedback: syncFeedback, clearFeedback: clearSyncFeedback, startSync, syncingNotion, syncingObsidian } = useConversationSyncFeedback();
+  const {
+    feedback: syncFeedback,
+    clearFeedback: clearSyncFeedback,
+    startSync,
+    syncingNotion,
+    syncingObsidian,
+  } = useConversationSyncFeedback();
 
   const selectedConversation = useMemo(
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
@@ -243,13 +255,19 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
 
   const setListSourceFilterKeyPersistent = useCallback((next: string) => {
-    const value = String(next || 'all').trim().toLowerCase() || 'all';
+    const value =
+      String(next || 'all')
+        .trim()
+        .toLowerCase() || 'all';
     setListSourceFilterKey(value);
     writeLocalStorageValue(LIST_SOURCE_FILTER_STORAGE_KEY, value);
   }, []);
 
   const setListSiteFilterKeyPersistent = useCallback((next: string) => {
-    const value = String(next || LIST_SITE_FILTER_ALL_KEY).trim().toLowerCase() || LIST_SITE_FILTER_ALL_KEY;
+    const value =
+      String(next || LIST_SITE_FILTER_ALL_KEY)
+        .trim()
+        .toLowerCase() || LIST_SITE_FILTER_ALL_KEY;
     setListSiteFilterKey(value);
     writeLocalStorageValue(LIST_SITE_FILTER_STORAGE_KEY, value === LIST_SITE_FILTER_ALL_KEY ? null : value);
   }, []);
@@ -448,7 +466,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       .then((actions) => {
         if (cancelled) return;
 
-        const isArticle = String((selectedConversation as any)?.sourceType || '').trim().toLowerCase() === 'article';
+        const isArticle =
+          String((selectedConversation as any)?.sourceType || '')
+            .trim()
+            .toLowerCase() === 'article';
         const safeActions = Array.isArray(actions) ? actions : [];
         if (isArticle) {
           setDetailHeaderActions(safeActions);
@@ -539,7 +560,6 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         if (mergeSingle) {
           const docs: string[] = [];
           for (const c of selectedConversations) {
-            // eslint-disable-next-line no-await-in-loop
             const d = await getConversationDetail(Number(c.id));
             docs.push(formatConversationMarkdown(c, d.messages || []));
           }
@@ -553,10 +573,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           for (const attachment of mergedMaterialized.attachments) files.push(attachment);
         } else {
           for (const c of selectedConversations) {
-            // eslint-disable-next-line no-await-in-loop
             const d = await getConversationDetail(Number(c.id));
             const basename = buildConversationBasename(c);
-            // eslint-disable-next-line no-await-in-loop
+
             const materialized = await materializeSyncnosAssetsForExport({
               markdown: formatConversationMarkdown(c, d.messages || []),
               markdownBasename: basename,

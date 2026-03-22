@@ -50,7 +50,9 @@ export function registerCurrentPageCaptureContentHandlers(
     }
 
     if (msg.type === CURRENT_PAGE_MESSAGE_TYPES.CAPTURE) {
-      const source = String(msg?.payload?.source || '').trim().toLowerCase();
+      const source = String(msg?.payload?.source || '')
+        .trim()
+        .toLowerCase();
       const inpageTip = options?.inpageTip;
       const showTip = source === 'contextmenu' && typeof inpageTip?.showSaveTip === 'function';
 

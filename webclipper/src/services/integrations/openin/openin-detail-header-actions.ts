@@ -7,10 +7,7 @@ import {
   buildNotionPageUrl,
   normalizeNotionPageId,
 } from '@services/integrations/openin/notion-openin';
-import {
-  openObsidianTarget,
-  resolveObsidianOpenTarget,
-} from '@services/integrations/openin/obsidian-open-target';
+import { openObsidianTarget, resolveObsidianOpenTarget } from '@services/integrations/openin/obsidian-open-target';
 
 export const DETAIL_HEADER_ACTION_LABELS = {
   openInNotion: t('detailHeaderOpenInNotion'),

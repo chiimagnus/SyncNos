@@ -20,8 +20,8 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
 
   function isValidConversationUrl(): any {
     try {
-      const p = env.location.pathname || "";
-      if (p === "/chat" || p === "/chat/") return false;
+      const p = env.location.pathname || '';
+      if (p === '/chat' || p === '/chat/') return false;
       if (/^\/chat\/local/.test(p)) return false;
       return /^\/chat\/(?!local)[^/]+/.test(p);
     } catch (_e) {
@@ -34,7 +34,11 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function getConversationRoot(): any {
-    return env.document.querySelector("[data-testid='message_list']") || env.document.querySelector("main") || env.document.body;
+    return (
+      env.document.querySelector("[data-testid='message_list']") ||
+      env.document.querySelector('main') ||
+      env.document.body
+    );
   }
 
   function inEditMode(root: any): any {
@@ -66,11 +70,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     if (!img) return '';
     const current = img.currentSrc ? String(img.currentSrc).trim() : '';
     if (isBlobUrl(current)) return current;
-    const src = img.src
-      ? String(img.src).trim()
-      : img.getAttribute
-        ? String(img.getAttribute('src') || '').trim()
-        : '';
+    const src = img.src ? String(img.src).trim() : img.getAttribute ? String(img.getAttribute('src') || '').trim() : '';
     if (isBlobUrl(src)) return src;
     const srcset = img.getAttribute ? String(img.getAttribute('srcset') || '').trim() : '';
     if (srcset) {
@@ -156,7 +156,7 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
         ctx.warningFlags.add('inline_images_single_too_large');
         return null;
       }
-      if ((ctx.inlinedBytes + size) > INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
+      if (ctx.inlinedBytes + size > INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
         ctx.warningFlags.add('inline_images_total_bytes_limit_reached');
         return null;
       }
@@ -177,7 +177,10 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     }
   }
 
-  async function extractImageUrlsIncludingBlobImages(element: ParentNode | null, ctx: InlineImageContext): Promise<string[]> {
+  async function extractImageUrlsIncludingBlobImages(
+    element: ParentNode | null,
+    ctx: InlineImageContext,
+  ): Promise<string[]> {
     const httpUrls = extractImageUrlsFromElement(element);
     const blobUrls = extractBlobImageUrlsFromElement(element);
     if (!blobUrls.length) return httpUrls;
@@ -214,18 +217,18 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
       const sendMessage = c.querySelector("[data-testid='send_message']");
       if (sendMessage) {
         const tEl = sendMessage.querySelector("[data-testid='message_text_content']") || sendMessage;
-        const text = env.normalize.normalizeText((tEl as any).innerText || tEl.textContent || "");
+        const text = env.normalize.normalizeText((tEl as any).innerText || tEl.textContent || '');
         const imageUrls = await extractImageUrlsIncludingBlobImages(sendMessage, ctx);
         if (text || imageUrls.length) {
-          const contentText = text || "";
+          const contentText = text || '';
           const contentMarkdown = appendImageMarkdown(contentText, imageUrls, { allowDataImageUrls: true });
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
-            role: "user",
+            messageKey: env.normalize.makeFallbackMessageKey({ role: 'user', contentText, sequence: seq }),
+            role: 'user',
             contentText,
             contentMarkdown,
             sequence: seq,
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
           });
           seq += 1;
         }
@@ -235,24 +238,26 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
       if (recv) {
         const all: any[] = Array.from(recv.querySelectorAll("[data-testid='message_text_content']")) as any[];
         const textEl = all.find((el: any) => !el.closest("[data-testid='think_block_collapse']")) || recv;
-        const fallbackText = env.normalize.normalizeText((textEl as any).innerText || textEl.textContent || "");
-        const text = typeof doubaoMarkdown.extractAssistantText === "function"
-          ? (doubaoMarkdown.extractAssistantText(textEl) || fallbackText)
-          : fallbackText;
+        const fallbackText = env.normalize.normalizeText((textEl as any).innerText || textEl.textContent || '');
+        const text =
+          typeof doubaoMarkdown.extractAssistantText === 'function'
+            ? doubaoMarkdown.extractAssistantText(textEl) || fallbackText
+            : fallbackText;
         const imageUrls = await extractImageUrlsIncludingBlobImages(recv, ctx);
         if (text || imageUrls.length) {
-          const contentText = text || "";
-          const baseMarkdown = typeof doubaoMarkdown.extractAssistantMarkdown === "function"
-            ? (doubaoMarkdown.extractAssistantMarkdown(textEl) || contentText)
-            : contentText;
+          const contentText = text || '';
+          const baseMarkdown =
+            typeof doubaoMarkdown.extractAssistantMarkdown === 'function'
+              ? doubaoMarkdown.extractAssistantMarkdown(textEl) || contentText
+              : contentText;
           const contentMarkdown = appendImageMarkdown(baseMarkdown, imageUrls, { allowDataImageUrls: true });
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
-            role: "assistant",
+            messageKey: env.normalize.makeFallbackMessageKey({ role: 'assistant', contentText, sequence: seq }),
+            role: 'assistant',
             contentText,
             contentMarkdown,
             sequence: seq,
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
           });
           seq += 1;
         }
@@ -268,18 +273,18 @@ export function createDoubaoCollectorDef(env: CollectorEnv): CollectorDefinition
     if (!messages.length) return null;
     return {
       conversation: {
-        sourceType: "chat",
-        source: "doubao",
+        sourceType: 'chat',
+        source: 'doubao',
         conversationKey: findConversationKey(),
-        title: env.document.title || "Doubao",
+        title: env.document.title || 'Doubao',
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
-        lastCapturedAt: Date.now()
+        lastCapturedAt: Date.now(),
       },
-      messages
+      messages,
     };
   }
 
   const collector = { capture, getRoot: getConversationRoot };
-  return { id: "doubao", matches, collector };
+  return { id: 'doubao', matches, collector };
 }

@@ -47,7 +47,6 @@ export function ConversationDetailPane({
     detailError,
     detail,
     detailHeaderActions,
-    refreshActiveDetail,
   } = useConversationsApp();
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
@@ -56,7 +55,10 @@ export function ConversationDetailPane({
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   const outlineButtonClass = buttonTintClassName();
-  const isArticle = String((selected as any)?.sourceType || '').trim().toLowerCase() === 'article';
+  const isArticle =
+    String((selected as any)?.sourceType || '')
+      .trim()
+      .toLowerCase() === 'article';
   const canonicalUrl = normalizeHttpUrl((selected as any)?.url);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
@@ -85,10 +87,7 @@ export function ConversationDetailPane({
 
   return (
     <section>
-      <section
-        className="tw-flex tw-flex-col"
-        aria-label={t('conversationDetailAria')}
-      >
+      <section className="tw-flex tw-flex-col" aria-label={t('conversationDetailAria')}>
         {!hideHeader ? (
           <header
             className={[
@@ -98,7 +97,12 @@ export function ConversationDetailPane({
           >
             <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-start tw-gap-2">
               {onExpandSidebar ? (
-                <button type="button" onClick={onExpandSidebar} className={navIconButtonSmClassName(false)} aria-label={expandSidebarLabel}>
+                <button
+                  type="button"
+                  onClick={onExpandSidebar}
+                  className={navIconButtonSmClassName(false)}
+                  aria-label={expandSidebarLabel}
+                >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
                       d="M9.75 3.25L13 6.5L9.75 9.75"
@@ -114,7 +118,12 @@ export function ConversationDetailPane({
               ) : null}
 
               {onBack ? (
-                <button type="button" onClick={onBack} className={navIconButtonSmClassName(false)} aria-label={t('backButton')}>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className={navIconButtonSmClassName(false)}
+                  aria-label={t('backButton')}
+                >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
                 </button>
@@ -125,7 +134,9 @@ export function ConversationDetailPane({
                   {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
                 </h2>
                 <div className="tw-mt-1 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {selected ? `${(selected as any).source} · ${(selected as any).conversationKey}` : t('selectConversationHint')}
+                  {selected
+                    ? `${(selected as any).source} · ${(selected as any).conversationKey}`
+                    : t('selectConversationHint')}
                 </div>
               </div>
             </div>
@@ -198,17 +209,23 @@ export function ConversationDetailPane({
         ) : null}
 
         <div
-          className={[
-            containerPaddingClassName,
-            'tw-pb-3 md:tw-pb-4',
-            hideHeader ? 'tw-pt-3 md:tw-pt-4' : '',
-          ].join(' ')}
+          className={[containerPaddingClassName, 'tw-pb-3 md:tw-pb-4', hideHeader ? 'tw-pt-3 md:tw-pt-4' : ''].join(
+            ' ',
+          )}
         >
           <div className="tw-flex tw-min-w-0 tw-gap-4">
             <div className="tw-min-w-0 tw-flex-1">
-              {listError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p> : null}
-              {loadingDetail ? <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('loadingDots')}</p> : null}
-              {detailError ? <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p> : null}
+              {listError ? (
+                <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{listError}</p>
+              ) : null}
+              {loadingDetail ? (
+                <p className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                  {t('loadingDots')}
+                </p>
+              ) : null}
+              {detailError ? (
+                <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p>
+              ) : null}
 
               {/* Narrow screens: keep inline comments. */}
               {hasArticleCommentsPane ? (
@@ -224,7 +241,9 @@ export function ConversationDetailPane({
                 <div ref={messagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
                   {detail.messages.map((m) => {
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-                    const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
+                    const messageConversationId = Number(
+                      (m as any).conversationId || (selected as any)?.id || activeId,
+                    );
                     return (
                       <ChatMessageBubble
                         key={String((m as any).id)}
@@ -242,10 +261,11 @@ export function ConversationDetailPane({
               ) : activeId ? (
                 <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('noMessages')}</p>
               ) : (
-                <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('selectAConversation')}</p>
+                <p className="tw-mt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                  {t('selectAConversation')}
+                </p>
               )}
             </div>
-
           </div>
         </div>
       </section>

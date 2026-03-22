@@ -1,298 +1,691 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SyncNos Design System Preview</title>
-<style>
-  /* ===== Light Mode ===== */
-  :root {
-    --bg-primary: #F5F7FA;
-    --bg-sunken: #ECEEF2;
-    --bg-card: #FFFFFF;
-    --bg-overlay: rgba(0, 0, 0, 0.45);
-    --text-primary: #2C3038;
-    --text-secondary: #636B78;
-    --accent: #FFC6AD;
-    --accent-foreground: #2C3038;
-    --accent-hover: rgba(255, 198, 173, 0.85);
-    --accent-active: #F0B89F;
-    --secondary: #7BC4A0;
-    --secondary-foreground: #1A2B22;
-    --tertiary: #E8C86A;
-    --tertiary-foreground: #2C3038;
-    --error: #E53E3E;
-    --error-foreground: #FFFFFF;
-    --warning: #D69E2E;
-    --warning-foreground: #2C3038;
-    --success: #38A169;
-    --success-foreground: #FFFFFF;
-    --info: #3182CE;
-    --info-foreground: #FFFFFF;
-    --border: #D8DCE2;
-    --focus-ring: #5B8DEF;
-    --gradient-start: #F5F7FA;
-    --gradient-end: #EDF0F5;
-    --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-    --card-border: 1px solid var(--border);
-  }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SyncNos Design System Preview</title>
+    <style>
+      /* ===== Light Mode ===== */
+      :root {
+        --bg-primary: #f5f7fa;
+        --bg-sunken: #eceef2;
+        --bg-card: #ffffff;
+        --bg-overlay: rgba(0, 0, 0, 0.45);
+        --text-primary: #2c3038;
+        --text-secondary: #636b78;
+        --accent: #ffc6ad;
+        --accent-foreground: #2c3038;
+        --accent-hover: rgba(255, 198, 173, 0.85);
+        --accent-active: #f0b89f;
+        --secondary: #7bc4a0;
+        --secondary-foreground: #1a2b22;
+        --tertiary: #e8c86a;
+        --tertiary-foreground: #2c3038;
+        --error: #e53e3e;
+        --error-foreground: #ffffff;
+        --warning: #d69e2e;
+        --warning-foreground: #2c3038;
+        --success: #38a169;
+        --success-foreground: #ffffff;
+        --info: #3182ce;
+        --info-foreground: #ffffff;
+        --border: #d8dce2;
+        --focus-ring: #5b8def;
+        --gradient-start: #f5f7fa;
+        --gradient-end: #edf0f5;
+        --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+        --card-border: 1px solid var(--border);
+      }
 
-  /* ===== Dark Mode ===== */
-  @media (prefers-color-scheme: dark) {
-    :root {
-    --bg-primary: #1A1C20;
-    --bg-sunken: #141618;
-    --bg-card: #262830;
-    --bg-overlay: rgba(0, 0, 0, 0.65);
-    --text-primary: #DCE0E8;
-    --text-secondary: #8B919A;
-    --accent: #FFD4C2;
-    --accent-foreground: #1A1C20;
-    --accent-hover: rgba(255, 212, 194, 0.85);
-    --accent-active: #F0C6B4;
-    --secondary: #6AAF8E;
-    --secondary-foreground: #1A1C20;
-    --tertiary: #D4B85E;
-    --tertiary-foreground: #1A1C20;
-    --error: #FC8181;
-    --error-foreground: #1A1C20;
-    --warning: #ECC94B;
-    --warning-foreground: #1A1C20;
-    --success: #68D391;
-    --success-foreground: #1A1C20;
-    --info: #63B3ED;
-    --info-foreground: #1A1C20;
-    --border: #363840;
-    --focus-ring: #7BA4F7;
-    --gradient-start: #1A1C20;
-    --gradient-end: #22242A;
-    --card-shadow: none;
-    --card-border: 1px solid rgba(255,255,255,0.06);
-    }
-  }
+      /* ===== Dark Mode ===== */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-primary: #1a1c20;
+          --bg-sunken: #141618;
+          --bg-card: #262830;
+          --bg-overlay: rgba(0, 0, 0, 0.65);
+          --text-primary: #dce0e8;
+          --text-secondary: #8b919a;
+          --accent: #ffd4c2;
+          --accent-foreground: #1a1c20;
+          --accent-hover: rgba(255, 212, 194, 0.85);
+          --accent-active: #f0c6b4;
+          --secondary: #6aaf8e;
+          --secondary-foreground: #1a1c20;
+          --tertiary: #d4b85e;
+          --tertiary-foreground: #1a1c20;
+          --error: #fc8181;
+          --error-foreground: #1a1c20;
+          --warning: #ecc94b;
+          --warning-foreground: #1a1c20;
+          --success: #68d391;
+          --success-foreground: #1a1c20;
+          --info: #63b3ed;
+          --info-foreground: #1a1c20;
+          --border: #363840;
+          --focus-ring: #7ba4f7;
+          --gradient-start: #1a1c20;
+          --gradient-end: #22242a;
+          --card-shadow: none;
+          --card-border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+      }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: linear-gradient(180deg, var(--gradient-start), var(--gradient-end));
-    color: var(--text-primary);
-    min-height: 100vh;
-    padding: 40px 24px;
-    transition: background 0.3s, color 0.3s;
-  }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: linear-gradient(180deg, var(--gradient-start), var(--gradient-end));
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 40px 24px;
+        transition:
+          background 0.3s,
+          color 0.3s;
+      }
 
-  .container { max-width: 960px; margin: 0 auto; }
+      .container {
+        max-width: 960px;
+        margin: 0 auto;
+      }
 
-  /* Header */
-  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 48px; }
-  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-  .header h1 span { color: var(--accent); }
-  /* Section */
-  .section { margin-bottom: 40px; }
-  .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 16px; }
+      /* Header */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 48px;
+      }
+      .header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+      }
+      .header h1 span {
+        color: var(--accent);
+      }
+      /* Section */
+      .section {
+        margin-bottom: 40px;
+      }
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+      }
 
-  /* Surface */
-  .surface-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .surface-box { border-radius: 12px; padding: 20px 16px; text-align: center; font-size: 12px; font-weight: 500; color: var(--text-secondary); border: var(--card-border); }
-  .surface-box .label { font-size: 11px; opacity: 0.7; margin-top: 4px; }
-  .surface-sunken { background: var(--bg-sunken); }
-  .surface-default { background: var(--bg-primary); }
-  .surface-raised { background: var(--bg-card); box-shadow: var(--card-shadow); }
-  .surface-overlay { background: var(--bg-card); position: relative; overflow: hidden; }
-  .surface-overlay::after { content: ''; position: absolute; inset: 0; background: var(--bg-overlay); border-radius: 12px; }
-  .surface-overlay span { position: relative; z-index: 1; color: #fff; }
+      /* Surface */
+      .surface-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .surface-box {
+        border-radius: 12px;
+        padding: 20px 16px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border: var(--card-border);
+      }
+      .surface-box .label {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-top: 4px;
+      }
+      .surface-sunken {
+        background: var(--bg-sunken);
+      }
+      .surface-default {
+        background: var(--bg-primary);
+      }
+      .surface-raised {
+        background: var(--bg-card);
+        box-shadow: var(--card-shadow);
+      }
+      .surface-overlay {
+        background: var(--bg-card);
+        position: relative;
+        overflow: hidden;
+      }
+      .surface-overlay::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--bg-overlay);
+        border-radius: 12px;
+      }
+      .surface-overlay span {
+        position: relative;
+        z-index: 1;
+        color: #fff;
+      }
 
-  /* Card */
-  .card { background: var(--bg-card); border: var(--card-border); border-radius: 16px; padding: 32px; box-shadow: var(--card-shadow); }
-  .card h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-  .card p { color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+      /* Card */
+      .card {
+        background: var(--bg-card);
+        border: var(--card-border);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: var(--card-shadow);
+      }
+      .card h2 {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .card p {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
 
-  /* Input */
-  .input-row { display: flex; gap: 12px; margin-bottom: 20px; }
-  .input {
-    flex: 1; background: var(--bg-sunken); border: 1px solid var(--border); border-radius: 8px;
-    padding: 10px 14px; font-size: 14px; color: var(--text-primary); outline: none; transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .input::placeholder { color: var(--text-secondary); }
-  .input:focus { border-color: var(--focus-ring); box-shadow: 0 0 0 2px var(--focus-ring); }
+      /* Input */
+      .input-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .input {
+        flex: 1;
+        background: var(--bg-sunken);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 14px;
+        color: var(--text-primary);
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .input::placeholder {
+        color: var(--text-secondary);
+      }
+      .input:focus {
+        border-color: var(--focus-ring);
+        box-shadow: 0 0 0 2px var(--focus-ring);
+      }
 
-  /* Buttons */
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.15s; outline: none; }
-  .btn:focus-visible { box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--focus-ring); }
-  .btn-accent { background: var(--accent); color: var(--accent-foreground); }
-  .btn-accent:hover { background: var(--accent-hover); }
-  .btn-accent:active { background: var(--accent-active); }
-  .btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
-  .btn-outline { background: transparent; color: var(--text-primary); border: 1px solid var(--border); }
-  .btn-outline:hover { background: var(--bg-sunken); }
-  .btn-disabled { background: var(--accent); color: var(--accent-foreground); opacity: 0.38; cursor: not-allowed; }
+      /* Buttons */
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s;
+        outline: none;
+      }
+      .btn:focus-visible {
+        box-shadow:
+          0 0 0 2px var(--bg-primary),
+          0 0 0 4px var(--focus-ring);
+      }
+      .btn-accent {
+        background: var(--accent);
+        color: var(--accent-foreground);
+      }
+      .btn-accent:hover {
+        background: var(--accent-hover);
+      }
+      .btn-accent:active {
+        background: var(--accent-active);
+      }
+      .btn-secondary {
+        background: var(--secondary);
+        color: var(--secondary-foreground);
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+      }
+      .btn-outline:hover {
+        background: var(--bg-sunken);
+      }
+      .btn-disabled {
+        background: var(--accent);
+        color: var(--accent-foreground);
+        opacity: 0.38;
+        cursor: not-allowed;
+      }
 
-  /* Alerts */
-  .alerts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .alert { border-radius: 10px; padding: 14px 18px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; }
-  .alert-icon { font-size: 18px; }
-  .alert-error { background: var(--error); color: var(--error-foreground); }
-  .alert-warning { background: var(--warning); color: var(--warning-foreground); }
-  .alert-success { background: var(--success); color: var(--success-foreground); }
-  .alert-info { background: var(--info); color: var(--info-foreground); }
+      /* Alerts */
+      .alerts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .alert {
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .alert-icon {
+        font-size: 18px;
+      }
+      .alert-error {
+        background: var(--error);
+        color: var(--error-foreground);
+      }
+      .alert-warning {
+        background: var(--warning);
+        color: var(--warning-foreground);
+      }
+      .alert-success {
+        background: var(--success);
+        color: var(--success-foreground);
+      }
+      .alert-info {
+        background: var(--info);
+        color: var(--info-foreground);
+      }
 
-  /* Swatches */
-  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-  .swatch { border-radius: 10px; overflow: hidden; border: var(--card-border); }
-  .swatch-color { height: 56px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
-  .swatch-label { background: var(--bg-card); padding: 8px 10px; font-size: 11px; color: var(--text-secondary); }
-  .swatch-label strong { display: block; color: var(--text-primary); font-size: 12px; margin-bottom: 2px; }
+      /* Swatches */
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+      }
+      .swatch {
+        border-radius: 10px;
+        overflow: hidden;
+        border: var(--card-border);
+      }
+      .swatch-color {
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .swatch-label {
+        background: var(--bg-card);
+        padding: 8px 10px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .swatch-label strong {
+        display: block;
+        color: var(--text-primary);
+        font-size: 12px;
+        margin-bottom: 2px;
+      }
 
-  /* Tags */
-  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-  .tag { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-  .tag-accent { background: var(--accent); color: var(--accent-foreground); }
-  .tag-secondary { background: var(--secondary); color: var(--secondary-foreground); }
-  .tag-tertiary { background: var(--tertiary); color: var(--tertiary-foreground); }
-  .tag-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+      /* Tags */
+      .tags {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .tag {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .tag-accent {
+        background: var(--accent);
+        color: var(--accent-foreground);
+      }
+      .tag-secondary {
+        background: var(--secondary);
+        color: var(--secondary-foreground);
+      }
+      .tag-tertiary {
+        background: var(--tertiary);
+        color: var(--tertiary-foreground);
+      }
+      .tag-outline {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+      }
 
-  /* Progress */
-  .progress-bar { height: 6px; background: var(--bg-sunken); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
-  .progress-fill { height: 100%; width: 65%; background: var(--secondary); border-radius: 3px; transition: width 0.3s; }
+      /* Progress */
+      .progress-bar {
+        height: 6px;
+        background: var(--bg-sunken);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+      .progress-fill {
+        height: 100%;
+        width: 65%;
+        background: var(--secondary);
+        border-radius: 3px;
+        transition: width 0.3s;
+      }
 
-  /* App Demo */
-  .app-demo { display: grid; grid-template-columns: 220px 1fr; border-radius: 16px; overflow: hidden; border: var(--card-border); height: 360px; box-shadow: var(--card-shadow); }
-  .sidebar { background: var(--bg-sunken); padding: 20px 16px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
-  .sidebar-brand { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-  .sidebar-brand .dot { width: 24px; height: 24px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; }
-  .sidebar-item { padding: 8px 12px; border-radius: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px; }
-  .sidebar-item:hover { background: var(--bg-card); color: var(--text-primary); }
-  .sidebar-item.active { background: var(--accent); color: var(--accent-foreground); font-weight: 600; }
-  .main-area { background: var(--bg-primary); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-  .main-area h3 { font-size: 18px; font-weight: 600; }
-  .main-area p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
-  .stat-row { display: flex; gap: 12px; }
-  .stat-card { flex: 1; background: var(--bg-card); border: var(--card-border); border-radius: 10px; padding: 16px; box-shadow: var(--card-shadow); }
-  .stat-card .stat-value { font-size: 22px; font-weight: 700; }
-  .stat-card .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-  .stat-accent .stat-value { color: var(--accent); }
-  .stat-secondary .stat-value { color: var(--secondary); }
-  .stat-info .stat-value { color: var(--info); }
+      /* App Demo */
+      .app-demo {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        border-radius: 16px;
+        overflow: hidden;
+        border: var(--card-border);
+        height: 360px;
+        box-shadow: var(--card-shadow);
+      }
+      .sidebar {
+        background: var(--bg-sunken);
+        padding: 20px 16px;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .sidebar-brand {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sidebar-brand .dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+      .sidebar-item {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sidebar-item:hover {
+        background: var(--bg-card);
+        color: var(--text-primary);
+      }
+      .sidebar-item.active {
+        background: var(--accent);
+        color: var(--accent-foreground);
+        font-weight: 600;
+      }
+      .main-area {
+        background: var(--bg-primary);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .main-area h3 {
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .main-area p {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+      .stat-row {
+        display: flex;
+        gap: 12px;
+      }
+      .stat-card {
+        flex: 1;
+        background: var(--bg-card);
+        border: var(--card-border);
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: var(--card-shadow);
+      }
+      .stat-card .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .stat-card .stat-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+      .stat-accent .stat-value {
+        color: var(--accent);
+      }
+      .stat-secondary .stat-value {
+        color: var(--secondary);
+      }
+      .stat-info .stat-value {
+        color: var(--info);
+      }
 
-  @media (max-width: 640px) {
-    .surface-grid { grid-template-columns: repeat(2, 1fr); }
-    .alerts { grid-template-columns: 1fr; }
-    .app-demo { grid-template-columns: 1fr; height: auto; }
-    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
-  }
-</style>
-</head>
-<body>
-<div class="container">
-
-  <!-- Header -->
-  <div class="header">
-    <h1>Sync<span>Nos</span> Design System</h1>
-  </div>
-
-  <!-- Surface Levels -->
-  <div class="section">
-    <div class="section-title">Surface Levels</div>
-    <div class="surface-grid">
-      <div class="surface-box surface-sunken">Sunken<div class="label">bg-sunken</div></div>
-      <div class="surface-box surface-default">Default<div class="label">bg-primary</div></div>
-      <div class="surface-box surface-raised">Raised<div class="label">bg-card</div></div>
-      <div class="surface-box surface-overlay"><span>Overlay</span><div class="label" style="position:relative;z-index:1;color:#fff">bg-overlay</div></div>
-    </div>
-  </div>
-
-  <!-- Card + Inputs + Buttons -->
-  <div class="section">
-    <div class="section-title">Card / Input / Button</div>
-    <div class="card">
-      <h2>Welcome to SyncNos</h2>
-      <p>&#x8FD9;&#x662F;&#x4E00;&#x4E2A;&#x5B8C;&#x6574;&#x7684;&#x914D;&#x8272;&#x65B9;&#x6848;&#x9884;&#x89C8;&#xFF0C;&#x5305;&#x542B; Surface &#x56DB;&#x7EA7;&#x5C42;&#x7EA7;&#x3001;On-Color &#x914D;&#x5BF9;&#x3001;&#x8BED;&#x4E49;&#x72B6;&#x6001;&#x8272;&#x548C;&#x4EA4;&#x4E92;&#x72B6;&#x6001;&#x3002;&#x5207;&#x6362;&#x53F3;&#x4E0A;&#x89D2;&#x7684;&#x4E3B;&#x9898;&#x6309;&#x94AE;&#x67E5;&#x770B;&#x4EAE;/&#x6697;&#x6A21;&#x5F0F;&#x6548;&#x679C;&#x3002;</p>
-      <div class="input-row">
-        <input class="input" placeholder="&#x8F93;&#x5165;&#x6846; (surface-sunken)" />
-        <input class="input" placeholder="&#x805A;&#x7126;&#x8BD5;&#x8BD5; (focus-ring)" />
+      @media (max-width: 640px) {
+        .surface-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .alerts {
+          grid-template-columns: 1fr;
+        }
+        .app-demo {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+        .sidebar {
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>Sync<span>Nos</span> Design System</h1>
       </div>
-      <div class="tags">
-        <span class="tag tag-accent">Brand Accent</span>
-        <span class="tag tag-secondary">Secondary</span>
-        <span class="tag tag-tertiary">&#x2B50; Premium</span>
-        <span class="tag tag-outline">Outline</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill"></div></div>
-      <div class="btn-row">
-        <button class="btn btn-accent">Primary CTA</button>
-        <button class="btn btn-secondary">Secondary</button>
-        <button class="btn btn-outline">Outline</button>
-        <button class="btn btn-disabled" disabled>Disabled (38%)</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Semantic Alerts -->
-  <div class="section">
-    <div class="section-title">Semantic Status Colors</div>
-    <div class="alerts">
-      <div class="alert alert-error"><span class="alert-icon">&#x274C;</span> Error: &#x64CD;&#x4F5C;&#x5931;&#x8D25;&#xFF0C;&#x8BF7;&#x91CD;&#x8BD5;</div>
-      <div class="alert alert-warning"><span class="alert-icon">&#x26A0;&#xFE0F;</span> Warning: &#x8BA2;&#x9605;&#x5373;&#x5C06;&#x8FC7;&#x671F;</div>
-      <div class="alert alert-success"><span class="alert-icon">&#x2705;</span> Success: &#x6570;&#x636E;&#x5DF2;&#x540C;&#x6B65;&#x5B8C;&#x6210;</div>
-      <div class="alert alert-info"><span class="alert-icon">&#x2139;&#xFE0F;</span> Info: &#x65B0;&#x7248;&#x672C;&#x5DF2;&#x53D1;&#x5E03;</div>
-    </div>
-  </div>
-
-  <!-- Color Swatches -->
-  <div class="section">
-    <div class="section-title">Color Palette</div>
-    <div class="swatches">
-      <div class="swatch"><div class="swatch-color" style="background:var(--bg-primary)"></div><div class="swatch-label"><strong>bg-primary</strong>Surface Default</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--bg-sunken)"></div><div class="swatch-label"><strong>bg-sunken</strong>Surface Sunken</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--bg-card)"></div><div class="swatch-label"><strong>bg-card</strong>Surface Raised</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--text-primary);color:var(--bg-primary)">Aa</div><div class="swatch-label"><strong>text-primary</strong>Headings</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--text-secondary);color:var(--bg-primary)">Aa</div><div class="swatch-label"><strong>text-secondary</strong>Captions</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--border)"></div><div class="swatch-label"><strong>border</strong>Dividers</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--accent);color:var(--accent-foreground)">Aa</div><div class="swatch-label"><strong>accent</strong>Brand CTA</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--secondary);color:var(--secondary-foreground)">Aa</div><div class="swatch-label"><strong>secondary</strong>Tags</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--tertiary);color:var(--tertiary-foreground)">Aa</div><div class="swatch-label"><strong>tertiary</strong>Premium</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--error);color:var(--error-foreground)">Aa</div><div class="swatch-label"><strong>error</strong>Destructive</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--warning);color:var(--warning-foreground)">Aa</div><div class="swatch-label"><strong>warning</strong>Caution</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--success);color:var(--success-foreground)">Aa</div><div class="swatch-label"><strong>success</strong>Positive</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--info);color:var(--info-foreground)">Aa</div><div class="swatch-label"><strong>info</strong>Informational</div></div>
-      <div class="swatch"><div class="swatch-color" style="background:var(--focus-ring);color:#fff">&#x25CE;</div><div class="swatch-label"><strong>focus-ring</strong>Focus</div></div>
-    </div>
-  </div>
-
-  <!-- App Mock -->
-  <div class="section">
-    <div class="section-title">App Layout Preview</div>
-    <div class="app-demo">
-      <div class="sidebar">
-        <div class="sidebar-brand">
-          <div class="dot">&#x1F431;</div>
-          SyncNos
+      <!-- Surface Levels -->
+      <div class="section">
+        <div class="section-title">Surface Levels</div>
+        <div class="surface-grid">
+          <div class="surface-box surface-sunken">
+            Sunken
+            <div class="label">bg-sunken</div>
+          </div>
+          <div class="surface-box surface-default">
+            Default
+            <div class="label">bg-primary</div>
+          </div>
+          <div class="surface-box surface-raised">
+            Raised
+            <div class="label">bg-card</div>
+          </div>
+          <div class="surface-box surface-overlay">
+            <span>Overlay</span>
+            <div class="label" style="position: relative; z-index: 1; color: #fff">bg-overlay</div>
+          </div>
         </div>
-        <div class="sidebar-item active">&#x1F4CB; Dashboard</div>
-        <div class="sidebar-item">&#x1F517; Web Clips</div>
-        <div class="sidebar-item">&#x2764;&#xFE0F; Favorites</div>
-        <div class="sidebar-item">&#x1F4C1; Collections</div>
-        <div class="sidebar-item">&#x2699;&#xFE0F; Settings</div>
       </div>
-      <div class="main-area">
-        <h3>Dashboard</h3>
-        <p>&#x6B22;&#x8FCE;&#x56DE;&#x6765;&#xFF01;&#x4F60;&#x5DF2;&#x4FDD;&#x5B58; 371 &#x6761;&#x7F51;&#x9875;&#x526A;&#x85CF;&#xFF0C;&#x4ECA;&#x65E5;&#x65B0;&#x589E; 12 &#x6761;&#x3002;</p>
-        <div class="stat-row">
-          <div class="stat-card stat-accent"><div class="stat-value">371</div><div class="stat-label">Total Clips</div></div>
-          <div class="stat-card stat-secondary"><div class="stat-value">12</div><div class="stat-label">Today</div></div>
-          <div class="stat-card stat-info"><div class="stat-value">98%</div><div class="stat-label">Sync Rate</div></div>
+
+      <!-- Card + Inputs + Buttons -->
+      <div class="section">
+        <div class="section-title">Card / Input / Button</div>
+        <div class="card">
+          <h2>Welcome to SyncNos</h2>
+          <p>
+            &#x8FD9;&#x662F;&#x4E00;&#x4E2A;&#x5B8C;&#x6574;&#x7684;&#x914D;&#x8272;&#x65B9;&#x6848;&#x9884;&#x89C8;&#xFF0C;&#x5305;&#x542B;
+            Surface &#x56DB;&#x7EA7;&#x5C42;&#x7EA7;&#x3001;On-Color
+            &#x914D;&#x5BF9;&#x3001;&#x8BED;&#x4E49;&#x72B6;&#x6001;&#x8272;&#x548C;&#x4EA4;&#x4E92;&#x72B6;&#x6001;&#x3002;&#x5207;&#x6362;&#x53F3;&#x4E0A;&#x89D2;&#x7684;&#x4E3B;&#x9898;&#x6309;&#x94AE;&#x67E5;&#x770B;&#x4EAE;/&#x6697;&#x6A21;&#x5F0F;&#x6548;&#x679C;&#x3002;
+          </p>
+          <div class="input-row">
+            <input class="input" placeholder="&#x8F93;&#x5165;&#x6846; (surface-sunken)" />
+            <input class="input" placeholder="&#x805A;&#x7126;&#x8BD5;&#x8BD5; (focus-ring)" />
+          </div>
+          <div class="tags">
+            <span class="tag tag-accent">Brand Accent</span>
+            <span class="tag tag-secondary">Secondary</span>
+            <span class="tag tag-tertiary">&#x2B50; Premium</span>
+            <span class="tag tag-outline">Outline</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <div class="btn-row">
+            <button class="btn btn-accent">Primary CTA</button>
+            <button class="btn btn-secondary">Secondary</button>
+            <button class="btn btn-outline">Outline</button>
+            <button class="btn btn-disabled" disabled>Disabled (38%)</button>
+          </div>
         </div>
-        <div class="btn-row">
-          <button class="btn btn-accent">&#x2795; New Clip</button>
-          <button class="btn btn-outline">View All</button>
+      </div>
+
+      <!-- Semantic Alerts -->
+      <div class="section">
+        <div class="section-title">Semantic Status Colors</div>
+        <div class="alerts">
+          <div class="alert alert-error">
+            <span class="alert-icon">&#x274C;</span> Error:
+            &#x64CD;&#x4F5C;&#x5931;&#x8D25;&#xFF0C;&#x8BF7;&#x91CD;&#x8BD5;
+          </div>
+          <div class="alert alert-warning">
+            <span class="alert-icon">&#x26A0;&#xFE0F;</span> Warning: &#x8BA2;&#x9605;&#x5373;&#x5C06;&#x8FC7;&#x671F;
+          </div>
+          <div class="alert alert-success">
+            <span class="alert-icon">&#x2705;</span> Success: &#x6570;&#x636E;&#x5DF2;&#x540C;&#x6B65;&#x5B8C;&#x6210;
+          </div>
+          <div class="alert alert-info">
+            <span class="alert-icon">&#x2139;&#xFE0F;</span> Info: &#x65B0;&#x7248;&#x672C;&#x5DF2;&#x53D1;&#x5E03;
+          </div>
+        </div>
+      </div>
+
+      <!-- Color Swatches -->
+      <div class="section">
+        <div class="section-title">Color Palette</div>
+        <div class="swatches">
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-primary)"></div>
+            <div class="swatch-label"><strong>bg-primary</strong>Surface Default</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-sunken)"></div>
+            <div class="swatch-label"><strong>bg-sunken</strong>Surface Sunken</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-card)"></div>
+            <div class="swatch-label"><strong>bg-card</strong>Surface Raised</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--text-primary); color: var(--bg-primary)">Aa</div>
+            <div class="swatch-label"><strong>text-primary</strong>Headings</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--text-secondary); color: var(--bg-primary)">Aa</div>
+            <div class="swatch-label"><strong>text-secondary</strong>Captions</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--border)"></div>
+            <div class="swatch-label"><strong>border</strong>Dividers</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--accent); color: var(--accent-foreground)">Aa</div>
+            <div class="swatch-label"><strong>accent</strong>Brand CTA</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--secondary); color: var(--secondary-foreground)">Aa</div>
+            <div class="swatch-label"><strong>secondary</strong>Tags</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--tertiary); color: var(--tertiary-foreground)">Aa</div>
+            <div class="swatch-label"><strong>tertiary</strong>Premium</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--error); color: var(--error-foreground)">Aa</div>
+            <div class="swatch-label"><strong>error</strong>Destructive</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--warning); color: var(--warning-foreground)">Aa</div>
+            <div class="swatch-label"><strong>warning</strong>Caution</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--success); color: var(--success-foreground)">Aa</div>
+            <div class="swatch-label"><strong>success</strong>Positive</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--info); color: var(--info-foreground)">Aa</div>
+            <div class="swatch-label"><strong>info</strong>Informational</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--focus-ring); color: #fff">&#x25CE;</div>
+            <div class="swatch-label"><strong>focus-ring</strong>Focus</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- App Mock -->
+      <div class="section">
+        <div class="section-title">App Layout Preview</div>
+        <div class="app-demo">
+          <div class="sidebar">
+            <div class="sidebar-brand">
+              <div class="dot">&#x1F431;</div>
+              SyncNos
+            </div>
+            <div class="sidebar-item active">&#x1F4CB; Dashboard</div>
+            <div class="sidebar-item">&#x1F517; Web Clips</div>
+            <div class="sidebar-item">&#x2764;&#xFE0F; Favorites</div>
+            <div class="sidebar-item">&#x1F4C1; Collections</div>
+            <div class="sidebar-item">&#x2699;&#xFE0F; Settings</div>
+          </div>
+          <div class="main-area">
+            <h3>Dashboard</h3>
+            <p>
+              &#x6B22;&#x8FCE;&#x56DE;&#x6765;&#xFF01;&#x4F60;&#x5DF2;&#x4FDD;&#x5B58; 371
+              &#x6761;&#x7F51;&#x9875;&#x526A;&#x85CF;&#xFF0C;&#x4ECA;&#x65E5;&#x65B0;&#x589E; 12 &#x6761;&#x3002;
+            </p>
+            <div class="stat-row">
+              <div class="stat-card stat-accent">
+                <div class="stat-value">371</div>
+                <div class="stat-label">Total Clips</div>
+              </div>
+              <div class="stat-card stat-secondary">
+                <div class="stat-value">12</div>
+                <div class="stat-label">Today</div>
+              </div>
+              <div class="stat-card stat-info">
+                <div class="stat-value">98%</div>
+                <div class="stat-label">Sync Rate</div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-accent">&#x2795; New Clip</button>
+              <button class="btn btn-outline">View All</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-
-</div>
-
-</body>
+  </body>
 </html>

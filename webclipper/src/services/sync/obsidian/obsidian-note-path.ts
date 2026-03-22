@@ -31,10 +31,7 @@ function getConversationKinds() {
 
 function folderForConversation(
   conversation: any,
-  {
-    folderByKindId,
-    defaultFolder,
-  }: { folderByKindId?: Record<string, unknown>; defaultFolder?: string } = {},
+  { folderByKindId, defaultFolder }: { folderByKindId?: Record<string, unknown>; defaultFolder?: string } = {},
 ) {
   const conversationKinds = getConversationKinds();
   if (conversationKinds && typeof conversationKinds.pick === 'function') {
@@ -42,9 +39,7 @@ function folderForConversation(
       const kind = conversationKinds.pick(conversation);
       const kindId = kind && kind.id ? safeString(kind.id) : '';
       const overrideFolderRaw =
-        kindId && folderByKindId && typeof folderByKindId === 'object'
-          ? safeString(folderByKindId[kindId])
-          : '';
+        kindId && folderByKindId && typeof folderByKindId === 'object' ? safeString(folderByKindId[kindId]) : '';
       const overrideFolder = normalizeFolderPath(overrideFolderRaw);
       if (overrideFolder) return overrideFolder;
 
@@ -59,14 +54,20 @@ function folderForConversation(
   return fallback || DEFAULT_OBSIDIAN_FOLDER;
 }
 
-function buildStableNotePath(conversation: any, opts?: { folderByKindId?: Record<string, unknown>; defaultFolder?: string }) {
+function buildStableNotePath(
+  conversation: any,
+  opts?: { folderByKindId?: Record<string, unknown>; defaultFolder?: string },
+) {
   const c = conversation || {};
   const folder = folderForConversation(c, opts || {});
   const filename = `${buildConversationBasename(c)}.md`;
   return folder ? `${folder}/${filename}` : filename;
 }
 
-function buildLegacyHashNotePath(conversation: any, opts?: { folderByKindId?: Record<string, unknown>; defaultFolder?: string }) {
+function buildLegacyHashNotePath(
+  conversation: any,
+  opts?: { folderByKindId?: Record<string, unknown>; defaultFolder?: string },
+) {
   const c = conversation || {};
   const source = safeString(c.source) || 'unknown';
   const folder = folderForConversation(c, opts || {});
@@ -188,7 +189,12 @@ async function resolveExistingNotePath({
     }
   }
 
-  if (desiredFolder && stableId && typeof client.listVaultDir === 'function' && typeof readSyncnosObject === 'function') {
+  if (
+    desiredFolder &&
+    stableId &&
+    typeof client.listVaultDir === 'function' &&
+    typeof readSyncnosObject === 'function'
+  ) {
     const listRes = await client.listVaultDir(desiredFolder);
     if (!listRes?.ok && Number(listRes?.status) !== 404 && safeString(listRes?.error?.code) !== 'not_found') {
       return {
@@ -226,7 +232,10 @@ async function resolveExistingNotePath({
       if (!candidateResult.found) continue;
 
       const frontmatter =
-        candidateResult.data && typeof candidateResult.data === 'object' && candidateResult.data.frontmatter && typeof candidateResult.data.frontmatter === 'object'
+        candidateResult.data &&
+        typeof candidateResult.data === 'object' &&
+        candidateResult.data.frontmatter &&
+        typeof candidateResult.data.frontmatter === 'object'
           ? candidateResult.data.frontmatter
           : null;
       const parsed = readSyncnosObject(frontmatter);

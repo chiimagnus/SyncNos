@@ -17,8 +17,12 @@ export default function Settings() {
 
   const params = useMemo<SearchParams>(() => {
     const s = new URLSearchParams(routerLocation.search || '');
-    const rawSection = String(s.get('section') || '').trim().toLowerCase();
-    const rawFocus = String(s.get('focus') || '').trim().toLowerCase();
+    const rawSection = String(s.get('section') || '')
+      .trim()
+      .toLowerCase();
+    const rawFocus = String(s.get('focus') || '')
+      .trim()
+      .toLowerCase();
     const explicit = s.has('section') || s.has('focus');
 
     // Backward compat: older deep links may use `section=notion-ai`.
@@ -39,7 +43,10 @@ export default function Settings() {
     const next = new URLSearchParams(routerLocation.search || '');
     next.set('section', key);
     next.delete('focus');
-    navigate({ pathname: routerLocation.pathname, search: `?${next.toString()}` }, { replace: true, state: routerLocation.state });
+    navigate(
+      { pathname: routerLocation.pathname, search: `?${next.toString()}` },
+      { replace: true, state: routerLocation.state },
+    );
   };
 
   return (

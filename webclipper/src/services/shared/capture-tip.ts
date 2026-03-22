@@ -17,7 +17,11 @@ function truncateForTip(title: string, maxChars: number): string {
   return `${value.slice(0, sliceLen)}…`;
 }
 
-export function buildCaptureSuccessTipMessage(input: { title?: unknown; isNew?: unknown; maxTitleChars?: number }): string {
+export function buildCaptureSuccessTipMessage(input: {
+  title?: unknown;
+  isNew?: unknown;
+  maxTitleChars?: number;
+}): string {
   const isNew = input?.isNew !== false;
   const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
   const maxChars =

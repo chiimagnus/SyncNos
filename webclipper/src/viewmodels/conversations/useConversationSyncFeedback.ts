@@ -10,7 +10,14 @@ import {
 } from '@services/sync/repo';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { storageOnChanged } from '@services/shared/storage';
-import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '@services/sync/models';
+import type {
+  SyncFailureSummary,
+  SyncJobSnapshot,
+  SyncJobStatusResponse,
+  SyncProvider,
+  SyncRunSummary,
+  SyncWarning,
+} from '@services/sync/models';
 import type { SyncStartAck } from '@services/sync/repo';
 import { t } from '@i18n';
 
@@ -65,7 +72,9 @@ function providerLabel(provider: SyncProvider) {
 }
 
 function normalizeIds(ids: number[]) {
-  return Array.from(new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)));
+  return Array.from(
+    new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
+  );
 }
 
 function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
@@ -146,11 +155,8 @@ function toTerminalFeedback(summary: SyncRunSummary, total: number): Conversatio
   const failures = toFailureSummaries(summary);
   const warnings = toWarningSummaries(summary);
   const safeTotal = Math.max(total, summary.results.length, summary.okCount + summary.failCount);
-  const phase: ConversationSyncFeedbackPhase = summary.failCount <= 0
-    ? 'success'
-    : summary.okCount > 0
-      ? 'partial-failed'
-      : 'failed';
+  const phase: ConversationSyncFeedbackPhase =
+    summary.failCount <= 0 ? 'success' : summary.okCount > 0 ? 'partial-failed' : 'failed';
 
   return {
     provider: summary.provider,
@@ -269,7 +275,9 @@ function pickPrimaryJob(
 }
 
 function errorCode(error: unknown): string {
-  return String((error as any)?.extra?.code ?? (error as any)?.code ?? '').trim().toLowerCase();
+  return String((error as any)?.extra?.code ?? (error as any)?.code ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDeps = {}) {
@@ -298,8 +306,8 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   const refreshFromBackground = useCallback(
     async (preferredProvider?: SyncProvider | null) => {
       const [notionStatus, obsidianStatus] = await Promise.all([
-        getNotionSyncJobStatus().catch(() => ({ provider: 'notion', job: null } as SyncJobStatusResponse)),
-        getObsidianSyncStatus().catch(() => ({ provider: 'obsidian', job: null } as SyncJobStatusResponse)),
+        getNotionSyncJobStatus().catch(() => ({ provider: 'notion', job: null }) as SyncJobStatusResponse),
+        getObsidianSyncStatus().catch(() => ({ provider: 'obsidian', job: null }) as SyncJobStatusResponse),
       ]);
       if (disposedRef.current) return null;
 

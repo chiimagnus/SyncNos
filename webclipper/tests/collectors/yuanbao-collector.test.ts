@@ -1,16 +1,16 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it, vi } from "vitest";
-import normalizeApi from "@services/shared/normalize.ts";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createYuanbaoCollectorDef } from "../../src/collectors/yuanbao/yuanbao-collector.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it, vi } from 'vitest';
+import normalizeApi from '@services/shared/normalize.ts';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createYuanbaoCollectorDef } from '../../src/collectors/yuanbao/yuanbao-collector.ts';
 
 function setupYuanbaoDom(html: string, url: string) {
   const dom = new JSDOM(`<body>${html}</body>`, { url });
   return dom;
 }
 
-describe("yuanbao-collector", () => {
-  it("extracts assistant contentMarkdown from semantic markdown DOM", async () => {
+describe('yuanbao-collector', () => {
+  it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <main class="agent-chat__list__content">
         <div class="agent-chat__list__item--human">
@@ -69,7 +69,7 @@ describe("yuanbao-collector", () => {
       </main>
     `;
 
-    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/b");
+    const dom = setupYuanbaoDom(html, 'https://yuanbao.tencent.com/chat/a/b');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -79,26 +79,26 @@ describe("yuanbao-collector", () => {
     const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
-    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentMarkdown).toContain("# 主标题");
-    expect(assistant.contentMarkdown).toContain("**粗体**");
-    expect(assistant.contentMarkdown).toContain("*斜体*");
-    expect(assistant.contentMarkdown).toContain("`inline()`");
-    expect(assistant.contentMarkdown).toContain("1. 父级条目");
-    expect(assistant.contentMarkdown).toContain("  - 子级条目");
-    expect(assistant.contentMarkdown).toContain("> 引用内容");
-    expect(assistant.contentMarkdown).toContain("| 列1 | 列2 |");
-    expect(assistant.contentMarkdown).toContain("[https://example.com/spring.jpg](https://example.com/spring.jpg)");
-    expect(assistant.contentMarkdown).toContain("[百科链接](https://example.com/wiki)");
-    expect(assistant.contentMarkdown).toContain("```python");
-    expect(assistant.contentMarkdown).toContain("print(\"yuanbao\")");
-    expect(assistant.contentMarkdown).not.toContain("下载");
-    expect(assistant.contentMarkdown).not.toContain("复制");
-    expect(assistant.contentMarkdown).not.toContain("运行");
+    expect(assistant.contentMarkdown).toContain('# 主标题');
+    expect(assistant.contentMarkdown).toContain('**粗体**');
+    expect(assistant.contentMarkdown).toContain('*斜体*');
+    expect(assistant.contentMarkdown).toContain('`inline()`');
+    expect(assistant.contentMarkdown).toContain('1. 父级条目');
+    expect(assistant.contentMarkdown).toContain('  - 子级条目');
+    expect(assistant.contentMarkdown).toContain('> 引用内容');
+    expect(assistant.contentMarkdown).toContain('| 列1 | 列2 |');
+    expect(assistant.contentMarkdown).toContain('[https://example.com/spring.jpg](https://example.com/spring.jpg)');
+    expect(assistant.contentMarkdown).toContain('[百科链接](https://example.com/wiki)');
+    expect(assistant.contentMarkdown).toContain('```python');
+    expect(assistant.contentMarkdown).toContain('print("yuanbao")');
+    expect(assistant.contentMarkdown).not.toContain('下载');
+    expect(assistant.contentMarkdown).not.toContain('复制');
+    expect(assistant.contentMarkdown).not.toContain('运行');
   });
 
-  it("falls back to plain text markdown when markdown helper is unavailable", async () => {
+  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
     const html = `
       <main class="agent-chat__list__content">
         <div class="agent-chat__list__item--ai">
@@ -108,10 +108,10 @@ describe("yuanbao-collector", () => {
     `;
 
     vi.resetModules();
-    vi.doMock("../../src/collectors/yuanbao/yuanbao-markdown.ts", () => ({ default: {} }));
+    vi.doMock('../../src/collectors/yuanbao/yuanbao-markdown.ts', () => ({ default: {} }));
 
-    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/fallback");
-    const { createYuanbaoCollectorDef: createDef } = await import("../../src/collectors/yuanbao/yuanbao-collector.ts");
+    const dom = setupYuanbaoDom(html, 'https://yuanbao.tencent.com/chat/a/fallback');
+    const { createYuanbaoCollectorDef: createDef } = await import('../../src/collectors/yuanbao/yuanbao-collector.ts');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -121,12 +121,12 @@ describe("yuanbao-collector", () => {
     const snap = createDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentText).toBe("plain answer");
-    expect(snap.messages[0].contentMarkdown).toBe("plain answer");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 
-  it("captures multimodal image urls from the message bubble", async () => {
+  it('captures multimodal image urls from the message bubble', async () => {
     const html = `
       <main class="agent-chat__list__content">
         <div class="agent-chat__list__item agent-chat__list__item--human">
@@ -151,7 +151,7 @@ describe("yuanbao-collector", () => {
       </main>
     `;
 
-    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/multimodal");
+    const dom = setupYuanbaoDom(html, 'https://yuanbao.tencent.com/chat/a/multimodal');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -161,12 +161,14 @@ describe("yuanbao-collector", () => {
     const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("user");
-    expect(snap.messages[0].contentText).toContain("这是什么？");
-    expect(snap.messages[0].contentMarkdown).toContain("![](https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be)");
+    expect(snap.messages[0].role).toBe('user');
+    expect(snap.messages[0].contentText).toContain('这是什么？');
+    expect(snap.messages[0].contentMarkdown).toContain(
+      '![](https://yuanbao.tencent.com/api/resource/download?resourceId=047f08de22d62597cb92c6dd570068be)',
+    );
   });
 
-  it("captures display formulas wrapped in <pre> (katex) as $$...$$ instead of a code fence", async () => {
+  it('captures display formulas wrapped in <pre> (katex) as $$...$$ instead of a code fence', async () => {
     const html = `
       <main class="agent-chat__list__content">
         <div class="agent-chat__list__item agent-chat__list__item--ai">
@@ -198,7 +200,7 @@ describe("yuanbao-collector", () => {
       </main>
     `;
 
-    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/formula");
+    const dom = setupYuanbaoDom(html, 'https://yuanbao.tencent.com/chat/a/formula');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -208,20 +210,20 @@ describe("yuanbao-collector", () => {
     const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentMarkdown).toContain("$$E=mc^2$$");
-    expect(snap.messages[0].contentMarkdown).not.toContain("```");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentMarkdown).toContain('$$E=mc^2$$');
+    expect(snap.messages[0].contentMarkdown).not.toContain('```');
   });
 
-  it("recovers fraction/sup/sub structure from KaTeX HTML when MathML annotation is missing", async () => {
-    const katexMod = await import("katex");
+  it('recovers fraction/sup/sub structure from KaTeX HTML when MathML annotation is missing', async () => {
+    const katexMod = await import('katex');
     const katexAny: any = (katexMod as any).default || katexMod;
     const rendered = String(
-      katexAny.renderToString("\\frac{1}{2} g_{\\mu\\nu} m^2", { displayMode: true, output: "html" })
+      katexAny.renderToString('\\frac{1}{2} g_{\\mu\\nu} m^2', { displayMode: true, output: 'html' }),
     );
 
-    const katexDom = new JSDOM(`<body>${rendered}</body>`, { url: "https://yuanbao.tencent.com/chat/a/katex" });
-    katexDom.window.document.querySelectorAll(".katex-mathml").forEach((el) => el.remove());
+    const katexDom = new JSDOM(`<body>${rendered}</body>`, { url: 'https://yuanbao.tencent.com/chat/a/katex' });
+    katexDom.window.document.querySelectorAll('.katex-mathml').forEach((el) => el.remove());
     const stripped = katexDom.window.document.body.innerHTML;
 
     const html = `
@@ -240,7 +242,7 @@ describe("yuanbao-collector", () => {
       </main>
     `;
 
-    const dom = setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/formula-no-mathml");
+    const dom = setupYuanbaoDom(html, 'https://yuanbao.tencent.com/chat/a/formula-no-mathml');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -250,11 +252,11 @@ describe("yuanbao-collector", () => {
     const snap = createYuanbaoCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentMarkdown).toContain("$$");
-    expect(snap.messages[0].contentMarkdown).toContain("\\frac{1}{2}");
-    expect(snap.messages[0].contentMarkdown).toContain("g_{");
-    expect(snap.messages[0].contentMarkdown).toContain("m^{2}");
-    expect(snap.messages[0].contentMarkdown).not.toContain("```");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentMarkdown).toContain('$$');
+    expect(snap.messages[0].contentMarkdown).toContain('\\frac{1}{2}');
+    expect(snap.messages[0].contentMarkdown).toContain('g_{');
+    expect(snap.messages[0].contentMarkdown).toContain('m^{2}');
+    expect(snap.messages[0].contentMarkdown).not.toContain('```');
   });
 });

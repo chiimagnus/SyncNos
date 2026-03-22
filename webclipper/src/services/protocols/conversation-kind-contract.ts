@@ -40,10 +40,7 @@ export function assertKindDef(definition: unknown): ConversationKindDefinition {
     throw new Error(`kind ${normalized.id} missing notion.dbSpec`);
   }
   assertNonEmptyString(normalized.notion.dbSpec.title, `kind ${normalized.id} missing notion.dbSpec.title`);
-  assertNonEmptyString(
-    normalized.notion.dbSpec.storageKey,
-    `kind ${normalized.id} missing notion.dbSpec.storageKey`,
-  );
+  assertNonEmptyString(normalized.notion.dbSpec.storageKey, `kind ${normalized.id} missing notion.dbSpec.storageKey`);
   if (!normalized.notion.dbSpec.properties || typeof normalized.notion.dbSpec.properties !== 'object') {
     throw new Error(`kind ${normalized.id} missing notion.dbSpec.properties`);
   }

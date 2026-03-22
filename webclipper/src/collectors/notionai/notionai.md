@@ -1,4 +1,4 @@
-<!-- 
+<!--
 # NotionAI Web DOM 备注（WebClipper）
 
 这份文档用于补充 `notionai.md`（DOM 快照）里不易从纯 DOM 一眼看出的结构与踩坑点，帮助维护 WebClipper 的 NotionAI 采集逻辑。

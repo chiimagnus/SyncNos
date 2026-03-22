@@ -35,7 +35,9 @@ describe('current-page-capture chatgpt deep research hydration', () => {
       send: async (type: string, payload?: any) => {
         seen.push({ type, payload });
         if (type === 'chatgptExtractDeepResearch') {
-          const longBody = Array.from({ length: 80 }).map(() => 'Body').join(' ');
+          const longBody = Array.from({ length: 80 })
+            .map(() => 'Body')
+            .join(' ');
           return {
             ok: true,
             data: {
@@ -54,7 +56,9 @@ describe('current-page-capture chatgpt deep research hydration', () => {
         if (type === 'upsertConversation') return { ok: true, data: { id: 101, __isNew: true } };
         if (type === 'syncConversationMessages') {
           const messages = payload?.messages || [];
-          expect(messages.some((m: any) => String(m?.contentText || '').includes('Deep Research (iframe):'))).toBe(false);
+          expect(messages.some((m: any) => String(m?.contentText || '').includes('Deep Research (iframe):'))).toBe(
+            false,
+          );
           expect(messages.some((m: any) => String(m?.contentText || '').includes('Body'))).toBe(true);
           return { ok: true, data: { ok: true } };
         }

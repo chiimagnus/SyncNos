@@ -160,14 +160,14 @@ function createRouter({
   });
 
   registerSyncHandlers(router as any, {
-      getInstanceId: () => instanceId,
-      notionSyncOrchestrator,
-      obsidianSyncOrchestrator: {
-        getSyncStatus: async () => ({ job: null }),
-        clearSyncStatus: async () => ({ job: null }),
-        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
-      },
-    });
+    getInstanceId: () => instanceId,
+    notionSyncOrchestrator,
+    obsidianSyncOrchestrator: {
+      getSyncStatus: async () => ({ job: null }),
+      clearSyncStatus: async () => ({ job: null }),
+      syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+    },
+  });
 
   return router;
 }
@@ -215,7 +215,12 @@ describe('background-router notion sync', () => {
         return notionHttpResponse({ ok: true });
       }
       if (method === 'GET' && href.includes('/v1/pages/')) {
-        return notionHttpResponse({ id: 'p1', parent: { type: 'database_id', database_id: 'db1' }, archived: false, in_trash: false });
+        return notionHttpResponse({
+          id: 'p1',
+          parent: { type: 'database_id', database_id: 'db1' },
+          archived: false,
+          in_trash: false,
+        });
       }
       return notionHttpResponse({ ok: true });
     });
@@ -482,7 +487,10 @@ describe('background-router notion sync', () => {
     expect(job.perConversation[0].mode).toBe('rebuilt');
 
     const archivedIds = (((globalThis as any).fetch as any)?.mock?.calls || [])
-      .map((args: any[]) => ({ url: String(args?.[0] || ''), method: String(args?.[1]?.method || 'GET').toUpperCase() }))
+      .map((args: any[]) => ({
+        url: String(args?.[0] || ''),
+        method: String(args?.[1]?.method || 'GET').toUpperCase(),
+      }))
       .filter((c: any) => c.method === 'DELETE')
       .map((c: any) => c.url);
     expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(true);
@@ -606,7 +614,10 @@ describe('background-router notion sync', () => {
     expect(job.perConversation[0].mode).toBe('rebuilt');
     expect(calls.some((c) => c.op === 'updateProps')).toBe(true);
     const archivedIds = (((globalThis as any).fetch as any)?.mock?.calls || [])
-      .map((args: any[]) => ({ url: String(args?.[0] || ''), method: String(args?.[1]?.method || 'GET').toUpperCase() }))
+      .map((args: any[]) => ({
+        url: String(args?.[0] || ''),
+        method: String(args?.[1]?.method || 'GET').toUpperCase(),
+      }))
       .filter((c: any) => c.method === 'DELETE')
       .map((c: any) => c.url);
     expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(true);
@@ -719,15 +730,18 @@ describe('background-router notion sync', () => {
     expect(job.perConversation[0].mode).toBe('rebuilt');
 
     const archivedIds = (((globalThis as any).fetch as any)?.mock?.calls || [])
-      .map((args: any[]) => ({ url: String(args?.[0] || ''), method: String(args?.[1]?.method || 'GET').toUpperCase() }))
+      .map((args: any[]) => ({
+        url: String(args?.[0] || ''),
+        method: String(args?.[1]?.method || 'GET').toUpperCase(),
+      }))
       .filter((c: any) => c.method === 'DELETE')
       .map((c: any) => c.url);
     expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_article'))).toBe(true);
     expect(archivedIds.some((url: string) => url.includes('/v1/blocks/b_comments'))).toBe(false);
 
-	    const cursorCall = calls.find((c) => c.op === 'setCursor');
-	    expect(String(cursorCall?.cursor?.notionSectionDigests?.article?.digest || '')).toBe(articleDigest);
-	  });
+    const cursorCall = calls.find((c) => c.op === 'setCursor');
+    expect(String(cursorCall?.cursor?.notionSectionDigests?.article?.digest || '')).toBe(articleDigest);
+  });
 
   it('updates page properties without rebuilding body when article content is unchanged', async () => {
     const calls: any[] = [];
@@ -911,7 +925,11 @@ describe('background-router notion sync', () => {
               lastSyncedSequence: 1,
               notionSections: { conversations: { headingBlockId: 'b_conversations' } },
               notionSectionCursors: {
-                conversations: { lastSyncedMessageKey: 'old_key', lastSyncedSequence: 1, lastSyncedMessageUpdatedAt: 1 },
+                conversations: {
+                  lastSyncedMessageKey: 'old_key',
+                  lastSyncedSequence: 1,
+                  lastSyncedMessageUpdatedAt: 1,
+                },
               },
             },
           }),
@@ -922,7 +940,11 @@ describe('background-router notion sync', () => {
           setSyncCursor: async () => calls.push({ op: 'setCursor' }),
         },
         syncService: {
-          getPage: async () => ({ parent: { type: 'database_id', database_id: 'db1' }, archived: false, properties: {} }),
+          getPage: async () => ({
+            parent: { type: 'database_id', database_id: 'db1' },
+            archived: false,
+            properties: {},
+          }),
           updatePageProperties: async () => ({ ok: true }),
           clearPageChildren: async () => calls.push({ op: 'clear' }),
           appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
@@ -1096,7 +1118,10 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const startRes = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1, 2, 3] });
+    const startRes = await router.__handleMessageForTests({
+      type: 'notionSyncConversations',
+      conversationIds: [1, 2, 3],
+    });
     expect(startRes.ok).toBe(true);
     expect(startRes.data?.started).toBe(true);
 
@@ -1288,7 +1313,13 @@ describe('background-router notion sync', () => {
             mapping: null,
           }),
           getMessagesByConversationId: async () => [
-            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+            {
+              messageKey: 'm1',
+              role: 'user',
+              contentText: 'hi',
+              contentMarkdown: '![](https://example.com/a.png)',
+              sequence: 1,
+            },
           ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
@@ -1349,7 +1380,13 @@ describe('background-router notion sync', () => {
             mapping: null,
           }),
           getMessagesByConversationId: async () => [
-            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+            {
+              messageKey: 'm1',
+              role: 'user',
+              contentText: 'hi',
+              contentMarkdown: '![](https://example.com/a.png)',
+              sequence: 1,
+            },
           ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
@@ -1402,7 +1439,13 @@ describe('background-router notion sync', () => {
             mapping: null,
           }),
           getMessagesByConversationId: async () => [
-            { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: '![](https://example.com/a.png)', sequence: 1 },
+            {
+              messageKey: 'm1',
+              role: 'user',
+              contentText: 'hi',
+              contentMarkdown: '![](https://example.com/a.png)',
+              sequence: 1,
+            },
           ],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
@@ -1521,7 +1564,12 @@ describe('background-router notion sync', () => {
         },
         storage: {
           getSyncMappingByConversation: async (conversationId: number) => ({
-            conversation: { id: conversationId, title: `Hello ${conversationId}`, url: `https://x/${conversationId}`, source: 'chatgpt' },
+            conversation: {
+              id: conversationId,
+              title: `Hello ${conversationId}`,
+              url: `https://x/${conversationId}`,
+              source: 'chatgpt',
+            },
             mapping: null,
           }),
           getMessagesByConversationId: async (conversationId: number) => [
@@ -1661,7 +1709,8 @@ describe('background-router notion sync', () => {
             const error: any = new Error('notion api failed: PATCH /v1/blocks/p_new/children HTTP 400');
             error.status = 400;
             error.code = 'validation_error';
-            error.notionMessage = 'body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`.';
+            error.notionMessage =
+              'body failed validation: body.children[27].paragraph.rich_text.length should be ≤ `100`, instead was `129`.';
             throw error;
           },
           messagesToBlocks: () => [{ kind: 'blocks', count: 1 }],

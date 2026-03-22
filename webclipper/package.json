@@ -12,7 +12,20 @@
     "prepare": "wxt prepare",
     "compile": "tsc -p tsconfig.compile.json --noEmit",
     "check": "npm run build && node ../.github/scripts/webclipper/check-dist.mjs --root=webclipper/.output/chrome-mv3",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "gate": "npm run lint && npm run format:check && npm run compile && npm run test && npm run build",
+    "gate:ci": "npm run lint && npm run format:check && npm run compile && npm run test"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": true,
+    "trailingComma": "all",
+    "printWidth": 120,
+    "tabWidth": 2
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
@@ -20,14 +33,21 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
+    "@eslint/js": "^9.19.0",
     "@vitest/coverage-v8": "^2.1.9",
     "@wxt-dev/module-react": "^1.1.5",
     "autoprefixer": "^10.4.21",
+    "eslint": "^9.19.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.1.0",
     "fake-indexeddb": "^6.2.2",
     "jsdom": "^28.1.0",
     "postcss": "^8.5.6",
+    "prettier": "^3.5.3",
     "tailwindcss": "^3.4.17",
     "terser": "^5.31.6",
+    "typescript-eslint": "^8.26.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8",
     "wxt": "^0.20.18"

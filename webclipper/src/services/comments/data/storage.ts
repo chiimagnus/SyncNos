@@ -23,4 +23,3 @@ export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string)
 export async function attachOrphanCommentsToConversation(canonicalUrl: string, conversationId: number) {
   return await idb.attachOrphanCommentsToConversation(canonicalUrl, conversationId);
 }
-

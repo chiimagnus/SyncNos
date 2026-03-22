@@ -85,11 +85,7 @@ function getSnappedRange(edge: string, size: { width: number; height: number }) 
   return { axis: 'x', min, max, range };
 }
 
-function resolveOffsetFromState(
-  edge: string,
-  size: { width: number; height: number },
-  state: any,
-) {
+function resolveOffsetFromState(edge: string, size: { width: number; height: number }, state: any) {
   const range = getSnappedRange(edge, size);
   const ratio = state && Number.isFinite(state.ratio) ? clamp01(Number(state.ratio)) : null;
   if (ratio != null) {
@@ -208,8 +204,7 @@ function ensureButtonShadow(btn: HTMLElement) {
   icon.draggable = false;
   icon.setAttribute('aria-hidden', 'true');
 
-  const iconUrl =
-    runtime && typeof runtime.getURL === 'function' ? runtime.getURL('icons/icon-128.png') : '';
+  const iconUrl = runtime && typeof runtime.getURL === 'function' ? runtime.getURL('icons/icon-128.png') : '';
   if (iconUrl) icon.src = iconUrl;
 
   icon.addEventListener('dragstart', (e) => e.preventDefault());

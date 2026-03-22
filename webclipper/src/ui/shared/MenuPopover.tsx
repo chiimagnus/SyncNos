@@ -62,10 +62,7 @@ export function MenuPopover(props: MenuPopoverProps) {
 
   const panelPosClassName = useMemo(() => {
     const alignClass = align === 'start' ? 'tw-left-0' : 'tw-right-0';
-    const sideClass =
-      side === 'top'
-        ? 'tw-bottom-[calc(100%+8px)] tw-top-auto'
-        : 'tw-top-[calc(100%+8px)]';
+    const sideClass = side === 'top' ? 'tw-bottom-[calc(100%+8px)] tw-top-auto' : 'tw-top-[calc(100%+8px)]';
     return ['tw-absolute', alignClass, sideClass].join(' ');
   }, [align, side]);
 
@@ -96,7 +93,7 @@ export function MenuPopover(props: MenuPopoverProps) {
   }, [panelMaxHeight, panelMinWidth]);
 
   const backdropStyle = useMemo(() => {
-    const { overflowY, overscrollBehavior, ...backdropStyleProps } = panelStyle;
+    const { overflowY: _overflowY, overscrollBehavior: _overscrollBehavior, ...backdropStyleProps } = panelStyle;
     return backdropStyleProps;
   }, [panelStyle]);
 

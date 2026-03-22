@@ -124,7 +124,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
 - `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
-- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
@@ -133,9 +133,9 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/settings/sections/InsightSection.tsx`
 - `webclipper/src/ui/settings/sections/InsightPanel.tsx`
-- `webclipper/src/ui/settings/sections/insight-stats.ts`
-- `webclipper/src/integrations/chatwith/chatwith-settings.ts`
-- `webclipper/src/integrations/chatwith/chatwith-detail-header-actions.ts`
+- `webclipper/src/viewmodels/settings/insight-stats.ts`
+- `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`
+- `webclipper/src/services/integrations/chatwith/chatwith-detail-header-actions.ts`
 - `webclipper/src/ui/styles/tokens.css`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

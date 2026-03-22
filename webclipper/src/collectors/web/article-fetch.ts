@@ -34,7 +34,9 @@ function conversationKeyForUrl(url: string) {
 }
 
 function normalizeText(text: unknown) {
-  return String(text || '').replace(/\r\n/g, '\n').trim();
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
 }
 
 function countWords(text: string) {
@@ -94,7 +96,9 @@ async function extractArticleOnTab(tabId: number) {
       const minTextLength = Math.max(120, Number(stabilizationMinTextLength) || 240);
 
       function normalize(value: unknown) {
-        return String(value || '').replace(/\r\n/g, '\n').trim();
+        return String(value || '')
+          .replace(/\r\n/g, '\n')
+          .trim();
       }
 
       function escapeHtml(value: unknown) {
@@ -139,134 +143,159 @@ async function extractArticleOnTab(tabId: number) {
         return String(value || '').replace(/\s+/g, ' ');
       }
 
-	      function sanitizeUrl(raw: unknown) {
-	        const text = String(raw || '').trim();
-	        if (!text) return '';
-	        if (/^\/\//.test(text)) return `${location.protocol}${text}`;
-	        try {
-	          const resolved = new URL(text, location.href).toString();
-	          return /^https?:\/\//i.test(resolved) ? resolved : '';
-	        } catch (_e) {
-	          return '';
-	        }
-	      }
+      function sanitizeUrl(raw: unknown) {
+        const text = String(raw || '').trim();
+        if (!text) return '';
+        if (/^\/\//.test(text)) return `${location.protocol}${text}`;
+        try {
+          const resolved = new URL(text, location.href).toString();
+          return /^https?:\/\//i.test(resolved) ? resolved : '';
+        } catch (_e) {
+          return '';
+        }
+      }
 
-	      function sanitizeWechatMediaUrl(raw: unknown) {
-	        const resolved = sanitizeUrl(raw);
-	        if (!resolved) return '';
-	        try {
-	          const url = new URL(resolved);
-	          url.searchParams.delete('tp');
-	          url.searchParams.delete('usePicPrefetch');
-	          url.searchParams.delete('wxfrom');
-	          url.searchParams.delete('from');
-	          return url.toString();
-	        } catch (_e) {
-	          return resolved;
-	        }
-	      }
+      function sanitizeWechatMediaUrl(raw: unknown) {
+        const resolved = sanitizeUrl(raw);
+        if (!resolved) return '';
+        try {
+          const url = new URL(resolved);
+          url.searchParams.delete('tp');
+          url.searchParams.delete('usePicPrefetch');
+          url.searchParams.delete('wxfrom');
+          url.searchParams.delete('from');
+          return url.toString();
+        } catch (_e) {
+          return resolved;
+        }
+      }
 
-	      function extractWechatShareMediaImageUrls() {
-	        const hostname = String(location.hostname || '').toLowerCase();
-	        if (hostname !== 'mp.weixin.qq.com') return [];
-	        if (!document.querySelector('.share_content_page')) return [];
-	        if (!document.querySelector('#img_swiper_content')) return [];
+      function extractWechatShareMediaImageUrls() {
+        const hostname = String(location.hostname || '').toLowerCase();
+        if (hostname !== 'mp.weixin.qq.com') return [];
+        if (!document.querySelector('.share_content_page')) return [];
+        if (!document.querySelector('#img_swiper_content')) return [];
 
-	        const urls: string[] = [];
-	        const pushUrl = (value: unknown) => {
-	          const url = sanitizeWechatMediaUrl(value);
-	          if (url) urls.push(url);
-	        };
+        const urls: string[] = [];
+        const pushUrl = (value: unknown) => {
+          const url = sanitizeWechatMediaUrl(value);
+          if (url) urls.push(url);
+        };
 
-	        const swiperImgs = Array.from(document.querySelectorAll('.swiper_item_img img'));
-	        for (const img of swiperImgs) {
-	          const el = img as any;
-	          pushUrl(el.getAttribute?.('data-src') || el.getAttribute?.('src') || el.currentSrc || el.src || '');
-	        }
+        const swiperImgs = Array.from(document.querySelectorAll('.swiper_item_img img'));
+        for (const img of swiperImgs) {
+          const el = img as any;
+          pushUrl(el.getAttribute?.('data-src') || el.getAttribute?.('src') || el.currentSrc || el.src || '');
+        }
 
-	        if (urls.length < 2) {
-	          const thumbEls = Array.from(document.querySelectorAll('.swiper_indicator_list_pc [style*="background-image"]'));
-	          for (const el of thumbEls) {
-	            const style = String((el as any)?.getAttribute?.('style') || '');
-	            const match = style.match(/background-image\s*:\s*url\(["']?([^"')]+)["']?\)/i);
-	            if (!match || !match[1]) continue;
-	            try {
-	              const thumbUrl = new URL(match[1], location.href);
-	              // Most wechat image urls use /300 as thumbnail; /0 is the original size.
-	              thumbUrl.pathname = thumbUrl.pathname.replace(/\/300$/, '/0');
-	              pushUrl(thumbUrl.toString());
-	            } catch (_e) {
-	              // ignore
-	            }
-	          }
-	        }
+        if (urls.length < 2) {
+          const thumbEls = Array.from(
+            document.querySelectorAll('.swiper_indicator_list_pc [style*="background-image"]'),
+          );
+          for (const el of thumbEls) {
+            const style = String((el as any)?.getAttribute?.('style') || '');
+            const match = style.match(/background-image\s*:\s*url\(["']?([^"')]+)["']?\)/i);
+            if (!match || !match[1]) continue;
+            try {
+              const thumbUrl = new URL(match[1], location.href);
+              // Most wechat image urls use /300 as thumbnail; /0 is the original size.
+              thumbUrl.pathname = thumbUrl.pathname.replace(/\/300$/, '/0');
+              pushUrl(thumbUrl.toString());
+            } catch (_e) {
+              // ignore
+            }
+          }
+        }
 
-	        const seen = new Set<string>();
-	        const out: string[] = [];
-	        for (const url of urls) {
-	          if (seen.has(url)) continue;
-	          seen.add(url);
-	          out.push(url);
-	        }
-	        return out;
-	      }
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const url of urls) {
+          if (seen.has(url)) continue;
+          seen.add(url);
+          out.push(url);
+        }
+        return out;
+      }
 
-	      function buildWechatShareMediaGridHtml({ columns = 3 } = {}) {
-	        const imageUrls = extractWechatShareMediaImageUrls();
-	        if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
+      function buildWechatShareMediaGridHtml({ columns = 3 } = {}) {
+        const imageUrls = extractWechatShareMediaImageUrls();
+        if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
 
-	        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
-	        const tdStyle = 'padding:4px;vertical-align:top;';
-	        const imgStyle = 'width:100%;height:auto;display:block;';
+        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
+        const tdStyle = 'padding:4px;vertical-align:top;';
+        const imgStyle = 'width:100%;height:auto;display:block;';
 
-	        const rows: string[] = [];
-	        for (let i = 0; i < imageUrls.length; i += safeColumns) {
-	          const slice = imageUrls.slice(i, i + safeColumns);
-	          const cells: string[] = [];
-	          for (const url of slice) {
-	            cells.push(
-	              `<td style="${tdStyle}"><img src="${escapeHtml(url)}" alt="" loading="lazy" style="${imgStyle}" /></td>`,
-	            );
-	          }
-	          while (cells.length < safeColumns) cells.push(`<td style="${tdStyle}"></td>`);
-	          rows.push(`<tr>${cells.join('')}</tr>`);
-	        }
+        const rows: string[] = [];
+        for (let i = 0; i < imageUrls.length; i += safeColumns) {
+          const slice = imageUrls.slice(i, i + safeColumns);
+          const cells: string[] = [];
+          for (const url of slice) {
+            cells.push(
+              `<td style="${tdStyle}"><img src="${escapeHtml(url)}" alt="" loading="lazy" style="${imgStyle}" /></td>`,
+            );
+          }
+          while (cells.length < safeColumns) cells.push(`<td style="${tdStyle}"></td>`);
+          rows.push(`<tr>${cells.join('')}</tr>`);
+        }
 
-	        const tableStyle = 'width:100%;border-collapse:collapse;table-layout:fixed;';
-	        return (
-	          `<hr />` +
-	          `<table data-syncnos-origin="wechat-share-media-grid" style="${tableStyle}"><tbody>${rows.join('')}</tbody></table>`
-	        );
-	      }
+        const tableStyle = 'width:100%;border-collapse:collapse;table-layout:fixed;';
+        return (
+          `<hr />` +
+          `<table data-syncnos-origin="wechat-share-media-grid" style="${tableStyle}"><tbody>${rows.join('')}</tbody></table>`
+        );
+      }
 
-	      function buildWechatShareMediaGridMarkdown({ columns = 3 } = {}) {
-	        const imageUrls = extractWechatShareMediaImageUrls();
-	        if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
+      function buildWechatShareMediaGridMarkdown({ columns = 3 } = {}) {
+        const imageUrls = extractWechatShareMediaImageUrls();
+        if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
 
-	        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
-	        const header = `| ${Array.from({ length: safeColumns }).map(() => ' ').join(' | ')} |`;
-	        const sep = `| ${Array.from({ length: safeColumns }).map(() => '---').join(' | ')} |`;
+        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
+        const header = `| ${Array.from({ length: safeColumns })
+          .map(() => ' ')
+          .join(' | ')} |`;
+        const sep = `| ${Array.from({ length: safeColumns })
+          .map(() => '---')
+          .join(' | ')} |`;
 
-	        const rows: string[] = [];
-	        for (let i = 0; i < imageUrls.length; i += safeColumns) {
-	          const slice = imageUrls.slice(i, i + safeColumns);
-	          const cells: string[] = [];
-	          for (const url of slice) {
-	            // Use <...> so URLs with parentheses stay valid in Markdown.
-	            cells.push(`![](<${url}>)`);
-	          }
-	          while (cells.length < safeColumns) cells.push(' ');
-	          rows.push(`| ${cells.join(' | ')} |`);
-	        }
+        const rows: string[] = [];
+        for (let i = 0; i < imageUrls.length; i += safeColumns) {
+          const slice = imageUrls.slice(i, i + safeColumns);
+          const cells: string[] = [];
+          for (const url of slice) {
+            // Use <...> so URLs with parentheses stay valid in Markdown.
+            cells.push(`![](<${url}>)`);
+          }
+          while (cells.length < safeColumns) cells.push(' ');
+          rows.push(`| ${cells.join(' | ')} |`);
+        }
 
-	        return `---\n\n${header}\n${sep}\n${rows.join('\n')}`;
-	      }
+        return `---\n\n${header}\n${sep}\n${rows.join('\n')}`;
+      }
 
-	      function isBlockTag(tag: unknown) {
-	        return [
-	          'p', 'div', 'section', 'article', 'main', 'header', 'footer', 'aside',
-	          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'ul', 'ol', 'li', 'blockquote', 'pre', 'table', 'figure', 'hr',
+      function isBlockTag(tag: unknown) {
+        return [
+          'p',
+          'div',
+          'section',
+          'article',
+          'main',
+          'header',
+          'footer',
+          'aside',
+          'h1',
+          'h2',
+          'h3',
+          'h4',
+          'h5',
+          'h6',
+          'ul',
+          'ol',
+          'li',
+          'blockquote',
+          'pre',
+          'table',
+          'figure',
+          'hr',
         ].includes(String(tag || '').toLowerCase());
       }
 
@@ -274,54 +303,54 @@ async function extractArticleOnTab(tabId: number) {
         return String(value || '').replace(/\]/g, '\\]');
       }
 
-	      function renderInlineNode(node: any): string {
-	        if (!node) return '';
-	        if (node.nodeType === Node.TEXT_NODE) return normalizeInlineText(node.nodeValue || '');
-	        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+      function renderInlineNode(node: any): string {
+        if (!node) return '';
+        if (node.nodeType === Node.TEXT_NODE) return normalizeInlineText(node.nodeValue || '');
+        if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
-	        const tag = String(node.tagName || '').toLowerCase();
-	        if (!tag) return '';
+        const tag = String(node.tagName || '').toLowerCase();
+        if (!tag) return '';
 
-	        if (tag === 'br') return '\n';
-	        if (tag === 'img') {
-	          const src = sanitizeUrl(node.getAttribute('src') || node.getAttribute('data-src') || '');
-	          if (!src) return '';
-	          const alt = escapeMarkdownLabel(normalize(node.getAttribute('alt') || ''));
-	          return `![${alt}](${src})`;
-	        }
-	        if (tag === 'a') {
-	          const href = sanitizeUrl(node.getAttribute('href') || '');
-	          const linkedImg = node.querySelector ? node.querySelector('img') : null;
-	          if (linkedImg) {
-	            const src = sanitizeUrl(linkedImg.getAttribute('src') || linkedImg.getAttribute('data-src') || '');
-	            if (src) {
-	              const alt = escapeMarkdownLabel(
-	                normalize(linkedImg.getAttribute('alt') || node.getAttribute('title') || ''),
-	              );
-	              const image = `![${alt}](${src})`;
-	              return href ? `[${image}](${href})` : image;
-	            }
-	          }
+        if (tag === 'br') return '\n';
+        if (tag === 'img') {
+          const src = sanitizeUrl(node.getAttribute('src') || node.getAttribute('data-src') || '');
+          if (!src) return '';
+          const alt = escapeMarkdownLabel(normalize(node.getAttribute('alt') || ''));
+          return `![${alt}](${src})`;
+        }
+        if (tag === 'a') {
+          const href = sanitizeUrl(node.getAttribute('href') || '');
+          const linkedImg = node.querySelector ? node.querySelector('img') : null;
+          if (linkedImg) {
+            const src = sanitizeUrl(linkedImg.getAttribute('src') || linkedImg.getAttribute('data-src') || '');
+            if (src) {
+              const alt = escapeMarkdownLabel(
+                normalize(linkedImg.getAttribute('alt') || node.getAttribute('title') || ''),
+              );
+              const image = `![${alt}](${src})`;
+              return href ? `[${image}](${href})` : image;
+            }
+          }
 
-	          const label = escapeMarkdownLabel(normalize(node.textContent || ''));
-	          if (!label) return '';
-	          if (!href) return label;
-	          return `[${label}](${href})`;
-	        }
-	        if (tag === 'code') {
-	          const text = normalize(node.textContent || '');
-	          return text ? `\`${text}\`` : '';
-	        }
-	        if (tag === 'strong' || tag === 'b') {
-	          const inner = renderInlineChildren(node);
-	          return inner ? `**${inner}**` : '';
-	        }
-	        if (tag === 'em' || tag === 'i') {
-	          const inner = renderInlineChildren(node);
-	          return inner ? `*${inner}*` : '';
-	        }
-	        return renderInlineChildren(node);
-	      }
+          const label = escapeMarkdownLabel(normalize(node.textContent || ''));
+          if (!label) return '';
+          if (!href) return label;
+          return `[${label}](${href})`;
+        }
+        if (tag === 'code') {
+          const text = normalize(node.textContent || '');
+          return text ? `\`${text}\`` : '';
+        }
+        if (tag === 'strong' || tag === 'b') {
+          const inner = renderInlineChildren(node);
+          return inner ? `**${inner}**` : '';
+        }
+        if (tag === 'em' || tag === 'i') {
+          const inner = renderInlineChildren(node);
+          return inner ? `*${inner}*` : '';
+        }
+        return renderInlineChildren(node);
+      }
 
       function renderInlineChildren(node: any): string {
         if (!node) return '';
@@ -413,34 +442,40 @@ async function extractArticleOnTab(tabId: number) {
         const root = pickRoot();
         if (!root) return null;
         const title =
-          normalize(document.title || '') ||
-          readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
-        const author =
-          readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+          normalize(document.title || '') || readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
+        const author = readMeta([
+          "meta[name='author']",
+          "meta[property='article:author']",
+          "meta[property='og:article:author']",
+        ]);
         const text = normalize((root as any).innerText || '');
         if (!text) return null;
         const contentHTML = buildHtml('', text);
-	        return {
-	          ok: true,
-	          title,
-	          author,
-          publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
+        return {
+          ok: true,
+          title,
+          author,
+          publishedAt: readMeta([
+            "meta[property='article:published_time']",
+            "meta[name='publish_date']",
+            "meta[name='pubdate']",
+          ]),
           excerpt: '',
           contentHTML,
           contentMarkdown: htmlToMarkdown('', text),
           textContent: text,
           warningFlags: [],
-	        };
-	      }
+        };
+      }
 
-		      async function waitForDomStabilized() {
-		        const deadline = Date.now() + timeoutMs;
-		        let last: any = null;
-		        let stableTicks = 0;
+      async function waitForDomStabilized() {
+        const deadline = Date.now() + timeoutMs;
+        let last: any = null;
+        let stableTicks = 0;
 
-	        while (Date.now() < deadline) {
-	          const root = pickRoot();
-	          const text = root ? normalize((root as any).innerText || '') : '';
+        while (Date.now() < deadline) {
+          const root = pickRoot();
+          const text = root ? normalize((root as any).innerText || '') : '';
           const nodeCount =
             root && typeof (root as any).querySelectorAll === 'function'
               ? (root as any).querySelectorAll('*').length
@@ -467,115 +502,120 @@ async function extractArticleOnTab(tabId: number) {
             return;
           }
 
-	          // eslint-disable-next-line no-await-in-loop
-		          await new Promise((resolve) => setTimeout(resolve, 350));
-		        }
-		      }
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+      }
 
-		      async function waitForWechatShareMediaHydrated() {
-		        const hostname = String(location.hostname || '').toLowerCase();
-		        if (hostname !== 'mp.weixin.qq.com') return;
-		        if (!document.querySelector('.share_content_page')) return;
-		        if (!document.querySelector('#img_swiper_content')) return;
+      async function waitForWechatShareMediaHydrated() {
+        const hostname = String(location.hostname || '').toLowerCase();
+        if (hostname !== 'mp.weixin.qq.com') return;
+        if (!document.querySelector('.share_content_page')) return;
+        if (!document.querySelector('#img_swiper_content')) return;
 
-		        const deadline = Date.now() + 1_500;
-		        let lastCount = 0;
-		        let stableTicks = 0;
-		        while (Date.now() < deadline) {
-		          const count = document.querySelectorAll('.swiper_item_img img').length;
-		          if (count >= 4 && count === lastCount) stableTicks += 1;
-		          else stableTicks = 0;
-		          lastCount = count;
-		          if (stableTicks >= 2) return;
-		          // eslint-disable-next-line no-await-in-loop
-		          await new Promise((resolve) => setTimeout(resolve, 150));
-		        }
-		      }
+        const deadline = Date.now() + 1_500;
+        let lastCount = 0;
+        let stableTicks = 0;
+        while (Date.now() < deadline) {
+          const count = document.querySelectorAll('.swiper_item_img img').length;
+          if (count >= 4 && count === lastCount) stableTicks += 1;
+          else stableTicks = 0;
+          lastCount = count;
+          if (stableTicks >= 2) return;
 
-		      function normalizeDetailsElementsForReadability(doc: any) {
-		        if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+      }
 
-	        const detailsNodes = Array.from(doc.querySelectorAll('details') as any) as any[];
-	        if (!detailsNodes.length) return;
+      function normalizeDetailsElementsForReadability(doc: any) {
+        if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
 
-	        for (const details of detailsNodes) {
-	          const detailsEl = details as any;
-	          if (!detailsEl || typeof detailsEl.replaceWith !== 'function') continue;
+        const detailsNodes = Array.from(doc.querySelectorAll('details') as any) as any[];
+        if (!detailsNodes.length) return;
 
-	          const summary =
-	            typeof detailsEl.querySelector === 'function' ? detailsEl.querySelector(':scope > summary') : null;
-	          const summaryText = normalize(summary?.textContent || '');
+        for (const details of detailsNodes) {
+          const detailsEl = details as any;
+          if (!detailsEl || typeof detailsEl.replaceWith !== 'function') continue;
 
-	          const container = doc.createElement('div');
-	          container.setAttribute('data-syncnos-origin', 'details');
+          const summary =
+            typeof detailsEl.querySelector === 'function' ? detailsEl.querySelector(':scope > summary') : null;
+          const summaryText = normalize(summary?.textContent || '');
 
-	          if (summaryText) {
-	            const label = doc.createElement('p');
-	            const strong = doc.createElement('strong');
-	            strong.textContent = summaryText;
-	            label.appendChild(strong);
-	            container.appendChild(label);
-	          }
+          const container = doc.createElement('div');
+          container.setAttribute('data-syncnos-origin', 'details');
 
-	          const children = Array.from((detailsEl.childNodes || []) as any) as any[];
-	          for (const child of children) {
-	            if (!child) continue;
-	            if (summary && child === summary) continue;
-	            container.appendChild(child);
-	          }
+          if (summaryText) {
+            const label = doc.createElement('p');
+            const strong = doc.createElement('strong');
+            strong.textContent = summaryText;
+            label.appendChild(strong);
+            container.appendChild(label);
+          }
 
-	          detailsEl.replaceWith(container);
-	        }
-	      }
+          const children = Array.from((detailsEl.childNodes || []) as any) as any[];
+          for (const child of children) {
+            if (!child) continue;
+            if (summary && child === summary) continue;
+            container.appendChild(child);
+          }
 
-		      try {
-		        await waitForDomStabilized();
-		        await waitForWechatShareMediaHydrated();
+          detailsEl.replaceWith(container);
+        }
+      }
 
-		        const wechatRoot = document.querySelector('#js_content') as any;
-		        if (wechatRoot) {
-		          wechatRoot.style.visibility = 'visible';
-	          wechatRoot.style.opacity = '1';
-	        }
-	        const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
-	        noisyNodes.forEach((node: any) => node?.remove?.());
+      try {
+        await waitForDomStabilized();
+        await waitForWechatShareMediaHydrated();
 
-		        if (typeof (globalThis as any).Readability === 'function') {
-		          const cloned = document.cloneNode(true) as any;
-		          normalizeDetailsElementsForReadability(cloned);
-		          const article = new (globalThis as any).Readability(cloned).parse();
-		          if (article) {
-		            const title = normalize(article.title || '');
-		            const author =
-		              normalize(article.byline || '') ||
-		              readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
-		            const content = normalize(article.content || '');
-		            const text = normalize(article.textContent || '');
-		            if (content || text) {
-		              const wechatGridHtml = buildWechatShareMediaGridHtml({ columns: 3 });
-		              const wechatGridMarkdown = buildWechatShareMediaGridMarkdown({ columns: 3 });
-		              const htmlBody =
-		                normalize(content) ||
-		                (text ? `<p>${escapeHtml(text)}</p>` : '');
-		              const contentWithWechatGrid = wechatGridHtml ? `${htmlBody}${wechatGridHtml}` : htmlBody;
-		              const markdownBase = htmlToMarkdown(content, text);
-		              const markdownWithWechatGrid = wechatGridMarkdown
-		                ? normalize(`${markdownBase}\n\n${wechatGridMarkdown}`)
-		                : markdownBase;
-	              return {
-	                ok: true,
-	                title,
-	                author,
-	                publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
-	                excerpt: normalize(article.excerpt || ''),
-	                contentHTML: buildHtml(contentWithWechatGrid, text),
-	                contentMarkdown: markdownWithWechatGrid,
-	                textContent: text,
-	                warningFlags: [],
-	              };
-	            }
-	          }
-	        }
+        const wechatRoot = document.querySelector('#js_content') as any;
+        if (wechatRoot) {
+          wechatRoot.style.visibility = 'visible';
+          wechatRoot.style.opacity = '1';
+        }
+        const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
+        noisyNodes.forEach((node: any) => node?.remove?.());
+
+        if (typeof (globalThis as any).Readability === 'function') {
+          const cloned = document.cloneNode(true) as any;
+          normalizeDetailsElementsForReadability(cloned);
+          const article = new (globalThis as any).Readability(cloned).parse();
+          if (article) {
+            const title = normalize(article.title || '');
+            const author =
+              normalize(article.byline || '') ||
+              readMeta([
+                "meta[name='author']",
+                "meta[property='article:author']",
+                "meta[property='og:article:author']",
+              ]);
+            const content = normalize(article.content || '');
+            const text = normalize(article.textContent || '');
+            if (content || text) {
+              const wechatGridHtml = buildWechatShareMediaGridHtml({ columns: 3 });
+              const wechatGridMarkdown = buildWechatShareMediaGridMarkdown({ columns: 3 });
+              const htmlBody = normalize(content) || (text ? `<p>${escapeHtml(text)}</p>` : '');
+              const contentWithWechatGrid = wechatGridHtml ? `${htmlBody}${wechatGridHtml}` : htmlBody;
+              const markdownBase = htmlToMarkdown(content, text);
+              const markdownWithWechatGrid = wechatGridMarkdown
+                ? normalize(`${markdownBase}\n\n${wechatGridMarkdown}`)
+                : markdownBase;
+              return {
+                ok: true,
+                title,
+                author,
+                publishedAt: readMeta([
+                  "meta[property='article:published_time']",
+                  "meta[name='publish_date']",
+                  "meta[name='pubdate']",
+                ]),
+                excerpt: normalize(article.excerpt || ''),
+                contentHTML: buildHtml(contentWithWechatGrid, text),
+                contentMarkdown: markdownWithWechatGrid,
+                textContent: text,
+                warningFlags: [],
+              };
+            }
+          }
+        }
 
         const fallback = fallbackExtract();
         if (fallback) return fallback;

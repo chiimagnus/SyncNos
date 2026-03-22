@@ -91,10 +91,10 @@ export function appendImageMarkdown(
   options?: { allowDataImageUrls?: boolean },
 ): string {
   const base = String(markdown || '').trimEnd();
-  const urls = Array.isArray(imageUrls)
-    ? imageUrls.map((url) => String(url || '').trim()).filter(Boolean)
-    : [];
-  const normalized = urls.filter((url) => isHttpUrl(url) || (options?.allowDataImageUrls ? isDataImageUrl(url) : false));
+  const urls = Array.isArray(imageUrls) ? imageUrls.map((url) => String(url || '').trim()).filter(Boolean) : [];
+  const normalized = urls.filter(
+    (url) => isHttpUrl(url) || (options?.allowDataImageUrls ? isDataImageUrl(url) : false),
+  );
   if (!normalized.length) return base;
 
   const lines: string[] = [];

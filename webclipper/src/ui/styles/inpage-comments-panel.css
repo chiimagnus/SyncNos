@@ -24,7 +24,15 @@
   border: 0;
   background: transparent;
   color: var(--panel-text);
-  font: 13px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font:
+    13px/1.35 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   isolation: isolate;
 }
 
@@ -140,11 +148,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding:
-    var(--comments-panel-body-padding-y)
-    var(--comments-panel-body-padding-x)
-    var(--comments-panel-body-padding-bottom)
-    var(--comments-panel-body-padding-x);
+  padding: var(--comments-panel-body-padding-y) var(--comments-panel-body-padding-x)
+    var(--comments-panel-body-padding-bottom) var(--comments-panel-body-padding-x);
 }
 
 .webclipper-inpage-comments-panel__quote {

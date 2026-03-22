@@ -22,7 +22,6 @@ export async function buildConversationsMarkdownZipExport({
   if (mergeSingle) {
     const docs: string[] = [];
     for (const c of list) {
-      // eslint-disable-next-line no-await-in-loop
       const d = await getConversationDetail(Number(c.id));
       docs.push(formatConversationMarkdown(c, d.messages || []));
     }
@@ -30,7 +29,6 @@ export async function buildConversationsMarkdownZipExport({
     files.push({ name: `SyncNos-md-${stamp}.md`, data: text });
   } else {
     for (const c of list) {
-      // eslint-disable-next-line no-await-in-loop
       const d = await getConversationDetail(Number(c.id));
       files.push({
         name: `${buildConversationBasename(c)}.md`,

@@ -6,7 +6,10 @@ vi.mock('../../src/platform/webext/tabs', () => ({
 }));
 
 import { tabsSendMessage } from '../../src/platform/webext/tabs';
-import { registerClipperContextMenu, unregisterClipperContextMenu } from '../../src/platform/context-menus/clipper-context-menu';
+import {
+  registerClipperContextMenu,
+  unregisterClipperContextMenu,
+} from '../../src/platform/context-menus/clipper-context-menu';
 
 function createMenusApi() {
   const onShownListeners: Array<(info: any, tab: any) => void> = [];
@@ -66,7 +69,8 @@ describe('clipper context menu save title', () => {
 
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(menusApi.update).toHaveBeenCalledWith('syncnos_clipper_save_current_page', { title: 'Save current AI chat' });
+    expect(menusApi.update).toHaveBeenCalledWith('syncnos_clipper_save_current_page', {
+      title: 'Save current AI chat',
+    });
   });
 });
-

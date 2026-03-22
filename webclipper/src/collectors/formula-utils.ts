@@ -4,13 +4,15 @@ export type FormulaReplaceResult = {
 
 function normalizeTeX(value: unknown): string {
   // Keep backslashes and braces; only normalize whitespace and remove ZWSP.
-  return String(value || '')
-    .replace(/\u200b/g, '')
-    // KaTeX does not support rendering some raw Unicode math symbols in strict mode.
-    // Prefer their TeX command equivalents to avoid runtime warnings.
-    .replace(/□/g, '\\Box')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    String(value || '')
+      .replace(/\u200b/g, '')
+      // KaTeX does not support rendering some raw Unicode math symbols in strict mode.
+      // Prefer their TeX command equivalents to avoid runtime warnings.
+      .replace(/□/g, '\\Box')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 function isLikelyTeX(value: unknown): boolean {
@@ -94,11 +96,11 @@ function texFromKatexHtmlFallback(container: any): string {
     function isIgnorableClassName(cls: string): boolean {
       const c = cls.toLowerCase();
       return (
-        c.includes('strut')
-        || c.includes('pstrut')
-        || c.includes('vlist-s')
-        || c.includes('frac-line')
-        || c.includes('delimsizing')
+        c.includes('strut') ||
+        c.includes('pstrut') ||
+        c.includes('vlist-s') ||
+        c.includes('frac-line') ||
+        c.includes('delimsizing')
       );
     }
 
@@ -353,7 +355,9 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
     if (!pre || !pre.parentNode) continue;
     let hasMath = false;
     try {
-      hasMath = !!pre.querySelector(".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex");
+      hasMath = !!pre.querySelector(
+        ".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex",
+      );
     } catch (_e) {
       hasMath = false;
     }
@@ -375,7 +379,9 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
     const extracted = extractTeXFromContainer(pre);
     const wrapped = extracted.hasTeX
       ? wrapTeX(extracted.tex, extracted.display)
-      : (extracted.display ? `\n\n${normalizeTeX(extracted.tex)}\n\n` : normalizeTeX(extracted.tex));
+      : extracted.display
+        ? `\n\n${normalizeTeX(extracted.tex)}\n\n`
+        : normalizeTeX(extracted.tex);
     if (replaceWithText(pre, wrapped)) replacedCount += 1;
   }
 
@@ -472,9 +478,7 @@ export function replaceMathElementsWithLatexText(container: ParentNode | null): 
     // Best-effort fallback: keep visible math-ish text (avoids dropping formulas entirely).
     const cls = String(el && el.className ? el.className : '').toLowerCase();
     const looksMath =
-      cls.includes('katex')
-      || cls.includes('math')
-      || String(el.tagName || '').toLowerCase() === 'mjx-container';
+      cls.includes('katex') || cls.includes('math') || String(el.tagName || '').toLowerCase() === 'mjx-container';
     if (!looksMath) continue;
 
     const visible = bestEffortTextFormula(el);

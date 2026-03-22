@@ -19,7 +19,9 @@ const MENU_MODE_ALL_ID = 'syncnos_clipper_mode_all';
 const MENU_MODE_OFF_ID = 'syncnos_clipper_mode_off';
 
 function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
   return null;
 }
@@ -51,7 +53,11 @@ function promisifyVoid(fn: (cb: () => void) => void): Promise<void> {
 
 async function readMenuState(): Promise<{ mode: InpageDisplayMode; autoSave: boolean }> {
   try {
-    const local = await storageGet([STORAGE_KEY_DISPLAY_MODE, STORAGE_KEY_SUPPORTED_ONLY, STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED]);
+    const local = await storageGet([
+      STORAGE_KEY_DISPLAY_MODE,
+      STORAGE_KEY_SUPPORTED_ONLY,
+      STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED,
+    ]);
     const normalizedMode = normalizeInpageDisplayMode(local?.[STORAGE_KEY_DISPLAY_MODE]);
     const mode = normalizedMode || displayModeFromLegacySupportedOnly(local?.[STORAGE_KEY_SUPPORTED_ONLY]);
     const autoSave = local?.[STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED] !== false;
@@ -267,7 +273,11 @@ export function registerClipperContextMenu(): void {
     if (areaName !== 'local') return;
     const keys = changes ? Object.keys(changes) : [];
     if (!keys.length) return;
-    if (!keys.includes(STORAGE_KEY_DISPLAY_MODE) && !keys.includes(STORAGE_KEY_SUPPORTED_ONLY) && !keys.includes(STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)) {
+    if (
+      !keys.includes(STORAGE_KEY_DISPLAY_MODE) &&
+      !keys.includes(STORAGE_KEY_SUPPORTED_ONLY) &&
+      !keys.includes(STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED)
+    ) {
       return;
     }
     void readMenuState().then((state) => updateCheckedStates(api, state));

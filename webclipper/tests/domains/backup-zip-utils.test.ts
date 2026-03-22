@@ -8,12 +8,7 @@ function u16(n: number) {
 }
 
 function u32(n: number) {
-  return new Uint8Array([
-    n & 0xff,
-    (n >>> 8) & 0xff,
-    (n >>> 16) & 0xff,
-    (n >>> 24) & 0xff,
-  ]);
+  return new Uint8Array([n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]);
 }
 
 function concat(chunks: Uint8Array[]) {
@@ -129,9 +124,7 @@ describe('backup zip-utils', () => {
     });
     const blob = new Blob([bytes], { type: 'application/zip' });
     const entries = await extractZipEntries(blob);
-    expect(new TextDecoder().decode(entries.get('sources/chatgpt/c1.json'))).toBe(
-      JSON.stringify({ ok: true, big }),
-    );
+    expect(new TextDecoder().decode(entries.get('sources/chatgpt/c1.json'))).toBe(JSON.stringify({ ok: true, big }));
   });
 
   it('extractZipEntries strips a single top-level folder prefix (rezipped backups)', async () => {

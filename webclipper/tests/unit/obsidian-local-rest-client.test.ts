@@ -23,11 +23,9 @@ describe('obsidian-local-rest-client', () => {
     }) as any;
     expect(clientRes.ok).toBe(true);
 
-    const res = await clientRes.putVaultBinaryFile(
-      'SyncNos-AIChats/my-note-1.webp',
-      Uint8Array.from([1, 2, 3, 4]),
-      { contentType: 'image/webp' },
-    );
+    const res = await clientRes.putVaultBinaryFile('SyncNos-AIChats/my-note-1.webp', Uint8Array.from([1, 2, 3, 4]), {
+      contentType: 'image/webp',
+    });
 
     expect(res.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);

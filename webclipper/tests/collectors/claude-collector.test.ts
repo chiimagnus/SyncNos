@@ -1,15 +1,15 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import normalizeApi from "@services/shared/normalize.ts";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createClaudeCollectorDef } from "../../src/collectors/claude/claude-collector.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it } from 'vitest';
+import normalizeApi from '@services/shared/normalize.ts';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createClaudeCollectorDef } from '../../src/collectors/claude/claude-collector.ts';
 
 function setupClaudeDom(html: string, url: string) {
   return new JSDOM(`<body><main>${html}</main></body>`, { url });
 }
 
-describe("claude-collector", () => {
-  it("extracts user/assistant and skips thinking blocks", () => {
+describe('claude-collector', () => {
+  it('extracts user/assistant and skips thinking blocks', () => {
     const html = `
       <div data-test-render-count="1">
         <div data-testid="user-message">hello</div>
@@ -19,7 +19,7 @@ describe("claude-collector", () => {
         </div>
       </div>
     `;
-    const dom = setupClaudeDom(html, "https://claude.ai/chat/abc123");
+    const dom = setupClaudeDom(html, 'https://claude.ai/chat/abc123');
 
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -32,8 +32,8 @@ describe("claude-collector", () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
 
-    const assistant = snap.messages.find((m: any) => m.role === "assistant");
-    expect(assistant.contentText).toBe("final answer");
-    expect(assistant.contentMarkdown).toBe("final answer");
+    const assistant = snap.messages.find((m: any) => m.role === 'assistant');
+    expect(assistant.contentText).toBe('final answer');
+    expect(assistant.contentMarkdown).toBe('final answer');
   });
 });

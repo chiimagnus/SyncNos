@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { createTestBackgroundRouter } from "./background-router-testkit";
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTestBackgroundRouter } from './background-router-testkit';
 
 const articleFetchMocks = vi.hoisted(() => ({
   fetchActiveTabArticle: vi.fn(),
 }));
 
-vi.mock("../../src/collectors/web/article-fetch", () => ({
+vi.mock('../../src/collectors/web/article-fetch', () => ({
   fetchActiveTabArticle: articleFetchMocks.fetchActiveTabArticle,
 }));
 
@@ -16,15 +16,15 @@ afterEach(() => {
   delete globalThis.chrome;
 });
 
-describe("background-router article fetch", () => {
-  it("routes fetchActiveTabArticle to integration handler", async () => {
+describe('background-router article fetch', () => {
+  it('routes fetchActiveTabArticle to integration handler', async () => {
     articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({
       conversationId: 7,
       tabId: 42,
     });
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle", tabId: 42 });
+    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle', tabId: 42 });
 
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({ conversationId: 7, tabId: 42 });
@@ -32,17 +32,17 @@ describe("background-router article fetch", () => {
     expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 42 });
   });
 
-  it("returns integration errors as router errors", async () => {
-    articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error("extract failed"));
+  it('returns integration errors as router errors', async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error('extract failed'));
 
     const router = createTestBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle" });
+    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle' });
 
     expect(res.ok).toBe(false);
-    expect(String(res.error?.message || "")).toContain("extract failed");
+    expect(String(res.error?.message || '')).toContain('extract failed');
   });
 
-  it("broadcasts conversationsChanged after successful fetch", async () => {
+  it('broadcasts conversationsChanged after successful fetch', async () => {
     articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({
       conversationId: 123,
     });
@@ -51,11 +51,11 @@ describe("background-router article fetch", () => {
     const broadcast = vi.fn();
     router.eventsHub.broadcast = broadcast;
 
-    const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle" });
+    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle' });
 
     expect(res.ok).toBe(true);
-    expect(broadcast).toHaveBeenCalledWith("conversationsChanged", {
-      reason: "articleFetch",
+    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', {
+      reason: 'articleFetch',
       conversationId: 123,
     });
   });

@@ -8,18 +8,11 @@ export type SettingsSectionGroup = {
 export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   {
     title: 'Features',
-    sections: [
-      { key: 'general' },
-      { key: 'chat_with' },
-    ],
+    sections: [{ key: 'general' }, { key: 'chat_with' }],
   },
   {
     title: 'Data',
-    sections: [
-      { key: 'backup' },
-      { key: 'notion' },
-      { key: 'obsidian' },
-    ],
+    sections: [{ key: 'backup' }, { key: 'notion' }, { key: 'obsidian' }],
   },
   {
     title: 'About',
@@ -27,7 +20,9 @@ export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   },
 ];
 
-export const SETTINGS_SECTIONS: ReadonlyArray<{ key: SettingsSectionKey }> = SETTINGS_SECTION_GROUPS.flatMap((group) => group.sections);
+export const SETTINGS_SECTIONS: ReadonlyArray<{ key: SettingsSectionKey }> = SETTINGS_SECTION_GROUPS.flatMap(
+  (group) => group.sections,
+);
 
 export const DEFAULT_SETTINGS_SECTION_KEY: SettingsSectionKey = SETTINGS_SECTIONS[0]?.key ?? 'backup';
 
@@ -39,7 +34,9 @@ export function isSettingsSectionKey(value: string): value is SettingsSectionKey
 
 export function readStoredSettingsSection(): SettingsSectionKey {
   try {
-    const value = String(globalThis.localStorage?.getItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY) || '').trim().toLowerCase();
+    const value = String(globalThis.localStorage?.getItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY) || '')
+      .trim()
+      .toLowerCase();
     if (isSettingsSectionKey(value)) return value;
   } catch (_e) {
     // ignore

@@ -1,28 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
 async function loadMetadata() {
-  const mod = await import("@services/sync/obsidian/obsidian-sync-metadata.ts");
+  const mod = await import('@services/sync/obsidian/obsidian-sync-metadata.ts');
   return mod.default || mod;
 }
 
-describe("obsidian-sync-metadata", () => {
-  it("reads missing or mismatched schema as non-ok", async () => {
+describe('obsidian-sync-metadata', () => {
+  it('reads missing or mismatched schema as non-ok', async () => {
     const mod = await loadMetadata();
     expect(mod.readSyncnosObject(null).ok).toBe(false);
     expect(mod.readSyncnosObject({ syncnos: { schemaVersion: 2 } }).ok).toBe(false);
   });
 
-  it("builds and reads syncnos object", async () => {
+  it('builds and reads syncnos object', async () => {
     const mod = await loadMetadata();
     const syncnos = mod.buildSyncnosObject({
-      conversation: { source: "x", conversationKey: "y" },
+      conversation: { source: 'x', conversationKey: 'y' },
       lastSyncedAt: 10,
     });
 
     const parsed = mod.readSyncnosObject({ syncnos });
     expect(parsed.ok).toBe(true);
-    expect(parsed.data?.source).toBe("x");
-    expect(parsed.data?.conversationKey).toBe("y");
+    expect(parsed.data?.source).toBe('x');
+    expect(parsed.data?.conversationKey).toBe('y');
     expect(parsed.data?.lastSyncedAt).toBe(10);
   });
 });

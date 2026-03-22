@@ -1,5 +1,7 @@
 function normalizeSource(value: string): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeConversationKey(value: string): string {

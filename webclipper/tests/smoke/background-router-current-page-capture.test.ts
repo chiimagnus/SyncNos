@@ -14,9 +14,7 @@ afterEach(() => {
 
 describe('background-router current page capture relay', () => {
   it('returns active tab capture state from content script', async () => {
-    vi.mocked(tabsQuery).mockResolvedValue([
-      { id: 7, url: 'https://chatgpt.com/c/123' },
-    ] as any);
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://chatgpt.com/c/123' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({
       ok: true,
       data: {
@@ -42,9 +40,7 @@ describe('background-router current page capture relay', () => {
   });
 
   it('returns unavailable state for non-http active tab', async () => {
-    vi.mocked(tabsQuery).mockResolvedValue([
-      { id: 9, url: 'chrome://extensions/' },
-    ] as any);
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 9, url: 'chrome://extensions/' }] as any);
 
     const router = createTestBackgroundRouter();
     const response = await router.__handleMessageForTests({ type: 'getActiveTabCaptureState' });

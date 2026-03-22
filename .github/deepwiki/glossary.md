@@ -37,8 +37,8 @@
 | `article_body` | article 会话的正文消息 key | `article-fetch.ts` |
 | `article_comments` | article 详情页的本地评论线程 store；会随 Zip v2 备份 / 导入保留 | `comments/data/storage-idb.ts`, `ArticleCommentsSection.tsx`, `backup/export.ts`, `backup/import.ts` |
 | `inpage_display_mode` | 控制 inpage UI 显示范围的开关（`supported / all / off`，并兼容旧 `inpage_supported_only`） | `bootstrap/content.ts`, Settings |
-| `ai_chat_cache_images_enabled` | 控制 chat 消息采集时是否尝试图片内联的设置键 | `useSettingsSceneController.ts`, `conversations/background/handlers.ts` |
-| detail header `tools` slot | 会话详情头的工具动作槽位，和 `open / chat-with` 并列 | `detail-header-action-types.ts`, `DetailHeaderActionBar.tsx` |
+| `ai_chat_cache_images_enabled` | 控制 chat 消息采集时是否尝试图片内联的设置键 | `src/viewmodels/settings/useSettingsSceneController.ts`, `conversations/background/handlers.ts` |
+| detail header `tools` slot | 会话详情头的工具动作槽位，和 `open / chat-with` 并列 | `src/services/integrations/detail-header-action-types.ts`, `DetailHeaderActionBar.tsx` |
 | `cache-images` | chat detail 中触发历史消息图片回填的工具动作 id | `conversations-context.tsx` |
 | `OPEN_INPAGE_COMMENTS_PANEL` | 打开页面内评论面板的内容脚本消息 | `message-contracts.ts`, `inpage-comments-panel-content-handlers.ts` |
 | `adaptiveMaxHeight` | `SelectMenu` 的动态面板高度开关；启用后菜单高度由当前可视区域计算而不是固定值 | `SelectMenu.tsx`, `ConversationListPane.tsx` |
@@ -78,7 +78,7 @@
 - `webclipper/src/collectors/register-all.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/bootstrap/content.ts`
-- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
+- `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
@@ -93,7 +93,7 @@
 - `webclipper/src/sync/backup/backup-utils.ts`
 - `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
 - `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
-- `webclipper/src/integrations/detail-header-action-types.ts`
+- `webclipper/src/services/integrations/detail-header-action-types.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

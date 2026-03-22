@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { OBSIDIAN_APP_LAUNCH_URL } from '@services/sync/obsidian/obsidian-app-launch';
-import {
-  openObsidianTarget,
-  resolveObsidianOpenTarget,
-} from '@services/integrations/openin/obsidian-open-target';
+import { openObsidianTarget, resolveObsidianOpenTarget } from '@services/integrations/openin/obsidian-open-target';
 
 describe('obsidian-open-target', () => {
   it('reports the header action as unavailable when the local API is unreachable', async () => {
@@ -17,7 +14,11 @@ describe('obsidian-open-target', () => {
       },
       services: {
         settingsStore: {
-          getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+          getConnectionConfig: vi.fn(async () => ({
+            apiBaseUrl: 'http://127.0.0.1:27123',
+            apiKey: 'k',
+            authHeaderName: 'Authorization',
+          })),
           getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
         },
         localRestClient: {
@@ -61,7 +62,11 @@ describe('obsidian-open-target', () => {
 
     const services = {
       settingsStore: {
-        getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+        getConnectionConfig: vi.fn(async () => ({
+          apiBaseUrl: 'http://127.0.0.1:27123',
+          apiKey: 'k',
+          authHeaderName: 'Authorization',
+        })),
         getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
       },
       localRestClient: {
@@ -144,7 +149,11 @@ describe('obsidian-open-target', () => {
 
     const services = {
       settingsStore: {
-        getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+        getConnectionConfig: vi.fn(async () => ({
+          apiBaseUrl: 'http://127.0.0.1:27123',
+          apiKey: 'k',
+          authHeaderName: 'Authorization',
+        })),
         getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
       },
       localRestClient: {
@@ -212,7 +221,11 @@ describe('obsidian-open-target', () => {
 
     const services = {
       settingsStore: {
-        getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+        getConnectionConfig: vi.fn(async () => ({
+          apiBaseUrl: 'http://127.0.0.1:27123',
+          apiKey: 'k',
+          authHeaderName: 'Authorization',
+        })),
         getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
       },
       localRestClient: {
@@ -275,7 +288,11 @@ describe('obsidian-open-target', () => {
       },
       services: {
         settingsStore: {
-          getConnectionConfig: vi.fn(async () => ({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k', authHeaderName: 'Authorization' })),
+          getConnectionConfig: vi.fn(async () => ({
+            apiBaseUrl: 'http://127.0.0.1:27123',
+            apiKey: 'k',
+            authHeaderName: 'Authorization',
+          })),
           getPathConfig: vi.fn(async () => ({ chatFolder: 'SyncNos-AIChats', articleFolder: 'SyncNos-WebArticles' })),
         },
         localRestClient: {

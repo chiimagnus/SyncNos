@@ -9,7 +9,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | UserDefaults | SyncNos App | macOS 偏好 | onboarding、自动同步、IAP 状态、提醒态、试用期辅助信息 | `SyncNosApp.swift`, `IAPService.swift` |
 | Keychain | SyncNos App | 系统安全存储 | 站点 Cookie、加密密钥、首次启动 / 设备指纹备份、Notion OAuth 相关敏感信息 | `SiteLoginsStore.swift`, `EncryptionService.swift`, `IAPService.swift` |
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings、image_cache、article_comments | `schema.ts`, `storage-idb.ts`, `comments/data/storage-idb.ts` |
-| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | SettingsScene controller、settings stores |
+| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | `src/viewmodels/settings/useSettingsSceneController.ts`、settings stores |
 | `localStorage` | WebClipper | 本地 Web Storage | 设置页当前 section、会话来源筛选、App sidebar UI 偏好 | `types.ts`, `ConversationListPane.tsx`, `AppShell.tsx` |
 | `sessionStorage` | WebClipper | 本地 Web Storage | 窄屏 list/detail 路由中的待打开 conversation | `pending-open.ts` |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、image-cache、article-comments、manifest | `backup/export.ts`, `backup/import.ts` |
@@ -69,7 +69,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 
 | 键 | 介质 | 生产方 | 含义 |
 | --- | --- | --- | --- |
-| `webclipper_settings_active_section` | `localStorage` | `ui/settings/types.ts` | 记住用户上次停留的设置 section |
+| `webclipper_settings_active_section` | `localStorage` | `src/viewmodels/settings/types.ts` | 记住用户上次停留的设置 section |
 | `webclipper_conversations_source_filter_key` | `localStorage` | `ConversationListPane.tsx` | 记住会话列表来源筛选（如 `all / chatgpt / claude`） |
 | `webclipper_app_source_filter_key` | `localStorage` | 旧版本兼容回读 | 旧的来源筛选键，当前只做 backward compatibility |
 | `webclipper_pending_open_conversation_id` | `sessionStorage` | `pending-open.ts` | 窄屏下从排行 / 列表导航到 detail 时桥接目标会话 id |
@@ -157,9 +157,9 @@ private var currentContentVersion: Int {
 - `macOS/SyncNos/Models/Sync/SyncedHighlightRecord.swift`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/conversations/data/storage-idb.ts`
-- `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts`
-- `webclipper/src/ui/settings/sections/insight-stats.ts`
-- `webclipper/src/integrations/chatwith/chatwith-settings.ts`
+| `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
+| `webclipper/src/viewmodels/settings/insight-stats.ts`
+| `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`
 - `webclipper/src/conversations/background/handlers.ts`
 - `webclipper/src/conversations/background/image-backfill-job.ts`
 - `webclipper/src/comments/background/handlers.ts`
@@ -170,7 +170,7 @@ private var currentContentVersion: Int {
 - `webclipper/src/ui/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
-- `webclipper/src/ui/settings/types.ts`
+- `webclipper/src/viewmodels/settings/types.ts`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/conversations/pending-open.ts`
 - `webclipper/src/ui/app/AppShell.tsx`

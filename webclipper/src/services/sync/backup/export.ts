@@ -143,7 +143,9 @@ function decodeDataImageUrlToBlob(dataUrl: string): Blob | null {
 }
 
 function extFromImageContentType(contentType: string): string {
-  const ct = String(contentType || '').trim().toLowerCase();
+  const ct = String(contentType || '')
+    .trim()
+    .toLowerCase();
   if (!ct.startsWith('image/')) return 'bin';
   if (ct === 'image/jpeg') return 'jpg';
   if (ct === 'image/jpg') return 'jpg';
@@ -171,7 +173,11 @@ export type BackupZipV2ExportResult = {
 
 export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'], 'readonly');
+  const { t, stores } = tx(
+    db,
+    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
+    'readonly',
+  );
   const conversations = (await reqToPromise(stores.conversations.getAll() as any)) as AnyRecord[];
   const messages = (await reqToPromise(stores.messages.getAll() as any)) as AnyRecord[];
   const syncMappings = (await reqToPromise(stores.sync_mappings.getAll() as any)) as AnyRecord[];

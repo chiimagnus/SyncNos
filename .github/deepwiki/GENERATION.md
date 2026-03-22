@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `e45d3aac6f217dd11341bf7edeb4f9880b552a04` |
-| Branch name | `crh2` |
-| Generation timestamp | `2026-03-21 18:47:11 CST` |
+| Commit hash | `394ea4f083cd2888d1d845e9054b8ccc459839cf` |
+| Branch name | `crh1` |
+| Generation timestamp | `2026-03-22 19:24:58 CST` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental sync update |
@@ -46,6 +46,7 @@
 - `assets/setting-screenshots.png`
 
 ## What Changed In This Update
+- 在 `configuration.md`、`modules/webclipper.md`、`README.md` / `README.zh-CN.md` 与相关 AGENTS 中同步 WebClipper settings 真路径、Chat with AI 真路径、`manifest.version = 1.4.0` 以及主题仅跟随系统的说明。
 - 在 `modules/comments.md`、`modules/webclipper.md`、`business-context.md`、`overview.md`、`operations.md`、`security.md`、`glossary.md`、`storage.md`、`data-flow.md`、`testing.md` 中同步 `article_comments` 已纳入 Zip v2 备份 / 导入，并补齐恢复验证入口。
 - 在 `configuration.md` 与 `security.md` 同步 WebClipper 图标配置收敛为单一 `icon-128.png`，并更新 `web_accessible_resources` 的暴露边界说明。
 - 在 `INDEX.md` 与 `GENERATION.md` 补齐页面可达性、元数据与页面清单的一致性。
@@ -61,7 +62,7 @@
 | --- | --- |
 | 仓库入口与规范 | `AGENTS.md`, `README.md`, `README.zh-CN.md`, `macOS/SyncNos/AGENTS.md`, `webclipper/AGENTS.md` |
 | WebClipper 版本与权限 | `webclipper/wxt.config.ts`, `webclipper/package.json` |
-| WebClipper 设置与运行时 | `webclipper/src/entrypoints/background.ts`, `webclipper/src/ui/settings/types.ts`, `webclipper/src/ui/settings/hooks/useSettingsSceneController.ts` |
+| WebClipper 设置与运行时 | `webclipper/src/entrypoints/background.ts`, `webclipper/src/viewmodels/settings/types.ts`, `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`, `webclipper/src/services/integrations/chatwith/chatwith-settings.ts` |
 | OAuth 与外部交换 | `webclipper/src/sync/notion/auth/oauth.ts`, `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts` |
 | WebClipper 存储与迁移 | `webclipper/src/platform/idb/schema.ts`, `webclipper/src/conversations/data/storage-idb.ts` |
 | WebClipper 评论线程 | `webclipper/src/comments/background/handlers.ts`, `webclipper/src/comments/data/storage-idb.ts` |

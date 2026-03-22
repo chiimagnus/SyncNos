@@ -91,16 +91,20 @@ export default function AppShell() {
     const { items, openConversationExternalById, selectedConversation } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
-    const isArticleConversation = String((selectedConversation as any)?.sourceType || '').trim().toLowerCase() === 'article';
+    const isArticleConversation =
+      String((selectedConversation as any)?.sourceType || '')
+        .trim()
+        .toLowerCase() === 'article';
     const canonicalUrl = normalizeHttpUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
-    const backgroundLocation = showSettingsSheet ? state?.backgroundLocation ?? null : null;
+    const backgroundLocation = showSettingsSheet ? (state?.backgroundLocation ?? null) : null;
     const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarSnapshot.openRequested && !showSettingsSheet;
 
-    const routesLocation = backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
+    const routesLocation =
+      backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
     const closeSettings = () => {
       const from = String(state?.from || '').trim();
@@ -168,7 +172,10 @@ export default function AppShell() {
       }
 
       const found = items.find(
-        (x) => String(x.source || '').trim().toLowerCase() === decoded.source && String(x.conversationKey || '').trim() === decoded.conversationKey,
+        (x) =>
+          String(x.source || '')
+            .trim()
+            .toLowerCase() === decoded.source && String(x.conversationKey || '').trim() === decoded.conversationKey,
       );
       if (!found) {
         if (items.length) processedLocRef.current = loc;
@@ -292,7 +299,12 @@ export default function AppShell() {
           )}
 
           {showSettingsSheet ? (
-            <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4" role="dialog" aria-modal="true" aria-label={t('settingsDialogAria')}>
+            <div
+              className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t('settingsDialogAria')}
+            >
               <div
                 className="tw-absolute tw-inset-0 tw-bg-[var(--bg-overlay)]"
                 role="presentation"

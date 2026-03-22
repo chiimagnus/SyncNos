@@ -21,4 +21,3 @@ export {
   platformStorageRemove as storageRemove,
   platformStorageOnChanged as storageOnChanged,
 };
-

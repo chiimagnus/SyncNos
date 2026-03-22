@@ -40,7 +40,12 @@ export function ConversationsScene({
   const isNarrow = useIsNarrowScreen();
   const { activeId, selectedConversation, detailHeaderActions, setActiveId } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
-  const { route: narrowRoute, openDetail, returnToList, listRestoreKey } = useNarrowListDetailRoute({
+  const {
+    route: narrowRoute,
+    openDetail,
+    returnToList,
+    listRestoreKey,
+  } = useNarrowListDetailRoute({
     isNarrow,
     defaultRoute: defaultNarrowRoute,
   });
@@ -62,9 +67,10 @@ export function ConversationsScene({
     }
 
     const title = activeId ? formatConversationTitle(selectedConversation?.title) : t('chatsTitle');
-    const subtitle = activeId && selectedConversation
-      ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
-      : '';
+    const subtitle =
+      activeId && selectedConversation
+        ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
+        : '';
 
     onPopupHeaderStateChange({
       mode: 'detail',
@@ -77,7 +83,15 @@ export function ConversationsScene({
     return () => {
       onPopupHeaderStateChange({ mode: 'list' });
     };
-  }, [activeId, detailHeaderActions, isNarrow, narrowRoute, onPopupHeaderStateChange, returnToList, selectedConversation]);
+  }, [
+    activeId,
+    detailHeaderActions,
+    isNarrow,
+    narrowRoute,
+    onPopupHeaderStateChange,
+    returnToList,
+    selectedConversation,
+  ]);
 
   const list = (
     <ConversationListPane
@@ -97,7 +111,11 @@ export function ConversationsScene({
       return (
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
           <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden">
-            {inlineNarrowDetailHeader ? <ConversationDetailPane onBack={returnToList} /> : <ConversationDetailPane hideHeader />}
+            {inlineNarrowDetailHeader ? (
+              <ConversationDetailPane onBack={returnToList} />
+            ) : (
+              <ConversationDetailPane hideHeader />
+            )}
           </div>
         </div>
       );

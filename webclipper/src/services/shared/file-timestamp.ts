@@ -16,4 +16,3 @@ export function buildLocalTimestampForFilename(date: Date = new Date()): string 
   const ms = pad3(date.getMilliseconds());
   return `${year}-${month}-${day}T${hours}-${minutes}-${seconds}-${ms}`;
 }
-

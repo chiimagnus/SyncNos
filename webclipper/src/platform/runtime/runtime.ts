@@ -46,10 +46,7 @@ export async function sendMessage<TResponse = unknown>(message: unknown): Promis
   throw new Error(INVALIDATED_MESSAGE);
 }
 
-export async function send<TResponse = unknown>(
-  type: string,
-  payload?: Record<string, unknown>,
-): Promise<TResponse> {
+export async function send<TResponse = unknown>(type: string, payload?: Record<string, unknown>): Promise<TResponse> {
   if (!type) throw new Error('Message type is required');
   return sendMessage<TResponse>({ type, ...(payload ?? {}) });
 }

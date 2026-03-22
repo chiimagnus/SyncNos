@@ -32,9 +32,7 @@ export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
 }
 
 export function menuChevronClassName(): string {
-  return [
-    'tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]',
-  ].join(' ');
+  return ['tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]'].join(' ');
 }
 
 export function buttonIconCircleCardClassName(): string {

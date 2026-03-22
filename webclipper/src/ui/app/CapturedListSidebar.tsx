@@ -29,7 +29,11 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
     navigate('/settings', {
       state: {
-        backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+        backgroundLocation: {
+          pathname: routerLocation.pathname,
+          search: routerLocation.search,
+          hash: routerLocation.hash,
+        },
         from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
       },
     });
@@ -43,14 +47,21 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
     navigate('/settings?section=insight', {
       state: {
-        backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+        backgroundLocation: {
+          pathname: routerLocation.pathname,
+          search: routerLocation.search,
+          hash: routerLocation.hash,
+        },
         from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
       },
     });
   };
 
   const openProviderSettings = (section: string) => {
-    const safeSection = String(section || '').trim().toLowerCase() || 'notion';
+    const safeSection =
+      String(section || '')
+        .trim()
+        .toLowerCase() || 'notion';
     const route = `/settings?section=${encodeURIComponent(safeSection)}`;
     if (settingsOpen) {
       navigate(route, { replace: true, state: routerLocation.state });
@@ -58,7 +69,11 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
     }
     navigate(route, {
       state: {
-        backgroundLocation: { pathname: routerLocation.pathname, search: routerLocation.search, hash: routerLocation.hash },
+        backgroundLocation: {
+          pathname: routerLocation.pathname,
+          search: routerLocation.search,
+          hash: routerLocation.hash,
+        },
         from: `${routerLocation.pathname || '/'}${routerLocation.search || ''}`,
       },
     });
@@ -70,7 +85,12 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             {logoUrl ? (
-              <img src={logoUrl} alt="SyncNos" className="tw-size-8 tw-rounded-xl tw-object-contain" draggable={false} />
+              <img
+                src={logoUrl}
+                alt="SyncNos"
+                className="tw-size-8 tw-rounded-xl tw-object-contain"
+                draggable={false}
+              />
             ) : (
               <span
                 className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text-primary)]"
@@ -93,9 +113,20 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
             </button>
 
-            <button type="button" onClick={onCollapse} className={navIconButtonClassName(false)} aria-label={t('collapseSidebar')}>
+            <button
+              type="button"
+              onClick={onCollapse}
+              className={navIconButtonClassName(false)}
+              aria-label={t('collapseSidebar')}
+            >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M6.25 3.25L3 6.5L6.25 9.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M6.25 3.25L3 6.5L6.25 9.75"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
                 <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               </svg>
             </button>
