@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { JSDOM } from "jsdom";
-import { inpageTipApi } from "../../src/ui/inpage/inpage-tip-shadow";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
+import { inpageTipApi } from '../../src/ui/inpage/inpage-tip-shadow';
 
 function setupDom() {
-  const dom = new JSDOM("<!doctype html><html><body></body></html>", {
-    url: "https://chatgpt.com/",
-    pretendToBeVisual: true
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://chatgpt.com/',
+    pretendToBeVisual: true,
   });
 
   // @ts-expect-error test global
@@ -16,8 +16,8 @@ function setupDom() {
   global.HTMLElement = dom.window.HTMLElement;
   // @ts-expect-error test global
   global.Node = dom.window.Node;
-  Object.defineProperty(dom.window, "innerWidth", { value: 1000, configurable: true, writable: true });
-  Object.defineProperty(dom.window, "innerHeight", { value: 800, configurable: true, writable: true });
+  Object.defineProperty(dom.window, 'innerWidth', { value: 1000, configurable: true, writable: true });
+  Object.defineProperty(dom.window, 'innerHeight', { value: 800, configurable: true, writable: true });
 
   return dom;
 }
@@ -28,16 +28,16 @@ function loadInpageTip() {
 
 function appendIconRect(
   rect: { left: number; right: number; top: number; bottom: number; width: number; height: number },
-  tagName = "button"
+  tagName = 'button',
 ) {
   const btn = document.createElement(tagName);
-  btn.id = "webclipper-inpage-btn";
+  btn.id = 'webclipper-inpage-btn';
   btn.getBoundingClientRect = () => rect as DOMRect;
   document.body.appendChild(btn);
   return btn;
 }
 
-describe("inpage-tip speech bubble", () => {
+describe('inpage-tip speech bubble', () => {
   beforeEach(() => {
     setupDom();
   });
@@ -54,22 +54,22 @@ describe("inpage-tip speech bubble", () => {
     delete global.Node;
   });
 
-  it("creates anchored bubble with kind and inward placement", () => {
+  it('creates anchored bubble with kind and inward placement', () => {
     appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip("Save failed", { kind: "error" });
+    api.showSaveTip('Save failed', { kind: 'error' });
 
-    const bubble = document.getElementById("webclipper-inpage-bubble");
+    const bubble = document.getElementById('webclipper-inpage-bubble');
     expect(bubble).toBeTruthy();
-    expect(bubble?.tagName).toBe("WEBCLIPPER-INPAGE-BUBBLE");
-    expect(bubble?.dataset.kind).toBe("error");
-    expect(bubble?.dataset.placement).toBe("left");
-    expect(bubble?.shadowRoot?.textContent).toContain("Save failed");
+    expect(bubble?.tagName).toBe('WEBCLIPPER-INPAGE-BUBBLE');
+    expect(bubble?.dataset.kind).toBe('error');
+    expect(bubble?.dataset.placement).toBe('left');
+    expect(bubble?.shadowRoot?.textContent).toContain('Save failed');
   });
 
-  it("hardens host styles against page-level custom-element overrides", () => {
-    const pageStyle = document.createElement("style");
+  it('hardens host styles against page-level custom-element overrides', () => {
+    const pageStyle = document.createElement('style');
     pageStyle.textContent = `
       webclipper-inpage-bubble {
         position: absolute !important;
@@ -85,91 +85,99 @@ describe("inpage-tip speech bubble", () => {
       }
     `;
     document.head.appendChild(pageStyle);
-    appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 }, "webclipper-inpage-btn");
+    appendIconRect({ left: 900, right: 940, top: 500, bottom: 540, width: 40, height: 40 }, 'webclipper-inpage-btn');
     const api = loadInpageTip();
 
-    api.showSaveTip("Save failed", { kind: "error" });
+    api.showSaveTip('Save failed', { kind: 'error' });
 
-    const bubble = document.getElementById("webclipper-inpage-bubble") as HTMLElement | null;
+    const bubble = document.getElementById('webclipper-inpage-bubble') as HTMLElement | null;
     expect(bubble).toBeTruthy();
-    expect(bubble?.style.position).toBe("fixed");
-    expect(bubble?.style.display).toBe("block");
-    expect(bubble?.style.pointerEvents).toBe("none");
-    expect(bubble?.style.getPropertyPriority("position")).toBe("important");
-    expect(bubble?.style.getPropertyPriority("display")).toBe("important");
-    expect(bubble?.style.getPropertyPriority("pointer-events")).toBe("important");
-    expect(bubble?.style.getPropertyPriority("left")).toBe("important");
-    expect(bubble?.style.getPropertyPriority("top")).toBe("important");
+    expect(bubble?.style.position).toBe('fixed');
+    expect(bubble?.style.display).toBe('block');
+    expect(bubble?.style.pointerEvents).toBe('none');
+    expect(bubble?.style.getPropertyPriority('position')).toBe('important');
+    expect(bubble?.style.getPropertyPriority('display')).toBe('important');
+    expect(bubble?.style.getPropertyPriority('pointer-events')).toBe('important');
+    expect(bubble?.style.getPropertyPriority('left')).toBe('important');
+    expect(bubble?.style.getPropertyPriority('top')).toBe('important');
   });
 
   it.each([
-    { name: "left edge", rect: { left: 2, right: 42, top: 360, bottom: 400, width: 40, height: 40 }, expected: "right" },
     {
-      name: "right edge",
-      rect: { left: 958, right: 998, top: 360, bottom: 400, width: 40, height: 40 },
-      expected: "left"
+      name: 'left edge',
+      rect: { left: 2, right: 42, top: 360, bottom: 400, width: 40, height: 40 },
+      expected: 'right',
     },
-    { name: "top edge", rect: { left: 470, right: 510, top: 2, bottom: 42, width: 40, height: 40 }, expected: "bottom" },
     {
-      name: "bottom edge",
+      name: 'right edge',
+      rect: { left: 958, right: 998, top: 360, bottom: 400, width: 40, height: 40 },
+      expected: 'left',
+    },
+    {
+      name: 'top edge',
+      rect: { left: 470, right: 510, top: 2, bottom: 42, width: 40, height: 40 },
+      expected: 'bottom',
+    },
+    {
+      name: 'bottom edge',
       rect: { left: 470, right: 510, top: 758, bottom: 798, width: 40, height: 40 },
-      expected: "top"
-    }
-  ])("uses inward placement for $name", ({ rect, expected }) => {
+      expected: 'top',
+    },
+  ])('uses inward placement for $name', ({ rect, expected }) => {
     appendIconRect(rect);
     const api = loadInpageTip();
 
-    api.showSaveTip("tip", { kind: "loading" });
-    expect(document.getElementById("webclipper-inpage-bubble")?.dataset.placement).toBe(expected);
+    api.showSaveTip('tip', { kind: 'loading' });
+    expect(document.getElementById('webclipper-inpage-bubble')?.dataset.placement).toBe(expected);
   });
 
-  it("reuses singleton bubble and replaces text on rapid updates", () => {
+  it('reuses singleton bubble and replaces text on rapid updates', () => {
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip("Loading full history...", { kind: "loading" });
-    api.showSaveTip("Save failed", { kind: "error" });
+    api.showSaveTip('Loading full history...', { kind: 'loading' });
+    api.showSaveTip('Save failed', { kind: 'error' });
 
-    const nodes = document.querySelectorAll("#webclipper-inpage-bubble");
+    const nodes = document.querySelectorAll('#webclipper-inpage-bubble');
     expect(nodes.length).toBe(1);
-    expect((nodes[0] as any).shadowRoot?.textContent).toContain("Save failed");
-    expect(nodes[0].dataset.kind).toBe("error");
+    expect((nodes[0] as any).shadowRoot?.textContent).toContain('Save failed');
+    expect(nodes[0].dataset.kind).toBe('error');
   });
 
-  it("falls back to corner placement when anchor is missing", () => {
+  it('falls back to corner placement when anchor is missing', () => {
     const api = loadInpageTip();
 
-    api.showSaveTip("tip");
+    api.showSaveTip('tip');
 
-    const bubble = document.getElementById("webclipper-inpage-bubble") as HTMLElement | null;
+    const bubble = document.getElementById('webclipper-inpage-bubble') as HTMLElement | null;
     expect(bubble).toBeTruthy();
-    expect(bubble?.dataset.placement).toBe("none");
+    expect(bubble?.dataset.placement).toBe('none');
     expect(bubble?.style.left).toMatch(/px$/);
     expect(bubble?.style.top).toMatch(/px$/);
   });
 
-  it("removes bubble after 1800ms", () => {
+  it('removes bubble after 1800ms', () => {
     vi.useFakeTimers();
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip("Loading full history...", { kind: "loading" });
-    expect(document.getElementById("webclipper-inpage-bubble")).toBeTruthy();
+    api.showSaveTip('Loading full history...', { kind: 'loading' });
+    expect(document.getElementById('webclipper-inpage-bubble')).toBeTruthy();
 
     vi.advanceTimersByTime(1801);
-    expect(document.getElementById("webclipper-inpage-bubble")).toBeNull();
+    expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
   });
 
-  it("clears enter class after animation window", () => {
+  it('clears enter class after animation window', () => {
     vi.useFakeTimers();
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip("Loading full history...", { kind: "loading" });
-    const bubble = document.getElementById("webclipper-inpage-bubble");
-    expect(bubble?.classList.contains("is-enter")).toBe(true);
+    api.showSaveTip('Loading full history...', { kind: 'loading' });
+    const bubble = document.getElementById('webclipper-inpage-bubble');
+    expect(bubble?.classList.contains('is-enter')).toBe(true);
 
     vi.advanceTimersByTime(341);
-    expect(bubble?.classList.contains("is-enter")).toBe(false);
+    expect(bubble?.classList.contains('is-enter')).toBe(false);
   });
 });

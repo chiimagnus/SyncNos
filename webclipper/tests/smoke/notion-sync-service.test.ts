@@ -28,7 +28,12 @@ describe('notion-sync-service', () => {
       return { id: 'p1' };
     };
 
-    await notionSyncService.createPageInDatabase('t', { databaseId: 'db', title: 'Hello', url: 'https://x', ai: 'chatgpt' });
+    await notionSyncService.createPageInDatabase('t', {
+      databaseId: 'db',
+      title: 'Hello',
+      url: 'https://x',
+      ai: 'chatgpt',
+    });
     expect(lastReq.method).toBe('POST');
     expect(lastReq.path).toBe('/v1/pages');
     expect(lastReq.body.properties.AI.multi_select[0].name).toBe('ChatGPT');
@@ -93,10 +98,20 @@ describe('notion-sync-service', () => {
       return { id: 'p1' };
     };
 
-    await notionSyncService.createPageInDatabase('t', { databaseId: 'db', title: 'Hello', url: '' as any, ai: 'chatgpt' });
+    await notionSyncService.createPageInDatabase('t', {
+      databaseId: 'db',
+      title: 'Hello',
+      url: '' as any,
+      ai: 'chatgpt',
+    });
     expect(lastReq.body.properties.URL.url).toBeNull();
 
-    await notionSyncService.updatePageProperties('t', { pageId: 'p1', title: 'Hello', url: undefined as any, ai: 'chatgpt' });
+    await notionSyncService.updatePageProperties('t', {
+      pageId: 'p1',
+      title: 'Hello',
+      url: undefined as any,
+      ai: 'chatgpt',
+    });
     expect(lastReq.body.properties.URL.url).toBeNull();
   });
 
@@ -122,7 +137,8 @@ describe('notion-sync-service', () => {
         }
         return { results: [{ id: 'b2' }], has_more: false, next_cursor: null };
       }
-      if (req.method === 'DELETE' && (req.path === '/v1/blocks/b1' || req.path === '/v1/blocks/b2')) return { ok: true };
+      if (req.method === 'DELETE' && (req.path === '/v1/blocks/b1' || req.path === '/v1/blocks/b2'))
+        return { ok: true };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
 

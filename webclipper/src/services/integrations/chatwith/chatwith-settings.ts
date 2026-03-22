@@ -65,10 +65,15 @@ function normalizeHttpUrl(raw: unknown): string {
 }
 
 function sanitizePlatformId(raw: unknown): string {
-  const value = String(raw ?? '').trim().toLowerCase();
+  const value = String(raw ?? '')
+    .trim()
+    .toLowerCase();
   if (!value) return '';
   // Keep a stable, URL-safe-ish id.
-  const cleaned = value.replace(/[^a-z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/(^-|-$)/g, '');
+  const cleaned = value
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)/g, '');
   return cleaned;
 }
 
@@ -87,7 +92,8 @@ function withDefaults(input: Partial<ChatWithSettings>): ChatWithSettings {
     : DEFAULT_CHAT_WITH_PROMPT_TEMPLATE;
 
   const maxCharsRaw = Number((input as any).maxChars);
-  const maxChars = Number.isFinite(maxCharsRaw) && maxCharsRaw > 500 ? Math.floor(maxCharsRaw) : DEFAULT_CHAT_WITH_MAX_CHARS;
+  const maxChars =
+    Number.isFinite(maxCharsRaw) && maxCharsRaw > 500 ? Math.floor(maxCharsRaw) : DEFAULT_CHAT_WITH_MAX_CHARS;
 
   const platformsInput = Array.isArray(input.platforms) ? input.platforms : [];
   const parsed = platformsInput.map(coercePlatform).filter(Boolean) as ChatWithAiPlatform[];
@@ -184,7 +190,9 @@ function parseSyncnosAssetId(url: unknown): number | null {
 }
 
 function normalizeImageExt(raw: unknown): string {
-  const text = String(raw || '').trim().toLowerCase();
+  const text = String(raw || '')
+    .trim()
+    .toLowerCase();
   if (!text) return 'png';
   if (text === 'jpeg') return 'jpg';
   if (text === 'svg+xml') return 'svg';
@@ -193,7 +201,9 @@ function normalizeImageExt(raw: unknown): string {
 }
 
 function inferImageExtFromSource(input: { contentType?: string; url?: string }): string {
-  const contentType = String(input.contentType || '').trim().toLowerCase();
+  const contentType = String(input.contentType || '')
+    .trim()
+    .toLowerCase();
   if (contentType.startsWith('image/')) {
     return normalizeImageExt(contentType.slice('image/'.length));
   }
@@ -244,7 +254,10 @@ export function materializeMarkdownAssetPlaceholders(input: { markdown: string }
   });
 }
 
-export async function materializeMarkdownAssetPaths(input: { markdown: string; markdownBasename: string }): Promise<string> {
+export async function materializeMarkdownAssetPaths(input: {
+  markdown: string;
+  markdownBasename: string;
+}): Promise<string> {
   const markdown = String(input.markdown || '');
   if (!markdown) return '';
 
@@ -298,7 +311,9 @@ export async function formatConversationMarkdownForExternalOutput(
 }
 
 async function getArticleContent(conversation: Conversation, detail: ConversationDetail): Promise<string> {
-  const sourceType = String(conversation?.sourceType || '').trim().toLowerCase();
+  const sourceType = String(conversation?.sourceType || '')
+    .trim()
+    .toLowerCase();
   if (sourceType !== 'article') {
     return formatConversationMarkdownForExternalOutput(conversation, detail);
   }
@@ -325,7 +340,9 @@ export function renderChatWithTemplate(template: string, vars: Record<string, st
 
 export function truncateForChatWith(input: string, maxChars: number): { text: string; truncated: boolean } {
   const text = String(input || '');
-  const limit = Number.isFinite(Number(maxChars)) ? Math.max(1, Math.floor(Number(maxChars))) : DEFAULT_CHAT_WITH_MAX_CHARS;
+  const limit = Number.isFinite(Number(maxChars))
+    ? Math.max(1, Math.floor(Number(maxChars)))
+    : DEFAULT_CHAT_WITH_MAX_CHARS;
   if (text.length <= limit) return { text, truncated: false };
   const suffix = `\n\n[Truncated: original length=${text.length}]`;
   const sliceLen = Math.max(0, limit - suffix.length);

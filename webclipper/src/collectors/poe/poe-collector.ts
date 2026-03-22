@@ -1,6 +1,11 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
-import { appendImageMarkdown, conversationKeyFromLocation, extractImageUrlsFromElement, inEditMode as inEditModeUtil } from '@collectors/collector-utils.ts';
+import {
+  appendImageMarkdown,
+  conversationKeyFromLocation,
+  extractImageUrlsFromElement,
+  inEditMode as inEditModeUtil,
+} from '@collectors/collector-utils.ts';
 import poeMarkdownApi from '@collectors/poe/poe-markdown.ts';
 
 export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
@@ -15,8 +20,8 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   function isValidConversationUrl(): any {
     try {
-      const p = String(location.pathname || "");
-      if (!p || p === "/") return false;
+      const p = String(location.pathname || '');
+      if (!p || p === '/') return false;
       // Exclude some well-known non-chat routes to reduce accidental activation.
       if (/^\/(login|logout|settings|explore|pricing|subscriptions)(\/|$)/.test(p)) return false;
       return true;
@@ -36,14 +41,14 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
       "p[class*='ChatHeader_titleText__']",
       "a[class*='BotHeader_title__'] p",
       "div[class*='BotHeader_textContainer__'] p",
-      "h1"
+      'h1',
     ];
     for (const selector of selectors) {
       const node = document.querySelector(selector);
-      const text = node && node.textContent ? node.textContent.trim() : "";
+      const text = node && node.textContent ? node.textContent.trim() : '';
       if (text) return text;
     }
-    return document.title || "Poe";
+    return document.title || 'Poe';
   }
 
   function getConversationRoot(): any {
@@ -63,7 +68,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     const msg = document.querySelector("div[class*='ChatMessage_chatMessage__'][id^='message-']");
     if (msg && msg.parentElement) return msg.parentElement;
 
-    return document.querySelector("main") || document.querySelector("[role='main']") || document.body;
+    return document.querySelector('main') || document.querySelector("[role='main']") || document.body;
   }
 
   function inEditMode(root: any): any {
@@ -95,18 +100,18 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
   function isUserWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return false;
     return !!(
-      wrapper.querySelector("[class*='ChatMessage_rightSideMessageWrapper__']")
-      || wrapper.querySelector("[class*='Message_rightSideMessageBubble__']")
-      || wrapper.querySelector("[class*='Message_rightSideMessageRow__']")
+      wrapper.querySelector("[class*='ChatMessage_rightSideMessageWrapper__']") ||
+      wrapper.querySelector("[class*='Message_rightSideMessageBubble__']") ||
+      wrapper.querySelector("[class*='Message_rightSideMessageRow__']")
     );
   }
 
   function isAssistantWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return false;
     return !!(
-      wrapper.querySelector("[class*='LeftSideMessageHeader_leftSideMessageHeader__']")
-      || wrapper.querySelector("[class*='Message_leftSideMessageBubble__']")
-      || wrapper.querySelector("[class*='Message_leftSideMessageRow__']")
+      wrapper.querySelector("[class*='LeftSideMessageHeader_leftSideMessageHeader__']") ||
+      wrapper.querySelector("[class*='Message_leftSideMessageBubble__']") ||
+      wrapper.querySelector("[class*='Message_leftSideMessageRow__']")
     );
   }
 
@@ -119,7 +124,9 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   function imageScopeFromWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return wrapper;
-    const bubble = wrapper.querySelector("div[class*='Message_leftSideMessageBubble__'], div[class*='Message_rightSideMessageBubble__']");
+    const bubble = wrapper.querySelector(
+      "div[class*='Message_leftSideMessageBubble__'], div[class*='Message_rightSideMessageBubble__']",
+    );
     if (bubble) return bubble;
     const bubbleWrapper = wrapper.querySelector("div[class*='Message_messageBubbleWrapper__']");
     if (bubbleWrapper) return bubbleWrapper;
@@ -137,7 +144,9 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     }
 
     if (!out.length) {
-      const msgs: any[] = Array.from(scope.querySelectorAll("div[class*='ChatMessage_chatMessage__'][id^='message-']")) as any[];
+      const msgs: any[] = Array.from(
+        scope.querySelectorAll("div[class*='ChatMessage_chatMessage__'][id^='message-']"),
+      ) as any[];
       out.push(...msgs);
     }
 
@@ -153,27 +162,22 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
   }
 
   function wrapperSignature(wrapper: any): any {
-    if (!wrapper) return "";
-    const id = wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
+    if (!wrapper) return '';
+    const id = wrapper.getAttribute ? String(wrapper.getAttribute('id') || '') : '';
     if (id) return id;
     const node = contentNodeFromWrapper(wrapper);
-    const raw = node && node.textContent ? String(node.textContent) : "";
-    return raw.replace(/\s+/g, " ").trim().slice(0, 80);
+    const raw = node && node.textContent ? String(node.textContent) : '';
+    return raw.replace(/\s+/g, ' ').trim().slice(0, 80);
   }
 
   function messageLoadSignature(root: any): any {
     const wrappers = getMessageWrappers(root);
     const total = wrappers.length;
-    if (!total) return "0";
+    if (!total) return '0';
     const first = wrappers[0];
     const second = total > 1 ? wrappers[1] : null;
     const last = wrappers[total - 1];
-    return [
-      total,
-      wrapperSignature(first),
-      wrapperSignature(second),
-      wrapperSignature(last)
-    ].join("|");
+    return [total, wrapperSignature(first), wrapperSignature(second), wrapperSignature(last)].join('|');
   }
 
   function isScrollableElement(el: any): any {
@@ -184,12 +188,12 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
       return canScroll;
     }
 
-    let overflowY = "";
+    let overflowY = '';
     try {
       const win = (el.ownerDocument && el.ownerDocument.defaultView) || window;
-      overflowY = String((win && win.getComputedStyle ? win.getComputedStyle(el).overflowY : "") || "");
+      overflowY = String((win && win.getComputedStyle ? win.getComputedStyle(el).overflowY : '') || '');
     } catch (_e) {
-      overflowY = "";
+      overflowY = '';
     }
     const styleScrollable = /(auto|scroll|overlay)/i.test(overflowY);
     return canScroll && (styleScrollable || !overflowY);
@@ -202,11 +206,12 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
 
   function findScrollContainer(root: any): any {
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
-    const seed = (root && root.querySelector)
-      ? (root.querySelector("div[class*='ChatMessagesView_messageTuple__']")
-        || root.querySelector("div[class*='ChatMessage_chatMessage__'][id^='message-']")
-        || root)
-      : root;
+    const seed =
+      root && root.querySelector
+        ? root.querySelector("div[class*='ChatMessagesView_messageTuple__']") ||
+          root.querySelector("div[class*='ChatMessage_chatMessage__'][id^='message-']") ||
+          root
+        : root;
 
     let el = seed;
     for (let depth = 0; depth < 24 && el; depth += 1) {
@@ -253,7 +258,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     const intervalMs = Math.max(10, Number(pollMs) || 80);
     const start = Date.now();
 
-    while ((Date.now() - start) <= timeoutMs) {
+    while (Date.now() - start <= timeoutMs) {
       await sleep(intervalMs);
       const nextSig = messageLoadSignature(root);
       if (nextSig !== previousSig) return { changed: true, sig: nextSig };
@@ -302,7 +307,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
   }
 
   function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
-    const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
+    const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute('id') || '') : '';
     if (id) return id;
     return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
   }
@@ -320,22 +325,25 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     const out: any[] = [];
     let seq = 0;
     for (const w of wrappers) {
-      const role = isUserWrapper(w) ? "user" : (isAssistantWrapper(w) ? "assistant" : "");
+      const role = isUserWrapper(w) ? 'user' : isAssistantWrapper(w) ? 'assistant' : '';
       if (!role) continue;
 
       const node = contentNodeFromWrapper(w);
-      const raw = node && ((node as any).innerText || node.textContent) ? ((node as any).innerText || node.textContent) : "";
+      const raw =
+        node && ((node as any).innerText || node.textContent) ? (node as any).innerText || node.textContent : '';
       const fallbackText = env.normalize.normalizeText(raw);
 
-      const contentText = typeof markdown.extractMessageText === "function"
-        ? String(markdown.extractMessageText(w, role) || "")
-        : fallbackText;
+      const contentText =
+        typeof markdown.extractMessageText === 'function'
+          ? String(markdown.extractMessageText(w, role) || '')
+          : fallbackText;
 
       const imageUrls = extractImageUrlsFromElement(imageScopeFromWrapper(w));
-      let contentMarkdown = typeof markdown.extractMessageMarkdown === "function"
-        ? String(markdown.extractMessageMarkdown(w, role) || "")
-        : (contentText || "");
-      if (!contentMarkdown) contentMarkdown = contentText || "";
+      let contentMarkdown =
+        typeof markdown.extractMessageMarkdown === 'function'
+          ? String(markdown.extractMessageMarkdown(w, role) || '')
+          : contentText || '';
+      if (!contentMarkdown) contentMarkdown = contentText || '';
 
       if (!contentText && !imageUrls.length) continue;
       const nextMarkdown = appendImageMarkdown(contentMarkdown, imageUrls);
@@ -343,10 +351,10 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
-        contentText: contentText || "",
+        contentText: contentText || '',
         contentMarkdown: nextMarkdown,
         sequence: seq,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       });
       seq += 1;
     }
@@ -359,15 +367,15 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     if (!messages.length) return null;
     return {
       conversation: {
-        sourceType: "chat",
-        source: "poe",
+        sourceType: 'chat',
+        source: 'poe',
         conversationKey: findConversationKey(),
         title: findTitle(),
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now()
+        lastCapturedAt: Date.now(),
       },
-      messages
+      messages,
     };
   }
 
@@ -383,5 +391,5 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     extractMessageText: markdown.extractMessageText,
   };
 
-  return { id: "poe", matches, collector };
+  return { id: 'poe', matches, collector };
 }

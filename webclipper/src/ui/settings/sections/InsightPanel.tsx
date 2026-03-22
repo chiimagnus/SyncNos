@@ -31,9 +31,7 @@ function formatTrendDayLabel(dayStart: number, mode: 'short' | 'long'): string {
   if (!Number.isFinite(safeDayStart) || safeDayStart === -1) return INSIGHT_UNKNOWN_DATE_LABEL;
 
   const options: Intl.DateTimeFormatOptions =
-    mode === 'short'
-      ? { month: 'numeric', day: 'numeric' }
-      : { year: 'numeric', month: 'numeric', day: 'numeric' };
+    mode === 'short' ? { month: 'numeric', day: 'numeric' } : { year: 'numeric', month: 'numeric', day: 'numeric' };
   return new Intl.DateTimeFormat(undefined, options).format(new Date(safeDayStart));
 }
 
@@ -51,10 +49,7 @@ function getOrangeBarFill(index: number, total: number): string {
   return `color-mix(in srgb, ${CHART_BASE_COLOR} ${clamped}%, var(--bg-card))`;
 }
 
-function DistributionChart(props: {
-  items: InsightDistributionItem[];
-  emptyText: string;
-}) {
+function DistributionChart(props: { items: InsightDistributionItem[]; emptyText: string }) {
   const { items, emptyText } = props;
   const chartHeight = Math.max(212, items.length * 48);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -89,7 +84,13 @@ function DistributionChart(props: {
   return (
     <div ref={containerRef} style={{ height: chartHeight }} className="tw-w-full tw-min-w-0">
       {chartWidth > 0 ? (
-        <BarChart width={chartWidth} height={chartHeight} data={items} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+        <BarChart
+          width={chartWidth}
+          height={chartHeight}
+          data={items}
+          layout="vertical"
+          margin={{ top: 4, right: 16, bottom: 4, left: 0 }}
+        >
           <XAxis type="number" hide allowDecimals={false} />
           <YAxis
             type="category"
@@ -123,11 +124,7 @@ function DistributionChart(props: {
   );
 }
 
-function DailyTrendChart(props: {
-  items: InsightDailyTrendPoint[];
-  stroke: string;
-  ariaLabel: string;
-}) {
+function DailyTrendChart(props: { items: InsightDailyTrendPoint[]; stroke: string; ariaLabel: string }) {
   const { items, stroke, ariaLabel } = props;
   const chartHeight = 204;
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -160,16 +157,13 @@ function DailyTrendChart(props: {
   }, [items.length]);
 
   if (!items.length) {
-    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightDistributionEmpty')}</div>;
+    return (
+      <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightDistributionEmpty')}</div>
+    );
   }
 
   return (
-    <div
-      ref={containerRef}
-      aria-label={ariaLabel}
-      style={{ height: chartHeight }}
-      className="tw-w-full tw-min-w-0"
-    >
+    <div ref={containerRef} aria-label={ariaLabel} style={{ height: chartHeight }} className="tw-w-full tw-min-w-0">
       {chartWidth > 0 ? (
         <AreaChart
           width={chartWidth}
@@ -262,7 +256,11 @@ function TopConversationList(props: {
 }) {
   const { items, getLinkTo, onOpenConversation } = props;
   if (!items.length) {
-    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightTopConversationsEmpty')}</div>;
+    return (
+      <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+        {t('insightTopConversationsEmpty')}
+      </div>
+    );
   }
 
   const rankToneClassName = (index: number) => {
@@ -275,7 +273,10 @@ function TopConversationList(props: {
   return (
     <div className="tw-grid tw-gap-2.5">
       {items.map((item, index) => (
-        <div key={item.conversationId} className="tw-grid tw-grid-cols-[auto_minmax(0,1fr)_auto] tw-items-start tw-gap-3">
+        <div
+          key={item.conversationId}
+          className="tw-grid tw-grid-cols-[auto_minmax(0,1fr)_auto] tw-items-start tw-gap-3"
+        >
           <div className={['tw-text-sm tw-font-black', rankToneClassName(index)].join(' ')}>{index + 1}.</div>
           <div className="tw-min-w-0">
             <Link
@@ -295,8 +296,15 @@ function TopConversationList(props: {
                 onOpenConversation(item.conversationId);
               }}
             >
-              <span className="tw-min-w-0 tw-truncate tw-underline-offset-2 group-hover:tw-underline">{item.title}</span>
-              <ChevronRight size={14} strokeWidth={2} aria-hidden="true" className="tw-shrink-0 tw-text-[var(--text-secondary)] tw-opacity-70 group-hover:tw-opacity-100" />
+              <span className="tw-min-w-0 tw-truncate tw-underline-offset-2 group-hover:tw-underline">
+                {item.title}
+              </span>
+              <ChevronRight
+                size={14}
+                strokeWidth={2}
+                aria-hidden="true"
+                className="tw-shrink-0 tw-text-[var(--text-secondary)] tw-opacity-70 group-hover:tw-opacity-100"
+              />
             </Link>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
           </div>
@@ -390,7 +398,10 @@ export function InsightPanel(props: {
           ].join(' ')}
         >
           <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
-            <span className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--info)]" aria-hidden="true" />
+            <span
+              className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--info)]"
+              aria-hidden="true"
+            />
             {t('insightOverviewChatCount')}
           </div>
           <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--info)]">{formatCount(stats.chatCount)}</div>
@@ -404,45 +415,76 @@ export function InsightPanel(props: {
           ].join(' ')}
         >
           <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
-            <span className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--secondary)]" aria-hidden="true" />
+            <span
+              className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--secondary)]"
+              aria-hidden="true"
+            />
             {t('insightOverviewArticleCount')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--secondary)]">{formatCount(stats.articleCount)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--secondary)]">
+            {formatCount(stats.articleCount)}
+          </div>
         </div>
       </section>
 
       <div className="tw-grid tw-gap-4 lg:tw-grid-cols-2">
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightChatSectionTitle')}</h2>
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('insightChatSectionTitle')}
+          </h2>
 
           <div className="tw-mt-3">
-            <DailyTrendChart items={stats.chatDailyTrend} stroke="var(--info)" ariaLabel={t('insightOverviewChatCount')} />
+            <DailyTrendChart
+              items={stats.chatDailyTrend}
+              stroke="var(--info)"
+              ariaLabel={t('insightOverviewChatCount')}
+            />
           </div>
 
           <div className="tw-mt-4">
-            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightSourceDistributionTitle')}</div>
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightSourceDistributionTitle')}
+            </div>
             <DistributionChart items={stats.chatSourceDistribution} emptyText={t('insightDistributionEmpty')} />
           </div>
 
           <div className="tw-mt-5">
             <div className="tw-mb-2 tw-flex tw-items-start tw-justify-between tw-gap-4">
-              <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightTopConversationsTitle')}</div>
+              <div className="tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+                {t('insightTopConversationsTitle')}
+              </div>
               <div className="tw-text-right">
-                <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">{t('insightTotalMessagesLabel')}</div>
-                <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalMessages)}</div>
+                <div className="tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+                  {t('insightTotalMessagesLabel')}
+                </div>
+                <div className="tw-mt-1 tw-text-2xl tw-font-black tw-text-[#FFA500]">
+                  {formatCount(stats.totalMessages)}
+                </div>
               </div>
             </div>
-            <TopConversationList items={stats.topConversations} getLinkTo={getLinkTo} onOpenConversation={onOpenConversation} />
+            <TopConversationList
+              items={stats.topConversations}
+              getLinkTo={getLinkTo}
+              onOpenConversation={onOpenConversation}
+            />
           </div>
         </section>
 
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightArticlesSectionAria')}>
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightArticlesSectionTitle')}</h2>
+          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+            {t('insightArticlesSectionTitle')}
+          </h2>
           <div className="tw-mt-3">
-            <DailyTrendChart items={stats.articleDailyTrend} stroke="var(--secondary)" ariaLabel={t('insightOverviewArticleCount')} />
+            <DailyTrendChart
+              items={stats.articleDailyTrend}
+              stroke="var(--secondary)"
+              ariaLabel={t('insightOverviewArticleCount')}
+            />
           </div>
           <div className="tw-mt-4">
-            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">{t('insightArticleDomainsTitle')}</div>
+            <div className="tw-mb-2 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">
+              {t('insightArticleDomainsTitle')}
+            </div>
             <DistributionChart items={stats.articleDomainDistribution} emptyText={t('insightDistributionEmpty')} />
           </div>
         </section>

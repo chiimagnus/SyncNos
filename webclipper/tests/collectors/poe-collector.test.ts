@@ -1,8 +1,8 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it } from 'vitest';
 
 async function loadNormalize() {
-  const normalizeModule = await import("@services/shared/normalize.ts");
+  const normalizeModule = await import('@services/shared/normalize.ts');
   const normalizeApi = normalizeModule.default || {
     normalizeText: normalizeModule.normalizeText,
     fnv1a32: normalizeModule.fnv1a32,
@@ -12,13 +12,13 @@ async function loadNormalize() {
 }
 
 async function loadPoeMarkdown() {
-  return import("../../src/collectors/poe/poe-markdown.ts");
+  return import('../../src/collectors/poe/poe-markdown.ts');
 }
 
 async function loadPoeCollector() {
   const normalizeApi = await loadNormalize();
-  const envModule = await import("../../src/collectors/collector-env.ts");
-  const poeModule = await import("../../src/collectors/poe/poe-collector.ts");
+  const envModule = await import('../../src/collectors/collector-env.ts');
+  const poeModule = await import('../../src/collectors/poe/poe-collector.ts');
   const env = envModule.createCollectorEnv({
     // @ts-expect-error test global
     window: globalThis.window,
@@ -33,9 +33,8 @@ async function loadPoeCollector() {
   return collector;
 }
 
-describe("poe-collector", () => {
-  it("prefers chat header title text for conversation title", async () => {
-
+describe('poe-collector', () => {
+  it('prefers chat header title text for conversation title', async () => {
     const html = `
       <div class="BaseNavbar_chatTitleItem__GtrXf">
         <div class="ChatHeader_titleRow__M_J3L">
@@ -63,7 +62,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/4ogjbuwydndzro1w6g' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -78,11 +77,10 @@ describe("poe-collector", () => {
 
     const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
-    expect(snap.conversation.title).toBe("你好");
+    expect(snap.conversation.title).toBe('你好');
   });
 
-  it("filters thinking process and captures markdown for assistant message", async () => {
-
+  it('filters thinking process and captures markdown for assistant message', async () => {
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
         <div class="ChatMessage_chatMessage__xkgHx" id="message-11">
@@ -115,7 +113,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/4ogjbuwydndzro1w6g' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -133,25 +131,24 @@ describe("poe-collector", () => {
     expect(snap.messages.length).toBe(1);
 
     const msg = snap.messages[0];
-    expect(msg.contentText).toContain("Bold and italic with link.");
-    expect(msg.contentText).not.toContain("Thinking");
-    expect(msg.contentText).not.toContain("this should be ignored");
+    expect(msg.contentText).toContain('Bold and italic with link.');
+    expect(msg.contentText).not.toContain('Thinking');
+    expect(msg.contentText).not.toContain('this should be ignored');
 
-    const md = msg.contentMarkdown || "";
-    expect(md).toContain("**Bold**");
-    expect(md).toContain("*italic*");
-    expect(md).toContain("[link](https://example.com)");
-    expect(md).toContain("- Item A");
-    expect(md).toContain("- Item B");
-    expect(md).toContain("```js");
-    expect(md).toContain("console.log(1);");
-    expect(md).toContain("```");
-    expect(md).not.toContain("Thinking...");
-    expect(md).not.toContain("this should be ignored");
+    const md = msg.contentMarkdown || '';
+    expect(md).toContain('**Bold**');
+    expect(md).toContain('*italic*');
+    expect(md).toContain('[link](https://example.com)');
+    expect(md).toContain('- Item A');
+    expect(md).toContain('- Item B');
+    expect(md).toContain('```js');
+    expect(md).toContain('console.log(1);');
+    expect(md).toContain('```');
+    expect(md).not.toContain('Thinking...');
+    expect(md).not.toContain('this should be ignored');
   });
 
-  it("captures latest poe markdown structure and keeps normal blockquote content", async () => {
-
+  it('captures latest poe markdown structure and keeps normal blockquote content', async () => {
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
         <div class="ChatMessage_chatMessage__xkgHx" id="message-12">
@@ -195,7 +192,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/4ogjbuwydndzro1w6g' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -212,23 +209,22 @@ describe("poe-collector", () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
-    const md = snap.messages[0].contentMarkdown || "";
-    expect(md).toContain("# 标题1");
-    expect(md).toContain("## 标题2");
-    expect(md).toContain("**加粗的文本**");
-    expect(md).toContain("*斜体的文本*");
-    expect(md).toContain("- 这是一个无序列表");
-    expect(md).toContain("- 子项1");
-    expect(md).toContain("- 子项2");
-    expect(md).toContain("1. 这是一个有序列表");
-    expect(md).toContain("1. 项目2");
-    expect(md).toContain("[这是一个链接](https://www.example.com)");
-    expect(md).toContain("> 这是一个引用。");
-    expect(md).toContain("您可以根据需要修改或添加内容！");
+    const md = snap.messages[0].contentMarkdown || '';
+    expect(md).toContain('# 标题1');
+    expect(md).toContain('## 标题2');
+    expect(md).toContain('**加粗的文本**');
+    expect(md).toContain('*斜体的文本*');
+    expect(md).toContain('- 这是一个无序列表');
+    expect(md).toContain('- 子项1');
+    expect(md).toContain('- 子项2');
+    expect(md).toContain('1. 这是一个有序列表');
+    expect(md).toContain('1. 项目2');
+    expect(md).toContain('[这是一个链接](https://www.example.com)');
+    expect(md).toContain('> 这是一个引用。');
+    expect(md).toContain('您可以根据需要修改或添加内容！');
   });
 
-  it("captures user + assistant messages from message tuples (ignores action bar)", async () => {
-
+  it('captures user + assistant messages from message tuples (ignores action bar)', async () => {
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
         <div class="ChatMessage_chatMessage__xkgHx" id="message-1">
@@ -272,7 +268,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/Assistant" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/Assistant' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -287,24 +283,23 @@ describe("poe-collector", () => {
 
     const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
-    expect(snap.conversation.source).toBe("poe");
+    expect(snap.conversation.source).toBe('poe');
     expect(snap.messages.length).toBe(2);
 
-    expect(snap.messages[0].role).toBe("user");
-    expect(snap.messages[0].messageKey).toBe("message-1");
-    expect(snap.messages[0].contentText).toContain("你好");
-    expect(snap.messages[0].contentText).not.toContain("更多操作");
-    expect(snap.messages[0].contentText).not.toContain("23:28");
+    expect(snap.messages[0].role).toBe('user');
+    expect(snap.messages[0].messageKey).toBe('message-1');
+    expect(snap.messages[0].contentText).toContain('你好');
+    expect(snap.messages[0].contentText).not.toContain('更多操作');
+    expect(snap.messages[0].contentText).not.toContain('23:28');
 
-    expect(snap.messages[1].role).toBe("assistant");
-    expect(snap.messages[1].messageKey).toBe("message-2");
-    expect(snap.messages[1].contentText).toContain("你好！有什么我可以帮助你的吗？");
-    expect(snap.messages[1].contentText).not.toContain("分享");
-    expect(snap.messages[1].contentText).not.toContain("重试");
+    expect(snap.messages[1].role).toBe('assistant');
+    expect(snap.messages[1].messageKey).toBe('message-2');
+    expect(snap.messages[1].contentText).toContain('你好！有什么我可以帮助你的吗？');
+    expect(snap.messages[1].contentText).not.toContain('分享');
+    expect(snap.messages[1].contentText).not.toContain('重试');
   });
 
-  it("captures messages across date tupleGroupContainer buckets", async () => {
-
+  it('captures messages across date tupleGroupContainer buckets', async () => {
     const html = `
       <div class="ChatMessagesView_chatMessagesView__ROOT">
         <div class="ChatMessagesView_tupleGroupContainer__LSCLm">
@@ -351,7 +346,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/4ogjbuwydndzro1w6g' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -366,13 +361,12 @@ describe("poe-collector", () => {
 
     const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
-    expect(snap.messages.map((m: any) => m.messageKey)).toEqual(["message-1", "message-2", "message-3", "message-4"]);
-    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
-    expect(snap.messages.map((m: any) => m.contentText)).toEqual(["y-user", "y-assistant", "t-user", "t-assistant"]);
+    expect(snap.messages.map((m: any) => m.messageKey)).toEqual(['message-1', 'message-2', 'message-3', 'message-4']);
+    expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
+    expect(snap.messages.map((m: any) => m.contentText)).toEqual(['y-user', 'y-assistant', 't-user', 't-assistant']);
   });
 
-  it("auto-loads older poe history on manual prepare before capture", async () => {
-
+  it('auto-loads older poe history on manual prepare before capture', async () => {
     function tupleHtml(startId: number) {
       const userId = startId;
       const aiId = startId + 1;
@@ -407,7 +401,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/4ogjbuwydndzro1w6g' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -417,16 +411,16 @@ describe("poe-collector", () => {
     // @ts-expect-error test global
     globalThis.location = dom.window.location;
 
-    const scrollRoot = dom.window.document.getElementById("scroll-root");
-    const listRoot = dom.window.document.getElementById("list-root");
+    const scrollRoot = dom.window.document.getElementById('scroll-root');
+    const listRoot = dom.window.document.getElementById('list-root');
     expect(scrollRoot).toBeTruthy();
     expect(listRoot).toBeTruthy();
 
     let loadRound = 0;
     let scrollTopValue = 240;
-    Object.defineProperty(scrollRoot, "clientHeight", { configurable: true, get: () => 300 });
-    Object.defineProperty(scrollRoot, "scrollHeight", { configurable: true, get: () => 1200 + loadRound * 300 });
-    Object.defineProperty(scrollRoot, "scrollTop", {
+    Object.defineProperty(scrollRoot, 'clientHeight', { configurable: true, get: () => 300 });
+    Object.defineProperty(scrollRoot, 'scrollHeight', { configurable: true, get: () => 1200 + loadRound * 300 });
+    Object.defineProperty(scrollRoot, 'scrollTop', {
       configurable: true,
       get: () => scrollTopValue,
       set: (value) => {
@@ -437,7 +431,7 @@ describe("poe-collector", () => {
           listRoot.innerHTML = `${prepend}${listRoot.innerHTML}`;
           scrollTopValue = loadRound < 2 ? 120 : 0;
         }
-      }
+      },
     });
 
     await loadPoeMarkdown();
@@ -448,17 +442,16 @@ describe("poe-collector", () => {
     const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.messageKey)).toEqual([
-      "message-1",
-      "message-2",
-      "message-3",
-      "message-4",
-      "message-5",
-      "message-6"
+      'message-1',
+      'message-2',
+      'message-3',
+      'message-4',
+      'message-5',
+      'message-6',
     ]);
   });
 
-  it("appends image markdown but does not capture bot avatar images", async () => {
-
+  it('appends image markdown but does not capture bot avatar images', async () => {
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
         <div class="ChatMessage_chatMessage__xkgHx" id="message-10">
@@ -481,7 +474,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/Assistant" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/Assistant' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -498,13 +491,12 @@ describe("poe-collector", () => {
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
 
-    const md = snap.messages[0].contentMarkdown || "";
-    expect(md).toContain("![](https://img.test/attach.png)");
-    expect(md).not.toContain("avatar.jpeg");
+    const md = snap.messages[0].contentMarkdown || '';
+    expect(md).toContain('![](https://img.test/attach.png)');
+    expect(md).not.toContain('avatar.jpeg');
   });
 
-  it("captures attachment images outside message text container", async () => {
-
+  it('captures attachment images outside message text container', async () => {
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
         <div class="ChatMessage_chatMessage__xkgHx" id="message-20">
@@ -530,7 +522,7 @@ describe("poe-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://poe.com/chat/4ogjbuwydndzro1w6g' });
     // @ts-expect-error test global
     globalThis.window = dom.window;
     // @ts-expect-error test global
@@ -546,7 +538,9 @@ describe("poe-collector", () => {
     const snap = collector.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].contentText).toContain("@GLM-5 这是什么？");
-    expect(snap.messages[0].contentMarkdown || "").toContain("![](https://pfst.cf2.poecdn.net/base/image/example-image.png?w=1280&h=800)");
+    expect(snap.messages[0].contentText).toContain('@GLM-5 这是什么？');
+    expect(snap.messages[0].contentMarkdown || '').toContain(
+      '![](https://pfst.cf2.poecdn.net/base/image/example-image.png?w=1280&h=800)',
+    );
   });
 });

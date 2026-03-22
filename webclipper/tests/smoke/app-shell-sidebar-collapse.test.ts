@@ -26,11 +26,7 @@ vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
     createElement(
       'div',
       null,
-      createElement(
-        'button',
-        { type: 'button', onClick: onCollapse, 'aria-label': 'Collapse sidebar' },
-        'collapse',
-      ),
+      createElement('button', { type: 'button', onClick: onCollapse, 'aria-label': 'Collapse sidebar' }, 'collapse'),
     ),
 }));
 
@@ -83,7 +79,11 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
         'header',
         null,
         onExpandSidebar
-          ? createElement('button', { type: 'button', onClick: onExpandSidebar, 'aria-label': 'Expand sidebar' }, 'expand')
+          ? createElement(
+              'button',
+              { type: 'button', onClick: onExpandSidebar, 'aria-label': 'Expand sidebar' },
+              'expand',
+            )
           : null,
       ),
       createElement('div', null, 'detail-pane'),

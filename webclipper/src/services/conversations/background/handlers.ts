@@ -6,10 +6,7 @@ import {
   hasConversation,
   listConversations,
 } from '@services/conversations/data/storage';
-import {
-  writeConversationMessagesSnapshot,
-  writeConversationSnapshot,
-} from '@services/conversations/data/write';
+import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 
@@ -57,13 +54,18 @@ export function registerConversationHandlers(router: AnyRouter) {
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const rawMode = String(msg?.mode || '').trim().toLowerCase();
+    const rawMode = String(msg?.mode || '')
+      .trim()
+      .toLowerCase();
     const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
     const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
     try {
-      const sourceType = String(msg?.conversationSourceType || '').trim().toLowerCase() || 'chat';
+      const sourceType =
+        String(msg?.conversationSourceType || '')
+          .trim()
+          .toLowerCase() || 'chat';
       if (sourceType !== 'article') {
         const local = await storageGet(['ai_chat_cache_images_enabled']);
         const enabled = local?.ai_chat_cache_images_enabled === true;

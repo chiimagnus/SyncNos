@@ -112,12 +112,7 @@ function PopupShellFrame() {
   const { refreshList, refreshActiveDetail } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
-  const {
-    buttonDisabled,
-    buttonLabel,
-    capture,
-    status,
-  } = usePopupCurrentPageCapture({
+  const { buttonDisabled, buttonLabel, capture, status } = usePopupCurrentPageCapture({
     onCaptured: async () => {
       await refreshList();
       await refreshActiveDetail();
@@ -173,8 +168,7 @@ function PopupShellFrame() {
     <div
       className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]"
       style={{
-        fontFamily:
-          '"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",sans-serif',
+        fontFamily: '"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",sans-serif',
         fontSize: 13,
         lineHeight: 1.45,
       }}

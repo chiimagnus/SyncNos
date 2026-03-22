@@ -100,7 +100,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const cacheKey = cacheKeyHint ? `${cacheKeyHint}|${cacheKeyBase}` : cacheKeyBase;
     const cached = deepResearchCache.get(cacheKey);
     const now = Date.now();
-    if (cached && now - cached.updatedAt < 60_000) return Promise.resolve({ markdown: cached.markdown, text: cached.text, title: cached.title });
+    if (cached && now - cached.updatedAt < 60_000)
+      return Promise.resolve({ markdown: cached.markdown, text: cached.text, title: cached.title });
 
     const existing = deepResearchInFlight.get(cacheKey);
     if (existing) return existing;
@@ -152,12 +153,14 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       } catch (_e) {
         resolve(null);
       }
-    }).then((payload) => {
-      if (payload) deepResearchCache.set(cacheKey, { ...payload, updatedAt: Date.now() });
-      return payload;
-    }).finally(() => {
-      deepResearchInFlight.delete(cacheKey);
-    });
+    })
+      .then((payload) => {
+        if (payload) deepResearchCache.set(cacheKey, { ...payload, updatedAt: Date.now() });
+        return payload;
+      })
+      .finally(() => {
+        deepResearchInFlight.delete(cacheKey);
+      });
 
     deepResearchInFlight.set(cacheKey, p);
     return p;
@@ -175,7 +178,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function makeFallbackConversationKey(messages: any): any {
-    const firstUser = Array.isArray(messages) ? messages.find((m: any) => m && m.role === 'user' && m.contentText) : null;
+    const firstUser = Array.isArray(messages)
+      ? messages.find((m: any) => m && m.role === 'user' && m.contentText)
+      : null;
     const seed = `${env.location.hostname}|${env.location.pathname}|${firstUser ? firstUser.contentText : ''}`;
     const hash = env.normalize && env.normalize.fnv1a32 ? env.normalize.fnv1a32(seed) : String(Date.now());
     return `fallback_${hash}`;
@@ -236,7 +241,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (roleNodes.length) {
       const picked = dropAncestors(roleNodes);
       const extraTurns = turnNodes.filter((turn: any) => !picked.some((node: any) => turn.contains(node)));
-      return sortInDocumentOrder(dropAncestors(Array.from(new Set(picked.concat(extraTurns).filter(Boolean))) as any[]));
+      return sortInDocumentOrder(
+        dropAncestors(Array.from(new Set(picked.concat(extraTurns).filter(Boolean))) as any[]),
+      );
     }
 
     if (turnNodes.length) {

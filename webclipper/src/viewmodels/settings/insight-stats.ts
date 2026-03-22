@@ -86,10 +86,7 @@ function compareDistributionItems(a: InsightDistributionItem, b: InsightDistribu
   return a.label.localeCompare(b.label);
 }
 
-function buildDistribution(
-  counts: Map<string, number>,
-  limit: number,
-): InsightDistributionItem[] {
+function buildDistribution(counts: Map<string, number>, limit: number): InsightDistributionItem[] {
   const sorted = Array.from(counts.entries())
     .map(([label, count]) => ({ label, count }))
     .filter((item) => item.count > 0)
@@ -161,15 +158,11 @@ function buildDailyTrend(options: {
   return out;
 }
 
-async function readAllConversations(
-  conversationsStore: IDBObjectStore,
-): Promise<Conversation[]> {
+async function readAllConversations(conversationsStore: IDBObjectStore): Promise<Conversation[]> {
   return ((await reqToPromise(conversationsStore.getAll())) as Conversation[]) || [];
 }
 
-async function readMessageCounts(
-  messagesStore: IDBObjectStore,
-): Promise<MessageCountByConversation> {
+async function readMessageCounts(messagesStore: IDBObjectStore): Promise<MessageCountByConversation> {
   const counts: MessageCountByConversation = new Map();
 
   await new Promise<void>((resolve, reject) => {

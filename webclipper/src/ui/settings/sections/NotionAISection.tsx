@@ -36,7 +36,13 @@ export function NotionAISection(props: {
                 aria-label={t('modelIndex')}
                 className={`${textInputClassName} tw-w-[120px]`}
               />
-              <button id="btnNotionAiModelSave" className={buttonClassName} onClick={onSave} disabled={busy} type="button">
+              <button
+                id="btnNotionAiModelSave"
+                className={buttonClassName}
+                onClick={onSave}
+                disabled={busy}
+                type="button"
+              >
                 {t('save')}
               </button>
               <button
@@ -55,9 +61,7 @@ export function NotionAISection(props: {
 
         <div aria-label={t('note')}>
           <SettingsFormRow label={t('note')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-              {t('notionAiModelNote')}
-            </div>
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('notionAiModelNote')}</div>
           </SettingsFormRow>
         </div>
       </div>

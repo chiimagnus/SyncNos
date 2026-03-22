@@ -1,4 +1,8 @@
-import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES, CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import {
+  ARTICLE_MESSAGE_TYPES,
+  COMMENTS_MESSAGE_TYPES,
+  CONTENT_MESSAGE_TYPES,
+} from '@platform/messaging/message-contracts';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import { getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow';
 
@@ -43,7 +47,12 @@ function pickQuoteFromSelection(fallback: unknown): string {
 }
 
 export type InpageCommentsPanelController = {
-  open: (input?: { tabId?: number | null; selectionText?: string | null; focusComposer?: boolean; ensureArticle?: boolean }) => Promise<void>;
+  open: (input?: {
+    tabId?: number | null;
+    selectionText?: string | null;
+    focusComposer?: boolean;
+    ensureArticle?: boolean;
+  }) => Promise<void>;
 };
 
 export function createInpageCommentsPanelController(runtime: RuntimeClient | null): InpageCommentsPanelController {
@@ -160,7 +169,12 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
   bindPanelHandlers();
 
-  async function open(input?: { tabId?: number | null; selectionText?: string | null; focusComposer?: boolean; ensureArticle?: boolean }) {
+  async function open(input?: {
+    tabId?: number | null;
+    selectionText?: string | null;
+    focusComposer?: boolean;
+    ensureArticle?: boolean;
+  }) {
     // Only handle on top frame to avoid duplicate panels.
     try {
       if (globalThis.top && globalThis.top !== globalThis.self) return;

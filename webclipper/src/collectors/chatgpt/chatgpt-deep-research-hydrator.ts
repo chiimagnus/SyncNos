@@ -20,7 +20,9 @@ function deepResearchHostFromUrl(urlText: string): string {
   if (!text) return '';
   try {
     const url = new URL(text);
-    const host = String(url.hostname || '').trim().toLowerCase();
+    const host = String(url.hostname || '')
+      .trim()
+      .toLowerCase();
     if (host === 'connector_openai_deep_research.web-sandbox.oaiusercontent.com') return host;
     if (host.endsWith('.web-sandbox.oaiusercontent.com')) return host;
   } catch (_e) {
@@ -49,12 +51,21 @@ function tryHtmlToMarkdown(html: string): string {
 }
 
 export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: RuntimeSend): Promise<any> {
-  if (!snapshot || !snapshot.conversation || !Array.isArray(snapshot.messages) || !snapshot.messages.length) return snapshot;
-  if (String(snapshot?.conversation?.source || '').trim().toLowerCase() !== 'chatgpt') return snapshot;
+  if (!snapshot || !snapshot.conversation || !Array.isArray(snapshot.messages) || !snapshot.messages.length)
+    return snapshot;
+  if (
+    String(snapshot?.conversation?.source || '')
+      .trim()
+      .toLowerCase() !== 'chatgpt'
+  )
+    return snapshot;
 
   const targets = snapshot.messages
     .map((m: any, idx: number) => ({ m, idx }))
-    .filter(({ m }: { m: any }) => m && m.role === 'assistant' && isDeepResearchPlaceholder(m.contentText || m.contentMarkdown));
+    .filter(
+      ({ m }: { m: any }) =>
+        m && m.role === 'assistant' && isDeepResearchPlaceholder(m.contentText || m.contentMarkdown),
+    );
 
   if (!targets.length) return snapshot;
 
@@ -71,7 +82,8 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
     })
     .filter(Boolean);
 
-  const expectedHost = deepResearchHostFromUrl(urls[0] || '') || 'connector_openai_deep_research.web-sandbox.oaiusercontent.com';
+  const expectedHost =
+    deepResearchHostFromUrl(urls[0] || '') || 'connector_openai_deep_research.web-sandbox.oaiusercontent.com';
 
   const res = await send(CHATGPT_MESSAGE_TYPES.EXTRACT_DEEP_RESEARCH, {
     expectedHost,
@@ -142,7 +154,7 @@ export async function hydrateChatgptDeepResearchSnapshot(snapshot: any, send: Ru
       if (aHas) return -1;
       if (bHas) return 1;
       // Fallback: when `top` ties (common with stale/duplicated iframes), use `frameId` as a stable tie-breaker.
-      return (a.top - b.top) || (Number(a.frameId) - Number(b.frameId));
+      return a.top - b.top || Number(a.frameId) - Number(b.frameId);
     });
 
   // Deduplicate items that share the same on-page position and identical content (ChatGPT can keep a stale duplicate iframe).

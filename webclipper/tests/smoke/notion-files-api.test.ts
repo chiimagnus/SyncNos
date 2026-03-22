@@ -95,8 +95,7 @@ describe('notion-api', () => {
         ok: true,
         status: 200,
         headers: createHeaders({ 'content-type': 'application/json' }),
-        text: async () =>
-          JSON.stringify({ results: [{ object: 'page', id: 'p1', properties: {} }], has_more: false }),
+        text: async () => JSON.stringify({ results: [{ object: 'page', id: 'p1', properties: {} }], has_more: false }),
       };
     };
 
@@ -201,7 +200,9 @@ describe('notion-files-api', () => {
 
     await waitUntilUploaded({ accessToken: 't', id: 'u2', pollIntervalMs: 1, maxAttempts: 1 });
 
-    const post = fetchCalls.find((c) => c.url === 'https://api.notion.com/v1/file_uploads' && c.init?.method === 'POST');
+    const post = fetchCalls.find(
+      (c) => c.url === 'https://api.notion.com/v1/file_uploads' && c.init?.method === 'POST',
+    );
     const body = JSON.parse(String(post.init.body));
     expect(body.mode).toBe('single_part');
     expect(body.content_type).toBe('image/png');
@@ -228,4 +229,3 @@ describe('notion-files-api', () => {
     );
   });
 });
-

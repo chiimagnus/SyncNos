@@ -24,7 +24,10 @@ export async function hasConversation(payload: any) {
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
-  options?: { mode?: 'snapshot' | 'incremental' | 'append'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
+  options?: {
+    mode?: 'snapshot' | 'incremental' | 'append';
+    diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
+  },
 ) {
   return await idb.syncConversationMessages(conversationId, messages, options);
 }

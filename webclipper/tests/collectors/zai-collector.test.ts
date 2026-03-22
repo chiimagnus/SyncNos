@@ -1,8 +1,8 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createZaiCollectorDef } from "../../src/collectors/zai/zai-collector.ts";
-import normalizeApi from "@services/shared/normalize.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it } from 'vitest';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createZaiCollectorDef } from '../../src/collectors/zai/zai-collector.ts';
+import normalizeApi from '@services/shared/normalize.ts';
 
 function setupDom(dom: JSDOM) {
   // @ts-expect-error test global
@@ -30,8 +30,8 @@ function createCollector() {
   return createZaiCollectorDef(env).collector as any;
 }
 
-describe("zai-collector", () => {
-  it("captures user uploaded images from attachment card", async () => {
+describe('zai-collector', () => {
+  it('captures user uploaded images from attachment card', async () => {
     const html = `
       <div id="message-u1" class="user-message">
         <div class="chat-user markdown-prose">
@@ -53,19 +53,18 @@ describe("zai-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv-img1" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv-img1' });
     setupDom(dom);
     const collector = createCollector();
     const snap = collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("user");
-    expect(snap.messages[0].contentMarkdown).toContain("这是什么？");
-    expect(snap.messages[0].contentMarkdown).toContain("![](https://z-cdn-media.chatglm.cn/files/");
+    expect(snap.messages[0].role).toBe('user');
+    expect(snap.messages[0].contentMarkdown).toContain('这是什么？');
+    expect(snap.messages[0].contentMarkdown).toContain('![](https://z-cdn-media.chatglm.cn/files/');
   });
 
-  it("ignores thinking-chain-container content", async () => {
-
+  it('ignores thinking-chain-container content', async () => {
     const html = `
       <div id="message-1">
         <div class="chat-assistant">
@@ -86,19 +85,18 @@ describe("zai-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv1" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv1' });
     setupDom(dom);
     const collector = createCollector();
 
-    const wrapper = dom.window.document.querySelector("#message-1");
+    const wrapper = dom.window.document.querySelector('#message-1');
     const text = collector.__test.extractAssistantText(wrapper);
-    expect(text).toContain("这是最终回答内容。");
-    expect(text).not.toContain("思考过程");
-    expect(text).not.toContain("思维链内容");
+    expect(text).toContain('这是最终回答内容。');
+    expect(text).not.toContain('思考过程');
+    expect(text).not.toContain('思维链内容');
   });
 
-  it("extracts assistant markdown from rendered HTML", async () => {
-
+  it('extracts assistant markdown from rendered HTML', async () => {
     const html = `
       <div id="message-3">
         <div class="chat-assistant">
@@ -116,25 +114,24 @@ describe("zai-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv3" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv3' });
     setupDom(dom);
     const collector = createCollector();
 
-    const wrapper = dom.window.document.querySelector("#message-3");
+    const wrapper = dom.window.document.querySelector('#message-3');
     const md = collector.__test.extractAssistantMarkdown(wrapper);
-    expect(md).toContain("**Bold**");
-    expect(md).toContain("*italic*");
-    expect(md).toContain("[link](https://example.com)");
-    expect(md).toContain("`x = 1`");
-    expect(md).toContain("- Item A");
-    expect(md).toContain("- Item B");
-    expect(md).toContain("```js");
-    expect(md).toContain("console.log(1);");
-    expect(md).toContain("```");
+    expect(md).toContain('**Bold**');
+    expect(md).toContain('*italic*');
+    expect(md).toContain('[link](https://example.com)');
+    expect(md).toContain('`x = 1`');
+    expect(md).toContain('- Item A');
+    expect(md).toContain('- Item B');
+    expect(md).toContain('```js');
+    expect(md).toContain('console.log(1);');
+    expect(md).toContain('```');
   });
 
-  it("does not leak UI button labels when falling back to wrapper", async () => {
-
+  it('does not leak UI button labels when falling back to wrapper', async () => {
     const html = `
       <div id="message-2">
         <div class="chat-assistant">
@@ -157,14 +154,14 @@ describe("zai-collector", () => {
       </div>
     `;
 
-    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv2" });
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://chat.z.ai/c/conv2' });
     setupDom(dom);
     const collector = createCollector();
 
-    const wrapper = dom.window.document.querySelector("#message-2");
+    const wrapper = dom.window.document.querySelector('#message-2');
     const text = collector.__test.extractAssistantText(wrapper);
-    expect(text).toContain("Hello answer");
-    expect(text).not.toContain("复制");
-    expect(text).not.toContain("重新生成");
+    expect(text).toContain('Hello answer');
+    expect(text).not.toContain('复制');
+    expect(text).not.toContain('重新生成');
   });
 });

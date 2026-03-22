@@ -1,10 +1,4 @@
-function formatArticleMarkdown({
-  conversation,
-  messages,
-}: {
-  conversation?: any;
-  messages?: any[];
-}) {
+function formatArticleMarkdown({ conversation, messages }: { conversation?: any; messages?: any[] }) {
   const c = conversation || {};
   const m0 = Array.isArray(messages) && messages.length ? messages[0] : null;
   const lines = [];

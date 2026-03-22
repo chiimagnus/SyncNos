@@ -19,7 +19,9 @@ const STORAGE_KEY_DISPLAY_MODE = 'inpage_display_mode';
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
 function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
   return null;
 }

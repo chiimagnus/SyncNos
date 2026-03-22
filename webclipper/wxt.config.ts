@@ -35,15 +35,11 @@ function resolveChromiumBinaryForMac(): string | undefined {
 
   return firstExistingPath([
     '/Applications/Arc.app/Contents/MacOS/Arc',
-    path.join(
-      process.env.HOME ?? '',
-      'Applications/Arc.app/Contents/MacOS/Arc',
-    ),
+    path.join(process.env.HOME ?? '', 'Applications/Arc.app/Contents/MacOS/Arc'),
   ]);
 }
 
-const chromeBinary =
-  process.platform === 'darwin' ? resolveChromiumBinaryForMac() : undefined;
+const chromeBinary = process.platform === 'darwin' ? resolveChromiumBinaryForMac() : undefined;
 
 export default defineConfig({
   manifestVersion: 3,
@@ -63,16 +59,8 @@ export default defineConfig({
   manifest: {
     name: 'SyncNos-AI+Web Clipper',
     version: '1.4.0',
-    description:
-      'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
-    permissions: [
-      'storage',
-      'contextMenus',
-      'tabs',
-      'webNavigation',
-      'activeTab',
-      'scripting',
-    ],
+    description: 'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
+    permissions: ['storage', 'contextMenus', 'tabs', 'webNavigation', 'activeTab', 'scripting'],
     host_permissions: [
       'https://chat.openai.com/*',
       'https://chatgpt.com/*',

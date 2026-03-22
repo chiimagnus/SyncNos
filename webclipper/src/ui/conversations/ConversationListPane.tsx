@@ -12,7 +12,13 @@ import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@service
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
 import { navItemClassName } from '@ui/shared/nav-styles';
-import { buttonDangerTintClassName, buttonFilledClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '@ui/shared/button-styles';
+import {
+  buttonDangerTintClassName,
+  buttonFilledClassName,
+  buttonMenuItemClassName,
+  buttonMiniIconClassName,
+  buttonTintClassName,
+} from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { parseHostnameFromUrl } from '@services/shared/url';
@@ -23,7 +29,9 @@ const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
 
 function toSiteFilterKey(domain: string) {
-  const safe = String(domain || '').trim().toLowerCase();
+  const safe = String(domain || '')
+    .trim()
+    .toLowerCase();
   if (!safe) return SITE_FILTER_UNKNOWN_KEY;
   return `domain:${safe}`;
 }
@@ -63,7 +71,11 @@ function hasWarningFlags(conversation: Conversation) {
 }
 
 function isArticleConversation(conversation: Conversation): boolean {
-  return String((conversation as any)?.sourceType || '').trim().toLowerCase() === 'article';
+  return (
+    String((conversation as any)?.sourceType || '')
+      .trim()
+      .toLowerCase() === 'article'
+  );
 }
 
 function getConversationSiteFilterKey(conversation: Conversation): string {
@@ -95,17 +107,27 @@ function getSourceMeta(raw: unknown): SourceMeta {
 }
 
 function sourceTagToneClass(key: string) {
-  const safe = String(key || '').trim().toLowerCase();
+  const safe = String(key || '')
+    .trim()
+    .toLowerCase();
   const map: Record<string, string> = {
-    chatgpt: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    claude: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    deepseek: 'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    notionai: 'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    gemini: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    googleaistudio: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    chatgpt:
+      'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    claude:
+      'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    deepseek:
+      'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    notionai:
+      'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    gemini:
+      'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    googleaistudio:
+      'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
     kimi: 'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    doubao: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    yuanbao: 'tw-border-[var(--tertiary)] tw-bg-[color-mix(in_srgb,var(--tertiary)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    doubao:
+      'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+    yuanbao:
+      'tw-border-[var(--tertiary)] tw-bg-[color-mix(in_srgb,var(--tertiary)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
     poe: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
     zai: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
     web: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
@@ -235,13 +257,19 @@ export function ConversationListPane({
   }, [items]);
 
   const sourceFilteredItems = useMemo(() => {
-    const key = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
+    const key =
+      String(listSourceFilterKey || 'all')
+        .trim()
+        .toLowerCase() || 'all';
     if (key === 'all') return items;
     return items.filter((c) => getSourceMeta((c as any).source).key === key);
   }, [items, listSourceFilterKey]);
 
   const siteOptions = useMemo(() => {
-    const key = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
+    const key =
+      String(listSourceFilterKey || 'all')
+        .trim()
+        .toLowerCase() || 'all';
     if (key !== 'web') return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }];
 
     const domainCounts = new Map<string, number>();
@@ -264,7 +292,10 @@ export function ConversationListPane({
         return String(a.label || '').localeCompare(String(b.label || ''));
       });
 
-    const out: Array<{ key: string; label: string }> = [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }, ...domains];
+    const out: Array<{ key: string; label: string }> = [
+      { key: SITE_FILTER_ALL_KEY, label: t('allFilter') },
+      ...domains,
+    ];
     if (unknownCount > 0) out.push({ key: SITE_FILTER_UNKNOWN_KEY, label: t('insightUnknownLabel') });
     return out;
   }, [listSourceFilterKey, sourceFilteredItems]);
@@ -272,10 +303,16 @@ export function ConversationListPane({
   const siteOptionKeys = useMemo(() => new Set(siteOptions.map((opt) => String(opt.key || ''))), [siteOptions]);
 
   const filteredItems = useMemo(() => {
-    const sourceKey = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
+    const sourceKey =
+      String(listSourceFilterKey || 'all')
+        .trim()
+        .toLowerCase() || 'all';
     if (sourceKey !== 'web') return sourceFilteredItems;
 
-    const key = String(listSiteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
+    const key =
+      String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
+        .trim()
+        .toLowerCase() || SITE_FILTER_ALL_KEY;
     if (key === SITE_FILTER_ALL_KEY) return sourceFilteredItems;
     return sourceFilteredItems.filter((conversation) => getConversationSiteFilterKey(conversation as any) === key);
   }, [listSiteFilterKey, listSourceFilterKey, sourceFilteredItems]);
@@ -299,7 +336,10 @@ export function ConversationListPane({
   );
 
   const visibleIdSet = useMemo(() => new Set(visibleIds.map((x) => Number(x))), [visibleIds]);
-  const selectedInView = useMemo(() => selectedIds.filter((id) => visibleIdSet.has(Number(id))), [selectedIds, visibleIdSet]);
+  const selectedInView = useMemo(
+    () => selectedIds.filter((id) => visibleIdSet.has(Number(id))),
+    [selectedIds, visibleIdSet],
+  );
 
   const total = visibleIds.length;
   const selectedCount = selectedInView.length;
@@ -429,7 +469,10 @@ export function ConversationListPane({
   }, [consumeListLocate, pendingListLocateId]);
 
   const onSetFilterKey = (key: string) => {
-    const next = String(key || 'all').trim().toLowerCase() || 'all';
+    const next =
+      String(key || 'all')
+        .trim()
+        .toLowerCase() || 'all';
     setListSourceFilterKeyPersistent(next);
     clearSelected();
     setDeleteConfirmOpen(false);
@@ -438,7 +481,10 @@ export function ConversationListPane({
   };
 
   const onSetSiteFilterKey = (key: string) => {
-    const next = String(key || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
+    const next =
+      String(key || SITE_FILTER_ALL_KEY)
+        .trim()
+        .toLowerCase() || SITE_FILTER_ALL_KEY;
     setListSiteFilterKeyPersistent(next);
     clearSelected();
     setDeleteConfirmOpen(false);
@@ -447,11 +493,17 @@ export function ConversationListPane({
   };
 
   useEffect(() => {
-    const sourceKey = String(listSourceFilterKey || 'all').trim().toLowerCase() || 'all';
+    const sourceKey =
+      String(listSourceFilterKey || 'all')
+        .trim()
+        .toLowerCase() || 'all';
     if (sourceKey !== 'web') return;
     if (siteOptions.length <= 1) return;
 
-    const current = String(listSiteFilterKey || SITE_FILTER_ALL_KEY).trim().toLowerCase() || SITE_FILTER_ALL_KEY;
+    const current =
+      String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
+        .trim()
+        .toLowerCase() || SITE_FILTER_ALL_KEY;
     if (current === SITE_FILTER_ALL_KEY) return;
     if (siteOptionKeys.has(current)) return;
     setListSiteFilterKeyPersistent(SITE_FILTER_ALL_KEY);
@@ -556,7 +608,10 @@ export function ConversationListPane({
     setDeleteConfirmOpen(false);
   };
 
-  const sourceFilterActive = String(listSourceFilterKey || 'all').trim().toLowerCase() !== 'all';
+  const sourceFilterActive =
+    String(listSourceFilterKey || 'all')
+      .trim()
+      .toLowerCase() !== 'all';
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
@@ -579,10 +634,7 @@ export function ConversationListPane({
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
-            const rowClass = [
-              navItemClassName(isActive),
-              'tw-group tw-relative tw-items-start tw-gap-2.5',
-            ].join(' ');
+            const rowClass = [navItemClassName(isActive), 'tw-group tw-relative tw-items-start tw-gap-2.5'].join(' ');
 
             const checkboxInputClass = isActive
               ? 'tw-size-4 tw-cursor-pointer tw-accent-[var(--accent-foreground)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
@@ -667,8 +719,16 @@ export function ConversationListPane({
 
       <div className="tw-border-t tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
         <div className="tw-px-3 tw-py-2">
-          <div className={['tw-flex tw-min-h-9 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0', hasSelection ? 'hasSelection' : ''].join(' ')}>
-            <label className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]" aria-label={t('selectAll')}>
+          <div
+            className={[
+              'tw-flex tw-min-h-9 tw-flex-nowrap tw-items-center tw-gap-1.5 tw-p-0',
+              hasSelection ? 'hasSelection' : '',
+            ].join(' ')}
+          >
+            <label
+              className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
+              aria-label={t('selectAll')}
+            >
               <input
                 ref={selectAllRef}
                 id="chkSelectAll"
@@ -701,7 +761,9 @@ export function ConversationListPane({
               options={sourceOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
             />
 
-            {String(listSourceFilterKey || 'all').trim().toLowerCase() === 'web' ? (
+            {String(listSourceFilterKey || 'all')
+              .trim()
+              .toLowerCase() === 'web' ? (
               <SelectMenu<string>
                 buttonId="siteFilterSelect"
                 className={hasSelection ? 'tw-hidden' : ''}
@@ -715,10 +777,7 @@ export function ConversationListPane({
                 adaptiveMaxHeight
                 chevronOverlay
                 triggerLabelClassName="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-whitespace-nowrap tw-text-left"
-                buttonClassName={[
-                  buttonTintClassName(),
-                  'tw-w-[80px] tw-shrink-0',
-                ].join(' ')}
+                buttonClassName={[buttonTintClassName(), 'tw-w-[80px] tw-shrink-0'].join(' ')}
                 options={siteOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
               />
             ) : null}
@@ -726,23 +785,26 @@ export function ConversationListPane({
             <div
               id="chatActionButtons"
               className={[
-                ['tw-inline-flex tw-items-center tw-gap-1.5', hasSelection ? 'tw-overflow-visible' : 'tw-overflow-hidden'].join(' '),
+                [
+                  'tw-inline-flex tw-items-center tw-gap-1.5',
+                  hasSelection ? 'tw-overflow-visible' : 'tw-overflow-hidden',
+                ].join(' '),
                 'tw-transition-[max-width,opacity,transform] tw-duration-[220ms] tw-ease-out motion-reduce:tw-transition-none',
                 hasSelection
                   ? 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-pointer-events-auto'
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-                <button
-                  id="btnDelete"
-                  type="button"
-                  className={dangerSurfaceButton}
-                  title={t('deleteButton')}
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  disabled={!hasSelection || actionBusy || syncingAny}
-                >
-                  {t('deleteButton')}
-                </button>
+              <button
+                id="btnDelete"
+                type="button"
+                className={dangerSurfaceButton}
+                title={t('deleteButton')}
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={!hasSelection || actionBusy || syncingAny}
+              >
+                {t('deleteButton')}
+              </button>
 
               <MenuPopover
                 open={exportOpen}
@@ -817,7 +879,9 @@ export function ConversationListPane({
                 <MenuPopover
                   open={syncOpen}
                   onOpenChange={setSyncOpen}
-                  disabled={enabledSyncProviders.length === 0 ? exporting || deleting : !hasSelection || exporting || deleting}
+                  disabled={
+                    enabledSyncProviders.length === 0 ? exporting || deleting : !hasSelection || exporting || deleting
+                  }
                   ariaLabel={syncMenuBaseLabel}
                   side="top"
                   align="end"
@@ -947,7 +1011,11 @@ export function ConversationListPane({
             )}
           </div>
 
-          <ConversationSyncFeedbackNotice feedback={syncFeedback} onDismiss={clearSyncFeedback} onJumpToConversation={onNoticeJumpToConversation} />
+          <ConversationSyncFeedbackNotice
+            feedback={syncFeedback}
+            onDismiss={clearSyncFeedback}
+            onJumpToConversation={onNoticeJumpToConversation}
+          />
         </div>
       </div>
 

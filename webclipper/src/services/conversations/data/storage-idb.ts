@@ -44,8 +44,7 @@ function tx(
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error || new Error('indexedDB request failed'));
+    request.onerror = () => reject(request.error || new Error('indexedDB request failed'));
   });
 }
 
@@ -57,10 +56,7 @@ function txDone(t: IDBTransaction): Promise<true> {
   });
 }
 
-function withOptionalId<T extends Record<string, any>>(
-  existingId: unknown,
-  payload: T,
-): T & { id?: number } {
+function withOptionalId<T extends Record<string, any>>(existingId: unknown, payload: T): T & { id?: number } {
   const id = Number(existingId);
   if (Number.isFinite(id) && id > 0) return { id, ...payload };
   return { ...payload };
@@ -163,11 +159,8 @@ function mergeSyncMappingRecord(base: any, incoming: any, fallbackNotionPageId: 
   const current = base && typeof base === 'object' ? { ...base } : {};
   const next = incoming && typeof incoming === 'object' ? incoming : {};
   const notionPageId =
-    safeString(current.notionPageId) ||
-    safeString(next.notionPageId) ||
-    safeString(fallbackNotionPageId);
-  const lastSyncedMessageKey =
-    safeString(current.lastSyncedMessageKey) || safeString(next.lastSyncedMessageKey);
+    safeString(current.notionPageId) || safeString(next.notionPageId) || safeString(fallbackNotionPageId);
+  const lastSyncedMessageKey = safeString(current.lastSyncedMessageKey) || safeString(next.lastSyncedMessageKey);
   const lastSyncedSequence = pickMaxFiniteNumber(current.lastSyncedSequence, next.lastSyncedSequence);
   const lastSyncedAt = pickMaxFiniteNumber(current.lastSyncedAt, next.lastSyncedAt);
   const lastSyncedMessageUpdatedAt = pickMaxFiniteNumber(
@@ -258,10 +251,8 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const existing = await findExistingConversationForPayload(stores.conversations, payload);
 
   const now = Date.now();
-  const nextTitle =
-    payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
-  const nextUrl =
-    payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+  const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
+  const nextUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
 
   const baseRecord = {
     sourceType: payload.sourceType || 'chat',
@@ -273,7 +264,9 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
     publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
     warningFlags: Array.isArray(payload.warningFlags)
       ? payload.warningFlags
-      : (existing ? existing.warningFlags || [] : []),
+      : existing
+        ? existing.warningFlags || []
+        : [],
     notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
     lastCapturedAt: payload.lastCapturedAt || now,
   };
@@ -302,7 +295,10 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
 export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
-  options?: { mode?: 'snapshot' | 'incremental' | 'append'; diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null },
+  options?: {
+    mode?: 'snapshot' | 'incremental' | 'append';
+    diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
+  },
 ): Promise<{ upserted: number; deleted: number }> {
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readwrite');
@@ -324,9 +320,7 @@ export async function syncConversationMessages(
       byKey.set(key, m);
     }
 
-    const upsertKeys = Array.from(
-      new Set([...normalizeKeys(diff.added), ...normalizeKeys(diff.updated)]),
-    );
+    const upsertKeys = Array.from(new Set([...normalizeKeys(diff.added), ...normalizeKeys(diff.updated)]));
     const allowDeletes = mode === 'incremental';
     const removedKeys = allowDeletes ? normalizeKeys(diff.removed) : [];
 
@@ -336,10 +330,7 @@ export async function syncConversationMessages(
       if (!m) continue;
       // eslint-disable-next-line no-await-in-loop
       const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
-      const incomingMarkdown =
-        m.contentMarkdown && String(m.contentMarkdown).trim()
-          ? String(m.contentMarkdown)
-          : '';
+      const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
       const baseRecord = {
         conversationId,
         messageKey: key,
@@ -384,10 +375,7 @@ export async function syncConversationMessages(
     presentKeys.add(String(m.messageKey));
     // eslint-disable-next-line no-await-in-loop
     const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
-    const incomingMarkdown =
-      m.contentMarkdown && String(m.contentMarkdown).trim()
-        ? String(m.contentMarkdown)
-        : '';
+    const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
     const baseRecord = {
       conversationId,
       messageKey: m.messageKey,
@@ -412,14 +400,10 @@ export async function syncConversationMessages(
   // Cleanup: delete messages not present in snapshot.
   let deleted = 0;
   const seqIdx = stores.messages.index('by_conversationId_sequence');
-  const range = IDBKeyRange.bound(
-    [conversationId, -Infinity] as any,
-    [conversationId, Infinity] as any,
-  );
+  const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
   const cursorReq = seqIdx.openCursor(range);
   await new Promise<void>((resolve, reject) => {
-    cursorReq.onerror = () =>
-      reject(cursorReq.error || new Error('cursor failed'));
+    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
     cursorReq.onsuccess = () => {
       const cursor = cursorReq.result;
       if (!cursor) return resolve();
@@ -469,32 +453,26 @@ export async function getConversationBySourceConversationKey(
   return item || null;
 }
 
-export async function getMessagesByConversationId(
-  conversationId: number,
-): Promise<ConversationMessage[]> {
+export async function getMessagesByConversationId(conversationId: number): Promise<ConversationMessage[]> {
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readonly');
   const idx = stores.messages.index('by_conversationId_sequence');
   const items = (await reqToPromise(
-    idx.getAll(
-      IDBKeyRange.bound(
-        [conversationId, -Infinity] as any,
-        [conversationId, Infinity] as any,
-      ),
-    ) as any,
+    idx.getAll(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any)) as any,
   )) as any[];
   await txDone(t);
   items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
   return items as any;
 }
 
-export async function deleteConversationsByIds(
-  conversationIds: any[],
-): Promise<{ deletedConversations: number; deletedMessages: number; deletedMappings: number; deletedImageCache: number }> {
+export async function deleteConversationsByIds(conversationIds: any[]): Promise<{
+  deletedConversations: number;
+  deletedMessages: number;
+  deletedMappings: number;
+  deletedImageCache: number;
+}> {
   const ids = Array.isArray(conversationIds)
-    ? conversationIds
-        .map((x) => Number(x))
-        .filter((x) => Number.isFinite(x) && x > 0)
+    ? conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
     : [];
   if (!ids.length) {
     return { deletedConversations: 0, deletedMessages: 0, deletedMappings: 0, deletedImageCache: 0 };
@@ -518,15 +496,11 @@ export async function deleteConversationsByIds(
     if (!convo) continue;
 
     // Delete messages under this conversation.
-    const range = IDBKeyRange.bound(
-      [id, -Infinity] as any,
-      [id, Infinity] as any,
-    );
+    const range = IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any);
     const cursorReq = msgIdx.openCursor(range);
     // eslint-disable-next-line no-await-in-loop
     await new Promise<void>((resolve, reject) => {
-      cursorReq.onerror = () =>
-        reject(cursorReq.error || new Error('cursor failed'));
+      cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
       cursorReq.onsuccess = () => {
         const cursor = cursorReq.result;
         if (!cursor) return resolve();
@@ -557,8 +531,7 @@ export async function deleteConversationsByIds(
     const imgCursorReq = imageCacheIdx.openCursor(imgRange);
     // eslint-disable-next-line no-await-in-loop
     await new Promise<void>((resolve, reject) => {
-      imgCursorReq.onerror = () =>
-        reject(imgCursorReq.error || new Error('cursor failed'));
+      imgCursorReq.onerror = () => reject(imgCursorReq.error || new Error('cursor failed'));
       imgCursorReq.onsuccess = () => {
         const cursor = imgCursorReq.result;
         if (!cursor) return resolve();
@@ -603,10 +576,7 @@ export async function getSyncMappingByConversation(
   return { conversation, mapping: mapping || null };
 }
 
-export async function patchSyncMapping(
-  conversationId: number,
-  patch: Record<string, unknown>,
-): Promise<true> {
+export async function patchSyncMapping(conversationId: number, patch: Record<string, unknown>): Promise<true> {
   const id = Number(conversationId);
   if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
   if (!patch || typeof patch !== 'object') throw new Error('invalid patch');
@@ -638,7 +608,9 @@ export async function patchSyncMapping(
           Object.entries(incomingSections).map(([key, value]) => [
             key,
             {
-              ...((existingSections && (existingSections as any)[key] && typeof (existingSections as any)[key] === 'object'
+              ...((existingSections &&
+              (existingSections as any)[key] &&
+              typeof (existingSections as any)[key] === 'object'
                 ? (existingSections as any)[key]
                 : null) || {}),
               ...((value && typeof value === 'object' ? value : null) || {}),
@@ -664,10 +636,7 @@ export async function patchSyncMapping(
   return true;
 }
 
-export async function setConversationNotionPageId(
-  conversationId: number,
-  notionPageId: string,
-): Promise<true> {
+export async function setConversationNotionPageId(conversationId: number, notionPageId: string): Promise<true> {
   const id = Number(conversationId);
   if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
 
@@ -753,12 +722,8 @@ export async function setSyncCursor(
     conversationKey,
     notionPageId: String(existing?.notionPageId || conversation.notionPageId || ''),
     lastSyncedMessageKey: String(input?.lastSyncedMessageKey || ''),
-    lastSyncedSequence: Number.isFinite(Number(input?.lastSyncedSequence))
-      ? Number(input?.lastSyncedSequence)
-      : null,
-    lastSyncedAt: Number.isFinite(Number(input?.lastSyncedAt))
-      ? Number(input?.lastSyncedAt)
-      : now,
+    lastSyncedSequence: Number.isFinite(Number(input?.lastSyncedSequence)) ? Number(input?.lastSyncedSequence) : null,
+    lastSyncedAt: Number.isFinite(Number(input?.lastSyncedAt)) ? Number(input?.lastSyncedAt) : now,
     lastSyncedMessageUpdatedAt: Number.isFinite(Number(input?.lastSyncedMessageUpdatedAt))
       ? Number(input?.lastSyncedMessageUpdatedAt)
       : null,

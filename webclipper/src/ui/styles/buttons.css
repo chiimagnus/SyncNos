@@ -59,11 +59,15 @@
   opacity: 0.38;
 }
 
-.webclipper-btn:not(.webclipper-btn--filled):not(.webclipper-btn--danger):not(.webclipper-btn--danger-tint):not(.webclipper-btn--menu-item):hover:not(:disabled) {
+.webclipper-btn:not(.webclipper-btn--filled):not(.webclipper-btn--danger):not(.webclipper-btn--danger-tint):not(
+    .webclipper-btn--menu-item
+  ):hover:not(:disabled) {
   background-color: var(--bg-sunken);
 }
 
-.webclipper-btn:not(.webclipper-btn--filled):not(.webclipper-btn--danger):not(.webclipper-btn--danger-tint):not(.webclipper-btn--menu-item)[aria-pressed='true'] {
+.webclipper-btn:not(.webclipper-btn--filled):not(.webclipper-btn--danger):not(.webclipper-btn--danger-tint):not(
+    .webclipper-btn--menu-item
+  )[aria-pressed='true'] {
   --btn-surface: var(--bg-sunken);
   background-color: var(--bg-sunken);
 }

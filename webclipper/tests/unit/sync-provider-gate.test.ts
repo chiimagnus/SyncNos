@@ -35,7 +35,8 @@ describe('sync provider gate', () => {
   });
 
   it('reads/writes disabled state via storage (explicit false only)', async () => {
-    const { ensureSyncProviderEnabled, isSyncProviderEnabled, setSyncProviderEnabled } = await import('@services/sync/sync-provider-gate');
+    const { ensureSyncProviderEnabled, isSyncProviderEnabled, setSyncProviderEnabled } =
+      await import('@services/sync/sync-provider-gate');
     expect(await ensureSyncProviderEnabled('notion')).toBe(null);
 
     await setSyncProviderEnabled('notion', false);
@@ -47,4 +48,3 @@ describe('sync provider gate', () => {
     expect(await ensureSyncProviderEnabled('notion')).toBe(null);
   });
 });
-

@@ -1,8 +1,8 @@
-import { deflateRawSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { deflateRawSync } from 'node:zlib';
+import { describe, expect, it } from 'vitest';
 
 async function loadZipUtils() {
-  const mod = await import("@services/sync/local/zip-utils.ts");
+  const mod = await import('@services/sync/local/zip-utils.ts');
   return mod.default || mod;
 }
 
@@ -31,7 +31,7 @@ const CRC32_TABLE = (() => {
   for (let i = 0; i < 256; i += 1) {
     let c = i;
     for (let j = 0; j < 8; j += 1) {
-      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
     }
     table[i] = c >>> 0;
   }
@@ -66,7 +66,7 @@ function makeDeflatedZipEntry({ name, data }: { name: string; data: Uint8Array }
     u32(size),
     u16(nameBytes.length),
     u16(0),
-    nameBytes
+    nameBytes,
   ]);
 
   const centralHeader = concat([
@@ -87,7 +87,7 @@ function makeDeflatedZipEntry({ name, data }: { name: string; data: Uint8Array }
     u16(0),
     u32(0),
     u32(localOffset),
-    nameBytes
+    nameBytes,
   ]);
 
   const centralDir = centralHeader;
@@ -101,34 +101,34 @@ function makeDeflatedZipEntry({ name, data }: { name: string; data: Uint8Array }
     u16(1),
     u32(centralDir.length),
     u32(localPart.length),
-    u16(0)
+    u16(0),
   ]);
 
   return concat([localPart, centralDir, endRecord]);
 }
 
-describe("zip-utils", () => {
-  it("extractZipEntries can read stored zips created by createZipBlob", async () => {
+describe('zip-utils', () => {
+  it('extractZipEntries can read stored zips created by createZipBlob', async () => {
     const zipUtils = await loadZipUtils();
     const blob = await zipUtils.createZipBlob([
-      { name: "a.txt", data: "hello" },
-      { name: "dir/b.txt", data: "world" }
+      { name: 'a.txt', data: 'hello' },
+      { name: 'dir/b.txt', data: 'world' },
     ]);
     const entries: Map<string, Uint8Array> = await zipUtils.extractZipEntries(blob);
-    expect(Array.from(entries.keys()).sort()).toEqual(["a.txt", "dir/b.txt"]);
-    expect(new TextDecoder().decode(entries.get("a.txt"))).toBe("hello");
-    expect(new TextDecoder().decode(entries.get("dir/b.txt"))).toBe("world");
+    expect(Array.from(entries.keys()).sort()).toEqual(['a.txt', 'dir/b.txt']);
+    expect(new TextDecoder().decode(entries.get('a.txt'))).toBe('hello');
+    expect(new TextDecoder().decode(entries.get('dir/b.txt'))).toBe('world');
   });
 
-  it("extractZipEntries can read deflated (method=8) entries", async () => {
+  it('extractZipEntries can read deflated (method=8) entries', async () => {
     const zipUtils = await loadZipUtils();
-    const big = "a".repeat(150_000);
+    const big = 'a'.repeat(150_000);
     const bytes = makeDeflatedZipEntry({
-      name: "sources/chatgpt/c1.json",
-      data: new TextEncoder().encode(JSON.stringify({ ok: true, big }))
+      name: 'sources/chatgpt/c1.json',
+      data: new TextEncoder().encode(JSON.stringify({ ok: true, big })),
     });
-    const blob = new Blob([bytes], { type: "application/zip" });
+    const blob = new Blob([bytes], { type: 'application/zip' });
     const entries: Map<string, Uint8Array> = await zipUtils.extractZipEntries(blob);
-    expect(new TextDecoder().decode(entries.get("sources/chatgpt/c1.json"))).toBe(JSON.stringify({ ok: true, big }));
+    expect(new TextDecoder().decode(entries.get('sources/chatgpt/c1.json'))).toBe(JSON.stringify({ ok: true, big }));
   });
 });

@@ -3,10 +3,7 @@ import { UI_PORT_NAMES } from '@platform/messaging/message-contracts';
 
 type Message = { type: string; [key: string]: any };
 
-type Handler = (
-  msg: Message,
-  sender: any,
-) => Promise<any> | any;
+type Handler = (msg: Message, sender: any) => Promise<any> | any;
 
 type RouterOptions = {
   fallback: Handler;

@@ -17,13 +17,15 @@ body {
   min-width: 320px;
   overflow: hidden;
   background: var(--bg-primary);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--bg-primary) 88%, var(--bg-sunken)),
-    var(--bg-primary)
-  );
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 88%, var(--bg-sunken)), var(--bg-primary));
   color: var(--text-primary);
-  font: 14px/1.5 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  font:
+    14px/1.5 'SF Pro Text',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    'Helvetica Neue',
+    sans-serif;
 }
 
 a {

@@ -1,6 +1,10 @@
 import { t } from '@i18n';
 import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
-import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import {
+  CONTENT_MESSAGE_TYPES,
+  CURRENT_PAGE_MESSAGE_TYPES,
+  UI_MESSAGE_TYPES,
+} from '@platform/messaging/message-contracts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -119,7 +123,11 @@ async function relayToActiveTab(tabId: number, type: string) {
       };
     }
 
-    const apiResponse = response as { ok?: boolean; data?: unknown; error?: { message?: unknown; extra?: unknown } | null };
+    const apiResponse = response as {
+      ok?: boolean;
+      data?: unknown;
+      error?: { message?: unknown; extra?: unknown } | null;
+    };
     if (apiResponse.ok) {
       return { ok: true as const, data: apiResponse.data };
     }

@@ -5,3 +5,5 @@ cloudflare-workers/.wrangler
 cloudflare-workers/.dev.vars
 cloudflare-workers/.output
 package-lock.json
+public/src/vendor
+src/ui/i18n

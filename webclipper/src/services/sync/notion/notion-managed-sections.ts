@@ -1,4 +1,9 @@
-import { buildToggleHeadingBlock, findToggleHeadingBlock, listBlockChildren, archiveBlock } from '@services/sync/notion/notion-section-blocks.ts';
+import {
+  buildToggleHeadingBlock,
+  findToggleHeadingBlock,
+  listBlockChildren,
+  archiveBlock,
+} from '@services/sync/notion/notion-section-blocks.ts';
 
 type ToggleHeadingLevel = 1 | 2 | 3;
 

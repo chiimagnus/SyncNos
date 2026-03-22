@@ -7,13 +7,7 @@ const eslintConfigPrettier = require('eslint-config-prettier');
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   {
-    ignores: [
-      '.output/**',
-      '.wxt/**',
-      'node_modules/**',
-      'cloudflare-workers/**',
-      'public/src/vendor/**',
-    ],
+    ignores: ['.output/**', '.wxt/**', 'node_modules/**', 'cloudflare-workers/**', 'public/src/vendor/**'],
   },
 
   js.configs.recommended,
@@ -86,10 +80,7 @@ module.exports = [
   // Bootstrap and Shadow-DOM panel mounting are glue layers that currently reuse UI modules/styles.
   // Keep them unblocked by the strict service -> ui restriction, but avoid introducing new deps elsewhere.
   {
-    files: [
-      'src/services/bootstrap/**/*.{ts,tsx}',
-      'src/services/comments/threaded-comments-panel.ts',
-    ],
+    files: ['src/services/bootstrap/**/*.{ts,tsx}', 'src/services/comments/threaded-comments-panel.ts'],
     rules: {
       'no-restricted-imports': 'off',
     },

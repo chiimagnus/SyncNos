@@ -126,11 +126,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
   const messagesByKeyIndex = msgKeyIdx;
   const mappingsBySourceConversationKeyIndex = mappingIdx;
 
-  function migrateMappingKey(input: {
-    legacyKey: string;
-    stableKey: string;
-    onDone: MigrationDone;
-  }): void {
+  function migrateMappingKey(input: { legacyKey: string; stableKey: string; onDone: MigrationDone }): void {
     const { legacyKey, stableKey, onDone } = input;
     if (!legacyKey || legacyKey === stableKey) {
       onDone({ ok: true, changed: false });
@@ -163,11 +159,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
     mapReq.onerror = () => onDone({ ok: false, changed: false });
   }
 
-  function migrateMessagesFromDupToKeep(input: {
-    dupId: number;
-    keepId: number;
-    onDone: MigrationDone;
-  }): void {
+  function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
     const { dupId, keepId, onDone } = input;
     let hadAny = false;
     let ok = true;
@@ -225,9 +217,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
 
     try {
       const keyRangeApi = globalThis.IDBKeyRange;
-      const range = keyRangeApi?.bound
-        ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity])
-        : null;
+      const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
       if (!range) {
         tryFallbackCursor();
         return;
@@ -308,9 +298,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
 
       const proceedWithStableExisting = (stableExisting: Record<string, unknown> | null) => {
         const seenIds = new Set(
-          groupedConversations
-            .map((item) => Number(item?.id))
-            .filter((id) => Number.isFinite(id) && id > 0),
+          groupedConversations.map((item) => Number(item?.id)).filter((id) => Number.isFinite(id) && id > 0),
         );
         const mergedConversations =
           stableExisting && stableExisting.id && !seenIds.has(Number(stableExisting.id))
@@ -330,16 +318,14 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
         }
         if (!keepConversation) {
           keepConversation =
-            mergedConversations
-              .slice()
-              .sort((a, b) => {
-                const at = Number(a?.lastCapturedAt) || 0;
-                const bt = Number(b?.lastCapturedAt) || 0;
-                if (bt !== at) return bt - at;
-                const aid = Number(a?.id) || 0;
-                const bid = Number(b?.id) || 0;
-                return bid - aid;
-              })[0] || null;
+            mergedConversations.slice().sort((a, b) => {
+              const at = Number(a?.lastCapturedAt) || 0;
+              const bt = Number(b?.lastCapturedAt) || 0;
+              if (bt !== at) return bt - at;
+              const aid = Number(a?.id) || 0;
+              const bid = Number(b?.id) || 0;
+              return bid - aid;
+            })[0] || null;
         }
 
         const keepId = keepConversation?.id ? Number(keepConversation.id) : 0;
@@ -371,9 +357,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
               legacyKey: legacyKeepKey,
               stableKey,
               onDone: () => {
-                const duplicates = mergedConversations.filter(
-                  (conversation) => Number(conversation?.id) !== keepId,
-                );
+                const duplicates = mergedConversations.filter((conversation) => Number(conversation?.id) !== keepId);
                 let duplicateIndex = 0;
 
                 const processNextDup = () => {
@@ -437,9 +421,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
 
       const stableReq = convoKeyIdx.get(['notionai', stableKey]);
       stableReq.onsuccess = () =>
-        proceedWithStableExisting(
-          (stableReq.result as Record<string, unknown> | undefined) || null,
-        );
+        proceedWithStableExisting((stableReq.result as Record<string, unknown> | undefined) || null);
       stableReq.onerror = () => proceedWithStableExisting(null);
     };
 
@@ -474,7 +456,8 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
   const messagesBySequenceIndex = msgSeqIdx;
   const messagesByKeyIndex = msgKeyIdx;
   const mappingsBySourceConversationKeyIndex = mappingIdx;
-  const articleConversations: Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }> = [];
+  const articleConversations: Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }> =
+    [];
 
   function mergeConversationRecord(base: Record<string, unknown>, incoming: Record<string, unknown>) {
     const next = { ...base };
@@ -487,19 +470,21 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     next.publishedAt = safeString(next.publishedAt) || safeString(incoming.publishedAt);
     next.notionPageId = safeString(next.notionPageId) || safeString(incoming.notionPageId);
     next.warningFlags = mergeStringArray(next.warningFlags, incoming.warningFlags);
-    next.lastCapturedAt =
-      pickMaxFiniteNumber(next.lastCapturedAt, incoming.lastCapturedAt) || Date.now();
+    next.lastCapturedAt = pickMaxFiniteNumber(next.lastCapturedAt, incoming.lastCapturedAt) || Date.now();
     return next;
   }
 
-  function mergeMappingRecord(base: Record<string, unknown>, incoming: Record<string, unknown>, fallbackNotionPageId: string) {
+  function mergeMappingRecord(
+    base: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+    fallbackNotionPageId: string,
+  ) {
     const next = { ...base };
     next.source = 'web';
     next.conversationKey = safeString(base.conversationKey || incoming.conversationKey);
     next.notionPageId =
       safeString(next.notionPageId) || safeString(incoming.notionPageId) || safeString(fallbackNotionPageId);
-    next.lastSyncedMessageKey =
-      safeString(next.lastSyncedMessageKey) || safeString(incoming.lastSyncedMessageKey);
+    next.lastSyncedMessageKey = safeString(next.lastSyncedMessageKey) || safeString(incoming.lastSyncedMessageKey);
     next.lastSyncedSequence = pickMaxFiniteNumber(next.lastSyncedSequence, incoming.lastSyncedSequence);
     next.lastSyncedAt = pickMaxFiniteNumber(next.lastSyncedAt, incoming.lastSyncedAt);
     next.lastSyncedMessageUpdatedAt = pickMaxFiniteNumber(
@@ -510,11 +495,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     return next;
   }
 
-  function migrateMessagesFromDupToKeep(input: {
-    dupId: number;
-    keepId: number;
-    onDone: MigrationDone;
-  }): void {
+  function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
     const { dupId, keepId, onDone } = input;
     let hadAny = false;
     let ok = true;
@@ -524,9 +505,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     }
 
     const keyRangeApi = globalThis.IDBKeyRange;
-    const range = keyRangeApi?.bound
-      ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity])
-      : null;
+    const range = keyRangeApi?.bound ? keyRangeApi.bound([dupId, -Infinity], [dupId, Infinity]) : null;
     if (!range) {
       onDone({ ok: false, hadAny: false });
       return;
@@ -656,7 +635,10 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
       return;
     }
 
-    const groups = new Map<string, Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }>>();
+    const groups = new Map<
+      string,
+      Array<Record<string, unknown> & { __canonicalUrl?: string; __canonicalKey?: string }>
+    >();
     for (const conversation of articleConversations) {
       const key = safeString(conversation.__canonicalKey);
       if (!key) continue;
@@ -678,9 +660,7 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
       exactReq.onsuccess = () => {
         const exact = (exactReq.result as Record<string, unknown> | undefined) || null;
         const seenIds = new Set(
-          groupedConversations
-            .map((item) => Number(item?.id))
-            .filter((id) => Number.isFinite(id) && id > 0),
+          groupedConversations.map((item) => Number(item?.id)).filter((id) => Number.isFinite(id) && id > 0),
         );
         const mergedConversations =
           exact && exact.id && !seenIds.has(Number(exact.id))
@@ -688,25 +668,25 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
             : groupedConversations;
 
         const keepConversation =
-          mergedConversations
-            .slice()
-            .sort((a, b) => {
-              const aCanonical = safeString(a?.source) === 'web' && safeString(a?.conversationKey) === canonicalKey ? 1 : 0;
-              const bCanonical = safeString(b?.source) === 'web' && safeString(b?.conversationKey) === canonicalKey ? 1 : 0;
-              if (bCanonical !== aCanonical) return bCanonical - aCanonical;
+          mergedConversations.slice().sort((a, b) => {
+            const aCanonical =
+              safeString(a?.source) === 'web' && safeString(a?.conversationKey) === canonicalKey ? 1 : 0;
+            const bCanonical =
+              safeString(b?.source) === 'web' && safeString(b?.conversationKey) === canonicalKey ? 1 : 0;
+            if (bCanonical !== aCanonical) return bCanonical - aCanonical;
 
-              const aMapped = safeString(a?.notionPageId) ? 1 : 0;
-              const bMapped = safeString(b?.notionPageId) ? 1 : 0;
-              if (bMapped !== aMapped) return bMapped - aMapped;
+            const aMapped = safeString(a?.notionPageId) ? 1 : 0;
+            const bMapped = safeString(b?.notionPageId) ? 1 : 0;
+            if (bMapped !== aMapped) return bMapped - aMapped;
 
-              const at = Number(a?.lastCapturedAt) || 0;
-              const bt = Number(b?.lastCapturedAt) || 0;
-              if (bt !== at) return bt - at;
+            const at = Number(a?.lastCapturedAt) || 0;
+            const bt = Number(b?.lastCapturedAt) || 0;
+            if (bt !== at) return bt - at;
 
-              const aid = Number(a?.id) || 0;
-              const bid = Number(b?.id) || 0;
-              return bid - aid;
-            })[0] || null;
+            const aid = Number(a?.id) || 0;
+            const bid = Number(b?.id) || 0;
+            return bid - aid;
+          })[0] || null;
 
         const keepId = Number(keepConversation?.id);
         if (!Number.isFinite(keepId) || keepId <= 0) {

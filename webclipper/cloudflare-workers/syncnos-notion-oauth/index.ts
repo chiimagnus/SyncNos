@@ -28,11 +28,13 @@ export default {
     const limitResult = await bestEffortRateLimit(request, {
       windowSeconds: 10 * 60,
       maxRequests: 30,
-      keyPrefix: 'rl:notion-oauth-exchange:'
+      keyPrefix: 'rl:notion-oauth-exchange:',
     });
     if (!limitResult.ok) {
       const retryAfterSeconds = 'retryAfterSeconds' in limitResult ? limitResult.retryAfterSeconds : 60;
-      return withCors(new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }));
+      return withCors(
+        new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }),
+      );
     }
 
     let body: any = null;
@@ -66,10 +68,10 @@ export default {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
-        Authorization: `Basic ${basic}`
+        Authorization: `Basic ${basic}`,
       },
       body: form.toString(),
-      signal: controller.signal
+      signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
 
     const text = await res.text();
@@ -77,8 +79,10 @@ export default {
       return withCors(new Response(text || 'Token exchange failed', { status: res.status }));
     }
 
-    return withCors(new Response(text, { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }));
-  }
+    return withCors(
+      new Response(text, { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }),
+    );
+  },
 };
 
 function withCors(response: Response): Response {
@@ -91,11 +95,10 @@ function withCors(response: Response): Response {
 
 async function bestEffortRateLimit(
   request: Request,
-  opts: { windowSeconds: number; maxRequests: number; keyPrefix: string }
+  opts: { windowSeconds: number; maxRequests: number; keyPrefix: string },
 ): Promise<{ ok: true } | { ok: false; retryAfterSeconds: number }> {
-  const ip = request.headers.get('CF-Connecting-IP')
-    || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || '';
+  const ip =
+    request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return { ok: true };
 
   const now = Date.now();
@@ -110,7 +113,7 @@ async function bestEffortRateLimit(
     const hit = await cache.match(cacheKey);
     if (hit) {
       const json = await hit.json().catch(() => null);
-      count = (json && typeof json.count === 'number' && isFinite(json.count)) ? json.count : 0;
+      count = json && typeof json.count === 'number' && isFinite(json.count) ? json.count : 0;
     }
   } catch (_e) {
     return { ok: true };
@@ -124,7 +127,7 @@ async function bestEffortRateLimit(
   const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000));
   await cache.put(
     cacheKey,
-    new Response(JSON.stringify(next), { headers: { 'Cache-Control': `max-age=${ttlSeconds}` } })
+    new Response(JSON.stringify(next), { headers: { 'Cache-Control': `max-age=${ttlSeconds}` } }),
   );
   return { ok: true };
 }

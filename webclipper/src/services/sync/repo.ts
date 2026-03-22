@@ -41,13 +41,7 @@ export async function clearObsidianSyncStatus(): Promise<ObsidianSyncStatus> {
 
 function normalizeIds(ids: unknown): number[] {
   return Array.isArray(ids)
-    ? Array.from(
-        new Set(
-          ids
-            .map((x) => Number(x))
-            .filter((x) => Number.isFinite(x) && x > 0),
-        ),
-      )
+    ? Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)))
     : [];
 }
 

@@ -9,7 +9,9 @@ function safeString(v: unknown) {
 }
 
 function normalizeNewlines(input: unknown) {
-  return String(input || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return String(input || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
 }
 
 function yamlEscapeString(value: unknown) {
@@ -88,9 +90,7 @@ function toArticleBodyMessages(messages: unknown[]): any[] {
 
 function buildArticleBodyMarkdown(messages: any[]) {
   const list = toArticleBodyMessages(messages);
-  const chunks = list
-    .map((m) => safeString(m?.contentMarkdown) || safeString(m?.contentText))
-    .filter((x) => !!x);
+  const chunks = list.map((m) => safeString(m?.contentMarkdown) || safeString(m?.contentText)).filter((x) => !!x);
   return chunks.join('\n\n').trim();
 }
 
@@ -194,11 +194,7 @@ function buildFullNoteMarkdown({
   }
 
   const messagesMd = buildMessagesMarkdown(messages || []);
-  return (
-    buildFrontmatterBlock(frontmatter) +
-    `# ${MESSAGES_HEADING}\n\n` +
-    messagesMd
-  );
+  return buildFrontmatterBlock(frontmatter) + `# ${MESSAGES_HEADING}\n\n` + messagesMd;
 }
 
 const api = {

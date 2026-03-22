@@ -7,7 +7,9 @@ const MESSAGE_TYPES = Object.freeze({
 });
 
 function isAllowedParentOrigin(origin: string): boolean {
-  const value = String(origin || '').trim().toLowerCase();
+  const value = String(origin || '')
+    .trim()
+    .toLowerCase();
   if (!value) return false;
   return value === 'https://chatgpt.com' || value === 'https://www.chatgpt.com' || value === 'https://chat.openai.com';
 }
@@ -56,9 +58,7 @@ function pickContentRoot(doc: Document): HTMLElement {
 
 function extractDeepResearchSnapshot(): { title: string; markdown: string; text: string } {
   const title =
-    normalizeTitle(document.querySelector('h1')?.textContent) ||
-    normalizeTitle(document.title) ||
-    'Deep Research';
+    normalizeTitle(document.querySelector('h1')?.textContent) || normalizeTitle(document.title) || 'Deep Research';
 
   const root = pickContentRoot(document);
   const cloned = root?.cloneNode ? (root.cloneNode(true) as any) : null;

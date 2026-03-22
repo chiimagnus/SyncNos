@@ -16,4 +16,3 @@ export function webNavigationOnCommittedAddListener(listener: (details: any) => 
   }
   return false;
 }
-

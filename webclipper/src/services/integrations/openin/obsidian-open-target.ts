@@ -298,9 +298,7 @@ export async function openObsidianTarget({
         shouldLaunchBeforeRetry = false;
       } else {
         const isLastAttempt = index >= attempts - 1;
-        const message =
-          refreshed.error?.message ||
-          'Failed to resolve the Obsidian note after launching the app.';
+        const message = refreshed.error?.message || 'Failed to resolve the Obsidian note after launching the app.';
         if (isLastAttempt || refreshed.error?.code === 'note_not_found') {
           port.reportError(message);
           return { ok: false, error: { code: refreshed.error?.code || 'unavailable_after_launch', message } } as const;

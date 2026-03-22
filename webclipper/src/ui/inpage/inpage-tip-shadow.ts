@@ -166,8 +166,16 @@ function positionBubble(el: HTMLElement) {
     const maxTop = Math.max(VIEWPORT_PAD, viewport.height - height - VIEWPORT_PAD);
 
     (el as any).dataset.placement = 'none';
-    setImportantStyle(el, 'left', `${Math.round(clamp(viewport.width - width - VIEWPORT_PAD, VIEWPORT_PAD, maxLeft))}px`);
-    setImportantStyle(el, 'top', `${Math.round(clamp(viewport.height - height - VIEWPORT_PAD, VIEWPORT_PAD, maxTop))}px`);
+    setImportantStyle(
+      el,
+      'left',
+      `${Math.round(clamp(viewport.width - width - VIEWPORT_PAD, VIEWPORT_PAD, maxLeft))}px`,
+    );
+    setImportantStyle(
+      el,
+      'top',
+      `${Math.round(clamp(viewport.height - height - VIEWPORT_PAD, VIEWPORT_PAD, maxTop))}px`,
+    );
     return;
   }
   const placement = inferPlacement(anchorRect, viewport);

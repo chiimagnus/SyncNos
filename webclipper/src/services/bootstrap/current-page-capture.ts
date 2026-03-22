@@ -8,7 +8,12 @@ type RuntimeClient = {
 
 type CollectorRegistry = {
   pickActive?: () => { id: string; collector: any } | null;
-  list?: () => Array<{ id: string; collector?: any; matches?: (loc: any) => boolean; inpageMatches?: (loc: any) => boolean }>;
+  list?: () => Array<{
+    id: string;
+    collector?: any;
+    matches?: (loc: any) => boolean;
+    inpageMatches?: (loc: any) => boolean;
+  }>;
 };
 
 type CurrentPageCaptureDeps = {
@@ -185,10 +190,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         }
         const title = String(response?.data?.title || '');
         const isNew = response?.data?.isNew !== false;
-        report(
-          buildCaptureSuccessTipMessage({ isNew, title }),
-          'default',
-        );
+        report(buildCaptureSuccessTipMessage({ isNew, title }), 'default');
         return {
           kind: 'article',
           label: target.label,
@@ -209,11 +211,18 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       }
 
       try {
-        const isChatgpt = String(snapshot?.conversation?.source || '').trim().toLowerCase() === 'chatgpt';
+        const isChatgpt =
+          String(snapshot?.conversation?.source || '')
+            .trim()
+            .toLowerCase() === 'chatgpt';
         const hasDeepResearchPlaceholders =
           isChatgpt &&
           Array.isArray(snapshot?.messages) &&
-          snapshot.messages.some((m: any) => String(m?.contentText || m?.contentMarkdown || '').trim().startsWith('Deep Research (iframe):'));
+          snapshot.messages.some((m: any) =>
+            String(m?.contentText || m?.contentMarkdown || '')
+              .trim()
+              .startsWith('Deep Research (iframe):'),
+          );
         if (hasDeepResearchPlaceholders) {
           await hydrateChatgptDeepResearchSnapshot(snapshot, send);
         }
@@ -228,10 +237,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       const title = String(snapshot?.conversation?.title || '');
       const isNew = saved.isNew !== false;
-      report(
-        buildCaptureSuccessTipMessage({ isNew, title }),
-        'default',
-      );
+      report(buildCaptureSuccessTipMessage({ isNew, title }), 'default');
       return {
         kind: 'chat',
         label: target.label,

@@ -2,7 +2,13 @@ import { useMemo } from 'react';
 
 import { t } from '@i18n';
 import type { ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
-import { buttonClassName, cardClassName, checkboxClassName, dangerButtonClassName, textInputClassName } from '@ui/settings/ui';
+import {
+  buttonClassName,
+  cardClassName,
+  checkboxClassName,
+  dangerButtonClassName,
+  textInputClassName,
+} from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 const textareaClassName =
@@ -23,7 +29,16 @@ export function ChatWithAiSection(props: {
   onChangePlatforms: (next: ChatWithAiPlatform[]) => void;
   onReset: () => void;
 }) {
-  const { busy, promptTemplate, onChangePromptTemplate, maxChars, onChangeMaxChars, platforms, onChangePlatforms, onReset } = props;
+  const {
+    busy,
+    promptTemplate,
+    onChangePromptTemplate,
+    maxChars,
+    onChangeMaxChars,
+    platforms,
+    onChangePlatforms,
+    onReset,
+  } = props;
 
   const rows = useMemo(() => (Array.isArray(platforms) ? platforms : []), [platforms]);
 
@@ -41,7 +56,9 @@ export function ChatWithAiSection(props: {
   };
 
   const addPlatform = () => {
-    const next = rows.concat([{ id: makePlatformId(), name: t('chatWithPlatformNamePlaceholder'), url: 'https://', enabled: true }]);
+    const next = rows.concat([
+      { id: makePlatformId(), name: t('chatWithPlatformNamePlaceholder'), url: 'https://', enabled: true },
+    ]);
     onChangePlatforms(next);
   };
 
@@ -58,7 +75,7 @@ export function ChatWithAiSection(props: {
 
       <div className="tw-mt-3 tw-grid tw-gap-2">
         <SettingsFormRow label={t('chatWithPromptTemplateLabel')} align="start">
-            <div className="tw-grid tw-gap-2">
+          <div className="tw-grid tw-gap-2">
             <textarea
               id="chatWithPromptTemplate"
               className={textareaClassName}
@@ -139,7 +156,9 @@ export function ChatWithAiSection(props: {
                 ))}
               </div>
             ) : (
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">{t('chatWithNoPlatforms')}</div>
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+                {t('chatWithNoPlatforms')}
+              </div>
             )}
 
             <div className="tw-flex tw-items-center tw-gap-2">

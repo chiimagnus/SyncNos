@@ -34,7 +34,10 @@ export function extractCursor(
   };
 }
 
-export function computeNewMessages(messages: unknown, cursor: Partial<NotionSyncCursor> | null | undefined): {
+export function computeNewMessages(
+  messages: unknown,
+  cursor: Partial<NotionSyncCursor> | null | undefined,
+): {
   ok: boolean;
   mode: string;
   newMessages: any[];
@@ -45,15 +48,9 @@ export function computeNewMessages(messages: unknown, cursor: Partial<NotionSync
 
   const key = cursor?.lastSyncedMessageKey ? String(cursor.lastSyncedMessageKey) : '';
   const rawSeq = cursor ? (cursor as any).lastSyncedSequence : null;
-  const seq =
-    rawSeq == null
-      ? null
-      : Number.isFinite(Number(rawSeq))
-        ? Number(rawSeq)
-        : null;
+  const seq = rawSeq == null ? null : Number.isFinite(Number(rawSeq)) ? Number(rawSeq) : null;
 
-  const findIndexBySeq = (needle: number) =>
-    list.findIndex((m) => m && Number((m as any).sequence) === needle);
+  const findIndexBySeq = (needle: number) => list.findIndex((m) => m && Number((m as any).sequence) === needle);
 
   const maxSequence = () => {
     let max = -Infinity;

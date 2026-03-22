@@ -26,9 +26,7 @@ export async function getConversationDetail(conversationId: number): Promise<Con
 
 export async function deleteConversations(conversationIds: number[]): Promise<unknown> {
   const ids = Array.isArray(conversationIds)
-    ? conversationIds
-        .map((x) => Number(x))
-        .filter((x) => Number.isFinite(x) && x > 0)
+    ? conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
     : [];
   if (!ids.length) return null;
   const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, { conversationIds: ids });
@@ -51,9 +49,12 @@ export async function backfillConversationImages(
 ): Promise<BackfillConversationImagesResult> {
   const id = Number(conversationId);
   if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
-  const res = await send<ApiResponse<BackfillConversationImagesResult>>(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, {
-    conversationId: id,
-    conversationUrl: String(conversationUrl || ''),
-  });
+  const res = await send<ApiResponse<BackfillConversationImagesResult>>(
+    CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
+    {
+      conversationId: id,
+      conversationUrl: String(conversationUrl || ''),
+    },
+  );
   return unwrap(res);
 }

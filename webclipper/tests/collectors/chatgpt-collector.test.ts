@@ -1,16 +1,16 @@
-import { JSDOM } from "jsdom";
-import { describe, expect, it, vi } from "vitest";
-import normalizeApi from "@services/shared/normalize.ts";
-import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
-import { createChatgptCollectorDef } from "../../src/collectors/chatgpt/chatgpt-collector.ts";
+import { JSDOM } from 'jsdom';
+import { describe, expect, it, vi } from 'vitest';
+import normalizeApi from '@services/shared/normalize.ts';
+import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
+import { createChatgptCollectorDef } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
 
 function setupChatgptDom(html: string, url: string) {
   const dom = new JSDOM(`<body><main>${html}</main></body>`, { url });
   return dom;
 }
 
-describe("chatgpt-collector", () => {
-  it("extracts assistant contentMarkdown from semantic markdown DOM", async () => {
+describe('chatgpt-collector', () => {
+  it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <article data-testid="conversation-turn-1">
         <div data-message-author-role="user"><div class="whitespace-pre-wrap">你好</div></div>
@@ -50,7 +50,7 @@ describe("chatgpt-collector", () => {
       </article>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_md_1");
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_md_1');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -58,34 +58,34 @@ describe("chatgpt-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true })) as any;
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
 
-    const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
+    const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
     expect(assistant).toBeTruthy();
-    expect(assistant.contentMarkdown).toContain("# 主标题");
-    expect(assistant.contentMarkdown).toContain("> 这是引用");
-    expect(assistant.contentMarkdown).toContain("- 父级条目");
-    expect(assistant.contentMarkdown).toContain("  - 子级条目");
-    expect(assistant.contentMarkdown).toContain("3. 第三项");
-    expect(assistant.contentMarkdown).toContain("| 类型 | 特征 |");
-    expect(assistant.contentMarkdown).toContain("```");
-    expect(assistant.contentMarkdown).toContain("const a = 1;");
-    expect(assistant.contentMarkdown).toContain("console.log(a);");
-    expect(assistant.contentMarkdown).toContain("**粗体**");
-    expect(assistant.contentMarkdown).toContain("*斜体*");
-    expect(assistant.contentMarkdown).toContain("`sum(1,2)`");
-    expect(assistant.contentMarkdown).toContain("[链接](https://example.com)");
-    expect(assistant.contentMarkdown).toContain("---");
-    expect(assistant.contentMarkdown).not.toContain("复制");
+    expect(assistant.contentMarkdown).toContain('# 主标题');
+    expect(assistant.contentMarkdown).toContain('> 这是引用');
+    expect(assistant.contentMarkdown).toContain('- 父级条目');
+    expect(assistant.contentMarkdown).toContain('  - 子级条目');
+    expect(assistant.contentMarkdown).toContain('3. 第三项');
+    expect(assistant.contentMarkdown).toContain('| 类型 | 特征 |');
+    expect(assistant.contentMarkdown).toContain('```');
+    expect(assistant.contentMarkdown).toContain('const a = 1;');
+    expect(assistant.contentMarkdown).toContain('console.log(a);');
+    expect(assistant.contentMarkdown).toContain('**粗体**');
+    expect(assistant.contentMarkdown).toContain('*斜体*');
+    expect(assistant.contentMarkdown).toContain('`sum(1,2)`');
+    expect(assistant.contentMarkdown).toContain('[链接](https://example.com)');
+    expect(assistant.contentMarkdown).toContain('---');
+    expect(assistant.contentMarkdown).not.toContain('复制');
 
-    expect(assistant.contentText).toContain("主标题");
-    expect(assistant.contentText).toContain("console.log(a);");
-    expect(assistant.contentText).not.toContain("复制");
+    expect(assistant.contentText).toContain('主标题');
+    expect(assistant.contentText).toContain('console.log(a);');
+    expect(assistant.contentText).not.toContain('复制');
   });
 
-  it("extracts multiple assistant messages inside an agent-turn container", async () => {
+  it('extracts multiple assistant messages inside an agent-turn container', async () => {
     const html = `
       <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
       <div class="group/turn-messages flex flex-col agent-turn">
@@ -101,7 +101,7 @@ describe("chatgpt-collector", () => {
       </div>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_agent_turn_1");
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_agent_turn_1');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -109,13 +109,13 @@ describe("chatgpt-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true })) as any;
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
-    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "assistant"]);
-    expect(snap.messages.map((m: any) => m.contentText)).toEqual(["Q", "first", "second"]);
+    expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'assistant']);
+    expect(snap.messages.map((m: any) => m.contentText)).toEqual(['Q', 'first', 'second']);
   });
 
-  it("preserves hidden mermaid code blocks that are rendered as diagrams", async () => {
+  it('preserves hidden mermaid code blocks that are rendered as diagrams', async () => {
     const html = `
       <article data-testid="conversation-turn-1">
         <div data-message-author-role="assistant" data-message-id="m_ai_mermaid">
@@ -130,7 +130,7 @@ describe("chatgpt-collector", () => {
       </article>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_mermaid_1");
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_mermaid_1');
     const env = createCollectorEnv({
       window: dom.window as any,
       document: dom.window.document as any,
@@ -141,13 +141,13 @@ describe("chatgpt-collector", () => {
     const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentMarkdown).toContain("```mermaid");
-    expect(snap.messages[0].contentMarkdown).toContain("graph TD");
-    expect(snap.messages[0].contentText).toContain("graph TD");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
+    expect(snap.messages[0].contentMarkdown).toContain('graph TD');
+    expect(snap.messages[0].contentText).toContain('graph TD');
   });
 
-  it("captures deep-research iframe content via postMessage", async () => {
+  it('captures deep-research iframe content via postMessage', async () => {
     const html = `
       <div data-message-author-role="assistant" data-message-id="m_ai_prev">
         <div class="markdown prose"><p>previous</p></div>
@@ -159,7 +159,7 @@ describe("chatgpt-collector", () => {
       </article>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_1");
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_1');
     const iframe = dom.window.document.querySelector('iframe') as any;
     expect(iframe).toBeTruthy();
 
@@ -191,7 +191,7 @@ describe("chatgpt-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true })) as any;
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     expect(snap.messages[0].contentText).toContain('previous');
@@ -200,7 +200,7 @@ describe("chatgpt-collector", () => {
     expect(snap.messages[1].contentText).toContain('Body');
   });
 
-  it("captures deep-research iframe inside section conversation-turn wrappers", async () => {
+  it('captures deep-research iframe inside section conversation-turn wrappers', async () => {
     const html = `
       <section data-testid="conversation-turn-1" data-turn="user">
         <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
@@ -213,30 +213,30 @@ describe("chatgpt-collector", () => {
       </section>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_section_1");
-    const iframe = dom.window.document.querySelector("iframe") as any;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_section_1');
+    const iframe = dom.window.document.querySelector('iframe') as any;
     expect(iframe).toBeTruthy();
 
     const fakeFrameWindow = {
       postMessage: (msg: any) => {
         const requestId = msg?.requestId;
         dom.window.dispatchEvent(
-          new (dom.window as any).MessageEvent("message", {
+          new (dom.window as any).MessageEvent('message', {
             data: {
               __syncnos: true,
-              type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+              type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
               requestId,
-              title: "Report",
-              markdown: "# Title\n\nBody",
-              text: "Title\n\nBody",
+              title: 'Report',
+              markdown: '# Title\n\nBody',
+              text: 'Title\n\nBody',
             },
-            origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+            origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
             source: fakeFrameWindow as any,
           }),
         );
       },
     };
-    Object.defineProperty(iframe, "contentWindow", { configurable: true, value: fakeFrameWindow });
+    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: fakeFrameWindow });
 
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -247,13 +247,13 @@ describe("chatgpt-collector", () => {
 
     const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
-    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant"]);
-    expect(snap.messages[0].contentText).toBe("Q");
-    expect(snap.messages[1].contentMarkdown).toContain("# Title");
-    expect(snap.messages[1].contentText).toContain("Body");
+    expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
+    expect(snap.messages[0].contentText).toBe('Q');
+    expect(snap.messages[1].contentMarkdown).toContain('# Title');
+    expect(snap.messages[1].contentText).toContain('Body');
   });
 
-  it("captures multiple deep-research iframes with identical src as distinct reports", async () => {
+  it('captures multiple deep-research iframes with identical src as distinct reports', async () => {
     const html = `
       <section data-testid="conversation-turn-1" data-turn="user" data-turn-id="u1">
         <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
@@ -275,8 +275,8 @@ describe("chatgpt-collector", () => {
       </section>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_multi_1");
-    const iframes = Array.from(dom.window.document.querySelectorAll("iframe")) as any[];
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_multi_1');
+    const iframes = Array.from(dom.window.document.querySelectorAll('iframe')) as any[];
     expect(iframes.length).toBe(3);
 
     const mkFrame = (title: string, body: string) => {
@@ -284,16 +284,16 @@ describe("chatgpt-collector", () => {
         postMessage: (msg: any) => {
           const requestId = msg?.requestId;
           dom.window.dispatchEvent(
-            new (dom.window as any).MessageEvent("message", {
+            new (dom.window as any).MessageEvent('message', {
               data: {
                 __syncnos: true,
-                type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+                type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
                 requestId,
                 title,
                 markdown: `# ${title}\n\n${body}`,
                 text: `${title}\n\n${body}`,
               },
-              origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+              origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
               source: win as any,
             }),
           );
@@ -302,12 +302,12 @@ describe("chatgpt-collector", () => {
       return win;
     };
 
-    const w1 = mkFrame("Report A", "Body A");
-    const w2 = mkFrame("Report A", "Body A");
-    const w3 = mkFrame("Report B", "Body B");
-    Object.defineProperty(iframes[0], "contentWindow", { configurable: true, value: w1 });
-    Object.defineProperty(iframes[1], "contentWindow", { configurable: true, value: w2 });
-    Object.defineProperty(iframes[2], "contentWindow", { configurable: true, value: w3 });
+    const w1 = mkFrame('Report A', 'Body A');
+    const w2 = mkFrame('Report A', 'Body A');
+    const w3 = mkFrame('Report B', 'Body B');
+    Object.defineProperty(iframes[0], 'contentWindow', { configurable: true, value: w1 });
+    Object.defineProperty(iframes[1], 'contentWindow', { configurable: true, value: w2 });
+    Object.defineProperty(iframes[2], 'contentWindow', { configurable: true, value: w3 });
 
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -318,16 +318,16 @@ describe("chatgpt-collector", () => {
 
     const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
-    const assistant = snap.messages.filter((m: any) => m.role === "assistant");
+    const assistant = snap.messages.filter((m: any) => m.role === 'assistant');
     expect(assistant.length).toBe(3);
     // When multiple deep-research iframes exist, we prefer stable placeholders and let the hydrator fill the body.
-    expect(String(assistant[0].contentText)).toContain("Deep Research (iframe)");
-    expect(String(assistant[1].contentText)).toContain("Deep Research (iframe)");
-    expect(String(assistant[2].contentText)).toContain("Deep Research (iframe)");
-    expect(String(assistant[0].messageKey || "")).not.toBe(String(assistant[1].messageKey || ""));
+    expect(String(assistant[0].contentText)).toContain('Deep Research (iframe)');
+    expect(String(assistant[1].contentText)).toContain('Deep Research (iframe)');
+    expect(String(assistant[2].contentText)).toContain('Deep Research (iframe)');
+    expect(String(assistant[0].messageKey || '')).not.toBe(String(assistant[1].messageKey || ''));
   });
 
-  it("falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label", async () => {
+  it('falls back to deep-research placeholder when iframe extraction returns empty, even with sr-only label', async () => {
     const html = `
       <article data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="t1">
         <h6 class="sr-only select-none">ChatGPT说:</h6>
@@ -337,30 +337,30 @@ describe("chatgpt-collector", () => {
       </article>
     `;
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_deep_research_fallback_1");
-    const iframe = dom.window.document.querySelector("iframe") as any;
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_fallback_1');
+    const iframe = dom.window.document.querySelector('iframe') as any;
     expect(iframe).toBeTruthy();
 
     const fakeFrameWindow = {
       postMessage: (msg: any) => {
         const requestId = msg?.requestId;
         dom.window.dispatchEvent(
-          new (dom.window as any).MessageEvent("message", {
+          new (dom.window as any).MessageEvent('message', {
             data: {
               __syncnos: true,
-              type: "SYNCNOS_DEEP_RESEARCH_RESPONSE",
+              type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
               requestId,
-              title: "Deep Research",
-              markdown: "",
-              text: "",
+              title: 'Deep Research',
+              markdown: '',
+              text: '',
             },
-            origin: "https://connector_openai_deep_research.web-sandbox.oaiusercontent.com",
+            origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
             source: fakeFrameWindow as any,
           }),
         );
       },
     };
-    Object.defineProperty(iframe, "contentWindow", { configurable: true, value: fakeFrameWindow });
+    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: fakeFrameWindow });
 
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -369,16 +369,18 @@ describe("chatgpt-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = await Promise.resolve(createChatgptCollectorDef(env).collector.capture({})) as any;
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({}))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
+    expect(snap.messages[0].role).toBe('assistant');
     expect(String(snap.messages[0].contentText)).toMatch(/^Deep Research \(iframe\):/);
-    expect(String(snap.messages[0].contentText)).toContain("connector_openai_deep_research.web-sandbox.oaiusercontent.com");
-    expect(String(snap.messages[0].contentText)).not.toContain("ChatGPT说");
+    expect(String(snap.messages[0].contentText)).toContain(
+      'connector_openai_deep_research.web-sandbox.oaiusercontent.com',
+    );
+    expect(String(snap.messages[0].contentText)).not.toContain('ChatGPT说');
   });
 
-  it("falls back to plain text markdown when markdown helper is unavailable", async () => {
+  it('falls back to plain text markdown when markdown helper is unavailable', async () => {
     const html = `
       <article data-testid="conversation-turn-1">
         <div data-message-author-role="assistant">
@@ -388,10 +390,10 @@ describe("chatgpt-collector", () => {
     `;
 
     vi.resetModules();
-    vi.doMock("../../src/collectors/chatgpt/chatgpt-markdown.ts", () => ({ default: {} }));
+    vi.doMock('../../src/collectors/chatgpt/chatgpt-markdown.ts', () => ({ default: {} }));
 
-    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_fallback_1");
-    const { createChatgptCollectorDef: createDef } = await import("../../src/collectors/chatgpt/chatgpt-collector.ts");
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_fallback_1');
+    const { createChatgptCollectorDef: createDef } = await import('../../src/collectors/chatgpt/chatgpt-collector.ts');
 
     const env = createCollectorEnv({
       window: dom.window as any,
@@ -400,11 +402,11 @@ describe("chatgpt-collector", () => {
       normalize: normalizeApi,
     });
 
-    const snap = await Promise.resolve(createDef(env).collector.capture({ manual: true })) as any;
+    const snap = (await Promise.resolve(createDef(env).collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe("assistant");
-    expect(snap.messages[0].contentText).toBe("plain answer");
-    expect(snap.messages[0].contentMarkdown).toBe("plain answer");
+    expect(snap.messages[0].role).toBe('assistant');
+    expect(snap.messages[0].contentText).toBe('plain answer');
+    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
   });
 });

@@ -29,4 +29,3 @@ export function webextLastErrorMessage(fallback: string) {
 export function webextError(message: unknown) {
   return toError(message);
 }
-

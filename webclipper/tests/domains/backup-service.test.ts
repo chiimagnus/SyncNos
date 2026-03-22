@@ -24,10 +24,10 @@ function mockChromeStorage(initial: Record<string, unknown> = {}) {
   const store: Record<string, unknown> = { ...initial };
   const setPayloads: Record<string, unknown>[] = [];
 
-    return {
-      runtime: { lastError: null as any },
-      storage: {
-        local: {
+  return {
+    runtime: { lastError: null as any },
+    storage: {
+      local: {
         get(keys: any, cb: (res: Record<string, unknown>) => void) {
           if (keys == null) {
             cb({ ...store });
@@ -320,7 +320,9 @@ describe('backup service', () => {
 
     expect(assets.length).toBe(0);
     expect(String(msgs[0].contentMarkdown || '')).not.toContain('syncnos-asset://');
-    expect(String(msgs[0].contentMarkdown || '')).toContain('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
+    expect(String(msgs[0].contentMarkdown || '')).toContain(
+      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+    );
   });
 
   it('importBackupZipV2Merge tolerates missing image blob and falls back to https url', async () => {
@@ -518,7 +520,9 @@ describe('backup service', () => {
         warningFlags: [],
         lastCapturedAt: 1,
       },
-      messages: [{ messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 }],
+      messages: [
+        { messageKey: 'm1', role: 'user', contentText: 'hi', contentMarkdown: 'hi', sequence: 1, updatedAt: 1 },
+      ],
       syncMapping: null,
     };
 
@@ -610,7 +614,9 @@ describe('backup service', () => {
     expect(maps.length).toBe(1);
 
     // Ensure secrets are not stored via settings merge.
-    expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_token_v1'))).toBe(false);
+    expect(chromeMock.__setPayloads.some((p) => Object.prototype.hasOwnProperty.call(p, 'notion_oauth_token_v1'))).toBe(
+      false,
+    );
     expect(chromeMock.__setPayloads.some((p) => (p as any).notion_oauth_client_id === 'cid')).toBe(true);
   });
 });

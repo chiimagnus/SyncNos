@@ -193,7 +193,9 @@ describe('AppShell comments sidebar', () => {
 
     expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
     expect(document.querySelector('aside')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-quote-text')).toBe('Selected quote');
+    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-quote-text')).toBe(
+      'Selected quote',
+    );
     expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-focus-signal')).toBe('1');
 
     act(() => {

@@ -21,10 +21,7 @@ vi.mock('@services/integrations/openin/obsidian-open-target', () => ({
   reportObsidianOpenError: vi.fn(),
 }));
 
-import {
-  DETAIL_HEADER_ACTION_LABELS,
-  resolveDetailHeaderActions,
-} from '@services/integrations/detail-header-actions';
+import { DETAIL_HEADER_ACTION_LABELS, resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { buildNotionPageUrl, normalizeNotionPageId } from '@services/integrations/openin/openin-detail-header-actions';
 
 describe('detail-header-actions', () => {

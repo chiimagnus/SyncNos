@@ -10,19 +10,13 @@ export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
 
 function normalizeConversationIds(ids: unknown): number[] {
   if (!Array.isArray(ids)) return [];
-  return Array.from(
-    new Set(
-      ids
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value) && value > 0),
-    ),
-  );
+  return Array.from(new Set(ids.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)));
 }
 
 function normalizePerConversation(rows: unknown) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
-    const value = row && typeof row === 'object' ? row as Record<string, unknown> : {};
+    const value = row && typeof row === 'object' ? (row as Record<string, unknown>) : {};
     return {
       conversationId: Number(value.conversationId) || 0,
       conversationTitle: value.conversationTitle == null ? undefined : String(value.conversationTitle || ''),
@@ -53,8 +47,11 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
     updatedAt: Number(value.updatedAt) || Date.now(),
     finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,
     conversationIds: normalizeConversationIds(value.conversationIds),
-    currentConversationId: Number.isFinite(Number(value.currentConversationId)) ? Number(value.currentConversationId) : undefined,
-    currentConversationTitle: value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),
+    currentConversationId: Number.isFinite(Number(value.currentConversationId))
+      ? Number(value.currentConversationId)
+      : undefined,
+    currentConversationTitle:
+      value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),
     currentStage: value.currentStage == null ? undefined : String(value.currentStage || ''),
     okCount: Number.isFinite(okCount) ? okCount : perConversation.filter((row) => row.ok).length,
     failCount: Number.isFinite(failCount) ? failCount : perConversation.filter((row) => !row.ok).length,
@@ -91,7 +88,10 @@ export function isRunningSyncJob(job: SyncJobSnapshot | null | undefined, staleM
   return Date.now() - updatedAt < maxAge;
 }
 
-export async function abortRunningSyncJobIfFromOtherInstance(provider: SyncProvider, instanceId: string): Promise<SyncJobSnapshot | null> {
+export async function abortRunningSyncJobIfFromOtherInstance(
+  provider: SyncProvider,
+  instanceId: string,
+): Promise<SyncJobSnapshot | null> {
   const current = await getSyncJob(provider);
   if (!current || current.status !== 'running') return current;
   const jobInstanceId = current.instanceId ? String(current.instanceId) : '';

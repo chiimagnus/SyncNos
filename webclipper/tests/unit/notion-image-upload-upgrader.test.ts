@@ -20,10 +20,16 @@ describe('notion-image-upload-upgrader', () => {
   });
 
   it('uploads syncnos-asset images from local bytes as file_upload blocks', async () => {
-    const createExternalUrlUpload = vi.spyOn(notionFilesApi, 'createExternalURLUpload').mockResolvedValue({ id: 'unused' } as any);
-    const createFileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'up-syncnos-1' } as any);
+    const createExternalUrlUpload = vi
+      .spyOn(notionFilesApi, 'createExternalURLUpload')
+      .mockResolvedValue({ id: 'unused' } as any);
+    const createFileUpload = vi
+      .spyOn(notionFilesApi, 'createFileUpload')
+      .mockResolvedValue({ id: 'up-syncnos-1' } as any);
     const sendFileUpload = vi.spyOn(notionFilesApi, 'sendFileUpload').mockResolvedValue({} as any);
-    const waitUntilUploaded = vi.spyOn(notionFilesApi, 'waitUntilUploaded').mockResolvedValue({ id: 'up-syncnos-1' } as any);
+    const waitUntilUploaded = vi
+      .spyOn(notionFilesApi, 'waitUntilUploaded')
+      .mockResolvedValue({ id: 'up-syncnos-1' } as any);
 
     vi.spyOn(imageCacheRead, 'getImageCacheAssetById').mockResolvedValue({
       id: 42,
@@ -53,7 +59,9 @@ describe('notion-image-upload-upgrader', () => {
   });
 
   it('falls back to placeholder paragraph when syncnos asset is missing', async () => {
-    const createFileUpload = vi.spyOn(notionFilesApi, 'createFileUpload').mockResolvedValue({ id: 'up-syncnos-2' } as any);
+    const createFileUpload = vi
+      .spyOn(notionFilesApi, 'createFileUpload')
+      .mockResolvedValue({ id: 'up-syncnos-2' } as any);
     vi.spyOn(imageCacheRead, 'getImageCacheAssetById').mockResolvedValue(null as any);
 
     const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('syncnos-asset://999')] as any);

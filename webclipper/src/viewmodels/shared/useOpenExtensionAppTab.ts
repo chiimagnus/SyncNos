@@ -7,4 +7,3 @@ export function useOpenExtensionAppTab() {
     return await openOrFocusExtensionAppTab({ route });
   }, []);
 }
-

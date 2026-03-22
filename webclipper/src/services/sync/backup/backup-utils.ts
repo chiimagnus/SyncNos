@@ -36,8 +36,7 @@ function isFinitePositiveInt(v: unknown) {
 
 export function uniqueConversationKey(conversation: UnknownRecord): string {
   const source = conversation && conversation.source ? String(conversation.source) : '';
-  const conversationKey =
-    conversation && conversation.conversationKey ? String(conversation.conversationKey) : '';
+  const conversationKey = conversation && conversation.conversationKey ? String(conversation.conversationKey) : '';
   if (!source || !conversationKey) return '';
   return `${source}||${conversationKey}`;
 }
@@ -99,10 +98,8 @@ function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownR
   const bUpdated = Number(b.updatedAt) || 0;
   if (bUpdated && bUpdated > aUpdated) return true;
 
-  const aMd =
-    a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
-  const bMd =
-    b.contentMarkdown && String(b.contentMarkdown).trim() ? String(b.contentMarkdown) : '';
+  const aMd = a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
+  const bMd = b.contentMarkdown && String(b.contentMarkdown).trim() ? String(b.contentMarkdown) : '';
   if (!aMd && bMd) return true;
   return false;
 }
@@ -255,7 +252,9 @@ export function validateImageCacheIndexDocument(doc: unknown): { ok: boolean; er
     const url = String(a.url || '').trim();
     if (!isNonEmptyString(url)) return { ok: false, error: 'Invalid image cache url' };
 
-    const contentType = String(a.contentType || '').trim().toLowerCase();
+    const contentType = String(a.contentType || '')
+      .trim()
+      .toLowerCase();
     if (!isNonEmptyString(contentType) || !contentType.startsWith('image/')) {
       return { ok: false, error: 'Invalid image cache contentType' };
     }

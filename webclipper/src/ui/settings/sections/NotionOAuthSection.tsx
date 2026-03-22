@@ -66,7 +66,9 @@ export function NotionOAuthSection(props: {
         {!syncEnabled ? (
           <div className="tw-mt-2">
             <SettingsFormRow label="" align="start">
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{t('notionSyncEnabledHint')}</div>
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                {t('notionSyncEnabledHint')}
+              </div>
             </SettingsFormRow>
           </div>
         ) : null}

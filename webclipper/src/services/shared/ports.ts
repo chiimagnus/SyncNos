@@ -5,4 +5,3 @@ export const ports = {
 };
 
 export { platformConnectPort as connectPort };
-

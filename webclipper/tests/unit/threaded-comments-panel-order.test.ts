@@ -70,9 +70,9 @@ describe('Threaded comments panel ordering', () => {
     );
     expect(rootBodies).toEqual(['root-new', 'root-old']);
 
-    const replies = Array.from(threads[0].querySelectorAll('.webclipper-inpage-comments-panel__comment-body.is-reply')).map((x) =>
-      x.textContent?.trim(),
-    );
+    const replies = Array.from(
+      threads[0].querySelectorAll('.webclipper-inpage-comments-panel__comment-body.is-reply'),
+    ).map((x) => x.textContent?.trim());
     expect(replies).toEqual(['reply-new', 'reply-old']);
 
     mounted.cleanup();

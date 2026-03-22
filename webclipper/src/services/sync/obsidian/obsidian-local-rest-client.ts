@@ -58,20 +58,9 @@ async function readBodyAsJsonOrText(res: any) {
   }
 }
 
-function toErrorObject({
-  status,
-  body,
-  fallbackMessage,
-}: {
-  status: unknown;
-  body: any;
-  fallbackMessage?: string;
-}) {
+function toErrorObject({ status, body, fallbackMessage }: { status: unknown; body: any; fallbackMessage?: string }) {
   const numericStatus = Number(status);
-  const errorCode =
-    body && typeof body === 'object' && Number.isFinite(body.errorCode)
-      ? Number(body.errorCode)
-      : null;
+  const errorCode = body && typeof body === 'object' && Number.isFinite(body.errorCode) ? Number(body.errorCode) : null;
   const message =
     body && typeof body === 'object' && body.message
       ? String(body.message)

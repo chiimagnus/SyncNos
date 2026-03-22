@@ -47,10 +47,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-async function exchangeNotionCodeForToken(
-  code: string,
-  { fetchImpl = fetch }: { fetchImpl?: typeof fetch } = {},
-) {
+async function exchangeNotionCodeForToken(code: string, { fetchImpl = fetch }: { fetchImpl?: typeof fetch } = {}) {
   const cfg = getNotionOAuthDefaults();
   if (!cfg.tokenExchangeProxyUrl) throw toError('token exchange proxy url not configured');
 
@@ -58,14 +55,18 @@ async function exchangeNotionCodeForToken(
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
       const res = await (fetchImpl === fetch
-        ? fetchWithTimeout(cfg.tokenExchangeProxyUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
+        ? fetchWithTimeout(
+            cfg.tokenExchangeProxyUrl,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify({ code, redirectUri: cfg.redirectUri }),
             },
-            body: JSON.stringify({ code, redirectUri: cfg.redirectUri }),
-          }, 12_000)
+            12_000,
+          )
         : fetchImpl(cfg.tokenExchangeProxyUrl, {
             method: 'POST',
             headers: {

@@ -230,7 +230,9 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
-    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail') as HTMLButtonElement | undefined;
+    const detailButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'show-detail',
+    ) as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
 
     act(() => {
@@ -248,7 +250,9 @@ describe('PopupShell header actions', () => {
       root!.render(createElement(PopupShell));
     });
 
-    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail-empty') as HTMLButtonElement | undefined;
+    const detailButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'show-detail-empty',
+    ) as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
 
     act(() => {
@@ -266,7 +270,9 @@ describe('PopupShell header actions', () => {
       root!.render(createElement(PopupShell));
     });
 
-    const detailButton = Array.from(document.querySelectorAll('button')).find((el) => el.textContent === 'show-detail-menu') as HTMLButtonElement | undefined;
+    const detailButton = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'show-detail-menu',
+    ) as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
 
     act(() => {

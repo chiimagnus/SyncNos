@@ -23,4 +23,3 @@ export function openConversation(conversationId: unknown, deps: OpenConversation
 
   return id;
 }
-

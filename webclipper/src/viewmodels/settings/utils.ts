@@ -61,7 +61,10 @@ function getPageTitle(page: any) {
     for (const key of Object.keys(props)) {
       const p = props[key];
       if (p && p.type === 'title' && Array.isArray(p.title)) {
-        const t = p.title.map((x: any) => x.plain_text || '').join('').trim();
+        const t = p.title
+          .map((x: any) => x.plain_text || '')
+          .join('')
+          .trim();
         if (t) return t;
       }
     }

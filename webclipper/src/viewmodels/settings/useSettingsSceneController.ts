@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
-import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
+import {
+  importBackupLegacyJsonMerge,
+  importBackupZipV2Merge,
+  type ImportProgress,
+  type ImportStats,
+} from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
@@ -84,7 +89,9 @@ export type UseSettingsSceneControllerArgs = {
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
 function normalizeInpageDisplayMode(value: unknown): InpageDisplayMode | null {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (raw === 'supported' || raw === 'all' || raw === 'off') return raw as InpageDisplayMode;
   return null;
 }
@@ -164,12 +171,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   const runTask = useCallback(async (task: () => Promise<void>, options: RunTaskOptions = {}) => {
     const run = taskQueueRef.current.then(async () => {
-      const {
-        useBusy = true,
-        clearError = true,
-        fallbackMessage = 'failed',
-        onError,
-      } = options;
+      const { useBusy = true, clearError = true, fallbackMessage = 'failed', onError } = options;
 
       if (clearError) setError(null);
       if (useBusy) setBusyCount((count) => count + 1);
@@ -189,7 +191,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       }
     });
 
-    taskQueueRef.current = run.then(() => undefined, () => undefined);
+    taskQueueRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
     return run;
   }, []);
 
@@ -230,7 +235,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       const normalizedInpageMode = normalizeInpageDisplayMode(local?.inpage_display_mode);
       setInpageDisplayMode(
-        normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only)
+        normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only),
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
@@ -249,7 +254,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const chatWith = await loadChatWithSettings();
       setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
       setChatWithMaxChars(String(chatWith.maxChars || DEFAULT_CHAT_WITH_MAX_CHARS));
-      setChatWithPlatforms(Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice());
+      setChatWithPlatforms(
+        Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
+      );
       chatWithHydratedRef.current = true;
     });
   }, [runTask]);
@@ -375,7 +382,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const savedTitle = String(notionParentPageTitle || '').trim();
 
         let pages = await searchNotionParentPages(accessToken);
-        let resolvedSaved = savedId ? pages.find((page) => page.id === savedId) ?? null : null;
+        let resolvedSaved = savedId ? (pages.find((page) => page.id === savedId) ?? null) : null;
 
         if (savedId && !resolvedSaved) {
           const retrieved = await retrieveNotionParentPage(accessToken, savedId);
@@ -398,7 +405,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         if (nextTitle && nextTitle !== savedTitle) payload.notion_parent_page_title = nextTitle;
         if (Object.keys(payload).length) await storageSet(payload);
       },
-      { useBusy: false, fallbackMessage: 'failed to load pages' }
+      { useBusy: false, fallbackMessage: 'failed to load pages' },
     );
     setLoadingNotionPages(false);
   }, [notionParentPageId, notionParentPageTitle, runTask]);
@@ -434,7 +441,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         await storageSet(payload);
       });
     },
-    [notionPages, runTask]
+    [notionPages, runTask],
   );
 
   const onSaveNotionAiModelIndex = useCallback(async () => {
@@ -496,7 +503,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           onError: () => {
             setObsidianStatus(t('statusError'));
           },
-        }
+        },
       );
 
       if (ok) setObsidianStatus(t('statusSaved'));
@@ -509,7 +516,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       obsidianAuthHeaderName,
       obsidianChatFolder,
       runTask,
-    ]
+    ],
   );
 
   const onTestObsidianConnection = useCallback(async () => {
@@ -522,9 +529,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const ok = data && data.ok === true;
         const message = data && data.message ? String(data.message) : '';
         setObsidianStatus(
-          ok
-            ? `${t('statusOk')} ✓ ${message}`.trim()
-            : `${t('statusError')}: ${message || t('phaseFailed')}`
+          ok ? `${t('statusOk')} ✓ ${message}`.trim() : `${t('statusError')}: ${message || t('phaseFailed')}`,
         );
       },
       {
@@ -532,7 +537,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         onError: (message) => {
           setObsidianStatus(`${t('statusError')}: ${message}`);
         },
-      }
+      },
     );
   }, [runTask]);
 
@@ -543,7 +548,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setInpageDisplayMode(next);
       });
     },
-    [runTask]
+    [runTask],
   );
 
   const onToggleAiChatAutoSaveEnabled = useCallback(
@@ -553,7 +558,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setAiChatAutoSaveEnabled(next === true);
       });
     },
-    [runTask]
+    [runTask],
   );
 
   const onToggleAiChatCacheImagesEnabled = useCallback(
@@ -563,7 +568,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setAiChatCacheImagesEnabled(next === true);
       });
     },
-    [runTask]
+    [runTask],
   );
 
   useEffect(() => {
@@ -640,7 +645,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         anchor.click();
 
         setExportStatus(
-          `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages}, ${t('statsComments')} ${result.counts.article_comments})`
+          `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages}, ${t('statsComments')} ${result.counts.article_comments})`,
         );
         setLastBackupExportAt(Date.parse(result.exportedAt) || Date.now());
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -650,7 +655,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         onError: (message) => {
           setExportStatus(`${t('statusError')}: ${message}`);
         },
-      }
+      },
     );
   }, [busy, runTask]);
 
@@ -689,7 +694,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           onError: (message) => {
             setImportStatus(`${t('statusError')}: ${message}`);
           },
-        }
+        },
       );
 
       try {
@@ -698,7 +703,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         // ignore
       }
     },
-    [busy, runTask]
+    [busy, runTask],
   );
 
   const openExtensionAppSettings = useCallback(async () => {

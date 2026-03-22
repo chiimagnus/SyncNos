@@ -24,14 +24,16 @@ function normalizeRoleFromTurn(turn: Element): 'user' | 'assistant' | null {
     if (cls.contains('model')) return 'assistant';
   }
   const marker = turn.querySelector('[data-turn-role]');
-  const roleText = marker && (marker as any).getAttribute ? String((marker as any).getAttribute('data-turn-role') || '') : '';
+  const roleText =
+    marker && (marker as any).getAttribute ? String((marker as any).getAttribute('data-turn-role') || '') : '';
   if (/user/i.test(roleText)) return 'user';
   if (/model|assistant/i.test(roleText)) return 'assistant';
   return null;
 }
 
 function pickTurnContent(turn: Element, role: 'user' | 'assistant'): Element | null {
-  const roleSelector = role === 'user' ? '[data-turn-role="User"] .turn-content' : '[data-turn-role="Model"] .turn-content';
+  const roleSelector =
+    role === 'user' ? '[data-turn-role="User"] .turn-content' : '[data-turn-role="Model"] .turn-content';
   const scoped = turn.querySelector(roleSelector);
   if (scoped) return scoped as any;
   const anyContent = turn.querySelector('.turn-content');
@@ -63,7 +65,9 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   }
 
   function getConversationRoot(): any {
-    return env.document.querySelector('.chat-session-content') || env.document.querySelector('main') || env.document.body;
+    return (
+      env.document.querySelector('.chat-session-content') || env.document.querySelector('main') || env.document.body
+    );
   }
 
   function inEditMode(root: any): any {
@@ -139,11 +143,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     if (!img) return '';
     const current = img.currentSrc ? String(img.currentSrc).trim() : '';
     if (isBlobUrl(current)) return current;
-    const src = img.src
-      ? String(img.src).trim()
-      : img.getAttribute
-        ? String(img.getAttribute('src') || '').trim()
-        : '';
+    const src = img.src ? String(img.src).trim() : img.getAttribute ? String(img.getAttribute('src') || '').trim() : '';
     if (isBlobUrl(src)) return src;
     const srcset = img.getAttribute ? String(img.getAttribute('srcset') || '').trim() : '';
     if (srcset) {
@@ -229,7 +229,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
         ctx.warningFlags.add('inline_images_single_too_large');
         return null;
       }
-      if ((ctx.inlinedBytes + size) > INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
+      if (ctx.inlinedBytes + size > INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
         ctx.warningFlags.add('inline_images_total_bytes_limit_reached');
         return null;
       }
@@ -250,7 +250,10 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     }
   }
 
-  async function extractImageUrlsIncludingBlobImages(element: ParentNode | null, ctx: InlineImageContext): Promise<string[]> {
+  async function extractImageUrlsIncludingBlobImages(
+    element: ParentNode | null,
+    ctx: InlineImageContext,
+  ): Promise<string[]> {
     const httpUrls = extractImageUrlsFromElement(element);
     const blobUrls = extractBlobImageUrlsFromElement(element);
     if (!blobUrls.length) return httpUrls;
@@ -273,79 +276,90 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     return out;
   }
 
-function stripThinkingFromNode(node: Element | null): Element | null {
-  if (!node || typeof (node as any).cloneNode !== 'function') return node;
-  const cloned = (node as any).cloneNode(true) as Element;
-  const selectors = [
-    'ms-thought-chunk',
-    '.thought-panel',
-    'img[alt="Thinking"]',
-    '.thinking-progress-icon',
-  ];
-  for (const selector of selectors) {
-    try {
-      const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
-      for (const el of list) {
-        try {
-          (el as any).remove?.();
-        } catch (_e) {
-          // ignore
+  function stripThinkingFromNode(node: Element | null): Element | null {
+    if (!node || typeof (node as any).cloneNode !== 'function') return node;
+    const cloned = (node as any).cloneNode(true) as Element;
+    const selectors = ['ms-thought-chunk', '.thought-panel', 'img[alt="Thinking"]', '.thinking-progress-icon'];
+    for (const selector of selectors) {
+      try {
+        const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
+        for (const el of list) {
+          try {
+            (el as any).remove?.();
+          } catch (_e) {
+            // ignore
+          }
         }
+      } catch (_e) {
+        // ignore
       }
-    } catch (_e) {
-      // ignore
     }
+    return cloned;
   }
-  return cloned;
-}
 
-function stripTurnChromeFromNode(node: Element | null): Element | null {
-  if (!node || typeof (node as any).cloneNode !== 'function') return node;
-  const cloned = (node as any).cloneNode(true) as Element;
-  const selectors = [
-    '.author-label',
-    '.timestamp',
-  ];
-  for (const selector of selectors) {
-    try {
-      const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
-      for (const el of list) {
-        try {
-          (el as any).remove?.();
-        } catch (_e) {
-          // ignore
+  function stripTurnChromeFromNode(node: Element | null): Element | null {
+    if (!node || typeof (node as any).cloneNode !== 'function') return node;
+    const cloned = (node as any).cloneNode(true) as Element;
+    const selectors = ['.author-label', '.timestamp'];
+    for (const selector of selectors) {
+      try {
+        const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
+        for (const el of list) {
+          try {
+            (el as any).remove?.();
+          } catch (_e) {
+            // ignore
+          }
         }
+      } catch (_e) {
+        // ignore
       }
-    } catch (_e) {
-      // ignore
     }
+    return cloned;
   }
-  return cloned;
-}
 
-function cleanTurnContentNode(node: Element | null): Element | null {
-  const noThinking = stripThinkingFromNode(node);
-  return stripTurnChromeFromNode(noThinking);
-}
+  function cleanTurnContentNode(node: Element | null): Element | null {
+    const noThinking = stripThinkingFromNode(node);
+    return stripTurnChromeFromNode(noThinking);
+  }
 
-async function extractMessageFromTurn(turn: Element, sequence: number, ctx: InlineImageContext): Promise<any | null> {
-  const role = normalizeRoleFromTurn(turn);
-  if (!role) return null;
+  async function extractMessageFromTurn(turn: Element, sequence: number, ctx: InlineImageContext): Promise<any | null> {
+    const role = normalizeRoleFromTurn(turn);
+    if (!role) return null;
 
-  const contentEl = pickTurnContent(turn, role);
-  if (!contentEl) return null;
-  const cleanedContent = cleanTurnContentNode(contentEl as any) || contentEl;
+    const contentEl = pickTurnContent(turn, role);
+    if (!contentEl) return null;
+    const cleanedContent = cleanTurnContentNode(contentEl as any) || contentEl;
 
-  const updatedAt = Date.now();
-  if (role === 'user') {
-    const text = env.normalize.normalizeText((cleanedContent as any).innerText || (cleanedContent as any).textContent || '');
+    const updatedAt = Date.now();
+    if (role === 'user') {
+      const text = env.normalize.normalizeText(
+        (cleanedContent as any).innerText || (cleanedContent as any).textContent || '',
+      );
+      const imageUrls = await extractImageUrlsIncludingBlobImages(cleanedContent, ctx);
+      if (!text && !imageUrls.length) return null;
+      const contentText = text || '';
+      const contentMarkdown = appendImageMarkdown(contentText, imageUrls, { allowDataImageUrls: true });
+      return {
+        messageKey: messageKeyFromTurn(turn, 'user', contentText, sequence),
+        role: 'user',
+        contentText,
+        contentMarkdown,
+        sequence,
+        updatedAt,
+      };
+    }
+
+    const text = extractAssistantText(cleanedContent);
     const imageUrls = await extractImageUrlsIncludingBlobImages(cleanedContent, ctx);
     if (!text && !imageUrls.length) return null;
+
     const contentText = text || '';
-    const contentMarkdown = appendImageMarkdown(contentText, imageUrls, { allowDataImageUrls: true });
+    const baseMarkdown = extractAssistantMarkdown(cleanedContent, contentText);
+    const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls, { allowDataImageUrls: true });
     return {
-      messageKey: messageKeyFromTurn(turn, 'user', contentText, sequence),
-      role: 'user',
+      messageKey: messageKeyFromTurn(turn, 'assistant', contentText, sequence),
+      role: 'assistant',
       contentText,
       contentMarkdown,
       sequence,
@@ -353,161 +367,151 @@ async function extractMessageFromTurn(turn: Element, sequence: number, ctx: Inli
     };
   }
 
-  const text = extractAssistantText(cleanedContent);
-  const imageUrls = await extractImageUrlsIncludingBlobImages(cleanedContent, ctx);
-  if (!text && !imageUrls.length) return null;
+  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
+    const root = getConversationRoot();
+    if (!root) return [];
+    if (inEditMode(root)) return [];
 
-  const contentText = text || '';
-  const baseMarkdown = extractAssistantMarkdown(cleanedContent, contentText);
-  const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls, { allowDataImageUrls: true });
-  return {
-    messageKey: messageKeyFromTurn(turn, 'assistant', contentText, sequence),
-    role: 'assistant',
-    contentText,
-    contentMarkdown,
-    sequence,
-    updatedAt,
-  };
-}
+    const turns: any[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any[];
+    if (!turns.length) return [];
 
-async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
-  const root = getConversationRoot();
-  if (!root) return [];
-  if (inEditMode(root)) return [];
-
-  const turns: any[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any[];
-  if (!turns.length) return [];
-
-  const out: any[] = [];
-  let seq = 0;
-  for (const turn of turns) {
-    const msg = await extractMessageFromTurn(turn, seq, ctx);
-    if (!msg) continue;
-    out.push(msg);
-    seq += 1;
+    const out: any[] = [];
+    let seq = 0;
+    for (const turn of turns) {
+      const msg = await extractMessageFromTurn(turn, seq, ctx);
+      if (!msg) continue;
+      out.push(msg);
+      seq += 1;
+    }
+    return out;
   }
-  return out;
-}
 
-async function prepareManualCapture(options: any = {}): Promise<any> {
-  if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return false;
+  async function prepareManualCapture(options: any = {}): Promise<any> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return false;
 
-  const root = getConversationRoot();
-  if (!root) return false;
+    const root = getConversationRoot();
+    if (!root) return false;
 
-  const turns: Element[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any;
-  if (!turns.length) return false;
+    const turns: Element[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any;
+    if (!turns.length) return false;
 
-  const maxTurns = Math.max(1, Number(options.maxTurns) || 240);
-  const settleMs = Math.max(0, Number(options.settleMs) || 80);
-  const perTurnTimeoutMs = Math.max(120, Number(options.perTurnTimeoutMs) || 900);
-  const pollMs = Math.max(30, Number(options.pollMs) || 80);
+    const maxTurns = Math.max(1, Number(options.maxTurns) || 240);
+    const settleMs = Math.max(0, Number(options.settleMs) || 80);
+    const perTurnTimeoutMs = Math.max(120, Number(options.perTurnTimeoutMs) || 900);
+    const pollMs = Math.max(30, Number(options.pollMs) || 80);
 
-  const conversationKey = String(findConversationKey() || '').trim();
-  manualCacheConversationKey = conversationKey;
-  manualTurnCache = new Map<string, any>();
-  const ctx = createInlineImageContext();
-  manualCacheWarningFlags = [];
+    const conversationKey = String(findConversationKey() || '').trim();
+    manualCacheConversationKey = conversationKey;
+    manualTurnCache = new Map<string, any>();
+    const ctx = createInlineImageContext();
+    manualCacheWarningFlags = [];
 
-  const bottomTurn = turns[turns.length - 1] || null;
+    const bottomTurn = turns[turns.length - 1] || null;
 
-  const total = Math.min(maxTurns, turns.length);
-  for (let i = 0; i < total; i += 1) {
-    const turn = turns[i];
-    const role = normalizeRoleFromTurn(turn);
-    if (!role) continue;
+    const total = Math.min(maxTurns, turns.length);
+    for (let i = 0; i < total; i += 1) {
+      const turn = turns[i];
+      const role = normalizeRoleFromTurn(turn);
+      if (!role) continue;
+
+      try {
+        (turn as any).scrollIntoView?.({ block: 'center' });
+      } catch (_e) {
+        // ignore
+      }
+
+      const start = Date.now();
+      while (Date.now() - start <= perTurnTimeoutMs) {
+        const contentEl = pickTurnContent(turn, role);
+        if (contentEl) {
+          const checkEl = cleanTurnContentNode(contentEl as any) || contentEl;
+          const text = String((checkEl as any).textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+          const imgs = Array.from((checkEl as any).querySelectorAll?.('img') || []);
+          const hasImage = imgs.some((img: any) => {
+            const src = String(img?.currentSrc || img?.src || img?.getAttribute?.('src') || '').trim();
+            return !!src;
+          });
+          if (text || hasImage) break;
+        }
+        await sleep(pollMs);
+      }
+
+      if (settleMs) await sleep(settleMs);
+
+      const msg = await extractMessageFromTurn(turn, 0, ctx);
+      if (!msg) continue;
+      const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
+      if (turnId) manualTurnCache.set(turnId, msg);
+    }
+
+    manualCacheWarningFlags = Array.from(ctx.warningFlags);
 
     try {
-      (turn as any).scrollIntoView?.({ block: 'center' });
+      (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });
     } catch (_e) {
       // ignore
     }
 
-    const start = Date.now();
-    while ((Date.now() - start) <= perTurnTimeoutMs) {
-      const contentEl = pickTurnContent(turn, role);
-      if (contentEl) {
-        const checkEl = cleanTurnContentNode(contentEl as any) || contentEl;
-        const text = String((checkEl as any).textContent || '').replace(/\s+/g, ' ').trim();
-        const imgs = Array.from((checkEl as any).querySelectorAll?.('img') || []);
-        const hasImage = imgs.some((img: any) => {
-          const src = String(img?.currentSrc || img?.src || img?.getAttribute?.('src') || '').trim();
-          return !!src;
-        });
-        if (text || hasImage) break;
+    return true;
+  }
+
+  async function capture(options: any = {}): Promise<any> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
+    const manual = options && options.manual === true;
+    let messages: any[] = [];
+    const ctx = createInlineImageContext();
+
+    const currentConversationKey = String(findConversationKey() || '').trim();
+    if (
+      manual &&
+      manualTurnCache &&
+      manualCacheConversationKey &&
+      manualCacheConversationKey === currentConversationKey
+    ) {
+      const root = getConversationRoot();
+      const turns: Element[] = root ? (Array.from(root.querySelectorAll('ms-chat-turn')) as any) : [];
+      for (const turn of turns) {
+        const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
+        if (!turnId) continue;
+        const hit = manualTurnCache.get(turnId);
+        if (hit) messages.push(hit);
       }
-      await sleep(pollMs);
+      messages = messages.map((m, idx) => ({ ...m, sequence: idx, updatedAt: Date.now() }));
+      for (const flag of manualCacheWarningFlags || []) ctx.warningFlags.add(String(flag));
+      manualTurnCache = null;
+      manualCacheConversationKey = '';
+      manualCacheWarningFlags = [];
+    } else {
+      messages = await collectMessages(ctx);
     }
 
-    if (settleMs) await sleep(settleMs);
-
-    const msg = await extractMessageFromTurn(turn, 0, ctx);
-    if (!msg) continue;
-    const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-    if (turnId) manualTurnCache.set(turnId, msg);
+    if (!messages.length) return null;
+    return {
+      conversation: {
+        sourceType: 'chat',
+        source: 'googleaistudio',
+        conversationKey: findConversationKey(),
+        title: extractConversationTitle(),
+        url: env.location.href,
+        warningFlags: Array.from(ctx.warningFlags),
+        lastCapturedAt: Date.now(),
+      },
+      messages,
+    };
   }
 
-  manualCacheWarningFlags = Array.from(ctx.warningFlags);
-
-  try {
-    (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });
-  } catch (_e) {
-    // ignore
-  }
-
-  return true;
-}
-
-async function capture(options: any = {}): Promise<any> {
-  if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
-  const manual = options && options.manual === true;
-  let messages: any[] = [];
-  const ctx = createInlineImageContext();
-
-  const currentConversationKey = String(findConversationKey() || '').trim();
-  if (manual && manualTurnCache && manualCacheConversationKey && manualCacheConversationKey === currentConversationKey) {
-    const root = getConversationRoot();
-    const turns: Element[] = root ? (Array.from(root.querySelectorAll('ms-chat-turn')) as any) : [];
-    for (const turn of turns) {
-      const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-      if (!turnId) continue;
-      const hit = manualTurnCache.get(turnId);
-      if (hit) messages.push(hit);
-    }
-    messages = messages.map((m, idx) => ({ ...m, sequence: idx, updatedAt: Date.now() }));
-    for (const flag of manualCacheWarningFlags || []) ctx.warningFlags.add(String(flag));
-    manualTurnCache = null;
-    manualCacheConversationKey = '';
-    manualCacheWarningFlags = [];
-  } else {
-    messages = await collectMessages(ctx);
-  }
-
-  if (!messages.length) return null;
-  return {
-    conversation: {
-      sourceType: 'chat',
-      source: 'googleaistudio',
-      conversationKey: findConversationKey(),
-      title: extractConversationTitle(),
-      url: env.location.href,
-      warningFlags: Array.from(ctx.warningFlags),
-      lastCapturedAt: Date.now(),
+  const collector = {
+    capture,
+    getRoot: getConversationRoot,
+    prepareManualCapture,
+    __test: {
+      collectMessages: async () => collectMessages(createInlineImageContext()),
+      extractAssistantMarkdown,
+      extractAssistantText,
     },
-    messages,
   };
-}
 
-const collector = {
-  capture,
-  getRoot: getConversationRoot,
-  prepareManualCapture,
-  __test: {
-    collectMessages: async () => collectMessages(createInlineImageContext()),
-    extractAssistantMarkdown,
-    extractAssistantText,
-  },
-};
-
-return { id: 'googleaistudio', matches, collector };
+  return { id: 'googleaistudio', matches, collector };
 }

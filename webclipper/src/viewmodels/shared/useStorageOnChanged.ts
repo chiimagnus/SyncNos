@@ -7,4 +7,3 @@ export function useStorageOnChanged(listener: (changes: any, areaName: string) =
     return storageOnChanged(listener);
   }, [listener]);
 }
-

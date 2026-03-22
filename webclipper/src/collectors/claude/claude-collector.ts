@@ -27,7 +27,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
   }
 
   function getConversationRoot(): any {
-    return env.document.querySelector("main") || env.document.querySelector("[role='main']") || env.document.body;
+    return env.document.querySelector('main') || env.document.querySelector("[role='main']") || env.document.body;
   }
 
   function inEditMode(root: any): any {
@@ -37,14 +37,20 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
   function isThinkingBlock(el: any): any {
     if (!el || !el.querySelector) return false;
     // Heuristic: collapsible containers usually have aria-expanded button.
-    if (el.querySelector("button[aria-expanded]")) return true;
+    if (el.querySelector('button[aria-expanded]')) return true;
     const cls = el.classList;
-    if (cls && cls.contains("transition-all") && cls.contains("rounded-lg") && (cls.contains("border") || cls.contains("border-0.5"))) return true;
+    if (
+      cls &&
+      cls.contains('transition-all') &&
+      cls.contains('rounded-lg') &&
+      (cls.contains('border') || cls.contains('border-0.5'))
+    )
+      return true;
     return false;
   }
 
   function extractOnlyFormalResponse(container: any): any {
-    if (!container) return "";
+    if (!container) return '';
     const parts: any[] = [];
     const children: any[] = Array.from(container.children || []) as any[];
     if (!children.length) {
@@ -55,28 +61,30 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
       const t = env.normalize.normalizeText(extractTextWithMath(child));
       if (t) parts.push(t);
     }
-    return env.normalize.normalizeText(parts.join("\n\n"));
+    return env.normalize.normalizeText(parts.join('\n\n'));
   }
 
   function extractTextWithMath(node: any): any {
-    if (!node) return "";
-    const hasQuery = !!(node && typeof node.querySelector === "function");
-    const hasClone = !!(node && typeof node.cloneNode === "function");
+    if (!node) return '';
+    const hasQuery = !!(node && typeof node.querySelector === 'function');
+    const hasClone = !!(node && typeof node.cloneNode === 'function');
     let hasMath = false;
     if (hasQuery) {
       try {
-        hasMath = !!node.querySelector(".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex");
+        hasMath = !!node.querySelector(
+          ".math-block[data-math], .katex, .katex-display, mjx-container, script[type^='math/tex'], .ybc-markdown-katex",
+        );
       } catch (_e) {
         hasMath = false;
       }
     }
-    if (!hasMath || !hasClone) return node.innerText || node.textContent || "";
+    if (!hasMath || !hasClone) return node.innerText || node.textContent || '';
     try {
       const cloned = node.cloneNode(true);
       replaceMathElementsWithLatexText(cloned);
-      return cloned.innerText || cloned.textContent || "";
+      return cloned.innerText || cloned.textContent || '';
     } catch (_e) {
-      return node.innerText || node.textContent || "";
+      return node.innerText || node.textContent || '';
     }
   }
 
@@ -85,7 +93,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const containers: any[] = Array.from(root.querySelectorAll("[data-test-render-count]")) as any[];
+    const containers: any[] = Array.from(root.querySelectorAll('[data-test-render-count]')) as any[];
     if (!containers.length) return [];
 
     const out: any[] = [];
@@ -93,37 +101,38 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     for (const c of containers) {
       const user = c.querySelector("[data-testid='user-message']");
       if (user) {
-        const text = env.normalize.normalizeText(user.innerText || user.textContent || "");
+        const text = env.normalize.normalizeText(user.innerText || user.textContent || '');
         const imageUrls = extractImageUrlsFromElement(user);
         if (text || imageUrls.length) {
-          const contentText = text || "";
+          const contentText = text || '';
           const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
-            role: "user",
+            messageKey: env.normalize.makeFallbackMessageKey({ role: 'user', contentText, sequence: seq }),
+            role: 'user',
             contentText,
             contentMarkdown,
             sequence: seq,
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
           });
           seq += 1;
         }
       }
 
-      const ai = c.querySelector(".font-claude-response") || c.querySelector("[data-testid='assistant-message']") || null;
+      const ai =
+        c.querySelector('.font-claude-response') || c.querySelector("[data-testid='assistant-message']") || null;
       if (ai) {
         const text = extractOnlyFormalResponse(ai);
         const imageUrls = extractImageUrlsFromElement(ai);
         if (text || imageUrls.length) {
-          const contentText = text || "";
+          const contentText = text || '';
           const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
           out.push({
-            messageKey: env.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
-            role: "assistant",
+            messageKey: env.normalize.makeFallbackMessageKey({ role: 'assistant', contentText, sequence: seq }),
+            role: 'assistant',
             contentText,
             contentMarkdown,
             sequence: seq,
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
           });
           seq += 1;
         }
@@ -138,18 +147,18 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     if (!messages.length) return null;
     return {
       conversation: {
-        sourceType: "chat",
-        source: "claude",
+        sourceType: 'chat',
+        source: 'claude',
         conversationKey: findConversationKey(),
-        title: env.document.title || "Claude",
+        title: env.document.title || 'Claude',
         url: env.location.href,
         warningFlags: [],
-        lastCapturedAt: Date.now()
+        lastCapturedAt: Date.now(),
       },
-      messages
+      messages,
     };
   }
 
   const collector = { capture, getRoot: getConversationRoot };
-  return { id: "claude", matches, collector };
+  return { id: 'claude', matches, collector };
 }

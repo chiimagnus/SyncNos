@@ -25,12 +25,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   return (
     <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 md:tw-grid md:tw-gap-2">
       <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className={backButtonClass}
-          aria-label={t('backToChatsAria')}
-        >
+        <button type="button" onClick={onBack} className={backButtonClass} aria-label={t('backToChatsAria')}>
           <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
         </button>
 

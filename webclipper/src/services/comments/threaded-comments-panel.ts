@@ -146,7 +146,11 @@ export function mountThreadedCommentsPanel(
     }
     try {
       const computed = getComputedStyle(el);
-      const w = Number.parseFloat(String((computed as any)?.width || '').replace('px', '').trim());
+      const w = Number.parseFloat(
+        String((computed as any)?.width || '')
+          .replace('px', '')
+          .trim(),
+      );
       if (Number.isFinite(w) && w > 0) return w;
     } catch (_e) {
       // ignore
@@ -538,9 +542,9 @@ export function mountThreadedCommentsPanel(
     // Keep composer editable even when busy (loading comments etc). We'll block send instead.
     composerTextarea.disabled = false;
 
-    const replyInputs = shadow.querySelectorAll?.('.webclipper-inpage-comments-panel__reply-textarea') as
-      | NodeListOf<HTMLTextAreaElement>
-      | null;
+    const replyInputs = shadow.querySelectorAll?.(
+      '.webclipper-inpage-comments-panel__reply-textarea',
+    ) as NodeListOf<HTMLTextAreaElement> | null;
     replyInputs?.forEach?.((node) => {
       try {
         node.disabled = false;
@@ -549,9 +553,9 @@ export function mountThreadedCommentsPanel(
       }
     });
 
-    const sendButtons = shadow.querySelectorAll?.('.webclipper-inpage-comments-panel__send') as
-      | NodeListOf<HTMLButtonElement>
-      | null;
+    const sendButtons = shadow.querySelectorAll?.(
+      '.webclipper-inpage-comments-panel__send',
+    ) as NodeListOf<HTMLButtonElement> | null;
     sendButtons?.forEach?.((node) => {
       try {
         if (node === composerSend) return;
@@ -655,7 +659,9 @@ export function mountThreadedCommentsPanel(
     },
     setComments(items) {
       threads.textContent = '';
-      const normalized = (Array.isArray(items) ? items : []).filter((x) => x && Number.isFinite(Number((x as any)?.id)));
+      const normalized = (Array.isArray(items) ? items : []).filter(
+        (x) => x && Number.isFinite(Number((x as any)?.id)),
+      );
       if (!normalized.length) {
         threads.appendChild(empty);
         refreshButtons();

@@ -54,7 +54,9 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 function normalizeRole(role: unknown): BubbleRole {
-  const r = String(role || '').trim().toLowerCase();
+  const r = String(role || '')
+    .trim()
+    .toLowerCase();
   if (!r) return 'other';
 
   // Normalize common variants from legacy data / different collectors.
@@ -153,7 +155,8 @@ export function ChatMessageBubble({
         : 'tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
 
   const headerBase = 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-1.5';
-  const headerToneClass = bubbleRole === 'user' ? 'tw-text-[var(--secondary-foreground)] tw-opacity-70' : 'tw-text-[var(--text-secondary)]';
+  const headerToneClass =
+    bubbleRole === 'user' ? 'tw-text-[var(--secondary-foreground)] tw-opacity-70' : 'tw-text-[var(--text-secondary)]';
   const headerLeftClass = `tw-text-[11px] tw-font-[760] ${headerToneClass}`;
   const headerRightClass = `tw-text-[11px] tw-font-[650] ${headerToneClass}`;
 

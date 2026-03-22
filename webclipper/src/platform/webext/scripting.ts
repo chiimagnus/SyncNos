@@ -6,9 +6,9 @@ export function scriptingCanInject(): boolean {
     (browser?.scripting &&
       typeof browser.scripting.executeScript === 'function' &&
       typeof browser.scripting.insertCSS === 'function') ||
-      (chrome?.scripting &&
-        typeof chrome.scripting.executeScript === 'function' &&
-        typeof chrome.scripting.insertCSS === 'function'),
+    (chrome?.scripting &&
+      typeof chrome.scripting.executeScript === 'function' &&
+      typeof chrome.scripting.insertCSS === 'function'),
   );
 }
 
@@ -18,9 +18,9 @@ export function scriptingCanDynamicRegister(): boolean {
     (browser?.scripting &&
       typeof browser.scripting.registerContentScripts === 'function' &&
       typeof browser.scripting.unregisterContentScripts === 'function') ||
-      (chrome?.scripting &&
-        typeof chrome.scripting.registerContentScripts === 'function' &&
-        typeof chrome.scripting.unregisterContentScripts === 'function'),
+    (chrome?.scripting &&
+      typeof chrome.scripting.registerContentScripts === 'function' &&
+      typeof chrome.scripting.unregisterContentScripts === 'function'),
   );
 }
 

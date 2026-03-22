@@ -20,7 +20,7 @@ describe('settings section definitions', () => {
       SETTINGS_SECTION_GROUPS.map((group) => ({
         title: group.title,
         keys: group.sections.map((section) => section.key),
-      }))
+      })),
     ).toEqual([
       { title: 'Features', keys: ['general', 'chat_with'] },
       { title: 'Data', keys: ['backup', 'notion', 'obsidian'] },

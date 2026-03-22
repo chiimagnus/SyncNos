@@ -79,7 +79,9 @@ function findComposerRoot(startEl) {
   let host = startEl;
   for (let depth = 0; depth < 25 && host; depth += 1) {
     if (host.querySelector) {
-      const hasInput = !!host.querySelector('div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]');
+      const hasInput = !!host.querySelector(
+        'div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]',
+      );
       const hasSend = !!host.querySelector('div[role="button"][data-testid="agent-send-message-button"]');
       const hasModel = !!host.querySelector('div[role="button"][data-testid="unified-chat-model-button"]');
       if (hasInput && (hasSend || hasModel)) return host;

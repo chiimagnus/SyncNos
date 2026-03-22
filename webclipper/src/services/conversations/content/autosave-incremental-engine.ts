@@ -35,10 +35,14 @@ function normalizeContent(value: unknown): string {
   return String(value || '');
 }
 
-function getMessageIdentityBase(message: any, identityPrefixLen: number): { role: string; base: string; text: string; markdown: string } {
+function getMessageIdentityBase(
+  message: any,
+  identityPrefixLen: number,
+): { role: string; base: string; text: string; markdown: string } {
   const role = String((message && message.role) || 'assistant').trim() || 'assistant';
   const text = normalizeContent(message && message.contentText);
-  const markdownRaw = message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
+  const markdownRaw =
+    message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
   const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
   const full = text || markdown;
   const clipped = full ? full.slice(0, identityPrefixLen) : '';
@@ -147,7 +151,10 @@ function buildTailEntries(args: {
 
     const idx3 = tryPick((p) => {
       if (p.role !== cur.role) return false;
-      const decision = isPrefixOrFillingUpdate({ text: p.text, markdown: p.markdown }, { text: cur.text, markdown: cur.markdown });
+      const decision = isPrefixOrFillingUpdate(
+        { text: p.text, markdown: p.markdown },
+        { text: cur.text, markdown: cur.markdown },
+      );
       return !decision.changed || decision.acceptable;
     });
     return idx3;
@@ -209,7 +216,8 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
 
   return {
     compute(snapshot: any): AutoSaveIncrementalResult {
-      if (!snapshot || !snapshot.conversation) return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
+      if (!snapshot || !snapshot.conversation)
+        return { changed: false, snapshot: null, diff: { added: [], updated: [], removed: [] } };
 
       const stateKey = makeConversationStateKey(snapshot);
       if (!stateKey) {
@@ -220,7 +228,8 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const state = getOrCreateState(stateKey);
 
       if (state.initialized) {
-        if (!normalizeMeta(snapshot.conversation.title) && state.lastTitle) snapshot.conversation.title = state.lastTitle;
+        if (!normalizeMeta(snapshot.conversation.title) && state.lastTitle)
+          snapshot.conversation.title = state.lastTitle;
         if (!normalizeMeta(snapshot.conversation.url) && state.lastUrl) snapshot.conversation.url = state.lastUrl;
       }
 
@@ -232,7 +241,13 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const windowStart = Math.max(0, allMessages.length - MAX_WINDOW_MESSAGES);
       const windowMessages = allMessages.slice(windowStart);
       const currentIdentityHashes: string[] = [];
-      const currentComparable: Array<{ role: string; identityHash: string; text: string; markdown: string; stableIncomingKey: string }> = [];
+      const currentComparable: Array<{
+        role: string;
+        identityHash: string;
+        text: string;
+        markdown: string;
+        stableIncomingKey: string;
+      }> = [];
 
       for (const m of windowMessages) {
         const incomingKeyRaw = String(m?.messageKey || '').trim();
@@ -272,13 +287,15 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
         state.lastTitle = nextTitle;
         state.lastUrl = nextUrl;
         state.lastWindowIdentityHashes = currentIdentityHashes;
-        state.lastTail = currentComparable.slice(Math.max(0, currentComparable.length - TAIL_UPDATE_WINDOW_SIZE)).map((m) => ({
-          key: m.stableIncomingKey || '',
-          role: m.role,
-          identityHash: m.identityHash,
-          text: m.text,
-          markdown: m.markdown,
-        }));
+        state.lastTail = currentComparable
+          .slice(Math.max(0, currentComparable.length - TAIL_UPDATE_WINDOW_SIZE))
+          .map((m) => ({
+            key: m.stableIncomingKey || '',
+            role: m.role,
+            identityHash: m.identityHash,
+            text: m.text,
+            markdown: m.markdown,
+          }));
 
         // Seed: for short conversations, persist the initial window once so the first user/assistant messages don't get missed.
         // For long conversations, skip seeding to avoid huge writes on re-entry when collectors only expose a tail window.
@@ -318,9 +335,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
             const msg = windowMessages[Math.max(0, windowMessages.length - curTail.length) + idx];
             const keyFromMsg = String(msg?.messageKey || '').trim();
             const key =
-              m.stableIncomingKey ||
-              (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') ||
-              '';
+              m.stableIncomingKey || (keyFromMsg.startsWith(`autosave_${state.stateKeyHash}_`) ? keyFromMsg : '') || '';
             return { key, role: m.role, identityHash: m.identityHash, text: m.text, markdown: m.markdown };
           });
 

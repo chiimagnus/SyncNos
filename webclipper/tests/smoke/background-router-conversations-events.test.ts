@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { createBackgroundRouter } from "../../src/platform/messaging/background-router";
-import { registerConversationHandlers } from "@services/conversations/background/handlers";
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
+import { registerConversationHandlers } from '@services/conversations/background/handlers';
 
 const writeMocks = vi.hoisted(() => ({
   writeConversationMessagesSnapshot: vi.fn(),
@@ -14,12 +14,12 @@ const storageMocks = vi.hoisted(() => ({
   hasConversation: vi.fn(),
 }));
 
-vi.mock("@services/conversations/data/write", () => ({
+vi.mock('@services/conversations/data/write', () => ({
   writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
   writeConversationSnapshot: writeMocks.writeConversationSnapshot,
 }));
 
-vi.mock("@services/conversations/data/storage", () => ({
+vi.mock('@services/conversations/data/storage', () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
   listConversations: storageMocks.listConversations,
   getConversationDetail: storageMocks.getConversationDetail,
@@ -48,8 +48,8 @@ afterEach(() => {
   storageMocks.hasConversation.mockReset();
 });
 
-describe("background-router conversations events", () => {
-  it("broadcasts conversationsChanged after syncConversationMessages", async () => {
+describe('background-router conversations events', () => {
+  it('broadcasts conversationsChanged after syncConversationMessages', async () => {
     const broadcast = vi.fn();
     writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
 
@@ -57,17 +57,17 @@ describe("background-router conversations events", () => {
     router.eventsHub.broadcast = broadcast;
 
     const res = await router.__handleMessageForTests({
-      type: "syncConversationMessages",
+      type: 'syncConversationMessages',
       conversationId: 123,
       messages: [],
     });
 
     expect(res.ok).toBe(true);
     expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalled();
-    expect(broadcast).toHaveBeenCalledWith("conversationsChanged", { reason: "upsert", conversationId: 123 });
+    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'upsert', conversationId: 123 });
   });
 
-  it("broadcasts conversationsChanged after deleteConversations", async () => {
+  it('broadcasts conversationsChanged after deleteConversations', async () => {
     const broadcast = vi.fn();
     storageMocks.deleteConversationsByIds.mockResolvedValue({
       deletedConversations: 2,
@@ -79,12 +79,12 @@ describe("background-router conversations events", () => {
     router.eventsHub.broadcast = broadcast;
 
     const res = await router.__handleMessageForTests({
-      type: "deleteConversations",
-      conversationIds: [1, "2", "bad", -1],
+      type: 'deleteConversations',
+      conversationIds: [1, '2', 'bad', -1],
     });
 
     expect(res.ok).toBe(true);
     expect(storageMocks.deleteConversationsByIds).toHaveBeenCalled();
-    expect(broadcast).toHaveBeenCalledWith("conversationsChanged", { reason: "delete", conversationIds: [1, 2] });
+    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'delete', conversationIds: [1, 2] });
   });
 });
