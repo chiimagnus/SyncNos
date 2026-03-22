@@ -7,7 +7,7 @@ import { t, formatConversationTitle } from '@i18n';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
-import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversationId } from '@ui/conversations/pending-open';
 
 type NarrowRoute = 'list' | 'detail';

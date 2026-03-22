@@ -16,7 +16,7 @@ vi.mock('../../src/platform/webext/tabs', () => ({
   tabsCreate: vi.fn(),
 }));
 
-vi.mock('../../src/ui/conversations/conversations-context', () => ({
+vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: ReactNode }) => children,
   useConversationsApp: () => ({
     items: [],

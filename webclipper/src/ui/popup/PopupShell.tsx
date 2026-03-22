@@ -6,7 +6,7 @@ import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
 
 import { t } from '@i18n';
-import { useConversationsApp, ConversationsProvider } from '@ui/conversations/conversations-context';
+import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';

@@ -11,7 +11,7 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 
 const setActiveId = vi.fn();
 
-vi.mock('../../src/ui/conversations/conversations-context', () => ({
+vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => ({
     items: [
       {

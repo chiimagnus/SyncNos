@@ -60,7 +60,7 @@ vi.mock('../../src/ui/i18n', () => ({
   formatConversationTitle: (value?: string) => String(value || 'Untitled'),
 }));
 
-vi.mock('../../src/ui/conversations/conversations-context', () => ({
+vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => currentState,
 }));
 

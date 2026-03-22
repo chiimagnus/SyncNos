@@ -3,7 +3,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'r
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
 import { CapturedListSidebar } from '@ui/app/CapturedListSidebar';
-import { ConversationsProvider, useConversationsApp } from '@ui/conversations/conversations-context';
+import { ConversationsProvider, useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';

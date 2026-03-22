@@ -14,7 +14,7 @@ import {
 } from '@viewmodels/settings/insight-stats';
 import type { InsightTimeRange } from '@viewmodels/settings/insight-stats';
 import { buttonClassName, cardClassName } from '@ui/settings/ui';
-import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
