@@ -1,11 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 
-import { getURL as runtimeGetURL } from '../../../platform/runtime/runtime';
+import { getURL as runtimeGetURL } from '../../platform/runtime/runtime';
 
-import { t } from '../../../i18n';
-import { ConversationListPane } from '../../conversations/ConversationListPane';
-import { navIconButtonClassName } from '../../shared/nav-styles';
+import { t } from '../../i18n';
+import { ConversationListPane } from '../conversations/ConversationListPane';
+import { navIconButtonClassName } from '../shared/nav-styles';
 
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
   const routerLocation = useLocation();
