@@ -1,7 +1,7 @@
-import { t } from '../../i18n';
-import inpageCommentsPanelCssRaw from '../styles/inpage-comments-panel.css?raw';
-import buttonsCssRaw from '../styles/buttons.css?raw';
-import tokensCssRaw from '../styles/tokens.css?raw';
+import { t } from '../i18n';
+import inpageCommentsPanelCssRaw from '../ui/styles/inpage-comments-panel.css?raw';
+import buttonsCssRaw from '../ui/styles/buttons.css?raw';
+import tokensCssRaw from '../ui/styles/tokens.css?raw';
 
 export type ThreadedCommentItem = {
   id: number;
@@ -73,7 +73,7 @@ function formatTime(ts: number | null | undefined): string {
   if (!Number.isFinite(t) || t <= 0) return '';
   try {
     return new Date(t).toLocaleString();
-  } catch (_e) {
+  } catch (_e) {1
     return '';
   }
 }
