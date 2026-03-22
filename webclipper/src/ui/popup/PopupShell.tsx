@@ -6,10 +6,9 @@ import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app'
 
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
-import type { PopupHeaderState } from '../conversations/ConversationsScene';
+import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-styles';
-import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
 import { PopupNotionSyncNudgeDialog } from './PopupNotionSyncNudgeDialog';
 import { getPopupNotionSyncNudgeDismissed, setPopupNotionSyncNudgeDismissed } from './notion-sync-nudge-preference';
@@ -160,13 +159,15 @@ function PopupShellFrame() {
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label={t('chatsAria')}>
-          <ChatsTab
-            onPopupHeaderStateChange={setHeaderState}
-            onPopupNotionSyncStarted={onPopupNotionSyncStarted}
-            onOpenInsightsSection={() => {
-              void onOpenInsightSettings().catch(() => {});
-            }}
-          />
+          <div className="tw-flex tw-h-full tw-min-h-0 tw-flex-1 tw-flex-col">
+            <ConversationsScene
+              onPopupHeaderStateChange={setHeaderState}
+              onPopupNotionSyncStarted={onPopupNotionSyncStarted}
+              onOpenInsightsSection={() => {
+                void onOpenInsightSettings().catch(() => {});
+              }}
+            />
+          </div>
         </section>
       </main>
 
