@@ -10,8 +10,8 @@ import { deleteConversations, getConversationDetail, listConversations } from '@
 import { backfillConversationImages } from '@services/conversations/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
-import { UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
-import { connectPort } from '../../platform/runtime/ports';
+import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
+import { connectPort } from '@services/shared/ports';
 import { t } from '../../i18n';
 import { useConversationSyncFeedback, type ConversationSyncFeedbackState } from './useConversationSyncFeedback';
 

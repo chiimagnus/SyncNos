@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';
-import { connectPort } from '../../platform/runtime/ports';
+import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
+import { connectPort } from '@services/shared/ports';
 import { addArticleComment, deleteArticleCommentById, listArticleCommentsByCanonicalUrl } from '@services/comments/client/repo';
 import { mountThreadedCommentsPanel, type ThreadedCommentsPanelApi, type ThreadedCommentItem } from '@services/comments/threaded-comments-panel';
 

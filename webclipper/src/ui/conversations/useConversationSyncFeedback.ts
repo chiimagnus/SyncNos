@@ -9,7 +9,7 @@ import {
   syncObsidianConversations as defaultSyncObsidianConversations,
 } from '@services/sync/repo';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
-import { storageOnChanged } from '../../platform/storage/local';
+import { storageOnChanged } from '@services/shared/storage';
 import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '@services/sync/models';
 import type { SyncStartAck } from '@services/sync/repo';
 import { t } from '../../i18n';
