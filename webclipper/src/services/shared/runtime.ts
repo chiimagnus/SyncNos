@@ -5,12 +5,16 @@ import {
   isInvalidContextError as platformIsInvalidContextError,
   onInstalled as platformOnInstalled,
   onStartup as platformOnStartup,
-  send as platformSend,
   sendMessage as platformSendMessage,
 } from '@platform/runtime/runtime';
 
+export async function send<TResponse = unknown>(type: string, payload?: Record<string, unknown>): Promise<TResponse> {
+  if (!type) throw new Error('Message type is required');
+  return platformSendMessage<TResponse>({ type, ...(payload ?? {}) });
+}
+
 export const runtime = {
-  send: platformSend,
+  send,
   sendMessage: platformSendMessage,
   getURL: platformGetURL,
   getManifest: platformGetManifest,
@@ -21,7 +25,6 @@ export const runtime = {
 };
 
 export {
-  platformSend as send,
   platformSendMessage as sendMessage,
   platformGetURL as getURL,
   platformGetManifest as getManifest,
@@ -30,4 +33,3 @@ export {
   platformIsInvalidContextError as isInvalidContextError,
   INVALIDATED_MESSAGE,
 };
-

@@ -4,9 +4,13 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import type { ReactNode } from 'react';
 
-vi.mock('../../src/platform/runtime/runtime', () => ({
-  getURL: (path: string) => path,
-}));
+vi.mock('../../src/platform/runtime/runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/platform/runtime/runtime')>();
+  return {
+    ...actual,
+    getURL: (path: string) => path,
+  };
+});
 
 vi.mock('../../src/platform/webext/tabs', () => ({
   tabsCreate: vi.fn(),
