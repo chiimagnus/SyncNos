@@ -2,7 +2,7 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
 import { createZaiCollectorDef } from "../../src/collectors/zai/zai-collector.ts";
-import normalizeApi from "../../src/shared/normalize.ts";
+import normalizeApi from "@services/shared/normalize.ts";
 
 function setupDom(dom: JSDOM) {
   // @ts-expect-error test global

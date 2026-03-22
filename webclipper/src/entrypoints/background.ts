@@ -1,4 +1,4 @@
-import { createBackgroundServices } from '../bootstrap/background-services.ts';
+import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '../conversations/background/handlers';
 import { registerSyncHandlers } from '../sync/background-handlers';
 import { createBackgroundRouter } from '../platform/messaging/background-router';

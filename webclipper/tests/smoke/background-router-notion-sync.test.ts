@@ -3,7 +3,7 @@ import { createBackgroundRouter } from '../../src/platform/messaging/background-
 import { registerNotionSettingsHandlers } from '../../src/sync/notion/settings-background-handlers';
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { createNotionSyncOrchestrator } from '../../src/sync/notion/notion-sync-orchestrator.ts';
-import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
+import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { NOTION_SYNC_JOB_KEY } from '../../src/sync/notion/notion-sync-job-store.ts';
 import { notionFetch } from '../../src/sync/notion/notion-api.ts';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildLocalTimestampForFilename } from '../../src/shared/file-timestamp';
+import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 
 describe('buildLocalTimestampForFilename', () => {
   it('formats local time with safe filename characters', () => {
@@ -8,4 +8,3 @@ describe('buildLocalTimestampForFilename', () => {
     expect(buildLocalTimestampForFilename(d)).toBe('2026-03-03T04-05-06-007');
   });
 });
-

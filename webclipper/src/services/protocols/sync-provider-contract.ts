@@ -1,4 +1,4 @@
-import type { SyncProvider } from '../sync/models';
+import type { SyncProvider } from '../../sync/models';
 
 export type SyncProviderId = SyncProvider;
 
@@ -7,4 +7,3 @@ export type SyncProviderDefinition = {
   labelKey: string;
   settingsSectionKey: string;
 };
-

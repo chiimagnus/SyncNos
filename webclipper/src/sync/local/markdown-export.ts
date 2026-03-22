@@ -3,7 +3,7 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { formatConversationMarkdown } from '../../conversations/domain/markdown';
 import type { Conversation } from '../../conversations/domain/models';
 import { getConversationDetail } from '../../conversations/client/repo';
-import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
+import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 
 export async function buildConversationsMarkdownZipExport({
   conversations,

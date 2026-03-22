@@ -1,4 +1,4 @@
-import normalizeApi from '../shared/normalize.ts';
+import normalizeApi from '@services/shared/normalize.ts';
 import chatgptMarkdown from '../collectors/chatgpt/chatgpt-markdown.ts';
 
 const MESSAGE_TYPES = Object.freeze({

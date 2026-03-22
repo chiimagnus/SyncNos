@@ -1,17 +1,17 @@
 import '../ui/styles/tokens.css';
 
-import { createContentController } from '../bootstrap/content-controller.ts';
-import { registerCurrentPageCaptureContentHandlers } from '../bootstrap/current-page-capture-content-handlers.ts';
-import { createCurrentPageCaptureService } from '../bootstrap/current-page-capture.ts';
-import { startContentBootstrap } from '../bootstrap/content.ts';
-import { registerInpageCommentsPanelContentHandlers } from '../bootstrap/inpage-comments-panel-content-handlers.ts';
+import { createContentController } from '@services/bootstrap/content-controller.ts';
+import { registerCurrentPageCaptureContentHandlers } from '@services/bootstrap/current-page-capture-content-handlers.ts';
+import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
+import { startContentBootstrap } from '@services/bootstrap/content.ts';
+import { registerInpageCommentsPanelContentHandlers } from '@services/bootstrap/inpage-comments-panel-content-handlers.ts';
 import { createCollectorEnv } from '../collectors/collector-env.ts';
 import { registerAllCollectors } from '../collectors/register-all.ts';
 import { createCollectorsRegistry } from '../collectors/registry.ts';
 import runtimeObserverApi from '../collectors/runtime-observer.ts';
 import incrementalUpdaterApi from '../conversations/content/incremental-updater.ts';
-import notionAiModelPickerApi from '../integrations/notionai-auto-picker/notionai-model-picker.ts';
-import normalizeApi from '../shared/normalize.ts';
+import notionAiModelPickerApi from '@services/integrations/notionai-auto-picker/notionai-model-picker.ts';
+import normalizeApi from '@services/shared/normalize.ts';
 import { inpageButtonApi } from '../ui/inpage/inpage-button-shadow.ts';
 import { inpageTipApi } from '../ui/inpage/inpage-tip-shadow.ts';
 import { createRuntimeClient } from '../platform/runtime/client.ts';

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createNotionSyncOrchestrator } from "../../src/sync/notion/notion-sync-orchestrator.ts";
-import { conversationKinds } from "../../src/protocols/conversation-kinds.ts";
+import { conversationKinds } from "@services/protocols/conversation-kinds.ts";
 
 let notionFetchImpl: ((req: any) => Promise<any>) | null = null;
 

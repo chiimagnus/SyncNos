@@ -4,7 +4,7 @@ import { OBSIDIAN_APP_LAUNCH_URL } from '../../src/sync/obsidian/obsidian-app-la
 import {
   openObsidianTarget,
   resolveObsidianOpenTarget,
-} from '../../src/integrations/openin/obsidian-open-target';
+} from '@services/integrations/openin/obsidian-open-target';
 
 describe('obsidian-open-target', () => {
   it('reports the header action as unavailable when the local API is unreachable', async () => {

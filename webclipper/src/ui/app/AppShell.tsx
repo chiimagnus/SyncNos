@@ -10,7 +10,7 @@ import { ArticleCommentsSection } from '../conversations/ArticleCommentsSection'
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '../shared/button-styles';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
-import { decodeConversationLoc, encodeConversationLoc } from '../../shared/conversation-loc';
+import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { createCommentSidebarSession } from '../../comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '../../comments/sidebar/comment-sidebar-contract';
 

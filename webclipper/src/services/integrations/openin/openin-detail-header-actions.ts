@@ -1,7 +1,7 @@
-import type { Conversation } from '../../conversations/domain/models';
-import { t } from '../../i18n';
+import type { Conversation } from '../../../conversations/domain/models';
+import { t } from '../../../i18n';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
-import { isSyncProviderEnabled } from '../../sync/sync-provider-gate';
+import { isSyncProviderEnabled } from '../../../sync/sync-provider-gate';
 import {
   buildNotionOpenInAction,
   buildNotionPageUrl,

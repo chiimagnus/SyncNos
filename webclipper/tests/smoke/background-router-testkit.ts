@@ -2,7 +2,7 @@ import { registerConversationHandlers } from '../../src/conversations/background
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
-import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
+import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
 import notionSyncJobStore from '../../src/sync/notion/notion-sync-job-store.ts';
 import {

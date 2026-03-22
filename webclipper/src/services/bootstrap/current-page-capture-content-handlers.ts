@@ -1,4 +1,4 @@
-import { CURRENT_PAGE_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
+import { CURRENT_PAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import type { CurrentPageCaptureService } from './current-page-capture';
 
 type ApiResponse<T> = {

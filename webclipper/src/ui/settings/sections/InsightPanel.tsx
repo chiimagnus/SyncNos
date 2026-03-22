@@ -18,7 +18,7 @@ import { useConversationsApp } from '../../conversations/conversations-context';
 import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '../../shared/SelectMenu';
 import { openConversation as openConversationInApp } from '../../conversations/open-conversation';
-import { buildConversationRouteFromLoc, encodeConversationLoc } from '../../../shared/conversation-loc';
+import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';
 

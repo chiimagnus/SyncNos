@@ -1,4 +1,4 @@
-import { tabsCreate } from '../platform/webext/tabs';
+import { tabsCreate } from '@platform/webext/tabs';
 
 async function openInNewTab(safeUrl: string): Promise<boolean> {
   try {
@@ -21,4 +21,3 @@ export async function openExternalUrl(url: string): Promise<boolean> {
   if (!/^https?:\/\//i.test(safeUrl)) return false;
   return openInNewTab(safeUrl);
 }
-

@@ -1,4 +1,4 @@
-import type { SyncProviderId, SyncProviderDefinition } from '../protocols/sync-provider-contract';
+import type { SyncProviderId, SyncProviderDefinition } from '@services/protocols/sync-provider-contract';
 
 const REGISTRY: ReadonlyArray<SyncProviderDefinition> = [
   { id: 'obsidian', labelKey: 'providerObsidian', settingsSectionKey: 'obsidian' },
@@ -12,4 +12,3 @@ export function listSyncProviders(): SyncProviderDefinition[] {
 export function getSyncProviderDefinition(id: SyncProviderId): SyncProviderDefinition | null {
   return REGISTRY.find((provider) => provider.id === id) ?? null;
 }
-

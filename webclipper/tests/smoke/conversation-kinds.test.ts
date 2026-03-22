@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conversationKinds } from "../../src/protocols/conversation-kinds.ts";
+import { conversationKinds } from "@services/protocols/conversation-kinds.ts";
 
 function loadConversationKinds() {
   return conversationKinds;

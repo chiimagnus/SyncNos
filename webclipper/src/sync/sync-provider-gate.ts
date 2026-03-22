@@ -1,5 +1,5 @@
 import { storageGet, storageRemove, storageSet } from '../platform/storage/local';
-import type { SyncProviderId } from '../protocols/sync-provider-contract';
+import type { SyncProviderId } from '@services/protocols/sync-provider-contract';
 import { listSyncProviders } from './sync-provider-registry';
 
 export type SyncProviderGateDisabledExtra = {
@@ -43,4 +43,3 @@ export async function ensureSyncProviderEnabled(id: SyncProviderId): Promise<Syn
   if (enabled) return null;
   return { code: 'sync_provider_disabled', provider: id };
 }
-

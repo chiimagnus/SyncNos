@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
 import { createCollectorsRegistry } from "../../src/collectors/registry.ts";
 import { createNotionAiCollectorDef } from "../../src/collectors/notionai/notionai-collector.ts";
-import normalizeApi from "../../src/shared/normalize.ts";
+import normalizeApi from "@services/shared/normalize.ts";
 
 function setupDom(dom: JSDOM) {
   // @ts-expect-error test global

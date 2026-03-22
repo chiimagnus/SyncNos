@@ -9,7 +9,7 @@ import { buildConversationBasename } from '../../conversations/domain/file-namin
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
 import { DB_NAME, DB_VERSION } from '../../platform/idb/schema.ts';
-import { buildLocalTimestampForFilename } from '../../shared/file-timestamp';
+import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 
 type AnyRecord = Record<string, any>;
 

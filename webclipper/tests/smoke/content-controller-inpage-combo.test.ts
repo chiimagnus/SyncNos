@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createContentController } from "../../src/bootstrap/content-controller.ts";
-import { createCurrentPageCaptureService } from "../../src/bootstrap/current-page-capture.ts";
+import { createContentController } from "@services/bootstrap/content-controller.ts";
+import { createCurrentPageCaptureService } from "@services/bootstrap/current-page-capture.ts";
 
 type TickFn = (() => void | Promise<void>) | null;
 

@@ -1,4 +1,4 @@
-import normalizeApi from '../../shared/normalize.ts';
+import normalizeApi from '@services/shared/normalize.ts';
 
 type Diff = { added: string[]; updated: string[]; removed: string[] };
 

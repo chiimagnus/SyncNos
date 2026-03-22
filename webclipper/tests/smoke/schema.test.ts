@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import * as normalize from "../../src/shared/normalize.ts";
+import * as normalize from "@services/shared/normalize.ts";
 import * as incrementalUpdater from "../../src/conversations/content/incremental-updater.ts";
 
 describe("smoke", () => {

@@ -4,7 +4,7 @@ import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailRoute } from '../shared/hooks/useNarrowListDetailRoute';
 
 import { t, formatConversationTitle } from '../../i18n';
-import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
+import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { ConversationDetailPane } from './ConversationDetailPane';
 import { ConversationListPane } from './ConversationListPane';
 import { useConversationsApp } from './conversations-context';

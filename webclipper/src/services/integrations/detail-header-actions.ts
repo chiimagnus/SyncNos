@@ -1,5 +1,5 @@
-import type { Conversation, ConversationDetail } from '../conversations/domain/models';
-import { launchObsidianApp } from '../sync/obsidian/obsidian-app-launch';
+import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
+import { launchObsidianApp } from '../../sync/obsidian/obsidian-app-launch';
 import type { DetailHeaderAction, DetailHeaderActionPort } from './detail-header-action-types';
 import { openExternalUrl } from './open-external-url';
 import { reportObsidianOpenError, waitForDelay } from './openin/obsidian-open-target';

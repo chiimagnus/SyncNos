@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
-import normalizeApi from "../../src/shared/normalize.ts";
+import normalizeApi from "@services/shared/normalize.ts";
 import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
 import { createChatgptCollectorDef } from "../../src/collectors/chatgpt/chatgpt-collector.ts";
 

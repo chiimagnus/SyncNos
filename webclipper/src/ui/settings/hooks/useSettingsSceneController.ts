@@ -18,7 +18,7 @@ import {
   loadChatWithSettings,
   resetChatWithSettings,
   saveChatWithSettings,
-} from '../../../integrations/chatwith/chatwith-settings';
+} from '@services/integrations/chatwith/chatwith-settings';
 import {
   buildInsightStats,
   getInsightStatsSourceData,

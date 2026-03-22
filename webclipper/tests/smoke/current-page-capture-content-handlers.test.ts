@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { registerCurrentPageCaptureContentHandlers } from '../../src/bootstrap/current-page-capture-content-handlers';
+import { registerCurrentPageCaptureContentHandlers } from '@services/bootstrap/current-page-capture-content-handlers';
 
 afterEach(() => {
   vi.restoreAllMocks();

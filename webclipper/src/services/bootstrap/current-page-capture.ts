@@ -1,5 +1,5 @@
-import { t } from '../i18n';
-import { hydrateChatgptDeepResearchSnapshot } from '../collectors/chatgpt/chatgpt-deep-research-hydrator';
+import { t } from '../../i18n';
+import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { buildCaptureSuccessTipMessage } from '../shared/capture-tip';
 
 type RuntimeClient = {

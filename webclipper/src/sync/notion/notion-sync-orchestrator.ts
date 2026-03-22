@@ -2,7 +2,7 @@
 import type { NotionServices } from './notion-services.ts';
 import { backgroundStorage as defaultBackgroundStorage } from '../../conversations/background/storage';
 import { getNotionOAuthToken } from './auth/token-store';
-import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
+import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
 import notionDbManagerDefault from './notion-db-manager.ts';
 import notionSyncJobStoreDefault from './notion-sync-job-store.ts';
 import notionSyncServiceDefault from './notion-sync-service.ts';

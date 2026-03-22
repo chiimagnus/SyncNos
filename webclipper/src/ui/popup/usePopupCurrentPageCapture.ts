@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
 import { send } from '../../platform/runtime/runtime';
 import { t } from '../../i18n';
-import { buildCaptureSuccessTipMessage } from '../../shared/capture-tip';
+import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 type ApiResponse<T> = {
   ok: boolean;

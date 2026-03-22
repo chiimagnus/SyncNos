@@ -1,4 +1,4 @@
-import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
+import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
 import {
   buildConversationBasename,
   stableConversationHash16,

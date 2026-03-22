@@ -1,4 +1,4 @@
-import { t } from '../i18n';
+import { t } from '../../i18n';
 
 export const CAPTURE_TIP_TITLE_MAX_CHARS = 48;
 
@@ -29,4 +29,3 @@ export function buildCaptureSuccessTipMessage(input: { title?: unknown; isNew?: 
   if (title) return `${prefix}${title}`;
   return isNew ? t('saved') : t('updated');
 }
-
