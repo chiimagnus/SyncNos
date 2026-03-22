@@ -14,7 +14,7 @@ import {
   INSIGHT_OTHER_LABEL,
   INSIGHT_UNKNOWN_DOMAIN_LABEL,
   INSIGHT_UNTITLED_CONVERSATION,
-} from "../../src/ui/settings/sections/insight-stats";
+} from "../../src/viewmodels/settings/insight-stats";
 
 async function deleteDb(name: string) {
   await new Promise<void>((resolve, reject) => {

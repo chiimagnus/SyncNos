@@ -15,7 +15,7 @@ import { navItemClassName } from '@ui/shared/nav-styles';
 import { buttonDangerTintClassName, buttonFilledClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { parseHostnameFromUrl } from '@ui/shared/domain';
+import { parseHostnameFromUrl } from '@services/shared/url';
 
 type SourceMeta = { key: string; label: string };
 

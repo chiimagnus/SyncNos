@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseHostnameFromUrl } from '../../src/ui/shared/domain';
+import { parseHostnameFromUrl } from '../../src/services/shared/url';
 
 describe('domain', () => {
   it('parses hostname from url', () => {

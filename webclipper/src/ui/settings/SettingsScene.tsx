@@ -6,9 +6,9 @@ import { t } from '@i18n';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
 
-import { useSettingsSceneController } from '@ui/settings/hooks/useSettingsSceneController';
+import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
-import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS, type SettingsSectionKey } from '@ui/settings/types';
+import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS, type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { ChatWithAiSection } from '@ui/settings/sections/ChatWithAiSection';

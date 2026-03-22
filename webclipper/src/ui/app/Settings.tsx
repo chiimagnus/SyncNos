@@ -6,7 +6,7 @@ import {
   readStoredSettingsSection,
   type SettingsSectionKey,
   writeStoredSettingsSection,
-} from '@ui/settings/types';
+} from '@viewmodels/settings/types';
 import { SettingsScene } from '@ui/settings/SettingsScene';
 
 export default function Settings() {

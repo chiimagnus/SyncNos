@@ -1,4 +1,4 @@
-import type { NotionPageOption } from '@ui/settings/utils';
+import type { NotionPageOption } from '@viewmodels/settings/utils';
 import { t } from '@i18n';
 import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';

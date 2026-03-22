@@ -26,7 +26,7 @@ import {
   type InsightStats,
   type InsightStatsSourceData,
   type InsightTimeRange,
-} from '@ui/settings/sections/insight-stats';
+} from '@viewmodels/settings/insight-stats';
 
 import {
   formatProgress,
@@ -37,8 +37,8 @@ import {
   unwrap,
   type ApiResponse,
   type NotionPageOption,
-} from '@ui/settings/utils';
-import type { SettingsSectionKey } from '@ui/settings/types';
+} from '@viewmodels/settings/utils';
+import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { t } from '@i18n';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
