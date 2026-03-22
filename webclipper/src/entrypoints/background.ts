@@ -1,10 +1,10 @@
 import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
-import { createBackgroundRouter } from '../platform/messaging/background-router';
-import { registerWebArticleHandlers } from '../collectors/web/article-fetch-background-handlers';
-import { registerChatgptDeepResearchHandlers } from '../collectors/chatgpt/chatgpt-deep-research-background-handlers';
-import { registerUiMessageHandlers } from '../platform/messaging/ui-background-handlers';
+import { createBackgroundRouter } from '@platform/messaging/background-router';
+import { registerWebArticleHandlers } from '@collectors/web/article-fetch-background-handlers';
+import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
+import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import {
   ensureDefaultNotionOAuthClientId,
@@ -13,9 +13,9 @@ import {
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
-import { onInstalled } from '../platform/runtime/runtime';
-import { openOrFocusExtensionAppTab } from '../platform/webext/extension-app';
-import { registerClipperContextMenu } from '../platform/context-menus/clipper-context-menu';
+import { onInstalled } from '@platform/runtime/runtime';
+import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
+import { registerClipperContextMenu } from '@platform/context-menus/clipper-context-menu';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
