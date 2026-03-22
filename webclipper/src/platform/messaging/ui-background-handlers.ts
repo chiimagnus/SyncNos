@@ -1,4 +1,4 @@
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { tabsQuery, tabsSendMessage } from '../webext/tabs';
 import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from './message-contracts';
 

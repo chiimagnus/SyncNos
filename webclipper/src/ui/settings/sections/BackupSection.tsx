@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 import { formatTime } from '../utils';
 import { buttonClassName, cardClassName } from '../ui';
 

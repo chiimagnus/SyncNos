@@ -1,7 +1,7 @@
 import { getManifest, getURL } from '@services/shared/runtime';
 import { tabsCreate } from '@services/shared/webext';
 
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 import { buttonClassName, cardClassName } from '../ui';
 
 export function AboutSection() {

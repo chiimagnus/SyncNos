@@ -3,7 +3,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL as runtimeGetURL } from '@services/shared/runtime';
 
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { ConversationListPane } from '../conversations/ConversationListPane';
 import { navIconButtonClassName } from '../shared/nav-styles';
 

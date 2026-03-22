@@ -1,4 +1,4 @@
-import { t } from '../../i18n';
+import { t } from '@i18n';
 
 export const CAPTURE_TIP_TITLE_MAX_CHARS = 48;
 

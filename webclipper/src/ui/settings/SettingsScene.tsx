@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { getURL } from '@services/shared/runtime';
 
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
 import { buttonFilledClassName, buttonTintClassName } from '../shared/button-styles';
 

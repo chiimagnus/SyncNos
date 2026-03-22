@@ -39,7 +39,7 @@ import {
   type NotionPageOption,
 } from '../utils';
 import type { SettingsSectionKey } from '../types';
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');

@@ -6,7 +6,7 @@ import { formatConversationMarkdownForExternalOutput } from '@services/integrati
 import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageOnChanged } from '@services/shared/storage';
 
-import { t, formatConversationTitle } from '../../i18n';
+import { t, formatConversationTitle } from '@i18n';
 import type { SyncProvider } from '@services/sync/models';
 import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { useConversationsApp } from './conversations-context';

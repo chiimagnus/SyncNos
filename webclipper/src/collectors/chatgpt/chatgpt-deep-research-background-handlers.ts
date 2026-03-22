@@ -1,5 +1,5 @@
-import { CHATGPT_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
-import { scriptingExecuteScript } from '../../platform/webext/scripting';
+import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { scriptingExecuteScript } from '@platform/webext/scripting';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

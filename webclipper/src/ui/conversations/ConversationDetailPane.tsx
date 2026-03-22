@@ -2,7 +2,7 @@ import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '../shared/ChatMessageBubble';
 
-import { t, formatConversationTitle } from '../../i18n';
+import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from './conversations-context';
 import { DetailHeaderActionBar } from './DetailHeaderActionBar';
 import { buttonTintClassName } from '../shared/button-styles';

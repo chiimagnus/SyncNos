@@ -1,4 +1,4 @@
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { navGroupTitleClassName, navItemClassName } from '../shared/nav-styles';
 import type { SettingsSectionKey } from './types';
 import { SETTINGS_SECTION_GROUPS } from './types';

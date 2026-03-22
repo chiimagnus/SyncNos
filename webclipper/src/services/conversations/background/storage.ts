@@ -14,7 +14,7 @@ import {
 import {
   attachOrphanCommentsToConversation as attachOrphanArticleCommentsToConversation,
   listArticleCommentsByConversationId as getArticleCommentsByConversationId,
-} from '../../comments/data/storage';
+} from '@services/comments/data/storage';
 
 export const backgroundStorage = {
   upsertConversation,

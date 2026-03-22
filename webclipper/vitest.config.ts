@@ -9,7 +9,8 @@ export default defineConfig({
       "@services": path.resolve("src/services"),
       "@platform": path.resolve("src/platform"),
       "@collectors": path.resolve("src/collectors"),
-      "@entrypoints": path.resolve("src/entrypoints")
+      "@entrypoints": path.resolve("src/entrypoints"),
+      "@i18n": path.resolve("src/i18n")
     }
   },
   test: {

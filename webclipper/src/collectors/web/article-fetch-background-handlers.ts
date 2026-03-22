@@ -1,4 +1,4 @@
-import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
+import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from './article-fetch';
 
 type AnyRouter = {

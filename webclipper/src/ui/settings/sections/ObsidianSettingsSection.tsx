@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';
 

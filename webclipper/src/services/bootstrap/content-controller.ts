@@ -1,5 +1,5 @@
 import type { CurrentPageCaptureService } from './current-page-capture';
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { buildCaptureSuccessTipMessage } from '../shared/capture-tip';

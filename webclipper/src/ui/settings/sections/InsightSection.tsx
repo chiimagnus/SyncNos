@@ -1,4 +1,4 @@
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 import type { InsightStats, InsightTimeRange } from './insight-stats';
 import { hasInsightData } from './insight-stats';
 import { InsightPanel } from './InsightPanel';

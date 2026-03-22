@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 import type { ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
 import { buttonClassName, cardClassName, checkboxClassName, dangerButtonClassName, textInputClassName } from '../ui';
 import { SettingsFormRow } from './SettingsFormRow';

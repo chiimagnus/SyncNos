@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BookOpen, ExternalLink, FileText, ImageDown, Link2Off, Sparkles } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { buttonMenuItemClassName } from '../shared/button-styles';
 import { MenuPopover } from '../shared/MenuPopover';
 

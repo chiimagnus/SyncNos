@@ -1,4 +1,4 @@
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';

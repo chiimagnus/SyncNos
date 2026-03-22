@@ -1,7 +1,7 @@
-import { formatConversationTitle, t } from '../../../i18n';
+import { formatConversationTitle, t } from '@i18n';
 import { openDb } from '@services/shared/idb';
 import type { Conversation } from '@services/conversations/domain/models';
-import { parseHostnameFromUrl } from '../../shared/domain';
+import { parseHostnameFromUrl } from '@ui/shared/domain';
 
 type MessageCountByConversation = Map<number, number>;
 

@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 
-import { t } from '../../../i18n';
+import { t } from '@i18n';
 import { Area, AreaChart, Bar, BarChart, Cell, CartesianGrid, LabelList, Tooltip, XAxis, YAxis } from 'recharts';
 
 import {
@@ -14,10 +14,10 @@ import {
 } from './insight-stats';
 import type { InsightTimeRange } from './insight-stats';
 import { buttonClassName, cardClassName } from '../ui';
-import { useConversationsApp } from '../../conversations/conversations-context';
-import { useIsNarrowScreen } from '../../shared/hooks/useIsNarrowScreen';
-import { SelectMenu } from '../../shared/SelectMenu';
-import { openConversation as openConversationInApp } from '../../conversations/open-conversation';
+import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { SelectMenu } from '@ui/shared/SelectMenu';
+import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
 import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';

@@ -9,6 +9,7 @@ const viteAlias = {
   '@platform': path.resolve('src/platform'),
   '@collectors': path.resolve('src/collectors'),
   '@entrypoints': path.resolve('src/entrypoints'),
+  '@i18n': path.resolve('src/i18n'),
 };
 
 function firstExistingPath(candidates: string[]): string | undefined {

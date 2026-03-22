@@ -9,7 +9,9 @@
       "@services/*": ["src/services/*"],
       "@platform/*": ["src/platform/*"],
       "@collectors/*": ["src/collectors/*"],
-      "@entrypoints/*": ["src/entrypoints/*"]
+      "@entrypoints/*": ["src/entrypoints/*"],
+      "@i18n": ["src/i18n/index.ts"],
+      "@i18n/*": ["src/i18n/*"]
     },
     "jsx": "react-jsx"
   },

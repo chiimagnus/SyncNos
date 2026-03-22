@@ -5,7 +5,7 @@ import { getURL } from '@services/shared/runtime';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
 
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';

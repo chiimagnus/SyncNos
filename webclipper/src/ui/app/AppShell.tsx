@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { t } from '../../i18n';
+import { t } from '@i18n';
 import Settings from './Settings';
 import { CapturedListSidebar } from './CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '../conversations/conversations-context';
