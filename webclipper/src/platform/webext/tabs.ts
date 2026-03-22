@@ -1,4 +1,4 @@
-import { webextApis, webextError, webextLastErrorMessage } from './base';
+import { webextApis, webextError, webextLastErrorMessage } from '@platform/webext/base';
 
 type AnyTab = { id?: number; url?: string; title?: string; windowId?: number; active?: boolean };
 

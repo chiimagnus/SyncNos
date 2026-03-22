@@ -1,4 +1,4 @@
-import { fetchActiveTabArticle } from './article-fetch';
+import { fetchActiveTabArticle } from '@collectors/web/article-fetch';
 
 const api = { fetchActiveTabArticle };
 

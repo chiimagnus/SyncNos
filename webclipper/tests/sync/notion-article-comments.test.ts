@@ -6,11 +6,11 @@ async function loadFresh(rel: string) {
 }
 
 async function loadNotionSectionBlocks() {
-  return loadFresh('../../src/sync/notion/notion-section-blocks.ts');
+  return loadFresh('@services/sync/notion/notion-section-blocks.ts');
 }
 
 async function loadNotionCommentsRenderer() {
-  return loadFresh('../../src/comments/sync/notion-comments-renderer.ts');
+  return loadFresh('@services/comments/sync/notion-comments-renderer.ts');
 }
 
 describe('notion article comments blocks', () => {

@@ -1,4 +1,4 @@
-import { webextApis, webextError, webextLastErrorMessage } from './base';
+import { webextApis, webextError, webextLastErrorMessage } from '@platform/webext/base';
 
 export function scriptingCanInject(): boolean {
   const { chrome, browser } = webextApis();

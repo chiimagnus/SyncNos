@@ -1,5 +1,5 @@
-import { createEventsHub } from '../events/hub';
-import { UI_PORT_NAMES } from './message-contracts';
+import { createEventsHub } from '@platform/events/hub';
+import { UI_PORT_NAMES } from '@platform/messaging/message-contracts';
 
 type Message = { type: string; [key: string]: any };
 

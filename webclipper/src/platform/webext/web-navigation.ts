@@ -1,4 +1,4 @@
-import { webextApis } from './base';
+import { webextApis } from '@platform/webext/base';
 
 export function webNavigationOnCommittedAddListener(listener: (details: any) => void): boolean {
   const { chrome, browser } = webextApis();

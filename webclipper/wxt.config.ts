@@ -2,6 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'wxt';
 
+const viteAlias = {
+  '@ui': path.resolve('src/ui'),
+  '@viewmodels': path.resolve('src/viewmodels'),
+  '@services': path.resolve('src/services'),
+  '@platform': path.resolve('src/platform'),
+  '@collectors': path.resolve('src/collectors'),
+  '@entrypoints': path.resolve('src/entrypoints'),
+  '@i18n': path.resolve('src/ui/i18n'),
+};
+
 function firstExistingPath(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
     try {
@@ -41,6 +51,9 @@ export default defineConfig({
   entrypointsDir: 'src/entrypoints',
   webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
   vite: () => ({
+    resolve: {
+      alias: viteAlias,
+    },
     build: {
       // KaTeX/Recharts can legitimately push some chunks beyond Vite's default 500kB warning threshold.
       // Keep the warning signal meaningful by using a higher, extension-appropriate limit.

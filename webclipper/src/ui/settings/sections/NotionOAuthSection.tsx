@@ -1,8 +1,8 @@
-import type { NotionPageOption } from '../utils';
-import { t } from '../../../i18n';
-import { buttonClassName, cardClassName, checkboxClassName } from '../ui';
-import { SettingsFormRow } from './SettingsFormRow';
-import { SelectMenu } from '../../shared/SelectMenu';
+import type { NotionPageOption } from '@ui/settings/utils';
+import { t } from '@i18n';
+import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
+import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
+import { SelectMenu } from '@ui/shared/SelectMenu';
 
 export function NotionOAuthSection(props: {
   busy: boolean;

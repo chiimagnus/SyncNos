@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { registerObsidianSettingsHandlers } from "../../src/sync/obsidian/settings-background-handlers";
-import { registerSyncHandlers } from "../../src/sync/background-handlers";
+import { registerObsidianSettingsHandlers } from "@services/sync/obsidian/settings-background-handlers";
+import { registerSyncHandlers } from "@services/sync/background-handlers";
 import { createBackgroundRouter } from "../../src/platform/messaging/background-router";
 
 function deferred<T>() {

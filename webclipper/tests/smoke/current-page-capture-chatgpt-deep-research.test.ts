@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { createCurrentPageCaptureService } from '../../src/bootstrap/current-page-capture';
+import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 
 function setupDom(url: string) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url, pretendToBeVisual: true });

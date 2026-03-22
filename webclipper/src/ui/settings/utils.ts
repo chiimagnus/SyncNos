@@ -1,4 +1,4 @@
-import { t } from '../../i18n';
+import { t } from '@i18n';
 
 export type ApiError = { message: string; extra: unknown } | null;
 export type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };

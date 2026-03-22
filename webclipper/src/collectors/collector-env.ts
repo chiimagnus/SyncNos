@@ -1,4 +1,4 @@
-import type normalizeApi from '../shared/normalize.ts';
+import type normalizeApi from '@services/shared/normalize.ts';
 
 export type CollectorEnv = {
   window: Window & typeof globalThis;
@@ -10,4 +10,3 @@ export type CollectorEnv = {
 export function createCollectorEnv(input: CollectorEnv): CollectorEnv {
   return input;
 }
-

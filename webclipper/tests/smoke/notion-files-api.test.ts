@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { NOTION_VERSION, notionFetch, searchPages } from '../../src/sync/notion/notion-api.ts';
+import { NOTION_VERSION, notionFetch, searchPages } from '@services/sync/notion/notion-api.ts';
 import {
   createExternalURLUpload,
   createFileUpload,
   sendFileUpload,
   waitUntilUploaded,
-} from '../../src/sync/notion/notion-files-api.ts';
+} from '@services/sync/notion/notion-files-api.ts';
 
 function createHeaders(map: Record<string, string> = {}) {
   return {

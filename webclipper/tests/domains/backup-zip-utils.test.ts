@@ -1,7 +1,7 @@
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
-import { createZipBlob, extractZipEntries } from '../../src/sync/backup/zip-utils';
+import { createZipBlob, extractZipEntries } from '@services/sync/backup/zip-utils';
 
 function u16(n: number) {
   return new Uint8Array([n & 0xff, (n >>> 8) & 0xff]);

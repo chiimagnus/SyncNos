@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let filesApi: any = null;
 
-vi.mock('../../src/sync/notion/notion-files-api.ts', () => {
+vi.mock('@services/sync/notion/notion-files-api.ts', () => {
   const getApi = () => {
     if (!filesApi) throw new Error('filesApi not set');
     return filesApi;
@@ -28,7 +28,7 @@ vi.mock('../../src/sync/notion/notion-files-api.ts', () => {
   };
 });
 
-import notionSyncService from '../../src/sync/notion/notion-sync-service.ts';
+import notionSyncService from '@services/sync/notion/notion-sync-service.ts';
 
 beforeEach(() => {
   filesApi = null;

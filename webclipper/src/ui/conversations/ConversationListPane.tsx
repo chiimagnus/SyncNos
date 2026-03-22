@@ -1,22 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation } from '../../conversations/domain/models';
-import { getConversationDetail } from '../../conversations/client/repo';
-import { formatConversationMarkdownForExternalOutput } from '../../integrations/chatwith/chatwith-settings';
-import { tabsCreate } from '../../platform/webext/tabs';
-import { storageOnChanged } from '../../platform/storage/local';
-import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
+import type { Conversation } from '@services/conversations/domain/models';
+import { getConversationDetail } from '@services/conversations/client/repo';
+import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { storageOnChanged } from '@services/shared/storage';
 
-import { t, formatConversationTitle } from '../../i18n';
-import type { SyncProvider } from '../../sync/models';
-import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '../../sync/sync-provider-gate';
-import { useConversationsApp } from './conversations-context';
-import { ConversationSyncFeedbackNotice } from './ConversationSyncFeedbackNotice';
-import { navItemClassName } from '../shared/nav-styles';
-import { buttonDangerTintClassName, buttonFilledClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '../shared/button-styles';
-import { MenuPopover } from '../shared/MenuPopover';
-import { SelectMenu } from '../shared/SelectMenu';
-import { parseHostnameFromUrl } from '../shared/domain';
+import { t, formatConversationTitle } from '@i18n';
+import type { SyncProvider } from '@services/sync/models';
+import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
+import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
+import { navItemClassName } from '@ui/shared/nav-styles';
+import { buttonDangerTintClassName, buttonFilledClassName, buttonMenuItemClassName, buttonMiniIconClassName, buttonTintClassName } from '@ui/shared/button-styles';
+import { MenuPopover } from '@ui/shared/MenuPopover';
+import { SelectMenu } from '@ui/shared/SelectMenu';
+import { parseHostnameFromUrl } from '@ui/shared/domain';
 
 type SourceMeta = { key: string; label: string };
 

@@ -6,7 +6,7 @@ async function loadFresh(rel: string) {
 }
 
 async function loadNotionSyncService() {
-  return loadFresh("../../src/sync/notion/notion-sync-service.ts");
+  return loadFresh("@services/sync/notion/notion-sync-service.ts");
 }
 
 function deferred<T>() {

@@ -1,4 +1,4 @@
-import inpageButtonCssRaw from '../styles/inpage-button.css?raw';
+import inpageButtonCssRaw from '@ui/styles/inpage-button.css?raw';
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';

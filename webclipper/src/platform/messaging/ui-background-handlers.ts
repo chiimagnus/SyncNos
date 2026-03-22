@@ -1,6 +1,6 @@
-import { t } from '../../i18n';
-import { tabsQuery, tabsSendMessage } from '../webext/tabs';
-import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from './message-contracts';
+import { t } from '@i18n';
+import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
+import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

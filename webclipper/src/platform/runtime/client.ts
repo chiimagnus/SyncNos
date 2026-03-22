@@ -1,4 +1,4 @@
-import { getURL, isInvalidContextError, send, sendMessage } from './runtime';
+import { getURL, isInvalidContextError, send, sendMessage } from '@platform/runtime/runtime';
 
 const INVALIDATED_MESSAGE = 'Extension context invalidated';
 

@@ -3,7 +3,7 @@ import { JSDOM } from 'jsdom';
 import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
-import { t } from '../../src/i18n';
+import { t } from '../../src/ui/i18n';
 import { ConversationsProvider } from '../../src/ui/conversations/conversations-context';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
@@ -21,13 +21,13 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
   useIsNarrowScreen: () => true,
 }));
 
-vi.mock('../../src/conversations/client/repo', () => ({
+vi.mock('@services/conversations/client/repo', () => ({
   listConversations: (...args: any[]) => listConversations(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
 }));
 
-vi.mock('../../src/sync/repo', () => ({
+vi.mock('@services/sync/repo', () => ({
   clearNotionSyncJobStatus: (...args: any[]) => clearNotionSyncJobStatus(...args),
   clearObsidianSyncStatus: (...args: any[]) => clearObsidianSyncStatus(...args),
   syncNotionConversations: (...args: any[]) => syncNotionConversations(...args),

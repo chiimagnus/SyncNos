@@ -1,5 +1,5 @@
-import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
-import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from './article-fetch';
+import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
+import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from '@collectors/web/article-fetch';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

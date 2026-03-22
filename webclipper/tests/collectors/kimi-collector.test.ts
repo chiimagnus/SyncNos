@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
-import normalizeApi from "../../src/shared/normalize.ts";
+import normalizeApi from "@services/shared/normalize.ts";
 import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
 import { createKimiCollectorDef } from "../../src/collectors/kimi/kimi-collector.ts";
 

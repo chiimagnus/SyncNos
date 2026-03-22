@@ -5,7 +5,7 @@ import {
   buildConversationRouteFromLoc,
   decodeConversationLoc,
   encodeConversationLoc,
-} from '../../src/shared/conversation-loc';
+} from '@services/shared/conversation-loc';
 
 describe('conversation-loc', () => {
   it('encodes and decodes loc with special characters', () => {
@@ -63,4 +63,3 @@ describe('conversation-loc', () => {
     expect(buildConversationRouteFromLoc(loc)).toBe(`/?loc=${loc}`);
   });
 });
-

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 
-import { menuPopoverPanelClassName } from './button-styles';
-import { useDismissableLayer } from './useDismissableLayer';
+import { menuPopoverPanelClassName } from '@ui/shared/button-styles';
+import { useDismissableLayer } from '@ui/shared/useDismissableLayer';
 
 export type MenuPopoverSide = 'top' | 'bottom';
 export type MenuPopoverAlign = 'start' | 'end';

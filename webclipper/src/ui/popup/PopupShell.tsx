@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 
-import { getURL } from '../../platform/runtime/runtime';
-import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
-import { storageGet, storageSet } from '../../platform/storage/local';
+import { getURL } from '@services/shared/runtime';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { storageGet, storageSet } from '@services/shared/storage';
 
-import { t } from '../../i18n';
-import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
-import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
-import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
-import { buttonFilledClassName, buttonTintClassName } from '../shared/button-styles';
-import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-styles';
-import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
+import { t } from '@i18n';
+import { useConversationsApp, ConversationsProvider } from '@ui/conversations/conversations-context';
+import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
+import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
+import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
+import { navIconButtonSmClassName, navPillButtonClassName } from '@ui/shared/nav-styles';
+import { usePopupCurrentPageCapture } from '@ui/popup/usePopupCurrentPageCapture';
 
 const POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_notion_sync_open_tab_dont_show_v1';
 

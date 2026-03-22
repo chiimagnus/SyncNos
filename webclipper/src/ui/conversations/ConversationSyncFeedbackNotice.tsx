@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { t } from '../../i18n';
-import type { ConversationSyncFeedbackState } from './useConversationSyncFeedback';
-import { buttonIconCircleCardClassName } from '../shared/button-styles';
-import type { TranslationKey } from '../../i18n/locales/en';
+import { t } from '@i18n';
+import type { ConversationSyncFeedbackState } from '@ui/conversations/useConversationSyncFeedback';
+import { buttonIconCircleCardClassName } from '@ui/shared/button-styles';
+import type { TranslationKey } from '@i18n/locales/en';
 
 type ConversationSyncFeedbackNoticeProps = {
   feedback: ConversationSyncFeedbackState;

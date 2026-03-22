@@ -1,4 +1,4 @@
-import { buttonTintClassName } from './button-styles';
+import { buttonTintClassName } from '@ui/shared/button-styles';
 
 export function navGroupTitleClassName(): string {
   return 'tw-px-3 tw-pb-1.5 tw-text-[11px] tw-font-bold tw-text-[var(--text-secondary)] tw-opacity-70';

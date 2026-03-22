@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
-import { registerNotionSettingsHandlers } from '../../src/sync/notion/settings-background-handlers';
-import { registerSyncHandlers } from '../../src/sync/background-handlers';
-import { createNotionSyncOrchestrator } from '../../src/sync/notion/notion-sync-orchestrator.ts';
-import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
-import { NOTION_SYNC_JOB_KEY } from '../../src/sync/notion/notion-sync-job-store.ts';
-import { notionFetch } from '../../src/sync/notion/notion-api.ts';
+import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
+import { registerSyncHandlers } from '@services/sync/background-handlers';
+import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
+import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
+import { NOTION_SYNC_JOB_KEY } from '@services/sync/notion/notion-sync-job-store.ts';
+import { notionFetch } from '@services/sync/notion/notion-api.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import notionFilesApi from '../../src/sync/notion/notion-files-api.ts';
-import * as imageCacheRead from '../../src/conversations/data/image-cache-read';
-import { upgradeImageBlocksToFileUploads } from '../../src/sync/notion/notion-image-upload-upgrader';
+import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
+import * as imageCacheRead from '@services/conversations/data/image-cache-read';
+import { upgradeImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader';
 
 function externalImageBlock(url: string) {
   return {

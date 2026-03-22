@@ -1,7 +1,7 @@
-import type { CollectorDefinition } from '../collector-contract.ts';
-import type { CollectorEnv } from '../collector-env.ts';
-import { appendImageMarkdown, conversationKeyFromLocation, extractImageUrlsFromElement, inEditMode as inEditModeUtil } from '../collector-utils.ts';
-import poeMarkdownApi from './poe-markdown.ts';
+import type { CollectorDefinition } from '@collectors/collector-contract.ts';
+import type { CollectorEnv } from '@collectors/collector-env.ts';
+import { appendImageMarkdown, conversationKeyFromLocation, extractImageUrlsFromElement, inEditMode as inEditModeUtil } from '@collectors/collector-utils.ts';
+import poeMarkdownApi from '@collectors/poe/poe-markdown.ts';
 
 export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
   const window = env.window;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBackgroundRouter } from "../../src/platform/messaging/background-router";
-import { registerConversationHandlers } from "../../src/conversations/background/handlers";
+import { registerConversationHandlers } from "@services/conversations/background/handlers";
 
 const writeMocks = vi.hoisted(() => ({
   writeConversationMessagesSnapshot: vi.fn(),
@@ -14,12 +14,12 @@ const storageMocks = vi.hoisted(() => ({
   hasConversation: vi.fn(),
 }));
 
-vi.mock("../../src/conversations/data/write", () => ({
+vi.mock("@services/conversations/data/write", () => ({
   writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
   writeConversationSnapshot: writeMocks.writeConversationSnapshot,
 }));
 
-vi.mock("../../src/conversations/data/storage", () => ({
+vi.mock("@services/conversations/data/storage", () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
   listConversations: storageMocks.listConversations,
   getConversationDetail: storageMocks.getConversationDetail,

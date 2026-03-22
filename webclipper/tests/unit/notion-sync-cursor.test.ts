@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeNewMessages, extractCursor, lastMessageCursor } from '../../src/sync/notion/notion-sync-cursor';
+import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor';
 
 describe('notion-sync-cursor', () => {
   it('extractCursor returns empty cursor for missing mapping', () => {

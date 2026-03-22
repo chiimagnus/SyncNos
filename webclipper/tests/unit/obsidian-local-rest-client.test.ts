@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createClient } from '../../src/sync/obsidian/obsidian-local-rest-client.ts';
+import { createClient } from '@services/sync/obsidian/obsidian-local-rest-client.ts';
 
 describe('obsidian-local-rest-client', () => {
   afterEach(() => {

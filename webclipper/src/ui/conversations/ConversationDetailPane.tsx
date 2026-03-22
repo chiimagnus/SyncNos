@@ -1,13 +1,13 @@
 import { ChevronLeft } from 'lucide-react';
 
-import { ChatMessageBubble } from '../shared/ChatMessageBubble';
+import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
-import { t, formatConversationTitle } from '../../i18n';
-import { useConversationsApp } from './conversations-context';
-import { DetailHeaderActionBar } from './DetailHeaderActionBar';
-import { buttonTintClassName } from '../shared/button-styles';
-import { navIconButtonSmClassName } from '../shared/nav-styles';
-import { ArticleCommentsSection } from './ArticleCommentsSection';
+import { t, formatConversationTitle } from '@i18n';
+import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
+import { buttonTintClassName } from '@ui/shared/button-styles';
+import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
+import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useRef } from 'react';
 
 function normalizeHttpUrl(raw: unknown): string {

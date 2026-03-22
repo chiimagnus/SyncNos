@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { buttonMenuItemClassName, buttonTintClassName, menuChevronClassName } from './button-styles';
-import { MenuPopover } from './MenuPopover';
+import { buttonMenuItemClassName, buttonTintClassName, menuChevronClassName } from '@ui/shared/button-styles';
+import { MenuPopover } from '@ui/shared/MenuPopover';
 
 export type SelectMenuOption<T extends string> = {
   value: T;

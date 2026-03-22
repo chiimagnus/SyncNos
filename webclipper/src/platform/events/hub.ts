@@ -1,4 +1,4 @@
-import { UI_PORT_NAMES } from '../messaging/message-contracts';
+import { UI_PORT_NAMES } from '@platform/messaging/message-contracts';
 
 type PortLike = {
   name?: string;

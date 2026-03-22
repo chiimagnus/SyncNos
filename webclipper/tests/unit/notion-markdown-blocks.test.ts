@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { markdownToNotionBlocks } from '../../src/sync/notion/notion-markdown-blocks';
+import { markdownToNotionBlocks } from '@services/sync/notion/notion-markdown-blocks';
 
 describe('notion-markdown-blocks', () => {
   it('parses syncnos-asset image markdown into an external image block', () => {

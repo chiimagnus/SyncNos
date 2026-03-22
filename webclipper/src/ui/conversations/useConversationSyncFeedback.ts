@@ -7,12 +7,12 @@ import {
   getObsidianSyncStatus as defaultGetObsidianSyncStatus,
   syncNotionConversations as defaultSyncNotionConversations,
   syncObsidianConversations as defaultSyncObsidianConversations,
-} from '../../sync/repo';
-import { SYNC_JOB_STORAGE_KEYS } from '../../sync/sync-job-store';
-import { storageOnChanged } from '../../platform/storage/local';
-import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '../../sync/models';
-import type { SyncStartAck } from '../../sync/repo';
-import { t } from '../../i18n';
+} from '@services/sync/repo';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
+import { storageOnChanged } from '@services/shared/storage';
+import type { SyncFailureSummary, SyncJobSnapshot, SyncJobStatusResponse, SyncProvider, SyncRunSummary, SyncWarning } from '@services/sync/models';
+import type { SyncStartAck } from '@services/sync/repo';
+import { t } from '@i18n';
 
 export type ConversationSyncFeedbackPhase = 'idle' | 'running' | 'success' | 'partial-failed' | 'failed';
 

@@ -11,7 +11,7 @@ import {
   syncConversationMessages,
   syncConversationMessagesAppendOnly,
   upsertConversation,
-} from "../../src/conversations/data/storage-idb";
+} from "@services/conversations/data/storage-idb";
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 
-vi.mock('../../src/i18n', () => ({
+vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => key,
 }));
 
-import { mountThreadedCommentsPanel } from '../../src/ui/comments/threaded-comments-panel';
+import { mountThreadedCommentsPanel } from '@services/comments/threaded-comments-panel';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {

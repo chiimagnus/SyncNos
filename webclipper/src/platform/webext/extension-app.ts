@@ -1,6 +1,6 @@
-import { getURL } from '../runtime/runtime';
-import { tabsCreate, tabsQuery, tabsUpdate } from './tabs';
-import { windowsUpdate } from './windows';
+import { getURL } from '@platform/runtime/runtime';
+import { tabsCreate, tabsQuery, tabsUpdate } from '@platform/webext/tabs';
+import { windowsUpdate } from '@platform/webext/windows';
 
 type OpenExtensionAppTabOptions = {
   route?: string;

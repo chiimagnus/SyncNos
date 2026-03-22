@@ -1,5 +1,5 @@
-import { mountThreadedCommentsPanel, type ThreadedCommentItem } from '../../comments/threaded-comments-panel';
-import type { CommentSidebarPanelApi } from '../../comments/sidebar/comment-sidebar-contract';
+import { mountThreadedCommentsPanel, type ThreadedCommentItem } from '@services/comments/threaded-comments-panel';
+import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 
 export type InpageCommentItem = ThreadedCommentItem;
 export type InpageCommentsPanelOpenInput = {

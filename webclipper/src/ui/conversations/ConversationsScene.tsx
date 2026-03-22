@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 
-import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
-import { useNarrowListDetailRoute } from '../shared/hooks/useNarrowListDetailRoute';
+import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { useNarrowListDetailRoute } from '@ui/shared/hooks/useNarrowListDetailRoute';
 
-import { t, formatConversationTitle } from '../../i18n';
-import type { DetailHeaderAction } from '../../integrations/detail-header-actions';
-import { ConversationDetailPane } from './ConversationDetailPane';
-import { ConversationListPane } from './ConversationListPane';
-import { useConversationsApp } from './conversations-context';
-import { consumePendingOpenConversationId } from './pending-open';
+import { t, formatConversationTitle } from '@i18n';
+import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
+import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
+import { ConversationListPane } from '@ui/conversations/ConversationListPane';
+import { useConversationsApp } from '@ui/conversations/conversations-context';
+import { consumePendingOpenConversationId } from '@ui/conversations/pending-open';
 
 type NarrowRoute = 'list' | 'detail';
 

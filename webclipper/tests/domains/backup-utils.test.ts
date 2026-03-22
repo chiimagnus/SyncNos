@@ -9,7 +9,7 @@ import {
   validateBackupDocument,
   validateBackupManifest,
   validateConversationBundle,
-} from '../../src/sync/backup/backup-utils';
+} from '@services/sync/backup/backup-utils';
 
 describe('backup backup-utils', () => {
   it('uniqueConversationKey returns stable source||key', () => {

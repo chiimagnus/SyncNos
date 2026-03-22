@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { getURL } from '../../platform/runtime/runtime';
+import { getURL } from '@services/shared/runtime';
 
-import { t } from '../../i18n';
-import { useIsNarrowScreen } from '../shared/hooks/useIsNarrowScreen';
-import { buttonFilledClassName, buttonTintClassName } from '../shared/button-styles';
+import { t } from '@i18n';
+import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
 
-import { useSettingsSceneController } from './hooks/useSettingsSceneController';
-import { SettingsSidebarNav } from './SettingsSidebarNav';
-import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS, type SettingsSectionKey } from './types';
-import { AboutSection } from './sections/AboutSection';
-import { BackupSection } from './sections/BackupSection';
-import { ChatWithAiSection } from './sections/ChatWithAiSection';
-import { InsightSection } from './sections/InsightSection';
-import { InpageSection } from './sections/InpageSection';
-import { NotionAISection } from './sections/NotionAISection';
-import { NotionOAuthSection } from './sections/NotionOAuthSection';
-import { ObsidianSettingsSection } from './sections/ObsidianSettingsSection';
+import { useSettingsSceneController } from '@ui/settings/hooks/useSettingsSceneController';
+import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
+import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS, type SettingsSectionKey } from '@ui/settings/types';
+import { AboutSection } from '@ui/settings/sections/AboutSection';
+import { BackupSection } from '@ui/settings/sections/BackupSection';
+import { ChatWithAiSection } from '@ui/settings/sections/ChatWithAiSection';
+import { InsightSection } from '@ui/settings/sections/InsightSection';
+import { InpageSection } from '@ui/settings/sections/InpageSection';
+import { NotionAISection } from '@ui/settings/sections/NotionAISection';
+import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
+import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
 
 type NarrowRoute = 'list' | 'detail';
 

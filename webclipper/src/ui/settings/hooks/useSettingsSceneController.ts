@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '../../../sync/backup/export';
-import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '../../../sync/backup/backup-utils';
-import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgress, type ImportStats } from '../../../sync/backup/import';
-import { extractZipEntries } from '../../../sync/backup/zip-utils';
-import { disconnectNotion } from '../../../sync/notion/auth/settings-client';
-import { getNotionOAuthDefaults } from '../../../sync/notion/auth/oauth';
-import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
-import { send } from '../../../platform/runtime/runtime';
-import { storageGet, storageOnChanged, storageSet } from '../../../platform/storage/local';
-import { openOrFocusExtensionAppTab } from '../../../platform/webext/extension-app';
-import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '../../../sync/sync-provider-gate';
+import { exportBackupZipV2 } from '@services/sync/backup/export';
+import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
+import { importBackupLegacyJsonMerge, importBackupZipV2Merge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
+import { extractZipEntries } from '@services/sync/backup/zip-utils';
+import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
+import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { send } from '@services/shared/runtime';
+import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import {
   DEFAULT_CHAT_WITH_MAX_CHARS,
   DEFAULT_CHAT_WITH_PLATFORMS,
@@ -18,7 +18,7 @@ import {
   loadChatWithSettings,
   resetChatWithSettings,
   saveChatWithSettings,
-} from '../../../integrations/chatwith/chatwith-settings';
+} from '@services/integrations/chatwith/chatwith-settings';
 import {
   buildInsightStats,
   getInsightStatsSourceData,
@@ -26,7 +26,7 @@ import {
   type InsightStats,
   type InsightStatsSourceData,
   type InsightTimeRange,
-} from '../sections/insight-stats';
+} from '@ui/settings/sections/insight-stats';
 
 import {
   formatProgress,
@@ -37,9 +37,9 @@ import {
   unwrap,
   type ApiResponse,
   type NotionPageOption,
-} from '../utils';
-import type { SettingsSectionKey } from '../types';
-import { t } from '../../../i18n';
+} from '@ui/settings/utils';
+import type { SettingsSectionKey } from '@ui/settings/types';
+import { t } from '@i18n';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');

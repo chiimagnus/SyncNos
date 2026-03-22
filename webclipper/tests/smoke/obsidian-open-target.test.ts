@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { OBSIDIAN_APP_LAUNCH_URL } from '../../src/sync/obsidian/obsidian-app-launch';
+import { OBSIDIAN_APP_LAUNCH_URL } from '@services/sync/obsidian/obsidian-app-launch';
 import {
   openObsidianTarget,
   resolveObsidianOpenTarget,
-} from '../../src/integrations/openin/obsidian-open-target';
+} from '@services/integrations/openin/obsidian-open-target';
 
 describe('obsidian-open-target', () => {
   it('reports the header action as unavailable when the local API is unreachable', async () => {

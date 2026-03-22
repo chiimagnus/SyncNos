@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-vi.mock('../../src/i18n', () => ({
+vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
       backToChatsAria: 'Back to chats',
@@ -33,8 +33,38 @@ vi.mock('../../src/ui/conversations/conversations-context', () => ({
   useConversationsApp: () => ({
     items: [],
     activeId: null,
+    selectedIds: [],
+    toggleAll: vi.fn(),
+    toggleSelected: vi.fn(),
     selectedConversation: null,
     setActiveId: vi.fn(),
+    clearSelected: vi.fn(),
+    openConversationExternalById: vi.fn(),
+    exporting: false,
+    syncFeedback: {
+      provider: null,
+      phase: 'idle',
+      total: 0,
+      done: 0,
+      failures: [],
+      message: '',
+      updatedAt: 0,
+      summary: null,
+    },
+    syncingNotion: false,
+    syncingObsidian: false,
+    deleting: false,
+    listSourceFilterKey: 'all',
+    listSiteFilterKey: 'all',
+    setListSourceFilterKeyPersistent: vi.fn(),
+    setListSiteFilterKeyPersistent: vi.fn(),
+    pendingListLocateId: null,
+    consumeListLocate: vi.fn(),
+    exportSelectedMarkdown: vi.fn(),
+    syncSelectedNotion: vi.fn(),
+    syncSelectedObsidian: vi.fn(),
+    clearSyncFeedback: vi.fn(),
+    deleteSelected: vi.fn(),
   }),
 }));
 

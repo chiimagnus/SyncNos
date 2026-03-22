@@ -1,5 +1,5 @@
-import { CHATGPT_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
-import chatgptMarkdown from './chatgpt-markdown.ts';
+import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import chatgptMarkdown from '@collectors/chatgpt/chatgpt-markdown.ts';
 
 type RuntimeSend = (type: string, payload?: Record<string, unknown>) => Promise<any>;
 

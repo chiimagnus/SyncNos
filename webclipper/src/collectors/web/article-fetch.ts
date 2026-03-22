@@ -3,9 +3,9 @@ import {
   hasConversation,
   syncConversationMessages,
   upsertConversation,
-} from '../../conversations/data/storage';
-import { scriptingExecuteScript } from '../../platform/webext/scripting';
-import { tabsGet, tabsQuery } from '../../platform/webext/tabs';
+} from '@services/conversations/data/storage';
+import { scriptingExecuteScript } from '@platform/webext/scripting';
+import { tabsGet, tabsQuery } from '@platform/webext/tabs';
 
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';

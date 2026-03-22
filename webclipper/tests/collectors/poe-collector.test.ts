@@ -2,7 +2,7 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 async function loadNormalize() {
-  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeModule = await import("@services/shared/normalize.ts");
   const normalizeApi = normalizeModule.default || {
     normalizeText: normalizeModule.normalizeText,
     fnv1a32: normalizeModule.fnv1a32,

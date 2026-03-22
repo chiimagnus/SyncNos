@@ -1,5 +1,5 @@
-import type { CollectorDefinition } from "../collector-contract.ts";
-import type { CollectorEnv } from "../collector-env.ts";
+import type { CollectorDefinition } from "@collectors/collector-contract.ts";
+import type { CollectorEnv } from "@collectors/collector-env.ts";
 
 function isHttpUrl(href: unknown): boolean {
   const raw = String(href || "").trim();
