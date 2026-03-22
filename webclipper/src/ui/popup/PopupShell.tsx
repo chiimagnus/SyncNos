@@ -1,18 +1,103 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 
 import { getURL } from '../../platform/runtime/runtime';
 import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
+import { storageGet, storageSet } from '../../platform/storage/local';
 
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
-import type { PopupHeaderState } from '../conversations/ConversationsScene';
+import { ConversationsScene, type PopupHeaderState } from '../conversations/ConversationsScene';
 import { DetailNavigationHeader } from '../conversations/DetailNavigationHeader';
+import { buttonFilledClassName, buttonTintClassName } from '../shared/button-styles';
 import { navIconButtonSmClassName, navPillButtonClassName } from '../shared/nav-styles';
-import ChatsTab from './tabs/ChatsTab';
 import { usePopupCurrentPageCapture } from './usePopupCurrentPageCapture';
-import { PopupNotionSyncNudgeDialog } from './PopupNotionSyncNudgeDialog';
-import { getPopupNotionSyncNudgeDismissed, setPopupNotionSyncNudgeDismissed } from './notion-sync-nudge-preference';
+
+const POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_notion_sync_open_tab_dont_show_v1';
+
+async function getPopupNotionSyncNudgeDismissed(): Promise<boolean> {
+  const res = await storageGet([POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY]).catch(() => ({}));
+  return Boolean((res as any)?.[POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY]);
+}
+
+async function setPopupNotionSyncNudgeDismissed(next: boolean): Promise<void> {
+  await storageSet({ [POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY]: Boolean(next) });
+}
+
+type PopupNotionSyncNudgeDialogProps = {
+  open: boolean;
+  dontShowAgain: boolean;
+  onDontShowAgainChange: (next: boolean) => void;
+  onDismiss: () => void;
+  onConfirm: () => void;
+};
+
+function PopupNotionSyncNudgeDialog(props: PopupNotionSyncNudgeDialogProps) {
+  const { open, dontShowAgain, onDontShowAgainChange, onDismiss, onConfirm } = props;
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const cancelButtonClassName = buttonTintClassName();
+  const confirmButtonClassName = buttonFilledClassName();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onDismiss();
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [onDismiss, open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-bg-[var(--bg-overlay)] tw-p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('popupNotionSyncNudgeAria')}
+      onMouseDown={(event) => {
+        const target = event.target as Node | null;
+        if (target && panelRef.current?.contains(target)) return;
+        onDismiss();
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="tw-w-full tw-max-w-[420px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-4 tw-text-[var(--text-primary)]"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="tw-text-sm tw-font-extrabold">{t('popupNotionSyncNudgeTitle')}</div>
+        <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+          {t('popupNotionSyncNudgeBody')}
+        </div>
+
+        <label className="tw-mt-3 tw-flex tw-cursor-pointer tw-select-none tw-items-start tw-gap-2 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2.5">
+          <input
+            type="checkbox"
+            checked={dontShowAgain}
+            onChange={(event) => onDontShowAgainChange(event.target.checked)}
+            className="tw-mt-0.5 tw-size-4 tw-cursor-pointer tw-accent-[var(--accent)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+            aria-label={t('popupNotionSyncNudgeDontShowAria')}
+          />
+          <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]">
+            {t('popupNotionSyncNudgeDontShowLabel')}
+          </span>
+        </label>
+
+        <div className="tw-mt-4 tw-flex tw-justify-end tw-gap-2">
+          <button type="button" className={cancelButtonClassName} onClick={onDismiss}>
+            {t('popupNotionSyncNudgeDismiss')}
+          </button>
+          <button type="button" className={confirmButtonClassName} onClick={onConfirm}>
+            {t('popupNotionSyncNudgeConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PopupShell() {
   return (
@@ -160,13 +245,15 @@ function PopupShellFrame() {
 
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label={t('chatsAria')}>
-          <ChatsTab
-            onPopupHeaderStateChange={setHeaderState}
-            onPopupNotionSyncStarted={onPopupNotionSyncStarted}
-            onOpenInsightsSection={() => {
-              void onOpenInsightSettings().catch(() => {});
-            }}
-          />
+          <div className="tw-flex tw-h-full tw-min-h-0 tw-flex-1 tw-flex-col">
+            <ConversationsScene
+              onPopupHeaderStateChange={setHeaderState}
+              onPopupNotionSyncStarted={onPopupNotionSyncStarted}
+              onOpenInsightsSection={() => {
+                void onOpenInsightSettings().catch(() => {});
+              }}
+            />
+          </div>
         </section>
       </main>
 

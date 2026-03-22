@@ -6,8 +6,8 @@ import {
   readStoredSettingsSection,
   type SettingsSectionKey,
   writeStoredSettingsSection,
-} from '../../settings/types';
-import { SettingsScene } from '../../settings/SettingsScene';
+} from '../settings/types';
+import { SettingsScene } from '../settings/SettingsScene';
 
 export default function Settings() {
   const routerLocation = useLocation();
