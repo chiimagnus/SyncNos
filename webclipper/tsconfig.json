@@ -2,6 +2,15 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ui/*": ["src/ui/*"],
+      "@viewmodels/*": ["src/viewmodels/*"],
+      "@services/*": ["src/services/*"],
+      "@platform/*": ["src/platform/*"],
+      "@collectors/*": ["src/collectors/*"],
+      "@entrypoints/*": ["src/entrypoints/*"]
+    },
     "jsx": "react-jsx"
   },
   "exclude": [

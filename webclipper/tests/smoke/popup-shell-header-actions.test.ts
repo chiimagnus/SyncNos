@@ -15,6 +15,39 @@ vi.mock('../../src/platform/webext/tabs', () => ({
 vi.mock('../../src/ui/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: ReactNode }) => children,
   useConversationsApp: () => ({
+    items: [],
+    activeId: null,
+    selectedIds: [],
+    toggleAll: vi.fn(),
+    toggleSelected: vi.fn(),
+    setActiveId: vi.fn(),
+    clearSelected: vi.fn(),
+    openConversationExternalById: vi.fn(),
+    exporting: false,
+    syncFeedback: {
+      provider: null,
+      phase: 'idle',
+      total: 0,
+      done: 0,
+      failures: [],
+      message: '',
+      updatedAt: 0,
+      summary: null,
+    },
+    syncingNotion: false,
+    syncingObsidian: false,
+    deleting: false,
+    listSourceFilterKey: 'all',
+    listSiteFilterKey: 'all',
+    setListSourceFilterKeyPersistent: vi.fn(),
+    setListSiteFilterKeyPersistent: vi.fn(),
+    pendingListLocateId: null,
+    consumeListLocate: vi.fn(),
+    exportSelectedMarkdown: vi.fn(),
+    syncSelectedNotion: vi.fn(),
+    syncSelectedObsidian: vi.fn(),
+    clearSyncFeedback: vi.fn(),
+    deleteSelected: vi.fn(),
     refreshList: vi.fn(),
     refreshActiveDetail: vi.fn(),
   }),
@@ -33,87 +66,103 @@ vi.mock('../../src/ui/popup/usePopupCurrentPageCapture', () => ({
   }),
 }));
 
-vi.mock('../../src/ui/popup/tabs/ChatsTab', () => ({
-  default: (props: { onPopupHeaderStateChange?: (state: any) => void }) =>
+vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
+  ConversationsScene: (props: { onPopupHeaderStateChange?: (state: any) => void }) =>
     createElement(
       'div',
       null,
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({ mode: 'list' });
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({ mode: 'list' });
+          },
         },
-      }, 'show-list'),
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({
-            mode: 'detail',
-            title: 'Conversation',
-            subtitle: 'chatgpt · key',
-            actions: [
-              {
-                id: 'open-in-notion',
-                label: 'Open in Notion',
-                kind: 'external-link',
-                provider: 'notion',
-                slot: 'open',
-                href: 'https://www.notion.so/example',
-                onTrigger: vi.fn(async () => {}),
+        'show-list',
+      ),
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({
+              mode: 'detail',
+              title: 'Conversation',
+              subtitle: 'chatgpt · key',
+              actions: [
+                {
+                  id: 'open-in-notion',
+                  label: 'Open in Notion',
+                  kind: 'external-link',
+                  provider: 'notion',
+                  slot: 'open',
+                  href: 'https://www.notion.so/example',
+                  onTrigger: vi.fn(async () => {}),
+                },
+              ],
+              onBack: () => {
+                props.onPopupHeaderStateChange?.({ mode: 'list' });
               },
-            ],
-            onBack: () => {
-              props.onPopupHeaderStateChange?.({ mode: 'list' });
-            },
-          });
+            });
+          },
         },
-      }, 'show-detail'),
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({
-            mode: 'detail',
-            title: 'Conversation',
-            subtitle: 'chatgpt · key',
-            actions: [],
-            onBack: () => {
-              props.onPopupHeaderStateChange?.({ mode: 'list' });
-            },
-          });
-        },
-      }, 'show-detail-empty'),
-      createElement('button', {
-        type: 'button',
-        onClick: () => {
-          props.onPopupHeaderStateChange?.({
-            mode: 'detail',
-            title: 'Conversation',
-            subtitle: 'chatgpt · key',
-            actions: [
-              {
-                id: 'open-in-notion',
-                label: 'Open in Notion',
-                provider: 'notion',
-                kind: 'external-link',
-                slot: 'open',
-                href: 'https://www.notion.so/example',
-                onTrigger: vi.fn(async () => {}),
+        'show-detail',
+      ),
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({
+              mode: 'detail',
+              title: 'Conversation',
+              subtitle: 'chatgpt · key',
+              actions: [],
+              onBack: () => {
+                props.onPopupHeaderStateChange?.({ mode: 'list' });
               },
-              {
-                id: 'open-in-obsidian',
-                label: 'Open in Obsidian',
-                provider: 'obsidian',
-                kind: 'open-target',
-                slot: 'open',
-                onTrigger: vi.fn(async () => {}),
-              },
-            ],
-            onBack: () => {
-              props.onPopupHeaderStateChange?.({ mode: 'list' });
-            },
-          });
+            });
+          },
         },
-      }, 'show-detail-menu'),
+        'show-detail-empty',
+      ),
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => {
+            props.onPopupHeaderStateChange?.({
+              mode: 'detail',
+              title: 'Conversation',
+              subtitle: 'chatgpt · key',
+              actions: [
+                {
+                  id: 'open-in-notion',
+                  label: 'Open in Notion',
+                  provider: 'notion',
+                  kind: 'external-link',
+                  slot: 'open',
+                  href: 'https://www.notion.so/example',
+                  onTrigger: vi.fn(async () => {}),
+                },
+                {
+                  id: 'open-in-obsidian',
+                  label: 'Open in Obsidian',
+                  provider: 'obsidian',
+                  kind: 'open-target',
+                  slot: 'open',
+                  onTrigger: vi.fn(async () => {}),
+                },
+              ],
+              onBack: () => {
+                props.onPopupHeaderStateChange?.({ mode: 'list' });
+              },
+            });
+          },
+        },
+        'show-detail-menu',
+      ),
     ),
 }));
 
