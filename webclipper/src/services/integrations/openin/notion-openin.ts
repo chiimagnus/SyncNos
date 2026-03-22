@@ -1,4 +1,4 @@
-import type { Conversation } from '../../../conversations/domain/models';
+import type { Conversation } from '@services/conversations/domain/models';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
 
 const NOTION_PAGE_ID_PATTERN = /^[0-9a-f]{32}$/i;

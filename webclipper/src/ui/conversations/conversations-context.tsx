@@ -1,13 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation, ConversationDetail } from '../../conversations/domain/models';
-import { buildConversationBasename } from '../../conversations/domain/file-naming';
-import { formatConversationMarkdown } from '../../conversations/domain/markdown';
-import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
+import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
+import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
+import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { createZipBlob } from '../../sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
-import { deleteConversations, getConversationDetail, listConversations } from '../../conversations/client/repo';
-import { backfillConversationImages } from '../../conversations/client/repo';
+import { deleteConversations, getConversationDetail, listConversations } from '@services/conversations/client/repo';
+import { backfillConversationImages } from '@services/conversations/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '../../platform/messaging/message-contracts';

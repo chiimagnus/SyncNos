@@ -1,5 +1,5 @@
 import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
-import { registerConversationHandlers } from '../conversations/background/handlers';
+import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { registerSyncHandlers } from '../sync/background-handlers';
 import { createBackgroundRouter } from '../platform/messaging/background-router';
 import { registerWebArticleHandlers } from '../collectors/web/article-fetch-background-handlers';

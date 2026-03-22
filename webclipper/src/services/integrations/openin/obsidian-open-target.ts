@@ -1,4 +1,4 @@
-import type { Conversation } from '../../../conversations/domain/models';
+import type { Conversation } from '@services/conversations/domain/models';
 import {
   getObsidianConnectionConfig as getDefaultObsidianConnectionConfig,
   getObsidianPathConfig as getDefaultObsidianPathConfig,

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import type { NotionServices } from './notion-services.ts';
-import { backgroundStorage as defaultBackgroundStorage } from '../../conversations/background/storage';
+import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
 import { getNotionOAuthToken } from './auth/token-store';
 import { conversationKinds as builtInConversationKinds } from '@services/protocols/conversation-kinds.ts';
 import notionDbManagerDefault from './notion-db-manager.ts';

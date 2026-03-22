@@ -1,4 +1,4 @@
-import { openDb as openSchemaDb } from '../../platform/idb/schema';
+import { openDb as openSchemaDb } from '@platform/idb/schema';
 
 type ImageCacheRow = {
   id?: number;

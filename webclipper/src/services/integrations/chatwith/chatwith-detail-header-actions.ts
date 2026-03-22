@@ -1,4 +1,4 @@
-import type { Conversation, ConversationDetail } from '../../../conversations/domain/models';
+import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '../detail-header-action-types';
 import {
   buildChatWithPayload,

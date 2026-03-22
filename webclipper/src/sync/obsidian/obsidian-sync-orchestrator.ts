@@ -1,4 +1,4 @@
-import { backgroundStorage as defaultBackgroundStorage } from '../../conversations/background/storage';
+import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
 import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
@@ -21,7 +21,7 @@ import {
   readSyncnosObject as readDefaultSyncnosObject,
 } from './obsidian-sync-metadata.ts';
 import obsidianSyncJobStore from './obsidian-sync-job-store.ts';
-import { getImageCacheAssetById } from '../../conversations/data/image-cache-read';
+import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
 const SYNC_PROVIDER = 'obsidian';
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;

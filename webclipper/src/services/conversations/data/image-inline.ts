@@ -1,4 +1,4 @@
-import { openDb as openSchemaDb } from '../../platform/idb/schema';
+import { openDb as openSchemaDb } from '@platform/idb/schema';
 
 const INLINE_HTTP_IMAGES_MAX_COUNT = 12;
 const INLINE_HTTP_IMAGE_MAX_BYTES = 2_000_000;

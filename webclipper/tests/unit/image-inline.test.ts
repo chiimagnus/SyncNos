@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IDBKeyRange, indexedDB } from "fake-indexeddb";
-import { inlineChatImagesInMessages, __closeDbForTests as __closeImageInlineDbForTests } from "../../src/conversations/data/image-inline";
+import { inlineChatImagesInMessages, __closeDbForTests as __closeImageInlineDbForTests } from "@services/conversations/data/image-inline";
 import { openDb as openSchemaDb } from "../../src/platform/idb/schema";
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {

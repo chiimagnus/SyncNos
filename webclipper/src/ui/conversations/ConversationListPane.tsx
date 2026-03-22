@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation } from '../../conversations/domain/models';
-import { getConversationDetail } from '../../conversations/client/repo';
+import type { Conversation } from '@services/conversations/domain/models';
+import { getConversationDetail } from '@services/conversations/client/repo';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
 import { tabsCreate } from '../../platform/webext/tabs';
 import { storageOnChanged } from '../../platform/storage/local';

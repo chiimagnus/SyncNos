@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildConversationBasename, stableConversationId10 } from '../../src/conversations/domain/file-naming';
+import { buildConversationBasename, stableConversationId10 } from '@services/conversations/domain/file-naming';
 
 describe('file-naming', () => {
   it('generates space-free conversation basenames for Obsidian-safe files', () => {

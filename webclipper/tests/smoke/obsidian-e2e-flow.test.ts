@@ -5,7 +5,7 @@ const backgroundStorageMocks = vi.hoisted(() => ({
   getMessagesByConversationId: vi.fn(),
 }));
 
-vi.mock("../../src/conversations/background/storage", () => ({
+vi.mock("@services/conversations/background/storage", () => ({
   backgroundStorage: {
     getConversationById: backgroundStorageMocks.getConversationById,
     getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,

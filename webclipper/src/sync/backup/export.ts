@@ -5,7 +5,7 @@ import {
   LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
   uniqueConversationKey,
 } from './backup-utils';
-import { buildConversationBasename } from '../../conversations/domain/file-naming';
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
 import { DB_NAME, DB_VERSION } from '../../platform/idb/schema.ts';

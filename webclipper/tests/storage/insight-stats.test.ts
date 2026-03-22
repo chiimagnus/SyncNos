@@ -6,7 +6,7 @@ import {
   __closeDbForTests,
   syncConversationMessages,
   upsertConversation,
-} from "../../src/conversations/data/storage-idb";
+} from "@services/conversations/data/storage-idb";
 import {
   getInsightStats,
   INSIGHT_ARTICLE_DOMAIN_LIMIT,

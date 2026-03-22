@@ -1,5 +1,5 @@
-import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
-import { storageGet } from '../../platform/storage/local';
+import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
+import { storageGet } from '@platform/storage/local';
 import {
   deleteConversationsByIds,
   getConversationDetail,

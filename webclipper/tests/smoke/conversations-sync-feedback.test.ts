@@ -21,7 +21,7 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
   useIsNarrowScreen: () => true,
 }));
 
-vi.mock('../../src/conversations/client/repo', () => ({
+vi.mock('@services/conversations/client/repo', () => ({
   listConversations: (...args: any[]) => listConversations(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),

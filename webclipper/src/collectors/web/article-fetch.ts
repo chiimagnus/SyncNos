@@ -3,7 +3,7 @@ import {
   hasConversation,
   syncConversationMessages,
   upsertConversation,
-} from '../../conversations/data/storage';
+} from '@services/conversations/data/storage';
 import { scriptingExecuteScript } from '../../platform/webext/scripting';
 import { tabsGet, tabsQuery } from '../../platform/webext/tabs';
 

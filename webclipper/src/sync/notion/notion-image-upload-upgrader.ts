@@ -1,6 +1,6 @@
 // @ts-nocheck
 import notionFilesApi from './notion-files-api.ts';
-import { getImageCacheAssetById } from '../../conversations/data/image-cache-read.ts';
+import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read.ts';
 
   const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
