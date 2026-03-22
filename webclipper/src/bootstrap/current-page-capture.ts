@@ -1,5 +1,6 @@
 import { t } from '../i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '../collectors/chatgpt/chatgpt-deep-research-hydrator';
+import { buildCaptureSuccessTipMessage } from '../shared/capture-tip';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -58,23 +59,6 @@ function normalizeConversationId(value: unknown): number | null {
   if (!Number.isFinite(conversationId) || conversationId <= 0) return null;
   return conversationId;
 }
-
-function normalizeTitle(value: unknown): string {
-  return String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function truncateForTip(title: string, maxChars: number): string {
-  const value = normalizeTitle(title);
-  const limit = Number.isFinite(Number(maxChars)) ? Math.max(1, Math.floor(Number(maxChars))) : 60;
-  if (!value) return '';
-  if (value.length <= limit) return value;
-  const sliceLen = Math.max(0, limit - 1);
-  return `${value.slice(0, sliceLen)}…`;
-}
-
-const TIP_TITLE_MAX_CHARS = 48;
 
 export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   const runtime = deps.runtime;
@@ -199,11 +183,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (!response?.ok) {
           throw new Error(response?.error?.message || t('captureFailedFallback'));
         }
-        const title = normalizeTitle(response?.data?.title || '');
+        const title = String(response?.data?.title || '');
         const isNew = response?.data?.isNew !== false;
-        const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
         report(
-          title ? `${prefix}${truncateForTip(title, TIP_TITLE_MAX_CHARS)}` : (isNew ? t('saved') : t('updated')),
+          buildCaptureSuccessTipMessage({ isNew, title }),
           'default',
         );
         return {
@@ -211,7 +194,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           label: target.label,
           collectorId: target.collectorId,
           conversationId: normalizeConversationId(response?.data?.conversationId),
-          title: title || undefined,
+          title: String(title || '').trim() || undefined,
           isNew,
         };
       }
@@ -243,11 +226,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         throw new Error(t('noVisibleConversationFound'));
       }
 
-      const title = normalizeTitle(snapshot?.conversation?.title || '');
+      const title = String(snapshot?.conversation?.title || '');
       const isNew = saved.isNew !== false;
-      const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
       report(
-        title ? `${prefix}${truncateForTip(title, TIP_TITLE_MAX_CHARS)}` : (isNew ? t('saved') : t('updated')),
+        buildCaptureSuccessTipMessage({ isNew, title }),
         'default',
       );
       return {
@@ -255,7 +237,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         label: target.label,
         collectorId: target.collectorId,
         conversationId: normalizeConversationId(saved.conversationId),
-        title: title || undefined,
+        title: String(title || '').trim() || undefined,
         isNew,
       };
     } catch (error) {

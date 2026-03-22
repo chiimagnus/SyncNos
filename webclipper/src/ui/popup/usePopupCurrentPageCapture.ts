@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
 import { send } from '../../platform/runtime/runtime';
 import { t } from '../../i18n';
+import { buildCaptureSuccessTipMessage } from '../../shared/capture-tip';
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -79,10 +80,9 @@ export function usePopupCurrentPageCapture(input: {
       const data = unwrap(response);
       await onCaptured?.();
       await refreshState();
-      const title = String(data?.title || '').trim();
       setStatus({
         kind: 'default',
-        message: title ? `${t('savedPrefix')}${title}` : t('saved'),
+        message: buildCaptureSuccessTipMessage({ isNew: (data as any)?.isNew, title: (data as any)?.title }),
       });
       return data;
     } catch (error) {

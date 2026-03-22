@@ -2,6 +2,7 @@ import type { CurrentPageCaptureService } from './current-page-capture';
 import { t } from '../i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '../collectors/ai-chat-sites';
 import { hydrateChatgptDeepResearchSnapshot } from '../collectors/chatgpt/chatgpt-deep-research-hydrator';
+import { buildCaptureSuccessTipMessage } from '../shared/capture-tip';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
@@ -176,6 +177,8 @@ export function createContentController(deps: Deps) {
     }
 
     const conversation = conversationRes.data;
+    const rawIsNew = (conversation as any)?.__isNew;
+    const isNew = typeof rawIsNew === 'boolean' ? rawIsNew : undefined;
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId: conversation.id,
       messages: snapshot.messages || [],
@@ -188,7 +191,7 @@ export function createContentController(deps: Deps) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
     }
 
-    return { conversationId: conversation.id };
+    return { conversationId: conversation.id, isNew };
   }
 
   function createAutoCaptureController() {
@@ -379,7 +382,12 @@ export function createContentController(deps: Deps) {
         beginSaving();
         try {
           const saved = await saveSnapshot(incremental.snapshot, { mode: 'append', diff: incremental.diff });
-          if (saved) showInpageTip(t('saved'), 'ok');
+          if (saved) {
+            showInpageTip(
+              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: incremental?.snapshot?.conversation?.title }),
+              'ok',
+            );
+          }
         } finally {
           endSaving();
         }
