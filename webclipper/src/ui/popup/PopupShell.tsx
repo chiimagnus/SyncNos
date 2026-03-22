@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 
-import { getURL } from '../../platform/runtime/runtime';
-import { openOrFocusExtensionAppTab } from '../../platform/webext/extension-app';
-import { storageGet, storageSet } from '../../platform/storage/local';
+import { getURL } from '@services/shared/runtime';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { storageGet, storageSet } from '@services/shared/storage';
 
 import { t } from '../../i18n';
 import { useConversationsApp, ConversationsProvider } from '../conversations/conversations-context';
