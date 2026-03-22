@@ -76,7 +76,7 @@ import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-
     });
   }
 
-  async function createFileUpload({ accessToken, filename, contentType, contentLength }) {
+  async function createFileUpload({ accessToken, filename, contentType, contentLength: _contentLength }) {
     const name = sanitizeFilename(filename || "");
     const ct = String(contentType || "").trim() || "application/octet-stream";
     const body = {

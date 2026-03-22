@@ -44,21 +44,6 @@ function setupChromeStorage() {
   return store;
 }
 
-function fnv1a32(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-function computeDigest(markdown: string) {
-  const normalized = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  if (!normalized) return "";
-  return fnv1a32(normalized);
-}
-
 describe("obsidian-sync-orchestrator", () => {
   it("reports missing_api_key when api key is not configured", async () => {
     setupChromeStorage();
@@ -111,10 +96,10 @@ describe("obsidian-sync-orchestrator", () => {
       { messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: Date.now() },
     ]);
 
-    let call = 0;
+    let _call = 0;
     // @ts-expect-error test global
     globalThis.fetch = async (_url: any, init: any) => {
-      call += 1;
+      _call += 1;
       const method = String(init?.method || "GET").toUpperCase();
       if (method === "GET") {
         return new Response(JSON.stringify({ errorCode: 40400, message: "not found" }), { status: 404, headers: { "content-type": "application/json" } });

@@ -172,7 +172,7 @@ const SYNC_CONVERSATION_CONCURRENCY = 2;
     return msg.includes("archived") || msg.includes("in_trash");
   }
 
-  function toCurrentConversationTitle(convo, id) {
+  function toCurrentConversationTitle(convo, _id) {
     const title = convo && convo.title ? String(convo.title).trim() : "";
     if (title) return title;
     return "";

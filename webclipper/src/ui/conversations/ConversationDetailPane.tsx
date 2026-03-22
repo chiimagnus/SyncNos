@@ -47,7 +47,6 @@ export function ConversationDetailPane({
     detailError,
     detail,
     detailHeaderActions,
-    refreshActiveDetail,
   } = useConversationsApp();
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];

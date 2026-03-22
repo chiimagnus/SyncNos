@@ -1,6 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
-import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 

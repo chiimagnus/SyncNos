@@ -1,0 +1,7 @@
+node_modules
+.output
+.wxt
+cloudflare-workers/.wrangler
+cloudflare-workers/.dev.vars
+cloudflare-workers/.output
+package-lock.json

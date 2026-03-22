@@ -34,7 +34,6 @@ function toHostTokensCss(css: string) {
 }
 
 const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1';
-const COMMENTS_SIDEBAR_WIDTH_DEFAULT_PX = 420;
 const COMMENTS_SIDEBAR_WIDTH_MIN_PX = 320;
 const COMMENTS_SIDEBAR_WIDTH_MAX_PX = 720;
 const COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX = 360;

@@ -240,7 +240,7 @@ function buildAlreadyRunningError() {
   return error;
 }
 
-function toCurrentConversationTitle(convo: any, conversationId: number) {
+function toCurrentConversationTitle(convo: any, _conversationId: number) {
   const title = safeString(convo && convo.title);
   if (title) return title;
   return '';

@@ -56,15 +56,12 @@ function DistributionChart(props: {
   emptyText: string;
 }) {
   const { items, emptyText } = props;
-  if (!items.length) {
-    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{emptyText}</div>;
-  }
-
   const chartHeight = Math.max(212, items.length * 48);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
 
   useLayoutEffect(() => {
+    if (!items.length) return;
     const node = containerRef.current;
     if (!node) return;
 
@@ -84,6 +81,10 @@ function DistributionChart(props: {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, [chartHeight, items.length]);
+
+  if (!items.length) {
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{emptyText}</div>;
+  }
 
   return (
     <div ref={containerRef} style={{ height: chartHeight }} className="tw-w-full tw-min-w-0">
@@ -128,10 +129,6 @@ function DailyTrendChart(props: {
   ariaLabel: string;
 }) {
   const { items, stroke, ariaLabel } = props;
-  if (!items.length) {
-    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightDistributionEmpty')}</div>;
-  }
-
   const chartHeight = 204;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
@@ -141,6 +138,7 @@ function DailyTrendChart(props: {
   const shouldRenderLabels = items.length <= 16;
 
   useLayoutEffect(() => {
+    if (!items.length) return;
     const node = containerRef.current;
     if (!node) return;
 
@@ -159,7 +157,11 @@ function DailyTrendChart(props: {
 
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  }, [items.length]);
+
+  if (!items.length) {
+    return <div className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('insightDistributionEmpty')}</div>;
+  }
 
   return (
     <div

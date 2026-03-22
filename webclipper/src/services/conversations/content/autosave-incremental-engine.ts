@@ -52,16 +52,6 @@ function fingerprintHash(base: string): string {
   return base;
 }
 
-function arrayEqual(a: string[], b: string[]) {
-  if (a === b) return true;
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
 function computeStateKeyHash(stateKey: string): string {
   const normalize = normalizeApi as any;
   if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(stateKey));
