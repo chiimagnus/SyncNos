@@ -83,19 +83,19 @@ function normalizeRole(role: unknown) {
   return normalized;
 }
 
-function buildMessageChunk(message: any, userName?: string) {
+function buildMessageChunk(message: any) {
   const m = message || {};
   const seq = Number.isFinite(Number(m.sequence)) ? Number(m.sequence) : 0;
   const role = normalizeRole(m.role);
-  const roleLabel = role === 'user' ? safeString(userName) || DEFAULT_COMMENT_AUTHOR : role;
+  const roleLabel = role === 'user' ? safeString(m.authorName) || DEFAULT_COMMENT_AUTHOR : role;
   const body = safeString(m.contentMarkdown) || safeString(m.contentText) || '';
   const header = `## ${seq} ${roleLabel}`.trim();
   return `${header}\n\n${body}\n\n`;
 }
 
-function buildMessagesMarkdown(messages: any[], userName?: string) {
+function buildMessagesMarkdown(messages: any[]) {
   const list = Array.isArray(messages) ? messages : [];
-  return list.map((m) => buildMessageChunk(m, userName)).join('');
+  return list.map((m) => buildMessageChunk(m)).join('');
 }
 
 function toArticleBodyMessages(messages: unknown[]): any[] {
@@ -251,13 +251,11 @@ function buildFullNoteMarkdown({
   messages,
   syncnosObject,
   comments,
-  userName,
 }: {
   conversation?: any;
   messages?: any[];
   syncnosObject?: any;
   comments?: ArticleComment[];
-  userName?: string;
 }) {
   const c = conversation || {};
   const url = safeString(c.url);
@@ -277,7 +275,7 @@ function buildFullNoteMarkdown({
     return buildFrontmatterBlock(frontmatter) + `${sections.join('\n').trim()}\n`;
   }
 
-  const messagesMd = buildMessagesMarkdown(messages || [], userName);
+  const messagesMd = buildMessagesMarkdown(messages || []);
   return buildFrontmatterBlock(frontmatter) + `# ${MESSAGES_HEADING}\n\n` + messagesMd;
 }
 

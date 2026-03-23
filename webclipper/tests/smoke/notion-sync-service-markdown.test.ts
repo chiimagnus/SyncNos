@@ -134,12 +134,12 @@ describe('notion-sync-service markdown', () => {
     expect(blocks.some((b: any) => b && b.type === 'bulleted_list_item')).toBe(true);
   });
 
-  it('messagesToBlocks uses userName when provided', async () => {
+  it('messagesToBlocks uses message.authorName for user role', async () => {
     await loadNotionAi();
     const notionSyncService = await loadNotionSyncService();
 
-    const messages = [{ role: 'user', contentText: 'hi' }];
-    const blocks = notionSyncService.messagesToBlocks(messages, { source: 'chatgpt', userName: 'Alice' });
+    const messages = [{ role: 'user', authorName: 'Alice', contentText: 'hi' }];
+    const blocks = notionSyncService.messagesToBlocks(messages, { source: 'chatgpt' });
     const heading = blocks.find((b: any) => b && b.type === 'heading_3');
     expect(heading?.heading_3?.rich_text?.[0]?.text?.content).toBe('Alice');
   });

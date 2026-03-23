@@ -57,7 +57,9 @@ function formatChatMarkdown(conversation: Conversation, messages: ConversationMe
   lines.push('');
   for (const m of messages || []) {
     const role = (m as any).role || 'assistant';
-    lines.push(`## ${role}`);
+    const authorName =
+      role === 'user' && isNonEmptyString((m as any).authorName) ? String((m as any).authorName) : '';
+    lines.push(`## ${role === 'user' ? authorName || 'You' : role}`);
     lines.push('');
     lines.push(String((m as any).contentMarkdown || (m as any).contentText || ''));
     lines.push('');

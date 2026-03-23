@@ -17,8 +17,6 @@ import {
 } from '@services/sync/obsidian/obsidian-sync-metadata.ts';
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
-import { storageGet } from '@platform/storage/local';
-import { ABOUT_YOU_USER_NAME_STORAGE_KEY, DEFAULT_ABOUT_YOU_USER_NAME, normalizeUserName } from '@services/shared/user-profile';
 
 const SYNC_PROVIDER = 'obsidian';
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
@@ -597,14 +595,6 @@ async function syncConversations({
   const existingJob = await obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(safeInstanceId);
   if (obsidianSyncJobStore.isRunningJob(existingJob)) throw buildAlreadyRunningError();
 
-  let aboutYouUserName = DEFAULT_ABOUT_YOU_USER_NAME;
-  try {
-    const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
-    aboutYouUserName = normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
-  } catch (_e) {
-    aboutYouUserName = DEFAULT_ABOUT_YOU_USER_NAME;
-  }
-
   const currentJob: any = {
     id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
     provider: SYNC_PROVIDER,
@@ -685,7 +675,6 @@ async function syncConversations({
             messages: decision.messages,
             syncnosObject,
             comments: (decision as any).comments || [],
-            userName: aboutYouUserName,
           });
           const markdown = await materializeMarkdownAssetsForObsidian({
             client,

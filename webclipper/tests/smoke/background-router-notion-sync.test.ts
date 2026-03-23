@@ -330,7 +330,6 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: {
               notionPageId: 'p1',
-              chatUserName: 'You',
               lastSyncedMessageKey: 'm1',
               notionSections: { conversations: { headingBlockId: 'b_conversations' } },
               notionSectionCursors: {
@@ -847,7 +846,6 @@ describe('background-router notion sync', () => {
             },
             mapping: {
               notionPageId: 'p1',
-              chatUserName: 'You',
               lastSyncedMessageKey: 'm1',
               lastSyncedMessageUpdatedAt: 1000,
               notionSections: { conversations: { headingBlockId: 'b_conversations' } },
@@ -923,7 +921,6 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: {
               notionPageId: 'p1',
-              chatUserName: 'You',
               lastSyncedMessageKey: 'old_key',
               lastSyncedSequence: 1,
               notionSections: { conversations: { headingBlockId: 'b_conversations' } },
