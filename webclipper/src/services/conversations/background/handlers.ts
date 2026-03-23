@@ -73,7 +73,9 @@ export function registerConversationHandlers(router: AnyRouter) {
 
       messages = messages.map((m: any) => {
         if (!m || typeof m !== 'object') return m;
-        const role = String((m as any).role || '').trim().toLowerCase();
+        const role = String((m as any).role || '')
+          .trim()
+          .toLowerCase();
         if (role !== 'user') return m;
         const currentAuthor = String((m as any).authorName || '').trim();
         if (currentAuthor) return m;

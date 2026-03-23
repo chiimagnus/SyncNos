@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Conversation } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
+import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageOnChanged } from '@services/shared/storage';
 
@@ -13,6 +14,7 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
 import { navItemClassName } from '@ui/shared/nav-styles';
 import {
+  buttonDangerClassName,
   buttonDangerTintClassName,
   buttonFilledClassName,
   buttonMenuItemClassName,
@@ -228,14 +230,23 @@ export function ConversationListPane({
   } = useConversationsApp();
 
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
   const [enabledSyncProviders, setEnabledSyncProviders] = useState<SyncProvider[]>(['obsidian', 'notion']);
+
+  const [, forceDeleteConfirmRender] = useState(0);
+  const deleteConfirm = useMemo(
+    () =>
+      createTwoStepConfirmController<string>({
+        onChange: () => forceDeleteConfirmRender((v) => v + 1),
+      }),
+    [],
+  );
 
   const sourceOptions = useMemo(() => {
     const map = new Map<string, { key: string; label: string; count: number }>();
@@ -396,28 +407,20 @@ export function ConversationListPane({
 
   useEffect(() => {
     if (hasSelection) return;
-    setDeleteConfirmOpen(false);
+    deleteConfirm.clear();
     setExportOpen(false);
     setSyncOpen(false);
-  }, [hasSelection]);
+  }, [deleteConfirm, hasSelection]);
 
   useEffect(() => {
     if (!syncingAny) return;
-    setDeleteConfirmOpen(false);
-  }, [syncingAny]);
+    deleteConfirm.clear();
+  }, [deleteConfirm, syncingAny]);
 
   useEffect(() => {
-    if (!deleteConfirmOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (deleting) return;
-      setDeleteConfirmOpen(false);
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [deleteConfirmOpen, deleting]);
+    if (!actionBusy) return;
+    deleteConfirm.clear();
+  }, [actionBusy, deleteConfirm]);
 
   useEffect(() => {
     if (syncFeedback.phase !== 'success') return;
@@ -475,7 +478,7 @@ export function ConversationListPane({
         .toLowerCase() || 'all';
     setListSourceFilterKeyPersistent(next);
     clearSelected();
-    setDeleteConfirmOpen(false);
+    deleteConfirm.clear();
     setExportOpen(false);
     setSyncOpen(false);
   };
@@ -487,7 +490,7 @@ export function ConversationListPane({
         .toLowerCase() || SITE_FILTER_ALL_KEY;
     setListSiteFilterKeyPersistent(next);
     clearSelected();
-    setDeleteConfirmOpen(false);
+    deleteConfirm.clear();
     setExportOpen(false);
     setSyncOpen(false);
   };
@@ -604,9 +607,54 @@ export function ConversationListPane({
   };
 
   const onConfirmDelete = async () => {
+    deleteConfirm.clear();
     await deleteSelected();
-    setDeleteConfirmOpen(false);
   };
+
+  useEffect(() => {
+    return () => {
+      deleteConfirm.dispose();
+    };
+  }, [deleteConfirm]);
+
+  const deleteConfirmKey = useMemo(() => {
+    if (!hasSelection) return '';
+    const normalized = Array.from(new Set(selectedIds.map((x) => Number(x) || 0)))
+      .filter((id) => Number.isFinite(id) && id > 0)
+      .sort((a, b) => a - b);
+    return normalized.join(',');
+  }, [hasSelection, selectedIds]);
+
+  const armedDeleteKey = deleteConfirm.getArmedKey();
+  const deleteConfirming = !!deleteConfirmKey && armedDeleteKey != null && deleteConfirm.isArmed(deleteConfirmKey);
+
+  useEffect(() => {
+    if (armedDeleteKey == null) return;
+    if (armedDeleteKey === deleteConfirmKey) return;
+    deleteConfirm.clear();
+  }, [armedDeleteKey, deleteConfirm, deleteConfirmKey]);
+
+  useEffect(() => {
+    if (armedDeleteKey == null) return;
+    const onPointerDown = (event: Event) => {
+      const target = (event as any).target as Node | null;
+      const btn = deleteButtonRef.current;
+      if (btn && target && btn.contains(target)) return;
+      deleteConfirm.clear();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      deleteConfirm.clear();
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [armedDeleteKey, deleteConfirm]);
 
   const sourceFilterActive =
     String(listSourceFilterKey || 'all')
@@ -795,16 +843,40 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <button
-                id="btnDelete"
-                type="button"
-                className={dangerSurfaceButton}
-                title={t('deleteButton')}
-                onClick={() => setDeleteConfirmOpen(true)}
-                disabled={!hasSelection || actionBusy || syncingAny}
-              >
-                {t('deleteButton')}
-              </button>
+	              <button
+	                id="btnDelete"
+	                type="button"
+	                ref={deleteButtonRef}
+	                className={
+	                  deleteConfirming
+	                    ? buttonDangerClassName()
+	                    : [
+	                        dangerSurfaceButton,
+	                        'webclipper-btn--icon webclipper-btn--icon-sm',
+	                      ].join(' ')
+	                }
+	                aria-pressed={deleteConfirming}
+	                title={t('deleteButton')}
+	                onClick={() => {
+	                  if (!hasSelection || actionBusy || syncingAny) return;
+	                  if (!deleteConfirmKey) return;
+	                  if (!deleteConfirm.isArmed(deleteConfirmKey)) {
+	                    deleteConfirm.arm(deleteConfirmKey);
+	                    return;
+	                  }
+	                  void onConfirmDelete();
+	                }}
+	                disabled={!hasSelection || actionBusy || syncingAny}
+	              >
+	                {deleteConfirming ? (
+	                  t('deleteButton')
+	                ) : (
+	                  <>
+	                    <span aria-hidden="true">×</span>
+	                    <span className="tw-sr-only">{t('deleteButton')}</span>
+	                  </>
+	                )}
+	              </button>
 
               <MenuPopover
                 open={exportOpen}
@@ -1018,42 +1090,6 @@ export function ConversationListPane({
           />
         </div>
       </div>
-
-      {deleteConfirmOpen ? (
-        <div className="tw-fixed tw-inset-0 tw-z-40 tw-flex tw-items-center tw-justify-center tw-bg-[var(--bg-overlay)] tw-p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('deleteConfirmDialogAria')}
-            className="tw-w-full tw-max-w-[340px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-4"
-          >
-            <div className="tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">{t('deleteConfirmTitle')}</div>
-            <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-              {t('deleteConfirmBody')}
-            </div>
-            <div className="tw-mt-3 tw-flex tw-justify-end tw-gap-2">
-              <button
-                type="button"
-                className={actionButton}
-                onClick={() => setDeleteConfirmOpen(false)}
-                disabled={deleting || syncingAny}
-              >
-                {t('cancelButton')}
-              </button>
-              <button
-                type="button"
-                className={dangerSurfaceButton}
-                onClick={() => {
-                  void onConfirmDelete();
-                }}
-                disabled={deleting || syncingAny}
-              >
-                {deleting ? t('deletingDots') : t('deleteButton')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

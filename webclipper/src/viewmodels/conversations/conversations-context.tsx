@@ -516,7 +516,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     return () => {
       cancelled = true;
     };
-  }, [detail, selectedConversation]);
+  }, [detail, refreshActiveDetail, selectedConversation]);
 
   const toggleSelected = useCallback((id: number) => {
     const safeId = Number(id);

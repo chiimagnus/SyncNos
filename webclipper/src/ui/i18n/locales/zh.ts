@@ -147,10 +147,7 @@ export const zh: { [K in TranslationKey]: string } = {
   notionSyncing: 'Notion...',
   todayLabel: '今日：',
   totalLabel: '总计：',
-  deleteConfirmTitle: '确认删除选中的对话？',
-  deleteConfirmBody: '此操作不可撤销。',
   cancelButton: '取消',
-  deletingDots: '删除中...',
 
   // ConversationDetailPane
   backButton: '返回',
@@ -216,7 +213,6 @@ export const zh: { [K in TranslationKey]: string } = {
   closeSettings: '关闭设置',
   sourceFilterAria: '来源筛选',
   conversationDetailAria: '对话详情',
-  deleteConfirmDialogAria: '删除对话确认',
 
   // CapturedListSidebar
   settingsLabel: '设置',

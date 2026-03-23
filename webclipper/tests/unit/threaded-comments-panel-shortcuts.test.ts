@@ -108,4 +108,3 @@ describe('Threaded comments panel shortcuts', () => {
     mounted.cleanup();
   });
 });
-

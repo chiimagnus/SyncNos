@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
@@ -52,6 +53,19 @@ function setImportantStyle(el: HTMLElement, name: string, value: string) {
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
+}
+
+function autosizeTextarea(textarea: HTMLTextAreaElement | null | undefined) {
+  const el = textarea as any;
+  if (!el) return;
+  try {
+    el.style.overflowY = 'hidden';
+    el.style.height = '0px';
+    const next = Math.max(0, Number(el.scrollHeight || 0) || 0);
+    el.style.height = `${next}px`;
+  } catch (_e) {
+    // ignore
+  }
 }
 
 function isEditableTarget(target: unknown): boolean {
@@ -486,7 +500,7 @@ export function mountThreadedCommentsPanel(
   const composerTextarea = document.createElement('textarea');
   composerTextarea.className = 'webclipper-inpage-comments-panel__composer-textarea';
   composerTextarea.placeholder = 'Write a comment…';
-  composerTextarea.rows = 2;
+  composerTextarea.rows = 1;
   composerMain.appendChild(composerTextarea);
 
   const composerActions = document.createElement('div');
@@ -519,6 +533,66 @@ export function mountThreadedCommentsPanel(
       onClose: null as any,
     },
   };
+
+  const deleteConfirm = createTwoStepConfirmController<number>({
+    onChange: () => {
+      refreshDeleteButtons();
+    },
+  });
+
+  function getDeleteButtons() {
+    try {
+      return Array.from(
+        shadow.querySelectorAll?.('button[data-webclipper-comment-delete-id]') || [],
+      ) as HTMLButtonElement[];
+    } catch (_e) {
+      return [] as HTMLButtonElement[];
+    }
+  }
+
+  function applyDeleteButtonUi(button: HTMLButtonElement, confirming: boolean) {
+    if (!button) return;
+
+    if (confirming) {
+      button.setAttribute('data-confirm', '1');
+      button.classList.remove('webclipper-btn--danger-tint');
+      button.classList.remove('webclipper-btn--icon');
+      button.classList.add('webclipper-btn--danger');
+      button.textContent = t('deleteButton');
+      button.setAttribute('aria-label', t('deleteButton'));
+      button.title = '';
+    } else {
+      button.removeAttribute('data-confirm');
+      button.classList.remove('webclipper-btn--danger');
+      button.classList.add('webclipper-btn--danger-tint');
+      button.classList.add('webclipper-btn--icon');
+      button.textContent = '×';
+      button.setAttribute('aria-label', t('deleteButton'));
+      button.title = '';
+    }
+  }
+
+  function refreshDeleteButtons() {
+    const buttons = getDeleteButtons();
+
+    const pendingId = deleteConfirm.getArmedKey();
+    if (pendingId == null) {
+      for (const btn of buttons) applyDeleteButtonUi(btn, false);
+      return;
+    }
+
+    let hasPending = false;
+    for (const btn of buttons) {
+      const id = Number(btn.getAttribute('data-webclipper-comment-delete-id') || 0);
+      const confirming = Number.isFinite(id) && id > 0 && id === pendingId;
+      if (confirming) hasPending = true;
+      applyDeleteButtonUi(btn, confirming);
+    }
+
+    if (!hasPending) {
+      deleteConfirm.clear();
+    }
+  }
 
   const focusComposer = () => {
     try {
@@ -570,6 +644,8 @@ export function mountThreadedCommentsPanel(
       state.pendingComposerFocus = false;
       focusComposer();
     }
+
+    refreshDeleteButtons();
   }
 
   function setOpen(open: boolean) {
@@ -584,7 +660,11 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  composerTextarea.addEventListener('input', () => refreshButtons());
+  autosizeTextarea(composerTextarea);
+  composerTextarea.addEventListener('input', () => {
+    autosizeTextarea(composerTextarea);
+    refreshButtons();
+  });
   const submitComposer = async () => {
     if (state.busy) return;
     const text = String((composerTextarea as any).value || '').trim();
@@ -596,6 +676,7 @@ export function mountThreadedCommentsPanel(
       refreshButtons();
       await handler(text);
       (composerTextarea as any).value = '';
+      autosizeTextarea(composerTextarea);
     } finally {
       state.busy = false;
       refreshButtons();
@@ -615,6 +696,30 @@ export function mountThreadedCommentsPanel(
     void submitComposer();
   });
 
+  shadow.addEventListener('click', (e) => {
+    if (deleteConfirm.getArmedKey() == null) return;
+    const target = (e as any).target;
+    try {
+      const deleteButton = target?.closest?.('button[data-webclipper-comment-delete-id]');
+      if (deleteButton) return;
+    } catch (_e) {
+      // ignore
+    }
+    deleteConfirm.clear();
+  });
+
+  shadow.addEventListener('keydown', (e) => {
+    if (deleteConfirm.getArmedKey() == null) return;
+    if ((e as any).isComposing) return;
+    if ((e as any).key !== 'Escape') return;
+    try {
+      (e as any).preventDefault?.();
+    } catch (_e) {
+      // ignore
+    }
+    deleteConfirm.clear();
+  });
+
   const apiRef: ThreadedCommentsPanelApi = {
     open(input) {
       const wasOpen = el.getAttribute('data-open') === '1';
@@ -632,6 +737,7 @@ export function mountThreadedCommentsPanel(
     },
     close() {
       setOpen(false);
+      deleteConfirm.clear();
       const handler = state.handlers.onClose;
       if (typeof handler === 'function') handler();
     },
@@ -665,6 +771,7 @@ export function mountThreadedCommentsPanel(
     },
     setComments(items) {
       threads.textContent = '';
+      deleteConfirm.clear();
       const normalized = (Array.isArray(items) ? items : []).filter(
         (x) => x && Number.isFinite(Number((x as any)?.id)),
       );
@@ -741,16 +848,24 @@ export function mountThreadedCommentsPanel(
         del.className =
           'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
         del.type = 'button';
-        del.setAttribute('aria-label', 'Delete');
+        del.setAttribute('data-webclipper-comment-delete-id', String(Number(root?.id) || ''));
+        del.setAttribute('aria-label', t('deleteButton'));
         del.textContent = '×';
         del.addEventListener('click', async () => {
           if (state.busy) return;
+          const id = Number(root?.id);
+          if (!Number.isFinite(id) || id <= 0) return;
+          if (!deleteConfirm.isArmed(id)) {
+            deleteConfirm.arm(id);
+            return;
+          }
+          deleteConfirm.clear();
           const handler = state.handlers.onDelete;
           if (typeof handler !== 'function') return;
           try {
             state.busy = true;
             refreshButtons();
-            await handler(Number(root?.id));
+            await handler(id);
           } finally {
             state.busy = false;
             refreshButtons();
@@ -805,16 +920,24 @@ export function mountThreadedCommentsPanel(
             replyDel.className =
               'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
             replyDel.type = 'button';
-            replyDel.setAttribute('aria-label', 'Delete');
+            replyDel.setAttribute('data-webclipper-comment-delete-id', String(Number(reply?.id) || ''));
+            replyDel.setAttribute('aria-label', t('deleteButton'));
             replyDel.textContent = '×';
             replyDel.addEventListener('click', async () => {
               if (state.busy) return;
+              const id = Number(reply?.id);
+              if (!Number.isFinite(id) || id <= 0) return;
+              if (!deleteConfirm.isArmed(id)) {
+                deleteConfirm.arm(id);
+                return;
+              }
+              deleteConfirm.clear();
               const handler = state.handlers.onDelete;
               if (typeof handler !== 'function') return;
               try {
                 state.busy = true;
                 refreshButtons();
-                await handler(Number(reply?.id));
+                await handler(id);
               } finally {
                 state.busy = false;
                 refreshButtons();
@@ -848,7 +971,11 @@ export function mountThreadedCommentsPanel(
 
         (replySend as any).__webclipperTextValue = () => String((replyTextarea as any).value || '');
 
-        replyTextarea.addEventListener('input', () => refreshButtons());
+        autosizeTextarea(replyTextarea);
+        replyTextarea.addEventListener('input', () => {
+          autosizeTextarea(replyTextarea);
+          refreshButtons();
+        });
         const submitReply = async () => {
           if (state.busy) return;
           const text = String((replyTextarea as any).value || '').trim();
@@ -860,6 +987,7 @@ export function mountThreadedCommentsPanel(
             refreshButtons();
             await handler(rootId, text);
             (replyTextarea as any).value = '';
+            autosizeTextarea(replyTextarea);
           } finally {
             state.busy = false;
             refreshButtons();
@@ -923,6 +1051,11 @@ export function mountThreadedCommentsPanel(
     // Ensure we restore page layout even if the panel is removed while open.
     try {
       setDockOpen(false);
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      deleteConfirm.dispose();
     } catch (_e) {
       // ignore
     }

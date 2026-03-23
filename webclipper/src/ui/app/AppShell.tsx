@@ -73,7 +73,17 @@ export default function AppShell() {
     }
   };
 
-  function AppShellFrame() {
+  function AppShellFrame({
+    sidebarCollapsed,
+    commentsSidebarCollapsed,
+    setCollapsed,
+    setCommentsCollapsed,
+  }: {
+    sidebarCollapsed: boolean;
+    commentsSidebarCollapsed: boolean;
+    setCollapsed: (collapsed: boolean) => void;
+    setCommentsCollapsed: (collapsed: boolean) => void;
+  }) {
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
     if (!commentsSidebarSessionRef.current) {
@@ -343,7 +353,12 @@ export default function AppShell() {
   return (
     <HashRouter>
       <ConversationsProvider>
-        <AppShellFrame />
+        <AppShellFrame
+          sidebarCollapsed={sidebarCollapsed}
+          commentsSidebarCollapsed={commentsSidebarCollapsed}
+          setCollapsed={setCollapsed}
+          setCommentsCollapsed={setCommentsCollapsed}
+        />
       </ConversationsProvider>
     </HashRouter>
   );

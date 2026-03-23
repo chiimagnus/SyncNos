@@ -210,9 +210,9 @@
 .webclipper-inpage-comments-panel__composer-textarea {
   width: 100%;
   box-sizing: border-box;
-  resize: vertical;
-  min-height: 44px;
-  max-height: 240px;
+  resize: none;
+  overflow: hidden;
+  min-height: 34px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -299,6 +299,11 @@
   gap: 6px;
 }
 
+.webclipper-inpage-comments-panel__icon-btn[data-confirm='1'] {
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
 .webclipper-inpage-comments-panel__comment-body {
   white-space: pre-wrap;
   word-break: break-word;
@@ -315,8 +320,8 @@
 
 .webclipper-inpage-comments-panel__replies {
   margin-top: 10px;
-  padding-left: 34px;
-  border-left: 2px solid color-mix(in srgb, var(--panel-border) 68%, transparent);
+  padding-left: 0;
+  border-left: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -337,7 +342,7 @@
 
 .webclipper-inpage-comments-panel__reply-composer {
   margin-top: 10px;
-  padding-left: 34px;
+  padding-left: 0;
   display: flex;
   gap: 8px;
   align-items: flex-end;
@@ -348,8 +353,8 @@
   min-width: 0;
   box-sizing: border-box;
   resize: none;
+  overflow: hidden;
   min-height: 34px;
-  max-height: 140px;
   padding: calc(var(--comments-panel-body-padding-y) - 2px) var(--comments-panel-body-padding-y);
   border-radius: 16px;
   border: 1px solid var(--panel-border);
