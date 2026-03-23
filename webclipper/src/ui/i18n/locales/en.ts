@@ -168,6 +168,7 @@ export const en = {
   articleCommentsEmpty: 'No comments yet.',
   openCommentsSidebar: 'Comment',
   closeCommentsSidebar: 'Collapse comments sidebar',
+  deleteCommentConfirm: 'Delete this comment? This cannot be undone.',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: 'Syncing',

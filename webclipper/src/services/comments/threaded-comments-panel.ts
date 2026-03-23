@@ -54,6 +54,19 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
+function autosizeTextarea(textarea: HTMLTextAreaElement | null | undefined) {
+  const el = textarea as any;
+  if (!el) return;
+  try {
+    el.style.overflowY = 'hidden';
+    el.style.height = '0px';
+    const next = Math.max(0, Number(el.scrollHeight || 0) || 0);
+    el.style.height = `${next}px`;
+  } catch (_e) {
+    // ignore
+  }
+}
+
 function isEditableTarget(target: unknown): boolean {
   const el = target as any;
   const tag = String(el?.tagName || '').toUpperCase();
@@ -486,7 +499,7 @@ export function mountThreadedCommentsPanel(
   const composerTextarea = document.createElement('textarea');
   composerTextarea.className = 'webclipper-inpage-comments-panel__composer-textarea';
   composerTextarea.placeholder = 'Write a comment…';
-  composerTextarea.rows = 2;
+  composerTextarea.rows = 1;
   composerMain.appendChild(composerTextarea);
 
   const composerActions = document.createElement('div');
@@ -584,7 +597,11 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  composerTextarea.addEventListener('input', () => refreshButtons());
+  autosizeTextarea(composerTextarea);
+  composerTextarea.addEventListener('input', () => {
+    autosizeTextarea(composerTextarea);
+    refreshButtons();
+  });
   const submitComposer = async () => {
     if (state.busy) return;
     const text = String((composerTextarea as any).value || '').trim();
@@ -596,6 +613,7 @@ export function mountThreadedCommentsPanel(
       refreshButtons();
       await handler(text);
       (composerTextarea as any).value = '';
+      autosizeTextarea(composerTextarea);
     } finally {
       state.busy = false;
       refreshButtons();
@@ -745,6 +763,14 @@ export function mountThreadedCommentsPanel(
         del.textContent = '×';
         del.addEventListener('click', async () => {
           if (state.busy) return;
+          try {
+            const message = t('deleteCommentConfirm');
+            if (typeof (globalThis as any).confirm === 'function') {
+              if (!(globalThis as any).confirm(String(message || ''))) return;
+            }
+          } catch (_e) {
+            // ignore
+          }
           const handler = state.handlers.onDelete;
           if (typeof handler !== 'function') return;
           try {
@@ -809,6 +835,14 @@ export function mountThreadedCommentsPanel(
             replyDel.textContent = '×';
             replyDel.addEventListener('click', async () => {
               if (state.busy) return;
+              try {
+                const message = t('deleteCommentConfirm');
+                if (typeof (globalThis as any).confirm === 'function') {
+                  if (!(globalThis as any).confirm(String(message || ''))) return;
+                }
+              } catch (_e) {
+                // ignore
+              }
               const handler = state.handlers.onDelete;
               if (typeof handler !== 'function') return;
               try {
@@ -848,7 +882,11 @@ export function mountThreadedCommentsPanel(
 
         (replySend as any).__webclipperTextValue = () => String((replyTextarea as any).value || '');
 
-        replyTextarea.addEventListener('input', () => refreshButtons());
+        autosizeTextarea(replyTextarea);
+        replyTextarea.addEventListener('input', () => {
+          autosizeTextarea(replyTextarea);
+          refreshButtons();
+        });
         const submitReply = async () => {
           if (state.busy) return;
           const text = String((replyTextarea as any).value || '').trim();
@@ -860,6 +898,7 @@ export function mountThreadedCommentsPanel(
             refreshButtons();
             await handler(rootId, text);
             (replyTextarea as any).value = '';
+            autosizeTextarea(replyTextarea);
           } finally {
             state.busy = false;
             refreshButtons();
