@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
@@ -26,8 +27,6 @@ export type ThreadedCommentsPanelApi = {
     onClose?: () => void;
   }) => void;
 };
-
-const DELETE_CONFIRM_TIMEOUT_MS = 2500;
 
 function toHostTokensCss(css: string) {
   // Scope tokens to the Shadow DOM host so inpage panels still use our design system.
@@ -527,8 +526,6 @@ export function mountThreadedCommentsPanel(
   const state = {
     busy: false,
     pendingComposerFocus: false,
-    pendingDeleteId: null as number | null,
-    pendingDeleteTimer: null as any,
     handlers: {
       onSave: null as any,
       onReply: null as any,
@@ -536,6 +533,12 @@ export function mountThreadedCommentsPanel(
       onClose: null as any,
     },
   };
+
+  const deleteConfirm = createTwoStepConfirmController<number>({
+    onChange: () => {
+      refreshDeleteButtons();
+    },
+  });
 
   function getDeleteButtons() {
     try {
@@ -572,7 +575,8 @@ export function mountThreadedCommentsPanel(
   function refreshDeleteButtons() {
     const buttons = getDeleteButtons();
 
-    if (state.pendingDeleteId == null) {
+    const pendingId = deleteConfirm.getArmedKey();
+    if (pendingId == null) {
       for (const btn of buttons) applyDeleteButtonUi(btn, false);
       return;
     }
@@ -580,59 +584,23 @@ export function mountThreadedCommentsPanel(
     let hasPending = false;
     for (const btn of buttons) {
       const id = Number(btn.getAttribute('data-webclipper-comment-delete-id') || 0);
-      const confirming = Number.isFinite(id) && id > 0 && id === state.pendingDeleteId;
+      const confirming = Number.isFinite(id) && id > 0 && deleteConfirm.isArmed(id);
       if (confirming) hasPending = true;
       applyDeleteButtonUi(btn, confirming);
     }
 
     if (!hasPending) {
-      state.pendingDeleteId = null;
-      if (state.pendingDeleteTimer != null) {
-        try {
-          clearTimeout(state.pendingDeleteTimer);
-        } catch (_e) {
-          // ignore
-        }
-        state.pendingDeleteTimer = null;
-      }
+      deleteConfirm.clear();
     }
   }
 
   function clearPendingDelete() {
-    state.pendingDeleteId = null;
-    if (state.pendingDeleteTimer != null) {
-      try {
-        clearTimeout(state.pendingDeleteTimer);
-      } catch (_e) {
-        // ignore
-      }
-      state.pendingDeleteTimer = null;
-    }
-    refreshDeleteButtons();
+    deleteConfirm.clear();
   }
 
   function armPendingDelete(id: number) {
     if (!Number.isFinite(id) || id <= 0) return;
-    state.pendingDeleteId = id;
-
-    if (state.pendingDeleteTimer != null) {
-      try {
-        clearTimeout(state.pendingDeleteTimer);
-      } catch (_e) {
-        // ignore
-      }
-      state.pendingDeleteTimer = null;
-    }
-
-    try {
-      state.pendingDeleteTimer = setTimeout(() => {
-        clearPendingDelete();
-      }, DELETE_CONFIRM_TIMEOUT_MS);
-    } catch (_e) {
-      // ignore
-    }
-
-    refreshDeleteButtons();
+    deleteConfirm.arm(id);
   }
 
   const focusComposer = () => {
@@ -738,7 +706,7 @@ export function mountThreadedCommentsPanel(
   });
 
   shadow.addEventListener('click', (e) => {
-    if (state.pendingDeleteId == null) return;
+    if (deleteConfirm.getArmedKey() == null) return;
     const target = (e as any).target;
     try {
       const deleteButton = target?.closest?.('button[data-webclipper-comment-delete-id]');
@@ -750,7 +718,7 @@ export function mountThreadedCommentsPanel(
   });
 
   shadow.addEventListener('keydown', (e) => {
-    if (state.pendingDeleteId == null) return;
+    if (deleteConfirm.getArmedKey() == null) return;
     if ((e as any).isComposing) return;
     if ((e as any).key !== 'Escape') return;
     try {
@@ -896,7 +864,7 @@ export function mountThreadedCommentsPanel(
           if (state.busy) return;
           const id = Number(root?.id);
           if (!Number.isFinite(id) || id <= 0) return;
-          if (state.pendingDeleteId !== id) {
+          if (!deleteConfirm.isArmed(id)) {
             armPendingDelete(id);
             return;
           }
@@ -968,7 +936,7 @@ export function mountThreadedCommentsPanel(
               if (state.busy) return;
               const id = Number(reply?.id);
               if (!Number.isFinite(id) || id <= 0) return;
-              if (state.pendingDeleteId !== id) {
+              if (!deleteConfirm.isArmed(id)) {
                 armPendingDelete(id);
                 return;
               }
@@ -1092,6 +1060,11 @@ export function mountThreadedCommentsPanel(
     // Ensure we restore page layout even if the panel is removed while open.
     try {
       setDockOpen(false);
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      deleteConfirm.dispose();
     } catch (_e) {
       // ignore
     }
