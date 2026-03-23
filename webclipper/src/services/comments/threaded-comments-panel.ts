@@ -27,6 +27,8 @@ export type ThreadedCommentsPanelApi = {
   }) => void;
 };
 
+const DELETE_CONFIRM_TIMEOUT_MS = 2500;
+
 function toHostTokensCss(css: string) {
   // Scope tokens to the Shadow DOM host so inpage panels still use our design system.
   // `tokens.css` uses `:root` selectors; in Shadow DOM we want `:host`.
@@ -525,6 +527,8 @@ export function mountThreadedCommentsPanel(
   const state = {
     busy: false,
     pendingComposerFocus: false,
+    pendingDeleteId: null as number | null,
+    pendingDeleteTimer: null as any,
     handlers: {
       onSave: null as any,
       onReply: null as any,
@@ -532,6 +536,117 @@ export function mountThreadedCommentsPanel(
       onClose: null as any,
     },
   };
+
+  const safeT = (key: any, fallback: string) => {
+    try {
+      const value = t(key as any);
+      if (typeof value === 'string' && value.trim()) return value;
+    } catch (_e) {
+      // ignore
+    }
+    return fallback;
+  };
+
+  function getDeleteButtons() {
+    try {
+      return Array.from(
+        shadow.querySelectorAll?.('button[data-webclipper-comment-delete-id]') || [],
+      ) as HTMLButtonElement[];
+    } catch (_e) {
+      return [] as HTMLButtonElement[];
+    }
+  }
+
+  function applyDeleteButtonUi(button: HTMLButtonElement, confirming: boolean) {
+    if (!button) return;
+
+    if (confirming) {
+      button.setAttribute('data-confirm', '1');
+      button.classList.remove('webclipper-btn--danger-tint');
+      button.classList.remove('webclipper-btn--icon');
+      button.classList.add('webclipper-btn--danger');
+      button.textContent = safeT('deleteButton', 'Delete');
+      button.setAttribute(
+        'aria-label',
+        safeT('deleteCommentConfirm', safeT('deleteButton', 'Delete')),
+      );
+      button.title = safeT('deleteCommentConfirm', '');
+    } else {
+      button.removeAttribute('data-confirm');
+      button.classList.remove('webclipper-btn--danger');
+      button.classList.add('webclipper-btn--danger-tint');
+      button.classList.add('webclipper-btn--icon');
+      button.textContent = '×';
+      button.setAttribute('aria-label', safeT('deleteButton', 'Delete'));
+      button.title = '';
+    }
+  }
+
+  function refreshDeleteButtons() {
+    const buttons = getDeleteButtons();
+
+    if (state.pendingDeleteId == null) {
+      for (const btn of buttons) applyDeleteButtonUi(btn, false);
+      return;
+    }
+
+    let hasPending = false;
+    for (const btn of buttons) {
+      const id = Number(btn.getAttribute('data-webclipper-comment-delete-id') || 0);
+      const confirming = Number.isFinite(id) && id > 0 && id === state.pendingDeleteId;
+      if (confirming) hasPending = true;
+      applyDeleteButtonUi(btn, confirming);
+    }
+
+    if (!hasPending) {
+      state.pendingDeleteId = null;
+      if (state.pendingDeleteTimer != null) {
+        try {
+          clearTimeout(state.pendingDeleteTimer);
+        } catch (_e) {
+          // ignore
+        }
+        state.pendingDeleteTimer = null;
+      }
+    }
+  }
+
+  function clearPendingDelete() {
+    state.pendingDeleteId = null;
+    if (state.pendingDeleteTimer != null) {
+      try {
+        clearTimeout(state.pendingDeleteTimer);
+      } catch (_e) {
+        // ignore
+      }
+      state.pendingDeleteTimer = null;
+    }
+    refreshDeleteButtons();
+  }
+
+  function armPendingDelete(id: number) {
+    if (!Number.isFinite(id) || id <= 0) return;
+    state.pendingDeleteId = id;
+
+    if (state.pendingDeleteTimer != null) {
+      try {
+        clearTimeout(state.pendingDeleteTimer);
+      } catch (_e) {
+        // ignore
+      }
+      state.pendingDeleteTimer = null;
+    }
+
+    try {
+      state.pendingDeleteTimer = setTimeout(() => {
+        clearPendingDelete();
+      }, DELETE_CONFIRM_TIMEOUT_MS);
+    } catch (_e) {
+      // ignore
+    }
+
+    refreshDeleteButtons();
+  }
 
   const focusComposer = () => {
     try {
@@ -583,6 +698,8 @@ export function mountThreadedCommentsPanel(
       state.pendingComposerFocus = false;
       focusComposer();
     }
+
+    refreshDeleteButtons();
   }
 
   function setOpen(open: boolean) {
@@ -633,6 +750,30 @@ export function mountThreadedCommentsPanel(
     void submitComposer();
   });
 
+  shadow.addEventListener('click', (e) => {
+    if (state.pendingDeleteId == null) return;
+    const target = (e as any).target;
+    try {
+      const deleteButton = target?.closest?.('button[data-webclipper-comment-delete-id]');
+      if (deleteButton) return;
+    } catch (_e) {
+      // ignore
+    }
+    clearPendingDelete();
+  });
+
+  shadow.addEventListener('keydown', (e) => {
+    if (state.pendingDeleteId == null) return;
+    if ((e as any).isComposing) return;
+    if ((e as any).key !== 'Escape') return;
+    try {
+      (e as any).preventDefault?.();
+    } catch (_e) {
+      // ignore
+    }
+    clearPendingDelete();
+  });
+
   const apiRef: ThreadedCommentsPanelApi = {
     open(input) {
       const wasOpen = el.getAttribute('data-open') === '1';
@@ -650,6 +791,7 @@ export function mountThreadedCommentsPanel(
     },
     close() {
       setOpen(false);
+      clearPendingDelete();
       const handler = state.handlers.onClose;
       if (typeof handler === 'function') handler();
     },
@@ -683,6 +825,7 @@ export function mountThreadedCommentsPanel(
     },
     setComments(items) {
       threads.textContent = '';
+      clearPendingDelete();
       const normalized = (Array.isArray(items) ? items : []).filter(
         (x) => x && Number.isFinite(Number((x as any)?.id)),
       );
@@ -759,24 +902,24 @@ export function mountThreadedCommentsPanel(
         del.className =
           'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
         del.type = 'button';
-        del.setAttribute('aria-label', 'Delete');
+        del.setAttribute('data-webclipper-comment-delete-id', String(Number(root?.id) || ''));
+        del.setAttribute('aria-label', safeT('deleteButton', 'Delete'));
         del.textContent = '×';
         del.addEventListener('click', async () => {
           if (state.busy) return;
-          try {
-            const message = t('deleteCommentConfirm');
-            if (typeof (globalThis as any).confirm === 'function') {
-              if (!(globalThis as any).confirm(String(message || ''))) return;
-            }
-          } catch (_e) {
-            // ignore
+          const id = Number(root?.id);
+          if (!Number.isFinite(id) || id <= 0) return;
+          if (state.pendingDeleteId !== id) {
+            armPendingDelete(id);
+            return;
           }
+          clearPendingDelete();
           const handler = state.handlers.onDelete;
           if (typeof handler !== 'function') return;
           try {
             state.busy = true;
             refreshButtons();
-            await handler(Number(root?.id));
+            await handler(id);
           } finally {
             state.busy = false;
             refreshButtons();
@@ -831,24 +974,24 @@ export function mountThreadedCommentsPanel(
             replyDel.className =
               'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
             replyDel.type = 'button';
-            replyDel.setAttribute('aria-label', 'Delete');
+            replyDel.setAttribute('data-webclipper-comment-delete-id', String(Number(reply?.id) || ''));
+            replyDel.setAttribute('aria-label', safeT('deleteButton', 'Delete'));
             replyDel.textContent = '×';
             replyDel.addEventListener('click', async () => {
               if (state.busy) return;
-              try {
-                const message = t('deleteCommentConfirm');
-                if (typeof (globalThis as any).confirm === 'function') {
-                  if (!(globalThis as any).confirm(String(message || ''))) return;
-                }
-              } catch (_e) {
-                // ignore
+              const id = Number(reply?.id);
+              if (!Number.isFinite(id) || id <= 0) return;
+              if (state.pendingDeleteId !== id) {
+                armPendingDelete(id);
+                return;
               }
+              clearPendingDelete();
               const handler = state.handlers.onDelete;
               if (typeof handler !== 'function') return;
               try {
                 state.busy = true;
                 refreshButtons();
-                await handler(Number(reply?.id));
+                await handler(id);
               } finally {
                 state.busy = false;
                 refreshButtons();
