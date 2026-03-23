@@ -3,6 +3,7 @@ export type ArticleComment = {
   parentId: number | null;
   conversationId: number | null;
   canonicalUrl: string;
+  authorName?: string | null;
   quoteText: string;
   commentText: string;
   createdAt: number;
@@ -13,6 +14,7 @@ export type AddArticleCommentInput = {
   parentId?: number | null;
   conversationId: number | null;
   canonicalUrl: string;
+  authorName?: string | null;
   quoteText?: string | null;
   commentText: string;
   createdAt?: number | null;

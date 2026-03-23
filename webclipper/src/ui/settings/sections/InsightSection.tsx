@@ -33,6 +33,32 @@ function InsightStateCard(props: { title: string; detail?: string; tone?: 'defau
   );
 }
 
+function UserNameCard(props: { value: string; onChange: (next: string) => void }) {
+  const { value, onChange } = props;
+  return (
+    <section className={cardClassName} aria-label="User name">
+      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">About you</h2>
+      <div className="tw-mt-3 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">User name</div>
+      <input
+        className={[
+          'tw-mt-2 tw-w-full tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
+          'tw-px-3 tw-py-2 tw-text-sm tw-font-semibold tw-text-[var(--text-primary)]',
+          'focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-[var(--focus)] focus-visible:tw-ring-offset-2',
+          'focus-visible:tw-ring-offset-[var(--bg-card)]',
+        ].join(' ')}
+        value={value}
+        onChange={(e) => onChange(String((e.target as any)?.value || ''))}
+        placeholder="Used in synced comments meta, e.g. Alice | 2026-03-23 11:07"
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        Takes effect for newly created comments only.
+      </div>
+    </section>
+  );
+}
+
 export function InsightSection(props: {
   loading: boolean;
   error: string;
@@ -40,20 +66,42 @@ export function InsightSection(props: {
   hasLoaded: boolean;
   range: InsightTimeRange;
   onChangeRange: (next: InsightTimeRange) => void;
+  userName: string;
+  onChangeUserName: (next: string) => void;
 }) {
-  const { loading, error, stats, hasLoaded, range, onChangeRange } = props;
+  const { loading, error, stats, hasLoaded, range, onChangeRange, userName, onChangeUserName } = props;
 
   if (loading || !hasLoaded) {
-    return <InsightStateCard title={t('insightLoadingTitle')} />;
+    return (
+      <div className="tw-grid tw-gap-4">
+        <UserNameCard value={userName} onChange={onChangeUserName} />
+        <InsightStateCard title={t('insightLoadingTitle')} />
+      </div>
+    );
   }
 
   if (error) {
-    return <InsightStateCard title={t('insightErrorTitle')} detail={error} tone="error" />;
+    return (
+      <div className="tw-grid tw-gap-4">
+        <UserNameCard value={userName} onChange={onChangeUserName} />
+        <InsightStateCard title={t('insightErrorTitle')} detail={error} tone="error" />
+      </div>
+    );
   }
 
   if (!stats || !hasInsightData(stats)) {
-    return <InsightStateCard title={t('insightEmptyTitle')} />;
+    return (
+      <div className="tw-grid tw-gap-4">
+        <UserNameCard value={userName} onChange={onChangeUserName} />
+        <InsightStateCard title={t('insightEmptyTitle')} />
+      </div>
+    );
   }
 
-  return <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />;
+  return (
+    <div className="tw-grid tw-gap-4">
+      <UserNameCard value={userName} onChange={onChangeUserName} />
+      <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />
+    </div>
+  );
 }
