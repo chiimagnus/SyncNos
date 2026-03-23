@@ -78,7 +78,9 @@ describe('obsidian-markdown-writer', () => {
     expect(md).toContain(`## ${w.COMMENTS_HEADING}`);
     expect(md).not.toContain(`## ${w.MESSAGES_HEADING}`);
     expect(md).toContain('> Quoted');
-    expect(md).toContain('- Root');
-    expect(md).toContain('  - Reply');
+    expect(md).toContain('- You |');
+    expect(md).toContain('  Root');
+    expect(md).toContain('You |');
+    expect(md).toContain('  Reply');
   });
 });

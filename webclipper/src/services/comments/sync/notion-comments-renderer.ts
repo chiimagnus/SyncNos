@@ -1,7 +1,35 @@
 import type { ArticleComment } from '@services/comments/domain/models';
 
 const MAX_TEXT = 1900;
-const NOTION_COMMENTS_DIGEST_VERSION = 2;
+const NOTION_COMMENTS_DIGEST_VERSION = 4;
+const DEFAULT_COMMENT_AUTHOR = 'You';
+
+function pad2(value: number): string {
+  return String(Math.trunc(value)).padStart(2, '0');
+}
+
+function formatCommentTime(ts: unknown): string {
+  const t = Number(ts);
+  if (!Number.isFinite(t) || t <= 0) return '';
+  try {
+    const d = new Date(t);
+    const yyyy = d.getFullYear();
+    const mm = pad2(d.getMonth() + 1);
+    const dd = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const min = pad2(d.getMinutes());
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  } catch (_e) {
+    return '';
+  }
+}
+
+function formatCommentMetaLine(input: { authorName?: unknown; createdAt?: unknown }): string {
+  const authorName = safeString(input?.authorName) || DEFAULT_COMMENT_AUTHOR;
+  const time = formatCommentTime(input?.createdAt);
+  if (!time) return authorName;
+  return `${authorName} | ${time}`;
+}
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
@@ -46,6 +74,11 @@ function paragraphBlock(content: string) {
   } as any;
 }
 
+function paragraphBlocksFromParts(parts: string[]): any[] {
+  const list = Array.isArray(parts) ? parts : [];
+  return list.map((p) => paragraphBlock(p)).filter(Boolean);
+}
+
 function dividerBlock() {
   return {
     object: 'block',
@@ -54,15 +87,8 @@ function dividerBlock() {
   } as any;
 }
 
-function bulletedItemBlock(content: string, continuation?: string[], extraChildren?: any[]) {
-  const children: any[] = [];
-  if (Array.isArray(continuation) && continuation.length) {
-    children.push(...continuation.map((p) => paragraphBlock(p)));
-  }
-  if (Array.isArray(extraChildren) && extraChildren.length) {
-    children.push(...extraChildren);
-  }
-  const resolvedChildren = children.length ? children : undefined;
+function bulletedItemBlock(content: string, children?: any[]) {
+  const resolvedChildren = Array.isArray(children) && children.length ? children : undefined;
   return {
     object: 'block',
     type: 'bulleted_list_item',
@@ -71,6 +97,31 @@ function bulletedItemBlock(content: string, continuation?: string[], extraChildr
       ...(resolvedChildren ? { children: resolvedChildren } : null),
     },
   } as any;
+}
+
+function commentItemBlock(input: { commentText: unknown; createdAt: unknown; extraChildren?: any[] }) {
+  const metaLine = formatCommentMetaLine({ createdAt: input?.createdAt });
+  const commentText = safeString(input?.commentText);
+  const commentParts = splitText(commentText);
+
+  const children: any[] = [];
+  if (commentParts.length) children.push(...paragraphBlocksFromParts(commentParts));
+  if (Array.isArray(input?.extraChildren) && input.extraChildren.length) children.push(...input.extraChildren);
+
+  return bulletedItemBlock(metaLine, children);
+}
+
+function replyParagraphBlocks(reply: ArticleComment): any[] {
+  const metaLine = formatCommentMetaLine({ createdAt: reply?.createdAt });
+  const replyText = safeString(reply?.commentText);
+  const parts = splitText(replyText);
+  const lines: string[] = [];
+  if (metaLine) lines.push(metaLine);
+  if (parts.length) lines.push(parts[0]!);
+  const out: any[] = [];
+  if (lines.length) out.push(paragraphBlock(lines.join('\n')));
+  if (parts.length > 1) out.push(...paragraphBlocksFromParts(parts.slice(1)));
+  return out;
 }
 
 export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
@@ -109,23 +160,21 @@ export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
     }
 
     const rootText = safeString(root.commentText);
-    const rootParts = splitText(rootText);
     const replies = byParentId.get(Number(root.id)) || [];
     const replyBlocks: any[] = [];
     for (const reply of replies) {
       const replyText = safeString(reply?.commentText);
-      const replyParts = splitText(replyText);
-      if (!replyParts.length) continue;
+      if (!replyText) continue;
       items += 1;
-      replyBlocks.push(bulletedItemBlock(replyParts[0]!, replyParts.slice(1)));
+      replyBlocks.push(...replyParagraphBlocks(reply));
     }
 
-    if (rootParts.length) {
+    if (rootText) {
       items += 1;
-      threadBlocks.push(bulletedItemBlock(rootParts[0]!, rootParts.slice(1), replyBlocks));
+      threadBlocks.push(commentItemBlock({ commentText: rootText, createdAt: root?.createdAt, extraChildren: replyBlocks }));
     } else if (replyBlocks.length) {
-      // No root comment text: keep replies visible as a top-level bullet group.
-      threadBlocks.push(...replyBlocks);
+      // No root comment text: keep replies visible inside a meta bullet.
+      threadBlocks.push(bulletedItemBlock(formatCommentMetaLine({ createdAt: root?.createdAt }), replyBlocks));
     }
 
     if (!threadBlocks.length) continue;

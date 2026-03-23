@@ -78,11 +78,14 @@ describe('notion article comments blocks', () => {
     expect(res.blocks[0]?.type).toBe('quote');
     expect(res.blocks[0]?.quote?.rich_text?.[0]?.text?.content).toBe('Quoted text');
     expect(res.blocks[1]?.type).toBe('bulleted_list_item');
-    expect(res.blocks[1]?.bulleted_list_item?.rich_text?.[0]?.text?.content).toBe('Root comment');
+    expect(String(res.blocks[1]?.bulleted_list_item?.rich_text?.[0]?.text?.content || '')).toContain('You |');
     const children = res.blocks[1]?.bulleted_list_item?.children || [];
-    expect(children.some((c: any) => c && c.type === 'bulleted_list_item')).toBe(true);
-    const reply = children.find((c: any) => c && c.type === 'bulleted_list_item');
-    expect(reply?.bulleted_list_item?.rich_text?.[0]?.text?.content).toBe('Reply comment');
+    const rootText = children.find((c: any) => c && c.type === 'paragraph' && String(c?.paragraph?.rich_text?.[0]?.text?.content || '').includes('Root comment'));
+    expect(rootText).toBeTruthy();
+    const replyParagraph = children.find(
+      (c: any) => c && c.type === 'paragraph' && String(c?.paragraph?.rich_text?.[0]?.text?.content || '').includes('Reply comment'),
+    );
+    expect(replyParagraph).toBeTruthy();
   });
 
   it('splits oversized comment text into a bullet with continuation paragraphs', async () => {
