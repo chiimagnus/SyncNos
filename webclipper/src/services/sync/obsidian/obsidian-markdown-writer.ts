@@ -168,11 +168,17 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
 
   list.sort((a, b) => Number(a?.createdAt || 0) - Number(b?.createdAt || 0));
 
+  const byId = new Map<number, ArticleComment>();
+  for (const c of list) {
+    const id = Number(c?.id);
+    if (Number.isFinite(id) && id > 0) byId.set(id, c);
+  }
+
   const byParentId = new Map<number, ArticleComment[]>();
   const roots: ArticleComment[] = [];
   for (const c of list) {
     const parentId = c && c.parentId != null ? Number(c.parentId) : null;
-    if (parentId && Number.isFinite(parentId) && parentId > 0) {
+    if (parentId && Number.isFinite(parentId) && parentId > 0 && byId.has(parentId)) {
       const bucket = byParentId.get(parentId) || [];
       bucket.push(c);
       byParentId.set(parentId, bucket);
@@ -181,44 +187,38 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
     }
   }
 
-  function renderReplyParagraphs(comment: ArticleComment): string[] {
+  function renderFlatBulletItem(comment: ArticleComment): string[] {
     const out: string[] = [];
     const metaLine = buildCommentMetaLine({ authorName: (comment as any)?.authorName, createdAt: comment?.createdAt });
+    const head = buildListItemHead(metaLine, 0);
+    if (head) out.push(head);
     const text = safeString(comment?.commentText);
-    if (!metaLine || !text) return out;
-    out.push(...buildListItemParagraph(`${metaLine}\n${text}`, 0));
-    return out;
+    if (text) out.push(...buildListItemParagraph(text, 0));
+    return out.filter((x) => !!x);
   }
 
-  function renderReplyParagraphsRecursive(comment: ArticleComment): string[] {
+  function renderFlatThread(root: ArticleComment): string[] {
     const out: string[] = [];
-    out.push(...renderReplyParagraphs(comment));
-    const replies = byParentId.get(Number(comment?.id)) || [];
-    for (const reply of replies) {
-      if (out.length) out.push('  ');
-      out.push(...renderReplyParagraphsRecursive(reply));
-    }
-    return out;
-  }
+    const visited = new Set<number>();
 
-  function renderThreadItems(comment: ArticleComment, depth: number): string[] {
-    const lines: string[] = [];
-    const text = safeString(comment?.commentText);
-    const hasText = !!text;
-    if (hasText) {
-      const head = buildListItemHead(
-        buildCommentMetaLine({ authorName: (comment as any)?.authorName, createdAt: comment?.createdAt }),
-        depth,
-      );
-      if (head) lines.push(head);
-      lines.push(...buildListItemParagraph(text, depth));
-    }
-    const replies = byParentId.get(Number(comment?.id)) || [];
-    for (const reply of replies) {
-      if (hasText) lines.push('  ');
-      lines.push(...renderReplyParagraphsRecursive(reply));
-    }
-    return lines.filter((x) => !!x);
+    const pushRecursive = (comment: ArticleComment) => {
+      if (!comment) return;
+      const id = Number(comment?.id);
+      if (Number.isFinite(id) && id > 0) {
+        if (visited.has(id)) return;
+        visited.add(id);
+      }
+      const itemLines = renderFlatBulletItem(comment);
+      if (itemLines.length) out.push(itemLines.join('\n'));
+
+      const replies = byParentId.get(Number(comment?.id)) || [];
+      for (const reply of replies) {
+        pushRecursive(reply);
+      }
+    };
+
+    pushRecursive(root);
+    return out.filter((x) => !!x);
   }
 
   const out: string[] = [];
@@ -231,8 +231,8 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
       thread.push('');
     }
 
-    const items = renderThreadItems(root, 0);
-    if (items.length) thread.push(items.join('\n'));
+    const items = renderFlatThread(root);
+    if (items.length) thread.push(items.join('\n\n'));
 
     const threadText = thread.join('\n').trim();
     if (!threadText) continue;
