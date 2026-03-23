@@ -201,8 +201,9 @@ describe('obsidian article sync replaces sections without duplicating headings',
     expect(lastPutBody).toContain('## Comments');
     expect(lastPutBody.match(/^##\s+Comments\s*$/gm)?.length || 0).toBe(1);
     expect(lastPutBody).toContain('> Quoted');
-    expect(lastPutBody).toContain('- Root');
-    expect(lastPutBody).toContain('  - Reply');
+    expect(lastPutBody).toContain('- You |');
+    expect(lastPutBody).toContain('  Root');
+    expect(lastPutBody).toContain('  Reply');
     expect(lastPutBody).not.toContain('## Tail');
     expect(lastPutBody).not.toContain('Keep tail');
   });

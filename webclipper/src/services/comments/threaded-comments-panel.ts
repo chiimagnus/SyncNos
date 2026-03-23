@@ -585,14 +585,7 @@ export function mountThreadedCommentsPanel(
   }
 
   composerTextarea.addEventListener('input', () => refreshButtons());
-  composerTextarea.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    if (!(e.metaKey || e.ctrlKey)) return;
-    e.preventDefault();
-    composerSend.click();
-  });
-
-  composerSend.addEventListener('click', async () => {
+  const submitComposer = async () => {
     if (state.busy) return;
     const text = String((composerTextarea as any).value || '').trim();
     if (!text) return;
@@ -607,6 +600,19 @@ export function mountThreadedCommentsPanel(
       state.busy = false;
       refreshButtons();
     }
+  };
+
+  composerTextarea.addEventListener('keydown', (e) => {
+    if ((e as any).isComposing) return;
+    if (e.key !== 'Enter') return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    void submitComposer();
+  });
+
+  composerSend.addEventListener('click', () => {
+    void submitComposer();
   });
 
   const apiRef: ThreadedCommentsPanelApi = {
@@ -843,14 +849,7 @@ export function mountThreadedCommentsPanel(
         (replySend as any).__webclipperTextValue = () => String((replyTextarea as any).value || '');
 
         replyTextarea.addEventListener('input', () => refreshButtons());
-        replyTextarea.addEventListener('keydown', (e) => {
-          if (e.key !== 'Enter') return;
-          if (!(e.metaKey || e.ctrlKey)) return;
-          e.preventDefault();
-          replySend.click();
-        });
-
-        replySend.addEventListener('click', async () => {
+        const submitReply = async () => {
           if (state.busy) return;
           const text = String((replyTextarea as any).value || '').trim();
           if (!text) return;
@@ -865,6 +864,19 @@ export function mountThreadedCommentsPanel(
             state.busy = false;
             refreshButtons();
           }
+        };
+
+        replyTextarea.addEventListener('keydown', (e) => {
+          if ((e as any).isComposing) return;
+          if (e.key !== 'Enter') return;
+          if (!(e.metaKey || e.ctrlKey)) return;
+          if (e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          void submitReply();
+        });
+
+        replySend.addEventListener('click', () => {
+          void submitReply();
         });
       }
 
@@ -900,9 +912,9 @@ export function mountThreadedCommentsPanel(
   // Prevent site-level single-letter shortcuts: key events crossing the Shadow DOM boundary are retargeted to the host,
   // so many sites won't detect that we're typing in a textarea. Stop propagation inside the shadow root.
   try {
-    shadow.addEventListener('keydown', stopShortcutKeyPropagation, true);
-    shadow.addEventListener('keypress', stopShortcutKeyPropagation, true);
-    shadow.addEventListener('keyup', stopShortcutKeyPropagation, true);
+    shadow.addEventListener('keydown', stopShortcutKeyPropagation);
+    shadow.addEventListener('keypress', stopShortcutKeyPropagation);
+    shadow.addEventListener('keyup', stopShortcutKeyPropagation);
   } catch (_e) {
     // ignore
   }
@@ -921,9 +933,9 @@ export function mountThreadedCommentsPanel(
     }
     cleanupSidebarResize = null;
     try {
-      shadow.removeEventListener('keydown', stopShortcutKeyPropagation, true);
-      shadow.removeEventListener('keypress', stopShortcutKeyPropagation, true);
-      shadow.removeEventListener('keyup', stopShortcutKeyPropagation, true);
+      shadow.removeEventListener('keydown', stopShortcutKeyPropagation);
+      shadow.removeEventListener('keypress', stopShortcutKeyPropagation);
+      shadow.removeEventListener('keyup', stopShortcutKeyPropagation);
     } catch (_e) {
       // ignore
     }

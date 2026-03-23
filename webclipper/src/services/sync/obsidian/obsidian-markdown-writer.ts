@@ -3,6 +3,27 @@ import type { ArticleComment } from '@services/comments/domain/models';
 const MESSAGES_HEADING = 'Conversations';
 const ARTICLE_HEADING = 'Article';
 const COMMENTS_HEADING = 'Comments';
+const DEFAULT_COMMENT_AUTHOR = 'You';
+
+function pad2(value: number): string {
+  return String(Math.trunc(value)).padStart(2, '0');
+}
+
+function formatCommentTime(ts: unknown): string {
+  const t = Number(ts);
+  if (!Number.isFinite(t) || t <= 0) return '';
+  try {
+    const d = new Date(t);
+    const yyyy = d.getFullYear();
+    const mm = pad2(d.getMonth() + 1);
+    const dd = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const min = pad2(d.getMinutes());
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  } catch (_e) {
+    return '';
+  }
+}
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -116,6 +137,29 @@ function buildBulletItem(text: string, indentLevel: number) {
   return `${head}\n${tail}`.trimEnd();
 }
 
+function buildCommentMetaLine(createdAt: unknown) {
+  const time = formatCommentTime(createdAt);
+  if (!time) return DEFAULT_COMMENT_AUTHOR;
+  return `${DEFAULT_COMMENT_AUTHOR} | ${time}`;
+}
+
+function buildListItemHead(metaLine: string, indentLevel: number) {
+  const meta = safeString(metaLine);
+  if (!meta) return '';
+  const indent = '  '.repeat(Math.max(0, indentLevel));
+  return `${indent}- ${meta}`.trimEnd();
+}
+
+function buildListItemParagraph(text: string, indentLevel: number): string[] {
+  const src = normalizeNewlines(text).trim();
+  if (!src) return [];
+  const indent = '  '.repeat(Math.max(0, indentLevel));
+  return src
+    .split('\n')
+    .map((line) => `${indent}  ${line}`.trimEnd())
+    .filter((x) => !!x);
+}
+
 function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
   const list = Array.isArray(comments) ? comments.slice() : [];
   if (!list.length) return '';
@@ -135,14 +179,39 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
     }
   }
 
+  function renderReplyParagraphs(comment: ArticleComment): string[] {
+    const out: string[] = [];
+    const metaLine = buildCommentMetaLine(comment?.createdAt);
+    const text = safeString(comment?.commentText);
+    if (!metaLine || !text) return out;
+    out.push(...buildListItemParagraph(`${metaLine}\n${text}`, 0));
+    return out;
+  }
+
+  function renderReplyParagraphsRecursive(comment: ArticleComment): string[] {
+    const out: string[] = [];
+    out.push(...renderReplyParagraphs(comment));
+    const replies = byParentId.get(Number(comment?.id)) || [];
+    for (const reply of replies) {
+      if (out.length) out.push('  ');
+      out.push(...renderReplyParagraphsRecursive(reply));
+    }
+    return out;
+  }
+
   function renderThreadItems(comment: ArticleComment, depth: number): string[] {
     const lines: string[] = [];
     const text = safeString(comment?.commentText);
     const hasText = !!text;
-    if (hasText) lines.push(buildBulletItem(text, depth));
+    if (hasText) {
+      const head = buildListItemHead(buildCommentMetaLine(comment?.createdAt), depth);
+      if (head) lines.push(head);
+      lines.push(...buildListItemParagraph(text, depth));
+    }
     const replies = byParentId.get(Number(comment?.id)) || [];
     for (const reply of replies) {
-      lines.push(...renderThreadItems(reply, hasText ? depth + 1 : depth));
+      if (hasText) lines.push('  ');
+      lines.push(...renderReplyParagraphsRecursive(reply));
     }
     return lines.filter((x) => !!x);
   }
@@ -150,15 +219,23 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
   const out: string[] = [];
   for (const root of roots) {
     if (!root) continue;
+    const thread: string[] = [];
     const quote = safeString(root.quoteText);
     if (quote) {
-      out.push(buildMarkdownQuote(quote));
-      out.push('');
+      thread.push(buildMarkdownQuote(quote));
+      thread.push('');
     }
 
     const items = renderThreadItems(root, 0);
-    if (items.length) out.push(items.join('\n'));
-    out.push('');
+    if (items.length) thread.push(items.join('\n'));
+
+    const threadText = thread.join('\n').trim();
+    if (!threadText) continue;
+
+    if (out.length) {
+      out.push('---', '');
+    }
+    out.push(threadText, '');
   }
 
   return out.join('\n').trim();
