@@ -1,6 +1,7 @@
 import type { ArticleComment } from '@services/comments/domain/models';
 
 const MAX_TEXT = 1900;
+const NOTION_COMMENTS_DIGEST_VERSION = 2;
 
 function safeString(value: unknown): string {
   return String(value == null ? '' : value).trim();
@@ -42,6 +43,14 @@ function paragraphBlock(content: string) {
     object: 'block',
     type: 'paragraph',
     paragraph: { rich_text: [textRich(content)] },
+  } as any;
+}
+
+function dividerBlock() {
+  return {
+    object: 'block',
+    type: 'divider',
+    divider: {},
   } as any;
 }
 
@@ -91,11 +100,12 @@ export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
 
   for (const root of roots) {
     if (!root) continue;
+    const threadBlocks: any[] = [];
     const quoteText = safeString(root.quoteText);
     const quoteParts = splitText(quoteText);
     if (quoteParts.length) {
       threads += 1;
-      for (const part of quoteParts) blocks.push(quoteBlock(part));
+      for (const part of quoteParts) threadBlocks.push(quoteBlock(part));
     }
 
     const rootText = safeString(root.commentText);
@@ -112,11 +122,15 @@ export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
 
     if (rootParts.length) {
       items += 1;
-      blocks.push(bulletedItemBlock(rootParts[0]!, rootParts.slice(1), replyBlocks));
+      threadBlocks.push(bulletedItemBlock(rootParts[0]!, rootParts.slice(1), replyBlocks));
     } else if (replyBlocks.length) {
       // No root comment text: keep replies visible as a top-level bullet group.
-      blocks.push(...replyBlocks);
+      threadBlocks.push(...replyBlocks);
     }
+
+    if (!threadBlocks.length) continue;
+    if (blocks.length) blocks.push(dividerBlock());
+    blocks.push(...threadBlocks);
   }
 
   return { blocks, threads, items };
@@ -143,5 +157,5 @@ export function computeNotionCommentsDigest(comments: ArticleComment[]): string 
     quoteText: safeString(c?.quoteText),
     commentText: safeString(c?.commentText),
   }));
-  return fnv1a32(JSON.stringify(normalized));
+  return fnv1a32(JSON.stringify({ v: NOTION_COMMENTS_DIGEST_VERSION, items: normalized }));
 }

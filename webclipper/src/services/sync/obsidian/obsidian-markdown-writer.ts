@@ -150,15 +150,23 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
   const out: string[] = [];
   for (const root of roots) {
     if (!root) continue;
+    const thread: string[] = [];
     const quote = safeString(root.quoteText);
     if (quote) {
-      out.push(buildMarkdownQuote(quote));
-      out.push('');
+      thread.push(buildMarkdownQuote(quote));
+      thread.push('');
     }
 
     const items = renderThreadItems(root, 0);
-    if (items.length) out.push(items.join('\n'));
-    out.push('');
+    if (items.length) thread.push(items.join('\n'));
+
+    const threadText = thread.join('\n').trim();
+    if (!threadText) continue;
+
+    if (out.length) {
+      out.push('---', '');
+    }
+    out.push(threadText, '');
   }
 
   return out.join('\n').trim();
