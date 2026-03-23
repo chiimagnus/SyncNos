@@ -584,7 +584,7 @@ export function mountThreadedCommentsPanel(
     let hasPending = false;
     for (const btn of buttons) {
       const id = Number(btn.getAttribute('data-webclipper-comment-delete-id') || 0);
-      const confirming = Number.isFinite(id) && id > 0 && deleteConfirm.isArmed(id);
+      const confirming = Number.isFinite(id) && id > 0 && id === pendingId;
       if (confirming) hasPending = true;
       applyDeleteButtonUi(btn, confirming);
     }
@@ -592,15 +592,6 @@ export function mountThreadedCommentsPanel(
     if (!hasPending) {
       deleteConfirm.clear();
     }
-  }
-
-  function clearPendingDelete() {
-    deleteConfirm.clear();
-  }
-
-  function armPendingDelete(id: number) {
-    if (!Number.isFinite(id) || id <= 0) return;
-    deleteConfirm.arm(id);
   }
 
   const focusComposer = () => {
@@ -714,7 +705,7 @@ export function mountThreadedCommentsPanel(
     } catch (_e) {
       // ignore
     }
-    clearPendingDelete();
+    deleteConfirm.clear();
   });
 
   shadow.addEventListener('keydown', (e) => {
@@ -726,7 +717,7 @@ export function mountThreadedCommentsPanel(
     } catch (_e) {
       // ignore
     }
-    clearPendingDelete();
+    deleteConfirm.clear();
   });
 
   const apiRef: ThreadedCommentsPanelApi = {
@@ -746,7 +737,7 @@ export function mountThreadedCommentsPanel(
     },
     close() {
       setOpen(false);
-      clearPendingDelete();
+      deleteConfirm.clear();
       const handler = state.handlers.onClose;
       if (typeof handler === 'function') handler();
     },
@@ -780,7 +771,7 @@ export function mountThreadedCommentsPanel(
     },
     setComments(items) {
       threads.textContent = '';
-      clearPendingDelete();
+      deleteConfirm.clear();
       const normalized = (Array.isArray(items) ? items : []).filter(
         (x) => x && Number.isFinite(Number((x as any)?.id)),
       );
@@ -865,10 +856,10 @@ export function mountThreadedCommentsPanel(
           const id = Number(root?.id);
           if (!Number.isFinite(id) || id <= 0) return;
           if (!deleteConfirm.isArmed(id)) {
-            armPendingDelete(id);
+            deleteConfirm.arm(id);
             return;
           }
-          clearPendingDelete();
+          deleteConfirm.clear();
           const handler = state.handlers.onDelete;
           if (typeof handler !== 'function') return;
           try {
@@ -937,10 +928,10 @@ export function mountThreadedCommentsPanel(
               const id = Number(reply?.id);
               if (!Number.isFinite(id) || id <= 0) return;
               if (!deleteConfirm.isArmed(id)) {
-                armPendingDelete(id);
+                deleteConfirm.arm(id);
                 return;
               }
-              clearPendingDelete();
+              deleteConfirm.clear();
               const handler = state.handlers.onDelete;
               if (typeof handler !== 'function') return;
               try {

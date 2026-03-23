@@ -148,10 +148,7 @@ export const en = {
   notionSyncing: 'Notion...',
   todayLabel: 'Today:',
   totalLabel: 'Total:',
-  deleteConfirmTitle: 'Delete selected conversations?',
-  deleteConfirmBody: 'This cannot be undone.',
   cancelButton: 'Cancel',
-  deletingDots: 'Deleting...',
 
   // ConversationDetailPane
   backButton: 'Back',
@@ -217,7 +214,6 @@ export const en = {
   closeSettings: 'Close settings',
   sourceFilterAria: 'Source filter',
   conversationDetailAria: 'Conversation detail',
-  deleteConfirmDialogAria: 'Delete conversations confirmation',
 
   // CapturedListSidebar
   settingsLabel: 'Settings',

@@ -132,6 +132,7 @@ describe('ConversationListPane delete button inline confirmation', () => {
     const btn = document.getElementById('btnDelete') as HTMLButtonElement | null;
     expect(btn).toBeTruthy();
     expect(btn!.textContent).toContain('deleteButton');
+    expect(btn!.textContent).toContain('×');
     expect(btn!.className).toContain('webclipper-btn--danger-tint');
 
     await act(async () => {
@@ -140,7 +141,8 @@ describe('ConversationListPane delete button inline confirmation', () => {
     });
 
     expect(deleteSelected).toHaveBeenCalledTimes(0);
-    expect(btn!.textContent).toContain('deleteConfirmTitle');
+    expect(btn!.textContent).toContain('deleteButton');
+    expect(btn!.textContent).not.toContain('×');
     expect(btn!.className).toContain('webclipper-btn--danger');
 
     await act(async () => {
@@ -164,7 +166,8 @@ describe('ConversationListPane delete button inline confirmation', () => {
       btn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
-    expect(btn!.textContent).toContain('deleteConfirmTitle');
+    expect(btn!.textContent).toContain('deleteButton');
+    expect(btn!.textContent).not.toContain('×');
 
     const escape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     await act(async () => {
@@ -173,18 +176,21 @@ describe('ConversationListPane delete button inline confirmation', () => {
     });
     expect(escape.defaultPrevented).toBe(true);
     expect(btn!.textContent).toContain('deleteButton');
+    expect(btn!.textContent).toContain('×');
 
     await act(async () => {
       btn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
-    expect(btn!.textContent).toContain('deleteConfirmTitle');
+    expect(btn!.textContent).toContain('deleteButton');
+    expect(btn!.textContent).not.toContain('×');
 
     await act(async () => {
       document.body.dispatchEvent(new window.Event('pointerdown', { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
     expect(btn!.textContent).toContain('deleteButton');
+    expect(btn!.textContent).toContain('×');
     expect(deleteSelected).toHaveBeenCalledTimes(0);
   });
 });
