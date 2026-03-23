@@ -311,6 +311,11 @@ export const en = {
   insightRangeToday: 'Today',
   insightRange7d: 'Past 7 days',
   insightRange30d: 'Past 30 days',
+  aboutYouUserNameSectionTitle: 'User Name',
+  aboutYouUserNameSectionAria: 'User name',
+  aboutYouUserNamePlaceholder: 'Used in synced comments meta, e.g. Alice | 2026-03-23 11:07',
+  aboutYouUserNameHint: 'Takes effect for newly created comments and chat messages only.',
+  aboutYouInsightSectionTitle: 'Insight',
 
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',

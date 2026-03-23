@@ -310,6 +310,11 @@ export const zh: { [K in TranslationKey]: string } = {
   insightRangeToday: '今天',
   insightRange7d: '过去7天',
   insightRange30d: '过去30天',
+  aboutYouUserNameSectionTitle: 'User Name',
+  aboutYouUserNameSectionAria: 'User name',
+  aboutYouUserNamePlaceholder: 'Used in synced comments meta, e.g. Alice | 2026-03-23 11:07',
+  aboutYouUserNameHint: 'Takes effect for newly created comments and chat messages only.',
+  aboutYouInsightSectionTitle: 'Insight',
 
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',
