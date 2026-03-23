@@ -14,6 +14,11 @@ import {
   buildNotionCommentsBlocks,
   computeNotionCommentsDigest,
 } from '@services/comments/sync/notion-comments-renderer';
+import {
+  ABOUT_YOU_USER_NAME_STORAGE_KEY,
+  DEFAULT_ABOUT_YOU_USER_NAME,
+  normalizeUserName,
+} from '@services/shared/user-profile';
 import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from '@services/sync/notion/notion-section-blocks.ts';
 import {
   ensureSectionHeadingBlockId,
@@ -279,9 +284,13 @@ function countInlineImageOmittedPlaceholders(blocks) {
   return count;
 }
 
-async function buildBlocksForSync({ notionSyncService, accessToken, source, messagesList }) {
+async function buildBlocksForSync({ notionSyncService, accessToken, source, messagesList, userName }) {
   const warnings = [];
-  let blocks = notionSyncService.messagesToBlocks(messagesList, { source });
+  const normalizedUserName = String(userName || '').trim();
+  let blocks = notionSyncService.messagesToBlocks(messagesList, {
+    source,
+    ...(normalizedUserName ? { userName: normalizedUserName } : null),
+  });
   blocks = await maybeUpgradeBlocksWithNotionFileUploads({ notionSyncService, accessToken, blocks, warnings });
   return { blocks, warnings };
 }
@@ -614,6 +623,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         const cursorSectionId = kind && kind.id === 'chat' ? 'conversations' : null;
         const cursor = extractCursor(mapping, cursorSectionId);
 
+        let chatUserName = '';
+        let prevChatUserName = '';
+        if (kind && kind.id === 'chat') {
+          prevChatUserName = mapping && typeof mapping === 'object' ? String(mapping.chatUserName || '').trim() : '';
+          const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+          chatUserName =
+            normalizeUserName(local && (local as any)[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+        }
+
         let pageId = '';
         if (mapping && mapping.notionPageId) pageId = String(mapping.notionPageId || '');
         if (!pageId && convo.notionPageId) pageId = String(convo.notionPageId || '');
@@ -829,6 +847,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             accessToken: token.accessToken,
             source: convo.source,
             messagesList: messages,
+            ...(chatUserName ? { userName: chatUserName } : null),
           });
           const blocks = Array.isArray(built?.blocks) ? built.blocks : [];
           if (Array.isArray(built?.warnings) && built.warnings.length) warnings.push(...built.warnings);
@@ -846,6 +865,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           if (storage && typeof storage.patchSyncMapping === 'function') {
             await storage.patchSyncMapping(id, {
               notionSections: { conversations: { headingBlockId: conversationsHeadingId } },
+              ...(chatUserName ? { chatUserName } : null),
             });
           }
           if (blocks.length) {
@@ -1185,6 +1205,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
         const inc = computeNewMessages(messages, cursor);
         let shouldRebuild = !!inc.rebuild;
+        if (kind && kind.id === 'chat') {
+          if (chatUserName && prevChatUserName !== chatUserName) shouldRebuild = true;
+        }
         const layout = layoutSpecForConversationKind(kind.id);
         const conversationsSection =
           (layout.sections || []).find((s) => s && String(s.id) === 'conversations') || layout.sections?.[0];
@@ -1248,6 +1271,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             accessToken: token.accessToken,
             source: convo.source,
             messagesList: messages,
+            ...(chatUserName ? { userName: chatUserName } : null),
           });
           const blocks = Array.isArray(built.blocks) ? built.blocks : [];
           if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
@@ -1288,6 +1312,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           if (storage && typeof storage.patchSyncMapping === 'function') {
             await storage.patchSyncMapping(id, {
               notionSections: { conversations: { headingBlockId: rebuilt.headingBlockId } },
+              ...(chatUserName ? { chatUserName } : null),
             });
           }
           const nextCursor = lastMessageCursor(messages);
@@ -1340,6 +1365,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             accessToken: token.accessToken,
             source: convo.source,
             messagesList: inc.newMessages,
+            ...(chatUserName ? { userName: chatUserName } : null),
           });
           const blocks = Array.isArray(built.blocks) ? built.blocks : [];
           if (Array.isArray(built.warnings) && built.warnings.length) warnings.push(...built.warnings);
@@ -1372,6 +1398,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               if (storage && typeof storage.patchSyncMapping === 'function') {
                 await storage.patchSyncMapping(id, {
                   notionSections: { conversations: { headingBlockId: recoveredId } },
+                  ...(chatUserName ? { chatUserName } : null),
                 });
               }
 
