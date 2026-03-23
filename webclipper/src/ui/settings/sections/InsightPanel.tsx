@@ -21,6 +21,7 @@ import { openConversation as openConversationInApp } from '@ui/conversations/ope
 import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';
+const INSIGHT_SECTION_TITLE = 'Insight';
 
 function formatCount(value: number): string {
   return Number(value || 0).toLocaleString();
@@ -359,7 +360,7 @@ export function InsightPanel(props: {
   return (
     <div className="tw-grid tw-gap-4">
       <header className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightHeading')}</h2>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{INSIGHT_SECTION_TITLE}</h2>
         <SelectMenu<InsightTimeRange>
           value={range}
           onChange={onChangeRange}

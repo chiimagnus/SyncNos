@@ -4,6 +4,9 @@ import { hasInsightData } from '@viewmodels/settings/insight-stats';
 import { InsightPanel } from '@ui/settings/sections/InsightPanel';
 import { cardClassName } from '@ui/settings/ui';
 
+const INSIGHT_SECTION_TITLE = 'Insight';
+const USER_NAME_SECTION_TITLE = 'User Name';
+
 function InsightStateCard(props: { title: string; detail?: string; tone?: 'default' | 'error' }) {
   const { title, detail, tone = 'default' } = props;
 
@@ -13,9 +16,9 @@ function InsightStateCard(props: { title: string; detail?: string; tone?: 'defau
         `${cardClassName} tw-flex tw-min-h-[220px] tw-flex-col tw-justify-center`,
         tone === 'error' ? 'tw-border-[var(--error)]' : '',
       ].join(' ')}
-      aria-label={t('insightHeading')}
+      aria-label={INSIGHT_SECTION_TITLE}
     >
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightHeading')}</h2>
+      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{INSIGHT_SECTION_TITLE}</h2>
       <div
         className={[
           'tw-mt-3 tw-text-lg tw-font-black',
@@ -37,11 +40,10 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void }
   const { value, onChange } = props;
   return (
     <section className={cardClassName} aria-label="User name">
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">About you</h2>
-      <div className="tw-mt-3 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">User name</div>
+      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{USER_NAME_SECTION_TITLE}</h2>
       <input
         className={[
-          'tw-mt-2 tw-w-full tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
+          'tw-mt-3 tw-w-full tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)]',
           'tw-px-3 tw-py-2 tw-text-sm tw-font-semibold tw-text-[var(--text-primary)]',
           'focus-visible:tw-outline-none focus-visible:tw-ring-2 focus-visible:tw-ring-[var(--focus)] focus-visible:tw-ring-offset-2',
           'focus-visible:tw-ring-offset-[var(--bg-card)]',
@@ -53,7 +55,7 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void }
         spellCheck={false}
       />
       <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-        Takes effect for newly created comments only.
+        Takes effect for newly created comments and chat messages only.
       </div>
     </section>
   );
