@@ -310,11 +310,11 @@ export const zh: { [K in TranslationKey]: string } = {
   insightRangeToday: '今天',
   insightRange7d: '过去7天',
   insightRange30d: '过去30天',
-  aboutYouUserNameSectionTitle: 'User Name',
-  aboutYouUserNameSectionAria: 'User name',
-  aboutYouUserNamePlaceholder: 'Used in synced comments meta, e.g. Alice | 2026-03-23 11:07',
-  aboutYouUserNameHint: 'Takes effect for newly created comments and chat messages only.',
-  aboutYouInsightSectionTitle: 'Insight',
+  aboutYouUserNameSectionTitle: '用户名',
+  aboutYouUserNameSectionAria: '用户名',
+  aboutYouUserNamePlaceholder: '用于同步评论元信息，例如：ChiiMagnus | 2026-03-23 11:07',
+  aboutYouUserNameHint: '仅对新创建的评论和聊天消息生效。',
+  aboutYouInsightSectionTitle: '统计',
 
   // DetailHeaderActionBar / DetailNavigationHeader
   detailHeaderChatWithMenuLabel: 'Chat with...',

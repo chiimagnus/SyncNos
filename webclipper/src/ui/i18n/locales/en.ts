@@ -313,7 +313,7 @@ export const en = {
   insightRange30d: 'Past 30 days',
   aboutYouUserNameSectionTitle: 'User Name',
   aboutYouUserNameSectionAria: 'User name',
-  aboutYouUserNamePlaceholder: 'Used in synced comments meta, e.g. Alice | 2026-03-23 11:07',
+  aboutYouUserNamePlaceholder: 'Used in synced comments meta, e.g. ChiiMagnus | 2026-03-23 11:07',
   aboutYouUserNameHint: 'Takes effect for newly created comments and chat messages only.',
   aboutYouInsightSectionTitle: 'Insight',
 
