@@ -3,15 +3,8 @@ import { navGroupTitleClassName, navItemClassName } from '@ui/shared/nav-styles'
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { SETTINGS_SECTION_GROUPS } from '@viewmodels/settings/types';
 
-function getSectionI18nKey(key: SettingsSectionKey): string {
-  if (key === 'aboutyou') return 'insight';
-  if (key === 'aboutme') return 'about';
-  return key;
-}
-
 function sectionLabel(key: SettingsSectionKey): string {
-  const i18nKey = getSectionI18nKey(key);
-  return t(`section_${i18nKey}_label` as Parameters<typeof t>[0]);
+  return t(`section_${key}_label` as Parameters<typeof t>[0]);
 }
 
 export function SettingsSidebarNav(props: {

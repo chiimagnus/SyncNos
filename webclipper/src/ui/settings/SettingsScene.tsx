@@ -27,20 +27,12 @@ export type SettingsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
 };
 
-function getSectionI18nKey(key: SettingsSectionKey): string {
-  if (key === 'aboutyou') return 'insight';
-  if (key === 'aboutme') return 'about';
-  return key;
-}
-
 function getSectionLabel(key: SettingsSectionKey): string {
-  const i18nKey = getSectionI18nKey(key);
-  return t(`section_${i18nKey}_label` as Parameters<typeof t>[0]);
+  return t(`section_${key}_label` as Parameters<typeof t>[0]);
 }
 
 function getSectionDescription(key: SettingsSectionKey): string {
-  const i18nKey = getSectionI18nKey(key);
-  return t(`section_${i18nKey}_desc` as Parameters<typeof t>[0]);
+  return t(`section_${key}_desc` as Parameters<typeof t>[0]);
 }
 
 export function SettingsScene(props: SettingsSceneProps) {
