@@ -7,7 +7,11 @@ import {
   listArticleCommentsByConversationId,
 } from '@services/comments/data/storage';
 import { storageGet } from '@services/shared/storage';
-import { ABOUT_YOU_USER_NAME_STORAGE_KEY, DEFAULT_ABOUT_YOU_USER_NAME, normalizeUserName } from '@services/shared/user-profile';
+import {
+  ABOUT_YOU_USER_NAME_STORAGE_KEY,
+  DEFAULT_ABOUT_YOU_USER_NAME,
+  normalizeUserName,
+} from '@services/shared/user-profile';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

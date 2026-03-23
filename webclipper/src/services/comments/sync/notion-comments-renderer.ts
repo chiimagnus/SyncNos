@@ -99,7 +99,12 @@ function bulletedItemBlock(content: string, children?: any[]) {
   } as any;
 }
 
-function commentItemBlock(input: { authorName?: unknown; commentText: unknown; createdAt: unknown; extraChildren?: any[] }) {
+function commentItemBlock(input: {
+  authorName?: unknown;
+  commentText: unknown;
+  createdAt: unknown;
+  extraChildren?: any[];
+}) {
   const metaLine = formatCommentMetaLine({ authorName: input?.authorName, createdAt: input?.createdAt });
   const commentText = safeString(input?.commentText);
   const commentParts = splitText(commentText);

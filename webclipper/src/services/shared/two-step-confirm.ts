@@ -71,4 +71,3 @@ export function createTwoStepConfirmController<T>(input?: {
 
   return { getArmedKey, isArmed, arm, clear, dispose };
 }
-

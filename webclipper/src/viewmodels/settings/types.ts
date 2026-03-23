@@ -1,11 +1,4 @@
-export type SettingsSectionKey =
-  | 'backup'
-  | 'notion'
-  | 'chat_with'
-  | 'aboutyou'
-  | 'obsidian'
-  | 'general'
-  | 'aboutme';
+export type SettingsSectionKey = 'backup' | 'notion' | 'chat_with' | 'aboutyou' | 'obsidian' | 'general' | 'aboutme';
 
 export type SettingsSectionGroup = {
   title: string;

@@ -65,9 +65,7 @@ describe('Threaded comments panel delete confirmation', () => {
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
 
-    const del = shadow.querySelector(
-      'button[data-webclipper-comment-delete-id="1"]',
-    ) as HTMLButtonElement | null;
+    const del = shadow.querySelector('button[data-webclipper-comment-delete-id="1"]') as HTMLButtonElement | null;
     expect(del).toBeTruthy();
     expect(del!.textContent).toBe('×');
 
@@ -103,9 +101,7 @@ describe('Threaded comments panel delete confirmation', () => {
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
 
-    const del = shadow.querySelector(
-      'button[data-webclipper-comment-delete-id="1"]',
-    ) as HTMLButtonElement | null;
+    const del = shadow.querySelector('button[data-webclipper-comment-delete-id="1"]') as HTMLButtonElement | null;
     expect(del).toBeTruthy();
 
     del!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -131,4 +127,3 @@ describe('Threaded comments panel delete confirmation', () => {
     mounted.cleanup();
   });
 });
-

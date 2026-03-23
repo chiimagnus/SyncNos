@@ -80,14 +80,21 @@ describe('notion article comments blocks', () => {
     expect(res.blocks[1]?.type).toBe('bulleted_list_item');
     expect(String(res.blocks[1]?.bulleted_list_item?.rich_text?.[0]?.text?.content || '')).toContain('You |');
     const children = res.blocks[1]?.bulleted_list_item?.children || [];
-    const rootText = children.find((c: any) => c && c.type === 'paragraph' && String(c?.paragraph?.rich_text?.[0]?.text?.content || '').includes('Root comment'));
+    const rootText = children.find(
+      (c: any) =>
+        c &&
+        c.type === 'paragraph' &&
+        String(c?.paragraph?.rich_text?.[0]?.text?.content || '').includes('Root comment'),
+    );
     expect(rootText).toBeTruthy();
 
     const replyBullet = res.blocks.find(
       (b: any) =>
         b &&
         b.type === 'bulleted_list_item' &&
-        String(b?.bulleted_list_item?.children?.[0]?.paragraph?.rich_text?.[0]?.text?.content || '').includes('Reply comment'),
+        String(b?.bulleted_list_item?.children?.[0]?.paragraph?.rich_text?.[0]?.text?.content || '').includes(
+          'Reply comment',
+        ),
     );
     expect(replyBullet).toBeTruthy();
   });

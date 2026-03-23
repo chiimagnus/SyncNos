@@ -842,29 +842,29 @@ export function ConversationListPane({
                   ? 'tw-max-w-[360px] tw-opacity-100 tw-translate-x-0 tw-scale-100 tw-pointer-events-auto'
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
-	            >
-	              <button
-	                id="btnDelete"
-	                type="button"
-	                ref={deleteButtonRef}
-	                className={deleteConfirming ? buttonDangerClassName() : dangerSurfaceButton}
-	                aria-pressed={deleteConfirming}
-	                title={deleteConfirming ? t('deleteConfirmBody') : t('deleteButton')}
-	                onClick={() => {
-	                  if (!hasSelection || actionBusy || syncingAny) return;
-	                  if (!deleteConfirmKey) return;
-	                  if (!deleteConfirm.isArmed(deleteConfirmKey)) {
-	                    deleteConfirm.arm(deleteConfirmKey);
-	                    return;
-	                  }
-	                  void onConfirmDelete();
-	                }}
-	                disabled={!hasSelection || actionBusy || syncingAny}
-	              >
-	                <span className="tw-max-w-[220px] tw-truncate">
-	                  {deleteConfirming ? t('deleteConfirmTitle') : t('deleteButton')}
-	                </span>
-	              </button>
+            >
+              <button
+                id="btnDelete"
+                type="button"
+                ref={deleteButtonRef}
+                className={deleteConfirming ? buttonDangerClassName() : dangerSurfaceButton}
+                aria-pressed={deleteConfirming}
+                title={deleteConfirming ? t('deleteConfirmBody') : t('deleteButton')}
+                onClick={() => {
+                  if (!hasSelection || actionBusy || syncingAny) return;
+                  if (!deleteConfirmKey) return;
+                  if (!deleteConfirm.isArmed(deleteConfirmKey)) {
+                    deleteConfirm.arm(deleteConfirmKey);
+                    return;
+                  }
+                  void onConfirmDelete();
+                }}
+                disabled={!hasSelection || actionBusy || syncingAny}
+              >
+                <span className="tw-max-w-[220px] tw-truncate">
+                  {deleteConfirming ? t('deleteConfirmTitle') : t('deleteButton')}
+                </span>
+              </button>
 
               <MenuPopover
                 open={exportOpen}
@@ -1077,7 +1077,7 @@ export function ConversationListPane({
             onJumpToConversation={onNoticeJumpToConversation}
           />
         </div>
-	      </div>
-	    </div>
-	  );
-	}
+      </div>
+    </div>
+  );
+}
