@@ -116,19 +116,6 @@ function commentItemBlock(input: {
   return bulletedItemBlock(metaLine, children);
 }
 
-function replyParagraphBlocks(reply: ArticleComment): any[] {
-  const metaLine = formatCommentMetaLine({ authorName: (reply as any)?.authorName, createdAt: reply?.createdAt });
-  const replyText = safeString(reply?.commentText);
-  const parts = splitText(replyText);
-  const lines: string[] = [];
-  if (metaLine) lines.push(metaLine);
-  if (parts.length) lines.push(parts[0]!);
-  const out: any[] = [];
-  if (lines.length) out.push(paragraphBlock(lines.join('\n')));
-  if (parts.length > 1) out.push(...paragraphBlocksFromParts(parts.slice(1)));
-  return out;
-}
-
 export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
   blocks: any[];
   threads: number;

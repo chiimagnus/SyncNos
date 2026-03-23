@@ -125,19 +125,6 @@ function buildMarkdownQuote(text: string) {
     .join('\n');
 }
 
-function buildBulletItem(text: string, indentLevel: number) {
-  const src = normalizeNewlines(text).trim();
-  if (!src) return '';
-  const indent = '  '.repeat(Math.max(0, indentLevel));
-  const lines = src.split('\n');
-  const first = lines.shift() || '';
-  const rest = lines;
-  const head = `${indent}- ${first}`.trimEnd();
-  if (!rest.length) return head;
-  const tail = rest.map((line) => `${indent}  ${line}`.trimEnd()).join('\n');
-  return `${head}\n${tail}`.trimEnd();
-}
-
 function buildCommentMetaLine(input: { authorName?: unknown; createdAt: unknown }) {
   const authorName = safeString(input?.authorName) || DEFAULT_COMMENT_AUTHOR;
   const time = formatCommentTime(input?.createdAt);

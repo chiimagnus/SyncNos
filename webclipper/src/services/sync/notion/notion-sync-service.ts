@@ -136,7 +136,7 @@ function markdownToNotionBlocks(markdown) {
   ];
 }
 
-function messagesToBlocks(messages, options) {
+function messagesToBlocks(messages, _options) {
   const out = [];
   for (const m of messages || []) {
     const role = m.role || 'assistant';
