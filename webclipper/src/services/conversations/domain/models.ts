@@ -17,6 +17,7 @@ export type ConversationMessage = {
   conversationId: number;
   messageKey: string;
   role: string;
+  authorName?: string;
   contentText?: string;
   contentMarkdown?: string;
   sequence?: number;

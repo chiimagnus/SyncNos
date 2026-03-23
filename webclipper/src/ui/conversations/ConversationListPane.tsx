@@ -966,8 +966,8 @@ export function ConversationListPane({
               <button
                 type="button"
                 id="stats"
-                aria-label={t('section_insight_label')}
-                title={t('section_insight_label')}
+                aria-label={t('section_aboutyou_label')}
+                title={t('section_aboutyou_label')}
                 onClick={() => onOpenInsightsSection()}
                 disabled={hasSelection}
                 className={[

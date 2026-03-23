@@ -359,7 +359,9 @@ export function InsightPanel(props: {
   return (
     <div className="tw-grid tw-gap-4">
       <header className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('insightHeading')}</h2>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('aboutYouInsightSectionTitle')}
+        </h2>
         <SelectMenu<InsightTimeRange>
           value={range}
           onChange={onChangeRange}

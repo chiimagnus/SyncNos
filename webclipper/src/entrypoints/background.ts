@@ -21,7 +21,7 @@ function getBackgroundInstanceId(): string {
 }
 
 async function openAboutSectionAfterInstall(): Promise<void> {
-  await openOrFocusExtensionAppTab({ route: '/settings?section=about' });
+  await openOrFocusExtensionAppTab({ route: '/settings?section=aboutme' });
 }
 
 export default defineBackground(() => {

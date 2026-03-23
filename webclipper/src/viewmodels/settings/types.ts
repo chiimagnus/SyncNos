@@ -1,4 +1,11 @@
-export type SettingsSectionKey = 'backup' | 'notion' | 'chat_with' | 'insight' | 'obsidian' | 'general' | 'about';
+export type SettingsSectionKey =
+  | 'backup'
+  | 'notion'
+  | 'chat_with'
+  | 'aboutyou'
+  | 'obsidian'
+  | 'general'
+  | 'aboutme';
 
 export type SettingsSectionGroup = {
   title: string;
@@ -16,7 +23,7 @@ export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   },
   {
     title: 'About',
-    sections: [{ key: 'insight' }, { key: 'about' }],
+    sections: [{ key: 'aboutyou' }, { key: 'aboutme' }],
   },
 ];
 
@@ -32,12 +39,27 @@ export function isSettingsSectionKey(value: string): value is SettingsSectionKey
   return SETTINGS_SECTIONS.some((section) => section.key === value);
 }
 
+export function coerceSettingsSectionKey(value: string): SettingsSectionKey | null {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!raw) return null;
+  if (isSettingsSectionKey(raw)) return raw;
+
+  // Backward compat for older deep links/stored values.
+  if (raw === 'insight') return 'aboutyou';
+  if (raw === 'about') return 'aboutme';
+
+  return null;
+}
+
 export function readStoredSettingsSection(): SettingsSectionKey {
   try {
     const value = String(globalThis.localStorage?.getItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY) || '')
       .trim()
       .toLowerCase();
-    if (isSettingsSectionKey(value)) return value;
+    const coerced = coerceSettingsSectionKey(value);
+    if (coerced) return coerced;
   } catch (_e) {
     // ignore
   }

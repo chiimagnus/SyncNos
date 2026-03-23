@@ -87,8 +87,9 @@ function buildMessageChunk(message: any) {
   const m = message || {};
   const seq = Number.isFinite(Number(m.sequence)) ? Number(m.sequence) : 0;
   const role = normalizeRole(m.role);
+  const roleLabel = role === 'user' ? safeString(m.authorName) || DEFAULT_COMMENT_AUTHOR : role;
   const body = safeString(m.contentMarkdown) || safeString(m.contentText) || '';
-  const header = `## ${seq} ${role}`.trim();
+  const header = `## ${seq} ${roleLabel}`.trim();
   return `${header}\n\n${body}\n\n`;
 }
 
@@ -137,10 +138,11 @@ function buildBulletItem(text: string, indentLevel: number) {
   return `${head}\n${tail}`.trimEnd();
 }
 
-function buildCommentMetaLine(createdAt: unknown) {
-  const time = formatCommentTime(createdAt);
-  if (!time) return DEFAULT_COMMENT_AUTHOR;
-  return `${DEFAULT_COMMENT_AUTHOR} | ${time}`;
+function buildCommentMetaLine(input: { authorName?: unknown; createdAt: unknown }) {
+  const authorName = safeString(input?.authorName) || DEFAULT_COMMENT_AUTHOR;
+  const time = formatCommentTime(input?.createdAt);
+  if (!time) return authorName;
+  return `${authorName} | ${time}`;
 }
 
 function buildListItemHead(metaLine: string, indentLevel: number) {
@@ -181,7 +183,7 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
 
   function renderReplyParagraphs(comment: ArticleComment): string[] {
     const out: string[] = [];
-    const metaLine = buildCommentMetaLine(comment?.createdAt);
+    const metaLine = buildCommentMetaLine({ authorName: (comment as any)?.authorName, createdAt: comment?.createdAt });
     const text = safeString(comment?.commentText);
     if (!metaLine || !text) return out;
     out.push(...buildListItemParagraph(`${metaLine}\n${text}`, 0));
@@ -204,7 +206,10 @@ function buildObsidianCommentsMarkdown(comments: ArticleComment[]) {
     const text = safeString(comment?.commentText);
     const hasText = !!text;
     if (hasText) {
-      const head = buildListItemHead(buildCommentMetaLine(comment?.createdAt), depth);
+      const head = buildListItemHead(
+        buildCommentMetaLine({ authorName: (comment as any)?.authorName, createdAt: comment?.createdAt }),
+        depth,
+      );
       if (head) lines.push(head);
       lines.push(...buildListItemParagraph(text, depth));
     }

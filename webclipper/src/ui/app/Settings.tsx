@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import {
-  isSettingsSectionKey,
+  coerceSettingsSectionKey,
   readStoredSettingsSection,
   type SettingsSectionKey,
   writeStoredSettingsSection,
@@ -30,7 +30,7 @@ export default function Settings() {
       return { section: 'notion', focus: rawFocus || 'notion-ai', explicit: true };
     }
 
-    const section: SettingsSectionKey = isSettingsSectionKey(rawSection) ? rawSection : readStoredSettingsSection();
+    const section: SettingsSectionKey = coerceSettingsSectionKey(rawSection) ?? readStoredSettingsSection();
     const focus = rawFocus;
     return { section, focus, explicit };
   }, [routerLocation.search]);

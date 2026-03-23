@@ -136,11 +136,12 @@ function markdownToNotionBlocks(markdown) {
   ];
 }
 
-function messagesToBlocks(messages, _options) {
+function messagesToBlocks(messages, options) {
   const out = [];
   for (const m of messages || []) {
     const role = m.role || 'assistant';
-    const label = role === 'user' ? 'User' : role === 'assistant' ? 'Assistant' : role;
+    const authorName = m && m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : 'You';
+    const label = role === 'user' ? authorName : role === 'assistant' ? 'Assistant' : role;
     out.push(headingBlock(label, role === 'user' ? 'green' : 'blue_background'));
     const markdown = m && m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
     if (markdown) {

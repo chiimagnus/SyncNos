@@ -281,7 +281,9 @@ function countInlineImageOmittedPlaceholders(blocks) {
 
 async function buildBlocksForSync({ notionSyncService, accessToken, source, messagesList }) {
   const warnings = [];
-  let blocks = notionSyncService.messagesToBlocks(messagesList, { source });
+  let blocks = notionSyncService.messagesToBlocks(messagesList, {
+    source,
+  });
   blocks = await maybeUpgradeBlocksWithNotionFileUploads({ notionSyncService, accessToken, blocks, warnings });
   return { blocks, warnings };
 }

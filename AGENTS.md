@@ -5,8 +5,6 @@ SyncNos 仓库当前包含两条产品线：
 - `macOS/`：macOS App（源代码位于 `macOS/SyncNos/`），将 Apple Books、GoodLinks、微信读书、得到和微信聊天 OCR 中的高亮笔记同步到 Notion。
 - `webclipper/`：浏览器扩展，抓取 AI 对话与网页文章，支持本地保存、导出、备份，以及同步到 Notion / Obsidian。
 
-需要注意，当我没有明确说明的情况下，不要查看不要编辑国际化字段
-
 ## 项目结构
 
 ```

@@ -99,8 +99,8 @@ function bulletedItemBlock(content: string, children?: any[]) {
   } as any;
 }
 
-function commentItemBlock(input: { commentText: unknown; createdAt: unknown; extraChildren?: any[] }) {
-  const metaLine = formatCommentMetaLine({ createdAt: input?.createdAt });
+function commentItemBlock(input: { authorName?: unknown; commentText: unknown; createdAt: unknown; extraChildren?: any[] }) {
+  const metaLine = formatCommentMetaLine({ authorName: input?.authorName, createdAt: input?.createdAt });
   const commentText = safeString(input?.commentText);
   const commentParts = splitText(commentText);
 
@@ -112,7 +112,7 @@ function commentItemBlock(input: { commentText: unknown; createdAt: unknown; ext
 }
 
 function replyParagraphBlocks(reply: ArticleComment): any[] {
-  const metaLine = formatCommentMetaLine({ createdAt: reply?.createdAt });
+  const metaLine = formatCommentMetaLine({ authorName: (reply as any)?.authorName, createdAt: reply?.createdAt });
   const replyText = safeString(reply?.commentText);
   const parts = splitText(replyText);
   const lines: string[] = [];
@@ -171,10 +171,19 @@ export function buildNotionCommentsBlocks(comments: ArticleComment[]): {
 
     if (rootText) {
       items += 1;
-      threadBlocks.push(commentItemBlock({ commentText: rootText, createdAt: root?.createdAt, extraChildren: replyBlocks }));
+      threadBlocks.push(
+        commentItemBlock({
+          authorName: (root as any)?.authorName,
+          commentText: rootText,
+          createdAt: root?.createdAt,
+          extraChildren: replyBlocks,
+        } as any),
+      );
     } else if (replyBlocks.length) {
       // No root comment text: keep replies visible inside a meta bullet.
-      threadBlocks.push(bulletedItemBlock(formatCommentMetaLine({ createdAt: root?.createdAt }), replyBlocks));
+      threadBlocks.push(
+        bulletedItemBlock(formatCommentMetaLine({ authorName: (root as any)?.authorName, createdAt: root?.createdAt }), replyBlocks),
+      );
     }
 
     if (!threadBlocks.length) continue;

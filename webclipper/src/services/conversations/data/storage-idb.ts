@@ -331,10 +331,12 @@ export async function syncConversationMessages(
 
       const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
       const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+      const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
       const baseRecord = {
         conversationId,
         messageKey: key,
         role: m.role || 'assistant',
+        authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
         contentText: m.contentText || '',
         contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || '' : ''),
         sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
@@ -373,10 +375,12 @@ export async function syncConversationMessages(
 
     const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
     const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
+    const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
     const baseRecord = {
       conversationId,
       messageKey: m.messageKey,
       role: m.role || 'assistant',
+      authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
       contentText: m.contentText || '',
       contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || '' : ''),
       sequence: Number.isFinite(m.sequence) ? m.sequence : 0,

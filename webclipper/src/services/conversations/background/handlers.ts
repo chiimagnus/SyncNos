@@ -9,6 +9,11 @@ import {
 import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
+import {
+  ABOUT_YOU_USER_NAME_STORAGE_KEY,
+  DEFAULT_ABOUT_YOU_USER_NAME,
+  normalizeUserName,
+} from '@services/shared/user-profile';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -61,6 +66,22 @@ export function registerConversationHandlers(router: AnyRouter) {
     const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
 
     let messages = Array.isArray(msg.messages) ? msg.messages : [];
+    try {
+      const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+      const aboutYouUserName =
+        normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+
+      messages = messages.map((m: any) => {
+        if (!m || typeof m !== 'object') return m;
+        const role = String((m as any).role || '').trim().toLowerCase();
+        if (role !== 'user') return m;
+        const currentAuthor = String((m as any).authorName || '').trim();
+        if (currentAuthor) return m;
+        return { ...(m as any), authorName: aboutYouUserName };
+      });
+    } catch (_e) {
+      // ignore: authorName is optional and will fallback during rendering
+    }
     try {
       const sourceType =
         String(msg?.conversationSourceType || '')

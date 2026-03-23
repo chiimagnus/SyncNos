@@ -45,6 +45,7 @@ import {
 } from '@viewmodels/settings/utils';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { t } from '@i18n';
+import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
@@ -165,6 +166,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [hasLoadedInsight, setHasLoadedInsight] = useState(false);
   const [insightRange, setInsightRange] = useState<InsightTimeRange>('7d');
   const insightSourceDataRef = useRef<InsightStatsSourceData | null>(null);
+  const [aboutYouUserName, setAboutYouUserName] = useState<string>('');
+  const aboutYouUserNameSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
@@ -216,6 +219,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'ai_chat_auto_save_enabled',
           'ai_chat_cache_images_enabled',
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
+          ABOUT_YOU_USER_NAME_STORAGE_KEY,
         ]),
         send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
       ]);
@@ -240,6 +244,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
+      setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
 
       const obsidianSettings = unwrap(obsidianRes);
       setObsidianApiBaseUrl(String(obsidianSettings?.apiBaseUrl || ''));
@@ -594,7 +599,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate]);
 
   useEffect(() => {
-    if (activeSection !== 'insight') return;
+    if (activeSection !== 'aboutyou') return;
     if (hasLoadedInsight || insightLoading) return;
 
     setInsightLoading(true);
@@ -616,7 +621,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [activeSection, hasLoadedInsight, insightLoading, insightRange]);
 
   useEffect(() => {
-    if (activeSection !== 'insight') return;
+    if (activeSection !== 'aboutyou') return;
     const data = insightSourceDataRef.current;
     if (!data) return;
 
@@ -755,6 +760,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     notionAiRef.current?.scrollIntoView({ block: 'start' });
   }, [activeSection, focusKey]);
 
+  const onChangeAboutYouUserName = useCallback((next: string) => {
+    const value = normalizeUserName(next);
+    setAboutYouUserName(value);
+    if (aboutYouUserNameSaveTimerRef.current) clearTimeout(aboutYouUserNameSaveTimerRef.current);
+    aboutYouUserNameSaveTimerRef.current = setTimeout(() => {
+      aboutYouUserNameSaveTimerRef.current = null;
+      void storageSet({ [ABOUT_YOU_USER_NAME_STORAGE_KEY]: value });
+    }, 200);
+  }, []);
+
   return {
     busy,
     error,
@@ -821,6 +836,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     hasLoadedInsight,
     insightRange,
     setInsightRange,
+    aboutYouUserName,
+    onChangeAboutYouUserName,
 
     chatWithPromptTemplate,
     setChatWithPromptTemplate,

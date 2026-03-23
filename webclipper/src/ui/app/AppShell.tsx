@@ -243,7 +243,7 @@ export default function AppShell() {
                     element={
                       <ConversationsScene
                         onPopupHeaderStateChange={setNarrowHeaderState}
-                        onOpenInsightsSection={() => navigate('/settings?section=insight')}
+                        onOpenInsightsSection={() => navigate('/settings?section=aboutyou')}
                       />
                     }
                   />

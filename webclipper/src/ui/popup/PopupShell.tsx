@@ -125,7 +125,7 @@ function PopupShellFrame() {
   };
 
   const onOpenInsightSettings = async () => {
-    await openOrFocusExtensionAppTab({ route: '/settings?section=insight' });
+    await openOrFocusExtensionAppTab({ route: '/settings?section=aboutyou' });
     window.close();
   };
 

@@ -41,11 +41,11 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   const openInsightSettings = () => {
     if (settingsOpen) {
-      navigate('/settings?section=insight', { replace: true, state: routerLocation.state });
+      navigate('/settings?section=aboutyou', { replace: true, state: routerLocation.state });
       return;
     }
 
-    navigate('/settings?section=insight', {
+    navigate('/settings?section=aboutyou', {
       state: {
         backgroundLocation: {
           pathname: routerLocation.pathname,

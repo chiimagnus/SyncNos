@@ -124,9 +124,11 @@ export function SettingsScene(props: SettingsSceneProps) {
     hasLoadedInsight,
     insightRange,
     setInsightRange,
+    aboutYouUserName,
+    onChangeAboutYouUserName,
   } = useSettingsSceneController({ activeSection, focusKey });
 
-  const detailMaxWidthClassName = activeSection === 'insight' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
+  const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
 
   const renderDetailContent = () => (
     <section className={`route-scroll tw-mx-auto tw-grid tw-w-full ${detailMaxWidthClassName} tw-gap-4 tw-pr-1`}>
@@ -247,7 +249,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'insight' ? (
+      {activeSection === 'aboutyou' ? (
         <InsightSection
           loading={insightLoading}
           error={insightError}
@@ -255,6 +257,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           hasLoaded={hasLoadedInsight}
           range={insightRange}
           onChangeRange={setInsightRange}
+          userName={aboutYouUserName}
+          onChangeUserName={onChangeAboutYouUserName}
         />
       ) : null}
 
@@ -276,7 +280,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'about' ? <AboutSection /> : null}
+      {activeSection === 'aboutme' ? <AboutSection /> : null}
     </section>
   );
 
