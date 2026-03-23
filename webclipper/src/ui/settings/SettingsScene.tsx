@@ -27,12 +27,20 @@ export type SettingsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
 };
 
+function getSectionI18nKey(key: SettingsSectionKey): string {
+  if (key === 'aboutyou') return 'insight';
+  if (key === 'aboutme') return 'about';
+  return key;
+}
+
 function getSectionLabel(key: SettingsSectionKey): string {
-  return t(`section_${key}_label` as Parameters<typeof t>[0]);
+  const i18nKey = getSectionI18nKey(key);
+  return t(`section_${i18nKey}_label` as Parameters<typeof t>[0]);
 }
 
 function getSectionDescription(key: SettingsSectionKey): string {
-  return t(`section_${key}_desc` as Parameters<typeof t>[0]);
+  const i18nKey = getSectionI18nKey(key);
+  return t(`section_${i18nKey}_desc` as Parameters<typeof t>[0]);
 }
 
 export function SettingsScene(props: SettingsSceneProps) {
@@ -128,7 +136,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onChangeAboutYouUserName,
   } = useSettingsSceneController({ activeSection, focusKey });
 
-  const detailMaxWidthClassName = activeSection === 'insight' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
+  const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
 
   const renderDetailContent = () => (
     <section className={`route-scroll tw-mx-auto tw-grid tw-w-full ${detailMaxWidthClassName} tw-gap-4 tw-pr-1`}>
@@ -249,7 +257,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'insight' ? (
+      {activeSection === 'aboutyou' ? (
         <InsightSection
           loading={insightLoading}
           error={insightError}
@@ -280,7 +288,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         />
       ) : null}
 
-      {activeSection === 'about' ? <AboutSection /> : null}
+      {activeSection === 'aboutme' ? <AboutSection /> : null}
     </section>
   );
 

@@ -599,7 +599,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate]);
 
   useEffect(() => {
-    if (activeSection !== 'insight') return;
+    if (activeSection !== 'aboutyou') return;
     if (hasLoadedInsight || insightLoading) return;
 
     setInsightLoading(true);
@@ -621,7 +621,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [activeSection, hasLoadedInsight, insightLoading, insightRange]);
 
   useEffect(() => {
-    if (activeSection !== 'insight') return;
+    if (activeSection !== 'aboutyou') return;
     const data = insightSourceDataRef.current;
     if (!data) return;
 
