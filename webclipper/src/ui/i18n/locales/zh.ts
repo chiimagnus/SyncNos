@@ -167,7 +167,6 @@ export const zh: { [K in TranslationKey]: string } = {
   articleCommentsEmpty: '暂无评论。',
   openCommentsSidebar: '评论',
   closeCommentsSidebar: '收起评论侧边栏',
-  deleteCommentConfirm: '确认删除这条评论？此操作不可撤销。',
 
   // ConversationSyncFeedbackNotice
   phaseRunning: '同步中',

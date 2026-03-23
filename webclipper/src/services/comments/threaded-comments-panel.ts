@@ -537,16 +537,6 @@ export function mountThreadedCommentsPanel(
     },
   };
 
-  const safeT = (key: any, fallback: string) => {
-    try {
-      const value = t(key as any);
-      if (typeof value === 'string' && value.trim()) return value;
-    } catch (_e) {
-      // ignore
-    }
-    return fallback;
-  };
-
   function getDeleteButtons() {
     try {
       return Array.from(
@@ -565,19 +555,16 @@ export function mountThreadedCommentsPanel(
       button.classList.remove('webclipper-btn--danger-tint');
       button.classList.remove('webclipper-btn--icon');
       button.classList.add('webclipper-btn--danger');
-      button.textContent = safeT('deleteButton', 'Delete');
-      button.setAttribute(
-        'aria-label',
-        safeT('deleteCommentConfirm', safeT('deleteButton', 'Delete')),
-      );
-      button.title = safeT('deleteCommentConfirm', '');
+      button.textContent = t('deleteButton');
+      button.setAttribute('aria-label', t('deleteButton'));
+      button.title = '';
     } else {
       button.removeAttribute('data-confirm');
       button.classList.remove('webclipper-btn--danger');
       button.classList.add('webclipper-btn--danger-tint');
       button.classList.add('webclipper-btn--icon');
       button.textContent = '×';
-      button.setAttribute('aria-label', safeT('deleteButton', 'Delete'));
+      button.setAttribute('aria-label', t('deleteButton'));
       button.title = '';
     }
   }
@@ -903,7 +890,7 @@ export function mountThreadedCommentsPanel(
           'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
         del.type = 'button';
         del.setAttribute('data-webclipper-comment-delete-id', String(Number(root?.id) || ''));
-        del.setAttribute('aria-label', safeT('deleteButton', 'Delete'));
+        del.setAttribute('aria-label', t('deleteButton'));
         del.textContent = '×';
         del.addEventListener('click', async () => {
           if (state.busy) return;
@@ -975,7 +962,7 @@ export function mountThreadedCommentsPanel(
               'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
             replyDel.type = 'button';
             replyDel.setAttribute('data-webclipper-comment-delete-id', String(Number(reply?.id) || ''));
-            replyDel.setAttribute('aria-label', safeT('deleteButton', 'Delete'));
+            replyDel.setAttribute('aria-label', t('deleteButton'));
             replyDel.textContent = '×';
             replyDel.addEventListener('click', async () => {
               if (state.busy) return;
