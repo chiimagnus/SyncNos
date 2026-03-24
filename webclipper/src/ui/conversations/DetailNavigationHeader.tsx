@@ -97,6 +97,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
                               error instanceof Error && error.message
                                 ? error.message
                                 : String(error || t('actionFailedFallback'));
+                            if (message === 'SYNCNOS_URL_EDIT_CANCELLED') return;
                             if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
                             else console.error(message);
                           }

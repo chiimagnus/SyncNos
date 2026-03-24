@@ -93,6 +93,8 @@ function canonicalizeHttpUrl(raw: unknown): string {
   }
 }
 
+const URL_EDIT_CANCELLED_ERROR = 'SYNCNOS_URL_EDIT_CANCELLED';
+
 async function materializeSyncnosAssetsForExport(input: {
   markdown: string;
   markdownBasename: string;
@@ -351,6 +353,30 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         .toLowerCase();
       const isArticle = sourceType === 'article';
 
+      if (isArticle) {
+        const conflict = (Array.isArray(items) ? items : []).find((item) => {
+          if (!item) return false;
+          const id = Number((item as any).id);
+          if (!Number.isFinite(id) || id <= 0) return false;
+          if (id === Number((convo as any).id)) return false;
+          const itemSourceType = String((item as any).sourceType || '')
+            .trim()
+            .toLowerCase();
+          if (itemSourceType !== 'article') return false;
+          const itemCanonical = canonicalizeHttpUrl((item as any).url);
+          if (!itemCanonical) return false;
+          return itemCanonical === nextCanonical;
+        });
+
+        if (conflict) {
+          const confirmed =
+            typeof globalThis.window?.confirm === 'function'
+              ? globalThis.window.confirm('这个 URL 已存在于另一条文章记录中。继续将会合并评论，是否继续？')
+              : true;
+          if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
+        }
+      }
+
       const payload: any = {
         source: (convo as any)?.source,
         conversationKey: (convo as any)?.conversationKey,
@@ -368,7 +394,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         });
       }
     },
-    [selectedConversation],
+    [items, selectedConversation],
   );
 
   useEffect(() => {
