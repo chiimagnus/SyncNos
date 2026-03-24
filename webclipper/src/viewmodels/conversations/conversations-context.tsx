@@ -6,8 +6,9 @@ import { formatConversationMarkdown } from '@services/conversations/domain/markd
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
-import { deleteConversations, getConversationDetail, listConversations } from '@services/conversations/client/repo';
+import { deleteConversations, getConversationDetail, listConversations, upsertConversation } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
+import { migrateArticleCommentsCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
@@ -76,6 +77,20 @@ function inferImageExtFromAsset(asset: { contentType?: string; url?: string }): 
   }
 
   return 'png';
+}
+
+function canonicalizeHttpUrl(raw: unknown): string {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = String(url.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
 }
 
 async function materializeSyncnosAssetsForExport(input: {
@@ -212,6 +227,8 @@ type ConversationsAppState = {
   syncSelectedObsidian: () => Promise<void>;
   clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
+
+  updateSelectedConversationUrl: (nextUrl: string) => Promise<void>;
 };
 
 const ConversationsContext = createContext<ConversationsAppState | null>(null);
@@ -319,6 +336,40 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       setLoadingList(false);
     }
   }, []);
+
+  const updateSelectedConversationUrl = useCallback(
+    async (nextUrl: string) => {
+      const convo = selectedConversation;
+      if (!convo) throw new Error('No conversation selected');
+
+      const nextCanonical = canonicalizeHttpUrl(nextUrl);
+      if (!nextCanonical) throw new Error('URL must be an http(s) page');
+
+      const currentCanonical = canonicalizeHttpUrl((convo as any)?.url);
+      const sourceType = String((convo as any)?.sourceType || '')
+        .trim()
+        .toLowerCase();
+      const isArticle = sourceType === 'article';
+
+      const payload: any = {
+        source: (convo as any)?.source,
+        conversationKey: (convo as any)?.conversationKey,
+        sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
+        url: nextCanonical,
+        lastCapturedAt: (convo as any)?.lastCapturedAt,
+      };
+      await upsertConversation(payload);
+
+      if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
+        await migrateArticleCommentsCanonicalUrl({
+          fromCanonicalUrl: currentCanonical,
+          toCanonicalUrl: nextCanonical,
+          conversationId: Number((convo as any)?.id) || null,
+        });
+      }
+    },
+    [selectedConversation],
+  );
 
   useEffect(() => {
     void refreshList();
@@ -669,6 +720,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     syncSelectedObsidian,
     clearSyncFeedback,
     deleteSelected,
+    updateSelectedConversationUrl,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;
