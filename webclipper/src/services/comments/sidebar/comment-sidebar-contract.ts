@@ -13,7 +13,7 @@ export type CommentSidebarItem = {
 };
 
 export type CommentSidebarHandlers = {
-  onSave?: (text: string) => void | Promise<void>;
+  onSave?: (text: string) => void | boolean | Promise<void | boolean>;
   onReply?: (parentId: number, text: string) => void | Promise<void>;
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;

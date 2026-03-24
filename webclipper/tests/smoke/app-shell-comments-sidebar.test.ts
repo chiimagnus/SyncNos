@@ -105,19 +105,24 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
   ArticleCommentsSection: ({
     onRequestClose,
+    sidebarSession,
     quoteText,
     focusComposerSignal,
   }: {
     onRequestClose: () => void;
+    sidebarSession?: { getSnapshot?: () => { quoteText?: string; focusComposerSignal?: number } };
     quoteText?: string;
     focusComposerSignal?: number;
-  }) =>
-    createElement(
+  }) => {
+    const snapshot = sidebarSession?.getSnapshot?.() ?? null;
+    const resolvedQuoteText = snapshot ? String(snapshot.quoteText || '') : quoteText || '';
+    const resolvedFocusSignal = snapshot ? Number(snapshot.focusComposerSignal || 0) : Number(focusComposerSignal || 0);
+    return createElement(
       'aside',
       {
         'aria-label': 'Comments sidebar',
-        'data-quote-text': quoteText || '',
-        'data-focus-signal': String(focusComposerSignal || 0),
+        'data-quote-text': resolvedQuoteText,
+        'data-focus-signal': String(resolvedFocusSignal),
       },
       createElement(
         'button',
@@ -125,7 +130,8 @@ vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
         'close-sidebar',
       ),
       createElement('div', null, 'comments-sidebar'),
-    ),
+    );
+  },
 }));
 
 import AppShell from '../../src/ui/app/AppShell';

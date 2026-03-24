@@ -106,7 +106,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
   function bindPanelHandlers() {
     sidebarSession.setHandlers({
       onSave: async (text) => {
-        if (!rt?.send) return;
+        if (!rt?.send) return false;
         let canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
         if (!canonicalUrl) return;
         const quoteText = sidebarSession.getSnapshot().quoteText;
@@ -130,10 +130,9 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
           quoteText,
           commentText: text,
         } as any);
-        if (res?.ok) {
-          await refreshCommentsList();
-          sidebarSession.setQuoteText('');
-        }
+        if (!res?.ok) return false;
+        await refreshCommentsList();
+        return true;
       },
       onReply: async (parentId, text) => {
         if (!rt?.send) return;

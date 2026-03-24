@@ -12,6 +12,7 @@ import {
   type ThreadedCommentsPanelApi,
   type ThreadedCommentItem,
 } from '@services/comments/threaded-comments-panel';
+import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -28,20 +29,20 @@ function normalizeHttpUrl(raw: unknown): string {
 }
 
 export function ArticleCommentsSection({
+  sidebarSession,
   conversationId,
   canonicalUrl,
   quoteText,
   focusComposerSignal,
-  onClearQuoteText,
   containerClassName,
   variant,
   onRequestClose,
 }: {
+  sidebarSession?: CommentSidebarSession;
   conversationId: number;
   canonicalUrl: string;
   quoteText?: string;
   focusComposerSignal?: number;
-  onClearQuoteText?: () => void;
   containerClassName?: string;
   variant?: 'embedded' | 'sidebar';
   onRequestClose?: () => void;
@@ -150,136 +151,131 @@ export function ArticleCommentsSection({
     if (apiRef.current) return;
     const host = hostRef.current;
 
-    const mounted = mountThreadedCommentsPanel(host, {
-      overlay: false,
-      variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
-      showHeader: true,
-      showCollapseButton: canClose,
-      surfaceBg: 'var(--bg-primary)',
-    });
-    apiRef.current = mounted.api;
-    mounted.api.setQuoteText(String(quoteTextRef.current || ''));
-    mounted.api.setHandlers({
-      onClose: () => {
-        onRequestCloseRef.current?.();
-      },
-      onSave: async (text) => {
-        if (!normalizedUrl) return;
-        const value = String(text || '').trim();
-        if (!value) return;
-        let created = false;
-        try {
-          mounted.api.setBusy(true);
-          await addArticleComment({
-            canonicalUrl: normalizedUrl,
-            conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
-            parentId: null,
-            quoteText: String(quoteTextRef.current || ''),
-            commentText: value,
-          } as any);
-          created = true;
-          await refresh();
-        } finally {
-          mounted.api.setBusy(false);
-        }
-        if (created) {
-          quoteTextRef.current = '';
-          mounted.api.setQuoteText('');
-          onClearQuoteText?.();
-        }
-      },
-      onReply: async (parentId, text) => {
-        if (!normalizedUrl) return;
-        const value = String(text || '').trim();
-        if (!value) return;
-        try {
-          mounted.api.setBusy(true);
-          await addArticleComment({
-            canonicalUrl: normalizedUrl,
-            conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
-            parentId: Number(parentId),
-            quoteText: '',
-            commentText: value,
-          } as any);
-          await refresh();
-        } finally {
-          mounted.api.setBusy(false);
-        }
-      },
-      onDelete: async (id) => {
-        const commentId = Number(id);
-        if (!Number.isFinite(commentId) || commentId <= 0) return;
-        try {
-          mounted.api.setBusy(true);
-          await deleteArticleCommentById(commentId);
-          await refresh();
-        } finally {
-          mounted.api.setBusy(false);
-        }
-      },
-    });
+	    const mounted = mountThreadedCommentsPanel(host, {
+	      overlay: false,
+	      variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
+	      showHeader: true,
+	      showCollapseButton: canClose,
+	      surfaceBg: 'var(--bg-primary)',
+	    });
+	    apiRef.current = mounted.api;
+	    const handlers = {
+	      onClose: () => {
+	        onRequestCloseRef.current?.();
+	      },
+	      onSave: async (text: string) => {
+	        if (!normalizedUrl) return false;
+	        const value = String(text || '').trim();
+	        if (!value) return false;
+	        const quoteValue = sidebarSession ? sidebarSession.getSnapshot().quoteText : String(quoteTextRef.current || '');
+	        try {
+	          mounted.api.setBusy(true);
+	          await addArticleComment({
+	            canonicalUrl: normalizedUrl,
+	            conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
+	            parentId: null,
+	            quoteText: quoteValue,
+	            commentText: value,
+	          } as any);
+	          await refresh();
+	          if (!sidebarSession) {
+	            quoteTextRef.current = '';
+	            mounted.api.setQuoteText('');
+	          }
+	          return true;
+	        } finally {
+	          mounted.api.setBusy(false);
+	        }
+	      },
+	      onReply: async (parentId: number, text: string) => {
+	        if (!normalizedUrl) return;
+	        const value = String(text || '').trim();
+	        if (!value) return;
+	        try {
+	          mounted.api.setBusy(true);
+	          await addArticleComment({
+	            canonicalUrl: normalizedUrl,
+	            conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
+	            parentId: Number(parentId),
+	            quoteText: '',
+	            commentText: value,
+	          } as any);
+	          await refresh();
+	        } finally {
+	          mounted.api.setBusy(false);
+	        }
+	      },
+	      onDelete: async (id: number) => {
+	        const commentId = Number(id);
+	        if (!Number.isFinite(commentId) || commentId <= 0) return;
+	        try {
+	          mounted.api.setBusy(true);
+	          await deleteArticleCommentById(commentId);
+	          await refresh();
+	        } finally {
+	          mounted.api.setBusy(false);
+	        }
+	      },
+	    };
 
-    mounted.api.setComments(
-      (Array.isArray(items) ? items : []).map(
-        (c: any): ThreadedCommentItem => ({
-          id: Number(c?.id),
-          parentId: c?.parentId != null ? Number(c.parentId) : null,
-          authorName: c?.authorName != null ? String(c.authorName) : null,
-          createdAt: Number(c?.createdAt) || null,
-          quoteText: String(c?.quoteText || ''),
-          commentText: String(c?.commentText || ''),
-        }),
-      ),
-    );
-    mounted.api.setBusy(loading);
+	    if (sidebarSession) {
+	      sidebarSession.attachPanel(mounted.api as any);
+	      sidebarSession.setHandlers(handlers as any);
+	    } else {
+	      mounted.api.setQuoteText(String(quoteTextRef.current || ''));
+	      mounted.api.setHandlers(handlers as any);
+	    }
 
-    if (pendingFocusRef.current || focusSignal > 0) {
-      pendingFocusRef.current = false;
-      mounted.api.open({ focusComposer: true });
-    }
+	    return () => {
+	      sidebarSession?.detachPanel();
+	      mounted.cleanup();
+	      apiRef.current = null;
+	    };
+	    // eslint-disable-next-line react-hooks/exhaustive-deps
+	  }, [conversationId, normalizedUrl, canClose, sidebarSession]);
 
-    return () => {
-      mounted.cleanup();
-      apiRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, normalizedUrl, canClose]);
+	  useEffect(() => {
+	    if (sidebarSession) return;
+	    const api = apiRef.current;
+	    if (!api) return;
+	    api.setQuoteText(String(quoteTextRef.current || ''));
+	  }, [quoteText, sidebarSession]);
 
-  useEffect(() => {
-    const api = apiRef.current;
-    if (!api) return;
-    api.setQuoteText(String(quoteTextRef.current || ''));
-  }, [quoteText]);
-
-  useEffect(() => {
-    const api = apiRef.current;
-    if (!focusSignal) return;
-    if (lastFocusSignalRef.current === focusSignal) return;
-    lastFocusSignalRef.current = focusSignal;
+	  useEffect(() => {
+	    if (sidebarSession) return;
+	    const api = apiRef.current;
+	    if (!focusSignal) return;
+	    if (lastFocusSignalRef.current === focusSignal) return;
+	    lastFocusSignalRef.current = focusSignal;
     if (!api) {
       pendingFocusRef.current = true;
       return;
     }
-    api.open({ focusComposer: true });
-  }, [focusSignal]);
+	    api.open({ focusComposer: true });
+	  }, [focusSignal, sidebarSession]);
 
-  useEffect(() => {
-    const api = apiRef.current;
-    if (!api) return;
-    api.setComments(
-      (Array.isArray(items) ? items : []).map(
-        (c: any): ThreadedCommentItem => ({
-          id: Number(c?.id),
-          parentId: c?.parentId != null ? Number(c.parentId) : null,
-          authorName: c?.authorName != null ? String(c.authorName) : null,
-          createdAt: Number(c?.createdAt) || null,
-          quoteText: String(c?.quoteText || ''),
-          commentText: String(c?.commentText || ''),
-        }),
-      ),
-    );
-    api.setBusy(loading);
-  }, [items, loading]);
+	  useEffect(() => {
+	    const target = sidebarSession || apiRef.current;
+	    if (!target) return;
+	    target.setComments(
+	      (Array.isArray(items) ? items : []).map(
+	        (c: any): ThreadedCommentItem => ({
+	          id: Number(c?.id),
+	          parentId: c?.parentId != null ? Number(c.parentId) : null,
+	          authorName: c?.authorName != null ? String(c.authorName) : null,
+	          createdAt: Number(c?.createdAt) || null,
+	          quoteText: String(c?.quoteText || ''),
+	          commentText: String(c?.commentText || ''),
+	        }),
+	      ),
+	    );
+	  }, [items, sidebarSession]);
+
+	  useEffect(() => {
+	    const target = sidebarSession || apiRef.current;
+	    if (!target) return;
+	    target.setBusy(loading);
+	  }, [loading, sidebarSession]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 

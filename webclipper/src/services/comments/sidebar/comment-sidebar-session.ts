@@ -24,6 +24,12 @@ function hasAnyHandlers(handlers: CommentSidebarHandlers): boolean {
   return !!handlers && Object.keys(handlers).length > 0;
 }
 
+function isOkResult(result: unknown): boolean {
+  if (result === true) return true;
+  if (!result || typeof result !== 'object') return false;
+  return (result as any).ok === true;
+}
+
 export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelApi | null): CommentSidebarSession {
   let panel: CommentSidebarPanelApi | null = initialPanel ?? null;
   let busy = false;
@@ -178,7 +184,16 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   }
 
   function setHandlers(nextHandlers: CommentSidebarHandlers) {
-    handlers = nextHandlers || {};
+    const base = nextHandlers || {};
+    const wrapped: CommentSidebarHandlers = { ...base };
+    if (typeof base.onSave === 'function') {
+      wrapped.onSave = async (text) => {
+        const res = await base.onSave?.(text);
+        if (isOkResult(res)) setQuoteText('');
+        return res as any;
+      };
+    }
+    handlers = wrapped;
     try {
       panel?.setHandlers(handlers);
     } catch (_e) {
