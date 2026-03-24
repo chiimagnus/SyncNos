@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ExternalLink } from 'lucide-react';
 
 import { t } from '@i18n';
+import { openExternalUrl } from '@services/integrations/open-external-url';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
-import { navIconButtonClassName } from '@ui/shared/nav-styles';
+import { navIconButtonClassName, navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 
@@ -55,6 +56,11 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
     setUrlEditing(false);
   };
 
+  const openDisplayedUrl = async () => {
+    const ok = await openExternalUrl(displayedUrl);
+    if (!ok) throw new Error(t('noLinkAvailable'));
+  };
+
   return (
     <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 md:tw-grid md:tw-gap-2">
       <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
@@ -66,10 +72,10 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           <div className="tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
             {title}
           </div>
-          {showSubtitleRow ? (
-            <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-              {urlEditing ? (
-                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
+	          {showSubtitleRow ? (
+	            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+	              {urlEditing ? (
+	                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
                   <input
                     ref={urlInputRef}
                     className="tw-min-w-0 tw-flex-1 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
@@ -135,22 +141,48 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
                   </button>
                   <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter · Esc</span>
                 </span>
-              ) : (
-                <button
-                  type="button"
-                  className="tw-min-w-0 tw-truncate tw-text-left tw-underline-offset-2 hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
-                  onClick={() => {
-                    setUrlDraft(displayedUrl);
-                    setUrlEditing(true);
-                  }}
-                  aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
-                  title={displayedUrl || t('noLinkAvailable')}
-                >
-                  {displayedUrl || t('noLinkAvailable')}
-                </button>
-              )}
-            </div>
-          ) : null}
+	              ) : (
+	                <>
+	                  <button
+	                    type="button"
+	                    className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-left tw-underline-offset-2 hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+	                    onClick={() => {
+	                      setUrlDraft(displayedUrl);
+	                      setUrlEditing(true);
+	                    }}
+	                    aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+	                    title={displayedUrl || t('noLinkAvailable')}
+	                  >
+	                    {displayedUrl || t('noLinkAvailable')}
+	                  </button>
+	                  <button
+	                    type="button"
+	                    className={navIconButtonSmClassName(false)}
+	                    disabled={!displayedUrl}
+	                    onClick={() => {
+	                      if (!displayedUrl) return;
+	                      void (async () => {
+	                        try {
+	                          await openDisplayedUrl();
+	                        } catch (error) {
+	                          const message =
+	                            error instanceof Error && error.message
+	                              ? error.message
+	                              : String(error || t('actionFailedFallback'));
+	                          if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+	                          else console.error(message);
+	                        }
+	                      })();
+	                    }}
+	                    aria-label="Open URL"
+	                    title="Open URL"
+	                  >
+	                    <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
+	                  </button>
+	                </>
+	              )}
+	            </div>
+	          ) : null}
         </div>
       </div>
 

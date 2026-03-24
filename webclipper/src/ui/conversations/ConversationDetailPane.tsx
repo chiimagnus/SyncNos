@@ -1,4 +1,4 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ExternalLink } from 'lucide-react';
 
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
@@ -9,6 +9,7 @@ import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useEffect, useRef, useState } from 'react';
+import { openExternalUrl } from '@services/integrations/open-external-url';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -98,6 +99,11 @@ export function ConversationDetailPane({
     setUrlEditing(false);
   };
 
+  const openDisplayedUrl = async () => {
+    const ok = await openExternalUrl(displayedUrl);
+    if (!ok) throw new Error(t('noLinkAvailable'));
+  };
+
   const readSelectionQuote = (): string => {
     const root = messagesRootRef.current;
     if (!root) return '';
@@ -164,10 +170,10 @@ export function ConversationDetailPane({
                 <h2 className="tw-m-0 tw-block tw-min-w-0 tw-truncate tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
                   {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
                 </h2>
-                {selected ? (
-                  <div className="tw-mt-1 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-                    {urlEditing ? (
-                      <>
+	                {selected ? (
+	                  <div className="tw-mt-1 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+	                    {urlEditing ? (
+	                      <>
                         <input
                           ref={urlInputRef}
                           className="tw-min-w-0 tw-flex-1 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
@@ -231,22 +237,48 @@ export function ConversationDetailPane({
                         </button>
                         <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter 保存 · Esc 取消</span>
                       </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-left tw-underline-offset-2 hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
-                        onClick={() => {
-                          setUrlDraft(displayedUrl);
-                          setUrlEditing(true);
-                        }}
-                        aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
-                        title={displayedUrl || t('noLinkAvailable')}
-                      >
-                        {displayedUrl || t('noLinkAvailable')}
-                      </button>
-                    )}
-                  </div>
-                ) : (
+	                    ) : (
+	                      <>
+	                        <button
+	                          type="button"
+	                          className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-left tw-underline-offset-2 hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+	                          onClick={() => {
+	                            setUrlDraft(displayedUrl);
+	                            setUrlEditing(true);
+	                          }}
+	                          aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+	                          title={displayedUrl || t('noLinkAvailable')}
+	                        >
+	                          {displayedUrl || t('noLinkAvailable')}
+	                        </button>
+	                        <button
+	                          type="button"
+	                          className={navIconButtonSmClassName(false)}
+	                          disabled={!displayedUrl}
+	                          onClick={() => {
+	                            if (!displayedUrl) return;
+	                            void (async () => {
+	                              try {
+	                                await openDisplayedUrl();
+	                              } catch (error) {
+	                                const message =
+	                                  error instanceof Error && error.message
+	                                    ? error.message
+	                                    : String(error || t('actionFailedFallback'));
+	                                if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+	                                else console.error(message);
+	                              }
+	                            })();
+	                          }}
+	                          aria-label="Open URL"
+	                          title="Open URL"
+	                        >
+	                          <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
+	                        </button>
+	                      </>
+	                    )}
+	                  </div>
+	                ) : (
                   <div className="tw-mt-1 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
                     {t('selectConversationHint')}
                   </div>
