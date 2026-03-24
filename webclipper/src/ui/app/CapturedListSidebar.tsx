@@ -81,7 +81,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
 
   return (
     <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
-      <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
+      <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-primary)]">
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             {logoUrl ? (

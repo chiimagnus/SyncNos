@@ -217,14 +217,14 @@ export default function AppShell() {
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-        {renderSidebar ? (
-          <aside
-            className="tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-sunken)] tw-p-0"
-            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
-          >
-            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-          </aside>
-        ) : null}
+	        {renderSidebar ? (
+	          <aside
+	            className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-p-0"
+	            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+	          >
+	            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
+	          </aside>
+	        ) : null}
 
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
           {isNarrow ? (

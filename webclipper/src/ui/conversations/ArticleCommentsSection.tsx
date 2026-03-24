@@ -154,6 +154,13 @@ export function ArticleCommentsSection({
       showHeader: true,
       showCollapseButton: canClose,
     });
+    if (variant === 'sidebar') {
+      try {
+        mounted.el.style.setProperty('--webclipper-comments-panel-sidebar-bg', 'var(--bg-primary)');
+      } catch (_e) {
+        // ignore
+      }
+    }
     apiRef.current = mounted.api;
     mounted.api.setQuoteText(String(quoteTextRef.current || ''));
     mounted.api.setHandlers({

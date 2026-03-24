@@ -42,7 +42,7 @@
   --comments-panel-body-padding-bottom: 20px;
 
   width: min(var(--webclipper-comments-panel-width, 420px), 92vw);
-  background: var(--bg-sunken, var(--panel-bg));
+  background: var(--webclipper-comments-panel-sidebar-bg, var(--bg-sunken, var(--panel-bg)));
   border-left: 1px solid var(--panel-border);
 }
 
@@ -125,7 +125,7 @@
   gap: 8px;
   padding: 12px var(--comments-panel-body-padding-x);
   border-bottom: 1px solid var(--panel-border);
-  background: var(--bg-sunken, var(--panel-bg));
+  background: var(--webclipper-comments-panel-sidebar-bg, var(--bg-sunken, var(--panel-bg)));
 }
 
 .webclipper-inpage-comments-panel__header-title {
