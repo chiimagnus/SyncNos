@@ -112,7 +112,11 @@ export default function AppShell() {
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? (state?.backgroundLocation ?? null) : null;
-    const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarSnapshot.openRequested && !showSettingsSheet;
+    const showCommentsSidebar =
+      canToggleCommentsSidebar &&
+      !showSettingsSheet &&
+      !commentsSidebarCollapsed &&
+      (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
 
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
@@ -133,12 +137,13 @@ export default function AppShell() {
       if (showSettingsSheet) return;
       if (!canToggleCommentsSidebar) return;
       if (commentsSidebarCollapsed) return;
-      if (commentsSidebarSnapshot.openRequested) return;
+      if (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen) return;
       commentsSidebarSession.requestOpen({ source: 'app-default' });
     }, [
       canToggleCommentsSidebar,
       commentsSidebarCollapsed,
       commentsSidebarSession,
+      commentsSidebarSnapshot.isOpen,
       commentsSidebarSnapshot.openRequested,
       showSettingsSheet,
     ]);
