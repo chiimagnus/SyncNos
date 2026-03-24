@@ -219,5 +219,14 @@ describe('AppShell comments sidebar', () => {
     });
 
     expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeFalsy();
+
+    const reopenBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(reopenBtn).toBeTruthy();
+
+    act(() => {
+      reopenBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
   });
 });
