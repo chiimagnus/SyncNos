@@ -23,7 +23,7 @@ import {
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { parseHostnameFromUrl } from '@services/shared/url';
+import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 
 type SourceMeta = { key: string; label: string };
 
@@ -843,40 +843,37 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-	              <button
-	                id="btnDelete"
-	                type="button"
-	                ref={deleteButtonRef}
-	                className={
-	                  deleteConfirming
-	                    ? buttonDangerClassName()
-	                    : [
-	                        dangerSurfaceButton,
-	                        'webclipper-btn--icon webclipper-btn--icon-sm',
-	                      ].join(' ')
-	                }
-	                aria-pressed={deleteConfirming}
-	                title={t('deleteButton')}
-	                onClick={() => {
-	                  if (!hasSelection || actionBusy || syncingAny) return;
-	                  if (!deleteConfirmKey) return;
-	                  if (!deleteConfirm.isArmed(deleteConfirmKey)) {
-	                    deleteConfirm.arm(deleteConfirmKey);
-	                    return;
-	                  }
-	                  void onConfirmDelete();
-	                }}
-	                disabled={!hasSelection || actionBusy || syncingAny}
-	              >
-	                {deleteConfirming ? (
-	                  t('deleteButton')
-	                ) : (
-	                  <>
-	                    <span aria-hidden="true">×</span>
-	                    <span className="tw-sr-only">{t('deleteButton')}</span>
-	                  </>
-	                )}
-	              </button>
+              <button
+                id="btnDelete"
+                type="button"
+                ref={deleteButtonRef}
+                className={
+                  deleteConfirming
+                    ? buttonDangerClassName()
+                    : [dangerSurfaceButton, 'webclipper-btn--icon webclipper-btn--icon-sm'].join(' ')
+                }
+                aria-pressed={deleteConfirming}
+                title={t('deleteButton')}
+                onClick={() => {
+                  if (!hasSelection || actionBusy || syncingAny) return;
+                  if (!deleteConfirmKey) return;
+                  if (!deleteConfirm.isArmed(deleteConfirmKey)) {
+                    deleteConfirm.arm(deleteConfirmKey);
+                    return;
+                  }
+                  void onConfirmDelete();
+                }}
+                disabled={!hasSelection || actionBusy || syncingAny}
+              >
+                {deleteConfirming ? (
+                  t('deleteButton')
+                ) : (
+                  <>
+                    <span aria-hidden="true">×</span>
+                    <span className="tw-sr-only">{t('deleteButton')}</span>
+                  </>
+                )}
+              </button>
 
               <MenuPopover
                 open={exportOpen}

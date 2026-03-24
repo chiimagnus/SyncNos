@@ -4,6 +4,7 @@ import {
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage';
+import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery } from '@platform/webext/tabs';
 
@@ -646,13 +647,14 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const targetTabId = Number(tab.id);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
+  const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
 
   await ensureReadability(targetTabId);
   const extracted = await extractArticleOnTab(targetTabId);
 
   const textContent = normalizeText(extracted.textContent || '');
   const markdownContent = normalizeText(extracted.contentMarkdown || '');
-  const title = normalizeText(extracted.title || '') || fallbackTitle(normalizedUrl, tab.title || '');
+  const title = normalizeText(extracted.title || '') || fallbackTitle(cleanedUrl, tab.title || '');
   const author = normalizeText(extracted.author || '');
   const publishedAt = normalizeText(extracted.publishedAt || '');
   const warningFlags = Array.isArray(extracted.warningFlags)
@@ -667,8 +669,8 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     existed = await hasConversation({
       sourceType: ARTICLE_SOURCE_TYPE,
       source: ARTICLE_SOURCE,
-      conversationKey: conversationKeyForUrl(normalizedUrl),
-      url: normalizedUrl,
+      conversationKey: conversationKeyForUrl(cleanedUrl),
+      url: cleanedUrl,
     });
   } catch (_e) {
     existed = false;
@@ -676,9 +678,9 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: ARTICLE_SOURCE,
-    conversationKey: conversationKeyForUrl(normalizedUrl),
+    conversationKey: conversationKeyForUrl(cleanedUrl),
     title,
-    url: normalizedUrl,
+    url: cleanedUrl,
     author,
     publishedAt,
     warningFlags,
@@ -701,7 +703,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   return {
     isNew: !existed,
     conversationId: Number((conversation as any).id),
-    url: normalizedUrl,
+    url: cleanedUrl,
     title,
     author,
     publishedAt,
@@ -715,8 +717,9 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const tab = await resolveTargetTab(tabId);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
+  const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
 
-  const key = conversationKeyForUrl(normalizedUrl);
+  const key = conversationKeyForUrl(cleanedUrl);
   try {
     const existing = await getConversationBySourceConversationKey(ARTICLE_SOURCE, key);
     const existingId = Number((existing as any)?.id);
@@ -727,8 +730,8 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
       return {
         isNew: false,
         conversationId: existingId,
-        url: normalizedUrl,
-        title: normalizeText((existing as any)?.title || '') || fallbackTitle(normalizedUrl, (tab as any)?.title || ''),
+        url: cleanedUrl,
+        title: normalizeText((existing as any)?.title || '') || fallbackTitle(cleanedUrl, (tab as any)?.title || ''),
         author: normalizeText((existing as any)?.author || ''),
         publishedAt: normalizeText((existing as any)?.publishedAt || ''),
         warningFlags,
