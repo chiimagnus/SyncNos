@@ -253,9 +253,11 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const now = Date.now();
   const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
   const nextUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+  const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
+  const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
 
   const baseRecord = {
-    sourceType: payload.sourceType || 'chat',
+    sourceType: nextSourceType,
     source: payload.source,
     conversationKey: payload.conversationKey,
     title: nextTitle || (existing ? existing.title || '' : ''),
@@ -268,7 +270,7 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
         ? existing.warningFlags || []
         : [],
     notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
-    lastCapturedAt: payload.lastCapturedAt || now,
+    lastCapturedAt: nextLastCapturedAt,
   };
 
   const record: any = withOptionalId(existing && existing.id, baseRecord);
