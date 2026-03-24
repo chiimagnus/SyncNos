@@ -1,4 +1,4 @@
-import { ChevronLeft, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Copy, ExternalLink } from 'lucide-react';
 
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
@@ -10,6 +10,7 @@ import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useEffect, useRef, useState } from 'react';
 import { openExternalUrl } from '@services/integrations/open-external-url';
+import { copyTextToClipboard } from '@ui/shared/clipboard';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -102,6 +103,10 @@ export function ConversationDetailPane({
   const openDisplayedUrl = async () => {
     const ok = await openExternalUrl(displayedUrl);
     if (!ok) throw new Error(t('noLinkAvailable'));
+  };
+
+  const copyDisplayedUrl = async () => {
+    await copyTextToClipboard(displayedUrl);
   };
 
   const readSelectionQuote = (): string => {
@@ -274,6 +279,26 @@ export function ConversationDetailPane({
 	                          title="Open URL"
 	                        >
 	                          <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
+	                        </button>
+	                        <button
+	                          type="button"
+	                          className={navIconButtonSmClassName(false)}
+	                          disabled={!displayedUrl}
+	                          onClick={() => {
+	                            if (!displayedUrl) return;
+	                            void (async () => {
+	                              try {
+	                                await copyDisplayedUrl();
+	                              } catch (_error) {
+	                                if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(t('copyFailed'));
+	                                else console.error(t('copyFailed'));
+	                              }
+	                            })();
+	                          }}
+	                          aria-label="Copy URL"
+	                          title="Copy URL"
+	                        >
+	                          <Copy size={14} strokeWidth={2} aria-hidden="true" />
 	                        </button>
 	                      </>
 	                    )}

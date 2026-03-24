@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Copy, ExternalLink } from 'lucide-react';
 
 import { t } from '@i18n';
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
+import { copyTextToClipboard } from '@ui/shared/clipboard';
 import { navIconButtonClassName, navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
@@ -59,6 +60,10 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   const openDisplayedUrl = async () => {
     const ok = await openExternalUrl(displayedUrl);
     if (!ok) throw new Error(t('noLinkAvailable'));
+  };
+
+  const copyDisplayedUrl = async () => {
+    await copyTextToClipboard(displayedUrl);
   };
 
   return (
@@ -178,6 +183,26 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
 	                    title="Open URL"
 	                  >
 	                    <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
+	                  </button>
+	                  <button
+	                    type="button"
+	                    className={navIconButtonSmClassName(false)}
+	                    disabled={!displayedUrl}
+	                    onClick={() => {
+	                      if (!displayedUrl) return;
+	                      void (async () => {
+	                        try {
+	                          await copyDisplayedUrl();
+	                        } catch (_error) {
+	                          if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(t('copyFailed'));
+	                          else console.error(t('copyFailed'));
+	                        }
+	                      })();
+	                    }}
+	                    aria-label="Copy URL"
+	                    title="Copy URL"
+	                  >
+	                    <Copy size={14} strokeWidth={2} aria-hidden="true" />
 	                  </button>
 	                </>
 	              )}
