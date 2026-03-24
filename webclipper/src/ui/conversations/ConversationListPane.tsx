@@ -23,7 +23,7 @@ import {
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { parseHostnameFromUrl } from '@services/shared/url';
+import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 
 type SourceMeta = { key: string; label: string };
 
