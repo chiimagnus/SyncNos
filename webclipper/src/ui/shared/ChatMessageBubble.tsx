@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from '@ui/shared/markdown';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
-type BubbleRole = 'user' | 'assistant' | 'other';
+type BubbleRole = 'user' | 'assistant';
 
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 
@@ -57,12 +57,12 @@ function normalizeRole(role: unknown): BubbleRole {
   const r = String(role || '')
     .trim()
     .toLowerCase();
-  if (!r) return 'other';
+  if (!r) return 'assistant';
 
   // Normalize common variants from legacy data / different collectors.
   if (r === 'user' || r === 'human' || r === 'me' || r === 'you') return 'user';
   if (r === 'assistant' || r === 'ai' || r === 'bot' || r === 'model') return 'assistant';
-  return 'other';
+  return 'assistant';
 }
 
 export type ChatMessageBubbleProps = {
@@ -148,9 +148,7 @@ export function ChatMessageBubble({
   const bubbleRoleClass =
     bubbleRole === 'user'
       ? 'tw-bg-[var(--bubble-user-bg)] tw-border-[var(--bubble-user-border)] tw-text-[var(--secondary-foreground)]'
-      : bubbleRole === 'assistant'
-        ? 'tw-bg-[var(--bg-card)] tw-border-[var(--border)] tw-text-[var(--text-primary)]'
-        : 'tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
+      : 'tw-bg-[var(--bg-card)] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
 
   const headerBase = 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-1.5';
   const headerToneClass =

@@ -668,7 +668,7 @@ export function ConversationListPane({
         className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden"
         onScroll={() => onListScrollTopChange?.(scrollRef.current?.scrollTop || 0)}
       >
-        <div className="tw-grid tw-gap-1 tw-px-4 tw-py-4">
+        <div className="tw-grid tw-gap-1 tw-p-3">
           {filteredItems.length ? null : (
             <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('noConversations')}
@@ -765,7 +765,7 @@ export function ConversationListPane({
         </div>
       </div>
 
-      <div className="tw-border-t tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
+      <div className="tw-border-t tw-border-[var(--border)] tw-bg-[var(--bg-primary)]">
         <div className="tw-px-3 tw-py-2">
           <div
             className={[

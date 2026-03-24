@@ -9,6 +9,7 @@ import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversationId } from '@ui/conversations/pending-open';
+import { columnDividerRightClassName } from '@ui/shared/column-styles';
 
 type NarrowRoute = 'list' | 'detail';
 
@@ -127,7 +128,12 @@ export function ConversationsScene({
 
   return (
     <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-      <aside className="tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
+      <aside
+        className={[
+          'tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
+          columnDividerRightClassName(),
+        ].join(' ')}
+      >
         {list}
       </aside>
       <main className="route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-primary)] tw-overflow-auto tw-overflow-x-hidden">

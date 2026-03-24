@@ -35,6 +35,7 @@ export function ArticleCommentsSection({
   containerClassName,
   variant,
   onRequestClose,
+  onQuoteTextConsumed,
 }: {
   conversationId: number;
   canonicalUrl: string;
@@ -43,6 +44,7 @@ export function ArticleCommentsSection({
   containerClassName?: string;
   variant?: 'embedded' | 'sidebar';
   onRequestClose?: () => void;
+  onQuoteTextConsumed?: () => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,8 @@ export function ArticleCommentsSection({
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
   const quoteTextRef = useRef<string>(String(quoteText || ''));
   quoteTextRef.current = String(quoteText || '');
+  const onQuoteTextConsumedRef = useRef<(() => void) | undefined>(onQuoteTextConsumed);
+  onQuoteTextConsumedRef.current = onQuoteTextConsumed;
   const onRequestCloseRef = useRef<(() => void) | undefined>(onRequestClose);
   onRequestCloseRef.current = onRequestClose;
   const focusSignal = Number(focusComposerSignal || 0);
@@ -153,6 +157,7 @@ export function ArticleCommentsSection({
       variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
       showHeader: true,
       showCollapseButton: canClose,
+      surfaceBg: 'var(--bg-primary)',
     });
     apiRef.current = mounted.api;
     mounted.api.setQuoteText(String(quoteTextRef.current || ''));
@@ -164,16 +169,21 @@ export function ArticleCommentsSection({
         if (!normalizedUrl) return;
         const value = String(text || '').trim();
         if (!value) return;
+        const quoteText = String(quoteTextRef.current || '');
         try {
           mounted.api.setBusy(true);
           await addArticleComment({
             canonicalUrl: normalizedUrl,
             conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
             parentId: null,
-            quoteText: String(quoteTextRef.current || ''),
+            quoteText,
             commentText: value,
           } as any);
           await refresh();
+          if (quoteText) {
+            mounted.api.setQuoteText('');
+            onQuoteTextConsumedRef.current?.();
+          }
         } finally {
           mounted.api.setBusy(false);
         }
@@ -182,6 +192,7 @@ export function ArticleCommentsSection({
         if (!normalizedUrl) return;
         const value = String(text || '').trim();
         if (!value) return;
+        const quoteText = String(quoteTextRef.current || '');
         try {
           mounted.api.setBusy(true);
           await addArticleComment({
@@ -192,6 +203,10 @@ export function ArticleCommentsSection({
             commentText: value,
           } as any);
           await refresh();
+          if (quoteText) {
+            mounted.api.setQuoteText('');
+            onQuoteTextConsumedRef.current?.();
+          }
         } finally {
           mounted.api.setBusy(false);
         }

@@ -9,6 +9,7 @@ import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
+import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
@@ -217,14 +218,14 @@ export default function AppShell() {
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-        {renderSidebar ? (
-          <aside
-            className="tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-sunken)] tw-p-0"
-            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
-          >
-            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-          </aside>
-        ) : null}
+	        {renderSidebar ? (
+	          <aside
+		            className={['tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0', columnDividerRightClassName()].join(' ')}
+		            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+	          >
+	            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
+	          </aside>
+	        ) : null}
 
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
           {isNarrow ? (
@@ -298,6 +299,9 @@ export default function AppShell() {
                     focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
                     containerClassName="tw-h-full tw-min-h-0"
                     variant="sidebar"
+                    onQuoteTextConsumed={() => {
+                      commentsSidebarSession.setQuoteText('');
+                    }}
                     onRequestClose={() => {
                       commentsSidebarSession.requestClose();
                       setCommentsCollapsed(true);
