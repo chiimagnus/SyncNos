@@ -112,7 +112,11 @@ export default function AppShell() {
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? (state?.backgroundLocation ?? null) : null;
-    const showCommentsSidebar = canToggleCommentsSidebar && commentsSidebarSnapshot.openRequested && !showSettingsSheet;
+    const showCommentsSidebar =
+      canToggleCommentsSidebar &&
+      !showSettingsSheet &&
+      !commentsSidebarCollapsed &&
+      (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
 
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
@@ -133,12 +137,13 @@ export default function AppShell() {
       if (showSettingsSheet) return;
       if (!canToggleCommentsSidebar) return;
       if (commentsSidebarCollapsed) return;
-      if (commentsSidebarSnapshot.openRequested) return;
+      if (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen) return;
       commentsSidebarSession.requestOpen({ source: 'app-default' });
     }, [
       canToggleCommentsSidebar,
       commentsSidebarCollapsed,
       commentsSidebarSession,
+      commentsSidebarSnapshot.isOpen,
       commentsSidebarSnapshot.openRequested,
       showSettingsSheet,
     ]);
@@ -218,14 +223,17 @@ export default function AppShell() {
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-	        {renderSidebar ? (
-	          <aside
-		            className={['tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0', columnDividerRightClassName()].join(' ')}
-		            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
-	          >
-	            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-	          </aside>
-	        ) : null}
+        {renderSidebar ? (
+          <aside
+            className={[
+              'tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0',
+              columnDividerRightClassName(),
+            ].join(' ')}
+            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+          >
+            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
+          </aside>
+        ) : null}
 
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
           {isNarrow ? (
@@ -293,15 +301,11 @@ export default function AppShell() {
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0">
                   <ArticleCommentsSection
+                    sidebarSession={commentsSidebarSession}
                     conversationId={Number((selectedConversation as any)?.id || 0)}
                     canonicalUrl={canonicalUrl}
-                    quoteText={commentsSidebarSnapshot.quoteText}
-                    focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
                     containerClassName="tw-h-full tw-min-h-0"
                     variant="sidebar"
-                    onQuoteTextConsumed={() => {
-                      commentsSidebarSession.setQuoteText('');
-                    }}
                     onRequestClose={() => {
                       commentsSidebarSession.requestClose();
                       setCommentsCollapsed(true);

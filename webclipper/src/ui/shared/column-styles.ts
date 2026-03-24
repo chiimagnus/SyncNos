@@ -5,4 +5,3 @@ export function columnDividerRightClassName(): string {
 export function columnDividerLeftClassName(): string {
   return 'tw-border-l tw-border-solid tw-border-[var(--border)]';
 }
-
