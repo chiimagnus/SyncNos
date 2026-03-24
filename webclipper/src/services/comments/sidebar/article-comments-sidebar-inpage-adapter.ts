@@ -1,0 +1,115 @@
+import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+
+import type { ArticleCommentsSidebarAdapter } from '@services/comments/sidebar/article-comments-sidebar-adapter';
+
+type RuntimeClient = {
+  send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
+};
+
+function safeString(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function normalizeHttpUrl(raw: unknown): string {
+  const text = safeString(raw);
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = safeString(url.protocol).toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
+
+function normalizeConversationId(value: unknown): number | null {
+  const id = Number(value);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
+}
+
+function getLocationHrefFallback(): string {
+  try {
+    return String(globalThis.location?.href || '');
+  } catch (_e) {
+    return '';
+  }
+}
+
+export function createArticleCommentsSidebarInpageAdapter(runtime: RuntimeClient | null): ArticleCommentsSidebarAdapter {
+  const rt = runtime;
+
+  return {
+    async list({ canonicalUrl }) {
+      const normalized = normalizeHttpUrl(canonicalUrl);
+      if (!normalized) return [];
+      if (!rt?.send) return [];
+      const res = await rt.send(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, { canonicalUrl: normalized } as any);
+      if (!res?.ok) return [];
+      const items = Array.isArray(res?.data) ? res.data : [];
+      return items.map((c: any) => ({
+        id: Number(c?.id),
+        parentId: c?.parentId != null ? Number(c.parentId) : null,
+        authorName: c?.authorName != null ? String(c.authorName) : null,
+        createdAt: Number(c?.createdAt) || null,
+        quoteText: String(c?.quoteText || ''),
+        commentText: String(c?.commentText || ''),
+      }));
+    },
+    async ensureContext(input) {
+      const ensureArticle = input?.ensureArticle !== false;
+      const fallbackUrl = normalizeHttpUrl(input?.canonicalUrlFallback) || normalizeHttpUrl(getLocationHrefFallback());
+
+      if (!rt?.send || !ensureArticle) {
+        return { canonicalUrl: fallbackUrl, conversationId: null };
+      }
+
+      const payload = input?.tabId ? { tabId: Number(input.tabId) } : null;
+      const res = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, payload as any);
+      if (!res?.ok) {
+        return { canonicalUrl: fallbackUrl, conversationId: null };
+      }
+
+      const canonicalUrl = normalizeHttpUrl(res?.data?.url) || fallbackUrl;
+      const conversationId = normalizeConversationId(res?.data?.conversationId);
+      if (canonicalUrl && conversationId) {
+        try {
+          await rt.send(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, { canonicalUrl, conversationId } as any);
+        } catch (_e) {
+          // ignore
+        }
+      }
+      return { canonicalUrl, conversationId };
+    },
+    async addRoot({ canonicalUrl, conversationId, quoteText, commentText }) {
+      if (!rt?.send) throw new Error('missing runtime for adding article comment');
+      const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
+        canonicalUrl,
+        conversationId,
+        quoteText,
+        commentText,
+      } as any);
+      if (!res?.ok) throw new Error('failed to add article comment');
+      return true;
+    },
+    async addReply({ canonicalUrl, conversationId, parentId, commentText }) {
+      if (!rt?.send) throw new Error('missing runtime for replying article comment');
+      const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
+        canonicalUrl,
+        conversationId,
+        parentId,
+        quoteText: '',
+        commentText,
+      } as any);
+      if (!res?.ok) throw new Error('failed to reply article comment');
+    },
+    async delete({ id }) {
+      if (!rt?.send) throw new Error('missing runtime for deleting article comment');
+      const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id } as any);
+      if (!res?.ok) throw new Error('failed to delete article comment');
+    },
+  };
+}
+
