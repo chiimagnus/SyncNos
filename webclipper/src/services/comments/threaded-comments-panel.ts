@@ -106,6 +106,9 @@ type MountOptions = {
   showHeader?: boolean;
   showCollapseButton?: boolean;
   variant?: 'embedded' | 'sidebar';
+  // Optional surface background for sidebar variant. When provided, it will be
+  // exposed to CSS via `--webclipper-comments-panel-surface-bg`.
+  surfaceBg?: string;
   // When `true`, opening the overlay panel will "dock" the host page content by
   // applying right padding to `document.documentElement` so the page is not
   // covered by the sidebar. Intended for inpage content-scripts only.
@@ -125,6 +128,12 @@ export function mountThreadedCommentsPanel(
   const showHeader = options.showHeader !== false;
   const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
   const dockPage = options.dockPage === true && options.overlay === true;
+  const surfaceBg = String(options.surfaceBg || '').trim();
+
+  const SURFACE_BG_CSS_VAR = '--webclipper-comments-panel-surface-bg';
+  if (surfaceBg) {
+    setImportantStyle(el, SURFACE_BG_CSS_VAR, surfaceBg);
+  }
 
   const DOCK_STYLE_ID = 'webclipper-inpage-comments-panel__dock-style';
 
