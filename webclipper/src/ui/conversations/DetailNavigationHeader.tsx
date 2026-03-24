@@ -32,6 +32,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   const [urlCleaning, setUrlCleaning] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String(subtitle || '').trim();
+  const openableUrl = /^https?:\/\//i.test(displayedUrl) ? displayedUrl : '';
   const showSubtitleRow = subtitle != null;
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   };
 
   const openDisplayedUrl = async () => {
-    const ok = await openExternalUrl(displayedUrl);
+    const ok = await openExternalUrl(openableUrl);
     if (!ok) throw new Error(t('noLinkAvailable'));
   };
 
@@ -163,9 +164,9 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
 	                  <button
 	                    type="button"
 	                    className={navIconButtonSmClassName(false)}
-	                    disabled={!displayedUrl}
+	                    disabled={!openableUrl}
 	                    onClick={() => {
-	                      if (!displayedUrl) return;
+	                      if (!openableUrl) return;
 	                      void (async () => {
 	                        try {
 	                          await openDisplayedUrl();
