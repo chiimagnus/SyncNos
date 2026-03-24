@@ -365,7 +365,7 @@ export async function mergeConversationsByIds(input: {
     publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
     notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
     warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
-    lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt, Date.now()) || Date.now(),
+    lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || Date.now(),
   };
 
   await migrateSyncMappingKey(stores.sync_mappings, {
