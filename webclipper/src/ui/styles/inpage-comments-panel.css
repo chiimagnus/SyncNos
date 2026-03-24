@@ -124,7 +124,7 @@
   justify-content: flex-start;
   gap: 8px;
   padding: 12px var(--comments-panel-body-padding-x);
-  border-bottom: 1px solid var(--panel-border);
+  border-bottom: var(--webclipper-comments-panel-header-divider, 1px solid var(--panel-border));
   background: var(--bg-sunken, var(--panel-bg));
 }
 

@@ -109,6 +109,10 @@ type MountOptions = {
   // Optional surface background for sidebar variant. When provided, it will be
   // exposed to CSS via `--webclipper-comments-panel-surface-bg`.
   surfaceBg?: string;
+  // Optional visual divider between header and body. By default:
+  // - `sidebar`: no divider (cleaner, matches app shell columns)
+  // - `embedded`: divider
+  headerDivider?: boolean;
   // When `true`, opening the overlay panel will "dock" the host page content by
   // applying right padding to `document.documentElement` so the page is not
   // covered by the sidebar. Intended for inpage content-scripts only.
@@ -134,6 +138,10 @@ export function mountThreadedCommentsPanel(
   if (surfaceBg) {
     setImportantStyle(el, SURFACE_BG_CSS_VAR, surfaceBg);
   }
+
+  const HEADER_DIVIDER_CSS_VAR = '--webclipper-comments-panel-header-divider';
+  const headerDivider = options.headerDivider ?? variant !== 'sidebar';
+  setImportantStyle(el, HEADER_DIVIDER_CSS_VAR, headerDivider && showHeader ? '1px solid var(--panel-border)' : '0');
 
   const DOCK_STYLE_ID = 'webclipper-inpage-comments-panel__dock-style';
 
