@@ -14,8 +14,17 @@ vi.mock('../../src/ui/i18n', () => ({
 }));
 
 vi.mock('@services/comments/client/repo', () => ({
-  addArticleComment: vi.fn(async () => ({ ok: true, data: {} })),
-  deleteArticleCommentById: vi.fn(async () => ({ ok: true, data: {} })),
+  addArticleComment: vi.fn(async () => ({
+    id: 1,
+    parentId: null,
+    conversationId: 21,
+    canonicalUrl: 'https://example.com/article',
+    quoteText: '',
+    commentText: 'ok',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  })),
+  deleteArticleCommentById: vi.fn(async () => true),
   listArticleCommentsByCanonicalUrl: vi.fn(async () => []),
 }));
 
@@ -28,6 +37,7 @@ vi.mock('../../src/platform/runtime/ports', () => ({
 }));
 
 import { ArticleCommentsSection } from '../../src/ui/conversations/ArticleCommentsSection';
+import { createCommentSidebarSession } from '../../src/services/comments/sidebar/comment-sidebar-session';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -78,13 +88,12 @@ describe('ArticleCommentsSection shared chrome', () => {
     cleanupDom();
   });
 
-  it('renders the shared panel header and collapse control inside the sidebar shell', async () => {
+  it('renders the shared panel header in embedded mode', async () => {
     await act(async () => {
       root!.render(
         createElement(ArticleCommentsSection, {
           conversationId: 21,
           canonicalUrl: 'https://example.com/article',
-          onRequestClose: vi.fn(),
         }),
       );
     });
@@ -95,8 +104,22 @@ describe('ArticleCommentsSection shared chrome', () => {
     const shadow = host?.shadowRoot;
     expect(shadow).toBeTruthy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__header-title')?.textContent).toBe('Comments');
-    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__collapse')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Collapse comments sidebar"]')).toBeFalsy();
+    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__collapse')).toBeFalsy();
     expect(document.querySelector('section')).toBeTruthy();
+  });
+
+  it('renders the collapse control in sidebar mode', async () => {
+    const session = createCommentSidebarSession();
+    await act(async () => {
+      root!.render(
+        createElement(ArticleCommentsSection, {
+          sidebarSession: session,
+        }),
+      );
+    });
+
+    const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(host).toBeTruthy();
+    expect(host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse')).toBeTruthy();
   });
 });

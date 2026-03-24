@@ -77,6 +77,21 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => currentState,
 }));
 
+vi.mock('@services/comments/client/repo', () => ({
+  addArticleComment: vi.fn(async () => ({
+    id: 1,
+    parentId: null,
+    conversationId: 21,
+    canonicalUrl: 'https://example.com/article',
+    quoteText: '',
+    commentText: 'ok',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  })),
+  deleteArticleCommentById: vi.fn(async () => true),
+  listArticleCommentsByCanonicalUrl: vi.fn(async () => []),
+}));
+
 vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
   ConversationDetailPane: ({
     onTriggerCommentsSidebar,
@@ -100,38 +115,6 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
       ),
       createElement('div', null, 'detail-pane'),
     ),
-}));
-
-vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
-  ArticleCommentsSection: ({
-    onRequestClose,
-    sidebarSession,
-    quoteText,
-    focusComposerSignal,
-  }: {
-    onRequestClose: () => void;
-    sidebarSession?: { getSnapshot?: () => { quoteText?: string; focusComposerSignal?: number } };
-    quoteText?: string;
-    focusComposerSignal?: number;
-  }) => {
-    const snapshot = sidebarSession?.getSnapshot?.() ?? null;
-    const resolvedQuoteText = snapshot ? String(snapshot.quoteText || '') : quoteText || '';
-    const resolvedFocusSignal = snapshot ? Number(snapshot.focusComposerSignal || 0) : Number(focusComposerSignal || 0);
-    return createElement(
-      'aside',
-      {
-        'aria-label': 'Comments sidebar',
-        'data-quote-text': resolvedQuoteText,
-        'data-focus-signal': String(resolvedFocusSignal),
-      },
-      createElement(
-        'button',
-        { type: 'button', onClick: onRequestClose, 'aria-label': 'mock-close-sidebar' },
-        'close-sidebar',
-      ),
-      createElement('div', null, 'comments-sidebar'),
-    );
-  },
 }));
 
 import AppShell from '../../src/ui/app/AppShell';
@@ -159,14 +142,9 @@ function setupDom() {
 }
 
 function cleanupDom() {
-  delete (globalThis as any).window;
-  delete (globalThis as any).document;
-  delete (globalThis as any).navigator;
-  delete (globalThis as any).HTMLElement;
-  delete (globalThis as any).Node;
-  delete (globalThis as any).localStorage;
-  delete (globalThis as any).getComputedStyle;
-  delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+  // Keep the JSDOM globals around: React may schedule async work that still
+  // references `window` after the test has completed. The next `setupDom()`
+  // call will overwrite them.
 }
 
 describe('AppShell comments sidebar', () => {
@@ -197,27 +175,35 @@ describe('AppShell comments sidebar', () => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
-    expect(document.querySelector('aside')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-quote-text')).toBe(
+    const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(host).toBeTruthy();
+    expect(host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent).toBe(
       'Selected quote',
     );
-    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-focus-signal')).toBe('1');
 
     act(() => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Comments sidebar"]')?.getAttribute('data-focus-signal')).toBe('2');
-
-    const closeBtn = document.querySelector('[aria-label="mock-close-sidebar"]') as HTMLButtonElement | null;
+    const closeBtn = (host?.shadowRoot?.querySelector(
+      '.webclipper-inpage-comments-panel__collapse',
+    ) || null) as HTMLButtonElement | null;
     expect(closeBtn).toBeTruthy();
 
     act(() => {
       closeBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.querySelector('[aria-label="Comments sidebar"]')).toBeFalsy();
+    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+
+    const reopenBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(reopenBtn).toBeTruthy();
+
+    act(() => {
+      reopenBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    const reopened = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(reopened).toBeTruthy();
   });
 });

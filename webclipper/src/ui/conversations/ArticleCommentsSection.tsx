@@ -1,25 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
-import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
-import { connectPort } from '@services/shared/ports';
-import {
-  addArticleComment,
-  deleteArticleCommentById,
-  listArticleCommentsByCanonicalUrl,
-} from '@services/comments/client/repo';
 import {
   mountThreadedCommentsPanel,
   type ThreadedCommentsPanelApi,
-  type ThreadedCommentItem,
 } from '@services/comments/threaded-comments-panel';
+import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
+import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
+import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
+
+function safeString(value: unknown): string {
+  return String(value ?? '').trim();
+}
 
 function normalizeHttpUrl(raw: unknown): string {
-  const text = String(raw || '').trim();
+  const text = safeString(raw);
   if (!text) return '';
   try {
     const url = new URL(text);
-    const protocol = String(url.protocol || '').toLowerCase();
+    const protocol = safeString(url.protocol).toLowerCase();
     if (protocol !== 'http:' && protocol !== 'https:') return '';
     url.hash = '';
     return url.toString();
@@ -28,123 +27,50 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
-export function ArticleCommentsSection({
-  sidebarSession,
-  conversationId,
-  canonicalUrl,
-  quoteText,
-  focusComposerSignal,
-  containerClassName,
-  variant,
-  onRequestClose,
-}: {
-  sidebarSession?: CommentSidebarSession;
+type SidebarModeProps = {
+  sidebarSession: CommentSidebarSession;
+  containerClassName?: string;
+};
+
+type EmbeddedModeProps = {
+  sidebarSession?: undefined;
   conversationId: number;
   canonicalUrl: string;
-  quoteText?: string;
-  focusComposerSignal?: number;
+  containerClassName?: string;
+};
+
+export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModeProps) {
+  if ('sidebarSession' in props && props.sidebarSession) {
+    return (
+      <ArticleCommentsPanelMount
+        sidebarSession={props.sidebarSession}
+        containerClassName={props.containerClassName}
+        variant="sidebar"
+      />
+    );
+  }
+
+  return (
+    <ArticleCommentsEmbedded
+      conversationId={props.conversationId}
+      canonicalUrl={props.canonicalUrl}
+      containerClassName={props.containerClassName}
+      variant="embedded"
+    />
+  );
+}
+
+function ArticleCommentsPanelMount({
+  sidebarSession,
+  containerClassName,
+  variant,
+}: {
+  sidebarSession: CommentSidebarSession;
   containerClassName?: string;
   variant?: 'embedded' | 'sidebar';
-  onRequestClose?: () => void;
 }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<any[]>([]);
-
   const hostRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
-  const quoteTextRef = useRef<string>(String(quoteText || ''));
-  quoteTextRef.current = String(quoteText || '');
-  const onRequestCloseRef = useRef<(() => void) | undefined>(onRequestClose);
-  onRequestCloseRef.current = onRequestClose;
-  const focusSignal = Number(focusComposerSignal || 0);
-  const lastFocusSignalRef = useRef<number>(0);
-  const pendingFocusRef = useRef<boolean>(false);
-
-  const normalizedUrl = useMemo(() => normalizeHttpUrl(canonicalUrl), [canonicalUrl]);
-  const canClose = typeof onRequestClose === 'function';
-
-  const refresh = async () => {
-    if (!normalizedUrl) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const next = await listArticleCommentsByCanonicalUrl(normalizedUrl);
-      const list = Array.isArray(next) ? next : [];
-      setItems(list);
-    } catch (e) {
-      setError((e as any)?.message ?? String(e ?? 'unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [normalizedUrl]);
-
-  useEffect(() => {
-    if (!conversationId) return;
-    let disposed = false;
-    let port: any = null;
-    const connect = () => {
-      if (disposed) return;
-      try {
-        port = connectPort(UI_PORT_NAMES.POPUP_EVENTS);
-      } catch (_e) {
-        port = null;
-        return;
-      }
-
-      const onMessage = (message: any) => {
-        if (disposed) return;
-        if (!message || typeof message !== 'object') return;
-        if (message.type !== UI_EVENT_TYPES.CONVERSATIONS_CHANGED) return;
-        const payload = (message as any).payload || {};
-        const changedId = Number(payload.conversationId);
-        if (Number.isFinite(changedId) && changedId > 0 && changedId === Number(conversationId)) {
-          void refresh();
-        }
-      };
-
-      const onDisconnect = () => {
-        try {
-          port?.onMessage?.removeListener?.(onMessage);
-        } catch (_e) {
-          // ignore
-        }
-        port = null;
-        if (disposed) return;
-        setTimeout(connect, 1000);
-      };
-
-      try {
-        port?.onMessage?.addListener?.(onMessage);
-        port?.onDisconnect?.addListener?.(onDisconnect);
-      } catch (_e) {
-        try {
-          port?.disconnect?.();
-        } catch (_e2) {
-          // ignore
-        }
-        port = null;
-      }
-    };
-
-    connect();
-
-    return () => {
-      disposed = true;
-      try {
-        port?.disconnect?.();
-      } catch (_e) {
-        // ignore
-      }
-      port = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, normalizedUrl]);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -155,134 +81,66 @@ export function ArticleCommentsSection({
       overlay: false,
       variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
       showHeader: true,
-      showCollapseButton: canClose,
+      showCollapseButton: variant === 'sidebar',
       surfaceBg: 'var(--bg-primary)',
     });
     apiRef.current = mounted.api;
-    const handlers = {
-      onClose: () => {
-        onRequestCloseRef.current?.();
-      },
-      onSave: async (text: string) => {
-        if (!normalizedUrl) return false;
-        const value = String(text || '').trim();
-        if (!value) return false;
-        const quoteValue = sidebarSession ? sidebarSession.getSnapshot().quoteText : String(quoteTextRef.current || '');
-        try {
-          mounted.api.setBusy(true);
-          await addArticleComment({
-            canonicalUrl: normalizedUrl,
-            conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
-            parentId: null,
-            quoteText: quoteValue,
-            commentText: value,
-          } as any);
-          await refresh();
-          if (!sidebarSession) {
-            quoteTextRef.current = '';
-            mounted.api.setQuoteText('');
-          }
-          return true;
-        } finally {
-          mounted.api.setBusy(false);
-        }
-      },
-      onReply: async (parentId: number, text: string) => {
-        if (!normalizedUrl) return;
-        const value = String(text || '').trim();
-        if (!value) return;
-        try {
-          mounted.api.setBusy(true);
-          await addArticleComment({
-            canonicalUrl: normalizedUrl,
-            conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
-            parentId: Number(parentId),
-            quoteText: '',
-            commentText: value,
-          } as any);
-          await refresh();
-        } finally {
-          mounted.api.setBusy(false);
-        }
-      },
-      onDelete: async (id: number) => {
-        const commentId = Number(id);
-        if (!Number.isFinite(commentId) || commentId <= 0) return;
-        try {
-          mounted.api.setBusy(true);
-          await deleteArticleCommentById(commentId);
-          await refresh();
-        } finally {
-          mounted.api.setBusy(false);
-        }
-      },
-    };
-
-    if (sidebarSession) {
-      sidebarSession.attachPanel(mounted.api as any);
-      sidebarSession.setHandlers(handlers as any);
-    } else {
-      mounted.api.setQuoteText(String(quoteTextRef.current || ''));
-      mounted.api.setHandlers(handlers as any);
-    }
+    sidebarSession.attachPanel(mounted.api as any);
 
     return () => {
-      sidebarSession?.detachPanel();
+      sidebarSession.detachPanel();
       mounted.cleanup();
       apiRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, normalizedUrl, canClose, sidebarSession]);
-
-  useEffect(() => {
-    if (sidebarSession) return;
-    const api = apiRef.current;
-    if (!api) return;
-    api.setQuoteText(String(quoteTextRef.current || ''));
-  }, [quoteText, sidebarSession]);
-
-  useEffect(() => {
-    if (sidebarSession) return;
-    const api = apiRef.current;
-    if (!focusSignal) return;
-    if (lastFocusSignalRef.current === focusSignal) return;
-    lastFocusSignalRef.current = focusSignal;
-    if (!api) {
-      pendingFocusRef.current = true;
-      return;
-    }
-    api.open({ focusComposer: true });
-  }, [focusSignal, sidebarSession]);
-
-  useEffect(() => {
-    const target = sidebarSession || apiRef.current;
-    if (!target) return;
-    target.setComments(
-      (Array.isArray(items) ? items : []).map(
-        (c: any): ThreadedCommentItem => ({
-          id: Number(c?.id),
-          parentId: c?.parentId != null ? Number(c.parentId) : null,
-          authorName: c?.authorName != null ? String(c.authorName) : null,
-          createdAt: Number(c?.createdAt) || null,
-          quoteText: String(c?.quoteText || ''),
-          commentText: String(c?.commentText || ''),
-        }),
-      ),
-    );
-  }, [items, sidebarSession]);
-
-  useEffect(() => {
-    const target = sidebarSession || apiRef.current;
-    if (!target) return;
-    target.setBusy(loading);
-  }, [loading, sidebarSession]);
+  }, [sidebarSession, variant]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 
   return (
     <section className={sectionClassName}>
-      {error ? <p className="tw-mb-2 tw-text-xs tw-font-semibold tw-text-[var(--error)]">{error}</p> : null}
       <div ref={hostRef} className="tw-min-h-0 tw-flex-1" />
     </section>
+  );
+}
+
+function ArticleCommentsEmbedded({
+  conversationId,
+  canonicalUrl,
+  containerClassName,
+  variant,
+}: {
+  conversationId: number;
+  canonicalUrl: string;
+  containerClassName?: string;
+  variant?: 'embedded' | 'sidebar';
+}) {
+  const sessionRef = useRef<CommentSidebarSession | null>(null);
+  const controllerRef = useRef<ReturnType<typeof createArticleCommentsSidebarController> | null>(null);
+
+  if (!sessionRef.current) sessionRef.current = createCommentSidebarSession();
+  const session = sessionRef.current;
+
+  if (!controllerRef.current) {
+    controllerRef.current = createArticleCommentsSidebarController({
+      session,
+      adapter: createArticleCommentsSidebarAppAdapter(),
+    });
+  }
+  const controller = controllerRef.current;
+
+  useEffect(() => {
+    controller.setContext({
+      canonicalUrl: normalizeHttpUrl(canonicalUrl),
+      conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
+    });
+    void controller.refresh();
+  }, [canonicalUrl, conversationId, controller]);
+
+  return (
+    <ArticleCommentsPanelMount
+      sidebarSession={session}
+      containerClassName={containerClassName}
+      variant={variant === 'sidebar' ? 'sidebar' : 'embedded'}
+    />
   );
 }
