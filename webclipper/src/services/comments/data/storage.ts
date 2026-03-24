@@ -23,3 +23,10 @@ export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string)
 export async function attachOrphanCommentsToConversation(canonicalUrl: string, conversationId: number) {
   return await idb.attachOrphanCommentsToConversation(canonicalUrl, conversationId);
 }
+
+export async function migrateArticleCommentsCanonicalUrl(
+  fromCanonicalUrl: string,
+  toCanonicalUrl: string,
+): Promise<{ updated: number }> {
+  return await idb.migrateArticleCommentsCanonicalUrl(fromCanonicalUrl, toCanonicalUrl);
+}

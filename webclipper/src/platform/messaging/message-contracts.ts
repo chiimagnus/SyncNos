@@ -48,6 +48,7 @@ export const COMMENTS_MESSAGE_TYPES = {
   ADD_ARTICLE_COMMENT: 'addArticleComment',
   DELETE_ARTICLE_COMMENT: 'deleteArticleComment',
   ATTACH_ORPHAN_ARTICLE_COMMENTS: 'attachOrphanArticleComments',
+  MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL: 'migrateArticleCommentsCanonicalUrl',
 } as const;
 
 export const UI_MESSAGE_TYPES = {

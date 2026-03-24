@@ -5,6 +5,7 @@ import {
   deleteArticleCommentById,
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
+  migrateArticleCommentsCanonicalUrl,
 } from '@services/comments/data/storage';
 import { storageGet } from '@services/shared/storage';
 import {
@@ -95,6 +96,31 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
       reason: 'articleCommentAttached',
       conversationId,
     });
+    return router.ok(res);
+  });
+
+  router.register(COMMENTS_MESSAGE_TYPES.MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL, async (msg) => {
+    const fromCanonicalUrl = normalizeHttpUrl(msg?.fromCanonicalUrl);
+    const toCanonicalUrl = normalizeHttpUrl(msg?.toCanonicalUrl);
+    const conversationId = msg?.conversationId != null ? Number(msg.conversationId) : null;
+    if (!fromCanonicalUrl) return router.err('missing fromCanonicalUrl');
+    if (!toCanonicalUrl) return router.err('missing toCanonicalUrl');
+
+    const res = await migrateArticleCommentsCanonicalUrl(fromCanonicalUrl, toCanonicalUrl);
+    if (conversationId != null && Number.isFinite(conversationId) && conversationId > 0) {
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'articleCommentsMigrated',
+        conversationId,
+        fromCanonicalUrl,
+        toCanonicalUrl,
+      });
+    } else {
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'articleCommentsMigrated',
+        fromCanonicalUrl,
+        toCanonicalUrl,
+      });
+    }
     return router.ok(res);
   });
 }
