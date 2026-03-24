@@ -223,14 +223,17 @@ export default function AppShell() {
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-	        {renderSidebar ? (
-	          <aside
-		            className={['tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0', columnDividerRightClassName()].join(' ')}
-		            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
-	          >
-	            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-	          </aside>
-	        ) : null}
+        {renderSidebar ? (
+          <aside
+            className={[
+              'tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0',
+              columnDividerRightClassName(),
+            ].join(' ')}
+            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+          >
+            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
+          </aside>
+        ) : null}
 
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
           {isNarrow ? (
@@ -295,17 +298,17 @@ export default function AppShell() {
                 </Routes>
               </div>
 
-	              {showCommentsSidebar ? (
-	                <div className="tw-h-full tw-min-h-0 tw-shrink-0">
-	                  <ArticleCommentsSection
-	                    sidebarSession={commentsSidebarSession}
-	                    conversationId={Number((selectedConversation as any)?.id || 0)}
-	                    canonicalUrl={canonicalUrl}
-	                    containerClassName="tw-h-full tw-min-h-0"
-	                    variant="sidebar"
-	                    onRequestClose={() => {
-	                      commentsSidebarSession.requestClose();
-	                      setCommentsCollapsed(true);
+              {showCommentsSidebar ? (
+                <div className="tw-h-full tw-min-h-0 tw-shrink-0">
+                  <ArticleCommentsSection
+                    sidebarSession={commentsSidebarSession}
+                    conversationId={Number((selectedConversation as any)?.id || 0)}
+                    canonicalUrl={canonicalUrl}
+                    containerClassName="tw-h-full tw-min-h-0"
+                    variant="sidebar"
+                    onRequestClose={() => {
+                      commentsSidebarSession.requestClose();
+                      setCommentsCollapsed(true);
                     }}
                   />
                 </div>

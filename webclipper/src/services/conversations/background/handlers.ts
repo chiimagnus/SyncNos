@@ -60,8 +60,10 @@ export function registerConversationHandlers(router: AnyRouter) {
   router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {
     const keepConversationId = Number(msg?.keepConversationId);
     const removeConversationId = Number(msg?.removeConversationId);
-    if (!Number.isFinite(keepConversationId) || keepConversationId <= 0) return router.err('invalid keepConversationId');
-    if (!Number.isFinite(removeConversationId) || removeConversationId <= 0) return router.err('invalid removeConversationId');
+    if (!Number.isFinite(keepConversationId) || keepConversationId <= 0)
+      return router.err('invalid keepConversationId');
+    if (!Number.isFinite(removeConversationId) || removeConversationId <= 0)
+      return router.err('invalid removeConversationId');
     if (keepConversationId === removeConversationId) {
       return router.ok({
         keptConversationId: keepConversationId,

@@ -44,9 +44,6 @@ export async function deleteConversationsByIds(conversationIds: any[]) {
   return await idb.deleteConversationsByIds(conversationIds);
 }
 
-export async function mergeConversationsByIds(input: {
-  keepConversationId: number;
-  removeConversationId: number;
-}) {
+export async function mergeConversationsByIds(input: { keepConversationId: number; removeConversationId: number }) {
   return await idb.mergeConversationsByIds(input);
 }

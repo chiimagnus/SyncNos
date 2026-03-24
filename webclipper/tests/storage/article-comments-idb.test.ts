@@ -140,7 +140,12 @@ describe('article comments storage-idb', () => {
 
     const c1 = await addArticleComment({ conversationId: 1, canonicalUrl: fromUrl, commentText: 'a', createdAt: 1 });
     const c2 = await addArticleComment({ conversationId: null, canonicalUrl: fromUrl, commentText: 'b', createdAt: 2 });
-    const existing = await addArticleComment({ conversationId: 2, canonicalUrl: toUrl, commentText: 'c', createdAt: 3 });
+    const existing = await addArticleComment({
+      conversationId: 2,
+      canonicalUrl: toUrl,
+      commentText: 'c',
+      createdAt: 3,
+    });
 
     const res = await migrateArticleCommentsCanonicalUrl(fromUrl, toUrl);
     expect(res.updated).toBe(2);

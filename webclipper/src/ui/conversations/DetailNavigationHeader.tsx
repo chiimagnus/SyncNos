@@ -66,10 +66,10 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           <div className="tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
             {title}
           </div>
-	          {showSubtitleRow ? (
-	            <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-	              {urlEditing ? (
-	                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
+          {showSubtitleRow ? (
+            <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+              {urlEditing ? (
+                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
                   <input
                     ref={urlInputRef}
                     className="tw-min-w-0 tw-flex-1 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
@@ -135,22 +135,22 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
                   </button>
                   <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter · Esc</span>
                 </span>
-	              ) : (
-	                <button
-	                  type="button"
-	                  className="tw-min-w-0 tw-w-full tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
-	                  onClick={() => {
-	                    setUrlDraft(displayedUrl);
-	                    setUrlEditing(true);
-	                  }}
-	                  aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
-	                  title={displayedUrl || t('noLinkAvailable')}
-	                >
-	                  {displayedUrl || t('noLinkAvailable')}
-	                </button>
-	              )}
-	            </div>
-	          ) : null}
+              ) : (
+                <button
+                  type="button"
+                  className="tw-min-w-0 tw-w-full tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
+                  onClick={() => {
+                    setUrlDraft(displayedUrl);
+                    setUrlEditing(true);
+                  }}
+                  aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+                  title={displayedUrl || t('noLinkAvailable')}
+                >
+                  {displayedUrl || t('noLinkAvailable')}
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 

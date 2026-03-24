@@ -326,7 +326,8 @@ export async function mergeConversationsByIds(input: {
   const keepConversationId = Number(input.keepConversationId);
   const removeConversationId = Number(input.removeConversationId);
   if (!Number.isFinite(keepConversationId) || keepConversationId <= 0) throw new Error('invalid keepConversationId');
-  if (!Number.isFinite(removeConversationId) || removeConversationId <= 0) throw new Error('invalid removeConversationId');
+  if (!Number.isFinite(removeConversationId) || removeConversationId <= 0)
+    throw new Error('invalid removeConversationId');
   if (keepConversationId === removeConversationId) {
     return {
       keptConversationId: keepConversationId,
@@ -381,10 +382,7 @@ export async function mergeConversationsByIds(input: {
   // Move messages.
   const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
   const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
-  const msgRange = IDBKeyRange.bound(
-    [removeConversationId, -Infinity] as any,
-    [removeConversationId, Infinity] as any,
-  );
+  const msgRange = IDBKeyRange.bound([removeConversationId, -Infinity] as any, [removeConversationId, Infinity] as any);
   const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
   let movedMessages = 0;
   for (const row of Array.isArray(msgRows) ? msgRows : []) {
