@@ -13,6 +13,7 @@ import type { DetailHeaderAction } from '@services/integrations/detail-header-ac
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
+import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { t } from '@i18n';
 import {
   useConversationSyncFeedback,
@@ -231,6 +232,7 @@ type ConversationsAppState = {
   deleteSelected: () => Promise<void>;
 
   updateSelectedConversationUrl: (nextUrl: string) => Promise<void>;
+  cleanUrlDraft: (rawUrl: string) => Promise<string>;
 };
 
 const ConversationsContext = createContext<ConversationsAppState | null>(null);
@@ -396,6 +398,18 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     },
     [items, selectedConversation],
   );
+
+  const cleanUrlDraft = useCallback(async (rawUrl: string) => {
+    const canonical = canonicalizeHttpUrl(rawUrl);
+    if (!canonical) throw new Error('URL must be an http(s) page');
+    try {
+      const cleaned = (await cleanTrackingParamsUrl(canonical)) || canonical;
+      return canonicalizeHttpUrl(cleaned) || canonical;
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : String(e || 'Failed to clean URL');
+      throw new Error(message);
+    }
+  }, []);
 
   useEffect(() => {
     void refreshList();
@@ -747,6 +761,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     clearSyncFeedback,
     deleteSelected,
     updateSelectedConversationUrl,
+    cleanUrlDraft,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;

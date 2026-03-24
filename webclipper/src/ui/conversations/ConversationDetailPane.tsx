@@ -48,6 +48,7 @@ export function ConversationDetailPane({
     detail,
     detailHeaderActions,
     updateSelectedConversationUrl,
+    cleanUrlDraft,
   } = useConversationsApp();
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
@@ -70,12 +71,14 @@ export function ConversationDetailPane({
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
+  const [urlCleaning, setUrlCleaning] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
 
   useEffect(() => {
     setUrlEditing(false);
     setUrlDraft('');
+    setUrlCleaning(false);
   }, [activeId]);
 
   useEffect(() => {
@@ -200,6 +203,32 @@ export function ConversationDetailPane({
                             }
                           }}
                         />
+                        <button
+                          type="button"
+                          className="tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] disabled:tw-opacity-60"
+                          disabled={urlCleaning}
+                          onClick={() => {
+                            if (urlCleaning) return;
+                            void (async () => {
+                              setUrlCleaning(true);
+                              try {
+                                const cleaned = await cleanUrlDraft(String(urlDraft || ''));
+                                setUrlDraft(cleaned);
+                              } catch (error) {
+                                const message =
+                                  error instanceof Error && error.message
+                                    ? error.message
+                                    : String(error || t('actionFailedFallback'));
+                                if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+                                else console.error(message);
+                              } finally {
+                                setUrlCleaning(false);
+                              }
+                            })();
+                          }}
+                        >
+                          {urlCleaning ? '清理中…' : '清理参数'}
+                        </button>
                         <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter 保存 · Esc 取消</span>
                       </>
                     ) : (
