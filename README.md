@@ -16,7 +16,6 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
 </div>
 
-
 ## Why SyncNos WebClipper?
 
 | | |
@@ -25,8 +24,6 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 | 🔄 **Incremental sync, no duplicates** | Only new content gets synced. Precise cursor tracking picks up right where you left off. Your knowledge base grows while you chat. |
 | 🔓 **Fully open source** | Every line of code is in this repo. You can see exactly what runs in your browser. |
 | 📦 **Multi-target output** | Notion / Obsidian / Markdown / Zip — your data, your choice. No vendor lock-in. |
-
----
 
 ## Download & Install
 
@@ -37,21 +34,15 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 | Firefox | [Firefox AMO](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Arc / Brave / other Chromium | Use the Chrome Web Store link |
 
----
-
 ## Get Started in 3 Steps
 
 1. **Install the extension** (Chrome / Edge / Firefox / Arc)
 2. **Open any supported AI platform or web page** — the extension captures conversations and articles in the background
 3. **Sync or export** — go to Settings to sync to Notion / Obsidian, or export Markdown / Zip backups
 
----
-
 ## Demo Video
 
 [![SyncNos demo video](.github/deepwiki/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
-
----
 
 ## Supported Sources
 
@@ -77,8 +68,6 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
 Any `http(s)` page can be clipped — body text, title, author, and publish date are extracted automatically.
 
----
-
 ## Output Targets
 
 | Target | Details |
@@ -86,8 +75,6 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 | **Notion** | One-click sync after OAuth. AI chats → `SyncNos-AI Chats` database; web articles → `SyncNos-Web Articles` database. |
 | **Obsidian** | Writes directly to your vault via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Local-to-local, no network involved. |
 | **Markdown / Zip** | Single file or bulk export. Keep an offline copy of everything, including article comment threads. |
-
----
 
 ## Core Capabilities
 
@@ -101,19 +88,13 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Theme** — follows system `prefers-color-scheme` only.
 - **Inpage button** — configurable display scope (all sites / supported sites only / off).
 
----
-
 ## Screenshots
-
-<!-- Keep your screenshots here; update as needed -->
 
 WebClipper Popup: save and browse conversations
 ![WebClipper Popup](.github/deepwiki/assets/popup-screenshots.png)
 
 WebClipper Settings: backup and sync (Notion / Obsidian)
 ![WebClipper Settings](.github/deepwiki/assets/setting-screenshots.png)
-
----
 
 ## Support
 
@@ -127,4 +108,6 @@ What connects us is emotion, not a transaction.
 
 <img src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus tip jar QR" width="180" />
 
----
+## Acknowledgements
+
+Special thanks to the [linux.do](https://linux.do/t/topic/1635410) community 💛

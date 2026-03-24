@@ -16,7 +16,6 @@
 
 </div>
 
-
 ## 为什么用 SyncNos WebClipper？
 
 | | |
@@ -25,8 +24,6 @@
 | 🔄 **增量同步，不重复不遗漏** | 只同步新内容，游标精确追踪上次同步位置。后台自动采集，知识库在你聊天的同时自己生长。 |
 | 🔓 **完全开源，没有黑箱** | 每一行代码都在这个仓库里。你能看到你的浏览器里到底跑了什么。 |
 | 📦 **多目标输出** | Notion / Obsidian / Markdown / Zip——你的数据你做主，不被任何平台绑架。 |
-
----
 
 ## 下载与安装
 
@@ -37,21 +34,15 @@
 | Firefox | [Firefox AMO](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) |
 | Arc / Brave 等 Chromium 系 | 使用 Chrome Web Store 链接 |
 
----
-
 ## 3 步上手
 
 1. **安装扩展**（Chrome / Edge / Firefox / Arc）
 2. **打开任何支持的 AI 平台或网页**，插件自动在后台采集对话或文章
 3. **同步或导出**：进入 Settings，一键同步到 Notion / Obsidian，或导出 Markdown / Zip 备份
 
----
-
 ## 操作演示视频
 
 [![SyncNos 操作演示视频](.github/deepwiki/assets/syncnos-demo-video.svg)](https://www.bilibili.com/video/BV1gjwQznEx7/)
-
----
 
 ## 支持采集的来源
 
@@ -77,8 +68,6 @@
 
 任意 `http(s)` 页面均可触发抓取，自动提取正文、标题、作者和发布时间。
 
----
-
 ## 输出目标
 
 | 目标 | 说明 |
@@ -86,8 +75,6 @@
 | **Notion** | OAuth 授权后一键同步。AI 对话 → `SyncNos-AI Chats` 数据库；网页文章 → `SyncNos-Web Articles` 数据库。 |
 | **Obsidian** | 通过 [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) 插件直接写入 vault。本地到本地，不经网络。 |
 | **Markdown / Zip** | 单文件或批量导出，随时备份完整数据（含文章评论线程）。 |
-
----
 
 ## 核心能力
 
@@ -101,8 +88,6 @@
 - **主题**：仅跟随系统 `prefers-color-scheme`。
 - **Inpage 按钮**：可配置显示范围（所有站点 / 仅支持站点 / 关闭）。
 
----
-
 ## 界面预览
 
 <!-- 保留你的截图，按需更新 -->
@@ -111,8 +96,6 @@ WebClipper Popup：保存与浏览对话
 ![WebClipper Popup](.github/deepwiki/assets/popup-screenshots.png)
 WebClipper Settings：备份与同步（Notion / Obsidian）
 ![WebClipper Settings](.github/deepwiki/assets/setting-screenshots.png)
-
----
 
 ## 支持
 
@@ -124,4 +107,6 @@ SyncNos 是一个人用心做的项目。
 
 <img src="webclipper/public/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="180" />
 
----
+## 致谢
+
+感谢 [linux.do](https://linux.do/t/topic/1635410) 社区的支持 💛
