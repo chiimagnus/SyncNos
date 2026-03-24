@@ -1,5 +1,6 @@
 export const CORE_MESSAGE_TYPES = {
   UPSERT_CONVERSATION: 'upsertConversation',
+  MERGE_CONVERSATIONS: 'mergeConversations',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
   GET_CONVERSATIONS: 'getConversations',
