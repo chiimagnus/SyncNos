@@ -138,7 +138,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
 	              ) : (
 	                <button
 	                  type="button"
-	                  className="tw-min-w-0 tw-w-full tw-truncate tw-bg-transparent tw-p-0 tw-text-left tw-cursor-text focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+	                  className="tw-min-w-0 tw-w-full tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
 	                  onClick={() => {
 	                    setUrlDraft(displayedUrl);
 	                    setUrlEditing(true);
