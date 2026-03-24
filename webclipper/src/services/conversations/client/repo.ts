@@ -33,6 +33,37 @@ export async function deleteConversations(conversationIds: number[]): Promise<un
   return unwrap(res);
 }
 
+export async function upsertConversation(payload: Partial<Conversation>): Promise<Conversation & { __isNew?: boolean }> {
+  const res = await send<ApiResponse<Conversation & { __isNew?: boolean }>>(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
+    payload: payload as any,
+  });
+  return unwrap(res);
+}
+
+export async function mergeConversations(input: {
+  keepConversationId: number;
+  removeConversationId: number;
+}): Promise<{
+  keptConversationId: number;
+  removedConversationId: number;
+  movedMessages: number;
+  movedImageCache: number;
+  merged: boolean;
+}> {
+  const keepConversationId = Number(input.keepConversationId);
+  const removeConversationId = Number(input.removeConversationId);
+  const res = await send<
+    ApiResponse<{
+      keptConversationId: number;
+      removedConversationId: number;
+      movedMessages: number;
+      movedImageCache: number;
+      merged: boolean;
+    }>
+  >(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, { keepConversationId, removeConversationId });
+  return unwrap(res);
+}
+
 export type BackfillConversationImagesResult = {
   scannedMessages: number;
   updatedMessages: number;

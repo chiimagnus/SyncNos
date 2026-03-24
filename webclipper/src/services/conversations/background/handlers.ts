@@ -5,6 +5,7 @@ import {
   getConversationDetail,
   hasConversation,
   listConversations,
+  mergeConversationsByIds,
 } from '@services/conversations/data/storage';
 import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
@@ -54,6 +55,30 @@ export function registerConversationHandlers(router: AnyRouter) {
       });
     }
     return router.ok({ ...(convo as any), __isNew: !existed });
+  });
+
+  router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {
+    const keepConversationId = Number(msg?.keepConversationId);
+    const removeConversationId = Number(msg?.removeConversationId);
+    if (!Number.isFinite(keepConversationId) || keepConversationId <= 0) return router.err('invalid keepConversationId');
+    if (!Number.isFinite(removeConversationId) || removeConversationId <= 0) return router.err('invalid removeConversationId');
+    if (keepConversationId === removeConversationId) {
+      return router.ok({
+        keptConversationId: keepConversationId,
+        removedConversationId: removeConversationId,
+        movedMessages: 0,
+        movedImageCache: 0,
+        merged: false,
+      });
+    }
+
+    const res = await mergeConversationsByIds({ keepConversationId, removeConversationId });
+    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+      reason: 'mergeConversations',
+      conversationId: keepConversationId,
+      removedConversationId: removeConversationId,
+    });
+    return router.ok(res);
   });
 
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {

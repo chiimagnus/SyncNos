@@ -10,6 +10,7 @@ import {
   hasAnyArticleCommentsForCanonicalUrl,
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
+  migrateArticleCommentsCanonicalUrl,
 } from '@services/comments/data/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
@@ -131,5 +132,24 @@ describe('article comments storage-idb', () => {
     expect(byId.get(orphan1.id)?.conversationId).toBe(42);
     expect(byId.get(orphan2.id)?.conversationId).toBe(42);
     expect(byId.get(already.id)?.conversationId).toBe(9);
+  });
+
+  it('migrates canonicalUrl and merges into existing thread', async () => {
+    const fromUrl = 'https://example.com/a?utm_source=x';
+    const toUrl = 'https://example.com/a';
+
+    const c1 = await addArticleComment({ conversationId: 1, canonicalUrl: fromUrl, commentText: 'a', createdAt: 1 });
+    const c2 = await addArticleComment({ conversationId: null, canonicalUrl: fromUrl, commentText: 'b', createdAt: 2 });
+    const existing = await addArticleComment({ conversationId: 2, canonicalUrl: toUrl, commentText: 'c', createdAt: 3 });
+
+    const res = await migrateArticleCommentsCanonicalUrl(fromUrl, toUrl);
+    expect(res.updated).toBe(2);
+
+    const afterTo = await listArticleCommentsByCanonicalUrl(toUrl);
+    expect(afterTo.map((c) => c.id)).toEqual([c1.id, c2.id, existing.id]);
+    expect(afterTo.every((c) => c.canonicalUrl === toUrl)).toBe(true);
+
+    const afterFrom = await listArticleCommentsByCanonicalUrl(fromUrl);
+    expect(afterFrom.length).toBe(0);
   });
 });

@@ -6,12 +6,20 @@ import { formatConversationMarkdown } from '@services/conversations/domain/markd
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
-import { deleteConversations, getConversationDetail, listConversations } from '@services/conversations/client/repo';
+import {
+  deleteConversations,
+  getConversationDetail,
+  listConversations,
+  mergeConversations,
+  upsertConversation,
+} from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
+import { migrateArticleCommentsCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
+import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { t } from '@i18n';
 import {
   useConversationSyncFeedback,
@@ -77,6 +85,22 @@ function inferImageExtFromAsset(asset: { contentType?: string; url?: string }): 
 
   return 'png';
 }
+
+function canonicalizeHttpUrl(raw: unknown): string {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    const protocol = String(url.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return '';
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return '';
+  }
+}
+
+const URL_EDIT_CANCELLED_ERROR = 'SYNCNOS_URL_EDIT_CANCELLED';
 
 async function materializeSyncnosAssetsForExport(input: {
   markdown: string;
@@ -212,6 +236,9 @@ type ConversationsAppState = {
   syncSelectedObsidian: () => Promise<void>;
   clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
+
+  updateSelectedConversationUrl: (nextUrl: string) => Promise<void>;
+  cleanUrlDraft: (rawUrl: string) => Promise<string>;
 };
 
 const ConversationsContext = createContext<ConversationsAppState | null>(null);
@@ -317,6 +344,101 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
     } finally {
       setLoadingList(false);
+    }
+  }, []);
+
+  const updateSelectedConversationUrl = useCallback(
+    async (nextUrl: string) => {
+      const convo = selectedConversation;
+      if (!convo) throw new Error('No conversation selected');
+
+      const nextCanonical = canonicalizeHttpUrl(nextUrl);
+      if (!nextCanonical) throw new Error('URL must be an http(s) page');
+
+      const currentCanonical = canonicalizeHttpUrl((convo as any)?.url);
+      const sourceType = String((convo as any)?.sourceType || '')
+        .trim()
+        .toLowerCase();
+      const isArticle = sourceType === 'article';
+
+      if (isArticle) {
+        const conflict = (Array.isArray(items) ? items : []).find((item) => {
+          if (!item) return false;
+          const id = Number((item as any).id);
+          if (!Number.isFinite(id) || id <= 0) return false;
+          if (id === Number((convo as any).id)) return false;
+          const itemSourceType = String((item as any).sourceType || '')
+            .trim()
+            .toLowerCase();
+          if (itemSourceType !== 'article') return false;
+          const itemCanonical = canonicalizeHttpUrl((item as any).url);
+          if (!itemCanonical) return false;
+          return itemCanonical === nextCanonical;
+        });
+
+        if (conflict) {
+          const confirmed =
+            typeof globalThis.window?.confirm === 'function'
+              ? globalThis.window.confirm(
+                  '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
+                )
+              : true;
+          if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
+        }
+      }
+
+      const payload: any = {
+        source: (convo as any)?.source,
+        conversationKey: (convo as any)?.conversationKey,
+        sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
+        url: nextCanonical,
+        lastCapturedAt: (convo as any)?.lastCapturedAt,
+      };
+      await upsertConversation(payload);
+
+      if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
+        await migrateArticleCommentsCanonicalUrl({
+          fromCanonicalUrl: currentCanonical,
+          toCanonicalUrl: nextCanonical,
+          conversationId: Number((convo as any)?.id) || null,
+        });
+      }
+
+      if (isArticle) {
+        const conflict = (Array.isArray(items) ? items : []).find((item) => {
+          if (!item) return false;
+          const id = Number((item as any).id);
+          if (!Number.isFinite(id) || id <= 0) return false;
+          if (id === Number((convo as any).id)) return false;
+          const itemSourceType = String((item as any).sourceType || '')
+            .trim()
+            .toLowerCase();
+          if (itemSourceType !== 'article') return false;
+          const itemCanonical = canonicalizeHttpUrl((item as any).url);
+          if (!itemCanonical) return false;
+          return itemCanonical === nextCanonical;
+        });
+
+        if (conflict) {
+          await mergeConversations({
+            keepConversationId: Number((convo as any).id),
+            removeConversationId: Number((conflict as any).id),
+          });
+        }
+      }
+    },
+    [items, selectedConversation],
+  );
+
+  const cleanUrlDraft = useCallback(async (rawUrl: string) => {
+    const canonical = canonicalizeHttpUrl(rawUrl);
+    if (!canonical) throw new Error('URL must be an http(s) page');
+    try {
+      const cleaned = (await cleanTrackingParamsUrl(canonical)) || canonical;
+      return canonicalizeHttpUrl(cleaned) || canonical;
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : String(e || 'Failed to clean URL');
+      throw new Error(message);
     }
   }, []);
 
@@ -669,6 +791,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     syncSelectedObsidian,
     clearSyncFeedback,
     deleteSelected,
+    updateSelectedConversationUrl,
+    cleanUrlDraft,
   };
 
   return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;

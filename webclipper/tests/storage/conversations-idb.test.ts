@@ -8,6 +8,7 @@ import {
   deleteConversationsByIds,
   getConversations,
   getMessagesByConversationId,
+  mergeConversationsByIds,
   syncConversationMessages,
   syncConversationMessagesAppendOnly,
   upsertConversation,
@@ -268,6 +269,83 @@ describe('conversations storage-idb', () => {
       source: 'web',
       conversationKey: 'article:https://example.com/post',
       notionPageId: 'page_old',
+    });
+  });
+
+  it('merges conversations by ids and migrates messages + sync mappings', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'keep',
+      title: '',
+      url: 'https://example.com/a',
+      notionPageId: '',
+      warningFlags: ['w1'],
+      lastCapturedAt: 10,
+    });
+    const remove = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'remove',
+      title: 'From remove',
+      url: 'https://example.com/b',
+      notionPageId: 'page_remove',
+      warningFlags: ['w2'],
+      lastCapturedAt: 20,
+    });
+    const keepId = Number(keep.id);
+    const removeId = Number(remove.id);
+
+    await syncConversationMessages(removeId, [
+      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
+    ]);
+
+    // Insert mapping for remove directly.
+    const db = await openDb();
+    const t = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      t.objectStore('sync_mappings').add({
+        source: 'web',
+        conversationKey: 'remove',
+        notionPageId: 'page_remove',
+        lastSyncedMessageKey: 'x',
+        updatedAt: 1,
+      }),
+    );
+    await txDone(t);
+    db.close();
+
+    const res = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+    expect(res.keptConversationId).toBe(keepId);
+    expect(res.removedConversationId).toBe(removeId);
+    expect(res.merged).toBe(true);
+
+    const items = await getConversations();
+    expect(items.map((c) => c.conversationKey)).toEqual(['keep']);
+    expect(items[0]).toMatchObject({
+      conversationKey: 'keep',
+      title: 'From remove',
+      notionPageId: 'page_remove',
+    });
+    expect(items[0].warningFlags).toEqual(['w1', 'w2']);
+    expect(Number(items[0].lastCapturedAt)).toBe(20);
+
+    const moved = await getMessagesByConversationId(keepId);
+    expect(moved.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
+
+    const reopened = await openDb();
+    const verifyTx = reopened.transaction(['sync_mappings'], 'readonly');
+    const verifyMappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
+    await txDone(verifyTx);
+    reopened.close();
+
+    expect(verifyMappings).toHaveLength(1);
+    expect(verifyMappings[0]).toMatchObject({
+      source: 'web',
+      conversationKey: 'keep',
+      notionPageId: 'page_remove',
+      lastSyncedMessageKey: 'x',
     });
   });
 });

@@ -267,3 +267,46 @@ export async function attachOrphanCommentsToConversation(
   await txDone(t);
   return { updated };
 }
+
+export async function migrateArticleCommentsCanonicalUrl(
+  fromCanonicalUrl: string,
+  toCanonicalUrl: string,
+): Promise<{ updated: number }> {
+  const from = normalizeHttpUrl(fromCanonicalUrl);
+  const to = normalizeHttpUrl(toCanonicalUrl);
+  if (!from) throw new Error('fromCanonicalUrl required');
+  if (!to) throw new Error('toCanonicalUrl required');
+  if (from === to) return { updated: 0 };
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
+  const store = stores.article_comments;
+
+  const idx = store.index('by_canonicalUrl_createdAt');
+  const range = globalThis.IDBKeyRange?.bound
+    ? globalThis.IDBKeyRange.bound([from, -Infinity] as any, [from, Infinity] as any)
+    : null;
+  if (!range) {
+    await txDone(t);
+    return { updated: 0 };
+  }
+
+  const rows = (await reqToPromise<any[]>(idx.getAll(range) as any)) || [];
+  if (!rows.length) {
+    await txDone(t);
+    return { updated: 0 };
+  }
+
+  const now = Date.now();
+  let updated = 0;
+  for (const row of rows) {
+    if (!row) continue;
+    row.canonicalUrl = to;
+    row.updatedAt = now;
+    await reqToPromise(store.put(row));
+    updated += 1;
+  }
+
+  await txDone(t);
+  return { updated };
+}

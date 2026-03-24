@@ -8,7 +8,7 @@ import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -47,6 +47,8 @@ export function ConversationDetailPane({
     detailError,
     detail,
     detailHeaderActions,
+    updateSelectedConversationUrl,
+    cleanUrlDraft,
   } = useConversationsApp();
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
@@ -66,6 +68,35 @@ export function ConversationDetailPane({
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const selectionQuoteRef = useRef<string>('');
+
+  const [urlEditing, setUrlEditing] = useState(false);
+  const [urlDraft, setUrlDraft] = useState('');
+  const [urlCleaning, setUrlCleaning] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const displayedUrl = String((selected as any)?.url || '').trim();
+
+  useEffect(() => {
+    setUrlEditing(false);
+    setUrlDraft('');
+    setUrlCleaning(false);
+  }, [activeId]);
+
+  useEffect(() => {
+    if (!urlEditing) return;
+    const timer = setTimeout(() => {
+      try {
+        urlInputRef.current?.focus?.();
+      } catch (_e) {
+        // ignore
+      }
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [urlEditing]);
+
+  const saveUrlDraft = async () => {
+    await updateSelectedConversationUrl(String(urlDraft || ''));
+    setUrlEditing(false);
+  };
 
   const readSelectionQuote = (): string => {
     const root = messagesRootRef.current;
@@ -133,11 +164,95 @@ export function ConversationDetailPane({
                 <h2 className="tw-m-0 tw-block tw-min-w-0 tw-truncate tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
                   {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
                 </h2>
-                <div className="tw-mt-1 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {selected
-                    ? `${(selected as any).source} · ${(selected as any).conversationKey}`
-                    : t('selectConversationHint')}
-                </div>
+	                {selected ? (
+	                  <div className="tw-mt-1 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+	                    {urlEditing ? (
+	                      <>
+                        <input
+                          ref={urlInputRef}
+                          className="tw-min-w-0 tw-flex-1 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                          value={urlDraft}
+                          onChange={(e) => setUrlDraft(e.target.value)}
+                          placeholder="https://"
+                          inputMode="url"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setUrlEditing(false);
+                              setUrlDraft('');
+                              return;
+                            }
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              void (async () => {
+                                try {
+                                  await saveUrlDraft();
+                                } catch (error) {
+                                  const message =
+                                    error instanceof Error && error.message
+                                      ? error.message
+                                      : String(error || t('actionFailedFallback'));
+                                  if (message === 'SYNCNOS_URL_EDIT_CANCELLED') return;
+                                  if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+                                  else console.error(message);
+                                }
+                              })();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] disabled:tw-opacity-60"
+                          disabled={urlCleaning}
+                          onClick={() => {
+                            if (urlCleaning) return;
+                            void (async () => {
+                              setUrlCleaning(true);
+                              try {
+                                const cleaned = await cleanUrlDraft(String(urlDraft || ''));
+                                setUrlDraft(cleaned);
+                              } catch (error) {
+                                const message =
+                                  error instanceof Error && error.message
+                                    ? error.message
+                                    : String(error || t('actionFailedFallback'));
+                                if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+                                else console.error(message);
+                              } finally {
+                                setUrlCleaning(false);
+                              }
+                            })();
+                          }}
+                        >
+                          {urlCleaning ? '清理中…' : '清理参数'}
+                        </button>
+                        <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter 保存 · Esc 取消</span>
+                      </>
+	                    ) : (
+	                      <>
+	                        <button
+	                          type="button"
+	                          className="tw-min-w-0 tw-flex-1 tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
+	                          onClick={() => {
+	                            setUrlDraft(displayedUrl);
+	                            setUrlEditing(true);
+	                          }}
+	                          aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+	                          title={displayedUrl || t('noLinkAvailable')}
+	                        >
+	                          {displayedUrl || t('noLinkAvailable')}
+	                        </button>
+	                      </>
+	                    )}
+	                  </div>
+	                ) : (
+                  <div className="tw-mt-1 tw-min-w-0 tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+                    {t('selectConversationHint')}
+                  </div>
+                )}
               </div>
             </div>
             <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">

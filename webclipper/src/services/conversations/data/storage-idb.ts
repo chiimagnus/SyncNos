@@ -155,6 +155,25 @@ function pickMaxFiniteNumber(...values: unknown[]): number | null {
   return max;
 }
 
+function mergeStringFallback(preferred: unknown, fallback: unknown): string {
+  const a = safeString(preferred);
+  if (a) return a;
+  return safeString(fallback);
+}
+
+function mergeWarningFlags(preferred: unknown, fallback: unknown): string[] {
+  const a = Array.isArray(preferred) ? preferred : [];
+  const b = Array.isArray(fallback) ? fallback : [];
+  const out: string[] = [];
+  for (const item of [...a, ...b]) {
+    const text = safeString(item);
+    if (!text) continue;
+    if (out.includes(text)) continue;
+    out.push(text);
+  }
+  return out;
+}
+
 function mergeSyncMappingRecord(base: any, incoming: any, fallbackNotionPageId: string): any {
   const current = base && typeof base === 'object' ? { ...base } : {};
   const next = incoming && typeof incoming === 'object' ? incoming : {};
@@ -253,9 +272,11 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const now = Date.now();
   const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
   const nextUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+  const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
+  const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
 
   const baseRecord = {
-    sourceType: payload.sourceType || 'chat',
+    sourceType: nextSourceType,
     source: payload.source,
     conversationKey: payload.conversationKey,
     title: nextTitle || (existing ? existing.title || '' : ''),
@@ -268,7 +289,7 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
         ? existing.warningFlags || []
         : [],
     notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
-    lastCapturedAt: payload.lastCapturedAt || now,
+    lastCapturedAt: nextLastCapturedAt,
   };
 
   const record: any = withOptionalId(existing && existing.id, baseRecord);
@@ -290,6 +311,122 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   record.id = id as any;
   await txDone(t);
   return record;
+}
+
+export async function mergeConversationsByIds(input: {
+  keepConversationId: number;
+  removeConversationId: number;
+}): Promise<{
+  keptConversationId: number;
+  removedConversationId: number;
+  movedMessages: number;
+  movedImageCache: number;
+  merged: boolean;
+}> {
+  const keepConversationId = Number(input.keepConversationId);
+  const removeConversationId = Number(input.removeConversationId);
+  if (!Number.isFinite(keepConversationId) || keepConversationId <= 0) throw new Error('invalid keepConversationId');
+  if (!Number.isFinite(removeConversationId) || removeConversationId <= 0) throw new Error('invalid removeConversationId');
+  if (keepConversationId === removeConversationId) {
+    return {
+      keptConversationId: keepConversationId,
+      removedConversationId: removeConversationId,
+      movedMessages: 0,
+      movedImageCache: 0,
+      merged: false,
+    };
+  }
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings', 'image_cache'], 'readwrite');
+  const keep: any = await reqToPromise(stores.conversations.get(keepConversationId as any));
+  const remove: any = await reqToPromise(stores.conversations.get(removeConversationId as any));
+  if (!keep) {
+    await txDone(t);
+    throw new Error('keep conversation not found');
+  }
+  if (!remove) {
+    await txDone(t);
+    return {
+      keptConversationId: keepConversationId,
+      removedConversationId: removeConversationId,
+      movedMessages: 0,
+      movedImageCache: 0,
+      merged: false,
+    };
+  }
+
+  const mergedConversation: any = {
+    ...keep,
+    sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
+    title: mergeStringFallback(keep.title, remove.title),
+    url: mergeStringFallback(keep.url, remove.url),
+    author: mergeStringFallback(keep.author, remove.author),
+    publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
+    notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
+    warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
+    lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || Date.now(),
+  };
+
+  await migrateSyncMappingKey(stores.sync_mappings, {
+    legacySource: remove.source,
+    legacyConversationKey: remove.conversationKey,
+    nextSource: keep.source,
+    nextConversationKey: keep.conversationKey,
+    fallbackNotionPageId: mergedConversation.notionPageId,
+  });
+
+  await reqToPromise(stores.conversations.put(mergedConversation));
+
+  // Move messages.
+  const msgSeqIdx = stores.messages.index('by_conversationId_sequence');
+  const msgKeyIdx = stores.messages.index('by_conversationId_messageKey');
+  const msgRange = IDBKeyRange.bound(
+    [removeConversationId, -Infinity] as any,
+    [removeConversationId, Infinity] as any,
+  );
+  const msgRows = (await reqToPromise(msgSeqIdx.getAll(msgRange) as any)) as any[];
+  let movedMessages = 0;
+  for (const row of Array.isArray(msgRows) ? msgRows : []) {
+    if (!row) continue;
+    const rowId = Number(row.id);
+    const key = safeString(row.messageKey);
+    if (key) {
+      const exists = (await reqToPromise(msgKeyIdx.get([keepConversationId, key] as any) as any)) as any;
+      if (exists) {
+        if (Number.isFinite(rowId) && rowId > 0) {
+          await reqToPromise(stores.messages.delete(rowId));
+        }
+        continue;
+      }
+    }
+    row.conversationId = keepConversationId;
+    await reqToPromise(stores.messages.put(row));
+    movedMessages += 1;
+  }
+
+  // Move cached images.
+  const imageCacheIdx = stores.image_cache.index('by_conversationId');
+  const imgRange = IDBKeyRange.only(removeConversationId);
+  const imgRows = (await reqToPromise(imageCacheIdx.getAll(imgRange) as any)) as any[];
+  let movedImageCache = 0;
+  for (const row of Array.isArray(imgRows) ? imgRows : []) {
+    if (!row) continue;
+    row.conversationId = keepConversationId;
+    await reqToPromise(stores.image_cache.put(row));
+    movedImageCache += 1;
+  }
+
+  await reqToPromise(stores.conversations.delete(removeConversationId));
+  await txDone(t);
+
+  return {
+    keptConversationId: keepConversationId,
+    removedConversationId: removeConversationId,
+    movedMessages,
+    movedImageCache,
+    merged: true,
+  };
 }
 
 export async function syncConversationMessages(

@@ -1,5 +1,6 @@
 export const CORE_MESSAGE_TYPES = {
   UPSERT_CONVERSATION: 'upsertConversation',
+  MERGE_CONVERSATIONS: 'mergeConversations',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
   GET_CONVERSATIONS: 'getConversations',
@@ -48,6 +49,7 @@ export const COMMENTS_MESSAGE_TYPES = {
   ADD_ARTICLE_COMMENT: 'addArticleComment',
   DELETE_ARTICLE_COMMENT: 'deleteArticleComment',
   ATTACH_ORPHAN_ARTICLE_COMMENTS: 'attachOrphanArticleComments',
+  MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL: 'migrateArticleCommentsCanonicalUrl',
 } as const;
 
 export const UI_MESSAGE_TYPES = {
