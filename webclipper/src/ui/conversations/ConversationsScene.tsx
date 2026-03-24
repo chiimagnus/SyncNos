@@ -67,10 +67,7 @@ export function ConversationsScene({
     }
 
     const title = activeId ? formatConversationTitle(selectedConversation?.title) : t('chatsTitle');
-    const subtitle =
-      activeId && selectedConversation
-        ? `${String((selectedConversation as any).source || '').trim()} · ${String((selectedConversation as any).conversationKey || '').trim()}`.trim()
-        : '';
+    const subtitle = activeId && selectedConversation ? String((selectedConversation as any).url || '').trim() : '';
 
     onPopupHeaderStateChange({
       mode: 'detail',
