@@ -14,6 +14,11 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
+import {
+  createArticleCommentsSidebarController,
+  type ArticleCommentsSidebarController,
+} from '@services/comments/sidebar/article-comments-sidebar-controller';
+import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -87,10 +92,23 @@ export default function AppShell() {
   }) {
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
+    const commentsSidebarControllerRef = useRef<ArticleCommentsSidebarController | null>(null);
+    const suppressCommentsSidebarCollapseRef = useRef(false);
     if (!commentsSidebarSessionRef.current) {
       commentsSidebarSessionRef.current = createCommentSidebarSession();
     }
     const commentsSidebarSession = commentsSidebarSessionRef.current;
+    if (!commentsSidebarControllerRef.current) {
+      commentsSidebarControllerRef.current = createArticleCommentsSidebarController({
+        session: commentsSidebarSession,
+        adapter: createArticleCommentsSidebarAppAdapter(),
+        onClose: () => {
+          if (suppressCommentsSidebarCollapseRef.current) return;
+          setCommentsCollapsed(true);
+        },
+      });
+    }
+    const commentsSidebarController = commentsSidebarControllerRef.current;
     const commentsSidebarSnapshot = useSyncExternalStore(
       (listener) => commentsSidebarSession.subscribe(listener),
       () => commentsSidebarSession.getSnapshot(),
@@ -128,20 +146,34 @@ export default function AppShell() {
     };
 
     useEffect(() => {
-      if (isArticleConversation && canonicalUrl) return;
-      commentsSidebarSession.requestClose();
+      if (isArticleConversation && canonicalUrl) {
+        commentsSidebarController.setContext({
+          canonicalUrl,
+          conversationId: Number((selectedConversation as any)?.id || 0) || null,
+        });
+        return;
+      }
+
+      commentsSidebarController.setContext(null);
+      suppressCommentsSidebarCollapseRef.current = true;
+      try {
+        commentsSidebarSession.requestClose();
+      } finally {
+        suppressCommentsSidebarCollapseRef.current = false;
+      }
       commentsSidebarSession.setQuoteText('');
-    }, [canonicalUrl, commentsSidebarSession, isArticleConversation]);
+    }, [canonicalUrl, commentsSidebarController, commentsSidebarSession, isArticleConversation, selectedConversation]);
 
     useEffect(() => {
       if (showSettingsSheet) return;
       if (!canToggleCommentsSidebar) return;
       if (commentsSidebarCollapsed) return;
       if (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen) return;
-      commentsSidebarSession.requestOpen({ source: 'app-default' });
+      void commentsSidebarController.open({ source: 'app-default', focusComposer: false, ensureContext: false });
     }, [
       canToggleCommentsSidebar,
       commentsSidebarCollapsed,
+      commentsSidebarController,
       commentsSidebarSession,
       commentsSidebarSnapshot.isOpen,
       commentsSidebarSnapshot.openRequested,
@@ -149,9 +181,13 @@ export default function AppShell() {
     ]);
 
     const triggerCommentsSidebar = (quoteText: string) => {
-      commentsSidebarSession.setQuoteText(String(quoteText || '').trim());
-      commentsSidebarSession.requestOpen({ focusComposer: true, source: 'app' });
       setCommentsCollapsed(false);
+      void commentsSidebarController.open({
+        selectionText: String(quoteText || '').trim(),
+        focusComposer: true,
+        source: 'app',
+        ensureContext: false,
+      });
     };
 
     useEffect(() => {
@@ -307,7 +343,6 @@ export default function AppShell() {
                     containerClassName="tw-h-full tw-min-h-0"
                     variant="sidebar"
                     onRequestClose={() => {
-                      commentsSidebarSession.requestClose();
                       setCommentsCollapsed(true);
                     }}
                   />

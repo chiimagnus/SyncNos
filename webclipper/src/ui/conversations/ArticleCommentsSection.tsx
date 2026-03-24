@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
-import { connectPort } from '@services/shared/ports';
 import {
   addArticleComment,
   deleteArticleCommentById,
@@ -47,6 +45,93 @@ export function ArticleCommentsSection({
   variant?: 'embedded' | 'sidebar';
   onRequestClose?: () => void;
 }) {
+  if (sidebarSession) {
+    return (
+      <ArticleCommentsSidebarMount
+        sidebarSession={sidebarSession}
+        containerClassName={containerClassName}
+        variant={variant}
+        onRequestClose={onRequestClose}
+      />
+    );
+  }
+
+  return (
+    <ArticleCommentsEmbedded
+      conversationId={conversationId}
+      canonicalUrl={canonicalUrl}
+      quoteText={quoteText}
+      focusComposerSignal={focusComposerSignal}
+      containerClassName={containerClassName}
+      variant={variant}
+      onRequestClose={onRequestClose}
+    />
+  );
+}
+
+function ArticleCommentsSidebarMount({
+  sidebarSession,
+  containerClassName,
+  variant,
+  onRequestClose,
+}: {
+  sidebarSession: CommentSidebarSession;
+  containerClassName?: string;
+  variant?: 'embedded' | 'sidebar';
+  onRequestClose?: () => void;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
+  const canClose = typeof onRequestClose === 'function';
+
+  useEffect(() => {
+    if (!hostRef.current) return;
+    if (apiRef.current) return;
+    const host = hostRef.current;
+
+    const mounted = mountThreadedCommentsPanel(host, {
+      overlay: false,
+      variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
+      showHeader: true,
+      showCollapseButton: canClose,
+      surfaceBg: 'var(--bg-primary)',
+    });
+    apiRef.current = mounted.api;
+    sidebarSession.attachPanel(mounted.api as any);
+
+    return () => {
+      sidebarSession.detachPanel();
+      mounted.cleanup();
+      apiRef.current = null;
+    };
+  }, [canClose, sidebarSession, variant]);
+
+  const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
+
+  return (
+    <section className={sectionClassName}>
+      <div ref={hostRef} className="tw-min-h-0 tw-flex-1" />
+    </section>
+  );
+}
+
+function ArticleCommentsEmbedded({
+  conversationId,
+  canonicalUrl,
+  quoteText,
+  focusComposerSignal,
+  containerClassName,
+  variant,
+  onRequestClose,
+}: {
+  conversationId: number;
+  canonicalUrl: string;
+  quoteText?: string;
+  focusComposerSignal?: number;
+  containerClassName?: string;
+  variant?: 'embedded' | 'sidebar';
+  onRequestClose?: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
@@ -59,7 +144,6 @@ export function ArticleCommentsSection({
   onRequestCloseRef.current = onRequestClose;
   const focusSignal = Number(focusComposerSignal || 0);
   const lastFocusSignalRef = useRef<number>(0);
-  const pendingFocusRef = useRef<boolean>(false);
 
   const normalizedUrl = useMemo(() => normalizeHttpUrl(canonicalUrl), [canonicalUrl]);
   const canClose = typeof onRequestClose === 'function';
@@ -85,68 +169,6 @@ export function ArticleCommentsSection({
   }, [normalizedUrl]);
 
   useEffect(() => {
-    if (!conversationId) return;
-    let disposed = false;
-    let port: any = null;
-    const connect = () => {
-      if (disposed) return;
-      try {
-        port = connectPort(UI_PORT_NAMES.POPUP_EVENTS);
-      } catch (_e) {
-        port = null;
-        return;
-      }
-
-      const onMessage = (message: any) => {
-        if (disposed) return;
-        if (!message || typeof message !== 'object') return;
-        if (message.type !== UI_EVENT_TYPES.CONVERSATIONS_CHANGED) return;
-        const payload = (message as any).payload || {};
-        const changedId = Number(payload.conversationId);
-        if (Number.isFinite(changedId) && changedId > 0 && changedId === Number(conversationId)) {
-          void refresh();
-        }
-      };
-
-      const onDisconnect = () => {
-        try {
-          port?.onMessage?.removeListener?.(onMessage);
-        } catch (_e) {
-          // ignore
-        }
-        port = null;
-        if (disposed) return;
-        setTimeout(connect, 1000);
-      };
-
-      try {
-        port?.onMessage?.addListener?.(onMessage);
-        port?.onDisconnect?.addListener?.(onDisconnect);
-      } catch (_e) {
-        try {
-          port?.disconnect?.();
-        } catch (_e2) {
-          // ignore
-        }
-        port = null;
-      }
-    };
-
-    connect();
-
-    return () => {
-      disposed = true;
-      try {
-        port?.disconnect?.();
-      } catch (_e) {
-        // ignore
-      }
-      port = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, normalizedUrl]);
-
-  useEffect(() => {
     if (!hostRef.current) return;
     if (apiRef.current) return;
     const host = hostRef.current;
@@ -159,7 +181,9 @@ export function ArticleCommentsSection({
       surfaceBg: 'var(--bg-primary)',
     });
     apiRef.current = mounted.api;
-    const handlers = {
+
+    mounted.api.setQuoteText(String(quoteTextRef.current || ''));
+    mounted.api.setHandlers({
       onClose: () => {
         onRequestCloseRef.current?.();
       },
@@ -167,7 +191,7 @@ export function ArticleCommentsSection({
         if (!normalizedUrl) return false;
         const value = String(text || '').trim();
         if (!value) return false;
-        const quoteValue = sidebarSession ? sidebarSession.getSnapshot().quoteText : String(quoteTextRef.current || '');
+        const quoteValue = String(quoteTextRef.current || '');
         try {
           mounted.api.setBusy(true);
           await addArticleComment({
@@ -178,10 +202,8 @@ export function ArticleCommentsSection({
             commentText: value,
           } as any);
           await refresh();
-          if (!sidebarSession) {
-            quoteTextRef.current = '';
-            mounted.api.setQuoteText('');
-          }
+          quoteTextRef.current = '';
+          mounted.api.setQuoteText('');
           return true;
         } finally {
           mounted.api.setBusy(false);
@@ -216,48 +238,34 @@ export function ArticleCommentsSection({
           mounted.api.setBusy(false);
         }
       },
-    };
-
-    if (sidebarSession) {
-      sidebarSession.attachPanel(mounted.api as any);
-      sidebarSession.setHandlers(handlers as any);
-    } else {
-      mounted.api.setQuoteText(String(quoteTextRef.current || ''));
-      mounted.api.setHandlers(handlers as any);
-    }
+    } as any);
 
     return () => {
-      sidebarSession?.detachPanel();
       mounted.cleanup();
       apiRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, normalizedUrl, canClose, sidebarSession]);
+  }, [conversationId, normalizedUrl, canClose]);
 
   useEffect(() => {
-    if (sidebarSession) return;
     const api = apiRef.current;
     if (!api) return;
     api.setQuoteText(String(quoteTextRef.current || ''));
-  }, [quoteText, sidebarSession]);
+  }, [quoteText]);
 
   useEffect(() => {
-    if (sidebarSession) return;
     const api = apiRef.current;
     if (!focusSignal) return;
     if (lastFocusSignalRef.current === focusSignal) return;
     lastFocusSignalRef.current = focusSignal;
-    if (!api) {
-      pendingFocusRef.current = true;
-      return;
-    }
+    if (!api) return;
     api.open({ focusComposer: true });
-  }, [focusSignal, sidebarSession]);
+  }, [focusSignal]);
 
   useEffect(() => {
-    const target = sidebarSession || apiRef.current;
-    if (!target) return;
-    target.setComments(
+    const api = apiRef.current;
+    if (!api) return;
+    api.setComments(
       (Array.isArray(items) ? items : []).map(
         (c: any): ThreadedCommentItem => ({
           id: Number(c?.id),
@@ -269,13 +277,13 @@ export function ArticleCommentsSection({
         }),
       ),
     );
-  }, [items, sidebarSession]);
+  }, [items]);
 
   useEffect(() => {
-    const target = sidebarSession || apiRef.current;
-    if (!target) return;
-    target.setBusy(loading);
-  }, [loading, sidebarSession]);
+    const api = apiRef.current;
+    if (!api) return;
+    api.setBusy(loading);
+  }, [loading]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 
