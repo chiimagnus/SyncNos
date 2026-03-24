@@ -299,6 +299,9 @@ export default function AppShell() {
                     focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
                     containerClassName="tw-h-full tw-min-h-0"
                     variant="sidebar"
+                    onQuoteTextConsumed={() => {
+                      commentsSidebarSession.setQuoteText('');
+                    }}
                     onRequestClose={() => {
                       commentsSidebarSession.requestClose();
                       setCommentsCollapsed(true);
