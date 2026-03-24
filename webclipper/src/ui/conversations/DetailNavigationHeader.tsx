@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Copy, ExternalLink } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 import { t } from '@i18n';
-import { openExternalUrl } from '@services/integrations/open-external-url';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
-import { copyTextToClipboard } from '@ui/shared/clipboard';
-import { navIconButtonClassName, navIconButtonSmClassName } from '@ui/shared/nav-styles';
+import { navIconButtonClassName } from '@ui/shared/nav-styles';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 
@@ -32,7 +30,6 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   const [urlCleaning, setUrlCleaning] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String(subtitle || '').trim();
-  const openableUrl = /^https?:\/\//i.test(displayedUrl) ? displayedUrl : '';
   const showSubtitleRow = subtitle != null;
 
   useEffect(() => {
@@ -58,15 +55,6 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
     setUrlEditing(false);
   };
 
-  const openDisplayedUrl = async () => {
-    const ok = await openExternalUrl(openableUrl);
-    if (!ok) throw new Error(t('noLinkAvailable'));
-  };
-
-  const copyDisplayedUrl = async () => {
-    await copyTextToClipboard(displayedUrl);
-  };
-
   return (
     <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 md:tw-grid md:tw-gap-2">
       <div className="tw-flex tw-min-w-0 tw-flex-1 tw-items-center tw-gap-2">
@@ -79,7 +67,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
             {title}
           </div>
 	          {showSubtitleRow ? (
-	            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+	            <div className="tw-truncate tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
 	              {urlEditing ? (
 	                <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
                   <input
@@ -148,64 +136,18 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
                   <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter · Esc</span>
                 </span>
 	              ) : (
-	                <>
-	                  <button
-	                    type="button"
-	                    className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-left tw-underline-offset-2 hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
-	                    onClick={() => {
-	                      setUrlDraft(displayedUrl);
-	                      setUrlEditing(true);
-	                    }}
-	                    aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
-	                    title={displayedUrl || t('noLinkAvailable')}
-	                  >
-	                    {displayedUrl || t('noLinkAvailable')}
-	                  </button>
-	                  <button
-	                    type="button"
-	                    className={navIconButtonSmClassName(false)}
-	                    disabled={!openableUrl}
-	                    onClick={() => {
-	                      if (!openableUrl) return;
-	                      void (async () => {
-	                        try {
-	                          await openDisplayedUrl();
-	                        } catch (error) {
-	                          const message =
-	                            error instanceof Error && error.message
-	                              ? error.message
-	                              : String(error || t('actionFailedFallback'));
-	                          if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
-	                          else console.error(message);
-	                        }
-	                      })();
-	                    }}
-	                    aria-label="Open URL"
-	                    title="Open URL"
-	                  >
-	                    <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />
-	                  </button>
-	                  <button
-	                    type="button"
-	                    className={navIconButtonSmClassName(false)}
-	                    disabled={!displayedUrl}
-	                    onClick={() => {
-	                      if (!displayedUrl) return;
-	                      void (async () => {
-	                        try {
-	                          await copyDisplayedUrl();
-	                        } catch (_error) {
-	                          if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(t('copyFailed'));
-	                          else console.error(t('copyFailed'));
-	                        }
-	                      })();
-	                    }}
-	                    aria-label="Copy URL"
-	                    title="Copy URL"
-	                  >
-	                    <Copy size={14} strokeWidth={2} aria-hidden="true" />
-	                  </button>
-	                </>
+	                <button
+	                  type="button"
+	                  className="tw-min-w-0 tw-w-full tw-truncate tw-bg-transparent tw-p-0 tw-text-left tw-cursor-text focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+	                  onClick={() => {
+	                    setUrlDraft(displayedUrl);
+	                    setUrlEditing(true);
+	                  }}
+	                  aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+	                  title={displayedUrl || t('noLinkAvailable')}
+	                >
+	                  {displayedUrl || t('noLinkAvailable')}
+	                </button>
 	              )}
 	            </div>
 	          ) : null}
