@@ -338,13 +338,7 @@ export default function AppShell() {
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0">
                   <ArticleCommentsSection
                     sidebarSession={commentsSidebarSession}
-                    conversationId={Number((selectedConversation as any)?.id || 0)}
-                    canonicalUrl={canonicalUrl}
                     containerClassName="tw-h-full tw-min-h-0"
-                    variant="sidebar"
-                    onRequestClose={() => {
-                      setCommentsCollapsed(true);
-                    }}
                   />
                 </div>
               ) : null}
