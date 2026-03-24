@@ -33,6 +33,13 @@ export async function deleteConversations(conversationIds: number[]): Promise<un
   return unwrap(res);
 }
 
+export async function upsertConversation(payload: Partial<Conversation>): Promise<Conversation & { __isNew?: boolean }> {
+  const res = await send<ApiResponse<Conversation & { __isNew?: boolean }>>(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
+    payload: payload as any,
+  });
+  return unwrap(res);
+}
+
 export type BackfillConversationImagesResult = {
   scannedMessages: number;
   updatedMessages: number;
