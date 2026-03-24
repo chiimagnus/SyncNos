@@ -6,7 +6,13 @@ import { formatConversationMarkdown } from '@services/conversations/domain/markd
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
-import { deleteConversations, getConversationDetail, listConversations, upsertConversation } from '@services/conversations/client/repo';
+import {
+  deleteConversations,
+  getConversationDetail,
+  listConversations,
+  mergeConversations,
+  upsertConversation,
+} from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
 import { migrateArticleCommentsCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
@@ -373,7 +379,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
         if (conflict) {
           const confirmed =
             typeof globalThis.window?.confirm === 'function'
-              ? globalThis.window.confirm('这个 URL 已存在于另一条文章记录中。继续将会合并评论，是否继续？')
+              ? globalThis.window.confirm(
+                  '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
+                )
               : true;
           if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
         }
@@ -394,6 +402,29 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           toCanonicalUrl: nextCanonical,
           conversationId: Number((convo as any)?.id) || null,
         });
+      }
+
+      if (isArticle) {
+        const conflict = (Array.isArray(items) ? items : []).find((item) => {
+          if (!item) return false;
+          const id = Number((item as any).id);
+          if (!Number.isFinite(id) || id <= 0) return false;
+          if (id === Number((convo as any).id)) return false;
+          const itemSourceType = String((item as any).sourceType || '')
+            .trim()
+            .toLowerCase();
+          if (itemSourceType !== 'article') return false;
+          const itemCanonical = canonicalizeHttpUrl((item as any).url);
+          if (!itemCanonical) return false;
+          return itemCanonical === nextCanonical;
+        });
+
+        if (conflict) {
+          await mergeConversations({
+            keepConversationId: Number((convo as any).id),
+            removeConversationId: Number((conflict as any).id),
+          });
+        }
       }
     },
     [items, selectedConversation],
