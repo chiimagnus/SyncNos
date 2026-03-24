@@ -1,9 +1,9 @@
 import {
-  ARTICLE_MESSAGE_TYPES,
-  COMMENTS_MESSAGE_TYPES,
   CONTENT_MESSAGE_TYPES,
 } from '@platform/messaging/message-contracts';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
+import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
+import { createArticleCommentsSidebarInpageAdapter } from '@services/comments/sidebar/article-comments-sidebar-inpage-adapter';
 import { getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -56,120 +56,13 @@ export type InpageCommentsPanelController = {
 };
 
 export function createInpageCommentsPanelController(runtime: RuntimeClient | null): InpageCommentsPanelController {
-  const rt = runtime;
   const sidebarSession = createCommentSidebarSession(getInpageCommentsPanelApi());
+  const controller = createArticleCommentsSidebarController({
+    session: sidebarSession,
+    adapter: createArticleCommentsSidebarInpageAdapter(runtime),
+  });
 
-  let activeCanonicalUrl = '';
-  let activeConversationId: number | null = null;
   let lastTabId: number | null = null;
-
-  async function refreshCommentsList() {
-    const canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
-    if (!canonicalUrl) {
-      sidebarSession.setComments([]);
-      return;
-    }
-    if (!rt?.send) {
-      sidebarSession.setComments([]);
-      return;
-    }
-    const res = await rt.send(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, { canonicalUrl });
-    if (!res?.ok) {
-      sidebarSession.setComments([]);
-      return;
-    }
-    const items = Array.isArray(res?.data) ? res.data : [];
-    sidebarSession.setComments(
-      items.map((c: any) => ({
-        id: Number(c?.id),
-        parentId: c?.parentId != null ? Number(c.parentId) : null,
-        authorName: c?.authorName != null ? String(c.authorName) : null,
-        createdAt: Number(c?.createdAt) || null,
-        quoteText: String(c?.quoteText || ''),
-        commentText: String(c?.commentText || ''),
-      })),
-    );
-  }
-
-  async function resolveOrCaptureArticle(tabId: number | null) {
-    if (!rt?.send) return { canonicalUrl: normalizeHttpUrl(location.href), conversationId: null };
-    const res = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {
-      ...(tabId ? { tabId } : null),
-    } as any);
-    if (!res?.ok) return { canonicalUrl: normalizeHttpUrl(location.href), conversationId: null };
-    return {
-      canonicalUrl: normalizeHttpUrl(res?.data?.url) || normalizeHttpUrl(location.href),
-      conversationId: normalizeConversationId(res?.data?.conversationId),
-    };
-  }
-
-  function bindPanelHandlers() {
-    sidebarSession.setHandlers({
-      onSave: async (text) => {
-        if (!rt?.send) return false;
-        let canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
-        if (!canonicalUrl) return;
-        const quoteText = sidebarSession.getSnapshot().quoteText;
-
-        if (!activeConversationId) {
-          const resolved = await resolveOrCaptureArticle(lastTabId);
-          canonicalUrl = normalizeHttpUrl(resolved.canonicalUrl) || canonicalUrl;
-          activeCanonicalUrl = canonicalUrl;
-          activeConversationId = resolved.conversationId;
-          if (canonicalUrl && activeConversationId) {
-            await rt.send(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, {
-              canonicalUrl,
-              conversationId: activeConversationId,
-            } as any);
-          }
-        }
-
-        const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
-          canonicalUrl,
-          conversationId: activeConversationId,
-          quoteText,
-          commentText: text,
-        } as any);
-        if (!res?.ok) return false;
-        await refreshCommentsList();
-        return true;
-      },
-      onReply: async (parentId, text) => {
-        if (!rt?.send) return;
-        let canonicalUrl = normalizeHttpUrl(activeCanonicalUrl) || normalizeHttpUrl(location.href);
-        if (!canonicalUrl) return;
-
-        if (!activeConversationId) {
-          const resolved = await resolveOrCaptureArticle(lastTabId);
-          canonicalUrl = normalizeHttpUrl(resolved.canonicalUrl) || canonicalUrl;
-          activeCanonicalUrl = canonicalUrl;
-          activeConversationId = resolved.conversationId;
-          if (canonicalUrl && activeConversationId) {
-            await rt.send(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, {
-              canonicalUrl,
-              conversationId: activeConversationId,
-            } as any);
-          }
-        }
-
-        const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
-          canonicalUrl,
-          conversationId: activeConversationId,
-          parentId: Number(parentId),
-          quoteText: '',
-          commentText: text,
-        } as any);
-        if (res?.ok) await refreshCommentsList();
-      },
-      onDelete: async (id) => {
-        if (!rt?.send) return;
-        const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id } as any);
-        if (res?.ok) await refreshCommentsList();
-      },
-    });
-  }
-
-  bindPanelHandlers();
 
   async function open(input?: {
     tabId?: number | null;
@@ -186,30 +79,19 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
-    sidebarSession.setQuoteText(quoteText);
-    sidebarSession.requestOpen({ focusComposer: input?.focusComposer === true, source: 'inpage' });
-
     const ensureArticle = input?.ensureArticle !== false;
-    sidebarSession.setBusy(true);
-    try {
-      if (ensureArticle) {
-        const resolved = await resolveOrCaptureArticle(lastTabId);
-        activeCanonicalUrl = resolved.canonicalUrl;
-        activeConversationId = resolved.conversationId;
-        if (activeCanonicalUrl && activeConversationId && rt?.send) {
-          await rt.send(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, {
-            canonicalUrl: activeCanonicalUrl,
-            conversationId: activeConversationId,
-          } as any);
-        }
-      } else {
-        activeCanonicalUrl = normalizeHttpUrl(location.href);
-        activeConversationId = null;
-      }
-      await refreshCommentsList();
-    } finally {
-      sidebarSession.setBusy(false);
-    }
+
+    await controller.open({
+      selectionText: quoteText,
+      focusComposer: input?.focusComposer === true,
+      source: 'inpage',
+      ensureContext: true,
+      ensureContextInput: {
+        tabId: lastTabId,
+        canonicalUrlFallback: normalizeHttpUrl(location.href),
+        ensureArticle,
+      },
+    });
   }
 
   return { open };
