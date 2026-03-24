@@ -290,21 +290,19 @@ export default function AppShell() {
                 </Routes>
               </div>
 
-              {showCommentsSidebar ? (
-                <div className="tw-h-full tw-min-h-0 tw-shrink-0">
-                  <ArticleCommentsSection
-                    conversationId={Number((selectedConversation as any)?.id || 0)}
-                    canonicalUrl={canonicalUrl}
-                    quoteText={commentsSidebarSnapshot.quoteText}
-                    focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
-                    containerClassName="tw-h-full tw-min-h-0"
-                    variant="sidebar"
-                    onQuoteTextConsumed={() => {
-                      commentsSidebarSession.setQuoteText('');
-                    }}
-                    onRequestClose={() => {
-                      commentsSidebarSession.requestClose();
-                      setCommentsCollapsed(true);
+	              {showCommentsSidebar ? (
+	                <div className="tw-h-full tw-min-h-0 tw-shrink-0">
+	                  <ArticleCommentsSection
+	                    conversationId={Number((selectedConversation as any)?.id || 0)}
+	                    canonicalUrl={canonicalUrl}
+	                    quoteText={commentsSidebarSnapshot.quoteText}
+	                    focusComposerSignal={commentsSidebarSnapshot.focusComposerSignal}
+	                    onClearQuoteText={() => commentsSidebarSession.setQuoteText('')}
+	                    containerClassName="tw-h-full tw-min-h-0"
+	                    variant="sidebar"
+	                    onRequestClose={() => {
+	                      commentsSidebarSession.requestClose();
+	                      setCommentsCollapsed(true);
                     }}
                   />
                 </div>

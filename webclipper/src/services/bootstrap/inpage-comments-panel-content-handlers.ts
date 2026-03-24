@@ -130,7 +130,10 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
           quoteText,
           commentText: text,
         } as any);
-        if (res?.ok) await refreshCommentsList();
+        if (res?.ok) {
+          await refreshCommentsList();
+          sidebarSession.setQuoteText('');
+        }
       },
       onReply: async (parentId, text) => {
         if (!rt?.send) return;
