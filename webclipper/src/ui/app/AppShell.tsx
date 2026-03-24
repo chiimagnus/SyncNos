@@ -9,6 +9,7 @@ import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
+import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
@@ -219,8 +220,8 @@ export default function AppShell() {
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
 	        {renderSidebar ? (
 	          <aside
-	            className="tw-relative tw-flex tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-p-0"
-	            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+		            className={['tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0', columnDividerRightClassName()].join(' ')}
+		            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
 	          >
 	            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
 	          </aside>
