@@ -56,6 +56,7 @@ export function createArticleCommentsSidebarInpageAdapter(runtime: RuntimeClient
         createdAt: Number(c?.createdAt) || null,
         quoteText: String(c?.quoteText || ''),
         commentText: String(c?.commentText || ''),
+        locator: c?.locator ?? null,
       }));
     },
     async ensureContext(input) {

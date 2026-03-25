@@ -1,3 +1,5 @@
+import type { ArticleCommentLocator } from '@services/comments/domain/models';
+
 export type CommentSidebarOpenInput = {
   focusComposer?: boolean;
   source?: string;
@@ -10,6 +12,7 @@ export type CommentSidebarItem = {
   createdAt?: number | null;
   quoteText?: string | null;
   commentText: string;
+  locator?: ArticleCommentLocator | null;
 };
 
 export type CommentSidebarHandlers = {

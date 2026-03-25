@@ -164,6 +164,17 @@
   background: var(--quote-bg);
 }
 
+.webclipper-inpage-comments-panel__notice {
+  margin: 0 0 8px 0;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
+  color: var(--panel-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .webclipper-inpage-comments-panel__quote-text {
   white-space: pre-wrap;
   word-break: break-word;

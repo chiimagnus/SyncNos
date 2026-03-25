@@ -3,6 +3,7 @@ import { createTwoStepConfirmController } from '@services/shared/two-step-confir
 import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
+import TextQuoteAnchor from 'dom-anchor-text-quote';
 
 export type ThreadedCommentItem = {
   id: number;
@@ -11,6 +12,7 @@ export type ThreadedCommentItem = {
   createdAt?: number | null;
   quoteText?: string | null;
   commentText: string;
+  locator?: any | null;
 };
 
 export type ThreadedCommentsPanelApi = {
@@ -117,7 +119,48 @@ type MountOptions = {
   // applying right padding to `document.documentElement` so the page is not
   // covered by the sidebar. Intended for inpage content-scripts only.
   dockPage?: boolean;
+  locatorEnv?: 'inpage' | 'app' | null;
+  getLocatorRoot?: () => Element | null;
 };
+
+function pickLocatorRoot(options: MountOptions): Element | null {
+  const getter = options.getLocatorRoot;
+  if (typeof getter === 'function') {
+    try {
+      return getter() || null;
+    } catch (_e) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function shouldIgnoreLocateClick(target: EventTarget | null): boolean {
+  const el = target as any as HTMLElement | null;
+  if (!el) return false;
+  if (isEditableTarget(el)) return true;
+  try {
+    if (el.closest?.('button,input,textarea,a,label,select,option')) return true;
+  } catch (_e) {
+    // ignore
+  }
+  return false;
+}
+
+function scrollRangeIntoView(range: Range): boolean {
+  const node = (range as any).startContainer as Node | null;
+  const el =
+    node && (node as any).nodeType === Node.TEXT_NODE
+      ? ((node as any).parentElement as HTMLElement | null)
+      : (node as any as HTMLElement | null);
+  if (!el) return false;
+  try {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' } as any);
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
 
 export function mountThreadedCommentsPanel(
   host: HTMLElement,
@@ -492,6 +535,11 @@ export function mountThreadedCommentsPanel(
   body.className = 'webclipper-inpage-comments-panel__body';
   surface.appendChild(body);
 
+  const notice = document.createElement('div');
+  notice.className = 'webclipper-inpage-comments-panel__notice';
+  notice.style.display = 'none';
+  body.appendChild(notice);
+
   const quote = document.createElement('div');
   quote.className = 'webclipper-inpage-comments-panel__quote';
   body.appendChild(quote);
@@ -543,6 +591,7 @@ export function mountThreadedCommentsPanel(
   const state = {
     busy: false,
     pendingComposerFocus: false,
+    noticeTimer: 0 as any,
     handlers: {
       onSave: null as any,
       onReply: null as any,
@@ -550,6 +599,47 @@ export function mountThreadedCommentsPanel(
       onClose: null as any,
     },
   };
+
+  function showNotice(message: string) {
+    const text = String(message || '').trim();
+    if (!text) return;
+    try {
+      notice.textContent = text;
+      notice.style.display = 'block';
+      if (state.noticeTimer) clearTimeout(state.noticeTimer);
+      state.noticeTimer = setTimeout(() => {
+        notice.style.display = 'none';
+        notice.textContent = '';
+      }, 1600);
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function locateThreadRoot(rootItem: ThreadedCommentItem): boolean {
+    const locator = (rootItem as any)?.locator;
+    if (!locator) return false;
+
+    const env = String((locator as any)?.env || '').trim();
+    const expectedEnv = String(options.locatorEnv || '').trim();
+    if (!expectedEnv || env !== expectedEnv) return false;
+
+    const pickedRoot = pickLocatorRoot(options);
+    if (expectedEnv === 'app' && !pickedRoot) return false;
+    const rootEl = pickedRoot || document.body || document.documentElement;
+    if (!rootEl) return false;
+
+    const quoteSelector = (locator as any)?.quote;
+    const hint = Number((locator as any)?.position?.start);
+    try {
+      const anchor = (TextQuoteAnchor as any).fromSelector(rootEl, quoteSelector);
+      const range = (anchor as any).toRange?.(Number.isFinite(hint) ? { hint } : undefined);
+      if (!range) return false;
+      return scrollRangeIntoView(range);
+    } catch (_e) {
+      return false;
+    }
+  }
 
   const deleteConfirm = createTwoStepConfirmController<number>({
     onChange: () => {
@@ -828,6 +918,15 @@ export function mountThreadedCommentsPanel(
           qText.className = 'webclipper-inpage-comments-panel__thread-quote-text';
           qText.textContent = quoteValue;
           q.appendChild(qText);
+
+          if (variant === 'sidebar') {
+            q.addEventListener('click', (e) => {
+              if (state.busy) return;
+              if (shouldIgnoreLocateClick((e as any).target)) return;
+              const ok = locateThreadRoot(root);
+              if (!ok) showNotice('无法定位');
+            });
+          }
         }
 
         const comment = document.createElement('div');
@@ -894,6 +993,15 @@ export function mountThreadedCommentsPanel(
         commentBody.className = 'webclipper-inpage-comments-panel__comment-body';
         commentBody.textContent = String(root?.commentText || '');
         comment.appendChild(commentBody);
+
+        if (variant === 'sidebar') {
+          comment.addEventListener('click', (e) => {
+            if (state.busy) return;
+            if (shouldIgnoreLocateClick((e as any).target)) return;
+            const ok = locateThreadRoot(root);
+            if (!ok) showNotice('无法定位');
+          });
+        }
 
         const replies = repliesByRoot.get(rootId) || [];
         if (replies.length) {

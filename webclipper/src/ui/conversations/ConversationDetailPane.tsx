@@ -311,9 +311,10 @@ export function ConversationDetailPane({
                     selectionLocatorRef.current = null;
                     const range = readSelectionRange();
                     if (range && messagesRootRef.current) {
+                      const locatorRoot = (messagesRootRef.current.closest?.('.route-scroll') as Element | null) ?? messagesRootRef.current;
                       selectionLocatorRef.current = buildArticleCommentLocatorFromRange({
                         env: 'app',
-                        root: messagesRootRef.current,
+                        root: locatorRoot,
                         range,
                       });
                     }
