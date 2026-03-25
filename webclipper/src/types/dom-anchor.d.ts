@@ -7,4 +7,3 @@ declare module 'dom-anchor-text-position' {
   const TextPositionAnchor: any;
   export default TextPositionAnchor;
 }
-

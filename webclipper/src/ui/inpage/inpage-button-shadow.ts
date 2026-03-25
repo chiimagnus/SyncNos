@@ -179,7 +179,10 @@ function writeSnappedState(el: HTMLElement, state: any) {
   (el as any).__webclipperSnappedState = state || null;
 }
 
-function writeOnPositionChange(el: HTMLElement, onPositionChange?: (state: { edge: InpageButtonPositionEdge; ratio: number }) => void) {
+function writeOnPositionChange(
+  el: HTMLElement,
+  onPositionChange?: (state: { edge: InpageButtonPositionEdge; ratio: number }) => void,
+) {
   (el as any).__webclipperOnPositionChange = typeof onPositionChange === 'function' ? onPositionChange : null;
 }
 

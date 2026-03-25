@@ -1,6 +1,4 @@
-import {
-  CONTENT_MESSAGE_TYPES,
-} from '@platform/messaging/message-contracts';
+import { CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarInpageAdapter } from '@services/comments/sidebar/article-comments-sidebar-inpage-adapter';

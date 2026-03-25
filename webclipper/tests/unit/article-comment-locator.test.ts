@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 
-import { buildArticleCommentLocatorFromRange, restoreRangeFromArticleCommentLocator } from '../../src/services/comments/locator';
+import {
+  buildArticleCommentLocatorFromRange,
+  restoreRangeFromArticleCommentLocator,
+} from '../../src/services/comments/locator';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {

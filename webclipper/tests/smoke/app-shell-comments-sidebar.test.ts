@@ -185,9 +185,8 @@ describe('AppShell comments sidebar', () => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    const closeBtn = (host?.shadowRoot?.querySelector(
-      '.webclipper-inpage-comments-panel__collapse',
-    ) || null) as HTMLButtonElement | null;
+    const closeBtn = (host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse') ||
+      null) as HTMLButtonElement | null;
     expect(closeBtn).toBeTruthy();
 
     act(() => {
