@@ -8,7 +8,9 @@ import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
+import type { ArticleCommentLocator } from '@services/comments/domain/models';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -28,7 +30,8 @@ export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
   onExpandSidebar?: () => void;
-  onTriggerCommentsSidebar?: (quoteText: string) => void;
+  onTriggerCommentsSidebar?: (input: { quoteText: string; locator: ArticleCommentLocator | null }) => void;
+  onCommentsLocatorRootChange?: (root: Element | null) => void;
   commentsSidebarOpen?: boolean;
 };
 
@@ -37,6 +40,7 @@ export function ConversationDetailPane({
   hideHeader = false,
   onExpandSidebar,
   onTriggerCommentsSidebar,
+  onCommentsLocatorRootChange,
   commentsSidebarOpen = false,
 }: ConversationDetailPaneProps) {
   const {
@@ -67,7 +71,19 @@ export function ConversationDetailPane({
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
+  const setMessagesRootRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      messagesRootRef.current = node;
+      try {
+        onCommentsLocatorRootChange?.(node);
+      } catch (_e) {
+        // ignore
+      }
+    },
+    [onCommentsLocatorRootChange],
+  );
   const selectionQuoteRef = useRef<string>('');
+  const selectionLocatorRef = useRef<ArticleCommentLocator | null>(null);
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
@@ -113,6 +129,23 @@ export function ConversationDetailPane({
       return text;
     } catch (_e) {
       return '';
+    }
+  };
+
+  const readSelectionRange = (): Range | null => {
+    const root = messagesRootRef.current;
+    if (!root) return null;
+    try {
+      const sel = globalThis.getSelection?.();
+      if (!sel || sel.rangeCount <= 0) return null;
+      const range = sel.getRangeAt(0);
+      const anchor = sel.anchorNode as any as Node | null;
+      const focus = sel.focusNode as any as Node | null;
+      if (anchor && !root.contains(anchor)) return null;
+      if (focus && !root.contains(focus)) return null;
+      return range.cloneRange();
+    } catch (_e) {
+      return null;
     }
   };
 
@@ -288,6 +321,16 @@ export function ConversationDetailPane({
                   type="button"
                   onMouseDown={(e) => {
                     selectionQuoteRef.current = readSelectionQuote();
+                    selectionLocatorRef.current = null;
+                    const range = readSelectionRange();
+                    if (range && messagesRootRef.current) {
+                      const locatorRoot = messagesRootRef.current;
+                      selectionLocatorRef.current = buildArticleCommentLocatorFromRange({
+                        env: 'app',
+                        root: locatorRoot,
+                        range,
+                      });
+                    }
                     // Avoid the button stealing focus and potentially collapsing selection before we read it.
                     try {
                       e.preventDefault();
@@ -298,7 +341,7 @@ export function ConversationDetailPane({
                   onClick={() => {
                     const quoteText = String(selectionQuoteRef.current || '').trim();
                     // When no selection, explicitly clear the quote.
-                    onTriggerCommentsSidebar(quoteText);
+                    onTriggerCommentsSidebar({ quoteText, locator: selectionLocatorRef.current });
                   }}
                   className={navIconButtonSmClassName(Boolean(commentsSidebarOpen))}
                   aria-label={commentsSidebarLabel}
@@ -353,7 +396,7 @@ export function ConversationDetailPane({
               ) : null}
 
               {detail?.messages?.length ? (
-                <div ref={messagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
+                <div ref={setMessagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
                   {detail.messages.map((m) => {
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
                     const messageConversationId = Number(

@@ -56,6 +56,7 @@ export function createArticleCommentsSidebarInpageAdapter(runtime: RuntimeClient
         createdAt: Number(c?.createdAt) || null,
         quoteText: String(c?.quoteText || ''),
         commentText: String(c?.commentText || ''),
+        locator: c?.locator ?? null,
       }));
     },
     async ensureContext(input) {
@@ -83,13 +84,14 @@ export function createArticleCommentsSidebarInpageAdapter(runtime: RuntimeClient
       }
       return { canonicalUrl, conversationId };
     },
-    async addRoot({ canonicalUrl, conversationId, quoteText, commentText }) {
+    async addRoot({ canonicalUrl, conversationId, quoteText, commentText, locator }) {
       if (!rt?.send) throw new Error('missing runtime for adding article comment');
       const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
         canonicalUrl,
         conversationId,
         quoteText,
         commentText,
+        locator: locator ?? null,
       } as any);
       if (!res?.ok) throw new Error('failed to add article comment');
       return true;
@@ -112,4 +114,3 @@ export function createArticleCommentsSidebarInpageAdapter(runtime: RuntimeClient
     },
   };
 }
-

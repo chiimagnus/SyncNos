@@ -12,6 +12,7 @@ import type {
 
 export type ArticleCommentsSidebarControllerOpenInput = {
   selectionText?: string | null;
+  locator?: any;
   focusComposer?: boolean;
   source?: string;
   ensureContext?: boolean;
@@ -67,6 +68,7 @@ export function createArticleCommentsSidebarController(input: {
 
   let activeContext: ArticleCommentsSidebarContext | null = null;
   let lastEnsureContextInput: ArticleCommentsSidebarEnsureContextInput | undefined;
+  let pendingRootLocator: any | null = null;
 
   const ensureContext = async (
     ensure: boolean,
@@ -129,7 +131,9 @@ export function createArticleCommentsSidebarController(input: {
           conversationId: normalizeConversationId(ctx?.conversationId),
           quoteText,
           commentText: value,
+          locator: quoteText && pendingRootLocator ? pendingRootLocator : null,
         });
+        pendingRootLocator = null;
         await refresh();
         return true;
       },
@@ -167,6 +171,7 @@ export function createArticleCommentsSidebarController(input: {
   const open = async (openInput?: ArticleCommentsSidebarControllerOpenInput) => {
     const selectionText = openInput?.selectionText;
     if (selectionText != null) session.setQuoteText(normalizeCommentSidebarQuoteText(selectionText));
+    if (selectionText != null) pendingRootLocator = openInput?.locator ?? null;
     session.requestOpen({ focusComposer: openInput?.focusComposer === true, source: openInput?.source });
 
     const shouldEnsureContext = openInput?.ensureContext !== false;
@@ -192,4 +197,3 @@ export function createArticleCommentsSidebarController(input: {
     setContext,
   };
 }
-

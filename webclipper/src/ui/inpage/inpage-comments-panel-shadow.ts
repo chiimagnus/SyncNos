@@ -31,6 +31,8 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     variant: 'sidebar',
     showHeader: true,
     showCollapseButton: true,
+    locatorEnv: 'inpage',
+    getLocatorRoot: () => document.body || document.documentElement,
   });
   el.id = PANEL_ID;
 

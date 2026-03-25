@@ -97,7 +97,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
     onTriggerCommentsSidebar,
     commentsSidebarOpen,
   }: {
-    onTriggerCommentsSidebar?: (quoteText: string) => void;
+    onTriggerCommentsSidebar?: (input: any) => void;
     commentsSidebarOpen?: boolean;
   }) =>
     createElement(
@@ -107,7 +107,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
         'button',
         {
           type: 'button',
-          onClick: () => onTriggerCommentsSidebar?.('Selected quote'),
+          onClick: () => onTriggerCommentsSidebar?.({ quoteText: 'Selected quote', locator: null } as any),
           'aria-label': 'Comment',
           'aria-pressed': commentsSidebarOpen ? 'true' : 'false',
         },

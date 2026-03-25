@@ -6,6 +6,10 @@ const storageMocks = {
   syncConversationMessages: vi.fn(),
 };
 
+vi.mock('@services/url-cleaning/tracking-param-cleaner', () => ({
+  cleanTrackingParamsUrl: async (url: string) => url,
+}));
+
 vi.mock('@services/conversations/data/storage', () => ({
   hasConversation: storageMocks.hasConversation,
   upsertConversation: storageMocks.upsertConversation,

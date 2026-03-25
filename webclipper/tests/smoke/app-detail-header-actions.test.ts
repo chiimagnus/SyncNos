@@ -211,7 +211,7 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     expect(onTriggerCommentsSidebar).toHaveBeenCalledTimes(1);
-    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith('');
+    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith({ quoteText: '', locator: null });
 
     act(() => {
       root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: true }));

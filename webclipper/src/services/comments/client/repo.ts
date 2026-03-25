@@ -18,6 +18,7 @@ export type ArticleCommentDto = {
   canonicalUrl: string;
   quoteText: string;
   commentText: string;
+  locator?: any;
   createdAt: number;
   updatedAt: number;
 };
@@ -28,6 +29,7 @@ export async function addArticleComment(input: {
   parentId?: number | null;
   quoteText?: string | null;
   commentText: string;
+  locator?: any;
 }): Promise<ArticleCommentDto> {
   const res = await send<ApiResponse<ArticleCommentDto>>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, input as any);
   return unwrap(res);

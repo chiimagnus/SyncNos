@@ -3,6 +3,7 @@ import { createTwoStepConfirmController } from '@services/shared/two-step-confir
 import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
+import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
 
 export type ThreadedCommentItem = {
   id: number;
@@ -11,6 +12,7 @@ export type ThreadedCommentItem = {
   createdAt?: number | null;
   quoteText?: string | null;
   commentText: string;
+  locator?: any | null;
 };
 
 export type ThreadedCommentsPanelApi = {
@@ -117,7 +119,139 @@ type MountOptions = {
   // applying right padding to `document.documentElement` so the page is not
   // covered by the sidebar. Intended for inpage content-scripts only.
   dockPage?: boolean;
+  locatorEnv?: 'inpage' | 'app' | null;
+  getLocatorRoot?: () => Element | null;
 };
+
+function pickLocatorRoot(options: MountOptions): Element | null {
+  const getter = options.getLocatorRoot;
+  if (typeof getter === 'function') {
+    try {
+      return getter() || null;
+    } catch (_e) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function shouldIgnoreLocateClick(target: EventTarget | null): boolean {
+  const el = target as any as HTMLElement | null;
+  if (!el) return false;
+  if (isEditableTarget(el)) return true;
+  try {
+    if (el.closest?.('button,input,textarea,a,label,select,option')) return true;
+  } catch (_e) {
+    // ignore
+  }
+  return false;
+}
+
+function scrollRangeIntoView(range: Range): boolean {
+  const node = (range as any).startContainer as Node | null;
+  const el =
+    node && (node as any).nodeType === Node.TEXT_NODE
+      ? ((node as any).parentElement as HTMLElement | null)
+      : (node as any as HTMLElement | null);
+  if (!el) return false;
+  try {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' } as any);
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function readLocatorHint(locator: unknown): number | null {
+  const hint = Number((locator as any)?.position?.start);
+  return Number.isFinite(hint) ? hint : null;
+}
+
+function isScrollableContainer(el: unknown): el is HTMLElement {
+  const node = el as any as HTMLElement | null;
+  if (!node) return false;
+  if (typeof node.scrollTop !== 'number') return false;
+  const scrollHeight = Number((node as any).scrollHeight || 0);
+  const clientHeight = Number((node as any).clientHeight || 0);
+  if (!Number.isFinite(scrollHeight) || !Number.isFinite(clientHeight)) return false;
+  return scrollHeight - clientHeight >= 240 && clientHeight >= 120;
+}
+
+function pickBestScrollContainer(rootEl: Element): HTMLElement | null {
+  const candidates: HTMLElement[] = [];
+  const scrollingEl = (document as any).scrollingElement as any;
+  if (isScrollableContainer(scrollingEl)) candidates.push(scrollingEl);
+  if (isScrollableContainer(document.documentElement)) candidates.push(document.documentElement);
+  if (isScrollableContainer(document.body)) candidates.push(document.body);
+  if (isScrollableContainer(rootEl)) candidates.push(rootEl);
+
+  try {
+    const common = document.querySelectorAll?.('main,[role="main"],article');
+    if (common && typeof (common as any).length === 'number') {
+      for (const node of Array.from(common as any)) {
+        if (isScrollableContainer(node)) candidates.push(node);
+      }
+    }
+  } catch (_e) {
+    // ignore
+  }
+
+  // Limited scan: some apps (e.g. docs/community) use a single large div scroller.
+  try {
+    const walkRoot = document.body || document.documentElement;
+    if (walkRoot) {
+      const walker = document.createTreeWalker(walkRoot, NodeFilter.SHOW_ELEMENT);
+      let best: { el: HTMLElement; score: number } | null = null;
+      let count = 0;
+      while (walker.nextNode() && count < 600) {
+        count += 1;
+        const el = walker.currentNode as any as HTMLElement;
+        if (!isScrollableContainer(el)) continue;
+        const scrollHeight = Number((el as any).scrollHeight || 0);
+        const clientHeight = Number((el as any).clientHeight || 0);
+        const score = (scrollHeight - clientHeight) * 2 + clientHeight;
+        if (!best || score > best.score) best = { el, score };
+      }
+      if (best) candidates.push(best.el);
+    }
+  } catch (_e) {
+    // ignore
+  }
+
+  if (!candidates.length) return null;
+  const seen = new Set<HTMLElement>();
+  for (const el of candidates) {
+    if (!el || seen.has(el)) continue;
+    seen.add(el);
+    return el;
+  }
+  return null;
+}
+
+function nudgeScrollTowardsHint(hint: number, rootEl: Element): void {
+  const scroller = pickBestScrollContainer(rootEl);
+  if (!scroller) return;
+
+  const maxScroll = Math.max(
+    0,
+    Number((scroller as any).scrollHeight || 0) - Number((scroller as any).clientHeight || 0),
+  );
+  if (!Number.isFinite(maxScroll) || maxScroll <= 0) return;
+
+  const textLength = Math.max(0, Number(String((rootEl as any)?.textContent || '').length) || 0);
+  const ratio = textLength > 0 ? Math.max(0, Math.min(1, hint / textLength)) : 1;
+  const nextTop = Math.round(maxScroll * ratio);
+
+  try {
+    (scroller as any).scrollTop = nextTop;
+  } catch (_e) {
+    // ignore
+  }
+}
 
 export function mountThreadedCommentsPanel(
   host: HTMLElement,
@@ -492,6 +626,14 @@ export function mountThreadedCommentsPanel(
   body.className = 'webclipper-inpage-comments-panel__body';
   surface.appendChild(body);
 
+  const notice = document.createElement('div');
+  notice.className = 'webclipper-inpage-comments-panel__notice';
+  notice.style.display = 'none';
+  notice.setAttribute('role', 'status');
+  notice.setAttribute('aria-live', 'polite');
+  notice.setAttribute('aria-atomic', 'true');
+  body.appendChild(notice);
+
   const quote = document.createElement('div');
   quote.className = 'webclipper-inpage-comments-panel__quote';
   body.appendChild(quote);
@@ -543,6 +685,7 @@ export function mountThreadedCommentsPanel(
   const state = {
     busy: false,
     pendingComposerFocus: false,
+    noticeTimer: 0 as any,
     handlers: {
       onSave: null as any,
       onReply: null as any,
@@ -550,6 +693,68 @@ export function mountThreadedCommentsPanel(
       onClose: null as any,
     },
   };
+
+  function showNotice(message: string) {
+    const text = String(message || '').trim();
+    if (!text) return;
+    try {
+      notice.textContent = text;
+      notice.style.display = 'block';
+      if (state.noticeTimer) clearTimeout(state.noticeTimer);
+      state.noticeTimer = setTimeout(() => {
+        notice.style.display = 'none';
+        notice.textContent = '';
+      }, 1600);
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function locateThreadRootOnce(rootItem: ThreadedCommentItem, rootEl: Element): boolean {
+    const locator = (rootItem as any)?.locator;
+    if (!locator) return false;
+
+    const env = String((locator as any)?.env || '').trim();
+    const expectedEnv = String(options.locatorEnv || '').trim();
+    if (!expectedEnv || env !== expectedEnv) return false;
+
+    try {
+      const range = restoreRangeFromArticleCommentLocator({ root: rootEl, locator });
+      if (!range) return false;
+      return scrollRangeIntoView(range);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  async function locateThreadRootWithRetry(rootItem: ThreadedCommentItem): Promise<boolean> {
+    const locator = (rootItem as any)?.locator;
+    if (!locator) return false;
+
+    const env = String((locator as any)?.env || '').trim();
+    const expectedEnv = String(options.locatorEnv || '').trim();
+    if (!expectedEnv || env !== expectedEnv) return false;
+
+    const pickedRoot = pickLocatorRoot(options);
+    if (expectedEnv === 'app' && !pickedRoot) return false;
+    const rootEl = pickedRoot || document.body || document.documentElement;
+    if (!rootEl) return false;
+
+    const ok = locateThreadRootOnce(rootItem, rootEl);
+    if (ok) return true;
+
+    // P2-T1: inpage retry to handle dynamic loading (lazy/infinite scroll).
+    if (expectedEnv !== 'inpage') return false;
+    const hint = readLocatorHint(locator);
+    if (hint != null) nudgeScrollTowardsHint(hint, rootEl);
+
+    await sleep(120);
+    const ok2 = locateThreadRootOnce(rootItem, rootEl);
+    if (ok2) return true;
+
+    await sleep(260);
+    return locateThreadRootOnce(rootItem, rootEl);
+  }
 
   const deleteConfirm = createTwoStepConfirmController<number>({
     onChange: () => {
@@ -828,6 +1033,17 @@ export function mountThreadedCommentsPanel(
           qText.className = 'webclipper-inpage-comments-panel__thread-quote-text';
           qText.textContent = quoteValue;
           q.appendChild(qText);
+
+          if (variant === 'sidebar') {
+            q.addEventListener('click', (e) => {
+              if (state.busy) return;
+              if (shouldIgnoreLocateClick((e as any).target)) return;
+              void (async () => {
+                const ok = await locateThreadRootWithRetry(root);
+                if (!ok) showNotice('无法定位');
+              })();
+            });
+          }
         }
 
         const comment = document.createElement('div');
@@ -894,6 +1110,17 @@ export function mountThreadedCommentsPanel(
         commentBody.className = 'webclipper-inpage-comments-panel__comment-body';
         commentBody.textContent = String(root?.commentText || '');
         comment.appendChild(commentBody);
+
+        if (variant === 'sidebar') {
+          comment.addEventListener('click', (e) => {
+            if (state.busy) return;
+            if (shouldIgnoreLocateClick((e as any).target)) return;
+            void (async () => {
+              const ok = await locateThreadRootWithRetry(root);
+              if (!ok) showNotice('无法定位');
+            })();
+          });
+        }
 
         const replies = repliesByRoot.get(rootId) || [];
         if (replies.length) {

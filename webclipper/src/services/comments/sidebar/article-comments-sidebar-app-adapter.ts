@@ -17,15 +17,17 @@ export function createArticleCommentsSidebarAppAdapter(): ArticleCommentsSidebar
         createdAt: Number(c?.createdAt) || null,
         quoteText: String(c?.quoteText || ''),
         commentText: String(c?.commentText || ''),
+        locator: c?.locator ?? null,
       }));
     },
-    async addRoot({ canonicalUrl, conversationId, quoteText, commentText }) {
+    async addRoot({ canonicalUrl, conversationId, quoteText, commentText, locator }) {
       await addArticleComment({
         canonicalUrl,
         conversationId,
         parentId: null,
         quoteText,
         commentText,
+        locator: locator ?? null,
       } as any);
       return true;
     },
@@ -44,4 +46,3 @@ export function createArticleCommentsSidebarAppAdapter(): ArticleCommentsSidebar
     },
   };
 }
-

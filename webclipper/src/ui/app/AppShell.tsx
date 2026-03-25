@@ -94,6 +94,7 @@ export default function AppShell() {
     const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
     const commentsSidebarControllerRef = useRef<ArticleCommentsSidebarController | null>(null);
     const suppressCommentsSidebarCollapseRef = useRef(false);
+    const commentsLocatorRootRef = useRef<Element | null>(null);
     if (!commentsSidebarSessionRef.current) {
       commentsSidebarSessionRef.current = createCommentSidebarSession();
     }
@@ -180,10 +181,12 @@ export default function AppShell() {
       showSettingsSheet,
     ]);
 
-    const triggerCommentsSidebar = (quoteText: string) => {
+    const triggerCommentsSidebar = (input: { quoteText: string; locator: any | null }) => {
       setCommentsCollapsed(false);
+      const quoteText = String(input?.quoteText || '').trim();
       void commentsSidebarController.open({
-        selectionText: String(quoteText || '').trim(),
+        selectionText: quoteText,
+        locator: input?.locator ?? null,
         focusComposer: true,
         source: 'app',
         ensureContext: false,
@@ -324,6 +327,9 @@ export default function AppShell() {
                       <ConversationDetailPane
                         onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
                         onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
+                        onCommentsLocatorRootChange={(root) => {
+                          commentsLocatorRootRef.current = root;
+                        }}
                         commentsSidebarOpen={showCommentsSidebar}
                       />
                     }
@@ -339,6 +345,7 @@ export default function AppShell() {
                   <ArticleCommentsSection
                     sidebarSession={commentsSidebarSession}
                     containerClassName="tw-h-full tw-min-h-0"
+                    getLocatorRoot={() => commentsLocatorRootRef.current}
                   />
                 </div>
               ) : null}
