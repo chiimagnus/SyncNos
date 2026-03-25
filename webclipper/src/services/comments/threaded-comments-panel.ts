@@ -147,15 +147,97 @@ function shouldIgnoreLocateClick(target: EventTarget | null): boolean {
   return false;
 }
 
-function scrollRangeIntoView(range: Range): boolean {
+function pickRangeTargetElement(range: Range): HTMLElement | null {
   const node = (range as any).startContainer as Node | null;
-  const el =
-    node && (node as any).nodeType === Node.TEXT_NODE
-      ? ((node as any).parentElement as HTMLElement | null)
-      : (node as any as HTMLElement | null);
+  return node && (node as any).nodeType === Node.TEXT_NODE
+    ? ((node as any).parentElement as HTMLElement | null)
+    : (node as any as HTMLElement | null);
+}
+
+const LOCATE_HIGHLIGHT_ATTR = 'data-webclipper-locate-highlight';
+const LOCATE_HIGHLIGHT_STYLE_ID = 'webclipper-comments-locate-highlight-style';
+
+function ensureLocateHighlightStyle() {
+  try {
+    if (document.getElementById(LOCATE_HIGHLIGHT_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = LOCATE_HIGHLIGHT_STYLE_ID;
+    style.textContent = [
+      `[${LOCATE_HIGHLIGHT_ATTR}="1"] {`,
+      '  outline: 2px solid rgba(79, 156, 255, 0.95) !important;',
+      '  outline-offset: 2px !important;',
+      '  border-radius: 8px !important;',
+      '  background-color: rgba(79, 156, 255, 0.12) !important;',
+      '  transition: background-color 200ms ease, outline-color 200ms ease !important;',
+      '}',
+    ].join('\n');
+    (document.head || document.documentElement).appendChild(style);
+  } catch (_e) {
+    // ignore
+  }
+}
+
+function createLocateHighlighter() {
+  let lastEl: HTMLElement | null = null;
+  let timer: any = 0;
+
+  const clear = () => {
+    if (timer) clearTimeout(timer);
+    timer = 0;
+    if (lastEl) {
+      try {
+        lastEl.removeAttribute(LOCATE_HIGHLIGHT_ATTR);
+      } catch (_e) {
+        // ignore
+      }
+    }
+    lastEl = null;
+  };
+
+  const flash = (el: HTMLElement) => {
+    if (!el) return;
+    ensureLocateHighlightStyle();
+
+    if (lastEl && lastEl !== el) {
+      try {
+        lastEl.removeAttribute(LOCATE_HIGHLIGHT_ATTR);
+      } catch (_e) {
+        // ignore
+      }
+    }
+    lastEl = el;
+
+    try {
+      el.setAttribute(LOCATE_HIGHLIGHT_ATTR, '1');
+    } catch (_e) {
+      // ignore
+    }
+
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      try {
+        el.removeAttribute(LOCATE_HIGHLIGHT_ATTR);
+      } catch (_e) {
+        // ignore
+      }
+      if (lastEl === el) lastEl = null;
+      timer = 0;
+    }, 1400);
+  };
+
+  return { flash, clear };
+}
+
+function scrollRangeIntoView(range: Range, highlighter?: { flash: (el: HTMLElement) => void }): boolean {
+  const el = pickRangeTargetElement(range);
   if (!el) return false;
   try {
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' } as any);
+    try {
+      highlighter?.flash(el);
+    } catch (_e2) {
+      // ignore
+    }
     return true;
   } catch (_e) {
     return false;
@@ -626,6 +708,8 @@ export function mountThreadedCommentsPanel(
   body.className = 'webclipper-inpage-comments-panel__body';
   surface.appendChild(body);
 
+  const locateHighlighter = createLocateHighlighter();
+
   const notice = document.createElement('div');
   notice.className = 'webclipper-inpage-comments-panel__notice';
   notice.style.display = 'none';
@@ -721,7 +805,7 @@ export function mountThreadedCommentsPanel(
     try {
       const range = restoreRangeFromArticleCommentLocator({ root: rootEl, locator });
       if (!range) return false;
-      return scrollRangeIntoView(range);
+      return scrollRangeIntoView(range, locateHighlighter);
     } catch (_e) {
       return false;
     }
@@ -1300,6 +1384,11 @@ export function mountThreadedCommentsPanel(
     }
     try {
       deleteConfirm.dispose();
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      locateHighlighter.clear();
     } catch (_e) {
       // ignore
     }
