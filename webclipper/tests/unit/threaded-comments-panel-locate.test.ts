@@ -47,10 +47,12 @@ function cleanupDom() {
 describe('Threaded comments panel locate', () => {
   beforeEach(() => {
     setupDom();
+    vi.useFakeTimers();
     (restoreRangeFromArticleCommentLocator as any).mockReset?.();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanupDom();
   });
 
@@ -106,6 +108,10 @@ describe('Threaded comments panel locate', () => {
 
     expect(restoreRangeFromArticleCommentLocator).toHaveBeenCalledTimes(1);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(article.getAttribute('data-webclipper-locate-highlight')).toBe('1');
+
+    vi.advanceTimersByTime(1500);
+    expect(article.getAttribute('data-webclipper-locate-highlight')).toBe(null);
 
     const replyBody = shadow.querySelector('.webclipper-inpage-comments-panel__comment-body.is-reply') as HTMLElement | null;
     expect(replyBody).toBeTruthy();
@@ -116,4 +122,3 @@ describe('Threaded comments panel locate', () => {
     mounted.cleanup();
   });
 });
-
