@@ -6,6 +6,7 @@ export type ArticleComment = {
   authorName?: string | null;
   quoteText: string;
   commentText: string;
+  locator?: ArticleCommentLocator | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -41,6 +42,7 @@ export type AddArticleCommentInput = {
   authorName?: string | null;
   quoteText?: string | null;
   commentText: string;
+  locator?: ArticleCommentLocator | null;
   createdAt?: number | null;
   updatedAt?: number | null;
 };

@@ -96,6 +96,19 @@ function normalizeCommentText(value: unknown): string {
   return String(value || '').trim();
 }
 
+function normalizeLocator(value: unknown): any | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = Number((value as any).v);
+  if (v !== 1) return null;
+  const env = String((value as any).env || '').trim();
+  if (env !== 'inpage' && env !== 'app') return null;
+  const quote = (value as any).quote;
+  const position = (value as any).position;
+  if (!quote || typeof quote !== 'object') return null;
+  if (!position || typeof position !== 'object') return null;
+  return value as any;
+}
+
 function toComment(row: any): ArticleComment {
   return {
     id: Number(row?.id),
@@ -105,6 +118,7 @@ function toComment(row: any): ArticleComment {
     authorName: safeString(row?.authorName) || null,
     quoteText: safeString(row?.quoteText),
     commentText: normalizeCommentText(row?.commentText),
+    locator: normalizeLocator(row?.locator),
     createdAt: Number(row?.createdAt) || 0,
     updatedAt: Number(row?.updatedAt) || 0,
   };
@@ -131,6 +145,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
     authorName: safeString(input?.authorName) || '',
     quoteText,
     commentText,
+    locator: normalizeLocator(input?.locator),
     createdAt,
     updatedAt,
   };
