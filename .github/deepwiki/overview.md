@@ -15,7 +15,7 @@
 | 路径 | 角色 | 典型内容 | 阅读建议 |
 | --- | --- | --- | --- |
 | `macOS/` | macOS App 容器 | `SyncNos/`, `SyncNos.xcodeproj/`, `Packages/`, `Resource/` | 先读 `macOS/SyncNos/AGENTS.md`，再按 MVVM + 协议注入边界进入。 |
-| `webclipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/conversations/`, `src/comments/`, `src/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app / comments 哪一层。 |
+| `webclipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/services/conversations/`, `src/services/comments/`, `src/services/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app / comments 哪一层。 |
 | `macOS/SyncNos/*.md` / `.github/guide/` | 仓库级专项文档 | 键盘焦点、OCR、Obsidian Local REST API 指南等 | 用来理解跨产品线的专项约束。 |
 | `.github/workflows/` | CI / Release / 商店发布入口 | `release.yml`, `webclipper-release.yml`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 看真实交付链路而不是猜测。 |
 | `.github/scripts/webclipper/` | WebClipper 打包 / 发布脚本 | 打包 release assets、AMO source、AMO 发布 | 与 workflow 配套理解渠道差异。 |
@@ -99,11 +99,11 @@ flowchart LR
 - `webclipper/wxt.config.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/entrypoints/content.ts`
-- `webclipper/src/comments/background/handlers.ts`
-- `webclipper/src/comments/data/storage-idb.ts`
-- `webclipper/src/sync/backup/export.ts`
-- `webclipper/src/sync/backup/import.ts`
-- `webclipper/src/sync/backup/backup-utils.ts`
+- `webclipper/src/services/comments/background/handlers.ts`
+- `webclipper/src/services/comments/data/storage-idb.ts`
+- `webclipper/src/services/sync/backup/export.ts`
+- `webclipper/src/services/sync/backup/import.ts`
+- `webclipper/src/services/sync/backup/backup-utils.ts`
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`

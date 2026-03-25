@@ -40,17 +40,17 @@
 
 | 阶段 | 入口 / 文件 | 关键点 |
 | --- | --- | --- |
-| 用户发起授权 | `oauth.ts` + Notion authorize URL | 使用 `authorizationUrl=https://api.notion.com/v1/oauth/authorize`，并生成 `state` 写入本地 pending key |
+| 用户发起授权 | `src/services/sync/notion/auth/oauth.ts` + Notion authorize URL | 使用 `authorizationUrl=https://api.notion.com/v1/oauth/authorize`，并生成 `state` 写入本地 pending key |
 | 回调拦截 | `handleNotionOAuthCallbackNavigation()` | 只处理 `redirectUri=https://chiimagnus.github.io/syncnos-oauth/callback`，并校验 `state` 一致 |
 | code 交换 | Worker `index.ts` | 扩展向 `/notion/oauth/exchange` 发送 `{ code, redirectUri }`；Worker 在服务端用 `NOTION_CLIENT_ID/SECRET` 调 Notion token endpoint |
 | token 入库 | `setNotionOAuthToken()` | 扩展仅持久化 `access_token` 与 workspace 信息，不落地 `client_secret` |
 
 | 关键参数 | 位置 | 说明 |
 | --- | --- | --- |
-| `tokenExchangeProxyUrl` | `oauth.ts` | `https://syncnos-notion-oauth.chiimagnus.workers.dev/notion/oauth/exchange` |
+| `tokenExchangeProxyUrl` | `src/services/sync/notion/auth/oauth.ts` | `https://syncnos-notion-oauth.chiimagnus.workers.dev/notion/oauth/exchange` |
 | Worker `NOTION_CLIENT_ID` | Cloudflare Worker env | OAuth client id，仅 Worker 可见 |
 | Worker `NOTION_CLIENT_SECRET` | Cloudflare Worker env | OAuth client secret，仅 Worker 可见 |
-| `redirectUri` | `oauth.ts` + Worker | 固定为 `https://chiimagnus.github.io/syncnos-oauth/callback`，用于 code exchange 对齐 |
+| `redirectUri` | `src/services/sync/notion/auth/oauth.ts` + Worker | 固定为 `https://chiimagnus.github.io/syncnos-oauth/callback`，用于 code exchange 对齐 |
 
 ## 典型调用时序
 
@@ -88,13 +88,13 @@ sequenceDiagram
 ## 来源引用（Source References）
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/platform/messaging/background-router.ts`
-- `webclipper/src/conversations/background/handlers.ts`
-- `webclipper/src/sync/background-handlers.ts`
-- `webclipper/src/sync/notion/auth/oauth.ts`
-- `webclipper/src/sync/notion/notion-sync-orchestrator.ts`
-- `webclipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
+- `webclipper/src/services/conversations/background/handlers.ts`
+- `webclipper/src/services/sync/background-handlers.ts`
+- `webclipper/src/services/sync/notion/auth/oauth.ts`
+- `webclipper/src/services/sync/notion/notion-sync-orchestrator.ts`
+- `webclipper/src/services/sync/obsidian/obsidian-sync-orchestrator.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
-- `webclipper/src/bootstrap/current-page-capture.ts`
+- `webclipper/src/services/bootstrap/current-page-capture.ts`
 - `webclipper/src/platform/messaging/ui-background-handlers.ts`
 
 ## 更新记录（Update Notes）

@@ -38,11 +38,11 @@
 
 | 控制点 | 文件 | 说明 |
 | --- | --- | --- |
-| 敏感键排除 | `backup-utils.ts` | denylist 排除 `notion_oauth_token*`、`notion_oauth_client_secret` |
-| Zip 路径安全 | `backup-utils.ts`, `zip-utils.ts` | 拒绝 `..`、绝对路径、NUL 字符等危险 entry |
-| manifest/schema 校验 | `backup-utils.ts` | 校验 `backupSchemaVersion`、sources、assets、扩展名 |
-| 导入合并策略 | `import.ts` | merge import，优先保留本地有效字段，避免误覆盖 |
-| 资产回退策略 | `import.ts` | 缺失图片 blob 时回退到 URL/占位图，不写入无效数据 |
+| 敏感键排除 | `src/services/sync/backup/backup-utils.ts` | denylist 排除 `notion_oauth_token*`、`notion_oauth_client_secret` |
+| Zip 路径安全 | `src/services/sync/backup/backup-utils.ts`, `src/services/sync/backup/zip-utils.ts` | 拒绝 `..`、绝对路径、NUL 字符等危险 entry |
+| manifest/schema 校验 | `src/services/sync/backup/backup-utils.ts` | 校验 `backupSchemaVersion`、sources、assets、扩展名 |
+| 导入合并策略 | `src/services/sync/backup/import.ts` | merge import，优先保留本地有效字段，避免误覆盖 |
+| 资产回退策略 | `src/services/sync/backup/import.ts` | 缺失图片 blob 时回退到 URL/占位图，不写入无效数据 |
 
 ## 供应链与发布校验
 
@@ -61,13 +61,13 @@
 
 ## 来源引用（Source References）
 - `webclipper/wxt.config.ts`
-- `webclipper/src/sync/notion/auth/oauth.ts`
-- `webclipper/src/sync/notion/auth/token-store.ts`
+- `webclipper/src/services/sync/notion/auth/oauth.ts`
+- `webclipper/src/services/sync/notion/auth/token-store.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/wrangler.toml`
-- `webclipper/src/sync/backup/backup-utils.ts`
-- `webclipper/src/sync/backup/import.ts`
-- `webclipper/src/sync/backup/zip-utils.ts`
+- `webclipper/src/services/sync/backup/backup-utils.ts`
+- `webclipper/src/services/sync/backup/import.ts`
+- `webclipper/src/services/sync/backup/zip-utils.ts`
 - `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
 - `macOS/SyncNos/Services/Auth/IAPService.swift`
 - `.github/workflows/webclipper-amo-publish.yml`

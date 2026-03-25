@@ -60,9 +60,9 @@ flowchart LR
 | 现象 | 首查文件 | 快速动作 |
 | --- | --- | --- |
 | 扩展升级后无弹窗引导 | `background.ts` | 确认 `onInstalled` 仅 `install` 打开 About（预期行为） |
-| 切换 inpage 开关无变化 | `bootstrap/content.ts` | 刷新页面或新开页面后再验证 |
-| `cache-images` 提示更新 0 条 | `image-backfill-job.ts` | 检查是否 chat 会话且消息内存在可下载图片链接 |
-| Notion OAuth 回调失败 | `sync/notion/auth/oauth.ts`, worker `index.ts` | 核对 pending state、worker secret、429/超时情况 |
+| 切换 inpage 开关无变化 | `src/services/bootstrap/content.ts` | 刷新页面或新开页面后再验证 |
+| `cache-images` 提示更新 0 条 | `src/services/conversations/background/image-backfill-job.ts` | 检查是否 chat 会话且消息内存在可下载图片链接 |
+| Notion OAuth 回调失败 | `src/services/sync/notion/auth/oauth.ts`, worker `index.ts` | 核对 pending state、worker secret、429/超时情况 |
 | 发布 workflow 报版本不匹配 | `wxt.config.ts`, `webclipper-*.yml` | 对齐 `manifest.version` 与 tag |
 
 ## 运维边界与 Coverage Gaps
@@ -76,14 +76,14 @@ flowchart LR
 - `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/entrypoints/content.ts`
-- `webclipper/src/bootstrap/content.ts`
+- `webclipper/src/services/bootstrap/content.ts`
 - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
-- `webclipper/src/conversations/background/handlers.ts`
-- `webclipper/src/conversations/background/image-backfill-job.ts`
-- `webclipper/src/sync/backup/export.ts`
-- `webclipper/src/sync/backup/import.ts`
-- `webclipper/src/sync/backup/backup-utils.ts`
-- `webclipper/src/sync/notion/auth/oauth.ts`
+- `webclipper/src/services/conversations/background/handlers.ts`
+- `webclipper/src/services/conversations/background/image-backfill-job.ts`
+- `webclipper/src/services/sync/backup/export.ts`
+- `webclipper/src/services/sync/backup/import.ts`
+- `webclipper/src/services/sync/backup/backup-utils.ts`
+- `webclipper/src/services/sync/notion/auth/oauth.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`

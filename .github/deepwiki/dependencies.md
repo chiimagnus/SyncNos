@@ -81,7 +81,7 @@
 | App 新服务或新来源 | `macOS/SyncNos/AGENTS.md`, `DIContainer.swift` | 协议、注入、Service / ViewModel 边界 |
 | 扩展新增依赖 / 构建插件 | `package.json`, `wxt.config.ts`, workflow | 构建、本地验证、CI 环境 |
 | 发布版本调整 | `wxt.config.ts`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | manifest version 与 tag |
-| 新增权限或 host 权限 | `wxt.config.ts`, `bootstrap/content.ts` | manifest、运行时 gating、文档 |
+| 新增权限或 host 权限 | `wxt.config.ts`, `src/services/bootstrap/content.ts` | manifest、运行时 gating、文档 |
 
 ## 来源引用（Source References）
 - `AGENTS.md`
@@ -90,7 +90,7 @@
 - `macOS/SyncNos/AppDelegate.swift`
 - `webclipper/package.json`
 - `webclipper/wxt.config.ts`
-- `webclipper/src/sync/notion/auth/oauth.ts`
+- `webclipper/src/services/sync/notion/auth/oauth.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
 - `macOS/Packages/MenuBarDockKit/Package.swift`
 - `.github/workflows/webclipper-release.yml`

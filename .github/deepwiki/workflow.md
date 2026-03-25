@@ -83,11 +83,11 @@
 - `webclipper/src/ui/conversations/conversations-context.tsx`
 - `webclipper/src/ui/conversations/DetailHeaderActionBar.tsx`
 - `webclipper/src/ui/conversations/DetailNavigationHeader.tsx`
-- `webclipper/src/comments/background/handlers.ts`
-- `webclipper/src/comments/client/repo.ts`
-- `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/services/comments/background/handlers.ts`
+- `webclipper/src/services/comments/client/repo.ts`
+- `webclipper/src/services/comments/data/storage-idb.ts`
 - `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
-- `webclipper/src/ui/comments/threaded-comments-panel.ts`
+- `webclipper/src/services/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
 - `.github/workflows/release.yml`

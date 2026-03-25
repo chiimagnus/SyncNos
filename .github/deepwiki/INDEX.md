@@ -3,7 +3,7 @@
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
 - **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
-- **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
+- **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `webclipper/src/entrypoints/content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **稳定事实源**：版本、权限、配置、迁移规则请以 `wxt.config.ts`、`schema.ts`、workflow 与脚本为准；本索引不再保留按日期堆叠的变更流水。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
@@ -85,7 +85,8 @@
 - [GENERATION.md](GENERATION.md)
 
 ## 更新记录（Update Notes）
-- 2026-03-22：同步 WebClipper settings 真路径、Chat with AI 真路径与 `manifest.version = 1.4.0`，并将 README 的主题说明收敛为系统跟随。
+- 2026-03-25：清理 deepwiki 内 WebClipper 旧目录引用并统一迁移到 `src/services/*` / `src/ui/i18n/*`；同步 comments locator 事实（移除不存在的 `quoteContext`）；更新 `GENERATION.md` 元数据。
+- 2026-03-22：同步 WebClipper settings 真路径、Chat with AI 真路径，并强调 `manifest.version` 以 `configuration.md` 为单一事实源维护。
 - 2026-03-19：Coverage Gaps 增加专项文档可点击链接，便于从索引直接跳转到仓库内技术文档。
 - 2026-03-19：补齐 `api.md`、`operations.md`、`security.md` 与 `glossary.md` 的索引级可达链接，消除页面可见性缺口。
 - 2026-03-19：新增 `modules/comments.md`，用于承载 WebClipper 文章评论 / 注释线程的本地事实层说明。

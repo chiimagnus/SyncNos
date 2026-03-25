@@ -27,7 +27,7 @@
 
 ### 1. 支持 AI 对话页面
 1. `content.ts` 在所有 `http(s)` 页面注入内容脚本。
-2. `bootstrap/content.ts` 先判断当前 host 是否属于支持站点；非支持站点是否显示 inpage UI 还取决于 `inpage_display_mode`（并兼容旧 `inpage_supported_only`）。
+2. `src/services/bootstrap/content.ts` 先判断当前 host 是否属于支持站点；非支持站点是否显示 inpage UI 还取决于 `inpage_display_mode`（并兼容旧 `inpage_supported_only`）。
 3. collectors registry 识别具体站点，把 DOM 统一为 `conversation + messages`。
 4. background conversation handlers 处理 `SYNC_CONVERSATION_MESSAGES`，并把快照写入 IndexedDB；UI 通过相同存储读会话列表与详情。
 5. 当 `ai_chat_cache_images_enabled = true` 且 `sourceType !== 'article'` 时，handler 会在写入前尝试把消息图片内联到 `contentMarkdown`（失败不阻塞主链路）。
@@ -54,7 +54,7 @@
 1. 用户在 article detail 或 inpage comments panel 中打开评论区。
 2. `ArticleCommentsSection.tsx` 先按 canonical URL 读取 `article_comments`，并把结果交给 threaded panel。
 3. 新评论、回复、删除与 orphan attach 都通过 comments background handlers 统一落库；`conversationId` 解析出来后会刷新 detail。
-4. 面板的 open / close / quote / focus / busy 由 shared session 统一调度；评论线程只保留本地回复与刷新语义，不再做正文高亮定位。
+4. 面板的 open / close / quote / focus / busy 由 shared session 统一调度；评论线程可选使用 `locator` 恢复 Range/上下文（TextQuote/TextPosition selectors），但不做“持久高亮回显”式的正文标注。
 5. Zip v2 备份会把 `article_comments` 写入 `assets/article-comments/index.json`，导入时按 merge 规则把评论线程恢复回本地库。
 
 ## WebClipper：从本地会话到外部目标
@@ -78,7 +78,7 @@
 | WebClipper `sync_mappings` | IndexedDB | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt` | 决定 Notion / Obsidian 是否可增量追加 |
 | WebClipper conversation | IndexedDB | `sourceType`, `source`, `conversationKey`, `lastCapturedAt` | UI 排序、导出、同步、备份的基础 |
 | WebClipper message | IndexedDB | `messageKey`, `sequence`, `updatedAt`, `contentMarkdown` | 生成 Notion blocks / Markdown / Obsidian 内容；图片可在实时采集或 backfill 时内联更新 |
-| WebClipper `article_comments` | IndexedDB | `canonicalUrl`, `conversationId`, `parentId`, `quoteText`, `quoteContext`, `commentText` | article 详情页的本地评论线程与回复 / 删除 |
+| WebClipper `article_comments` | IndexedDB | `canonicalUrl`, `conversationId`, `parentId`, `quoteText`, `commentText`, `locator?` | article 详情页的本地评论线程与回复 / 删除 |
 | WebClipper 图片缓存开关 | `chrome.storage.local` | `ai_chat_cache_images_enabled` | 控制 chat 消息图片内联策略；历史消息需手动触发 backfill |
 
 ## 图表
@@ -120,30 +120,30 @@ flowchart LR
 - `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
 - `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
 - `webclipper/src/entrypoints/content.ts`
-- `webclipper/src/bootstrap/content.ts`
-- `webclipper/src/bootstrap/content-controller.ts`
-- `webclipper/src/conversations/background/handlers.ts`
-- `webclipper/src/conversations/background/image-backfill-job.ts`
-- `webclipper/src/conversations/client/repo.ts`
-- `webclipper/src/comments/background/handlers.ts`
-- `webclipper/src/comments/client/repo.ts`
-- `webclipper/src/comments/data/storage-idb.ts`
+- `webclipper/src/services/bootstrap/content.ts`
+- `webclipper/src/services/bootstrap/content-controller.ts`
+- `webclipper/src/services/conversations/background/handlers.ts`
+- `webclipper/src/services/conversations/background/image-backfill-job.ts`
+- `webclipper/src/services/conversations/client/repo.ts`
+- `webclipper/src/services/comments/background/handlers.ts`
+- `webclipper/src/services/comments/client/repo.ts`
+- `webclipper/src/services/comments/data/storage-idb.ts`
 - `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
-- `webclipper/src/ui/comments/threaded-comments-panel.ts`
+- `webclipper/src/services/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
-- `webclipper/src/bootstrap/inpage-comments-panel-content-handlers.ts`
-- `webclipper/src/comments/sidebar/comment-sidebar-session.ts`
+- `webclipper/src/services/bootstrap/inpage-comments-panel-content-handlers.ts`
+- `webclipper/src/services/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/ui/conversations/conversations-context.tsx`
-- `webclipper/src/sync/backup/export.ts`
-- `webclipper/src/sync/backup/import.ts`
-- `webclipper/src/sync/backup/backup-utils.ts`
+- `webclipper/src/services/sync/backup/export.ts`
+- `webclipper/src/services/sync/backup/import.ts`
+- `webclipper/src/services/sync/backup/backup-utils.ts`
 - `webclipper/src/collectors/gemini/gemini-collector.ts`
 - `webclipper/src/collectors/kimi/kimi-collector.ts`
 - `webclipper/src/collectors/zai/zai-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
-- `webclipper/src/conversations/data/storage-idb.ts`
+- `webclipper/src/services/conversations/data/storage-idb.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
-- `webclipper/src/protocols/conversation-kinds.ts`
-- `webclipper/src/sync/notion/notion-sync-orchestrator.ts`
-- `webclipper/src/sync/obsidian/obsidian-sync-orchestrator.ts`
+- `webclipper/src/services/protocols/conversation-kinds.ts`
+- `webclipper/src/services/sync/notion/notion-sync-orchestrator.ts`
+- `webclipper/src/services/sync/obsidian/obsidian-sync-orchestrator.ts`
