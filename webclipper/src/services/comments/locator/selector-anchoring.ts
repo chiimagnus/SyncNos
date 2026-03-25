@@ -45,26 +45,33 @@ export function restoreRangeFromArticleCommentLocator(input: {
   if (!root || typeof (root as any).querySelector !== 'function') return null;
   if (!locator || typeof locator !== 'object') return null;
 
-  const positionSelector = (locator as any).position;
-  if (positionSelector && typeof positionSelector === 'object') {
-    try {
-      const range = (TextPositionAnchor as any).toRange?.(root, positionSelector);
-      if (range) return range as Range;
-    } catch (_e) {
-      // fallback to quote anchor
-    }
-  }
-
   const quoteSelector = (locator as any).quote;
   if (!quoteSelector || typeof quoteSelector !== 'object') return null;
 
   const hint = Number((locator as any)?.position?.start);
+  const expectedExact = String((quoteSelector as any)?.exact || '').trim();
 
   try {
     const anchor = (TextQuoteAnchor as any).fromSelector(root, quoteSelector);
     const range = (anchor as any).toRange?.(Number.isFinite(hint) ? { hint } : undefined);
-    return range || null;
+    if (!range) return null;
+    if (expectedExact && String((range as any).toString?.() || '').trim() !== expectedExact) return null;
+    return range as Range;
   } catch (_e) {
-    return null;
+    // ignore and fallback
   }
+
+  const positionSelector = (locator as any).position;
+  if (positionSelector && typeof positionSelector === 'object') {
+    try {
+      const range = (TextPositionAnchor as any).toRange?.(root, positionSelector);
+      if (!range) return null;
+      if (expectedExact && String((range as any).toString?.() || '').trim() !== expectedExact) return null;
+      return range as Range;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  return null;
 }

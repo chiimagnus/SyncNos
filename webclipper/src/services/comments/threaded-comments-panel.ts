@@ -171,18 +171,83 @@ function readLocatorHint(locator: unknown): number | null {
   return Number.isFinite(hint) ? hint : null;
 }
 
-function nudgeDocumentScrollTowardsHint(hint: number, rootEl: Element): void {
-  const scroller = (document as any).scrollingElement || document.documentElement;
+function isScrollableContainer(el: unknown): el is HTMLElement {
+  const node = el as any as HTMLElement | null;
+  if (!node) return false;
+  if (typeof node.scrollTop !== 'number') return false;
+  const scrollHeight = Number((node as any).scrollHeight || 0);
+  const clientHeight = Number((node as any).clientHeight || 0);
+  if (!Number.isFinite(scrollHeight) || !Number.isFinite(clientHeight)) return false;
+  return scrollHeight - clientHeight >= 240 && clientHeight >= 120;
+}
+
+function pickBestScrollContainer(rootEl: Element): HTMLElement | null {
+  const candidates: HTMLElement[] = [];
+  const scrollingEl = (document as any).scrollingElement as any;
+  if (isScrollableContainer(scrollingEl)) candidates.push(scrollingEl);
+  if (isScrollableContainer(document.documentElement)) candidates.push(document.documentElement);
+  if (isScrollableContainer(document.body)) candidates.push(document.body);
+  if (isScrollableContainer(rootEl)) candidates.push(rootEl);
+
+  try {
+    const common = document.querySelectorAll?.('main,[role="main"],article');
+    if (common && typeof (common as any).length === 'number') {
+      for (const node of Array.from(common as any)) {
+        if (isScrollableContainer(node)) candidates.push(node);
+      }
+    }
+  } catch (_e) {
+    // ignore
+  }
+
+  // Limited scan: some apps (e.g. docs/community) use a single large div scroller.
+  try {
+    const walkRoot = document.body || document.documentElement;
+    if (walkRoot) {
+      const walker = document.createTreeWalker(walkRoot, NodeFilter.SHOW_ELEMENT);
+      let best: { el: HTMLElement; score: number } | null = null;
+      let count = 0;
+      while (walker.nextNode() && count < 600) {
+        count += 1;
+        const el = walker.currentNode as any as HTMLElement;
+        if (!isScrollableContainer(el)) continue;
+        const scrollHeight = Number((el as any).scrollHeight || 0);
+        const clientHeight = Number((el as any).clientHeight || 0);
+        const score = (scrollHeight - clientHeight) * 2 + clientHeight;
+        if (!best || score > best.score) best = { el, score };
+      }
+      if (best) candidates.push(best.el);
+    }
+  } catch (_e) {
+    // ignore
+  }
+
+  if (!candidates.length) return null;
+  const seen = new Set<HTMLElement>();
+  for (const el of candidates) {
+    if (!el || seen.has(el)) continue;
+    seen.add(el);
+    return el;
+  }
+  return null;
+}
+
+function nudgeScrollTowardsHint(hint: number, rootEl: Element): void {
+  const scroller = pickBestScrollContainer(rootEl);
   if (!scroller) return;
 
-  const maxScroll = Math.max(0, Number((scroller as any).scrollHeight || 0) - Number((scroller as any).clientHeight || 0));
+  const maxScroll = Math.max(
+    0,
+    Number((scroller as any).scrollHeight || 0) - Number((scroller as any).clientHeight || 0),
+  );
   if (!Number.isFinite(maxScroll) || maxScroll <= 0) return;
 
   const textLength = Math.max(0, Number(String((rootEl as any)?.textContent || '').length) || 0);
   const ratio = textLength > 0 ? Math.max(0, Math.min(1, hint / textLength)) : 1;
+  const nextTop = Math.round(maxScroll * ratio);
 
   try {
-    (scroller as any).scrollTop = Math.round(maxScroll * ratio);
+    (scroller as any).scrollTop = nextTop;
   } catch (_e) {
     // ignore
   }
@@ -681,9 +746,13 @@ export function mountThreadedCommentsPanel(
     // P2-T1: inpage retry to handle dynamic loading (lazy/infinite scroll).
     if (expectedEnv !== 'inpage') return false;
     const hint = readLocatorHint(locator);
-    if (hint != null) nudgeDocumentScrollTowardsHint(hint, rootEl);
+    if (hint != null) nudgeScrollTowardsHint(hint, rootEl);
 
     await sleep(120);
+    const ok2 = locateThreadRootOnce(rootItem, rootEl);
+    if (ok2) return true;
+
+    await sleep(260);
     return locateThreadRootOnce(rootItem, rootEl);
   }
 
