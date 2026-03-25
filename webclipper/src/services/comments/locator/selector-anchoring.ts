@@ -35,3 +35,36 @@ export function buildArticleCommentLocatorFromRange(input: {
   }
 }
 
+export function restoreRangeFromArticleCommentLocator(input: {
+  root: Element;
+  locator: ArticleCommentLocator;
+}): Range | null {
+  const root = input.root;
+  const locator = input.locator;
+
+  if (!root || typeof (root as any).querySelector !== 'function') return null;
+  if (!locator || typeof locator !== 'object') return null;
+
+  const positionSelector = (locator as any).position;
+  if (positionSelector && typeof positionSelector === 'object') {
+    try {
+      const range = (TextPositionAnchor as any).toRange?.(root, positionSelector);
+      if (range) return range as Range;
+    } catch (_e) {
+      // fallback to quote anchor
+    }
+  }
+
+  const quoteSelector = (locator as any).quote;
+  if (!quoteSelector || typeof quoteSelector !== 'object') return null;
+
+  const hint = Number((locator as any)?.position?.start);
+
+  try {
+    const anchor = (TextQuoteAnchor as any).fromSelector(root, quoteSelector);
+    const range = (anchor as any).toRange?.(Number.isFinite(hint) ? { hint } : undefined);
+    return range || null;
+  } catch (_e) {
+    return null;
+  }
+}

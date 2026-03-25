@@ -106,6 +106,7 @@ describe('article-comments-sidebar-controller', () => {
       conversationId: 21,
       quoteText: 'Quoted',
       commentText: 'Hello',
+      locator: null,
     });
     expect(adapter.list).toHaveBeenCalled();
     expect(session.getSnapshot().quoteText).toBe('');

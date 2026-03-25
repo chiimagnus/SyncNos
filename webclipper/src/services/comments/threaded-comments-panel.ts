@@ -3,7 +3,7 @@ import { createTwoStepConfirmController } from '@services/shared/two-step-confir
 import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
-import TextQuoteAnchor from 'dom-anchor-text-quote';
+import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
 
 export type ThreadedCommentItem = {
   id: number;
@@ -629,11 +629,8 @@ export function mountThreadedCommentsPanel(
     const rootEl = pickedRoot || document.body || document.documentElement;
     if (!rootEl) return false;
 
-    const quoteSelector = (locator as any)?.quote;
-    const hint = Number((locator as any)?.position?.start);
     try {
-      const anchor = (TextQuoteAnchor as any).fromSelector(rootEl, quoteSelector);
-      const range = (anchor as any).toRange?.(Number.isFinite(hint) ? { hint } : undefined);
+      const range = restoreRangeFromArticleCommentLocator({ root: rootEl, locator });
       if (!range) return false;
       return scrollRangeIntoView(range);
     } catch (_e) {
