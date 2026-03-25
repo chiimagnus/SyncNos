@@ -38,7 +38,9 @@ function getLocationHrefFallback(): string {
   }
 }
 
-export function createArticleCommentsSidebarInpageAdapter(runtime: RuntimeClient | null): ArticleCommentsSidebarAdapter {
+export function createArticleCommentsSidebarInpageAdapter(
+  runtime: RuntimeClient | null,
+): ArticleCommentsSidebarAdapter {
   const rt = runtime;
 
   return {

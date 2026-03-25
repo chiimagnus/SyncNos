@@ -11,4 +11,3 @@ if (!(globalThis as any).NodeFilter) {
     SHOW_TEXT: 0x4,
   };
 }
-

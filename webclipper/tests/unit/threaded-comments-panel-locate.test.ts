@@ -113,7 +113,9 @@ describe('Threaded comments panel locate', () => {
     vi.advanceTimersByTime(1500);
     expect(article.getAttribute('data-webclipper-locate-highlight')).toBe(null);
 
-    const replyBody = shadow.querySelector('.webclipper-inpage-comments-panel__comment-body.is-reply') as HTMLElement | null;
+    const replyBody = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__comment-body.is-reply',
+    ) as HTMLElement | null;
     expect(replyBody).toBeTruthy();
     replyBody!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
 

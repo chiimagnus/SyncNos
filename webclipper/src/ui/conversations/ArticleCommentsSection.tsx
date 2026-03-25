@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import {
-  mountThreadedCommentsPanel,
-  type ThreadedCommentsPanelApi,
-} from '@services/comments/threaded-comments-panel';
+import { mountThreadedCommentsPanel, type ThreadedCommentsPanelApi } from '@services/comments/threaded-comments-panel';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
