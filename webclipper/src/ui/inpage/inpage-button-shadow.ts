@@ -2,8 +2,6 @@ import inpageButtonCssRaw from '@ui/styles/inpage-button.css?raw';
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
-const INPAGE_BTN_STORAGE_KEY_V2 = 'webclipper_btn_pos_inpage_v2';
-const INPAGE_BTN_STORAGE_KEY_V3 = 'webclipper_btn_pos_inpage_v3';
 const EDGE_GAP = 0;
 const INPAGE_BUTTON_LABEL = 'WebClipper: Save';
 const COMBO_WINDOW_MS = 400;
@@ -32,6 +30,12 @@ function toButtonHostCss(css: string) {
 const BUTTON_SHADOW_CSS = toButtonHostCss(String(inpageButtonCssRaw || ''));
 
 let runtime: InpageRuntime = null;
+
+type InpageButtonPositionEdge = 'left' | 'right' | 'top' | 'bottom';
+type InpageButtonPositionState = {
+  edge: InpageButtonPositionEdge;
+  ratio: number;
+};
 
 function initRuntime(nextRuntime: InpageRuntime) {
   runtime = nextRuntime || null;
@@ -87,14 +91,8 @@ function getSnappedRange(edge: string, size: { width: number; height: number }) 
 
 function resolveOffsetFromState(edge: string, size: { width: number; height: number }, state: any) {
   const range = getSnappedRange(edge, size);
-  const ratio = state && Number.isFinite(state.ratio) ? clamp01(Number(state.ratio)) : null;
-  if (ratio != null) {
-    return { offset: range.min + ratio * range.range, ratio };
-  }
-  const fallbackOffset = state && Number.isFinite(state.offset) ? Number(state.offset) : EDGE_GAP;
-  const clampedOffset = clamp(fallbackOffset, range.min, range.max);
-  const nextRatio = range.range > 0 ? (clampedOffset - range.min) / range.range : 0;
-  return { offset: clampedOffset, ratio: clamp01(nextRatio) };
+  const ratio = state && Number.isFinite(state.ratio) ? clamp01(Number(state.ratio)) : 0;
+  return { offset: range.min + ratio * range.range, ratio };
 }
 
 function applySnappedPosition(el: HTMLElement, state: any) {
@@ -173,6 +171,31 @@ function resolveComboLevel(count: number) {
   return 0;
 }
 
+function readSnappedState(el: HTMLElement): any {
+  return (el as any).__webclipperSnappedState || null;
+}
+
+function writeSnappedState(el: HTMLElement, state: any) {
+  (el as any).__webclipperSnappedState = state || null;
+}
+
+function writeOnPositionChange(el: HTMLElement, onPositionChange?: (state: { edge: InpageButtonPositionEdge; ratio: number }) => void) {
+  (el as any).__webclipperOnPositionChange = typeof onPositionChange === 'function' ? onPositionChange : null;
+}
+
+function readOnPositionChange(el: HTMLElement) {
+  const fn = (el as any).__webclipperOnPositionChange;
+  return typeof fn === 'function' ? fn : null;
+}
+
+function applyExternalPositionState(el: HTMLElement, inputState: InpageButtonPositionState) {
+  if (!inputState || !inputState.edge || !Number.isFinite(inputState.ratio)) return null;
+  const applied = applySnappedPosition(el, inputState);
+  if (!applied) return null;
+  writeSnappedState(el, applied);
+  return applied;
+}
+
 function destroyButton(el: HTMLElement | null) {
   if (!el) return;
   const cleanup = (el as any).__webclipperCleanup;
@@ -231,11 +254,15 @@ function ensureInpageButton({
   onClick,
   onDoubleClick,
   onCombo,
+  positionState,
+  onPositionChange,
 }: {
   collectorId?: string;
   onClick?: () => void;
   onDoubleClick?: () => void;
   onCombo?: (payload: { level: number; count: number }) => void;
+  positionState?: InpageButtonPositionState | null;
+  onPositionChange?: (state: { edge: InpageButtonPositionEdge; ratio: number }) => void;
 }) {
   if (!collectorId) return;
 
@@ -245,6 +272,14 @@ function ensureInpageButton({
       // Ensure Shadow DOM is initialized even if legacy button existed.
       try {
         if (!existing.shadowRoot) ensureButtonShadow(existing);
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        writeOnPositionChange(existing, onPositionChange);
+        if (positionState) {
+          applyExternalPositionState(existing, positionState);
+        }
       } catch (_e) {
         // ignore
       }
@@ -266,7 +301,8 @@ function ensureInpageButton({
 
   ensureButtonShadow(btn);
 
-  let snappedState: any = null;
+  writeSnappedState(btn, null);
+  writeOnPositionChange(btn, onPositionChange);
 
   let dragging = false;
   let moved = false;
@@ -400,8 +436,15 @@ function ensureInpageButton({
     }
     try {
       const rect = btn.getBoundingClientRect();
-      snappedState = snapToClosestEdge(btn, rect.left, rect.top);
-      if (snappedState) localStorage.setItem(INPAGE_BTN_STORAGE_KEY_V3, JSON.stringify(snappedState));
+      const nextState = snapToClosestEdge(btn, rect.left, rect.top);
+      if (nextState) {
+        writeSnappedState(btn, nextState);
+        try {
+          readOnPositionChange(btn)?.(nextState);
+        } catch (_e) {
+          // ignore
+        }
+      }
     } catch (_e) {
       // ignore
     }
@@ -414,49 +457,26 @@ function ensureInpageButton({
 
   document.documentElement.appendChild(btn);
 
-  // Restore persisted position (v3 ratio preferred).
-  try {
-    const rawV3 = localStorage.getItem(INPAGE_BTN_STORAGE_KEY_V3);
-    if (rawV3) {
-      const parsed = JSON.parse(rawV3);
-      const applied = applySnappedPosition(btn, parsed);
-      if (applied) snappedState = applied;
-    } else {
-      const rawV2 = localStorage.getItem(INPAGE_BTN_STORAGE_KEY_V2);
-      if (rawV2) {
-        const parsed = JSON.parse(rawV2);
-        if (parsed && parsed.edge) {
-          snappedState = applySnappedPosition(btn, parsed);
-        }
-      }
-    }
-  } catch (_e) {
-    // ignore and fallback
-  }
-
-  if (!snappedState) {
-    const rect = btn.getBoundingClientRect();
-    snappedState = snapToClosestEdge(btn, rect.left, rect.top);
-  }
-
-  if (snappedState) {
+  let next = null as any;
+  if (positionState) {
     try {
-      localStorage.setItem(INPAGE_BTN_STORAGE_KEY_V3, JSON.stringify(snappedState));
+      next = applyExternalPositionState(btn, positionState);
     } catch (_e) {
-      // ignore
+      next = null;
     }
+  }
+  if (!next) {
+    const rect = btn.getBoundingClientRect();
+    next = snapToClosestEdge(btn, rect.left, rect.top);
+    if (next) writeSnappedState(btn, next);
   }
 
   const onResize = () => {
     if (!btn.isConnected) return;
-    const nextState = applySnappedPosition(btn, snappedState);
+    const current = readSnappedState(btn);
+    const nextState = applySnappedPosition(btn, current);
     if (!nextState) return;
-    snappedState = nextState;
-    try {
-      localStorage.setItem(INPAGE_BTN_STORAGE_KEY_V3, JSON.stringify(snappedState));
-    } catch (_e) {
-      // ignore
-    }
+    writeSnappedState(btn, nextState);
   };
   window.addEventListener('resize', onResize);
 
