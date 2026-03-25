@@ -10,6 +10,30 @@ export type ArticleComment = {
   updatedAt: number;
 };
 
+export type ArticleCommentLocatorEnv = 'inpage' | 'app';
+
+export type ArticleCommentTextQuoteSelector = {
+  type: 'TextQuoteSelector';
+  exact: string;
+  prefix?: string;
+  suffix?: string;
+};
+
+export type ArticleCommentTextPositionSelector = {
+  type: 'TextPositionSelector';
+  start: number;
+  end: number;
+};
+
+export type ArticleCommentLocatorV1 = {
+  v: 1;
+  env: ArticleCommentLocatorEnv;
+  quote: ArticleCommentTextQuoteSelector;
+  position: ArticleCommentTextPositionSelector;
+};
+
+export type ArticleCommentLocator = ArticleCommentLocatorV1;
+
 export type AddArticleCommentInput = {
   parentId?: number | null;
   conversationId: number | null;
