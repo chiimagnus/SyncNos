@@ -8,7 +8,7 @@ import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
 
@@ -31,6 +31,7 @@ export type ConversationDetailPaneProps = {
   hideHeader?: boolean;
   onExpandSidebar?: () => void;
   onTriggerCommentsSidebar?: (input: { quoteText: string; locator: ArticleCommentLocator | null }) => void;
+  onCommentsLocatorRootChange?: (root: Element | null) => void;
   commentsSidebarOpen?: boolean;
 };
 
@@ -39,6 +40,7 @@ export function ConversationDetailPane({
   hideHeader = false,
   onExpandSidebar,
   onTriggerCommentsSidebar,
+  onCommentsLocatorRootChange,
   commentsSidebarOpen = false,
 }: ConversationDetailPaneProps) {
   const {
@@ -69,6 +71,17 @@ export function ConversationDetailPane({
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
+  const setMessagesRootRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      messagesRootRef.current = node;
+      try {
+        onCommentsLocatorRootChange?.(node);
+      } catch (_e) {
+        // ignore
+      }
+    },
+    [onCommentsLocatorRootChange],
+  );
   const selectionQuoteRef = useRef<string>('');
   const selectionLocatorRef = useRef<ArticleCommentLocator | null>(null);
 
@@ -311,7 +324,7 @@ export function ConversationDetailPane({
                     selectionLocatorRef.current = null;
                     const range = readSelectionRange();
                     if (range && messagesRootRef.current) {
-                      const locatorRoot = (messagesRootRef.current.closest?.('.route-scroll') as Element | null) ?? messagesRootRef.current;
+                      const locatorRoot = messagesRootRef.current;
                       selectionLocatorRef.current = buildArticleCommentLocatorFromRange({
                         env: 'app',
                         root: locatorRoot,
@@ -383,7 +396,7 @@ export function ConversationDetailPane({
               ) : null}
 
               {detail?.messages?.length ? (
-                <div ref={messagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
+                <div ref={setMessagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
                   {detail.messages.map((m) => {
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
                     const messageConversationId = Number(

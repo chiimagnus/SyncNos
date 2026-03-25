@@ -30,6 +30,7 @@ function normalizeHttpUrl(raw: unknown): string {
 type SidebarModeProps = {
   sidebarSession: CommentSidebarSession;
   containerClassName?: string;
+  getLocatorRoot?: () => Element | null;
 };
 
 type EmbeddedModeProps = {
@@ -45,6 +46,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
       <ArticleCommentsPanelMount
         sidebarSession={props.sidebarSession}
         containerClassName={props.containerClassName}
+        getLocatorRoot={props.getLocatorRoot}
         variant="sidebar"
       />
     );
@@ -63,10 +65,12 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
 function ArticleCommentsPanelMount({
   sidebarSession,
   containerClassName,
+  getLocatorRoot,
   variant,
 }: {
   sidebarSession: CommentSidebarSession;
   containerClassName?: string;
+  getLocatorRoot?: () => Element | null;
   variant?: 'embedded' | 'sidebar';
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -76,6 +80,8 @@ function ArticleCommentsPanelMount({
     if (!hostRef.current) return;
     if (apiRef.current) return;
     const host = hostRef.current;
+    const rootGetter =
+      typeof getLocatorRoot === 'function' ? getLocatorRoot : () => document.querySelector('.route-scroll') || null;
 
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
@@ -84,7 +90,7 @@ function ArticleCommentsPanelMount({
       showCollapseButton: variant === 'sidebar',
       surfaceBg: 'var(--bg-primary)',
       locatorEnv: variant === 'sidebar' ? 'app' : null,
-      getLocatorRoot: () => document.querySelector('.route-scroll') || null,
+      getLocatorRoot: rootGetter,
     });
     apiRef.current = mounted.api;
     sidebarSession.attachPanel(mounted.api as any);

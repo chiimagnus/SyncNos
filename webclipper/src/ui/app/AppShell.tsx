@@ -94,6 +94,7 @@ export default function AppShell() {
     const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
     const commentsSidebarControllerRef = useRef<ArticleCommentsSidebarController | null>(null);
     const suppressCommentsSidebarCollapseRef = useRef(false);
+    const commentsLocatorRootRef = useRef<Element | null>(null);
     if (!commentsSidebarSessionRef.current) {
       commentsSidebarSessionRef.current = createCommentSidebarSession();
     }
@@ -326,6 +327,9 @@ export default function AppShell() {
                       <ConversationDetailPane
                         onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
                         onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
+                        onCommentsLocatorRootChange={(root) => {
+                          commentsLocatorRootRef.current = root;
+                        }}
                         commentsSidebarOpen={showCommentsSidebar}
                       />
                     }
@@ -341,6 +345,7 @@ export default function AppShell() {
                   <ArticleCommentsSection
                     sidebarSession={commentsSidebarSession}
                     containerClassName="tw-h-full tw-min-h-0"
+                    getLocatorRoot={() => commentsLocatorRootRef.current}
                   />
                 </div>
               ) : null}
