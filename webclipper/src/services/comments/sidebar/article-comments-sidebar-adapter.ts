@@ -1,4 +1,5 @@
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
+import type { ArticleCommentLocator } from '@services/comments/domain/models';
 
 export type ArticleCommentsSidebarContext = {
   canonicalUrl: string;
@@ -18,6 +19,7 @@ export type ArticleCommentsSidebarAdapter = {
     conversationId: number | null;
     quoteText: string;
     commentText: string;
+    locator?: ArticleCommentLocator | null;
   }) => Promise<void | true>;
   addReply: (input: {
     canonicalUrl: string;
@@ -28,4 +30,3 @@ export type ArticleCommentsSidebarAdapter = {
   delete: (input: { id: number }) => Promise<void>;
   ensureContext?: (input?: ArticleCommentsSidebarEnsureContextInput) => Promise<ArticleCommentsSidebarContext>;
 };
-

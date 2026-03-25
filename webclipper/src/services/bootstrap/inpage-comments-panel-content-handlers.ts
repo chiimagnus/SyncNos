@@ -4,6 +4,7 @@ import {
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarInpageAdapter } from '@services/comments/sidebar/article-comments-sidebar-inpage-adapter';
+import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import { getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -46,6 +47,23 @@ function pickQuoteFromSelection(fallback: unknown): string {
   }
 }
 
+function pickLocatorFromSelection(): any | null {
+  try {
+    const selection = globalThis.getSelection?.();
+    if (!selection || selection.rangeCount <= 0) return null;
+    const range = selection.getRangeAt(0);
+    const text = String(selection.toString() || '').trim();
+    if (!text) return null;
+    return buildArticleCommentLocatorFromRange({
+      env: 'inpage',
+      root: document.body || document.documentElement,
+      range,
+    });
+  } catch (_e) {
+    return null;
+  }
+}
+
 export type InpageCommentsPanelController = {
   open: (input?: {
     tabId?: number | null;
@@ -79,10 +97,12 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
     lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
+    const locator = quoteText ? pickLocatorFromSelection() : null;
     const ensureArticle = input?.ensureArticle !== false;
 
     await controller.open({
       selectionText: quoteText,
+      locator,
       focusComposer: input?.focusComposer === true,
       source: 'inpage',
       ensureContext: true,

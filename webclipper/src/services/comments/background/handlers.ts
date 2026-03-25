@@ -67,6 +67,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
       authorName,
       quoteText: msg?.quoteText ?? '',
       commentText: String(msg?.commentText || ''),
+      locator: msg?.parentId ? null : (msg?.locator ?? null),
     });
 
     if (comment.conversationId) {
