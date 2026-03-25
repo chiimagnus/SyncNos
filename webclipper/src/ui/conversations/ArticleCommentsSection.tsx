@@ -75,13 +75,16 @@ function ArticleCommentsPanelMount({
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
+  const locatorRootGetterRef = useRef<(() => Element | null) | null>(null);
+
+  useEffect(() => {
+    locatorRootGetterRef.current = typeof getLocatorRoot === 'function' ? getLocatorRoot : null;
+  }, [getLocatorRoot]);
 
   useEffect(() => {
     if (!hostRef.current) return;
     if (apiRef.current) return;
     const host = hostRef.current;
-    const rootGetter =
-      typeof getLocatorRoot === 'function' ? getLocatorRoot : () => document.querySelector('.route-scroll') || null;
 
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
@@ -90,7 +93,8 @@ function ArticleCommentsPanelMount({
       showCollapseButton: variant === 'sidebar',
       surfaceBg: 'var(--bg-primary)',
       locatorEnv: variant === 'sidebar' ? 'app' : null,
-      getLocatorRoot: rootGetter,
+      getLocatorRoot: () =>
+        locatorRootGetterRef.current?.() ?? (document.querySelector('.route-scroll') as Element | null) ?? null,
     });
     apiRef.current = mounted.api;
     sidebarSession.attachPanel(mounted.api as any);
