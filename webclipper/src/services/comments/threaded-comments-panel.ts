@@ -162,6 +162,32 @@ function scrollRangeIntoView(range: Range): boolean {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function readLocatorHint(locator: unknown): number | null {
+  const hint = Number((locator as any)?.position?.start);
+  return Number.isFinite(hint) ? hint : null;
+}
+
+function nudgeDocumentScrollTowardsHint(hint: number, rootEl: Element): void {
+  const scroller = (document as any).scrollingElement || document.documentElement;
+  if (!scroller) return;
+
+  const maxScroll = Math.max(0, Number((scroller as any).scrollHeight || 0) - Number((scroller as any).clientHeight || 0));
+  if (!Number.isFinite(maxScroll) || maxScroll <= 0) return;
+
+  const textLength = Math.max(0, Number(String((rootEl as any)?.textContent || '').length) || 0);
+  const ratio = textLength > 0 ? Math.max(0, Math.min(1, hint / textLength)) : 1;
+
+  try {
+    (scroller as any).scrollTop = Math.round(maxScroll * ratio);
+  } catch (_e) {
+    // ignore
+  }
+}
+
 export function mountThreadedCommentsPanel(
   host: HTMLElement,
   options: MountOptions = {},
@@ -616,7 +642,24 @@ export function mountThreadedCommentsPanel(
     }
   }
 
-  function locateThreadRoot(rootItem: ThreadedCommentItem): boolean {
+  function locateThreadRootOnce(rootItem: ThreadedCommentItem, rootEl: Element): boolean {
+    const locator = (rootItem as any)?.locator;
+    if (!locator) return false;
+
+    const env = String((locator as any)?.env || '').trim();
+    const expectedEnv = String(options.locatorEnv || '').trim();
+    if (!expectedEnv || env !== expectedEnv) return false;
+
+    try {
+      const range = restoreRangeFromArticleCommentLocator({ root: rootEl, locator });
+      if (!range) return false;
+      return scrollRangeIntoView(range);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  async function locateThreadRootWithRetry(rootItem: ThreadedCommentItem): Promise<boolean> {
     const locator = (rootItem as any)?.locator;
     if (!locator) return false;
 
@@ -629,13 +672,16 @@ export function mountThreadedCommentsPanel(
     const rootEl = pickedRoot || document.body || document.documentElement;
     if (!rootEl) return false;
 
-    try {
-      const range = restoreRangeFromArticleCommentLocator({ root: rootEl, locator });
-      if (!range) return false;
-      return scrollRangeIntoView(range);
-    } catch (_e) {
-      return false;
-    }
+    const ok = locateThreadRootOnce(rootItem, rootEl);
+    if (ok) return true;
+
+    // P2-T1: inpage retry to handle dynamic loading (lazy/infinite scroll).
+    if (expectedEnv !== 'inpage') return false;
+    const hint = readLocatorHint(locator);
+    if (hint != null) nudgeDocumentScrollTowardsHint(hint, rootEl);
+
+    await sleep(120);
+    return locateThreadRootOnce(rootItem, rootEl);
   }
 
   const deleteConfirm = createTwoStepConfirmController<number>({
@@ -920,8 +966,10 @@ export function mountThreadedCommentsPanel(
             q.addEventListener('click', (e) => {
               if (state.busy) return;
               if (shouldIgnoreLocateClick((e as any).target)) return;
-              const ok = locateThreadRoot(root);
-              if (!ok) showNotice('无法定位');
+              void (async () => {
+                const ok = await locateThreadRootWithRetry(root);
+                if (!ok) showNotice('无法定位');
+              })();
             });
           }
         }
@@ -995,8 +1043,10 @@ export function mountThreadedCommentsPanel(
           comment.addEventListener('click', (e) => {
             if (state.busy) return;
             if (shouldIgnoreLocateClick((e as any).target)) return;
-            const ok = locateThreadRoot(root);
-            if (!ok) showNotice('无法定位');
+            void (async () => {
+              const ok = await locateThreadRootWithRetry(root);
+              if (!ok) showNotice('无法定位');
+            })();
           });
         }
 
