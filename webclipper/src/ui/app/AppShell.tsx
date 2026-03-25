@@ -180,10 +180,12 @@ export default function AppShell() {
       showSettingsSheet,
     ]);
 
-    const triggerCommentsSidebar = (quoteText: string) => {
+    const triggerCommentsSidebar = (input: { quoteText: string; locator: any | null }) => {
       setCommentsCollapsed(false);
+      const quoteText = String(input?.quoteText || '').trim();
       void commentsSidebarController.open({
-        selectionText: String(quoteText || '').trim(),
+        selectionText: quoteText,
+        locator: input?.locator ?? null,
         focusComposer: true,
         source: 'app',
         ensureContext: false,

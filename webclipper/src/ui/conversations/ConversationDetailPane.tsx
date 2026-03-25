@@ -9,6 +9,8 @@ import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useEffect, useRef, useState } from 'react';
+import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
+import type { ArticleCommentLocator } from '@services/comments/domain/models';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -28,7 +30,7 @@ export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
   onExpandSidebar?: () => void;
-  onTriggerCommentsSidebar?: (quoteText: string) => void;
+  onTriggerCommentsSidebar?: (input: { quoteText: string; locator: ArticleCommentLocator | null }) => void;
   commentsSidebarOpen?: boolean;
 };
 
@@ -68,6 +70,7 @@ export function ConversationDetailPane({
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const selectionQuoteRef = useRef<string>('');
+  const selectionLocatorRef = useRef<ArticleCommentLocator | null>(null);
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
@@ -113,6 +116,23 @@ export function ConversationDetailPane({
       return text;
     } catch (_e) {
       return '';
+    }
+  };
+
+  const readSelectionRange = (): Range | null => {
+    const root = messagesRootRef.current;
+    if (!root) return null;
+    try {
+      const sel = globalThis.getSelection?.();
+      if (!sel || sel.rangeCount <= 0) return null;
+      const range = sel.getRangeAt(0);
+      const anchor = sel.anchorNode as any as Node | null;
+      const focus = sel.focusNode as any as Node | null;
+      if (anchor && !root.contains(anchor)) return null;
+      if (focus && !root.contains(focus)) return null;
+      return range.cloneRange();
+    } catch (_e) {
+      return null;
     }
   };
 
@@ -288,6 +308,15 @@ export function ConversationDetailPane({
                   type="button"
                   onMouseDown={(e) => {
                     selectionQuoteRef.current = readSelectionQuote();
+                    selectionLocatorRef.current = null;
+                    const range = readSelectionRange();
+                    if (range && messagesRootRef.current) {
+                      selectionLocatorRef.current = buildArticleCommentLocatorFromRange({
+                        env: 'app',
+                        root: messagesRootRef.current,
+                        range,
+                      });
+                    }
                     // Avoid the button stealing focus and potentially collapsing selection before we read it.
                     try {
                       e.preventDefault();
@@ -298,7 +327,7 @@ export function ConversationDetailPane({
                   onClick={() => {
                     const quoteText = String(selectionQuoteRef.current || '').trim();
                     // When no selection, explicitly clear the quote.
-                    onTriggerCommentsSidebar(quoteText);
+                    onTriggerCommentsSidebar({ quoteText, locator: selectionLocatorRef.current });
                   }}
                   className={navIconButtonSmClassName(Boolean(commentsSidebarOpen))}
                   aria-label={commentsSidebarLabel}
