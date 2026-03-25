@@ -173,6 +173,7 @@
   color: var(--panel-text-muted);
   font-size: 12px;
   font-weight: 800;
+  pointer-events: none;
 }
 
 .webclipper-inpage-comments-panel__quote-text {

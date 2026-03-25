@@ -564,6 +564,9 @@ export function mountThreadedCommentsPanel(
   const notice = document.createElement('div');
   notice.className = 'webclipper-inpage-comments-panel__notice';
   notice.style.display = 'none';
+  notice.setAttribute('role', 'status');
+  notice.setAttribute('aria-live', 'polite');
+  notice.setAttribute('aria-atomic', 'true');
   body.appendChild(notice);
 
   const quote = document.createElement('div');
