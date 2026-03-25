@@ -3,6 +3,7 @@ import { t } from '@i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
+import { readInpageButtonGlobalPosition, writeInpageButtonGlobalPosition } from '@platform/storage/inpage-button-position.ts';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
@@ -28,6 +29,8 @@ type InpageButtonApi = {
     onClick?: () => void;
     onDoubleClick?: () => void;
     onCombo?: (payload: { level: number; count?: number }) => void;
+    positionState?: any;
+    onPositionChange?: (state: any) => void;
   }) => void;
   cleanupButtons?: (collectorId: string) => void;
   setSaving?: (saving: boolean) => void;
@@ -228,6 +231,9 @@ export function createContentController(deps: Deps) {
     // When storage is available, wait for the async read to avoid a "first tick" auto-save surprise for users who disabled it.
     let aiChatAutoSaveEnabled: boolean | null = hasStorageGet ? null : true;
     let savingDepth = 0;
+    let inpageButtonPosition: any = null;
+    let inpageButtonPositionLoaded = false;
+    let inpageButtonPositionLoadPromise: Promise<any> | null = null;
 
     void readAiChatAutoSaveEnabled()
       .then((enabled) => {
@@ -236,6 +242,35 @@ export function createContentController(deps: Deps) {
       .catch(() => {
         aiChatAutoSaveEnabled = true;
       });
+
+    async function ensureInpageButtonPositionLoadedOnce(): Promise<any | null> {
+      if (inpageButtonPositionLoaded) return inpageButtonPosition;
+      if (inpageButtonPositionLoadPromise) return inpageButtonPositionLoadPromise;
+
+      inpageButtonPositionLoadPromise = (async () => {
+        try {
+          const globalPos = await readInpageButtonGlobalPosition();
+          if (globalPos) {
+            inpageButtonPosition = globalPos;
+            return inpageButtonPosition;
+          }
+        } catch (_e) {
+          // ignore
+        }
+
+        inpageButtonPosition = null;
+        return null;
+      })();
+
+      try {
+        await inpageButtonPositionLoadPromise;
+      } finally {
+        inpageButtonPositionLoaded = true;
+        inpageButtonPositionLoadPromise = null;
+      }
+
+      return inpageButtonPosition;
+    }
 
     function stop() {
       if (stopped) return;
@@ -335,15 +370,21 @@ export function createContentController(deps: Deps) {
       if (line) showInpageTip(line);
     };
 
-    function refreshInpageButton() {
+    async function refreshInpageButton() {
       const collector = getCollector();
       const inpageCollector = collector || getInpageCollector();
+      const positionState = await ensureInpageButtonPositionLoadedOnce();
       inpageButton?.cleanupButtons?.(inpageCollector?.id || '');
       inpageButton?.ensureInpageButton?.({
         collectorId: inpageCollector?.id,
         onClick: clickSave,
         onDoubleClick: openCommentsSidebar,
         onCombo: showComboLine,
+        positionState,
+        onPositionChange: (state: any) => {
+          inpageButtonPosition = state;
+          void writeInpageButtonGlobalPosition(state);
+        },
       });
       return collector;
     }
@@ -354,7 +395,7 @@ export function createContentController(deps: Deps) {
       try {
         notionAiModelPicker?.maybeApply?.();
 
-        const collector = refreshInpageButton();
+        const collector = await refreshInpageButton();
         if (!collector || typeof collector.capture !== 'function') return;
         if (collector.id === 'googleaistudio') return;
         if (!AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has(String(collector.id || ''))) return;
