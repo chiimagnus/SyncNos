@@ -188,11 +188,29 @@ function readOnPositionChange(el: HTMLElement) {
   return typeof fn === 'function' ? fn : null;
 }
 
+function toExternalStateKey(state: { edge?: unknown; ratio?: unknown } | null | undefined) {
+  const edge = state && state.edge ? String(state.edge) : '';
+  const ratio = state && Number.isFinite((state as any).ratio) ? String((state as any).ratio) : '';
+  return `${edge}:${ratio}`;
+}
+
+function readLastExternalStateKey(el: HTMLElement) {
+  const value = (el as any).__webclipperExternalPositionStateKey;
+  return typeof value === 'string' ? value : '';
+}
+
+function writeLastExternalStateKey(el: HTMLElement, key: string) {
+  (el as any).__webclipperExternalPositionStateKey = String(key || '');
+}
+
 function applyExternalPositionState(el: HTMLElement, inputState: InpageButtonPositionState) {
   if (!inputState || !inputState.edge || !Number.isFinite(inputState.ratio)) return null;
+  const nextKey = toExternalStateKey(inputState);
+  if (nextKey && nextKey === readLastExternalStateKey(el)) return readSnappedState(el);
   const applied = applySnappedPosition(el, inputState);
   if (!applied) return null;
   writeSnappedState(el, applied);
+  writeLastExternalStateKey(el, nextKey);
   return applied;
 }
 
@@ -277,7 +295,7 @@ function ensureInpageButton({
       }
       try {
         writeOnPositionChange(existing, onPositionChange);
-        if (positionState) {
+        if (positionState && !existing.classList.contains('is-dragging')) {
           applyExternalPositionState(existing, positionState);
         }
       } catch (_e) {
