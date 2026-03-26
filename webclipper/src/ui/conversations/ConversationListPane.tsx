@@ -23,6 +23,7 @@ import {
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
+import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 
 type SourceMeta = { key: string; label: string };
@@ -729,26 +730,28 @@ export function ConversationListPane({
                   </div>
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
-                    <button
-                      className={buttonMiniIconClassName(isActive)}
-                      type="button"
-                      aria-label={t('copyFullMarkdown')}
-                      title={copiedId === id ? t('copied') : t('copyFullMarkdown')}
-                      onClick={(e) => void onCopyConversation(conversation as any, e)}
-                    >
-                      {copiedId === id ? '✓' : '⧉'}
-                    </button>
+                    <span className="tw-inline-flex" {...tooltipAttrs(copiedId === id ? t('copied') : t('copyFullMarkdown'))}>
+                      <button
+                        className={buttonMiniIconClassName(isActive)}
+                        type="button"
+                        aria-label={t('copyFullMarkdown')}
+                        onClick={(e) => void onCopyConversation(conversation as any, e)}
+                      >
+                        {copiedId === id ? '✓' : '⧉'}
+                      </button>
+                    </span>
 
-                    <button
-                      className={buttonMiniIconClassName(isActive)}
-                      type="button"
-                      aria-label={t('openOriginalChat')}
-                      title={safeUrl ? t('openChat') : t('noLinkAvailable')}
-                      disabled={!safeUrl}
-                      onClick={(e) => void openConversationUrl(String((conversation as any).url || ''), e)}
-                    >
-                      ↗
-                    </button>
+                    <span className="tw-inline-flex" {...tooltipAttrs(safeUrl ? t('openChat') : t('noLinkAvailable'))}>
+                      <button
+                        className={buttonMiniIconClassName(isActive)}
+                        type="button"
+                        aria-label={t('openOriginalChat')}
+                        disabled={!safeUrl}
+                        onClick={(e) => void openConversationUrl(String((conversation as any).url || ''), e)}
+                      >
+                        ↗
+                      </button>
+                    </span>
 
                     <span
                       className={[
@@ -850,37 +853,38 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <button
-                id="btnDelete"
-                type="button"
-                ref={deleteButtonRef}
-                className={
-                  deleteConfirming
-                    ? buttonDangerClassName()
-                    : [dangerSurfaceButton, 'webclipper-btn--icon webclipper-btn--icon-sm'].join(' ')
-                }
-                aria-pressed={deleteConfirming}
-                title={t('deleteButton')}
-                onClick={() => {
-                  if (!hasSelection || actionBusy || syncingAny) return;
-                  if (!deleteConfirmKey) return;
-                  if (!deleteConfirm.isArmed(deleteConfirmKey)) {
-                    deleteConfirm.arm(deleteConfirmKey);
-                    return;
+              <span className="tw-inline-flex" {...tooltipAttrs(t('deleteButton'))}>
+                <button
+                  id="btnDelete"
+                  type="button"
+                  ref={deleteButtonRef}
+                  className={
+                    deleteConfirming
+                      ? buttonDangerClassName()
+                      : [dangerSurfaceButton, 'webclipper-btn--icon webclipper-btn--icon-sm'].join(' ')
                   }
-                  void onConfirmDelete();
-                }}
-                disabled={!hasSelection || actionBusy || syncingAny}
-              >
-                {deleteConfirming ? (
-                  t('deleteButton')
-                ) : (
-                  <>
-                    <span aria-hidden="true">×</span>
-                    <span className="tw-sr-only">{t('deleteButton')}</span>
-                  </>
-                )}
-              </button>
+                  aria-pressed={deleteConfirming}
+                  onClick={() => {
+                    if (!hasSelection || actionBusy || syncingAny) return;
+                    if (!deleteConfirmKey) return;
+                    if (!deleteConfirm.isArmed(deleteConfirmKey)) {
+                      deleteConfirm.arm(deleteConfirmKey);
+                      return;
+                    }
+                    void onConfirmDelete();
+                  }}
+                  disabled={!hasSelection || actionBusy || syncingAny}
+                >
+                  {deleteConfirming ? (
+                    t('deleteButton')
+                  ) : (
+                    <>
+                      <span aria-hidden="true">×</span>
+                      <span className="tw-sr-only">{t('deleteButton')}</span>
+                    </>
+                  )}
+                </button>
+              </span>
 
               <MenuPopover
                 open={exportOpen}
@@ -891,15 +895,17 @@ export function ConversationListPane({
                 align="end"
                 panelMinWidth={150}
                 trigger={(triggerProps) => (
-                  <button {...triggerProps} id="btnExport" className={actionButton}>
-                    <span className="tw-leading-none">{t('exportButton')}</span>
-                    <span
-                      className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-                      aria-hidden="true"
-                    >
-                      ▾
-                    </span>
-                  </button>
+                  <span className="tw-inline-flex" {...tooltipAttrs(t('exportButton'))}>
+                    <button {...triggerProps} id="btnExport" className={actionButton}>
+                      <span className="tw-leading-none">{t('exportButton')}</span>
+                      <span
+                        className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                        aria-hidden="true"
+                      >
+                        ▾
+                      </span>
+                    </button>
+                  </span>
                 )}
               >
                 <button
@@ -929,28 +935,30 @@ export function ConversationListPane({
               </MenuPopover>
 
               {singleSyncProvider ? (
-                <button
-                  id="btnSyncProvider"
-                  className={actionButton}
-                  type="button"
-                  disabled={
-                    !hasSelection ||
-                    exporting ||
-                    deleting ||
-                    actionBusy ||
-                    (singleSyncProvider === 'notion' ? syncingNotion : syncingObsidian)
-                  }
-                  onClick={() => {
-                    if (singleSyncProvider === 'obsidian') {
-                      void syncSelectedObsidian().catch(() => {});
-                      return;
+                <span className="tw-inline-flex" {...tooltipAttrs(singleSyncLabel)}>
+                  <button
+                    id="btnSyncProvider"
+                    className={actionButton}
+                    type="button"
+                    disabled={
+                      !hasSelection ||
+                      exporting ||
+                      deleting ||
+                      actionBusy ||
+                      (singleSyncProvider === 'notion' ? syncingNotion : syncingObsidian)
                     }
-                    void syncSelectedNotion().catch(() => {});
-                    onPopupNotionSyncStarted?.();
-                  }}
-                >
-                  <span className="tw-leading-none">{singleSyncLabel}</span>
-                </button>
+                    onClick={() => {
+                      if (singleSyncProvider === 'obsidian') {
+                        void syncSelectedObsidian().catch(() => {});
+                        return;
+                      }
+                      void syncSelectedNotion().catch(() => {});
+                      onPopupNotionSyncStarted?.();
+                    }}
+                  >
+                    <span className="tw-leading-none">{singleSyncLabel}</span>
+                  </button>
+                </span>
               ) : (
                 <MenuPopover
                   open={syncOpen}
@@ -963,15 +971,17 @@ export function ConversationListPane({
                   align="end"
                   panelMinWidth={170}
                   trigger={(triggerProps) => (
-                    <button {...triggerProps} id="btnSyncTo" className={actionButton}>
-                      <span className="tw-leading-none">{syncMenuButtonLabel}</span>
-                      <span
-                        className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-                        aria-hidden="true"
-                      >
-                        ▾
-                      </span>
-                    </button>
+                    <span className="tw-inline-flex" {...tooltipAttrs(syncMenuBaseLabel)}>
+                      <button {...triggerProps} id="btnSyncTo" className={actionButton}>
+                        <span className="tw-leading-none">{syncMenuButtonLabel}</span>
+                        <span
+                          className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                          aria-hidden="true"
+                        >
+                          ▾
+                        </span>
+                      </button>
+                    </span>
                   )}
                 >
                   {enabledSyncProviders.includes('obsidian') ? (

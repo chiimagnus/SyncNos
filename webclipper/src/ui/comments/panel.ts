@@ -76,6 +76,15 @@ function shouldIgnoreLocateClick(target: EventTarget | null): boolean {
   return false;
 }
 
+function setPanelTooltip(el: HTMLElement, label: string) {
+  const text = String(label || '').trim();
+  if (!text) {
+    el.removeAttribute('data-webclipper-tooltip');
+    return;
+  }
+  el.setAttribute('data-webclipper-tooltip', text);
+}
+
 export function mountThreadedCommentsPanel(
   host: HTMLElement,
   options: MountOptions = {},
@@ -163,7 +172,7 @@ export function mountThreadedCommentsPanel(
         'webclipper-inpage-comments-panel__collapse webclipper-btn webclipper-btn--icon webclipper-btn--icon-sm webclipper-btn--tone-muted';
       const collapseLabel = t('closeCommentsSidebar');
       collapse.setAttribute('aria-label', collapseLabel);
-      collapse.setAttribute('title', collapseLabel);
+      setPanelTooltip(collapse, collapseLabel);
       collapse.innerHTML = [
         '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">',
         '<path d="M6.25 3.25L9.5 6.5L6.25 9.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />',
@@ -223,7 +232,9 @@ export function mountThreadedCommentsPanel(
   composerSend.className =
     'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--filled webclipper-btn--icon';
   composerSend.type = 'button';
-  composerSend.setAttribute('aria-label', 'Comment');
+  const commentLabel = 'Comment';
+  composerSend.setAttribute('aria-label', commentLabel);
+  setPanelTooltip(composerSend, commentLabel);
   composerSend.textContent = '↑';
   composerActions.appendChild(composerSend);
 
@@ -293,7 +304,7 @@ export function mountThreadedCommentsPanel(
       button.classList.add('webclipper-btn--danger');
       button.textContent = t('deleteButton');
       button.setAttribute('aria-label', t('deleteButton'));
-      button.title = '';
+      setPanelTooltip(button, t('deleteButton'));
     } else {
       button.removeAttribute('data-confirm');
       button.classList.remove('webclipper-btn--danger');
@@ -301,7 +312,7 @@ export function mountThreadedCommentsPanel(
       button.classList.add('webclipper-btn--icon');
       button.textContent = '×';
       button.setAttribute('aria-label', t('deleteButton'));
-      button.title = '';
+      setPanelTooltip(button, t('deleteButton'));
     }
   }
 

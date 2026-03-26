@@ -387,6 +387,40 @@
   white-space: nowrap;
 }
 
+.webclipper-inpage-comments-panel__surface [data-webclipper-tooltip] {
+  position: relative;
+}
+
+.webclipper-inpage-comments-panel__surface [data-webclipper-tooltip]::after {
+  content: attr(data-webclipper-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 4px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 50;
+  border: 1px solid rgb(67 71 82 / 64%);
+  border-radius: 10px;
+  background: rgb(27 30 36 / 95%);
+  color: rgb(244 247 252);
+  box-shadow: 0 12px 24px rgb(0 0 0 / 30%);
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.webclipper-inpage-comments-panel__surface [data-webclipper-tooltip]:is(:hover, :focus-visible)::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .webclipper-inpage-comments-panel__comment-body {
   white-space: pre-wrap;
   word-break: break-word;
