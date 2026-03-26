@@ -158,7 +158,6 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           actions={toolActions}
           buttonClassName={headerActionButtonClass}
           menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
-          menuTriggerTitle={t('detailHeaderToolsMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
           menuAriaLabel={t('detailHeaderToolsMenuAria')}
           className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"
@@ -167,7 +166,6 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           actions={openActions}
           buttonClassName={headerActionButtonClass}
           menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
-          menuTriggerTitle={t('detailHeaderOpenInMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
           menuAriaLabel={t('detailHeaderOpenInMenuAria')}
           className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"

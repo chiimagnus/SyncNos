@@ -1,0 +1,15 @@
+.react-tooltip.webclipper-tooltip {
+  max-width: 320px;
+  border: 1px solid color-mix(in srgb, var(--border) 42%, #ffffff2c);
+  border-radius: 10px;
+  background: color-mix(in srgb, black 76%, var(--bg-panel));
+  color: color-mix(in srgb, white 92%, var(--text-primary));
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  z-index: 1600;
+}

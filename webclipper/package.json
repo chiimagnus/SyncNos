@@ -28,12 +28,12 @@
     "tabWidth": 2
   },
   "devDependencies": {
+    "@eslint/js": "^9.19.0",
     "@types/markdown-it": "^14.1.2",
     "@types/markdown-it-link-attributes": "^3.0.5",
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
-    "@eslint/js": "^9.19.0",
     "@vitest/coverage-v8": "^2.1.9",
     "@wxt-dev/module-react": "^1.1.5",
     "autoprefixer": "^10.4.21",
@@ -47,8 +47,8 @@
     "prettier": "^3.5.3",
     "tailwindcss": "^3.4.17",
     "terser": "^5.31.6",
-    "typescript-eslint": "^8.26.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.26.1",
     "vitest": "^2.1.8",
     "wxt": "^0.20.18"
   },
@@ -65,6 +65,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "7.13.1",
+    "react-tooltip": "^5.30.0",
     "recharts": "^3.8.0"
   }
 }

@@ -5,12 +5,12 @@ import type { DetailHeaderAction } from '@services/integrations/detail-header-ac
 import { t } from '@i18n';
 import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
+import { tooltipAttrs } from '@ui/shared/AppTooltip';
 
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
   buttonClassName: string;
   menuTriggerLabel?: string;
-  menuTriggerTitle?: string;
   menuTriggerAriaLabel?: string;
   menuAriaLabel?: string;
   className?: string;
@@ -20,7 +20,6 @@ export function DetailHeaderActionBar({
   actions,
   buttonClassName,
   menuTriggerLabel,
-  menuTriggerTitle,
   menuTriggerAriaLabel,
   menuAriaLabel,
   className,
@@ -85,7 +84,7 @@ export function DetailHeaderActionBar({
         <button
           key={action.id}
           type="button"
-          title={action.label}
+          {...tooltipAttrs(action.label)}
           onClick={() => {
             void handleTrigger(action);
           }}
@@ -104,7 +103,6 @@ export function DetailHeaderActionBar({
   }
 
   const resolvedMenuTriggerLabel = String(menuTriggerLabel || '').trim() || 'Open in...';
-  const resolvedMenuTriggerTitle = String(menuTriggerTitle || '').trim() || resolvedMenuTriggerLabel;
   const resolvedMenuTriggerAriaLabel = String(menuTriggerAriaLabel || '').trim() || 'Open destinations';
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
   const triggerLabel = labelOverride || resolvedMenuTriggerLabel;
@@ -125,7 +123,7 @@ export function DetailHeaderActionBar({
         trigger={(triggerProps) => (
           <button
             {...triggerProps}
-            title={resolvedMenuTriggerTitle}
+            {...tooltipAttrs(resolvedMenuTriggerLabel)}
             aria-label={resolvedMenuTriggerAriaLabel}
             className={buttonClassName}
           >

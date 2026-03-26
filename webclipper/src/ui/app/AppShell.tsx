@@ -10,6 +10,7 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
+import { AppTooltipHost } from '@ui/shared/AppTooltip';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
@@ -442,6 +443,7 @@ export default function AppShell() {
           setCollapsed={setCollapsed}
           setCommentsCollapsed={setCommentsCollapsed}
         />
+        <AppTooltipHost />
       </ConversationsProvider>
     </HashRouter>
   );
