@@ -22,6 +22,16 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+export function clampSidebarWidthPxForViewport(widthPx: number, input: { isOverlay: boolean; viewportWidth: number }): number {
+  const viewport = Math.max(1, Math.round(Number(input.viewportWidth || 0) || 0));
+  const maxCap = Math.max(
+    COMMENTS_SIDEBAR_WIDTH_MIN_PX,
+    input.isOverlay ? Math.floor(viewport * 0.92) : viewport - COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX,
+  );
+  const max = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.min(COMMENTS_SIDEBAR_WIDTH_MAX_PX, maxCap));
+  return Math.round(clamp(widthPx, COMMENTS_SIDEBAR_WIDTH_MIN_PX, max));
+}
+
 function stopEvent(event: Event) {
   try {
     event.preventDefault();
@@ -55,13 +65,8 @@ function persistSidebarWidthPx(widthPx: number) {
 }
 
 function clampSidebarWidthPx(widthPx: number, isOverlay: boolean): number {
-  const viewport = Math.max(1, Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0));
-  const maxCap = Math.max(
-    COMMENTS_SIDEBAR_WIDTH_MIN_PX,
-    isOverlay ? Math.floor(viewport * 0.92) : viewport - COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX,
-  );
-  const max = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.min(COMMENTS_SIDEBAR_WIDTH_MAX_PX, maxCap));
-  return Math.round(clamp(widthPx, COMMENTS_SIDEBAR_WIDTH_MIN_PX, max));
+  const viewportWidth = Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0;
+  return clampSidebarWidthPxForViewport(widthPx, { isOverlay, viewportWidth });
 }
 
 export function installSidebarResize(options: InstallSidebarResizeOptions): { cleanup: () => void } {
