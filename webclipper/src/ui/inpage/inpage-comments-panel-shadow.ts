@@ -77,51 +77,57 @@ function buildConversationFromResolved(input: {
 
 async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChatWithAction[]> {
   const rt = runtimeClient;
-  if (!rt?.send) return [];
-
-  try {
-    const resolved = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {});
-    if (!resolved?.ok) return [];
-
-    const conversationId = normalizeConversationId(resolved?.data?.conversationId);
-    if (!conversationId) return [];
-
-    const detailRes = await rt.send(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, { conversationId });
-    if (!detailRes?.ok) return [];
-    const detail = detailRes.data as ConversationDetail | null;
-    if (!detail || !Array.isArray(detail.messages) || !detail.messages.length) return [];
-
-    const conversation = buildConversationFromResolved({
-      conversationId,
-      url: resolved?.data?.url,
-      title: resolved?.data?.title,
-      author: resolved?.data?.author,
-      publishedAt: resolved?.data?.publishedAt,
-    });
-
-    const actions: DetailHeaderAction[] = await resolveChatWithDetailHeaderActions({
-      conversation,
-      detail,
-      port: defaultDetailHeaderActionPort,
-    });
-
-    const mapped: ThreadedCommentsPanelChatWithAction[] = [];
-    for (const action of actions) {
-      const id = safeString((action as any)?.id);
-      const label = safeString((action as any)?.label);
-      const onTrigger = (action as any)?.onTrigger;
-      if (!id || !label || typeof onTrigger !== 'function') continue;
-      mapped.push({
-        id,
-        label,
-        disabled: Boolean((action as any)?.disabled),
-        onTrigger: () => onTrigger(),
-      });
-    }
-    return mapped;
-  } catch (_e) {
-    return [];
+  if (!rt?.send) {
+    throw new Error('Runtime is unavailable in this page context');
   }
+
+  const resolved = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {});
+  if (!resolved?.ok) {
+    throw new Error(safeString(resolved?.error?.message) || 'Failed to resolve current page article');
+  }
+
+  const conversationId = normalizeConversationId(resolved?.data?.conversationId);
+  if (!conversationId) {
+    throw new Error('No article conversation is available for this page');
+  }
+
+  const detailRes = await rt.send(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, { conversationId });
+  if (!detailRes?.ok) {
+    throw new Error(safeString(detailRes?.error?.message) || 'Failed to load conversation detail');
+  }
+  const detail = detailRes.data as ConversationDetail | null;
+  if (!detail || !Array.isArray(detail.messages) || !detail.messages.length) {
+    throw new Error('Conversation detail is not ready yet');
+  }
+
+  const conversation = buildConversationFromResolved({
+    conversationId,
+    url: resolved?.data?.url,
+    title: resolved?.data?.title,
+    author: resolved?.data?.author,
+    publishedAt: resolved?.data?.publishedAt,
+  });
+
+  const actions: DetailHeaderAction[] = await resolveChatWithDetailHeaderActions({
+    conversation,
+    detail,
+    port: defaultDetailHeaderActionPort,
+  });
+
+  const mapped: ThreadedCommentsPanelChatWithAction[] = [];
+  for (const action of actions) {
+    const id = safeString((action as any)?.id);
+    const label = safeString((action as any)?.label);
+    const onTrigger = (action as any)?.onTrigger;
+    if (!id || !label || typeof onTrigger !== 'function') continue;
+    mapped.push({
+      id,
+      label,
+      disabled: Boolean((action as any)?.disabled),
+      onTrigger: () => onTrigger(),
+    });
+  }
+  return mapped;
 }
 
 function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {

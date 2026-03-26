@@ -210,8 +210,13 @@ export default function AppShell() {
 
       const currentDetail =
         detail && Number((detail as any)?.conversationId || 0) === conversationId ? detail : null;
-      if (!currentDetail || !Array.isArray((currentDetail as any)?.messages) || !(currentDetail as any)?.messages.length)
-        return [];
+      if (
+        !currentDetail ||
+        !Array.isArray((currentDetail as any)?.messages) ||
+        !(currentDetail as any)?.messages.length
+      ) {
+        throw new Error('Conversation detail is not ready yet');
+      }
 
       const actions: DetailHeaderAction[] = await resolveChatWithDetailHeaderActions({
         conversation: selectedConversation,
