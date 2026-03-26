@@ -3,6 +3,14 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
+const { commentsByUrl, listArticleCommentsByCanonicalUrlMock } = vi.hoisted(() => {
+  const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
+  const listArticleCommentsByCanonicalUrlMock = vi.fn(async (canonicalUrl: string) => {
+    return commentsByUrl.get(String(canonicalUrl || '')) || [];
+  });
+  return { commentsByUrl, listArticleCommentsByCanonicalUrlMock };
+});
+
 const currentState = {
   items: [],
   activeId: null,
@@ -89,7 +97,7 @@ vi.mock('@services/comments/client/repo', () => ({
     updatedAt: Date.now(),
   })),
   deleteArticleCommentById: vi.fn(async () => true),
-  listArticleCommentsByCanonicalUrl: vi.fn(async () => []),
+  listArticleCommentsByCanonicalUrl: listArticleCommentsByCanonicalUrlMock,
 }));
 
 vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
@@ -151,6 +159,16 @@ describe('AppShell comments sidebar', () => {
   let root: ReactDOM.Root | null = null;
 
   beforeEach(() => {
+    commentsByUrl.clear();
+    listArticleCommentsByCanonicalUrlMock.mockClear();
+    currentState.selectedConversation = {
+      id: 21,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-21',
+      url: 'https://example.com/article',
+    };
     setupDom();
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
@@ -204,5 +222,56 @@ describe('AppShell comments sidebar', () => {
 
     const reopened = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(reopened).toBeTruthy();
+  });
+
+  it('refreshes comments when selected article switches while sidebar stays open', async () => {
+    commentsByUrl.set('https://example.com/a', [{ id: 101, parentId: null, commentText: 'Comment A' }]);
+    commentsByUrl.set('https://example.com/b', [{ id: 202, parentId: null, commentText: 'Comment B' }]);
+    currentState.selectedConversation = {
+      id: 21,
+      title: 'Article A',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-a',
+      url: 'https://example.com/a',
+    };
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+      const body = host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-body');
+      expect(body?.textContent).toBe('Comment A');
+    });
+
+    currentState.selectedConversation = {
+      id: 22,
+      title: 'Article B',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-b',
+      url: 'https://example.com/b',
+    };
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    await vi.waitFor(() => {
+      const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+      const body = host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-body');
+      expect(body?.textContent).toBe('Comment B');
+    });
+
+    expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/a');
+    expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/b');
   });
 });

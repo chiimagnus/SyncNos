@@ -14,7 +14,7 @@ vi.mock('@services/comments/locator', async () => {
 });
 
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
-import { mountThreadedCommentsPanel } from '@services/comments/threaded-comments-panel';
+import { mountThreadedCommentsPanel } from '@ui/comments';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {

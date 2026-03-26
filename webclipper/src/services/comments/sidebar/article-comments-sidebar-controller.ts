@@ -3,6 +3,9 @@ import type {
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
 import { normalizeCommentSidebarQuoteText } from '@services/comments/sidebar/comment-sidebar-session';
+import type { ArticleCommentLocator } from '@services/comments/domain/models';
+import { normalizePositiveInt } from '@services/shared/numbers';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 
 import type {
   ArticleCommentsSidebarAdapter,
@@ -12,7 +15,7 @@ import type {
 
 export type ArticleCommentsSidebarControllerOpenInput = {
   selectionText?: string | null;
-  locator?: any;
+  locator?: unknown;
   focusComposer?: boolean;
   source?: string;
   ensureContext?: boolean;
@@ -30,24 +33,8 @@ function safeString(value: unknown): string {
   return String(value ?? '').trim();
 }
 
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
-
 function normalizeConversationId(value: unknown): number | null {
-  const id = Number(value);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
+  return normalizePositiveInt(value);
 }
 
 function normalizeContext(next: ArticleCommentsSidebarContext): ArticleCommentsSidebarContext {
@@ -55,6 +42,19 @@ function normalizeContext(next: ArticleCommentsSidebarContext): ArticleCommentsS
     canonicalUrl: normalizeHttpUrl(next.canonicalUrl),
     conversationId: normalizeConversationId(next.conversationId),
   };
+}
+
+function buildContextKey(context: ArticleCommentsSidebarContext | null): string {
+  if (!context) return '';
+  const canonicalUrl = normalizeHttpUrl(context.canonicalUrl);
+  if (!canonicalUrl) return '';
+  const conversationId = normalizeConversationId(context.conversationId);
+  return `${canonicalUrl}#${conversationId ?? ''}`;
+}
+
+function normalizeLocator(locator: unknown): ArticleCommentLocator | null {
+  if (!locator || typeof locator !== 'object') return null;
+  return locator as ArticleCommentLocator;
 }
 
 export function createArticleCommentsSidebarController(input: {
@@ -68,7 +68,8 @@ export function createArticleCommentsSidebarController(input: {
 
   let activeContext: ArticleCommentsSidebarContext | null = null;
   let lastEnsureContextInput: ArticleCommentsSidebarEnsureContextInput | undefined;
-  let pendingRootLocator: any | null = null;
+  let pendingRootLocator: ArticleCommentLocator | null = null;
+  let refreshRunId = 0;
 
   const ensureContext = async (
     ensure: boolean,
@@ -82,9 +83,12 @@ export function createArticleCommentsSidebarController(input: {
   };
 
   const getCanonicalUrl = () => normalizeHttpUrl(activeContext?.canonicalUrl);
+  const getContextKey = () => buildContextKey(activeContext);
 
   const refresh = async (options?: { manageBusy?: boolean }) => {
     const manageBusy = options?.manageBusy !== false;
+    const runId = ++refreshRunId;
+    const contextKeyAtStart = getContextKey();
     const canonicalUrl = getCanonicalUrl();
     if (!canonicalUrl) {
       session.setComments([]);
@@ -93,11 +97,13 @@ export function createArticleCommentsSidebarController(input: {
     if (manageBusy) session.setBusy(true);
     try {
       const items = await adapter.list({ canonicalUrl });
+      if (runId !== refreshRunId || contextKeyAtStart !== getContextKey()) return;
       session.setComments(Array.isArray(items) ? items : []);
     } catch (_e) {
+      if (runId !== refreshRunId || contextKeyAtStart !== getContextKey()) return;
       session.setComments([]);
     } finally {
-      if (manageBusy) session.setBusy(false);
+      if (manageBusy && runId === refreshRunId) session.setBusy(false);
     }
   };
 
@@ -171,7 +177,7 @@ export function createArticleCommentsSidebarController(input: {
   const open = async (openInput?: ArticleCommentsSidebarControllerOpenInput) => {
     const selectionText = openInput?.selectionText;
     if (selectionText != null) session.setQuoteText(normalizeCommentSidebarQuoteText(selectionText));
-    if (selectionText != null) pendingRootLocator = openInput?.locator ?? null;
+    if (selectionText != null) pendingRootLocator = normalizeLocator(openInput?.locator);
     session.requestOpen({ focusComposer: openInput?.focusComposer === true, source: openInput?.source });
 
     const shouldEnsureContext = openInput?.ensureContext !== false;
@@ -187,7 +193,22 @@ export function createArticleCommentsSidebarController(input: {
   const getContext = () => (activeContext ? { ...activeContext } : null);
 
   const setContext = (next: ArticleCommentsSidebarContext | null) => {
-    activeContext = next ? normalizeContext(next) : null;
+    const normalized = next ? normalizeContext(next) : null;
+    if (buildContextKey(activeContext) === buildContextKey(normalized)) return;
+
+    activeContext = normalized;
+    pendingRootLocator = null;
+    session.setQuoteText('');
+    refreshRunId += 1;
+
+    const canonicalUrl = getCanonicalUrl();
+    if (!canonicalUrl) {
+      session.setBusy(false);
+      session.setComments([]);
+      return;
+    }
+
+    void refresh();
   };
 
   return {

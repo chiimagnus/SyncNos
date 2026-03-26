@@ -2,10 +2,12 @@ import {
   mountThreadedCommentsPanel,
   type ThreadedCommentItem,
   type ThreadedCommentsPanelChatWithAction,
-} from '@services/comments/threaded-comments-panel';
+} from '@ui/comments';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { normalizePositiveInt } from '@services/shared/numbers';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -32,26 +34,6 @@ type RuntimeClient = {
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
-}
-
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
-
-function normalizeConversationId(value: unknown): number | null {
-  const id = Number(value);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
 }
 
 function buildConversationFromResolved(input: {
@@ -86,7 +68,7 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     throw new Error(safeString(resolved?.error?.message) || 'Failed to resolve current page article');
   }
 
-  const conversationId = normalizeConversationId(resolved?.data?.conversationId);
+  const conversationId = normalizePositiveInt(resolved?.data?.conversationId);
   if (!conversationId) {
     throw new Error('No article conversation is available for this page');
   }
