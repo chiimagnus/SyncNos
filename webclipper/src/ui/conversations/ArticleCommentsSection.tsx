@@ -83,7 +83,7 @@ function ArticleCommentsPanelMount({
       variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
       showHeader: true,
       showCollapseButton: variant === 'sidebar',
-      surfaceBg: 'var(--bg-primary)',
+      surfaceBg: 'var(--bg-card)',
       locatorEnv: variant === 'sidebar' ? 'app' : null,
       getLocatorRoot: () =>
         locatorRootGetterRef.current?.() ?? (document.querySelector('.route-scroll') as Element | null) ?? null,

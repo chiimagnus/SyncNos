@@ -127,6 +127,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     dockPage: true,
     initiallyOpen: false,
     variant: 'sidebar',
+    surfaceBg: 'var(--bg-card)',
     showHeader: true,
     showCollapseButton: true,
     locatorEnv: 'inpage',

@@ -668,7 +668,7 @@ export function ConversationListPane({
         className="route-scroll tw-relative tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden"
         onScroll={() => onListScrollTopChange?.(scrollRef.current?.scrollTop || 0)}
       >
-        <div className="tw-grid tw-gap-1 tw-p-3">
+        <div className="tw-grid tw-gap-2 tw-p-3">
           {filteredItems.length ? null : (
             <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('noConversations')}
@@ -682,7 +682,14 @@ export function ConversationListPane({
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
-            const rowClass = [navItemClassName(isActive), 'tw-group tw-relative tw-items-start tw-gap-2.5'].join(' ');
+            const rowSurfaceClass = isActive
+              ? 'tw-border tw-border-[color-mix(in_srgb,var(--accent)_58%,var(--border))] tw-shadow-[inset_0_1px_0_rgb(255_255_255_/_0.55)]'
+              : 'tw-border tw-border-[color-mix(in_srgb,var(--border)_82%,transparent)] tw-bg-[var(--bg-card)] hover:tw-border-[color-mix(in_srgb,var(--border)_96%,transparent)]';
+            const rowClass = [
+              navItemClassName(isActive),
+              'tw-group tw-relative tw-items-start tw-gap-2.5 tw-rounded-xl',
+              rowSurfaceClass,
+            ].join(' ');
 
             const checkboxInputClass = isActive
               ? 'tw-size-4 tw-cursor-pointer tw-accent-[var(--accent-foreground)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]'
