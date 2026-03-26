@@ -4,7 +4,6 @@ import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integ
 import { openExternalUrl } from '@services/integrations/open-external-url';
 import { reportObsidianOpenError, waitForDelay } from '@services/integrations/openin/obsidian-open-target';
 import { resolveOpenInDetailHeaderActions } from '@services/integrations/openin/openin-detail-header-actions';
-import { resolveChatWithDetailHeaderActions } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 
 export { DETAIL_HEADER_ACTION_LABELS } from '@services/integrations/openin/openin-detail-header-actions';
 export type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
@@ -34,9 +33,5 @@ export async function resolveDetailHeaderActions({
   detail,
   port = defaultDetailHeaderActionPort,
 }: ResolveDetailHeaderActionsInput): Promise<DetailHeaderAction[]> {
-  const actions: DetailHeaderAction[] = await resolveOpenInDetailHeaderActions({ conversation, port });
-
-  actions.push(...(await resolveChatWithDetailHeaderActions({ conversation, detail: detail ?? null, port })));
-
-  return actions;
+  return await resolveOpenInDetailHeaderActions({ conversation, port });
 }

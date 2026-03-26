@@ -22,7 +22,6 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
   const { activeId, updateSelectedConversationUrl, cleanUrlDraft } = useConversationsApp();
   const safeActions = Array.isArray(actions) ? actions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
-  const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   const [urlEditing, setUrlEditing] = useState(false);
@@ -162,15 +161,6 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
           menuTriggerTitle={t('detailHeaderToolsMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
           menuAriaLabel={t('detailHeaderToolsMenuAria')}
-          className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"
-        />
-        <DetailHeaderActionBar
-          actions={chatWithActions}
-          buttonClassName={headerActionButtonClass}
-          menuTriggerLabel={t('detailHeaderChatWithMenuLabel')}
-          menuTriggerTitle={t('detailHeaderChatWithMenuLabel')}
-          menuTriggerAriaLabel={t('detailHeaderChatWithMenuAria')}
-          menuAriaLabel={t('detailHeaderChatWithMenuAria')}
           className="tw-flex tw-items-center tw-gap-2 tw-flex-wrap tw-justify-end"
         />
         <DetailHeaderActionBar
