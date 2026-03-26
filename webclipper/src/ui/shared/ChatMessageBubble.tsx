@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { createMarkdownRenderer } from '@ui/shared/markdown';
+import { createMarkdownRenderer } from '@ui/shared/markdown-core';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
 type BubbleRole = 'user' | 'assistant';
@@ -75,7 +75,31 @@ export type ChatMessageBubbleProps = {
 };
 
 // Shared singleton to avoid per-message renderer instantiation.
-const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
+const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true, renderMath: false });
+let sharedMathMd: ReturnType<typeof createMarkdownRenderer> | null = null;
+let sharedMathMdPromise: Promise<ReturnType<typeof createMarkdownRenderer>> | null = null;
+
+const MATH_BLOCK_RE = /\$\$[\s\S]+?\$\$/;
+const MATH_INLINE_RE = /(^|[^\\])\$(?!\$)[^$\n]+?\$(?!\$)/;
+const MATH_BRACKET_RE = /\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/;
+
+function markdownLikelyContainsMath(markdown: string): boolean {
+  const text = String(markdown || '');
+  if (!text) return false;
+  return MATH_BLOCK_RE.test(text) || MATH_INLINE_RE.test(text) || MATH_BRACKET_RE.test(text);
+}
+
+async function ensureSharedMathRenderer(): Promise<ReturnType<typeof createMarkdownRenderer>> {
+  if (sharedMathMd) return sharedMathMd;
+  if (!sharedMathMdPromise) {
+    sharedMathMdPromise = import('@ui/shared/markdown-math').then((mod) => {
+      const renderer = mod.createKatexMarkdownRenderer({ openLinksInNewTab: true });
+      sharedMathMd = renderer;
+      return renderer;
+    });
+  }
+  return sharedMathMdPromise;
+}
 
 export function ChatMessageBubble({
   role,
@@ -87,8 +111,30 @@ export function ChatMessageBubble({
 }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
   const markdownRef = useRef<HTMLDivElement | null>(null);
+  const [mathRenderer, setMathRenderer] = useState<ReturnType<typeof createMarkdownRenderer> | null>(
+    () => sharedMathMd,
+  );
 
   const [assetSrcById, setAssetSrcById] = useState<Map<number, string>>(() => new Map());
+  const containsMath = useMemo(() => markdownLikelyContainsMath(markdown), [markdown]);
+
+  useEffect(() => {
+    if (!containsMath || sharedMathMd) return;
+    let disposed = false;
+    void ensureSharedMathRenderer()
+      .then(() => {
+        if (disposed) return;
+        setMathRenderer(sharedMathMd);
+      })
+      .catch((error) => {
+        console.warn('[Markdown] failed to load math renderer', {
+          error: error instanceof Error ? error.message : String(error || ''),
+        });
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [containsMath]);
 
   useEffect(() => {
     const ids = collectOrderedSyncnosAssetIds(String(markdown || ''));
@@ -136,8 +182,10 @@ export function ChatMessageBubble({
   }, [markdown, conversationId]);
 
   const html = useMemo(() => {
-    return sharedMd.render(String(markdown || ''), { syncnosAssetSrcById: assetSrcById } as any);
-  }, [markdown, assetSrcById]);
+    const activeMathRenderer = mathRenderer || sharedMathMd;
+    const renderer = containsMath && activeMathRenderer ? activeMathRenderer : sharedMd;
+    return renderer.render(String(markdown || ''), { syncnosAssetSrcById: assetSrcById } as any);
+  }, [markdown, assetSrcById, containsMath, mathRenderer]);
   const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
   // NOTE: asset URLs are resolved before render via markdown-it env;
