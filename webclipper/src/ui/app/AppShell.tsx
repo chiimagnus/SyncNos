@@ -20,7 +20,7 @@ import {
   type ArticleCommentsSidebarController,
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
-import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments/threaded-comments-panel';
+import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import {
   resolveChatWithDetailHeaderActions,

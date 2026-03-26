@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampSidebarWidthPxForViewport } from '@ui/comments/threaded-comments-panel/resize';
+import { clampSidebarWidthPxForViewport } from '@ui/comments/resize';
 
 describe('clampSidebarWidthPxForViewport', () => {
   it('clamps to min width for tiny viewports', () => {

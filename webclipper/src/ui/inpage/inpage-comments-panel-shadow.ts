@@ -2,7 +2,7 @@ import {
   mountThreadedCommentsPanel,
   type ThreadedCommentItem,
   type ThreadedCommentsPanelChatWithAction,
-} from '@ui/comments/threaded-comments-panel';
+} from '@ui/comments';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
