@@ -1,8 +1,8 @@
 import { t } from '@i18n';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
-import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
 import { createChatWithMenuController } from './chatwith';
 import { createDockController } from './dock';
+import { createThreadLocateController } from './locate';
 import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type {
@@ -82,194 +82,6 @@ function shouldIgnoreLocateClick(target: EventTarget | null): boolean {
     // ignore
   }
   return false;
-}
-
-function pickRangeTargetElement(range: Range): HTMLElement | null {
-  const node = (range as any).startContainer as Node | null;
-  return node && (node as any).nodeType === Node.TEXT_NODE
-    ? ((node as any).parentElement as HTMLElement | null)
-    : (node as any as HTMLElement | null);
-}
-
-const LOCATE_HIGHLIGHT_ATTR = 'data-webclipper-locate-highlight';
-const LOCATE_HIGHLIGHT_STYLE_ID = 'webclipper-comments-locate-highlight-style';
-
-function ensureLocateHighlightStyle() {
-  try {
-    if (document.getElementById(LOCATE_HIGHLIGHT_STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = LOCATE_HIGHLIGHT_STYLE_ID;
-    style.textContent = [
-      `[${LOCATE_HIGHLIGHT_ATTR}="1"] {`,
-      '  outline: 2px solid rgba(79, 156, 255, 0.95) !important;',
-      '  outline-offset: 2px !important;',
-      '  border-radius: 8px !important;',
-      '  background-color: rgba(79, 156, 255, 0.12) !important;',
-      '  transition: background-color 200ms ease, outline-color 200ms ease !important;',
-      '}',
-    ].join('\n');
-    (document.head || document.documentElement).appendChild(style);
-  } catch (_e) {
-    // ignore
-  }
-}
-
-function createLocateHighlighter() {
-  let lastEl: HTMLElement | null = null;
-  let timer: any = 0;
-
-  const clear = () => {
-    if (timer) clearTimeout(timer);
-    timer = 0;
-    if (lastEl) {
-      try {
-        lastEl.removeAttribute(LOCATE_HIGHLIGHT_ATTR);
-      } catch (_e) {
-        // ignore
-      }
-    }
-    lastEl = null;
-  };
-
-  const flash = (el: HTMLElement) => {
-    if (!el) return;
-    ensureLocateHighlightStyle();
-
-    if (lastEl && lastEl !== el) {
-      try {
-        lastEl.removeAttribute(LOCATE_HIGHLIGHT_ATTR);
-      } catch (_e) {
-        // ignore
-      }
-    }
-    lastEl = el;
-
-    try {
-      el.setAttribute(LOCATE_HIGHLIGHT_ATTR, '1');
-    } catch (_e) {
-      // ignore
-    }
-
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      try {
-        el.removeAttribute(LOCATE_HIGHLIGHT_ATTR);
-      } catch (_e) {
-        // ignore
-      }
-      if (lastEl === el) lastEl = null;
-      timer = 0;
-    }, 1400);
-  };
-
-  return { flash, clear };
-}
-
-function scrollRangeIntoView(range: Range, highlighter?: { flash: (el: HTMLElement) => void }): boolean {
-  const el = pickRangeTargetElement(range);
-  if (!el) return false;
-  try {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' } as any);
-    try {
-      highlighter?.flash(el);
-    } catch (_e2) {
-      // ignore
-    }
-    return true;
-  } catch (_e) {
-    return false;
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
-}
-
-function readLocatorHint(locator: unknown): number | null {
-  const hint = Number((locator as any)?.position?.start);
-  return Number.isFinite(hint) ? hint : null;
-}
-
-function isScrollableContainer(el: unknown): el is HTMLElement {
-  const node = el as any as HTMLElement | null;
-  if (!node) return false;
-  if (typeof node.scrollTop !== 'number') return false;
-  const scrollHeight = Number((node as any).scrollHeight || 0);
-  const clientHeight = Number((node as any).clientHeight || 0);
-  if (!Number.isFinite(scrollHeight) || !Number.isFinite(clientHeight)) return false;
-  return scrollHeight - clientHeight >= 240 && clientHeight >= 120;
-}
-
-function pickBestScrollContainer(rootEl: Element): HTMLElement | null {
-  const candidates: HTMLElement[] = [];
-  const scrollingEl = (document as any).scrollingElement as any;
-  if (isScrollableContainer(scrollingEl)) candidates.push(scrollingEl);
-  if (isScrollableContainer(document.documentElement)) candidates.push(document.documentElement);
-  if (isScrollableContainer(document.body)) candidates.push(document.body);
-  if (isScrollableContainer(rootEl)) candidates.push(rootEl);
-
-  try {
-    const common = document.querySelectorAll?.('main,[role="main"],article');
-    if (common && typeof (common as any).length === 'number') {
-      for (const node of Array.from(common as any)) {
-        if (isScrollableContainer(node)) candidates.push(node);
-      }
-    }
-  } catch (_e) {
-    // ignore
-  }
-
-  // Limited scan: some apps (e.g. docs/community) use a single large div scroller.
-  try {
-    const walkRoot = document.body || document.documentElement;
-    if (walkRoot) {
-      const walker = document.createTreeWalker(walkRoot, NodeFilter.SHOW_ELEMENT);
-      let best: { el: HTMLElement; score: number } | null = null;
-      let count = 0;
-      while (walker.nextNode() && count < 600) {
-        count += 1;
-        const el = walker.currentNode as any as HTMLElement;
-        if (!isScrollableContainer(el)) continue;
-        const scrollHeight = Number((el as any).scrollHeight || 0);
-        const clientHeight = Number((el as any).clientHeight || 0);
-        const score = (scrollHeight - clientHeight) * 2 + clientHeight;
-        if (!best || score > best.score) best = { el, score };
-      }
-      if (best) candidates.push(best.el);
-    }
-  } catch (_e) {
-    // ignore
-  }
-
-  if (!candidates.length) return null;
-  const seen = new Set<HTMLElement>();
-  for (const el of candidates) {
-    if (!el || seen.has(el)) continue;
-    seen.add(el);
-    return el;
-  }
-  return null;
-}
-
-function nudgeScrollTowardsHint(hint: number, rootEl: Element): void {
-  const scroller = pickBestScrollContainer(rootEl);
-  if (!scroller) return;
-
-  const maxScroll = Math.max(
-    0,
-    Number((scroller as any).scrollHeight || 0) - Number((scroller as any).clientHeight || 0),
-  );
-  if (!Number.isFinite(maxScroll) || maxScroll <= 0) return;
-
-  const textLength = Math.max(0, Number(String((rootEl as any)?.textContent || '').length) || 0);
-  const ratio = textLength > 0 ? Math.max(0, Math.min(1, hint / textLength)) : 1;
-  const nextTop = Math.round(maxScroll * ratio);
-
-  try {
-    (scroller as any).scrollTop = nextTop;
-  } catch (_e) {
-    // ignore
-  }
 }
 
 export function mountThreadedCommentsPanel(
@@ -375,8 +187,6 @@ export function mountThreadedCommentsPanel(
   body.className = 'webclipper-inpage-comments-panel__body';
   surface.appendChild(body);
 
-  const locateHighlighter = createLocateHighlighter();
-
   const notice = document.createElement('div');
   notice.className = 'webclipper-inpage-comments-panel__notice';
   notice.style.display = 'none';
@@ -460,52 +270,10 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
   }
-
-  function locateThreadRootOnce(rootItem: ThreadedCommentItem, rootEl: Element): boolean {
-    const locator = (rootItem as any)?.locator;
-    if (!locator) return false;
-
-    const env = String((locator as any)?.env || '').trim();
-    const expectedEnv = String(options.locatorEnv || '').trim();
-    if (!expectedEnv || env !== expectedEnv) return false;
-
-    try {
-      const range = restoreRangeFromArticleCommentLocator({ root: rootEl, locator });
-      if (!range) return false;
-      return scrollRangeIntoView(range, locateHighlighter);
-    } catch (_e) {
-      return false;
-    }
-  }
-
-  async function locateThreadRootWithRetry(rootItem: ThreadedCommentItem): Promise<boolean> {
-    const locator = (rootItem as any)?.locator;
-    if (!locator) return false;
-
-    const env = String((locator as any)?.env || '').trim();
-    const expectedEnv = String(options.locatorEnv || '').trim();
-    if (!expectedEnv || env !== expectedEnv) return false;
-
-    const pickedRoot = pickLocatorRoot(options);
-    if (expectedEnv === 'app' && !pickedRoot) return false;
-    const rootEl = pickedRoot || document.body || document.documentElement;
-    if (!rootEl) return false;
-
-    const ok = locateThreadRootOnce(rootItem, rootEl);
-    if (ok) return true;
-
-    // P2-T1: inpage retry to handle dynamic loading (lazy/infinite scroll).
-    if (expectedEnv !== 'inpage') return false;
-    const hint = readLocatorHint(locator);
-    if (hint != null) nudgeScrollTowardsHint(hint, rootEl);
-
-    await sleep(120);
-    const ok2 = locateThreadRootOnce(rootItem, rootEl);
-    if (ok2) return true;
-
-    await sleep(260);
-    return locateThreadRootOnce(rootItem, rootEl);
-  }
+  const locateController = createThreadLocateController({
+    locatorEnv: options.locatorEnv ?? null,
+    pickLocatorRoot: () => pickLocatorRoot(options),
+  });
 
   const deleteConfirm = createTwoStepConfirmController<number>({
     onChange: () => {
@@ -796,7 +564,7 @@ export function mountThreadedCommentsPanel(
               if (state.busy) return;
               if (shouldIgnoreLocateClick((e as any).target)) return;
               void (async () => {
-                const ok = await locateThreadRootWithRetry(root);
+                const ok = await locateController.locateThreadRootWithRetry(root);
                 if (!ok) showNotice('无法定位');
               })();
             });
@@ -873,7 +641,7 @@ export function mountThreadedCommentsPanel(
             if (state.busy) return;
             if (shouldIgnoreLocateClick((e as any).target)) return;
             void (async () => {
-              const ok = await locateThreadRootWithRetry(root);
+              const ok = await locateController.locateThreadRootWithRetry(root);
               if (!ok) showNotice('无法定位');
             })();
           });
@@ -1061,7 +829,7 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     try {
-      locateHighlighter.clear();
+      locateController.clear();
     } catch (_e) {
       // ignore
     }
