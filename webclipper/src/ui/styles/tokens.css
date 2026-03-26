@@ -36,6 +36,8 @@
   /* Utility */
   --border: rgb(224 214 200);
   --focus-ring: var(--accent);
+  --card-shadow: 0 8px 20px rgb(93 63 35 / 8%);
+  --surface-inset-highlight: rgb(255 255 255 / 55%);
 
   /* Component: chat bubbles */
   --bubble-user-bg: var(--secondary);
@@ -77,6 +79,8 @@
 
     /* Utility */
     --border: rgb(54 56 64);
+    --card-shadow: 0 12px 28px rgb(0 0 0 / 36%);
+    --surface-inset-highlight: rgb(255 255 255 / 14%);
   }
 }
 

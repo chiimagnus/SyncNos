@@ -683,7 +683,7 @@ export function ConversationListPane({
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
             const rowSurfaceClass = isActive
-              ? 'tw-border tw-border-[color-mix(in_srgb,var(--accent)_58%,var(--border))] tw-shadow-[inset_0_1px_0_rgb(255_255_255_/_0.55)]'
+              ? 'tw-border tw-border-[color-mix(in_srgb,var(--accent)_58%,var(--border))] tw-shadow-[inset_0_1px_0_var(--surface-inset-highlight)]'
               : 'tw-border tw-border-[color-mix(in_srgb,var(--border)_82%,transparent)] tw-bg-[var(--bg-card)] hover:tw-border-[color-mix(in_srgb,var(--border)_96%,transparent)]';
             const rowClass = [
               navItemClassName(isActive),
