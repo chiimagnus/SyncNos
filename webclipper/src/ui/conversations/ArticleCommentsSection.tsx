@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 
-import { mountThreadedCommentsPanel, type ThreadedCommentsPanelApi } from '@services/comments/threaded-comments-panel';
+import {
+  mountThreadedCommentsPanel,
+  type ThreadedCommentsPanelApi,
+  type ThreadedCommentsPanelChatWithAction,
+} from '@services/comments/threaded-comments-panel';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
@@ -28,6 +32,7 @@ type SidebarModeProps = {
   sidebarSession: CommentSidebarSession;
   containerClassName?: string;
   getLocatorRoot?: () => Element | null;
+  resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
 };
 
 type EmbeddedModeProps = {
@@ -44,6 +49,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
         sidebarSession={props.sidebarSession}
         containerClassName={props.containerClassName}
         getLocatorRoot={props.getLocatorRoot}
+        resolveChatWithActions={props.resolveChatWithActions}
         variant="sidebar"
       />
     );
@@ -63,11 +69,13 @@ function ArticleCommentsPanelMount({
   sidebarSession,
   containerClassName,
   getLocatorRoot,
+  resolveChatWithActions,
   variant,
 }: {
   sidebarSession: CommentSidebarSession;
   containerClassName?: string;
   getLocatorRoot?: () => Element | null;
+  resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   variant?: 'embedded' | 'sidebar';
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -92,6 +100,10 @@ function ArticleCommentsPanelMount({
       locatorEnv: variant === 'sidebar' ? 'app' : null,
       getLocatorRoot: () =>
         locatorRootGetterRef.current?.() ?? (document.querySelector('.route-scroll') as Element | null) ?? null,
+      chatWith:
+        variant === 'sidebar' && typeof resolveChatWithActions === 'function'
+          ? { resolveActions: resolveChatWithActions }
+          : null,
     });
     apiRef.current = mounted.api;
     sidebarSession.attachPanel(mounted.api as any);
@@ -101,7 +113,7 @@ function ArticleCommentsPanelMount({
       mounted.cleanup();
       apiRef.current = null;
     };
-  }, [sidebarSession, variant]);
+  }, [resolveChatWithActions, sidebarSession, variant]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 

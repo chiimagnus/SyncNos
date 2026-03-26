@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
@@ -19,6 +19,12 @@ import {
   type ArticleCommentsSidebarController,
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
+import type { ThreadedCommentsPanelChatWithAction } from '@services/comments/threaded-comments-panel';
+import {
+  defaultDetailHeaderActionPort,
+  type DetailHeaderAction,
+} from '@services/integrations/detail-header-actions';
+import { resolveChatWithDetailHeaderActions } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -118,7 +124,7 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
-    const { items, openConversationExternalById, selectedConversation } = useConversationsApp();
+    const { items, openConversationExternalById, selectedConversation, detail } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
     const isArticleConversation =
@@ -192,6 +198,42 @@ export default function AppShell() {
         ensureContext: false,
       });
     };
+
+    const resolveCommentsSidebarChatWithActions = useCallback(async (): Promise<
+      ThreadedCommentsPanelChatWithAction[]
+    > => {
+      if (!selectedConversation) return [];
+      if (!showCommentsSidebar) return [];
+
+      const conversationId = Number((selectedConversation as any)?.id || 0);
+      if (!Number.isFinite(conversationId) || conversationId <= 0) return [];
+
+      const currentDetail =
+        detail && Number((detail as any)?.conversationId || 0) === conversationId ? detail : null;
+      if (!currentDetail || !Array.isArray((currentDetail as any)?.messages) || !(currentDetail as any)?.messages.length)
+        return [];
+
+      const actions: DetailHeaderAction[] = await resolveChatWithDetailHeaderActions({
+        conversation: selectedConversation,
+        detail: currentDetail,
+        port: defaultDetailHeaderActionPort,
+      });
+
+      const mapped: ThreadedCommentsPanelChatWithAction[] = [];
+      for (const action of actions) {
+        const id = String((action as any)?.id || '').trim();
+        const label = String((action as any)?.label || '').trim();
+        const onTrigger = (action as any)?.onTrigger;
+        if (!id || !label || typeof onTrigger !== 'function') continue;
+        mapped.push({
+          id,
+          label,
+          disabled: Boolean((action as any)?.disabled),
+          onTrigger: () => onTrigger(),
+        });
+      }
+      return mapped;
+    }, [detail, selectedConversation, showCommentsSidebar]);
 
     useEffect(() => {
       if (!showSettingsSheet) return;
@@ -346,6 +388,7 @@ export default function AppShell() {
                     sidebarSession={commentsSidebarSession}
                     containerClassName="tw-h-full tw-min-h-0"
                     getLocatorRoot={() => commentsLocatorRootRef.current}
+                    resolveChatWithActions={resolveCommentsSidebarChatWithActions}
                   />
                 </div>
               ) : null}
