@@ -5,28 +5,11 @@ import {
   type ThreadedCommentsPanelApi,
   type ThreadedCommentsPanelChatWithAction,
 } from '@ui/comments/threaded-comments-panel';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
-
-function safeString(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
 
 type SidebarModeProps = {
   sidebarSession: CommentSidebarSession;

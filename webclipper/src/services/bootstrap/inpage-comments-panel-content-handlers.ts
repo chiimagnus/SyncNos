@@ -3,6 +3,8 @@ import { createCommentSidebarSession } from '@services/comments/sidebar/comment-
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarInpageAdapter } from '@services/comments/sidebar/article-comments-sidebar-inpage-adapter';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
+import { normalizePositiveInt } from '@services/shared/numbers';
+import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -11,26 +13,6 @@ type RuntimeClient = {
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
-}
-
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
-
-function normalizeConversationId(value: unknown): number | null {
-  const id = Number(value);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  return id;
 }
 
 function pickQuoteFromSelection(fallback: unknown): string {
@@ -93,7 +75,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
       // ignore
     }
 
-    lastTabId = normalizeConversationId(input?.tabId) || lastTabId;
+    lastTabId = normalizePositiveInt(input?.tabId) || lastTabId;
     const quoteText = pickQuoteFromSelection(input?.selectionText);
     const locator = quoteText ? pickLocatorFromSelection() : null;
     const ensureArticle = input?.ensureArticle !== false;
@@ -127,7 +109,7 @@ export function registerInpageCommentsPanelContentHandlers(runtime: RuntimeClien
 
     void controller
       .open({
-        tabId: normalizeConversationId(msg?.payload?.tabId) || null,
+        tabId: normalizePositiveInt(msg?.payload?.tabId) || null,
         selectionText: msg?.payload?.selectionText,
         focusComposer: true,
         ensureArticle: true,
