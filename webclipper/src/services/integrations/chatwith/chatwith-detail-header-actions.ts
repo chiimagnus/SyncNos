@@ -69,7 +69,7 @@ function buildChatWithPlatformAction(input: {
     label,
     kind: 'external-link',
     provider: String(platform.id || 'chat-with'),
-    slot: 'chat-with',
+    slot: 'tools',
     href,
     afterTriggerLabel: after,
     onTrigger: async () => {
