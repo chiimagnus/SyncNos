@@ -1,6 +1,7 @@
 import { t } from '@i18n';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
+import { createDockController } from './dock';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type {
   MountOptions,
@@ -304,64 +305,10 @@ export function mountThreadedCommentsPanel(
   const HEADER_DIVIDER_CSS_VAR = '--webclipper-comments-panel-header-divider';
   const headerDivider = options.headerDivider ?? variant !== 'sidebar';
   setImportantStyle(el, HEADER_DIVIDER_CSS_VAR, headerDivider && showHeader ? '1px solid var(--panel-border)' : '0');
-
-  const DOCK_STYLE_ID = 'webclipper-inpage-comments-panel__dock-style';
-
-  function ensureDockStyle() {
-    if (!dockPage) return;
-    try {
-      if (document.getElementById(DOCK_STYLE_ID)) return;
-      const style = document.createElement('style');
-      style.id = DOCK_STYLE_ID;
-      style.textContent = [
-        "html[data-webclipper-comments-dock='1'] {",
-        '  box-sizing: border-box !important;',
-        '  padding-right: var(--webclipper-comments-dock-width, 0px) !important;',
-        '  overflow-x: hidden !important;',
-        '}',
-        "html[data-webclipper-comments-dock='1'] body {",
-        '  box-sizing: border-box !important;',
-        '}',
-      ].join('\n');
-      (document.head || document.documentElement).appendChild(style);
-    } catch (_e) {
-      // ignore
-    }
-  }
-
-  function readDockWidthPx(): number {
-    try {
-      const rect = el.getBoundingClientRect?.();
-      const w = Number(rect?.width || 0);
-      if (Number.isFinite(w) && w > 0) return w;
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      const computed = getComputedStyle(el);
-      const w = Number.parseFloat(
-        String((computed as any)?.width || '')
-          .replace('px', '')
-          .trim(),
-      );
-      if (Number.isFinite(w) && w > 0) return w;
-    } catch (_e) {
-      // ignore
-    }
-    return 420;
-  }
-
-  let dockRaf: number | null = null;
-  const dockResize = () => {
-    try {
-      if (!dockPage) return;
-      if (el.getAttribute('data-open') !== '1') return;
-      const width = Math.round(readDockWidthPx());
-      document.documentElement.style.setProperty('--webclipper-comments-dock-width', `${width}px`, 'important');
-    } catch (_e) {
-      // ignore
-    }
-  };
+  const dockController = createDockController({
+    enabled: dockPage,
+    panelEl: el,
+  });
 
   const widthState = {
     widthPx: null as number | null,
@@ -412,7 +359,7 @@ export function mountThreadedCommentsPanel(
       } catch (_e) {
         // ignore
       }
-      dockResize();
+      dockController.syncWidth();
       return;
     }
 
@@ -424,7 +371,7 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     if (input?.persist !== false) persistSidebarWidthPx(clamped);
-    dockResize();
+    dockController.syncWidth();
   }
 
   if (variant === 'sidebar') {
@@ -432,61 +379,6 @@ export function mountThreadedCommentsPanel(
     if (persistedWidth != null) {
       widthState.widthPx = clampSidebarWidthPx(persistedWidth);
       setSidebarWidthPx(widthState.widthPx, { persist: false });
-    }
-  }
-
-  function setDockOpen(open: boolean) {
-    if (!dockPage) return;
-    const root = document.documentElement;
-    if (!root) return;
-
-    if (open) {
-      ensureDockStyle();
-      try {
-        root.setAttribute('data-webclipper-comments-dock', '1');
-      } catch (_e) {
-        // ignore
-      }
-
-      // Set it once synchronously, then again on next frame so layout has settled.
-      dockResize();
-      try {
-        if (dockRaf != null) cancelAnimationFrame(dockRaf);
-        dockRaf = requestAnimationFrame(() => {
-          dockRaf = null;
-          dockResize();
-        });
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        globalThis.addEventListener?.('resize', dockResize, { passive: true } as any);
-      } catch (_e) {
-        // ignore
-      }
-      return;
-    }
-
-    try {
-      if (dockRaf != null) cancelAnimationFrame(dockRaf);
-    } catch (_e) {
-      // ignore
-    }
-    dockRaf = null;
-    try {
-      globalThis.removeEventListener?.('resize', dockResize as any);
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      root.removeAttribute('data-webclipper-comments-dock');
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      root.style.removeProperty('--webclipper-comments-dock-width');
-    } catch (_e) {
-      // ignore
     }
   }
 
@@ -554,7 +446,7 @@ export function mountThreadedCommentsPanel(
       } catch (_e) {
         // ignore
       }
-      dockResize();
+      dockController.syncWidth();
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -568,7 +460,7 @@ export function mountThreadedCommentsPanel(
         // ignore
       }
       if (widthState.widthPx == null) {
-        const measured = readDockWidthPx();
+        const measured = dockController.readWidthPx();
         setSidebarWidthPx(measured, { persist: false });
       }
       try {
@@ -1124,12 +1016,12 @@ export function mountThreadedCommentsPanel(
     if (open) {
       el.setAttribute('data-open', '1');
       setImportantStyle(el, 'display', 'block');
-      setDockOpen(true);
+      dockController.setOpen(true);
     } else {
       closeChatWithMenu();
       el.removeAttribute('data-open');
       setImportantStyle(el, 'display', 'none');
-      setDockOpen(false);
+      dockController.setOpen(false);
     }
   }
 
@@ -1559,7 +1451,7 @@ export function mountThreadedCommentsPanel(
   const cleanup = () => {
     // Ensure we restore page layout even if the panel is removed while open.
     try {
-      setDockOpen(false);
+      dockController.cleanup();
     } catch (_e) {
       // ignore
     }
