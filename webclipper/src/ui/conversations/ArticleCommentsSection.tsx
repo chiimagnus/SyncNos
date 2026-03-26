@@ -109,9 +109,7 @@ function ArticleCommentsPanelMount({
           ? {
               resolveActions: resolveChatWithActions,
               resolveSingleActionLabel:
-                typeof resolveChatWithSingleActionLabel === 'function'
-                  ? resolveChatWithSingleActionLabel
-                  : undefined,
+                typeof resolveChatWithSingleActionLabel === 'function' ? resolveChatWithSingleActionLabel : undefined,
             }
           : null,
     });

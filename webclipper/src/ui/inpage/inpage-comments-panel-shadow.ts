@@ -10,10 +10,7 @@ import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-detail-header-actions';
-import {
-  defaultDetailHeaderActionPort,
-  type DetailHeaderAction,
-} from '@services/integrations/detail-header-actions';
+import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 
 export type InpageCommentItem = ThreadedCommentItem;
 export type InpageCommentsPanelOpenInput = {

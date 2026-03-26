@@ -701,13 +701,16 @@ export function mountThreadedCommentsPanel(
   const defaultChatWithTriggerLabel = () => t('detailHeaderChatWithMenuLabel') || 'Chat with...';
 
   const getChatWithTrigger = () =>
-    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-trigger') as HTMLButtonElement | null) ??
-    null;
+    (chatWithMenuRoot?.querySelector?.(
+      '.webclipper-inpage-comments-panel__chatwith-trigger',
+    ) as HTMLButtonElement | null) ?? null;
   const getChatWithMenu = () =>
-    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu') as HTMLElement | null) ?? null;
-  const getChatWithMenuBody = () =>
-    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu-body') as HTMLElement | null) ??
+    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu') as HTMLElement | null) ??
     null;
+  const getChatWithMenuBody = () =>
+    (chatWithMenuRoot?.querySelector?.(
+      '.webclipper-inpage-comments-panel__chatwith-menu-body',
+    ) as HTMLElement | null) ?? null;
 
   const applyChatWithTrigger = (input: { label: string; hasMenu: boolean }) => {
     const trigger = getChatWithTrigger();
@@ -801,7 +804,8 @@ export function mountThreadedCommentsPanel(
     void Promise.resolve()
       .then(() => action.onTrigger?.())
       .catch((error) => {
-        const message = error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+        const message =
+          error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
         showNotice(message);
       });
   };

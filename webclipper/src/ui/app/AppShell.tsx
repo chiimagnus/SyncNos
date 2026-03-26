@@ -20,10 +20,7 @@ import {
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
 import type { ThreadedCommentsPanelChatWithAction } from '@services/comments/threaded-comments-panel';
-import {
-  defaultDetailHeaderActionPort,
-  type DetailHeaderAction,
-} from '@services/integrations/detail-header-actions';
+import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -211,8 +208,7 @@ export default function AppShell() {
       const conversationId = Number((selectedConversation as any)?.id || 0);
       if (!Number.isFinite(conversationId) || conversationId <= 0) return [];
 
-      const currentDetail =
-        detail && Number((detail as any)?.conversationId || 0) === conversationId ? detail : null;
+      const currentDetail = detail && Number((detail as any)?.conversationId || 0) === conversationId ? detail : null;
       if (
         !currentDetail ||
         !Array.isArray((currentDetail as any)?.messages) ||
