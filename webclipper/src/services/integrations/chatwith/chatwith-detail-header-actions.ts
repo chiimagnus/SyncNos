@@ -115,3 +115,16 @@ export async function resolveChatWithDetailHeaderActions({
     return [];
   }
 }
+
+export async function resolveSingleEnabledChatWithActionLabel(): Promise<string | null> {
+  try {
+    const settings = await loadChatWithSettings();
+    const enabled = (settings.platforms || []).filter((platform) => platform && platform.enabled);
+    if (enabled.length !== 1) return null;
+    const name = String(enabled[0]?.name || '').trim();
+    if (!name) return null;
+    return `Chat with ${name}`;
+  } catch (_e) {
+    return null;
+  }
+}

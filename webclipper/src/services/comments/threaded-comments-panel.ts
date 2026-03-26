@@ -39,6 +39,7 @@ export type ThreadedCommentsPanelChatWithAction = {
 
 export type ThreadedCommentsPanelChatWithConfig = {
   resolveActions: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
+  resolveSingleActionLabel?: () => Promise<string | null>;
 };
 
 function toHostTokensCss(css: string) {
@@ -697,15 +698,48 @@ export function mountThreadedCommentsPanel(
     requestId: 0,
   };
 
+  const defaultChatWithTriggerLabel = () => t('detailHeaderChatWithMenuLabel') || 'Chat with...';
+
+  const getChatWithTrigger = () =>
+    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-trigger') as HTMLButtonElement | null) ??
+    null;
+  const getChatWithMenu = () =>
+    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu') as HTMLElement | null) ?? null;
+  const getChatWithMenuBody = () =>
+    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu-body') as HTMLElement | null) ??
+    null;
+
+  const applyChatWithTrigger = (input: { label: string; hasMenu: boolean }) => {
+    const trigger = getChatWithTrigger();
+    if (!trigger) return;
+    trigger.textContent = input.label;
+    if (input.hasMenu) {
+      trigger.setAttribute('aria-haspopup', 'menu');
+    } else {
+      trigger.removeAttribute('aria-haspopup');
+      if (chatWithState.open) closeChatWithMenu();
+    }
+  };
+
+  const applyChatWithTriggerFromActions = (actions: ThreadedCommentsPanelChatWithAction[]) => {
+    if (actions.length === 1) {
+      applyChatWithTrigger({
+        label: actions[0].label,
+        hasMenu: false,
+      });
+      return;
+    }
+    applyChatWithTrigger({
+      label: defaultChatWithTriggerLabel(),
+      hasMenu: true,
+    });
+  };
+
   const closeChatWithMenu = () => {
     if (!chatWithState.open) return;
     chatWithState.open = false;
-    const trigger = chatWithMenuRoot?.querySelector?.(
-      '.webclipper-inpage-comments-panel__chatwith-trigger',
-    ) as HTMLButtonElement | null;
-    const menu = chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu') as
-      | HTMLElement
-      | null;
+    const trigger = getChatWithTrigger();
+    const menu = getChatWithMenu();
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
     if (menu) menu.hidden = true;
   };
@@ -728,11 +762,42 @@ export function mountThreadedCommentsPanel(
     return out;
   };
 
+  const renderChatWithMenuActions = (actions: ThreadedCommentsPanelChatWithAction[]) => {
+    const menuBody = getChatWithMenuBody();
+    if (!menuBody) return;
+    menuBody.textContent = '';
+
+    if (!actions.length) {
+      const empty = document.createElement('div');
+      empty.className = 'webclipper-inpage-comments-panel__chatwith-state';
+      empty.textContent = 'No AI platforms enabled';
+      menuBody.appendChild(empty);
+      return;
+    }
+
+    for (const action of actions) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'webclipper-btn webclipper-btn--menu-item';
+      btn.textContent = action.label;
+      btn.disabled = Boolean(action.disabled);
+      btn.addEventListener('click', () => {
+        closeChatWithMenu();
+        void Promise.resolve()
+          .then(() => action.onTrigger?.())
+          .catch((error) => {
+            const message =
+              error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+            showNotice(message);
+          });
+      });
+      menuBody.appendChild(btn);
+    }
+  };
+
   const runChatWithResolveActions = () => {
     if (!chatWithConfig || !chatWithMenuRoot) return;
-    const menuBody = chatWithMenuRoot.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu-body') as
-      | HTMLElement
-      | null;
+    const menuBody = getChatWithMenuBody();
     if (!menuBody) return;
 
     chatWithState.loading = true;
@@ -754,34 +819,8 @@ export function mountThreadedCommentsPanel(
         const nextActions = normalizeChatWithActions(items as any);
         chatWithState.loading = false;
         chatWithState.actions = nextActions;
-        menuBody.textContent = '';
-
-        if (!nextActions.length) {
-          const empty = document.createElement('div');
-          empty.className = 'webclipper-inpage-comments-panel__chatwith-state';
-          empty.textContent = 'No AI platforms enabled';
-          menuBody.appendChild(empty);
-          return;
-        }
-
-        for (const action of nextActions) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'webclipper-btn webclipper-btn--menu-item';
-          btn.textContent = action.label;
-          btn.disabled = Boolean(action.disabled);
-          btn.addEventListener('click', () => {
-            closeChatWithMenu();
-            void Promise.resolve()
-              .then(() => action.onTrigger?.())
-              .catch((error) => {
-                const message =
-                  error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-                showNotice(message);
-              });
-          });
-          menuBody.appendChild(btn);
-        }
+        applyChatWithTriggerFromActions(nextActions);
+        renderChatWithMenuActions(nextActions);
       })
       .catch((error) => {
         if (!chatWithMenuRoot || currentRequestId !== chatWithState.requestId) return;
@@ -805,18 +844,43 @@ export function mountThreadedCommentsPanel(
       });
   };
 
+  const runChatWithAction = (action: ThreadedCommentsPanelChatWithAction | null | undefined) => {
+    if (!action || action.disabled) return;
+    closeChatWithMenu();
+    void Promise.resolve()
+      .then(() => action.onTrigger?.())
+      .catch((error) => {
+        const message = error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+        showNotice(message);
+      });
+  };
+
+  const preloadChatWithSingleActionLabel = () => {
+    if (!chatWithConfig || typeof chatWithConfig.resolveSingleActionLabel !== 'function') return;
+    void Promise.resolve()
+      .then(() => chatWithConfig.resolveSingleActionLabel?.())
+      .then((label) => {
+        if (!chatWithMenuRoot) return;
+        if (chatWithState.actions.length > 0) return;
+        const text = String(label || '').trim();
+        if (!text) return;
+        applyChatWithTrigger({
+          label: text,
+          hasMenu: false,
+        });
+      })
+      .catch(() => {
+        // ignore label preload failure
+      });
+  };
+
   const openChatWithMenu = () => {
     if (!chatWithMenuRoot || !chatWithConfig) return;
     chatWithState.open = true;
-    const trigger = chatWithMenuRoot.querySelector?.(
-      '.webclipper-inpage-comments-panel__chatwith-trigger',
-    ) as HTMLButtonElement | null;
-    const menu = chatWithMenuRoot.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu') as
-      | HTMLElement
-      | null;
+    const trigger = getChatWithTrigger();
+    const menu = getChatWithMenu();
     if (trigger) trigger.setAttribute('aria-expanded', 'true');
     if (menu) menu.hidden = false;
-    runChatWithResolveActions();
   };
 
   if (showHeader) {
@@ -845,7 +909,7 @@ export function mountThreadedCommentsPanel(
         'webclipper-inpage-comments-panel__chatwith-trigger webclipper-btn webclipper-btn--tone-muted';
       trigger.setAttribute('aria-haspopup', 'menu');
       trigger.setAttribute('aria-expanded', 'false');
-      trigger.textContent = t('detailHeaderChatWithMenuLabel') || 'Chat with…';
+      trigger.textContent = defaultChatWithTriggerLabel();
       chatWith.appendChild(trigger);
 
       const menu = document.createElement('div');
@@ -860,12 +924,45 @@ export function mountThreadedCommentsPanel(
       menu.appendChild(menuBody);
 
       trigger.addEventListener('click', () => {
+        if (chatWithState.loading) return;
         if (chatWithState.open) {
           closeChatWithMenu();
           return;
         }
-        openChatWithMenu();
+        chatWithState.loading = true;
+        const requestId = chatWithState.requestId + 1;
+        chatWithState.requestId = requestId;
+        void Promise.resolve()
+          .then(() => chatWithConfig.resolveActions())
+          .then((items) => {
+            if (!chatWithMenuRoot || requestId !== chatWithState.requestId) return;
+            const actions = normalizeChatWithActions(items as any);
+            chatWithState.actions = actions;
+            applyChatWithTriggerFromActions(actions);
+            if (!actions.length) {
+              showNotice('No AI platforms enabled');
+              return;
+            }
+            if (actions.length === 1) {
+              runChatWithAction(actions[0]);
+              return;
+            }
+            openChatWithMenu();
+            renderChatWithMenuActions(actions);
+          })
+          .catch((error) => {
+            if (!chatWithMenuRoot || requestId !== chatWithState.requestId) return;
+            const message =
+              error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+            showNotice(message);
+          })
+          .finally(() => {
+            if (!chatWithMenuRoot || requestId !== chatWithState.requestId) return;
+            chatWithState.loading = false;
+          });
       });
+
+      preloadChatWithSingleActionLabel();
     }
 
     if (showCollapseButton) {

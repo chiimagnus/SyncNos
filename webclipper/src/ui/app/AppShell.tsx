@@ -24,7 +24,10 @@ import {
   defaultDetailHeaderActionPort,
   type DetailHeaderAction,
 } from '@services/integrations/detail-header-actions';
-import { resolveChatWithDetailHeaderActions } from '@services/integrations/chatwith/chatwith-detail-header-actions';
+import {
+  resolveChatWithDetailHeaderActions,
+  resolveSingleEnabledChatWithActionLabel,
+} from '@services/integrations/chatwith/chatwith-detail-header-actions';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -240,6 +243,10 @@ export default function AppShell() {
       return mapped;
     }, [detail, selectedConversation, showCommentsSidebar]);
 
+    const resolveCommentsSidebarSingleChatWithLabel = useCallback(async (): Promise<string | null> => {
+      return resolveSingleEnabledChatWithActionLabel();
+    }, []);
+
     useEffect(() => {
       if (!showSettingsSheet) return;
       const onKey = (e: KeyboardEvent) => {
@@ -394,6 +401,7 @@ export default function AppShell() {
                     containerClassName="tw-h-full tw-min-h-0"
                     getLocatorRoot={() => commentsLocatorRootRef.current}
                     resolveChatWithActions={resolveCommentsSidebarChatWithActions}
+                    resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
                   />
                 </div>
               ) : null}

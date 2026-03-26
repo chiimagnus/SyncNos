@@ -33,6 +33,7 @@ type SidebarModeProps = {
   containerClassName?: string;
   getLocatorRoot?: () => Element | null;
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
+  resolveChatWithSingleActionLabel?: () => Promise<string | null>;
 };
 
 type EmbeddedModeProps = {
@@ -50,6 +51,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
         containerClassName={props.containerClassName}
         getLocatorRoot={props.getLocatorRoot}
         resolveChatWithActions={props.resolveChatWithActions}
+        resolveChatWithSingleActionLabel={props.resolveChatWithSingleActionLabel}
         variant="sidebar"
       />
     );
@@ -70,12 +72,14 @@ function ArticleCommentsPanelMount({
   containerClassName,
   getLocatorRoot,
   resolveChatWithActions,
+  resolveChatWithSingleActionLabel,
   variant,
 }: {
   sidebarSession: CommentSidebarSession;
   containerClassName?: string;
   getLocatorRoot?: () => Element | null;
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
+  resolveChatWithSingleActionLabel?: () => Promise<string | null>;
   variant?: 'embedded' | 'sidebar';
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -102,7 +106,13 @@ function ArticleCommentsPanelMount({
         locatorRootGetterRef.current?.() ?? (document.querySelector('.route-scroll') as Element | null) ?? null,
       chatWith:
         variant === 'sidebar' && typeof resolveChatWithActions === 'function'
-          ? { resolveActions: resolveChatWithActions }
+          ? {
+              resolveActions: resolveChatWithActions,
+              resolveSingleActionLabel:
+                typeof resolveChatWithSingleActionLabel === 'function'
+                  ? resolveChatWithSingleActionLabel
+                  : undefined,
+            }
           : null,
     });
     apiRef.current = mounted.api;
@@ -113,7 +123,7 @@ function ArticleCommentsPanelMount({
       mounted.cleanup();
       apiRef.current = null;
     };
-  }, [resolveChatWithActions, sidebarSession, variant]);
+  }, [resolveChatWithActions, resolveChatWithSingleActionLabel, sidebarSession, variant]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 

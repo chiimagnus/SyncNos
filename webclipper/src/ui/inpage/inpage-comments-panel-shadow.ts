@@ -6,7 +6,10 @@ import {
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { resolveChatWithDetailHeaderActions } from '@services/integrations/chatwith/chatwith-detail-header-actions';
+import {
+  resolveChatWithDetailHeaderActions,
+  resolveSingleEnabledChatWithActionLabel,
+} from '@services/integrations/chatwith/chatwith-detail-header-actions';
 import {
   defaultDetailHeaderActionPort,
   type DetailHeaderAction,
@@ -149,7 +152,10 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     showCollapseButton: true,
     locatorEnv: 'inpage',
     getLocatorRoot: () => document.body || document.documentElement,
-    chatWith: { resolveActions: resolveInpageChatWithActions },
+    chatWith: {
+      resolveActions: resolveInpageChatWithActions,
+      resolveSingleActionLabel: resolveSingleEnabledChatWithActionLabel,
+    },
   });
   el.id = PANEL_ID;
 
