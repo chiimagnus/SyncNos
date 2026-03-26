@@ -3,6 +3,7 @@ import { createTwoStepConfirmController } from '@services/shared/two-step-confir
 import { createChatWithMenuController } from './chatwith';
 import { createDockController } from './dock';
 import { createThreadLocateController } from './locate';
+import { renderThreadedComments } from './render';
 import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type {
@@ -49,15 +50,6 @@ function formatTime(ts: number | null | undefined): string {
   } catch (_e) {
     return '';
   }
-}
-
-function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
-  const ta = Number((a as any)?.createdAt) || 0;
-  const tb = Number((b as any)?.createdAt) || 0;
-  if (tb !== ta) return tb - ta;
-  const ia = Number((a as any)?.id) || 0;
-  const ib = Number((b as any)?.id) || 0;
-  return ib - ia;
 }
 
 function pickLocatorRoot(options: MountOptions): Element | null {
@@ -517,267 +509,25 @@ export function mountThreadedCommentsPanel(
       };
     },
     setComments(items) {
-      threads.textContent = '';
-      deleteConfirm.clear();
-      const normalized = (Array.isArray(items) ? items : []).filter(
-        (x) => x && Number.isFinite(Number((x as any)?.id)),
-      );
-      if (!normalized.length) {
-        threads.appendChild(empty);
-        refreshButtons();
-        return;
-      }
-
-      const roots = normalized.filter((it) => !it.parentId).sort(compareCommentTimeDesc);
-      const repliesByRoot = new Map<number, ThreadedCommentItem[]>();
-      for (const it of normalized) {
-        if (!it.parentId) continue;
-        const rootId = Number(it.parentId);
-        const list = repliesByRoot.get(rootId) || [];
-        list.push(it);
-        repliesByRoot.set(rootId, list);
-      }
-
-      for (const [rootId, list] of repliesByRoot) {
-        repliesByRoot.set(rootId, list.sort(compareCommentTimeDesc));
-      }
-
-      for (const root of roots) {
-        const rootId = Number(root.id);
-        const thread = document.createElement('div');
-        thread.className = 'webclipper-inpage-comments-panel__thread';
-        threads.appendChild(thread);
-
-        const quoteValue = String(root?.quoteText || '').trim();
-        if (quoteValue) {
-          const q = document.createElement('div');
-          q.className = 'webclipper-inpage-comments-panel__thread-quote';
-          thread.appendChild(q);
-
-          const qText = document.createElement('div');
-          qText.className = 'webclipper-inpage-comments-panel__thread-quote-text';
-          qText.textContent = quoteValue;
-          q.appendChild(qText);
-
-          if (variant === 'sidebar') {
-            q.addEventListener('click', (e) => {
-              if (state.busy) return;
-              if (shouldIgnoreLocateClick((e as any).target)) return;
-              void (async () => {
-                const ok = await locateController.locateThreadRootWithRetry(root);
-                if (!ok) showNotice('无法定位');
-              })();
-            });
-          }
-        }
-
-        const comment = document.createElement('div');
-        comment.className = 'webclipper-inpage-comments-panel__comment';
-        thread.appendChild(comment);
-
-        const commentHeader = document.createElement('div');
-        commentHeader.className = 'webclipper-inpage-comments-panel__comment-header';
-        comment.appendChild(commentHeader);
-
-        const commentAvatar = document.createElement('div');
-        commentAvatar.className = 'webclipper-inpage-comments-panel__avatar';
-        commentAvatar.textContent = 'You';
-        commentHeader.appendChild(commentAvatar);
-
-        const commentMeta = document.createElement('div');
-        commentMeta.className = 'webclipper-inpage-comments-panel__comment-meta';
-        commentHeader.appendChild(commentMeta);
-
-        const author = document.createElement('div');
-        author.className = 'webclipper-inpage-comments-panel__comment-author';
-        author.textContent = String(root?.authorName || 'You');
-        commentMeta.appendChild(author);
-
-        const time = document.createElement('div');
-        time.className = 'webclipper-inpage-comments-panel__comment-time';
-        time.textContent = formatTime(root?.createdAt ?? null);
-        commentMeta.appendChild(time);
-
-        const commentActions = document.createElement('div');
-        commentActions.className = 'webclipper-inpage-comments-panel__comment-actions';
-        commentHeader.appendChild(commentActions);
-
-        const del = document.createElement('button');
-        del.className =
-          'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
-        del.type = 'button';
-        del.setAttribute('data-webclipper-comment-delete-id', String(Number(root?.id) || ''));
-        del.setAttribute('aria-label', t('deleteButton'));
-        del.textContent = '×';
-        del.addEventListener('click', async () => {
-          if (state.busy) return;
-          const id = Number(root?.id);
-          if (!Number.isFinite(id) || id <= 0) return;
-          if (!deleteConfirm.isArmed(id)) {
-            deleteConfirm.arm(id);
-            return;
-          }
-          deleteConfirm.clear();
-          const handler = state.handlers.onDelete;
-          if (typeof handler !== 'function') return;
-          try {
-            state.busy = true;
-            refreshButtons();
-            await handler(id);
-          } finally {
-            state.busy = false;
-            refreshButtons();
-          }
-        });
-        commentActions.appendChild(del);
-
-        const commentBody = document.createElement('div');
-        commentBody.className = 'webclipper-inpage-comments-panel__comment-body';
-        commentBody.textContent = String(root?.commentText || '');
-        comment.appendChild(commentBody);
-
-        if (variant === 'sidebar') {
-          comment.addEventListener('click', (e) => {
-            if (state.busy) return;
-            if (shouldIgnoreLocateClick((e as any).target)) return;
-            void (async () => {
-              const ok = await locateController.locateThreadRootWithRetry(root);
-              if (!ok) showNotice('无法定位');
-            })();
-          });
-        }
-
-        const replies = repliesByRoot.get(rootId) || [];
-        if (replies.length) {
-          const repliesWrap = document.createElement('div');
-          repliesWrap.className = 'webclipper-inpage-comments-panel__replies';
-          thread.appendChild(repliesWrap);
-
-          for (const reply of replies) {
-            const replyRow = document.createElement('div');
-            replyRow.className = 'webclipper-inpage-comments-panel__reply';
-            repliesWrap.appendChild(replyRow);
-
-            const replyHeader = document.createElement('div');
-            replyHeader.className = 'webclipper-inpage-comments-panel__reply-header';
-            replyRow.appendChild(replyHeader);
-
-            const replyAvatar = document.createElement('div');
-            replyAvatar.className = 'webclipper-inpage-comments-panel__avatar is-small';
-            replyAvatar.textContent = 'You';
-            replyHeader.appendChild(replyAvatar);
-
-            const replyMeta = document.createElement('div');
-            replyMeta.className = 'webclipper-inpage-comments-panel__reply-meta';
-            replyHeader.appendChild(replyMeta);
-
-            const replyAuthor = document.createElement('div');
-            replyAuthor.className = 'webclipper-inpage-comments-panel__comment-author';
-            replyAuthor.textContent = String(reply?.authorName || 'You');
-            replyMeta.appendChild(replyAuthor);
-
-            const replyTime = document.createElement('div');
-            replyTime.className = 'webclipper-inpage-comments-panel__comment-time';
-            replyTime.textContent = formatTime(reply?.createdAt ?? null);
-            replyMeta.appendChild(replyTime);
-
-            const replyActions = document.createElement('div');
-            replyActions.className = 'webclipper-inpage-comments-panel__comment-actions';
-            replyHeader.appendChild(replyActions);
-
-            const replyDel = document.createElement('button');
-            replyDel.className =
-              'webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon';
-            replyDel.type = 'button';
-            replyDel.setAttribute('data-webclipper-comment-delete-id', String(Number(reply?.id) || ''));
-            replyDel.setAttribute('aria-label', t('deleteButton'));
-            replyDel.textContent = '×';
-            replyDel.addEventListener('click', async () => {
-              if (state.busy) return;
-              const id = Number(reply?.id);
-              if (!Number.isFinite(id) || id <= 0) return;
-              if (!deleteConfirm.isArmed(id)) {
-                deleteConfirm.arm(id);
-                return;
-              }
-              deleteConfirm.clear();
-              const handler = state.handlers.onDelete;
-              if (typeof handler !== 'function') return;
-              try {
-                state.busy = true;
-                refreshButtons();
-                await handler(id);
-              } finally {
-                state.busy = false;
-                refreshButtons();
-              }
-            });
-            replyActions.appendChild(replyDel);
-
-            const replyBody = document.createElement('div');
-            replyBody.className = 'webclipper-inpage-comments-panel__comment-body is-reply';
-            replyBody.textContent = String(reply?.commentText || '');
-            replyRow.appendChild(replyBody);
-          }
-        }
-
-        const replyComposer = document.createElement('div');
-        replyComposer.className = 'webclipper-inpage-comments-panel__reply-composer';
-        thread.appendChild(replyComposer);
-
-        const replyTextarea = document.createElement('textarea');
-        replyTextarea.className = 'webclipper-inpage-comments-panel__reply-textarea';
-        replyTextarea.placeholder = 'Reply…';
-        replyTextarea.rows = 1;
-        replyComposer.appendChild(replyTextarea);
-
-        const replySend = document.createElement('button');
-        replySend.className = 'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon';
-        replySend.type = 'button';
-        replySend.setAttribute('aria-label', 'Reply');
-        replySend.textContent = '↑';
-        replyComposer.appendChild(replySend);
-
-        (replySend as any).__webclipperTextValue = () => String((replyTextarea as any).value || '');
-
-        autosizeTextarea(replyTextarea);
-        replyTextarea.addEventListener('input', () => {
-          autosizeTextarea(replyTextarea);
-          refreshButtons();
-        });
-        const submitReply = async () => {
-          if (state.busy) return;
-          const text = String((replyTextarea as any).value || '').trim();
-          if (!text) return;
-          const handler = state.handlers.onReply;
-          if (typeof handler !== 'function') return;
-          try {
-            state.busy = true;
-            refreshButtons();
-            await handler(rootId, text);
-            (replyTextarea as any).value = '';
-            autosizeTextarea(replyTextarea);
-          } finally {
-            state.busy = false;
-            refreshButtons();
-          }
-        };
-
-        replyTextarea.addEventListener('keydown', (e) => {
-          if ((e as any).isComposing) return;
-          if (e.key !== 'Enter') return;
-          if (!(e.metaKey || e.ctrlKey)) return;
-          if (e.shiftKey || e.altKey) return;
-          e.preventDefault();
-          void submitReply();
-        });
-
-        replySend.addEventListener('click', () => {
-          void submitReply();
-        });
-      }
-
-      refreshButtons();
+      renderThreadedComments({
+        items,
+        threadsEl: threads,
+        emptyEl: empty,
+        variant,
+        isBusy: () => state.busy,
+        setBusy: (busy) => {
+          state.busy = Boolean(busy);
+        },
+        onBusyChanged: () => refreshButtons(),
+        onDelete: state.handlers.onDelete,
+        onReply: state.handlers.onReply,
+        deleteConfirm,
+        shouldIgnoreLocateClick,
+        locateThreadRoot: (root) => locateController.locateThreadRootWithRetry(root),
+        onLocateFailed: () => showNotice('无法定位'),
+        formatTime,
+        autosizeTextarea,
+      });
     },
   };
 
