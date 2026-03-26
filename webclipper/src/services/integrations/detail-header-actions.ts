@@ -30,7 +30,7 @@ export const defaultDetailHeaderActionPort: DetailHeaderActionPort = {
 
 export async function resolveDetailHeaderActions({
   conversation,
-  detail,
+  detail: _detail,
   port = defaultDetailHeaderActionPort,
 }: ResolveDetailHeaderActionsInput): Promise<DetailHeaderAction[]> {
   return await resolveOpenInDetailHeaderActions({ conversation, port });

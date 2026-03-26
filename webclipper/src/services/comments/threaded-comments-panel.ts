@@ -795,55 +795,6 @@ export function mountThreadedCommentsPanel(
     }
   };
 
-  const runChatWithResolveActions = () => {
-    if (!chatWithConfig || !chatWithMenuRoot) return;
-    const menuBody = getChatWithMenuBody();
-    if (!menuBody) return;
-
-    chatWithState.loading = true;
-    chatWithState.actions = [];
-    menuBody.textContent = '';
-
-    const loading = document.createElement('div');
-    loading.className = 'webclipper-inpage-comments-panel__chatwith-state';
-    loading.textContent = 'Loading…';
-    menuBody.appendChild(loading);
-
-    const currentRequestId = chatWithState.requestId + 1;
-    chatWithState.requestId = currentRequestId;
-
-    void Promise.resolve()
-      .then(() => chatWithConfig.resolveActions())
-      .then((items) => {
-        if (!chatWithMenuRoot || currentRequestId !== chatWithState.requestId) return;
-        const nextActions = normalizeChatWithActions(items as any);
-        chatWithState.loading = false;
-        chatWithState.actions = nextActions;
-        applyChatWithTriggerFromActions(nextActions);
-        renderChatWithMenuActions(nextActions);
-      })
-      .catch((error) => {
-        if (!chatWithMenuRoot || currentRequestId !== chatWithState.requestId) return;
-        const message =
-          error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-        chatWithState.loading = false;
-        chatWithState.actions = [];
-        menuBody.textContent = '';
-
-        const failed = document.createElement('div');
-        failed.className = 'webclipper-inpage-comments-panel__chatwith-state is-error';
-        failed.textContent = message;
-        menuBody.appendChild(failed);
-
-        const retry = document.createElement('button');
-        retry.type = 'button';
-        retry.className = 'webclipper-btn webclipper-btn--menu-item';
-        retry.textContent = 'Retry';
-        retry.addEventListener('click', () => runChatWithResolveActions());
-        menuBody.appendChild(retry);
-      });
-  };
-
   const runChatWithAction = (action: ThreadedCommentsPanelChatWithAction | null | undefined) => {
     if (!action || action.disabled) return;
     closeChatWithMenu();

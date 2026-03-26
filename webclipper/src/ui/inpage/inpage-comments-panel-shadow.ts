@@ -5,7 +5,7 @@ import {
 } from '@services/comments/threaded-comments-panel';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
-import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
