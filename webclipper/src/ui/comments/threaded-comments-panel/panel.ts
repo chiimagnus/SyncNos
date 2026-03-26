@@ -4,43 +4,12 @@ import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw'
 import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
-
-export type ThreadedCommentItem = {
-  id: number;
-  parentId: number | null;
-  authorName?: string | null;
-  createdAt?: number | null;
-  quoteText?: string | null;
-  commentText: string;
-  locator?: any | null;
-};
-
-export type ThreadedCommentsPanelApi = {
-  open: (input?: { focusComposer?: boolean }) => void;
-  close: () => void;
-  isOpen: () => boolean;
-  setBusy: (busy: boolean) => void;
-  setQuoteText: (text: string) => void;
-  setComments: (items: ThreadedCommentItem[]) => void;
-  setHandlers: (handlers: {
-    onSave?: (text: string) => void | boolean | Promise<void | boolean>;
-    onReply?: (parentId: number, text: string) => void | Promise<void>;
-    onDelete?: (id: number) => void | Promise<void>;
-    onClose?: () => void;
-  }) => void;
-};
-
-export type ThreadedCommentsPanelChatWithAction = {
-  id: string;
-  label: string;
-  disabled?: boolean;
-  onTrigger?: () => void | Promise<void>;
-};
-
-export type ThreadedCommentsPanelChatWithConfig = {
-  resolveActions: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
-  resolveSingleActionLabel?: () => Promise<string | null>;
-};
+import type {
+  MountOptions,
+  ThreadedCommentItem,
+  ThreadedCommentsPanelApi,
+  ThreadedCommentsPanelChatWithAction,
+} from './types';
 
 function toHostTokensCss(css: string) {
   // Scope tokens to the Shadow DOM host so inpage panels still use our design system.
@@ -113,28 +82,6 @@ function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem):
   const ib = Number((b as any)?.id) || 0;
   return ib - ia;
 }
-
-type MountOptions = {
-  overlay?: boolean;
-  initiallyOpen?: boolean;
-  showHeader?: boolean;
-  showCollapseButton?: boolean;
-  variant?: 'embedded' | 'sidebar';
-  // Optional surface background for sidebar variant. When provided, it will be
-  // exposed to CSS via `--webclipper-comments-panel-surface-bg`.
-  surfaceBg?: string;
-  // Optional visual divider between header and body. By default:
-  // - `sidebar`: no divider (cleaner, matches app shell columns)
-  // - `embedded`: divider
-  headerDivider?: boolean;
-  // When `true`, opening the overlay panel will "dock" the host page content by
-  // applying right padding to `document.documentElement` so the page is not
-  // covered by the sidebar. Intended for inpage content-scripts only.
-  dockPage?: boolean;
-  locatorEnv?: 'inpage' | 'app' | null;
-  getLocatorRoot?: () => Element | null;
-  chatWith?: ThreadedCommentsPanelChatWithConfig | null;
-};
 
 function pickLocatorRoot(options: MountOptions): Element | null {
   const getter = options.getLocatorRoot;
