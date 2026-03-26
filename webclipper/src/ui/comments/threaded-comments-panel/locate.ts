@@ -80,7 +80,7 @@ function createLocateHighlighter() {
         // ignore
       }
       if (lastEl === el) lastEl = null;
-    }, 1800);
+    }, 1400);
   };
 
   return { flash, clear };

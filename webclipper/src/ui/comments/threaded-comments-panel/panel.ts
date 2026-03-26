@@ -8,7 +8,6 @@ import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type {
   MountOptions,
-  ThreadedCommentItem,
   ThreadedCommentsPanelApi,
 } from './types';
 
