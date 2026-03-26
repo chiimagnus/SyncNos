@@ -76,17 +76,17 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
   function syncPanelState() {
     if (!panel) return;
     try {
+      panel.setHandlers(handlers);
+    } catch (_e) {
+      // ignore
+    }
+    try {
       panel.setQuoteText(quoteText);
     } catch (_e) {
       // ignore; a detached host should not break the session state.
     }
     try {
       panel.setComments(cloneCommentItems(comments));
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      panel.setHandlers(handlers);
     } catch (_e) {
       // ignore
     }
@@ -196,6 +196,11 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
     handlers = wrapped;
     try {
       panel?.setHandlers(handlers);
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      panel?.setComments(cloneCommentItems(comments));
     } catch (_e) {
       // ignore
     }
