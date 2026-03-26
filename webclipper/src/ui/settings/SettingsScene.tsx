@@ -314,7 +314,7 @@ export function SettingsScene(props: SettingsSceneProps) {
             </div>
           </div>
 
-          <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-p-3">
+          <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-primary)] tw-p-3">
             {renderDetailContent()}
           </div>
         </div>
