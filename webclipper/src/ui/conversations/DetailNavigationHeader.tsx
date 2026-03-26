@@ -165,6 +165,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         <DetailHeaderActionBar
           actions={openActions}
           buttonClassName={headerActionButtonClass}
+          iconOnly
           menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
           menuAriaLabel={t('detailHeaderOpenInMenuAria')}

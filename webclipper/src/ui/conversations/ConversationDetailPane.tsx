@@ -301,6 +301,7 @@ export function ConversationDetailPane({
               <DetailHeaderActionBar
                 actions={openActions}
                 buttonClassName={outlineButtonClass}
+                iconOnly
                 menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
                 menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
                 menuAriaLabel={t('detailHeaderOpenInMenuAria')}

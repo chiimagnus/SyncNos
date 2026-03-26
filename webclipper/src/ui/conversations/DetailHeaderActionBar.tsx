@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BookOpen, ExternalLink, FileText, ImageDown, Link2Off } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
@@ -10,6 +10,8 @@ import { tooltipAttrs } from '@ui/shared/AppTooltip';
 export type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
   buttonClassName: string;
+  iconOnly?: boolean;
+  triggerIcon?: ReactNode;
   menuTriggerLabel?: string;
   menuTriggerAriaLabel?: string;
   menuAriaLabel?: string;
@@ -19,6 +21,8 @@ export type DetailHeaderActionBarProps = {
 export function DetailHeaderActionBar({
   actions,
   buttonClassName,
+  iconOnly = false,
+  triggerIcon,
   menuTriggerLabel,
   menuTriggerAriaLabel,
   menuAriaLabel,
@@ -79,6 +83,13 @@ export function DetailHeaderActionBar({
     const action = actions[0]!;
     const buttonLabel = labelOverride || action.label;
     const icon = resolveActionIcon(action);
+    const resolvedTriggerIcon =
+      triggerIcon ||
+      (iconOnly ? <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" /> : icon) ||
+      <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" />;
+    const triggerButtonClassName = iconOnly
+      ? [buttonClassName, 'webclipper-btn--icon webclipper-btn--icon-sm'].join(' ')
+      : buttonClassName;
     return (
       <div className={className || 'tw-flex tw-items-center tw-gap-2'}>
         <button
@@ -88,15 +99,19 @@ export function DetailHeaderActionBar({
           onClick={() => {
             void handleTrigger(action);
           }}
-          className={buttonClassName}
+          className={triggerButtonClassName}
           aria-label={action.label}
           aria-disabled={action.disabled ? 'true' : undefined}
           disabled={busy || !!action.disabled}
         >
-          <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-            {icon}
-            <span className="tw-hidden md:tw-inline tw-whitespace-nowrap">{buttonLabel}</span>
-          </span>
+          {iconOnly ? (
+            <span className="tw-inline-flex tw-items-center tw-justify-center">{resolvedTriggerIcon}</span>
+          ) : (
+            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+              {resolvedTriggerIcon}
+              <span className="tw-hidden md:tw-inline tw-whitespace-nowrap">{buttonLabel}</span>
+            </span>
+          )}
         </button>
       </div>
     );
@@ -107,6 +122,13 @@ export function DetailHeaderActionBar({
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
   const triggerLabel = labelOverride || resolvedMenuTriggerLabel;
   const primaryIcon = resolveActionIcon(actions[0]!);
+  const resolvedTriggerIcon =
+    triggerIcon ||
+    (iconOnly ? <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" /> : primaryIcon) ||
+    <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" />;
+  const triggerButtonClassName = iconOnly
+    ? [buttonClassName, 'webclipper-btn--icon webclipper-btn--icon-sm'].join(' ')
+    : buttonClassName;
 
   const menuButtonClass = buttonMenuItemClassName();
 
@@ -125,18 +147,24 @@ export function DetailHeaderActionBar({
             {...triggerProps}
             {...tooltipAttrs(resolvedMenuTriggerLabel)}
             aria-label={resolvedMenuTriggerAriaLabel}
-            className={buttonClassName}
+            className={triggerButtonClassName}
           >
-            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-              {primaryIcon}
-              <span className="tw-hidden md:tw-inline tw-whitespace-nowrap tw-leading-none">{triggerLabel}</span>
-            </span>
-            <span
-              className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
-              aria-hidden="true"
-            >
-              ▾
-            </span>
+            {iconOnly ? (
+              <span className="tw-inline-flex tw-items-center tw-justify-center">{resolvedTriggerIcon}</span>
+            ) : (
+              <>
+                <span className="tw-inline-flex tw-items-center tw-gap-1.5">
+                  {resolvedTriggerIcon}
+                  <span className="tw-hidden md:tw-inline tw-whitespace-nowrap tw-leading-none">{triggerLabel}</span>
+                </span>
+                <span
+                  className="tw-ml-1 tw-w-[14px] tw-text-center tw-text-[12px] tw-font-black tw-leading-none tw-text-[var(--text-secondary)]"
+                  aria-hidden="true"
+                >
+                  ▾
+                </span>
+              </>
+            )}
           </button>
         )}
       >
