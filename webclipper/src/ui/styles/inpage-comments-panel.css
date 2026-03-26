@@ -43,8 +43,8 @@
 
   width: min(var(--webclipper-comments-panel-width, 420px), 92vw);
   background: var(--webclipper-comments-panel-surface-bg, var(--bg-sunken, var(--panel-bg)));
-  border-left: 0;
-  box-shadow: -1px 0 0 color-mix(in srgb, var(--panel-border) 78%, transparent);
+  border-left: 1px solid var(--panel-border);
+  box-shadow: none;
 }
 
 .webclipper-inpage-comments-panel__surface {
