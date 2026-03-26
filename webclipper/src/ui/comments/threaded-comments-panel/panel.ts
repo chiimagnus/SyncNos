@@ -1,6 +1,7 @@
 import { t } from '@i18n';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
+import { createChatWithMenuController } from './chatwith';
 import { createDockController } from './dock';
 import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
@@ -8,7 +9,6 @@ import type {
   MountOptions,
   ThreadedCommentItem,
   ThreadedCommentsPanelApi,
-  ThreadedCommentsPanelChatWithAction,
 } from './types';
 
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
@@ -326,153 +326,10 @@ export function mountThreadedCommentsPanel(
     cleanupSidebarResize = () => resize.cleanup();
   }
 
-  let chatWithMenuRoot: HTMLElement | null = null;
-  const chatWithState = {
-    open: false,
-    loading: false,
-    actions: [] as ThreadedCommentsPanelChatWithAction[],
-    requestId: 0,
-  };
-
-  const defaultChatWithTriggerLabel = () => t('detailHeaderChatWithMenuLabel') || 'Chat with...';
-
-  const getChatWithTrigger = () =>
-    (chatWithMenuRoot?.querySelector?.(
-      '.webclipper-inpage-comments-panel__chatwith-trigger',
-    ) as HTMLButtonElement | null) ?? null;
-  const getChatWithMenu = () =>
-    (chatWithMenuRoot?.querySelector?.('.webclipper-inpage-comments-panel__chatwith-menu') as HTMLElement | null) ??
-    null;
-  const getChatWithMenuBody = () =>
-    (chatWithMenuRoot?.querySelector?.(
-      '.webclipper-inpage-comments-panel__chatwith-menu-body',
-    ) as HTMLElement | null) ?? null;
-
-  const applyChatWithTrigger = (input: { label: string; hasMenu: boolean }) => {
-    const trigger = getChatWithTrigger();
-    if (!trigger) return;
-    trigger.textContent = input.label;
-    if (input.hasMenu) {
-      trigger.setAttribute('aria-haspopup', 'menu');
-    } else {
-      trigger.removeAttribute('aria-haspopup');
-      if (chatWithState.open) closeChatWithMenu();
-    }
-  };
-
-  const applyChatWithTriggerFromActions = (actions: ThreadedCommentsPanelChatWithAction[]) => {
-    if (actions.length === 1) {
-      applyChatWithTrigger({
-        label: actions[0].label,
-        hasMenu: false,
-      });
-      return;
-    }
-    applyChatWithTrigger({
-      label: defaultChatWithTriggerLabel(),
-      hasMenu: true,
-    });
-  };
-
-  const closeChatWithMenu = () => {
-    if (!chatWithState.open) return;
-    chatWithState.open = false;
-    const trigger = getChatWithTrigger();
-    const menu = getChatWithMenu();
-    if (trigger) trigger.setAttribute('aria-expanded', 'false');
-    if (menu) menu.hidden = true;
-  };
-
-  const normalizeChatWithActions = (items: ThreadedCommentsPanelChatWithAction[]) => {
-    if (!Array.isArray(items)) return [] as ThreadedCommentsPanelChatWithAction[];
-    const out: ThreadedCommentsPanelChatWithAction[] = [];
-    for (const item of items) {
-      const id = String((item as any)?.id || '').trim();
-      const label = String((item as any)?.label || '').trim();
-      const onTrigger = (item as any)?.onTrigger;
-      if (!id || !label || typeof onTrigger !== 'function') continue;
-      out.push({
-        id,
-        label,
-        onTrigger,
-        disabled: Boolean((item as any)?.disabled),
-      });
-    }
-    return out;
-  };
-
-  const renderChatWithMenuActions = (actions: ThreadedCommentsPanelChatWithAction[]) => {
-    const menuBody = getChatWithMenuBody();
-    if (!menuBody) return;
-    menuBody.textContent = '';
-
-    if (!actions.length) {
-      const empty = document.createElement('div');
-      empty.className = 'webclipper-inpage-comments-panel__chatwith-state';
-      empty.textContent = 'No AI platforms enabled';
-      menuBody.appendChild(empty);
-      return;
-    }
-
-    for (const action of actions) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'webclipper-btn webclipper-btn--menu-item';
-      btn.textContent = action.label;
-      btn.disabled = Boolean(action.disabled);
-      btn.addEventListener('click', () => {
-        closeChatWithMenu();
-        void Promise.resolve()
-          .then(() => action.onTrigger?.())
-          .catch((error) => {
-            const message =
-              error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-            showNotice(message);
-          });
-      });
-      menuBody.appendChild(btn);
-    }
-  };
-
-  const runChatWithAction = (action: ThreadedCommentsPanelChatWithAction | null | undefined) => {
-    if (!action || action.disabled) return;
-    closeChatWithMenu();
-    void Promise.resolve()
-      .then(() => action.onTrigger?.())
-      .catch((error) => {
-        const message =
-          error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-        showNotice(message);
-      });
-  };
-
-  const preloadChatWithSingleActionLabel = () => {
-    if (!chatWithConfig || typeof chatWithConfig.resolveSingleActionLabel !== 'function') return;
-    void Promise.resolve()
-      .then(() => chatWithConfig.resolveSingleActionLabel?.())
-      .then((label) => {
-        if (!chatWithMenuRoot) return;
-        if (chatWithState.actions.length > 0) return;
-        const text = String(label || '').trim();
-        if (!text) return;
-        applyChatWithTrigger({
-          label: text,
-          hasMenu: false,
-        });
-      })
-      .catch(() => {
-        // ignore label preload failure
-      });
-  };
-
-  const openChatWithMenu = () => {
-    if (!chatWithMenuRoot || !chatWithConfig) return;
-    chatWithState.open = true;
-    const trigger = getChatWithTrigger();
-    const menu = getChatWithMenu();
-    if (trigger) trigger.setAttribute('aria-expanded', 'true');
-    if (menu) menu.hidden = false;
-  };
+  const chatWithMenuController = createChatWithMenuController({
+    config: chatWithConfig,
+    showNotice: (message) => showNotice(message),
+  });
 
   if (showHeader) {
     const header = document.createElement('div');
@@ -492,68 +349,7 @@ export function mountThreadedCommentsPanel(
       const chatWith = document.createElement('div');
       chatWith.className = 'webclipper-inpage-comments-panel__chatwith';
       headerActions.appendChild(chatWith);
-      chatWithMenuRoot = chatWith;
-
-      const trigger = document.createElement('button');
-      trigger.type = 'button';
-      trigger.className =
-        'webclipper-inpage-comments-panel__chatwith-trigger webclipper-btn webclipper-btn--tone-muted';
-      trigger.setAttribute('aria-haspopup', 'menu');
-      trigger.setAttribute('aria-expanded', 'false');
-      trigger.textContent = defaultChatWithTriggerLabel();
-      chatWith.appendChild(trigger);
-
-      const menu = document.createElement('div');
-      menu.className = 'webclipper-inpage-comments-panel__chatwith-menu';
-      menu.setAttribute('role', 'menu');
-      menu.setAttribute('aria-label', t('detailHeaderChatWithMenuAria'));
-      menu.hidden = true;
-      chatWith.appendChild(menu);
-
-      const menuBody = document.createElement('div');
-      menuBody.className = 'webclipper-inpage-comments-panel__chatwith-menu-body';
-      menu.appendChild(menuBody);
-
-      trigger.addEventListener('click', () => {
-        if (chatWithState.loading) return;
-        if (chatWithState.open) {
-          closeChatWithMenu();
-          return;
-        }
-        chatWithState.loading = true;
-        const requestId = chatWithState.requestId + 1;
-        chatWithState.requestId = requestId;
-        void Promise.resolve()
-          .then(() => chatWithConfig.resolveActions())
-          .then((items) => {
-            if (!chatWithMenuRoot || requestId !== chatWithState.requestId) return;
-            const actions = normalizeChatWithActions(items as any);
-            chatWithState.actions = actions;
-            applyChatWithTriggerFromActions(actions);
-            if (!actions.length) {
-              showNotice('No AI platforms enabled');
-              return;
-            }
-            if (actions.length === 1) {
-              runChatWithAction(actions[0]);
-              return;
-            }
-            openChatWithMenu();
-            renderChatWithMenuActions(actions);
-          })
-          .catch((error) => {
-            if (!chatWithMenuRoot || requestId !== chatWithState.requestId) return;
-            const message =
-              error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
-            showNotice(message);
-          })
-          .finally(() => {
-            if (!chatWithMenuRoot || requestId !== chatWithState.requestId) return;
-            chatWithState.loading = false;
-          });
-      });
-
-      preloadChatWithSingleActionLabel();
+      chatWithMenuController.attachRoot(chatWith);
     }
 
     if (showCollapseButton) {
@@ -831,7 +627,7 @@ export function mountThreadedCommentsPanel(
       setImportantStyle(el, 'display', 'block');
       dockController.setOpen(true);
     } else {
-      closeChatWithMenu();
+      chatWithMenuController.closeMenu();
       el.removeAttribute('data-open');
       setImportantStyle(el, 'display', 'none');
       dockController.setOpen(false);
@@ -875,15 +671,12 @@ export function mountThreadedCommentsPanel(
   });
 
   shadow.addEventListener('click', (e) => {
-    if (chatWithState.open && chatWithMenuRoot) {
-      const target = (e as any).target as Element | null;
-      const inMenu = Boolean(target?.closest?.('.webclipper-inpage-comments-panel__chatwith'));
-      if (!inMenu) closeChatWithMenu();
-    }
+    const target = (e as any).target as Element | null;
+    chatWithMenuController.handleShadowClick(target);
     if (deleteConfirm.getArmedKey() == null) return;
-    const target = (e as any).target;
+    const currentTarget = (e as any).target;
     try {
-      const deleteButton = target?.closest?.('button[data-webclipper-comment-delete-id]');
+      const deleteButton = currentTarget?.closest?.('button[data-webclipper-comment-delete-id]');
       if (deleteButton) return;
     } catch (_e) {
       // ignore
@@ -893,13 +686,7 @@ export function mountThreadedCommentsPanel(
 
   shadow.addEventListener('keydown', (e) => {
     if ((e as any).isComposing) return;
-    if ((e as any).key === 'Escape' && chatWithState.open) {
-      try {
-        (e as any).preventDefault?.();
-      } catch (_e) {
-        // ignore
-      }
-      closeChatWithMenu();
+    if ((e as any).key === 'Escape' && chatWithMenuController.handleShadowEscape(e as KeyboardEvent)) {
       return;
     }
     if (deleteConfirm.getArmedKey() == null) return;
@@ -1284,8 +1071,7 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
     cleanupSidebarResize = null;
-    closeChatWithMenu();
-    chatWithMenuRoot = null;
+    chatWithMenuController.cleanup();
     try {
       shadow.removeEventListener('keydown', stopShortcutKeyPropagation);
       shadow.removeEventListener('keypress', stopShortcutKeyPropagation);
