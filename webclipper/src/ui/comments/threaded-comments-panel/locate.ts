@@ -1,4 +1,5 @@
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
+import type { ArticleCommentLocator } from '@services/comments/domain/models';
 import type { ThreadedCommentItem } from './types';
 
 const LOCATE_HIGHLIGHT_ATTR = 'data-webclipper-locate-highlight';
@@ -9,11 +10,48 @@ type ThreadLocateControllerOptions = {
   pickLocatorRoot: () => Element | null;
 };
 
+type LocatorLike = {
+  env?: unknown;
+  quote?: unknown;
+  hintStart?: unknown;
+  textOffset?: unknown;
+  start?: unknown;
+  position?: {
+    start?: unknown;
+  } | null;
+};
+
+function readLocator(value: unknown): LocatorLike | null {
+  if (!value || typeof value !== 'object') return null;
+  return value as LocatorLike;
+}
+
+function readLocatorEnv(value: unknown): string {
+  return String(readLocator(value)?.env || '').trim();
+}
+
+function isArticleCommentLocator(value: unknown): value is ArticleCommentLocator {
+  const locator = readLocator(value);
+  if (!locator) return false;
+  const version = Number((locator as { v?: unknown }).v);
+  return (
+    Number.isFinite(version) &&
+    version > 0 &&
+    typeof locator.env === 'string' &&
+    !!locator.quote &&
+    typeof locator.quote === 'object' &&
+    !!locator.position &&
+    typeof locator.position === 'object'
+  );
+}
+
 function pickRangeTargetElement(range: Range): HTMLElement | null {
-  const node = (range as any).startContainer as Node | null;
-  return node && (node as any).nodeType === Node.TEXT_NODE
-    ? ((node as any).parentElement as HTMLElement | null)
-    : (node as any as HTMLElement | null);
+  const node = range.startContainer;
+  if (!node) return null;
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.parentElement as HTMLElement | null;
+  }
+  return node instanceof HTMLElement ? node : null;
 }
 
 function ensureLocateHighlightStyle() {
@@ -38,7 +76,7 @@ function ensureLocateHighlightStyle() {
 
 function createLocateHighlighter() {
   let lastEl: HTMLElement | null = null;
-  let timer: any = 0;
+  let timer: ReturnType<typeof setTimeout> | 0 = 0;
 
   const clear = () => {
     if (timer) clearTimeout(timer);
@@ -107,8 +145,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 function readLocatorHint(locator: unknown): number | null {
-  const o = locator as any;
-  const candidates = [o?.hintStart, o?.textOffset, o?.start];
+  const candidate = readLocator(locator);
+  const candidates = [candidate?.hintStart, candidate?.textOffset, candidate?.start, candidate?.position?.start];
   for (const value of candidates) {
     const n = Number(value);
     if (Number.isFinite(n) && n >= 0) return Math.round(n);
@@ -119,18 +157,18 @@ function readLocatorHint(locator: unknown): number | null {
 function pickBestScrollContainer(rootEl: Element): HTMLElement | null {
   const candidates: HTMLElement[] = [];
   const pushIf = (el: Element | null | undefined) => {
-    if (!el || (el as any).nodeType !== 1) return;
-    candidates.push(el as HTMLElement);
+    if (!el || !(el instanceof HTMLElement)) return;
+    candidates.push(el);
   };
 
-  pushIf(rootEl as any);
+  pushIf(rootEl);
   try {
-    pushIf((rootEl as any).closest?.('.route-scroll'));
-    pushIf((rootEl as any).closest?.('.captured-list-sidebar'));
+    pushIf(rootEl.closest('.route-scroll'));
+    pushIf(rootEl.closest('.captured-list-sidebar'));
     pushIf(document.querySelector('.route-scroll'));
-    pushIf(document.scrollingElement as any);
-    pushIf(document.documentElement as any);
-    pushIf(document.body as any);
+    pushIf(document.scrollingElement);
+    pushIf(document.documentElement);
+    pushIf(document.body);
   } catch (_e) {
     // ignore
   }
@@ -148,18 +186,15 @@ function nudgeScrollTowardsHint(hint: number, rootEl: Element): void {
   const scroller = pickBestScrollContainer(rootEl);
   if (!scroller) return;
 
-  const maxScroll = Math.max(
-    0,
-    Number((scroller as any).scrollHeight || 0) - Number((scroller as any).clientHeight || 0),
-  );
+  const maxScroll = Math.max(0, Number(scroller.scrollHeight || 0) - Number(scroller.clientHeight || 0));
   if (!Number.isFinite(maxScroll) || maxScroll <= 0) return;
 
-  const textLength = Math.max(0, Number(String((rootEl as any)?.textContent || '').length) || 0);
+  const textLength = Math.max(0, Number(String(rootEl.textContent || '').length) || 0);
   const ratio = textLength > 0 ? Math.max(0, Math.min(1, hint / textLength)) : 1;
   const nextTop = Math.round(maxScroll * ratio);
 
   try {
-    (scroller as any).scrollTop = nextTop;
+    scroller.scrollTop = nextTop;
   } catch (_e) {
     // ignore
   }
@@ -169,10 +204,10 @@ export function createThreadLocateController(options: ThreadLocateControllerOpti
   const locateHighlighter = createLocateHighlighter();
 
   function locateThreadRootOnce(rootItem: ThreadedCommentItem, rootEl: Element): boolean {
-    const locator = (rootItem as any)?.locator;
-    if (!locator) return false;
+    const locator = rootItem?.locator;
+    if (!isArticleCommentLocator(locator)) return false;
 
-    const env = String((locator as any)?.env || '').trim();
+    const env = readLocatorEnv(locator);
     const expectedEnv = String(options.locatorEnv || '').trim();
     if (!expectedEnv || env !== expectedEnv) return false;
 
@@ -186,10 +221,10 @@ export function createThreadLocateController(options: ThreadLocateControllerOpti
   }
 
   const locateThreadRootWithRetry = async (rootItem: ThreadedCommentItem): Promise<boolean> => {
-    const locator = (rootItem as any)?.locator;
-    if (!locator) return false;
+    const locator = rootItem?.locator;
+    if (!isArticleCommentLocator(locator)) return false;
 
-    const env = String((locator as any)?.env || '').trim();
+    const env = readLocatorEnv(locator);
     const expectedEnv = String(options.locatorEnv || '').trim();
     if (!expectedEnv || env !== expectedEnv) return false;
 

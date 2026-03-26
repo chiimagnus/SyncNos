@@ -11,25 +11,29 @@ import type {
   ThreadedCommentsPanelApi,
 } from './types';
 
+type ThreadedCommentsPanelHandlers = Parameters<ThreadedCommentsPanelApi['setHandlers']>[0];
+type SendButtonWithTextGetter = HTMLButtonElement & {
+  __webclipperTextValue?: () => string;
+};
+
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
 }
 
 function autosizeTextarea(textarea: HTMLTextAreaElement | null | undefined) {
-  const el = textarea as any;
-  if (!el) return;
+  if (!textarea) return;
   try {
-    el.style.overflowY = 'hidden';
-    el.style.height = '0px';
-    const next = Math.max(0, Number(el.scrollHeight || 0) || 0);
-    el.style.height = `${next}px`;
+    textarea.style.overflowY = 'hidden';
+    textarea.style.height = '0px';
+    const next = Math.max(0, Number(textarea.scrollHeight || 0) || 0);
+    textarea.style.height = `${next}px`;
   } catch (_e) {
     // ignore
   }
 }
 
 function isEditableTarget(target: unknown): boolean {
-  const el = target as any;
+  const el = target as HTMLElement | null;
   const tag = String(el?.tagName || '').toUpperCase();
   if (tag === 'TEXTAREA') return true;
   if (tag === 'INPUT') return true;
@@ -64,7 +68,7 @@ function pickLocatorRoot(options: MountOptions): Element | null {
 }
 
 function shouldIgnoreLocateClick(target: EventTarget | null): boolean {
-  const el = target as any as HTMLElement | null;
+  const el = target as HTMLElement | null;
   if (!el) return false;
   if (isEditableTarget(el)) return true;
   try {
@@ -79,7 +83,7 @@ export function mountThreadedCommentsPanel(
   host: HTMLElement,
   options: MountOptions = {},
 ): { el: HTMLElement; api: ThreadedCommentsPanelApi; cleanup: () => void } {
-  const el = document.createElement('webclipper-threaded-comments-panel') as any as HTMLElement;
+  const el = document.createElement('webclipper-threaded-comments-panel') as HTMLElement;
   const isOverlay = options.overlay === true;
   if (isOverlay) el.setAttribute('data-overlay', '1');
   const variant = options.variant === 'sidebar' ? 'sidebar' : 'embedded';
@@ -237,13 +241,13 @@ export function mountThreadedCommentsPanel(
   const state = {
     busy: false,
     pendingComposerFocus: false,
-    noticeTimer: 0 as any,
+    noticeTimer: null as ReturnType<typeof setTimeout> | null,
     handlers: {
-      onSave: null as any,
-      onReply: null as any,
-      onDelete: null as any,
-      onClose: null as any,
-    },
+      onSave: undefined,
+      onReply: undefined,
+      onDelete: undefined,
+      onClose: undefined,
+    } as ThreadedCommentsPanelHandlers,
   };
 
   function showNotice(message: string) {
@@ -328,12 +332,12 @@ export function mountThreadedCommentsPanel(
 
   const focusComposer = () => {
     try {
-      if (!composerTextarea || typeof (composerTextarea as any).focus !== 'function') return;
-      (composerTextarea as any).focus();
+      if (!composerTextarea) return;
+      composerTextarea.focus();
       // Put caret at the end for convenience.
       try {
-        const value = String((composerTextarea as any).value || '');
-        (composerTextarea as any).setSelectionRange?.(value.length, value.length);
+        const value = String(composerTextarea.value || '');
+        composerTextarea.setSelectionRange(value.length, value.length);
       } catch (_e2) {
         // ignore
       }
@@ -343,7 +347,7 @@ export function mountThreadedCommentsPanel(
   };
 
   function refreshButtons() {
-    const text = String((composerTextarea as any).value || '').trim();
+    const text = String(composerTextarea.value || '').trim();
     composerSend.disabled = state.busy || !text;
     // Keep composer editable even when busy (loading comments etc). We'll block send instead.
     composerTextarea.disabled = false;
@@ -361,11 +365,11 @@ export function mountThreadedCommentsPanel(
 
     const sendButtons = shadow.querySelectorAll?.(
       '.webclipper-inpage-comments-panel__send',
-    ) as NodeListOf<HTMLButtonElement> | null;
+    ) as NodeListOf<SendButtonWithTextGetter> | null;
     sendButtons?.forEach?.((node) => {
       try {
         if (node === composerSend) return;
-        const threadText = String((node as any).__webclipperTextValue?.() || '').trim();
+        const threadText = String(node.__webclipperTextValue?.() || '').trim();
         node.disabled = state.busy || !threadText;
       } catch (_e) {
         // ignore
@@ -400,7 +404,7 @@ export function mountThreadedCommentsPanel(
   });
   const submitComposer = async () => {
     if (state.busy) return;
-    const text = String((composerTextarea as any).value || '').trim();
+    const text = String(composerTextarea.value || '').trim();
     if (!text) return;
     const handler = state.handlers.onSave;
     if (typeof handler !== 'function') return;
@@ -408,7 +412,7 @@ export function mountThreadedCommentsPanel(
       state.busy = true;
       refreshButtons();
       await handler(text);
-      (composerTextarea as any).value = '';
+      composerTextarea.value = '';
       autosizeTextarea(composerTextarea);
     } finally {
       state.busy = false;
@@ -416,8 +420,8 @@ export function mountThreadedCommentsPanel(
     }
   };
 
-  composerTextarea.addEventListener('keydown', (e) => {
-    if ((e as any).isComposing) return;
+  composerTextarea.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.isComposing) return;
     if (e.key !== 'Enter') return;
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.shiftKey || e.altKey) return;
@@ -430,10 +434,10 @@ export function mountThreadedCommentsPanel(
   });
 
   shadow.addEventListener('click', (e) => {
-    const target = (e as any).target as Element | null;
+    const target = e.target as Element | null;
     chatWithMenuController.handleShadowClick(target);
     if (deleteConfirm.getArmedKey() == null) return;
-    const currentTarget = (e as any).target;
+    const currentTarget = e.target as Element | null;
     try {
       const deleteButton = currentTarget?.closest?.('button[data-webclipper-comment-delete-id]');
       if (deleteButton) return;
@@ -444,14 +448,15 @@ export function mountThreadedCommentsPanel(
   });
 
   shadow.addEventListener('keydown', (e) => {
-    if ((e as any).isComposing) return;
-    if ((e as any).key === 'Escape' && chatWithMenuController.handleShadowEscape(e as KeyboardEvent)) {
+    const keyEvent = e as KeyboardEvent;
+    if (keyEvent.isComposing) return;
+    if (keyEvent.key === 'Escape' && chatWithMenuController.handleShadowEscape(keyEvent)) {
       return;
     }
     if (deleteConfirm.getArmedKey() == null) return;
-    if ((e as any).key !== 'Escape') return;
+    if (keyEvent.key !== 'Escape') return;
     try {
-      (e as any).preventDefault?.();
+      keyEvent.preventDefault();
     } catch (_e) {
       // ignore
     }
@@ -499,7 +504,7 @@ export function mountThreadedCommentsPanel(
       quoteText.textContent = value;
       quote.style.display = value ? 'block' : 'none';
     },
-    setHandlers(handlers: any) {
+    setHandlers(handlers: ThreadedCommentsPanelHandlers) {
       state.handlers = handlers || {
         onSave: null,
         onReply: null,
@@ -542,9 +547,9 @@ export function mountThreadedCommentsPanel(
   host.appendChild(el);
 
   const stopShortcutKeyPropagation = (e: Event) => {
-    if (!isEditableTarget((e as any).target)) return;
+    if (!isEditableTarget(e.target)) return;
     try {
-      (e as any).stopImmediatePropagation?.();
+      e.stopImmediatePropagation();
     } catch (_e) {
       // ignore
     }

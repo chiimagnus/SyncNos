@@ -51,11 +51,7 @@ export function createDockController(options: CreateDockControllerOptions): Dock
     }
     try {
       const computed = getComputedStyle(panelEl);
-      const width = Number.parseFloat(
-        String((computed as any)?.width || '')
-          .replace('px', '')
-          .trim(),
-      );
+      const width = Number.parseFloat(String(computed.width || '').replace('px', '').trim());
       if (Number.isFinite(width) && width > 0) return width;
     } catch (_e) {
       // ignore
@@ -101,7 +97,7 @@ export function createDockController(options: CreateDockControllerOptions): Dock
         // ignore
       }
       try {
-        globalThis.addEventListener?.('resize', onViewportResize, { passive: true } as any);
+        globalThis.addEventListener('resize', onViewportResize, { passive: true });
       } catch (_e) {
         // ignore
       }
@@ -115,7 +111,7 @@ export function createDockController(options: CreateDockControllerOptions): Dock
     }
     dockRaf = null;
     try {
-      globalThis.removeEventListener?.('resize', onViewportResize as any);
+      globalThis.removeEventListener('resize', onViewportResize);
     } catch (_e) {
       // ignore
     }

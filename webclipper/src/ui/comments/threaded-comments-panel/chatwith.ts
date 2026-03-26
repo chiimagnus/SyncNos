@@ -69,19 +69,20 @@ export function createChatWithMenuController(options: CreateChatWithMenuControll
     applyTrigger({ label: defaultTriggerLabel(), hasMenu: true });
   };
 
-  const normalizeActions = (items: ThreadedCommentsPanelChatWithAction[]) => {
+  const normalizeActions = (items: unknown[]) => {
     if (!Array.isArray(items)) return [] as ThreadedCommentsPanelChatWithAction[];
     const out: ThreadedCommentsPanelChatWithAction[] = [];
     for (const item of items) {
-      const id = String((item as any)?.id || '').trim();
-      const label = String((item as any)?.label || '').trim();
-      const onTrigger = (item as any)?.onTrigger;
+      const candidate = item as Partial<ThreadedCommentsPanelChatWithAction> | null;
+      const id = String(candidate?.id || '').trim();
+      const label = String(candidate?.label || '').trim();
+      const onTrigger = candidate?.onTrigger;
       if (!id || !label || typeof onTrigger !== 'function') continue;
       out.push({
         id,
         label,
         onTrigger,
-        disabled: Boolean((item as any)?.disabled),
+        disabled: Boolean(candidate?.disabled),
       });
     }
     return out;
@@ -167,7 +168,7 @@ export function createChatWithMenuController(options: CreateChatWithMenuControll
       .then(() => config.resolveActions())
       .then((items) => {
         if (!rootEl || requestId !== state.requestId) return;
-        const actions = normalizeActions(items as any);
+        const actions = normalizeActions(items);
         state.actions = actions;
         applyTriggerFromActions(actions);
         if (!actions.length) {

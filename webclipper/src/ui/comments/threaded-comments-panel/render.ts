@@ -7,6 +7,10 @@ type DeleteConfirmLike = {
   clear: () => void;
 };
 
+type ReplySendButton = HTMLButtonElement & {
+  __webclipperTextValue?: () => string;
+};
+
 type RenderThreadedCommentsOptions = {
   items: ThreadedCommentItem[];
   threadsEl: HTMLElement;
@@ -26,11 +30,11 @@ type RenderThreadedCommentsOptions = {
 };
 
 function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
-  const ta = Number((a as any)?.createdAt) || 0;
-  const tb = Number((b as any)?.createdAt) || 0;
+  const ta = Number(a?.createdAt) || 0;
+  const tb = Number(b?.createdAt) || 0;
   if (tb !== ta) return tb - ta;
-  const ia = Number((a as any)?.id) || 0;
-  const ib = Number((b as any)?.id) || 0;
+  const ia = Number(a?.id) || 0;
+  const ib = Number(b?.id) || 0;
   return ib - ia;
 }
 
@@ -56,9 +60,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
   threadsEl.textContent = '';
   deleteConfirm.clear();
 
-  const normalized = (Array.isArray(items) ? items : []).filter(
-    (item) => item && Number.isFinite(Number((item as any)?.id)),
-  );
+  const normalized = (Array.isArray(items) ? items : []).filter((item) => Number.isFinite(Number(item?.id)));
   if (!normalized.length) {
     threadsEl.appendChild(emptyEl);
     onBusyChanged();
@@ -99,7 +101,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
       if (variant === 'sidebar') {
         quote.addEventListener('click', (event) => {
           if (isBusy()) return;
-          if (shouldIgnoreLocateClick((event as any).target)) return;
+          if (shouldIgnoreLocateClick(event.target)) return;
           void (async () => {
             const ok = await locateThreadRoot(root);
             if (!ok) onLocateFailed();
@@ -175,7 +177,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     if (variant === 'sidebar') {
       comment.addEventListener('click', (event) => {
         if (isBusy()) return;
-        if (shouldIgnoreLocateClick((event as any).target)) return;
+        if (shouldIgnoreLocateClick(event.target)) return;
         void (async () => {
           const ok = await locateThreadRoot(root);
           if (!ok) onLocateFailed();
@@ -266,14 +268,14 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     replyTextarea.rows = 1;
     replyComposer.appendChild(replyTextarea);
 
-    const replySend = document.createElement('button');
+    const replySend = document.createElement('button') as ReplySendButton;
     replySend.className = 'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon';
     replySend.type = 'button';
     replySend.setAttribute('aria-label', 'Reply');
     replySend.textContent = '↑';
     replyComposer.appendChild(replySend);
 
-    (replySend as any).__webclipperTextValue = () => String((replyTextarea as any).value || '');
+    replySend.__webclipperTextValue = () => String(replyTextarea.value || '');
 
     autosizeTextarea(replyTextarea);
     replyTextarea.addEventListener('input', () => {
@@ -282,14 +284,14 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     });
     const submitReply = async () => {
       if (isBusy()) return;
-      const text = String((replyTextarea as any).value || '').trim();
+      const text = String(replyTextarea.value || '').trim();
       if (!text) return;
       if (typeof onReply !== 'function') return;
       try {
         setBusy(true);
         onBusyChanged();
         await onReply(rootId, text);
-        (replyTextarea as any).value = '';
+        replyTextarea.value = '';
         autosizeTextarea(replyTextarea);
       } finally {
         setBusy(false);
@@ -298,7 +300,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     };
 
     replyTextarea.addEventListener('keydown', (event) => {
-      if ((event as any).isComposing) return;
+      if (event.isComposing) return;
       if (event.key !== 'Enter') return;
       if (!(event.metaKey || event.ctrlKey)) return;
       if (event.shiftKey || event.altKey) return;

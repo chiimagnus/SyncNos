@@ -24,12 +24,12 @@ function clamp(value: number, min: number, max: number): number {
 
 function stopEvent(event: Event) {
   try {
-    (event as any).preventDefault?.();
+    event.preventDefault();
   } catch (_e) {
     // ignore
   }
   try {
-    (event as any).stopPropagation?.();
+    event.stopPropagation();
   } catch (_e) {
     // ignore
   }
@@ -135,15 +135,15 @@ export function installSidebarResize(options: InstallSidebarResizeOptions): { cl
       // ignore
     }
     try {
-      (handleEl as any).releasePointerCapture?.(event.pointerId);
+      handleEl.releasePointerCapture(event.pointerId);
     } catch (_e) {
       // ignore
     }
     if (widthState.widthPx != null) persistSidebarWidthPx(widthState.widthPx);
     try {
-      globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
-      globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
-      globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
+      globalThis.removeEventListener('pointermove', onPointerMove, true);
+      globalThis.removeEventListener('pointerup', onPointerUp, true);
+      globalThis.removeEventListener('pointercancel', onPointerUp, true);
     } catch (_e) {
       // ignore
     }
@@ -151,7 +151,7 @@ export function installSidebarResize(options: InstallSidebarResizeOptions): { cl
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    if ((event as any).button != null && (event as any).button !== 0) return;
+    if (event.button !== 0) return;
     stopEvent(event);
     widthState.dragging = true;
     widthState.pointerId = event.pointerId;
@@ -165,14 +165,14 @@ export function installSidebarResize(options: InstallSidebarResizeOptions): { cl
       setSidebarWidthPx(measured, { persist: false });
     }
     try {
-      (handleEl as any).setPointerCapture?.(event.pointerId);
+      handleEl.setPointerCapture(event.pointerId);
     } catch (_e) {
       // ignore
     }
     try {
-      globalThis.addEventListener?.('pointermove', onPointerMove as any, true);
-      globalThis.addEventListener?.('pointerup', onPointerUp as any, true);
-      globalThis.addEventListener?.('pointercancel', onPointerUp as any, true);
+      globalThis.addEventListener('pointermove', onPointerMove, true);
+      globalThis.addEventListener('pointerup', onPointerUp, true);
+      globalThis.addEventListener('pointercancel', onPointerUp, true);
     } catch (_e) {
       // ignore
     }
@@ -188,7 +188,7 @@ export function installSidebarResize(options: InstallSidebarResizeOptions): { cl
   handleEl.addEventListener('pointerdown', onPointerDown);
 
   try {
-    globalThis.addEventListener?.('resize', onViewportResize as any, { passive: true } as any);
+    globalThis.addEventListener('resize', onViewportResize, { passive: true });
   } catch (_e) {
     // ignore
   }
@@ -200,14 +200,14 @@ export function installSidebarResize(options: InstallSidebarResizeOptions): { cl
       // ignore
     }
     try {
-      globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
-      globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
-      globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
+      globalThis.removeEventListener('pointermove', onPointerMove, true);
+      globalThis.removeEventListener('pointerup', onPointerUp, true);
+      globalThis.removeEventListener('pointercancel', onPointerUp, true);
     } catch (_e) {
       // ignore
     }
     try {
-      globalThis.removeEventListener?.('resize', onViewportResize as any);
+      globalThis.removeEventListener('resize', onViewportResize);
     } catch (_e) {
       // ignore
     }

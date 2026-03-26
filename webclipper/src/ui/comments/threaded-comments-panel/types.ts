@@ -5,7 +5,7 @@ export type ThreadedCommentItem = {
   createdAt?: number | null;
   quoteText?: string | null;
   commentText: string;
-  locator?: any | null;
+  locator?: unknown | null;
 };
 
 export type ThreadedCommentsPanelApi = {
