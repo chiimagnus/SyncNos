@@ -156,7 +156,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     deleteButton.type = 'button';
     deleteButton.setAttribute('data-webclipper-comment-delete-id', String(Number(root?.id) || ''));
     deleteButton.setAttribute('aria-label', t('deleteButton'));
-    setPanelTooltip(deleteButton, t('deleteButton'));
+    setPanelTooltip(deleteButton, t('tooltipDeleteCommentDetailed'));
     deleteButton.textContent = '×';
     deleteButton.addEventListener('click', async () => {
       if (isBusy()) return;
@@ -239,7 +239,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
         replyDeleteButton.type = 'button';
         replyDeleteButton.setAttribute('data-webclipper-comment-delete-id', String(Number(reply?.id) || ''));
         replyDeleteButton.setAttribute('aria-label', t('deleteButton'));
-        setPanelTooltip(replyDeleteButton, t('deleteButton'));
+        setPanelTooltip(replyDeleteButton, t('tooltipDeleteCommentDetailed'));
         replyDeleteButton.textContent = '×';
         replyDeleteButton.addEventListener('click', async () => {
           if (isBusy()) return;
@@ -282,8 +282,9 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     const replySend = document.createElement('button') as ReplySendButton;
     replySend.className = 'webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon';
     replySend.type = 'button';
-    replySend.setAttribute('aria-label', 'Reply');
-    setPanelTooltip(replySend, 'Reply');
+    const replyLabel = t('tooltipReplySendDetailed');
+    replySend.setAttribute('aria-label', replyLabel);
+    setPanelTooltip(replySend, replyLabel);
     replySend.textContent = '↑';
     replyComposer.appendChild(replySend);
 

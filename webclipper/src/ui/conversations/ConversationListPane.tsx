@@ -357,6 +357,7 @@ export function ConversationListPane({
   const selectedCount = selectedInView.length;
   const allSelected = total > 0 && selectedCount === total;
   const indeterminate = selectedCount > 0 && selectedCount < total;
+  const selectedTotalCount = selectedIds.length;
 
   useEffect(() => {
     const el = selectAllRef.current;
@@ -364,7 +365,7 @@ export function ConversationListPane({
     el.indeterminate = indeterminate;
   }, [indeterminate]);
 
-  const hasSelection = selectedIds.length > 0;
+  const hasSelection = selectedTotalCount > 0;
   const actionBusy = exporting || deleting;
   const syncingAny = syncingNotion || syncingObsidian;
 
@@ -628,6 +629,23 @@ export function ConversationListPane({
 
   const armedDeleteKey = deleteConfirm.getArmedKey();
   const deleteConfirming = !!deleteConfirmKey && armedDeleteKey != null && deleteConfirm.isArmed(deleteConfirmKey);
+  const deleteTooltip = deleteConfirming
+    ? t('tooltipDeleteSelectedConfirmDetailed')
+    : hasSelection
+      ? `${t('tooltipDeleteSelectedDetailed')} (${selectedTotalCount})`
+      : t('tooltipDeleteSelectedDetailed');
+  const exportTooltip = hasSelection
+    ? `${t('tooltipExportDetailed')} (${selectedTotalCount})`
+    : t('tooltipExportSelectFirstDetailed');
+  const singleSyncTooltip = hasSelection
+    ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${singleSyncLabel}`
+    : t('tooltipSyncSelectFirstDetailed');
+  const syncMenuTooltip =
+    enabledSyncProviders.length === 0
+      ? t('tooltipSyncProvidersDisabledDetailed')
+      : hasSelection
+        ? `${t('tooltipSyncDetailed')} (${selectedTotalCount})`
+        : t('tooltipSyncSelectFirstDetailed');
 
   useEffect(() => {
     if (armedDeleteKey == null) return;
@@ -730,7 +748,14 @@ export function ConversationListPane({
                   </div>
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
-                    <span className="tw-inline-flex" {...tooltipAttrs(copiedId === id ? t('copied') : t('copyFullMarkdown'))}>
+                    <span
+                      className="tw-inline-flex"
+                      {...tooltipAttrs(
+                        copiedId === id
+                          ? `${t('copied')} · ${t('tooltipCopyFullMarkdownDetailed')}`
+                          : t('tooltipCopyFullMarkdownDetailed'),
+                      )}
+                    >
                       <button
                         className={buttonMiniIconClassName(isActive)}
                         type="button"
@@ -741,7 +766,10 @@ export function ConversationListPane({
                       </button>
                     </span>
 
-                    <span className="tw-inline-flex" {...tooltipAttrs(safeUrl ? t('openChat') : t('noLinkAvailable'))}>
+                    <span
+                      className="tw-inline-flex"
+                      {...tooltipAttrs(safeUrl ? t('tooltipOpenChatDetailed') : t('tooltipOpenChatMissingLinkDetailed'))}
+                    >
                       <button
                         className={buttonMiniIconClassName(isActive)}
                         type="button"
@@ -853,7 +881,7 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <span className="tw-inline-flex" {...tooltipAttrs(t('deleteButton'))}>
+              <span className="tw-inline-flex" {...tooltipAttrs(deleteTooltip)}>
                 <button
                   id="btnDelete"
                   type="button"
@@ -895,7 +923,7 @@ export function ConversationListPane({
                 align="end"
                 panelMinWidth={150}
                 trigger={(triggerProps) => (
-                  <span className="tw-inline-flex" {...tooltipAttrs(t('exportButton'))}>
+                  <span className="tw-inline-flex" {...tooltipAttrs(exportTooltip)}>
                     <button {...triggerProps} id="btnExport" className={actionButton}>
                       <span className="tw-leading-none">{t('exportButton')}</span>
                       <span
@@ -935,7 +963,7 @@ export function ConversationListPane({
               </MenuPopover>
 
               {singleSyncProvider ? (
-                <span className="tw-inline-flex" {...tooltipAttrs(singleSyncLabel)}>
+                <span className="tw-inline-flex" {...tooltipAttrs(singleSyncTooltip)}>
                   <button
                     id="btnSyncProvider"
                     className={actionButton}
@@ -971,7 +999,7 @@ export function ConversationListPane({
                   align="end"
                   panelMinWidth={170}
                   trigger={(triggerProps) => (
-                    <span className="tw-inline-flex" {...tooltipAttrs(syncMenuBaseLabel)}>
+                    <span className="tw-inline-flex" {...tooltipAttrs(syncMenuTooltip)}>
                       <button {...triggerProps} id="btnSyncTo" className={actionButton}>
                         <span className="tw-leading-none">{syncMenuButtonLabel}</span>
                         <span
