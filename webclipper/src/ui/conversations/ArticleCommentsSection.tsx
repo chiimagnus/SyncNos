@@ -145,7 +145,6 @@ function ArticleCommentsEmbedded({
       canonicalUrl: normalizeHttpUrl(canonicalUrl),
       conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
     });
-    void controller.refresh();
   }, [canonicalUrl, conversationId, controller]);
 
   return (

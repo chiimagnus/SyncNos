@@ -45,6 +45,16 @@ function createMockPanel() {
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('article-comments-sidebar-controller', () => {
   it('opens: sets quote, requests open, ensures context, and refreshes comments', async () => {
     const panel = createMockPanel();
@@ -110,5 +120,69 @@ describe('article-comments-sidebar-controller', () => {
     });
     expect(adapter.list).toHaveBeenCalled();
     expect(session.getSnapshot().quoteText).toBe('');
+  });
+
+  it('setContext: refreshes comments when canonicalUrl switches', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+
+    const adapter = {
+      list: vi.fn(async ({ canonicalUrl }: { canonicalUrl: string }) => {
+        if (canonicalUrl.includes('/a')) {
+          return [{ id: 1, parentId: null, commentText: 'A', quoteText: '', createdAt: 1 }];
+        }
+        return [{ id: 2, parentId: null, commentText: 'B', quoteText: '', createdAt: 2 }];
+      }),
+      addRoot: vi.fn(async () => true),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+    };
+
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+
+    controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    await vi.waitFor(() => {
+      expect(panel.getState().comments[0]?.commentText).toBe('A');
+    });
+
+    controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
+    await vi.waitFor(() => {
+      expect(panel.getState().comments[0]?.commentText).toBe('B');
+    });
+
+    expect(adapter.list).toHaveBeenNthCalledWith(1, { canonicalUrl: 'https://example.com/a' });
+    expect(adapter.list).toHaveBeenNthCalledWith(2, { canonicalUrl: 'https://example.com/b' });
+  });
+
+  it('setContext: ignores stale refresh results from previous context', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+    const deferredA = createDeferred<any[]>();
+    const deferredB = createDeferred<any[]>();
+
+    const adapter = {
+      list: vi.fn(({ canonicalUrl }: { canonicalUrl: string }) => {
+        if (canonicalUrl.includes('/a')) return deferredA.promise;
+        return deferredB.promise;
+      }),
+      addRoot: vi.fn(async () => true),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+    };
+
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+
+    controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+    controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
+
+    deferredB.resolve([{ id: 2, parentId: null, commentText: 'B', quoteText: '', createdAt: 2 }]);
+    await vi.waitFor(() => {
+      expect(panel.getState().comments[0]?.commentText).toBe('B');
+    });
+
+    deferredA.resolve([{ id: 1, parentId: null, commentText: 'A', quoteText: '', createdAt: 1 }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(panel.getState().comments[0]?.commentText).toBe('B');
   });
 });
