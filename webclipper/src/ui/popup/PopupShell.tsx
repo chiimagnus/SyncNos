@@ -11,6 +11,7 @@ import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/Con
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName, navPillButtonClassName } from '@ui/shared/nav-styles';
+import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 
 const POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_notion_sync_open_tab_dont_show_v1';
@@ -103,6 +104,7 @@ export default function PopupShell() {
   return (
     <ConversationsProvider>
       <PopupShellFrame />
+      <AppTooltipHost />
     </ConversationsProvider>
   );
 }
@@ -187,20 +189,24 @@ function PopupShellFrame() {
             </div>
 
             <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
-              <button
-                type="button"
-                title={buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel}
-                onClick={() => capture().catch(() => {})}
-                disabled={buttonDisabled}
-                className={navPillButtonClassName()}
-                aria-label={buttonLabel}
+              <span
+                className="tw-inline-flex"
+                {...tooltipAttrs(buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel)}
               >
-                <span className="tw-truncate">{buttonLabel}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => capture().catch(() => {})}
+                  disabled={buttonDisabled}
+                  className={navPillButtonClassName()}
+                  aria-label={buttonLabel}
+                >
+                  <span className="tw-truncate">{buttonLabel}</span>
+                </button>
+              </span>
 
               <button
                 type="button"
-                title={t('openSettings')}
+                {...tooltipAttrs(t('openSettings'))}
                 onClick={() => onOpenSettings().catch(() => {})}
                 className={navIconButtonSmClassName(false)}
                 aria-label={t('openSettingsAria')}

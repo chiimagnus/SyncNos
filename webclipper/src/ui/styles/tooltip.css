@@ -1,0 +1,25 @@
+.react-tooltip.webclipper-tooltip {
+  --rt-opacity: 1;
+  max-width: 320px;
+  border: 1px solid rgb(67 71 82 / 64%);
+  border-radius: 10px;
+  background: rgb(27 30 36 / 95%);
+  color: rgb(244 247 252);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 30%);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  z-index: 1600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .react-tooltip.webclipper-tooltip {
+    border-color: rgb(84 90 104 / 70%);
+    background: rgb(20 22 28 / 94%);
+    color: rgb(236 241 250);
+    box-shadow: 0 16px 30px rgb(0 0 0 / 46%);
+  }
+}

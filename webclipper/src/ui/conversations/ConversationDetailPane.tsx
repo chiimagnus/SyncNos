@@ -7,6 +7,7 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
+import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
@@ -293,7 +294,6 @@ export function ConversationDetailPane({
                   actions={toolActions}
                   buttonClassName={outlineButtonClass}
                   menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
-                  menuTriggerTitle={t('detailHeaderToolsMenuLabel')}
                   menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
                   menuAriaLabel={t('detailHeaderToolsMenuAria')}
                 />
@@ -301,8 +301,8 @@ export function ConversationDetailPane({
               <DetailHeaderActionBar
                 actions={openActions}
                 buttonClassName={outlineButtonClass}
+                iconOnly
                 menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
-                menuTriggerTitle={t('detailHeaderOpenInMenuLabel')}
                 menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
                 menuAriaLabel={t('detailHeaderOpenInMenuAria')}
               />
@@ -336,7 +336,7 @@ export function ConversationDetailPane({
                   }}
                   className={navIconButtonSmClassName(Boolean(commentsSidebarOpen))}
                   aria-label={commentsSidebarLabel}
-                  title={commentsSidebarLabel}
+                  {...tooltipAttrs(commentsSidebarLabel)}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">

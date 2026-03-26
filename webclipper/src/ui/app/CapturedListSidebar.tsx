@@ -6,6 +6,7 @@ import { getURL as runtimeGetURL } from '@services/shared/runtime';
 import { t } from '@i18n';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { navIconButtonClassName } from '@ui/shared/nav-styles';
+import { tooltipAttrs } from '@ui/shared/AppTooltip';
 
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
   const routerLocation = useLocation();
@@ -107,7 +108,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
               onClick={openSettings}
               className={navIconButtonClassName(false)}
               aria-label={t('openSettingsAria')}
-              title={t('openSettings')}
+              {...tooltipAttrs(t('openSettings'))}
             >
               <span className="tw-sr-only">{t('settingsLabel')}</span>
               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
