@@ -1,5 +1,4 @@
 import { Tooltip } from 'react-tooltip';
-import 'react-tooltip/dist/react-tooltip.css';
 
 const WEBCLIPPER_TOOLTIP_ID = 'webclipper-tooltip';
 
