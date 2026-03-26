@@ -1,9 +1,7 @@
 import { t } from '@i18n';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
-import inpageCommentsPanelCssRaw from '@ui/styles/inpage-comments-panel.css?raw';
-import buttonsCssRaw from '@ui/styles/buttons.css?raw';
-import tokensCssRaw from '@ui/styles/tokens.css?raw';
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
+import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type {
   MountOptions,
   ThreadedCommentItem,
@@ -11,24 +9,10 @@ import type {
   ThreadedCommentsPanelChatWithAction,
 } from './types';
 
-function toHostTokensCss(css: string) {
-  // Scope tokens to the Shadow DOM host so inpage panels still use our design system.
-  // `tokens.css` uses `:root` selectors; in Shadow DOM we want `:host`.
-  return css.replaceAll(':root', ':host');
-}
-
 const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1';
 const COMMENTS_SIDEBAR_WIDTH_MIN_PX = 320;
 const COMMENTS_SIDEBAR_WIDTH_MAX_PX = 720;
 const COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX = 360;
-
-const PANEL_SHADOW_CSS = [
-  toHostTokensCss(String(tokensCssRaw || '')),
-  String(buttonsCssRaw || ''),
-  String(inpageCommentsPanelCssRaw || ''),
-]
-  .filter(Boolean)
-  .join('\n');
 
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
@@ -508,7 +492,7 @@ export function mountThreadedCommentsPanel(
 
   const shadow = el.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
-  style.textContent = PANEL_SHADOW_CSS;
+  style.textContent = buildThreadedCommentsPanelShadowCss();
   shadow.appendChild(style);
 
   const surface = document.createElement('div');
