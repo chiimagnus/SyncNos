@@ -2,6 +2,7 @@ import { t } from '@i18n';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { restoreRangeFromArticleCommentLocator } from '@services/comments/locator';
 import { createDockController } from './dock';
+import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type {
   MountOptions,
@@ -10,17 +11,8 @@ import type {
   ThreadedCommentsPanelChatWithAction,
 } from './types';
 
-const COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY = 'webclipper_comments_sidebar_width_v1';
-const COMMENTS_SIDEBAR_WIDTH_MIN_PX = 320;
-const COMMENTS_SIDEBAR_WIDTH_MAX_PX = 720;
-const COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX = 360;
-
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
-}
-
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
 }
 
 function autosizeTextarea(textarea: HTMLTextAreaElement | null | undefined) {
@@ -310,78 +302,6 @@ export function mountThreadedCommentsPanel(
     panelEl: el,
   });
 
-  const widthState = {
-    widthPx: null as number | null,
-    dragging: false,
-    pointerId: null as number | null,
-  };
-
-  const SIDEBAR_WIDTH_CSS_VAR = '--webclipper-comments-panel-width';
-
-  function readPersistedSidebarWidthPx(): number | null {
-    try {
-      const raw = localStorage.getItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY);
-      const parsed = Number.parseFloat(String(raw || '').trim());
-      if (!Number.isFinite(parsed) || parsed <= 0) return null;
-      return Math.round(parsed);
-    } catch (_e) {
-      return null;
-    }
-  }
-
-  function persistSidebarWidthPx(widthPx: number) {
-    try {
-      localStorage.setItem(COMMENTS_SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(widthPx)));
-    } catch (_e) {
-      // ignore
-    }
-  }
-
-  function clampSidebarWidthPx(widthPx: number): number {
-    const viewport = Math.max(
-      1,
-      Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
-    );
-    const maxCap = Math.max(
-      COMMENTS_SIDEBAR_WIDTH_MIN_PX,
-      isOverlay ? Math.floor(viewport * 0.92) : viewport - COMMENTS_SIDEBAR_MIN_MAIN_WIDTH_PX,
-    );
-    const max = Math.max(COMMENTS_SIDEBAR_WIDTH_MIN_PX, Math.min(COMMENTS_SIDEBAR_WIDTH_MAX_PX, maxCap));
-    return Math.round(clamp(widthPx, COMMENTS_SIDEBAR_WIDTH_MIN_PX, max));
-  }
-
-  function setSidebarWidthPx(widthPx: number | null, input?: { persist?: boolean }) {
-    if (variant !== 'sidebar') return;
-    if (widthPx == null) {
-      widthState.widthPx = null;
-      try {
-        el.style.removeProperty(SIDEBAR_WIDTH_CSS_VAR);
-      } catch (_e) {
-        // ignore
-      }
-      dockController.syncWidth();
-      return;
-    }
-
-    const clamped = clampSidebarWidthPx(widthPx);
-    widthState.widthPx = clamped;
-    try {
-      el.style.setProperty(SIDEBAR_WIDTH_CSS_VAR, `${clamped}px`, 'important');
-    } catch (_e) {
-      // ignore
-    }
-    if (input?.persist !== false) persistSidebarWidthPx(clamped);
-    dockController.syncWidth();
-  }
-
-  if (variant === 'sidebar') {
-    const persistedWidth = readPersistedSidebarWidthPx();
-    if (persistedWidth != null) {
-      widthState.widthPx = clampSidebarWidthPx(persistedWidth);
-      setSidebarWidthPx(widthState.widthPx, { persist: false });
-    }
-  }
-
   const shadow = el.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = buildThreadedCommentsPanelShadowCss();
@@ -396,121 +316,14 @@ export function mountThreadedCommentsPanel(
     const handle = document.createElement('div');
     handle.className = 'webclipper-inpage-comments-panel__resize-handle';
     surface.appendChild(handle);
-
-    const stopEvent = (event: Event) => {
-      try {
-        (event as any).preventDefault?.();
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        (event as any).stopPropagation?.();
-      } catch (_e) {
-        // ignore
-      }
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (!widthState.dragging) return;
-      if (widthState.pointerId != null && e.pointerId !== widthState.pointerId) return;
-      stopEvent(e);
-      const viewport = Math.max(
-        1,
-        Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
-      );
-      const nextWidth = viewport - e.clientX;
-      setSidebarWidthPx(nextWidth, { persist: false });
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      if (!widthState.dragging) return;
-      if (widthState.pointerId != null && e.pointerId !== widthState.pointerId) return;
-      stopEvent(e);
-      widthState.dragging = false;
-      widthState.pointerId = null;
-      try {
-        el.removeAttribute('data-resizing');
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        (handle as any).releasePointerCapture?.(e.pointerId);
-      } catch (_e) {
-        // ignore
-      }
-      if (widthState.widthPx != null) persistSidebarWidthPx(widthState.widthPx);
-      try {
-        globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
-        globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
-        globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
-      } catch (_e) {
-        // ignore
-      }
-      dockController.syncWidth();
-    };
-
-    const onPointerDown = (e: PointerEvent) => {
-      if ((e as any).button != null && (e as any).button !== 0) return;
-      stopEvent(e);
-      widthState.dragging = true;
-      widthState.pointerId = e.pointerId;
-      try {
-        el.setAttribute('data-resizing', '1');
-      } catch (_e) {
-        // ignore
-      }
-      if (widthState.widthPx == null) {
-        const measured = dockController.readWidthPx();
-        setSidebarWidthPx(measured, { persist: false });
-      }
-      try {
-        (handle as any).setPointerCapture?.(e.pointerId);
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        globalThis.addEventListener?.('pointermove', onPointerMove as any, true);
-        globalThis.addEventListener?.('pointerup', onPointerUp as any, true);
-        globalThis.addEventListener?.('pointercancel', onPointerUp as any, true);
-      } catch (_e) {
-        // ignore
-      }
-    };
-
-    handle.addEventListener('pointerdown', onPointerDown);
-
-    const onViewportResize = () => {
-      if (widthState.widthPx == null) return;
-      const clamped = clampSidebarWidthPx(widthState.widthPx);
-      if (clamped === widthState.widthPx) return;
-      setSidebarWidthPx(clamped, { persist: true });
-    };
-
-    try {
-      globalThis.addEventListener?.('resize', onViewportResize as any, { passive: true } as any);
-    } catch (_e) {
-      // ignore
-    }
-
-    cleanupSidebarResize = () => {
-      try {
-        handle.removeEventListener('pointerdown', onPointerDown);
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        globalThis.removeEventListener?.('pointermove', onPointerMove as any, true);
-        globalThis.removeEventListener?.('pointerup', onPointerUp as any, true);
-        globalThis.removeEventListener?.('pointercancel', onPointerUp as any, true);
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        globalThis.removeEventListener?.('resize', onViewportResize as any);
-      } catch (_e) {
-        // ignore
-      }
-    };
+    const resize = installSidebarResize({
+      panelEl: el,
+      handleEl: handle,
+      isOverlay,
+      readPanelWidthPx: () => dockController.readWidthPx(),
+      onWidthApplied: () => dockController.syncWidth(),
+    });
+    cleanupSidebarResize = () => resize.cleanup();
   }
 
   let chatWithMenuRoot: HTMLElement | null = null;
