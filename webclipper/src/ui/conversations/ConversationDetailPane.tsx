@@ -57,7 +57,6 @@ export function ConversationDetailPane({
 
   const safeActions = Array.isArray(detailHeaderActions) ? detailHeaderActions : [];
   const openActions = safeActions.filter((action) => action.slot === 'open');
-  const chatWithActions = safeActions.filter((action) => action.slot === 'chat-with');
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   const outlineButtonClass = buttonTintClassName();
@@ -299,14 +298,6 @@ export function ConversationDetailPane({
                   menuAriaLabel={t('detailHeaderToolsMenuAria')}
                 />
               ) : null}
-              <DetailHeaderActionBar
-                actions={chatWithActions}
-                buttonClassName={outlineButtonClass}
-                menuTriggerLabel={t('detailHeaderChatWithMenuLabel')}
-                menuTriggerTitle={t('detailHeaderChatWithMenuLabel')}
-                menuTriggerAriaLabel={t('detailHeaderChatWithMenuAria')}
-                menuAriaLabel={t('detailHeaderChatWithMenuAria')}
-              />
               <DetailHeaderActionBar
                 actions={openActions}
                 buttonClassName={outlineButtonClass}

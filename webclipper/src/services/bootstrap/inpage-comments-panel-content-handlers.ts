@@ -72,7 +72,7 @@ export type InpageCommentsPanelController = {
 };
 
 export function createInpageCommentsPanelController(runtime: RuntimeClient | null): InpageCommentsPanelController {
-  const sidebarSession = createCommentSidebarSession(getInpageCommentsPanelApi());
+  const sidebarSession = createCommentSidebarSession(getInpageCommentsPanelApi(runtime));
   const controller = createArticleCommentsSidebarController({
     session: sidebarSession,
     adapter: createArticleCommentsSidebarInpageAdapter(runtime),

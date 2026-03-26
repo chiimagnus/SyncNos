@@ -69,7 +69,7 @@ function buildChatWithPlatformAction(input: {
     label,
     kind: 'external-link',
     provider: String(platform.id || 'chat-with'),
-    slot: 'chat-with',
+    slot: 'tools',
     href,
     afterTriggerLabel: after,
     onTrigger: async () => {
@@ -113,5 +113,18 @@ export async function resolveChatWithDetailHeaderActions({
     return actions;
   } catch (_e) {
     return [];
+  }
+}
+
+export async function resolveSingleEnabledChatWithActionLabel(): Promise<string | null> {
+  try {
+    const settings = await loadChatWithSettings();
+    const enabled = (settings.platforms || []).filter((platform) => platform && platform.enabled);
+    if (enabled.length !== 1) return null;
+    const name = String(enabled[0]?.name || '').trim();
+    if (!name) return null;
+    return `Chat with ${name}`;
+  } catch (_e) {
+    return null;
   }
 }
