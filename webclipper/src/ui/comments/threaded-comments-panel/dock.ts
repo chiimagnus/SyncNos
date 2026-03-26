@@ -51,7 +51,11 @@ export function createDockController(options: CreateDockControllerOptions): Dock
     }
     try {
       const computed = getComputedStyle(panelEl);
-      const width = Number.parseFloat(String(computed.width || '').replace('px', '').trim());
+      const width = Number.parseFloat(
+        String(computed.width || '')
+          .replace('px', '')
+          .trim(),
+      );
       if (Number.isFinite(width) && width > 0) return width;
     } catch (_e) {
       // ignore

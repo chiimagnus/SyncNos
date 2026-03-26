@@ -6,10 +6,7 @@ import { createThreadLocateController } from './locate';
 import { renderThreadedComments } from './render';
 import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
-import type {
-  MountOptions,
-  ThreadedCommentsPanelApi,
-} from './types';
+import type { MountOptions, ThreadedCommentsPanelApi } from './types';
 
 type ThreadedCommentsPanelHandlers = Parameters<ThreadedCommentsPanelApi['setHandlers']>[0];
 type SendButtonWithTextGetter = HTMLButtonElement & {

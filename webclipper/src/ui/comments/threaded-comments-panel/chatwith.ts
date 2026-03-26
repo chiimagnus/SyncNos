@@ -201,8 +201,7 @@ export function createChatWithMenuController(options: CreateChatWithMenuControll
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
-    trigger.className =
-      'webclipper-inpage-comments-panel__chatwith-trigger webclipper-btn webclipper-btn--tone-muted';
+    trigger.className = 'webclipper-inpage-comments-panel__chatwith-trigger webclipper-btn webclipper-btn--tone-muted';
     trigger.setAttribute('aria-haspopup', 'menu');
     trigger.setAttribute('aria-expanded', 'false');
     trigger.textContent = defaultTriggerLabel();

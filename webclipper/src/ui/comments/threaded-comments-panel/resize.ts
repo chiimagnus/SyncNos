@@ -22,7 +22,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export function clampSidebarWidthPxForViewport(widthPx: number, input: { isOverlay: boolean; viewportWidth: number }): number {
+export function clampSidebarWidthPxForViewport(
+  widthPx: number,
+  input: { isOverlay: boolean; viewportWidth: number },
+): number {
   const viewport = Math.max(1, Math.round(Number(input.viewportWidth || 0) || 0));
   const maxCap = Math.max(
     COMMENTS_SIDEBAR_WIDTH_MIN_PX,
@@ -123,7 +126,10 @@ export function installSidebarResize(options: InstallSidebarResizeOptions): { cl
     if (!widthState.dragging) return;
     if (widthState.pointerId != null && event.pointerId !== widthState.pointerId) return;
     stopEvent(event);
-    const viewport = Math.max(1, Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0));
+    const viewport = Math.max(
+      1,
+      Math.round(Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0),
+    );
     const nextWidth = viewport - event.clientX;
     setSidebarWidthPx(nextWidth, { persist: false });
   };

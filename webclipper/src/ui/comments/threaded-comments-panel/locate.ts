@@ -33,16 +33,7 @@ function readLocatorEnv(value: unknown): string {
 function isArticleCommentLocator(value: unknown): value is ArticleCommentLocator {
   const locator = readLocator(value);
   if (!locator) return false;
-  const version = Number((locator as { v?: unknown }).v);
-  return (
-    Number.isFinite(version) &&
-    version > 0 &&
-    typeof locator.env === 'string' &&
-    !!locator.quote &&
-    typeof locator.quote === 'object' &&
-    !!locator.position &&
-    typeof locator.position === 'object'
-  );
+  return typeof locator.env === 'string' && !!locator.quote && typeof locator.quote === 'object';
 }
 
 function pickRangeTargetElement(range: Range): HTMLElement | null {
