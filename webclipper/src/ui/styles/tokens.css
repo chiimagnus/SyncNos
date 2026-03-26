@@ -2,21 +2,22 @@
   color-scheme: light dark;
 
   /* ===== Design System Tokens (Light Mode) ===== */
+  /* Notion-like warm paper foundation with soft orange accent preserved. */
   /* Surface */
-  --bg-primary: rgb(245 247 250);
-  --bg-sunken: rgb(236 238 242);
+  --bg-primary: rgb(248 243 234);
+  --bg-sunken: rgb(241 233 220);
   --bg-card: rgb(255 255 255);
-  --bg-overlay: rgba(0, 0, 0, 0.45);
+  --bg-overlay: rgba(0, 0, 0, 0.42);
 
   /* Text */
-  --text-primary: rgb(44 48 56);
-  --text-secondary: rgb(99 107 120);
+  --text-primary: rgb(52 46 40);
+  --text-secondary: rgb(113 101 89);
 
   /* Brand + On-Color */
-  --accent: rgb(255 198 173);
-  --accent-foreground: rgb(44 48 56);
-  --accent-hover: rgba(255, 198, 173, 0.85);
-  --accent-active: rgb(240 184 159);
+  --accent: rgb(246 196 166);
+  --accent-foreground: rgb(62 45 36);
+  --accent-hover: rgba(246, 196, 166, 0.86);
+  --accent-active: rgb(234 182 150);
   --secondary: rgb(123 196 160);
   --secondary-foreground: rgb(26 43 34);
   --tertiary: rgb(232 200 106);
@@ -33,8 +34,10 @@
   --info-foreground: rgb(255 255 255);
 
   /* Utility */
-  --border: rgb(216 220 226);
+  --border: rgb(224 214 200);
   --focus-ring: var(--accent);
+  --card-shadow: 0 8px 20px rgb(93 63 35 / 8%);
+  --surface-inset-highlight: rgb(255 255 255 / 55%);
 
   /* Component: chat bubbles */
   --bubble-user-bg: var(--secondary);
@@ -76,6 +79,8 @@
 
     /* Utility */
     --border: rgb(54 56 64);
+    --card-shadow: 0 12px 28px rgb(0 0 0 / 36%);
+    --surface-inset-highlight: rgb(255 255 255 / 14%);
   }
 }
 

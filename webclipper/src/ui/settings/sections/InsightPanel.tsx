@@ -381,15 +381,20 @@ export function InsightPanel(props: {
           className={[
             cardClassName,
             'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
-            'tw-border-[color-mix(in_srgb,#FFA500_32%,var(--border))]',
-            'tw-bg-[color-mix(in_srgb,#FFA500_10%,var(--bg-card))]',
+            'tw-border-[color-mix(in_srgb,var(--accent)_34%,var(--border))]',
+            'tw-bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-card))]',
           ].join(' ')}
         >
           <div className="tw-flex tw-items-center tw-gap-2 tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
-            <span className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[#FFA500]" aria-hidden="true" />
+            <span
+              className="tw-inline-flex tw-size-2 tw-shrink-0 tw-rounded-full tw-bg-[var(--accent)]"
+              aria-hidden="true"
+            />
             {t('insightOverviewTotalClips')}
           </div>
-          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[#FFA500]">{formatCount(stats.totalClips)}</div>
+          <div className="tw-mt-2 tw-text-3xl tw-font-black tw-text-[var(--accent)]">
+            {formatCount(stats.totalClips)}
+          </div>
         </div>
         <div
           className={[

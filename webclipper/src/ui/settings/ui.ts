@@ -1,6 +1,7 @@
 import { buttonDangerTintClassName, buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
 
-export const cardClassName = 'tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3';
+export const cardClassName =
+  'tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-3 tw-shadow-[var(--card-shadow)]';
 
 export const buttonClassName = buttonTintClassName();
 
