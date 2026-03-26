@@ -314,6 +314,7 @@
 :host([data-variant='sidebar']) .webclipper-inpage-comments-panel__thread {
   border: 0;
   box-shadow: none;
+  padding: var(--comments-panel-body-padding-y) 0;
   background: color-mix(in srgb, var(--panel-bg) 90%, var(--bg-sunken, transparent));
 }
 
