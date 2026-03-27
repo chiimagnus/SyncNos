@@ -61,6 +61,7 @@ type Deps = {
   runtimeObserver: RuntimeObserverApi | null;
   incrementalUpdater: { computeIncremental?: (snapshot: unknown) => any } | null;
   notionAiModelPicker: { maybeApply?: () => void } | null;
+  itemMention: { start?: () => { stop?: () => void } | null } | null;
 };
 
 const CORE_MESSAGE_TYPES = Object.freeze({
@@ -109,6 +110,7 @@ export function createContentController(deps: Deps) {
   const runtimeObserver = deps.runtimeObserver;
   const incrementalUpdater = deps.incrementalUpdater;
   const notionAiModelPicker = deps.notionAiModelPicker;
+  const itemMention = deps.itemMention;
 
   function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
     const value = String(kind || '')
@@ -487,7 +489,17 @@ export function createContentController(deps: Deps) {
     start() {
       const controller = createAutoCaptureController();
       controller.start();
-      return controller;
+      const mentionController = itemMention?.start?.() || null;
+      return {
+        stop() {
+          try {
+            mentionController?.stop?.();
+          } catch (_e) {
+            // ignore
+          }
+          controller.stop();
+        },
+      };
     },
   };
 }

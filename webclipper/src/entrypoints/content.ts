@@ -11,6 +11,7 @@ import { createCollectorsRegistry } from '@collectors/registry.ts';
 import runtimeObserverApi from '@collectors/runtime-observer.ts';
 import incrementalUpdaterApi from '@services/conversations/content/incremental-updater.ts';
 import notionAiModelPickerApi from '@services/integrations/notionai-auto-picker/notionai-model-picker.ts';
+import { createItemMentionController } from '@services/integrations/item-mention/content/mention-controller';
 import normalizeApi from '@services/shared/normalize.ts';
 import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
 import { inpageTipApi } from '@ui/inpage/inpage-tip-shadow.ts';
@@ -33,6 +34,7 @@ export default defineContentScript({
     registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
     registerInpageCommentsPanelContentHandlers(runtime);
 
+    const itemMentionController = createItemMentionController({ runtime });
     const controller = createContentController({
       runtime,
       collectorsRegistry,
@@ -42,6 +44,7 @@ export default defineContentScript({
       runtimeObserver: runtimeObserverApi,
       incrementalUpdater: incrementalUpdaterApi,
       notionAiModelPicker: notionAiModelPickerApi,
+      itemMention: itemMentionController,
     });
     startContentBootstrap({
       runtime,

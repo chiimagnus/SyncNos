@@ -66,6 +66,8 @@ function ensureMentionEl(): HTMLElement | null {
   panel.appendChild(list);
 
   list.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     const target = e.target as any;
     const li = target?.closest?.('li');
     if (!li) return;
@@ -170,4 +172,3 @@ export const inpageItemMentionApi = {
     removeMentionEl();
   },
 } as const;
-
