@@ -274,6 +274,30 @@
 5. **主题兼容**：stroke 色值用 `color-mix()` 从当前 surface token（`--bg-card` / `--accent` / `--error`）派生，禁止硬编码亮暗色值。
 6. **选中态走 aria**：toggle 用 `aria-pressed='true'`；`SelectMenu` 的选中项用 `aria-checked='true'`（样式在 `buttons.css` 统一处理）。
 
+### B2.2 · 同心圆角分级（Concentric Radius）
+
+WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半径 token，按“外层到内层递减”的同心关系落位：
+
+| Token | 语义层级 | 典型组件 |
+| --- | --- | --- |
+| `--radius-outer` | 最外层容器 | app/popup 主壳层 |
+| `--radius-card` | 卡片层 | panel/card/backdrop |
+| `--radius-control` | 控件层 | button/input/menu panel |
+| `--radius-chip` | 标签层 | chip/tag/menu item |
+| `--radius-inline` | 内容内联层 | markdown inline/code/kbd |
+| `--radius-pill` | 圆形/胶囊白名单 | 圆形 icon button、pill badge |
+
+工程约束：
+
+1. 新增样式默认使用 `--radius-*`，禁止新增裸 `border-radius: <px>`。
+2. `tw-rounded-[...]` 仅允许用于 `var(--radius-*)` 或 `999px`（pill）语义；禁止再引入固定 px 分叉。
+3. 任何组件圆角改动都需要保持同心关系，不允许“内层半径大于外层”。
+
+自检命令（手动）：
+
+- `rg -n "border-radius:\\s*[0-9]|tw-rounded-\\[" webclipper/src/ui webclipper/src/entrypoints`
+- `rg -n -- "--radius-" webclipper/src/ui/styles/tokens.css`
+
 ## B3 · 插件 UI 与宣传图的差异
 
 | **维度**     | **宣传图**             | **插件 UI**                                         |
