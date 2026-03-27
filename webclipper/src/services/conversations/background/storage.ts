@@ -2,7 +2,6 @@ import {
   clearSyncCursor,
   deleteConversationsByIds,
   getConversationById,
-  getConversations,
   getMessagesByConversationId,
   getSyncMappingByConversation,
   patchSyncMapping,
@@ -19,7 +18,6 @@ import {
 export const backgroundStorage = {
   upsertConversation,
   syncConversationMessages,
-  getConversations,
   getConversationById,
   getMessagesByConversationId,
   deleteConversationsByIds,

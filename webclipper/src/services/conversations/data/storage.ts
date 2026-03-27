@@ -7,10 +7,6 @@ import type {
   ConversationListQueryInput,
 } from '@services/conversations/domain/models';
 
-export async function listConversations() {
-  return await idb.getConversations();
-}
-
 export async function getConversationListBootstrap(
   queryInput?: ConversationListQueryInput | null,
   limit?: number | null,

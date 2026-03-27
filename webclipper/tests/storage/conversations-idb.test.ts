@@ -7,7 +7,7 @@ import {
   __closeDbForTests,
   deleteConversationsByIds,
   getConversationById,
-  getConversations,
+  getConversationListBootstrap,
   getMessagesByConversationId,
   mergeConversationsByIds,
   syncConversationMessages,
@@ -49,6 +49,11 @@ afterEach(async () => {
   await __closeDbForTests();
 });
 
+async function listAllConversationsForTests() {
+  const page = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 500 }, 500);
+  return page.items;
+}
+
 describe('conversations storage-idb', () => {
   it('upserts conversation and lists conversations sorted by lastCapturedAt desc', async () => {
     await upsertConversation({
@@ -66,7 +71,7 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 2,
     });
 
-    const items = await getConversations();
+    const items = await listAllConversationsForTests();
     expect(items.length).toBe(2);
     expect(items[0].conversationKey).toBe('k2');
     expect(items[1].conversationKey).toBe('k1');
@@ -204,7 +209,7 @@ describe('conversations storage-idb', () => {
     expect(res.deletedMessages).toBe(1);
     expect(res.deletedMappings).toBe(1);
 
-    const items = await getConversations();
+    const items = await listAllConversationsForTests();
     expect(items.length).toBe(0);
   });
 
@@ -324,7 +329,7 @@ describe('conversations storage-idb', () => {
     expect(res.removedConversationId).toBe(removeId);
     expect(res.merged).toBe(true);
 
-    const items = await getConversations();
+    const items = await listAllConversationsForTests();
     expect(items.map((c) => c.conversationKey)).toEqual(['keep']);
     expect(items[0]).toMatchObject({
       conversationKey: 'keep',

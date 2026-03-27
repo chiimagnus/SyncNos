@@ -890,22 +890,6 @@ export async function getConversationListPage(
   return await readConversationListPage({ queryInput, cursor, limit });
 }
 
-export async function getConversations(): Promise<Conversation[]> {
-  const db = await openDb();
-  const { t, stores } = tx(db, ['conversations'], 'readonly');
-  const rows = (await reqToPromise(stores.conversations.getAll())) as any[];
-  await txDone(t);
-  rows.sort((a, b) => {
-    const bt = Number(b?.lastCapturedAt) || 0;
-    const at = Number(a?.lastCapturedAt) || 0;
-    if (bt !== at) return bt - at;
-    const bid = Number(b?.id) || 0;
-    const aid = Number(a?.id) || 0;
-    return bid - aid;
-  });
-  return rows.map((row) => normalizeConversationListRecord(row || {})) as Conversation[];
-}
-
 export async function getConversationBySourceConversationKey(
   source: string,
   conversationKey: string,
