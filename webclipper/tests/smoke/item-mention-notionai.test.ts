@@ -49,7 +49,10 @@ beforeEach(() => {
   Object.defineProperty(globalThis, 'location', { configurable: true, value: dom.window.location });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
-  Object.defineProperty(globalThis, 'getSelection', { configurable: true, value: dom.window.getSelection.bind(dom.window) });
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: dom.window.getSelection.bind(dom.window),
+  });
 
   const leaf = document.querySelector('div[role="textbox"]') as any;
   leaf.getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
@@ -70,7 +73,22 @@ describe('item mention notionai controller', () => {
   it('replaces trigger segment on enter', async () => {
     const send = vi.fn(async (type: string, payload: any) => {
       if (type === ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES) {
-        return { ok: true, data: { candidates: [{ conversationId: 1, title: 'A', source: 'web', domain: 'a.com', url: '', sourceType: 'chat', lastCapturedAt: 1 }] } };
+        return {
+          ok: true,
+          data: {
+            candidates: [
+              {
+                conversationId: 1,
+                title: 'A',
+                source: 'web',
+                domain: 'a.com',
+                url: '',
+                sourceType: 'chat',
+                lastCapturedAt: 1,
+              },
+            ],
+          },
+        };
       }
       if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) {
         if (payload?.conversationId !== 1) return { ok: false, data: null, error: { message: 'bad id', extra: null } };
@@ -104,7 +122,22 @@ describe('item mention notionai controller', () => {
   it('does not pick during IME composition', async () => {
     const send = vi.fn(async (type: string) => {
       if (type === ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES) {
-        return { ok: true, data: { candidates: [{ conversationId: 1, title: 'A', source: 'web', domain: 'a.com', url: '', sourceType: 'chat', lastCapturedAt: 1 }] } };
+        return {
+          ok: true,
+          data: {
+            candidates: [
+              {
+                conversationId: 1,
+                title: 'A',
+                source: 'web',
+                domain: 'a.com',
+                url: '',
+                sourceType: 'chat',
+                lastCapturedAt: 1,
+              },
+            ],
+          },
+        };
       }
       if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) {
         return { ok: true, data: { conversationId: 1, markdown: 'MD' } };
@@ -135,4 +168,3 @@ describe('item mention notionai controller', () => {
     active?.stop?.();
   });
 });
-

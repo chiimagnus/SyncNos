@@ -48,8 +48,24 @@ describe('background-router item mention', () => {
   it('searches candidates and returns sorted+limited results', async () => {
     storageMocks.searchConversationMentionCandidates.mockResolvedValue({
       candidates: [
-        { conversationId: 1, title: 'b', source: 'chatgpt', url: 'https://b.com', domain: 'b.com', sourceType: 'chat', lastCapturedAt: 1 },
-        { conversationId: 2, title: 'a', source: 'chatgpt', url: 'https://a.com', domain: 'a.com', sourceType: 'chat', lastCapturedAt: 2 },
+        {
+          conversationId: 1,
+          title: 'b',
+          source: 'chatgpt',
+          url: 'https://b.com',
+          domain: 'b.com',
+          sourceType: 'chat',
+          lastCapturedAt: 1,
+        },
+        {
+          conversationId: 2,
+          title: 'a',
+          source: 'chatgpt',
+          url: 'https://a.com',
+          domain: 'a.com',
+          sourceType: 'chat',
+          lastCapturedAt: 2,
+        },
       ],
       scannedCount: 2,
       truncatedByScanLimit: false,
@@ -137,4 +153,3 @@ describe('background-router item mention', () => {
     expect(res.error?.extra?.code).toBe('EMPTY_DETAIL');
   });
 });
-

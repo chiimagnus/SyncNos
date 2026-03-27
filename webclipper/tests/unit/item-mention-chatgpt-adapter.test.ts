@@ -13,7 +13,10 @@ beforeEach(() => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
-  Object.defineProperty(globalThis, 'HTMLTextAreaElement', { configurable: true, value: (dom.window as any).HTMLTextAreaElement });
+  Object.defineProperty(globalThis, 'HTMLTextAreaElement', {
+    configurable: true,
+    value: (dom.window as any).HTMLTextAreaElement,
+  });
 });
 
 afterEach(() => {
@@ -41,4 +44,3 @@ describe('item-mention chatgpt textarea adapter', () => {
     expect(after).toEqual({ start: 6 + 'MARKDOWN'.length, end: 6 + 'MARKDOWN'.length });
   });
 });
-

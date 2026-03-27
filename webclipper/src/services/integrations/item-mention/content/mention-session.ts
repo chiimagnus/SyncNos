@@ -1,4 +1,7 @@
-import { parseMentionTrigger, type MentionTriggerMatch } from '@services/integrations/item-mention/content/mention-trigger-parser';
+import {
+  parseMentionTrigger,
+  type MentionTriggerMatch,
+} from '@services/integrations/item-mention/content/mention-trigger-parser';
 
 export type MentionSessionState = {
   open: boolean;
@@ -29,7 +32,10 @@ function buildState(match: MentionTriggerMatch, open: boolean, previous?: Mentio
   } satisfies MentionSessionState;
 }
 
-export function updateMentionSession(previous: MentionSessionState | null, input: UpdateInput): MentionSessionState | null {
+export function updateMentionSession(
+  previous: MentionSessionState | null,
+  input: UpdateInput,
+): MentionSessionState | null {
   const text = String(input.text || '');
   const cursor = Number(input.cursor);
   const match = parseMentionTrigger({ text, cursor });
@@ -46,4 +52,3 @@ export function updateMentionSession(previous: MentionSessionState | null, input
 
   return buildState(match, true, previous, text);
 }
-

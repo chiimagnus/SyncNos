@@ -1,8 +1,4 @@
-export function moveMentionHighlightIndex(input: {
-  current: number;
-  count: number;
-  key: string;
-}): number {
+export function moveMentionHighlightIndex(input: { current: number; count: number; key: string }): number {
   const count = Math.max(0, Math.floor(Number(input.count) || 0));
   if (count <= 0) return 0;
 
@@ -13,4 +9,3 @@ export function moveMentionHighlightIndex(input: {
   if (key === 'ArrowUp') return (current - 1 + count) % count;
   return Math.min(current, count - 1);
 }
-

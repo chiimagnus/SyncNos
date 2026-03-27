@@ -17,4 +17,3 @@ describe('item-mention ui state', () => {
     expect(moveMentionHighlightIndex({ current: 1, count: 0, key: 'ArrowDown' })).toBe(0);
   });
 });
-

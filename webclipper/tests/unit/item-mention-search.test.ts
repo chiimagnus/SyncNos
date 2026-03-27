@@ -7,9 +7,30 @@ describe('item-mention-search', () => {
     const res = searchMentionCandidates({
       query: '',
       candidates: [
-        { conversationId: 1, title: 'A', source: 'chatgpt', url: 'https://a.com', lastCapturedAt: 1000, sourceType: 'chat' },
-        { conversationId: 2, title: 'B', source: 'chatgpt', url: 'https://b.com', lastCapturedAt: 3000, sourceType: 'chat' },
-        { conversationId: 3, title: 'C', source: 'web', url: 'https://c.com', lastCapturedAt: 2000, sourceType: 'article' },
+        {
+          conversationId: 1,
+          title: 'A',
+          source: 'chatgpt',
+          url: 'https://a.com',
+          lastCapturedAt: 1000,
+          sourceType: 'chat',
+        },
+        {
+          conversationId: 2,
+          title: 'B',
+          source: 'chatgpt',
+          url: 'https://b.com',
+          lastCapturedAt: 3000,
+          sourceType: 'chat',
+        },
+        {
+          conversationId: 3,
+          title: 'C',
+          source: 'web',
+          url: 'https://c.com',
+          lastCapturedAt: 2000,
+          sourceType: 'article',
+        },
       ],
       limit: 10,
     });
@@ -21,10 +42,38 @@ describe('item-mention-search', () => {
     const res = searchMentionCandidates({
       query: 'openai',
       candidates: [
-        { conversationId: 1, title: 'Hello world', source: 'chatgpt', url: 'https://openai.com/blog', lastCapturedAt: 1000, sourceType: 'article' },
-        { conversationId: 2, title: 'OpenAI paper', source: 'chatgpt', url: 'https://example.com', lastCapturedAt: 900, sourceType: 'chat' },
-        { conversationId: 3, title: 'Something else', source: 'openai', url: 'https://foo.com', lastCapturedAt: 5000, sourceType: 'chat' },
-        { conversationId: 4, title: 'Nothing', source: 'chatgpt', url: 'https://bar.com', lastCapturedAt: 9999, sourceType: 'chat' },
+        {
+          conversationId: 1,
+          title: 'Hello world',
+          source: 'chatgpt',
+          url: 'https://openai.com/blog',
+          lastCapturedAt: 1000,
+          sourceType: 'article',
+        },
+        {
+          conversationId: 2,
+          title: 'OpenAI paper',
+          source: 'chatgpt',
+          url: 'https://example.com',
+          lastCapturedAt: 900,
+          sourceType: 'chat',
+        },
+        {
+          conversationId: 3,
+          title: 'Something else',
+          source: 'openai',
+          url: 'https://foo.com',
+          lastCapturedAt: 5000,
+          sourceType: 'chat',
+        },
+        {
+          conversationId: 4,
+          title: 'Nothing',
+          source: 'chatgpt',
+          url: 'https://bar.com',
+          lastCapturedAt: 9999,
+          sourceType: 'chat',
+        },
       ],
       limit: 10,
     });
@@ -47,4 +96,3 @@ describe('item-mention-search', () => {
     expect(res.candidates.length).toBeLessThanOrEqual(50);
   });
 });
-

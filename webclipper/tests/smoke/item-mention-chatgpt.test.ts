@@ -58,7 +58,19 @@ describe('item mention chatgpt controller', () => {
       if (type === ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES) {
         return {
           ok: true,
-          data: { candidates: [{ conversationId: 1, title: 'T', source: 'chatgpt', domain: 'x', url: '', sourceType: 'chat', lastCapturedAt: 1 }] },
+          data: {
+            candidates: [
+              {
+                conversationId: 1,
+                title: 'T',
+                source: 'chatgpt',
+                domain: 'x',
+                url: '',
+                sourceType: 'chat',
+                lastCapturedAt: 1,
+              },
+            ],
+          },
           error: null,
         };
       }
@@ -98,8 +110,24 @@ describe('item mention chatgpt controller', () => {
           ok: true,
           data: {
             candidates: [
-              { conversationId: 1, title: 'A', source: 'chatgpt', domain: 'a.com', url: '', sourceType: 'chat', lastCapturedAt: 1 },
-              { conversationId: 2, title: 'B', source: 'chatgpt', domain: 'b.com', url: '', sourceType: 'chat', lastCapturedAt: 2 },
+              {
+                conversationId: 1,
+                title: 'A',
+                source: 'chatgpt',
+                domain: 'a.com',
+                url: '',
+                sourceType: 'chat',
+                lastCapturedAt: 1,
+              },
+              {
+                conversationId: 2,
+                title: 'B',
+                source: 'chatgpt',
+                domain: 'b.com',
+                url: '',
+                sourceType: 'chat',
+                lastCapturedAt: 2,
+              },
             ],
           },
           error: null,
@@ -138,7 +166,22 @@ describe('item mention chatgpt controller', () => {
   it('replaces trigger segment on enter', async () => {
     const send = vi.fn(async (type: string, payload: any) => {
       if (type === ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES) {
-        return { ok: true, data: { candidates: [{ conversationId: 1, title: 'A', source: 'chatgpt', domain: 'a.com', url: '', sourceType: 'chat', lastCapturedAt: 1 }] } };
+        return {
+          ok: true,
+          data: {
+            candidates: [
+              {
+                conversationId: 1,
+                title: 'A',
+                source: 'chatgpt',
+                domain: 'a.com',
+                url: '',
+                sourceType: 'chat',
+                lastCapturedAt: 1,
+              },
+            ],
+          },
+        };
       }
       if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) {
         if (payload?.conversationId !== 1) return { ok: false, data: null, error: { message: 'bad id', extra: null } };
@@ -169,4 +212,3 @@ describe('item mention chatgpt controller', () => {
     active?.stop?.();
   });
 });
-

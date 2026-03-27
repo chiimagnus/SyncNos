@@ -1109,9 +1109,12 @@ export async function searchConversationMentionCandidates(input?: {
 }> {
   const query = safeString(input?.query).toLowerCase();
   const limit = normalizeMentionCandidateLimit(input?.limit);
-  const maxScan = Number.isFinite(input?.maxScan) && (input?.maxScan as number) > 0 ? Math.floor(input!.maxScan!) : 2000;
+  const maxScan =
+    Number.isFinite(input?.maxScan) && (input?.maxScan as number) > 0 ? Math.floor(input!.maxScan!) : 2000;
   const maxDurationMs =
-    Number.isFinite(input?.maxDurationMs) && (input?.maxDurationMs as number) > 0 ? Math.floor(input!.maxDurationMs!) : 300;
+    Number.isFinite(input?.maxDurationMs) && (input?.maxDurationMs as number) > 0
+      ? Math.floor(input!.maxDurationMs!)
+      : 300;
 
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations'], 'readonly');

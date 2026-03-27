@@ -1,4 +1,9 @@
-import type { ContentEditableEditor, EditorAdapter, EditorHandle, EditorRange } from '@services/integrations/item-mention/content/editor-adapter';
+import type {
+  ContentEditableEditor,
+  EditorAdapter,
+  EditorHandle,
+  EditorRange,
+} from '@services/integrations/item-mention/content/editor-adapter';
 import { clampRange, replaceTextRange } from '@services/integrations/item-mention/content/editor-adapter';
 
 function isNotionHost(hostname: string): boolean {
@@ -29,8 +34,10 @@ function toContentEditableEditor(handle: EditorHandle): ContentEditableEditor {
   const el = (handle as any)?.el as HTMLElement | null;
   const isEditable =
     !!el &&
-    (((el as any).isContentEditable === true) ||
-      String(el.getAttribute?.('contenteditable') || '').trim().toLowerCase() === 'true');
+    ((el as any).isContentEditable === true ||
+      String(el.getAttribute?.('contenteditable') || '')
+        .trim()
+        .toLowerCase() === 'true');
   if (!handle || (handle as any).kind !== 'contenteditable' || !isEditable) {
     throw new Error('invalid contenteditable editor');
   }

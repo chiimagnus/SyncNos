@@ -1,8 +1,15 @@
-import type { EditorAdapter, EditorHandle, EditorRange, TextareaEditor } from '@services/integrations/item-mention/content/editor-adapter';
+import type {
+  EditorAdapter,
+  EditorHandle,
+  EditorRange,
+  TextareaEditor,
+} from '@services/integrations/item-mention/content/editor-adapter';
 import { clampRange, replaceTextRange } from '@services/integrations/item-mention/content/editor-adapter';
 
 function isTextarea(node: unknown): node is HTMLTextAreaElement {
-  return !!node && typeof (node as any).tagName === 'string' && String((node as any).tagName).toLowerCase() === 'textarea';
+  return (
+    !!node && typeof (node as any).tagName === 'string' && String((node as any).tagName).toLowerCase() === 'textarea'
+  );
 }
 
 function pickTextarea(): HTMLTextAreaElement | null {
@@ -65,4 +72,3 @@ export const chatgptTextareaEditorAdapter: EditorAdapter = {
     }
   },
 };
-

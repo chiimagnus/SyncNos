@@ -60,7 +60,12 @@ describe('item mention storage search', () => {
       lastCapturedAt: ts - 1,
     });
 
-    const res = await searchConversationMentionCandidates({ query: '', limit: 10, maxScan: 1000, maxDurationMs: 10_000 });
+    const res = await searchConversationMentionCandidates({
+      query: '',
+      limit: 10,
+      maxScan: 1000,
+      maxDurationMs: 10_000,
+    });
     expect(res.candidates.map((x) => x.conversationId)).toEqual([Number(b.id), Number(a.id), Number(c.id)]);
     expect(res.candidates[0]?.title).toBe('B');
   });
@@ -100,9 +105,20 @@ describe('item mention storage search', () => {
       lastCapturedAt: now - 3,
     });
 
-    const res = await searchConversationMentionCandidates({ query: 'openai', limit: 20, maxScan: 2000, maxDurationMs: 10_000 });
+    const res = await searchConversationMentionCandidates({
+      query: 'openai',
+      limit: 20,
+      maxScan: 2000,
+      maxDurationMs: 10_000,
+    });
     expect(res.candidates.length).toBe(3);
-    expect(res.candidates.every((c) => String(c.title + c.source + c.domain).toLowerCase().includes('openai'))).toBe(true);
+    expect(
+      res.candidates.every((c) =>
+        String(c.title + c.source + c.domain)
+          .toLowerCase()
+          .includes('openai'),
+      ),
+    ).toBe(true);
   });
 
   it('respects scan limit and exposes truncation flag', async () => {
@@ -118,7 +134,12 @@ describe('item mention storage search', () => {
       });
     }
 
-    const res = await searchConversationMentionCandidates({ query: 'never-matches', limit: 20, maxScan: 1, maxDurationMs: 10_000 });
+    const res = await searchConversationMentionCandidates({
+      query: 'never-matches',
+      limit: 20,
+      maxScan: 1,
+      maxDurationMs: 10_000,
+    });
     expect(res.scannedCount).toBe(1);
     expect(res.truncatedByScanLimit).toBe(true);
   });

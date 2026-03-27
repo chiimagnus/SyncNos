@@ -49,4 +49,3 @@ describe('item-mention session', () => {
     expect(s?.query).toBe('ab');
   });
 });
-

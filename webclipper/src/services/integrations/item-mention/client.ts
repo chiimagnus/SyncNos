@@ -35,4 +35,3 @@ export async function buildMentionInsertText(
   });
   return ensureOk(res, 'buildMentionInsertText failed') as { conversationId: number; markdown: string };
 }
-

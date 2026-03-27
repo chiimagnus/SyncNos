@@ -89,11 +89,7 @@ function setPosition(el: HTMLElement, left: number, top: number) {
   setImportantStyle(el, 'top', `${Math.max(6, Math.round(top))}px`);
 }
 
-function setList(
-  el: HTMLElement,
-  items: MentionUiItem[],
-  highlightIndex: number,
-) {
+function setList(el: HTMLElement, items: MentionUiItem[], highlightIndex: number) {
   const shadow = (el as any).shadowRoot as ShadowRoot | null;
   const list = shadow?.querySelector?.('.webclipper-item-mention__list') as HTMLElement | null;
   const empty = shadow?.querySelector?.('.webclipper-item-mention__empty') as HTMLElement | null;

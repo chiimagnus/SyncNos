@@ -1,5 +1,9 @@
 import { ITEM_MENTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { getConversationById, getConversationDetail, searchConversationMentionCandidates } from '@services/conversations/data/storage';
+import {
+  getConversationById,
+  getConversationDetail,
+  searchConversationMentionCandidates,
+} from '@services/conversations/data/storage';
 import { normalizeMentionSearchLimit } from '@services/integrations/item-mention/mention-contract';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';

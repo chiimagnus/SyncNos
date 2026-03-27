@@ -1,5 +1,12 @@
-import type { MentionCandidate, MentionQuery, MentionSearchResult } from '@services/integrations/item-mention/mention-contract';
-import { normalizeMentionQuery, normalizeMentionSearchLimit } from '@services/integrations/item-mention/mention-contract';
+import type {
+  MentionCandidate,
+  MentionQuery,
+  MentionSearchResult,
+} from '@services/integrations/item-mention/mention-contract';
+import {
+  normalizeMentionQuery,
+  normalizeMentionSearchLimit,
+} from '@services/integrations/item-mention/mention-contract';
 
 function safeText(value: unknown): string {
   return String(value || '').trim();
@@ -22,7 +29,9 @@ function parseDomainFromUrl(url: unknown): string {
   }
 }
 
-export function normalizeMentionCandidate(input: Partial<MentionCandidate> & Record<string, unknown>): MentionCandidate {
+export function normalizeMentionCandidate(
+  input: Partial<MentionCandidate> & Record<string, unknown>,
+): MentionCandidate {
   const conversationId = Number((input as any).conversationId);
   const lastCapturedAt = Number((input as any).lastCapturedAt);
   return {
@@ -112,4 +121,3 @@ export function searchMentionCandidates(input: {
     limit,
   };
 }
-

@@ -29,4 +29,3 @@ export function parseMentionTrigger(input: { text: string; cursor: number }): Me
     query,
   };
 }
-
