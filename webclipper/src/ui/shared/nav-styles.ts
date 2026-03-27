@@ -6,8 +6,8 @@ export function navGroupTitleClassName(): string {
 
 export function navItemClassName(active: boolean): string {
   const base = [
-    // Match `src/ui/example.html` sidebar item: 8px 12px padding, 6px radius, 13px text.
-    'tw-flex tw-min-h-9 tw-w-full tw-cursor-pointer tw-appearance-none tw-items-center tw-gap-2 tw-rounded-md tw-border-0 tw-px-3 tw-py-2 tw-text-left tw-text-[13px] tw-shadow-none',
+    // Sidebar item follows shared chip-level radius token and existing spacing.
+    'tw-flex tw-min-h-9 tw-w-full tw-cursor-pointer tw-appearance-none tw-items-center tw-gap-2 tw-rounded-[var(--radius-chip)] tw-border-0 tw-px-3 tw-py-2 tw-text-left tw-text-[13px] tw-shadow-none',
     'tw-transition-colors tw-duration-150',
     'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
   ].join(' ');
