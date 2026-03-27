@@ -8,8 +8,8 @@ import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
   deleteConversations,
+  getConversationListBootstrap,
   getConversationDetail,
-  listConversations,
   mergeConversations,
   upsertConversation,
 } from '@services/conversations/client/repo';
@@ -29,6 +29,7 @@ import {
 const LIST_SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
 const LIST_SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
 const LIST_SITE_FILTER_ALL_KEY = 'all';
+const LIST_BOOTSTRAP_LIMIT = 200;
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 
 function stripAngleBrackets(url: string): string {
@@ -329,7 +330,11 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     setLoadingList(true);
     setListError(null);
     try {
-      const list = await listConversations();
+      const page = await getConversationListBootstrap(
+        { sourceKey: 'all', siteKey: LIST_SITE_FILTER_ALL_KEY, limit: LIST_BOOTSTRAP_LIMIT },
+        LIST_BOOTSTRAP_LIMIT,
+      );
+      const list = Array.isArray(page?.items) ? page.items : [];
       setItems(list);
 
       const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));

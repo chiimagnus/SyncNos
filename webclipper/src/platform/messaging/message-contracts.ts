@@ -3,7 +3,10 @@ export const CORE_MESSAGE_TYPES = {
   MERGE_CONVERSATIONS: 'mergeConversations',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
-  GET_CONVERSATIONS: 'getConversations',
+  GET_CONVERSATION_LIST_BOOTSTRAP: 'getConversationListBootstrap',
+  GET_CONVERSATION_LIST_PAGE: 'getConversationListPage',
+  FIND_CONVERSATION_BY_SOURCE_AND_KEY: 'findConversationBySourceAndKey',
+  FIND_CONVERSATION_BY_ID: 'findConversationById',
   GET_CONVERSATION_DETAIL: 'getConversationDetail',
   DELETE_CONVERSATIONS: 'deleteConversations',
 } as const;

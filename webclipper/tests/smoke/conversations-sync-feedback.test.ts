@@ -7,7 +7,7 @@ import { t } from '../../src/ui/i18n';
 import { ConversationsProvider } from '../../src/viewmodels/conversations/conversations-context';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
-const listConversations = vi.fn();
+const getConversationListBootstrap = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const syncNotionConversations = vi.fn();
@@ -22,7 +22,7 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 vi.mock('@services/conversations/client/repo', () => ({
-  listConversations: (...args: any[]) => listConversations(...args),
+  getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
 }));
@@ -106,7 +106,7 @@ describe('Conversations sync feedback', () => {
     setupDom();
     root = ReactDOM.createRoot(document.getElementById('root')!);
 
-    listConversations.mockReset();
+    getConversationListBootstrap.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
     syncNotionConversations.mockReset();
@@ -116,7 +116,16 @@ describe('Conversations sync feedback', () => {
     getNotionSyncJobStatus.mockReset();
     getObsidianSyncStatus.mockReset();
 
-    listConversations.mockResolvedValue([baseConversation]);
+    getConversationListBootstrap.mockResolvedValue({
+      items: [baseConversation],
+      cursor: null,
+      hasMore: false,
+      summary: { totalCount: 1, todayCount: 1 },
+      facets: {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+        sites: [],
+      },
+    });
     getConversationDetail.mockResolvedValue({ id: 11, messages: [] });
     deleteConversations.mockResolvedValue(null);
     clearNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
