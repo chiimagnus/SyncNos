@@ -43,6 +43,34 @@ async function openV1Db() {
   return reqToPromise(req);
 }
 
+async function openV7DbWithoutPaginationIndexes() {
+  const req = indexedDB.open('webclipper', 7);
+  req.onupgradeneeded = () => {
+    const db = req.result;
+
+    const conversations = db.createObjectStore('conversations', { keyPath: 'id', autoIncrement: true });
+    conversations.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
+    conversations.createIndex('by_lastCapturedAt', 'lastCapturedAt', { unique: false });
+
+    const messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+    messages.createIndex('by_conversationId_sequence', ['conversationId', 'sequence'], { unique: false });
+    messages.createIndex('by_conversationId_messageKey', ['conversationId', 'messageKey'], { unique: true });
+
+    const mappings = db.createObjectStore('sync_mappings', { keyPath: 'id', autoIncrement: true });
+    mappings.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
+    mappings.createIndex('by_notionPageId', 'notionPageId', { unique: false });
+
+    const imageCache = db.createObjectStore('image_cache', { keyPath: 'id', autoIncrement: true });
+    imageCache.createIndex('by_conversationId_url', ['conversationId', 'url'], { unique: true });
+    imageCache.createIndex('by_conversationId', 'conversationId', { unique: false });
+
+    const comments = db.createObjectStore('article_comments', { keyPath: 'id', autoIncrement: true });
+    comments.createIndex('by_canonicalUrl_createdAt', ['canonicalUrl', 'createdAt'], { unique: false });
+    comments.createIndex('by_conversationId_createdAt', ['conversationId', 'createdAt'], { unique: false });
+  };
+  return reqToPromise(req);
+}
+
 beforeEach(async () => {
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -185,6 +213,59 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     expect(
       maps.some((m) => m.source === 'notionai' && m.conversationKey === stableKey && m.notionPageId === 'page_1'),
     ).toBe(true);
+  });
+});
+
+describe('storage schema migration (v8 list pagination indexes)', () => {
+  it('adds composite indexes and backfills listSourceKey/listSiteKey', async () => {
+    const db7 = await openV7DbWithoutPaginationIndexes();
+    const tx7 = db7.transaction(['conversations'], 'readwrite');
+    const conversations = tx7.objectStore('conversations');
+    await reqToPromise(
+      conversations.add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'chat-1',
+        title: 'chat row',
+        url: 'https://chatgpt.com/c/1',
+        lastCapturedAt: 10,
+      }),
+    );
+    await reqToPromise(
+      conversations.add({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'article:https://example.com/a',
+        title: 'article row',
+        url: 'https://example.com/a#fragment',
+        lastCapturedAt: 20,
+      }),
+    );
+    await txDone(tx7);
+    db7.close();
+
+    const db8 = await openDb();
+    const tx8 = db8.transaction(['conversations'], 'readonly');
+    const store = tx8.objectStore('conversations');
+    const rows = await reqToPromise<any[]>(store.getAll());
+    await txDone(tx8);
+
+    expect(store.indexNames.contains('by_lastCapturedAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_listSourceKey_lastCapturedAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_listSourceKey_listSiteKey_lastCapturedAt_id')).toBe(true);
+    expect(store.indexNames.contains('by_listSiteKey_lastCapturedAt_id')).toBe(true);
+
+    const chat = rows.find((row) => row.conversationKey === 'chat-1');
+    expect(chat).toBeTruthy();
+    expect(chat.listSourceKey).toBe('chatgpt');
+    expect(chat.listSiteKey).toBe('chatgpt.com');
+
+    const article = rows.find((row) => row.conversationKey === 'article:https://example.com/a');
+    expect(article).toBeTruthy();
+    expect(article.listSourceKey).toBe('web');
+    expect(article.listSiteKey).toBe('example.com');
+
+    db8.close();
   });
 });
 
