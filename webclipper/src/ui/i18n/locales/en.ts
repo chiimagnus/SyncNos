@@ -138,6 +138,7 @@ export const en = {
   untitled: '(Untitled)',
   selectLabel: 'Select',
   selectAll: 'Select all',
+  tooltipLoadedVisibleSelectionScope: 'Only currently loaded visible items',
   copyFullMarkdown: 'Copy full markdown',
   copied: 'Copied',
   tooltipCopyFullMarkdownDetailed: 'Copy the full conversation as Markdown',

@@ -603,22 +603,27 @@ export function ConversationListPane({
 
   const armedDeleteKey = deleteConfirm.getArmedKey();
   const deleteConfirming = !!deleteConfirmKey && armedDeleteKey != null && deleteConfirm.isArmed(deleteConfirmKey);
+  const loadedVisibleScopeHint = t('tooltipLoadedVisibleSelectionScope');
+  const selectAllTooltip =
+    total > 0
+      ? `${t('selectAll')} · ${loadedVisibleScopeHint} (${total})`
+      : `${t('selectAll')} · ${loadedVisibleScopeHint}`;
   const deleteTooltip = deleteConfirming
-    ? t('tooltipDeleteSelectedConfirmDetailed')
+    ? `${t('tooltipDeleteSelectedConfirmDetailed')} · ${loadedVisibleScopeHint}`
     : hasSelection
-      ? `${t('tooltipDeleteSelectedDetailed')} (${selectedTotalCount})`
+      ? `${t('tooltipDeleteSelectedDetailed')} (${selectedTotalCount}) · ${loadedVisibleScopeHint}`
       : t('tooltipDeleteSelectedDetailed');
   const exportTooltip = hasSelection
-    ? `${t('tooltipExportDetailed')} (${selectedTotalCount})`
+    ? `${t('tooltipExportDetailed')} (${selectedTotalCount}) · ${loadedVisibleScopeHint}`
     : t('tooltipExportSelectFirstDetailed');
   const singleSyncTooltip = hasSelection
-    ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${singleSyncLabel}`
+    ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${singleSyncLabel} · ${loadedVisibleScopeHint}`
     : t('tooltipSyncSelectFirstDetailed');
   const syncMenuTooltip =
     enabledSyncProviders.length === 0
       ? t('tooltipSyncProvidersDisabledDetailed')
       : hasSelection
-        ? `${t('tooltipSyncDetailed')} (${selectedTotalCount})`
+        ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${loadedVisibleScopeHint}`
         : t('tooltipSyncSelectFirstDetailed');
 
   useEffect(() => {
@@ -793,6 +798,7 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
+              {...tooltipAttrs(selectAllTooltip)}
             >
               <input
                 ref={selectAllRef}

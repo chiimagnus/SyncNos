@@ -137,6 +137,7 @@ export const zh: { [K in TranslationKey]: string } = {
   untitled: '(无标题)',
   selectLabel: '选择',
   selectAll: '全选',
+  tooltipLoadedVisibleSelectionScope: '仅当前已加载可见项',
   copyFullMarkdown: '复制完整 Markdown',
   copied: '已复制',
   tooltipCopyFullMarkdownDetailed: '将该对话完整复制为 Markdown',
