@@ -191,7 +191,7 @@ export function ChatMessageBubble({
   // NOTE: asset URLs are resolved before render via markdown-it env;
   // no post-render DOM hydration is needed, which avoids re-render race conditions.
 
-  const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[12px] tw-p-3 tw-shadow-none';
+  const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[var(--radius-chip)] tw-p-3 tw-shadow-none';
 
   const bubbleRoleClass =
     bubbleRole === 'user'
@@ -243,11 +243,11 @@ export function ChatMessageBubble({
       // Inline code: avoid "too black" chips in dark mode (preflight is disabled).
       // Use currentColor-based translucent background so it adapts to both bubble variants.
       // Notion-like code size: 85% of 14px => 11.9px.
-      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[6px] [&_code]:tw-bg-[color-mix(in_srgb,currentColor_12%,transparent)] [&_code]:tw-font-mono [&_code]:tw-text-[11.9px]',
-      '[&_kbd]:tw-inline-flex [&_kbd]:tw-items-center [&_kbd]:tw-rounded-[6px] [&_kbd]:tw-border [&_kbd]:tw-border-[var(--border)] [&_kbd]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_kbd]:tw-px-[6px] [&_kbd]:tw-py-[1px] [&_kbd]:tw-font-mono [&_kbd]:tw-text-[11.9px]',
+      '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[var(--radius-inline)] [&_code]:tw-bg-[color-mix(in_srgb,currentColor_12%,transparent)] [&_code]:tw-font-mono [&_code]:tw-text-[11.9px]',
+      '[&_kbd]:tw-inline-flex [&_kbd]:tw-items-center [&_kbd]:tw-rounded-[var(--radius-inline)] [&_kbd]:tw-border [&_kbd]:tw-border-[var(--border)] [&_kbd]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_kbd]:tw-px-[6px] [&_kbd]:tw-py-[1px] [&_kbd]:tw-font-mono [&_kbd]:tw-text-[11.9px]',
 
       // Code blocks: keep contrast high in both light/dark bubbles (avoid near-black background).
-      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[8px] [&_pre]:tw-border [&_pre]:tw-border-[var(--border)] [&_pre]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_pre]:tw-overflow-auto',
+      '[&_pre]:tw-mt-0 [&_pre]:tw-mb-2 [&_pre]:tw-px-[10px] [&_pre]:tw-py-[8px] [&_pre]:tw-rounded-[var(--radius-inline)] [&_pre]:tw-border [&_pre]:tw-border-[var(--border)] [&_pre]:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_55%,var(--bg-card))] [&_pre]:tw-overflow-auto',
       '[&_pre>code]:tw-block [&_pre>code]:tw-p-0 [&_pre>code]:tw-bg-transparent [&_pre>code]:tw-rounded-none [&_pre>code]:tw-text-[11.9px] [&_pre>code]:tw-leading-[17.85px]',
 
       // Tables can be wider than the viewport; let the table itself scroll instead of the whole bubble.
@@ -264,7 +264,7 @@ export function ChatMessageBubble({
       '[&_img]:tw-block [&_img]:tw-h-auto [&_img]:tw-object-contain',
       // "Small image" policy: cap both width and height, but never overflow the bubble.
       '[&_img]:tw-max-w-[min(360px,100%)] [&_img]:tw-max-h-[240px]',
-      '[&_img]:tw-rounded-[10px] [&_img]:tw-border [&_img]:tw-border-[var(--border)]',
+      '[&_img]:tw-rounded-[var(--radius-inline)] [&_img]:tw-border [&_img]:tw-border-[var(--border)]',
       // When images fail to load, show an explicit link below the image to keep it discoverable.
       '[&_.syncnos-md-image]:tw-inline-block [&_.syncnos-md-image]:tw-max-w-full',
       // Small-text caption: 12.25px (14px * 0.875), 1.4 line-height, wrapping.
