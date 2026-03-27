@@ -25,8 +25,9 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => currentState,
 }));
 
-let observerCallback: ((entries: Array<{ isIntersecting: boolean; target: Element }>, observer: unknown) => void) | null =
-  null;
+let observerCallback:
+  | ((entries: Array<{ isIntersecting: boolean; target: Element }>, observer: unknown) => void)
+  | null = null;
 let observedTarget: Element | null = null;
 
 class MockIntersectionObserver {

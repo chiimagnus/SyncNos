@@ -94,7 +94,8 @@ export function registerConversationHandlers(router: AnyRouter) {
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP, async (msg) => {
     const parsed = parseListQueryPayload(msg);
     if (parsed.errorField === 'query') return invalidArgument('query', 'invalid query', msg?.query);
-    if (parsed.errorField === 'limit') return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
+    if (parsed.errorField === 'limit')
+      return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
     const page = await getConversationListBootstrap(parsed.query, parsed.query.limit);
     return router.ok(page);
   });
@@ -102,7 +103,8 @@ export function registerConversationHandlers(router: AnyRouter) {
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE, async (msg) => {
     const parsed = parseListQueryPayload(msg);
     if (parsed.errorField === 'query') return invalidArgument('query', 'invalid query', msg?.query);
-    if (parsed.errorField === 'limit') return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
+    if (parsed.errorField === 'limit')
+      return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
     const cursor = parseListCursorPayload(msg?.cursor);
     if (!cursor) return invalidArgument('cursor', 'invalid cursor', msg?.cursor);
     const page = await getConversationListPage(parsed.query, cursor, parsed.query.limit);

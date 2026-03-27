@@ -23,10 +23,13 @@ export async function getConversationListBootstrap(
   queryInput?: ConversationListQueryInput | null,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  const res = await send<ApiResponse<ConversationListPage<Conversation>>>(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP, {
-    query: queryInput || {},
-    limit: Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : undefined,
-  });
+  const res = await send<ApiResponse<ConversationListPage<Conversation>>>(
+    CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP,
+    {
+      query: queryInput || {},
+      limit: Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : undefined,
+    },
+  );
   return unwrap(res);
 }
 
@@ -35,11 +38,14 @@ export async function getConversationListPage(
   cursor: ConversationListCursor,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
-  const res = await send<ApiResponse<ConversationListPage<Conversation>>>(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE, {
-    query: queryInput || {},
-    cursor,
-    limit: Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : undefined,
-  });
+  const res = await send<ApiResponse<ConversationListPage<Conversation>>>(
+    CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE,
+    {
+      query: queryInput || {},
+      cursor,
+      limit: Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : undefined,
+    },
+  );
   return unwrap(res);
 }
 

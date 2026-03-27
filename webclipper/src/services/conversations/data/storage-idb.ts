@@ -151,9 +151,7 @@ function isSameLocalDayTimestamp(ts: number, now: Date): boolean {
   try {
     const date = new Date(ts);
     return (
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate()
+      date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
     );
   } catch (_e) {
     return false;
@@ -701,7 +699,7 @@ function buildListPageRange(
     | 'by_listSourceKey_listSiteKey_lastCapturedAt_id'
     | 'by_listSiteKey_lastCapturedAt_id';
   range: IDBKeyRange | null;
-  } {
+} {
   const sourceKey = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
   const siteKey = normalizeConversationListSiteFilterKey(query.siteKey);
   const hasSourceFilter = sourceKey !== LIST_SOURCE_KEY_ALL;

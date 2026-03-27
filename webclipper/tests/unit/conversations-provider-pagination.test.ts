@@ -221,7 +221,9 @@ describe('ConversationsProvider pagination state', () => {
     const chatgptReq = deferred<any>();
 
     getConversationListBootstrap.mockImplementation((query: any) => {
-      const sourceKey = String(query?.sourceKey || 'all').trim().toLowerCase();
+      const sourceKey = String(query?.sourceKey || 'all')
+        .trim()
+        .toLowerCase();
       if (sourceKey === 'all') return allReq.promise;
       if (sourceKey === 'web') return webReq.promise;
       if (sourceKey === 'chatgpt') return chatgptReq.promise;

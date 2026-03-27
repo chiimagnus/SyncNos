@@ -114,7 +114,11 @@ function canonicalizeHttpUrl(raw: unknown): string {
   }
 }
 
-function resolveConversationSourceType(input: { sourceType?: unknown; source?: unknown; url?: unknown }): string | undefined {
+function resolveConversationSourceType(input: {
+  sourceType?: unknown;
+  source?: unknown;
+  url?: unknown;
+}): string | undefined {
   const explicit = String(input?.sourceType || '')
     .trim()
     .toLowerCase();
@@ -285,7 +289,9 @@ function normalizeConversationListFacets(input: unknown): ConversationListFacets
   return { sources, sites };
 }
 
-function toOpenTargetFromConversation(conversation: Conversation | null | undefined): ConversationListOpenTarget | null {
+function toOpenTargetFromConversation(
+  conversation: Conversation | null | undefined,
+): ConversationListOpenTarget | null {
   if (!conversation) return null;
   const id = Number((conversation as any).id);
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -468,7 +474,9 @@ export function ConversationsProvider({
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
   const activeConversationSnapshotRef = useRef<ConversationListOpenTarget | null>(null);
-  const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(null);
+  const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(
+    null,
+  );
   const setActiveConversationSnapshot = useCallback((next: ConversationListOpenTarget | null) => {
     activeConversationSnapshotRef.current = next;
     setActiveConversationSnapshotState(next);
@@ -652,11 +660,7 @@ export function ConversationsProvider({
         currentActiveId > 0 &&
         (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
 
-      const nextActiveId = shouldPreserveActive
-        ? currentActiveId
-        : list.length
-          ? Number((list[0] as any).id)
-          : null;
+      const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
       setActiveId(nextActiveId);
       if (!shouldPreserveActive) {
         const nextActiveConversation =
@@ -716,14 +720,7 @@ export function ConversationsProvider({
         setLoadingMoreList(false);
       }
     }
-  }, [
-    listCursor,
-    listHasMore,
-    listSiteFilterKey,
-    listSourceFilterKey,
-    loadingInitialList,
-    loadingMoreList,
-  ]);
+  }, [listCursor, listHasMore, listSiteFilterKey, listSourceFilterKey, loadingInitialList, loadingMoreList]);
 
   const updateSelectedConversationUrl = useCallback(
     async (nextUrl: string) => {
@@ -829,7 +826,9 @@ export function ConversationsProvider({
       const safeSource = String(initialOpenLoc?.source || '').trim();
       const safeConversationKey = String(initialOpenLoc?.conversationKey || '').trim();
       if (safeSource && safeConversationKey) {
-        await openConversationExternalByLoc({ source: safeSource, conversationKey: safeConversationKey }).catch(() => {});
+        await openConversationExternalByLoc({ source: safeSource, conversationKey: safeConversationKey }).catch(
+          () => {},
+        );
       }
       if (cancelled) return;
       setBootstrapped(true);

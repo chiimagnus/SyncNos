@@ -1147,9 +1147,7 @@ export function ConversationListPane({
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
                 <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
                 <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
-                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                  {String(totalCount)}
-                </span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">{String(totalCount)}</span>
               </button>
             ) : (
               <div
@@ -1166,9 +1164,7 @@ export function ConversationListPane({
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
                 <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
                 <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
-                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                  {String(totalCount)}
-                </span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">{String(totalCount)}</span>
               </div>
             )}
           </div>

@@ -277,7 +277,10 @@ export function buildInsightStats(
         source: sourceLabel,
         openSource,
         openConversationKey,
-        loc: openSource && openConversationKey ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey }) : '',
+        loc:
+          openSource && openConversationKey
+            ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey })
+            : '',
       });
       continue;
     }

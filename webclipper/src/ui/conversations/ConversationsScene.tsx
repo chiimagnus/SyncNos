@@ -39,8 +39,13 @@ export function ConversationsScene({
   onOpenInsightsSection,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId, selectedConversation, detailHeaderActions, openConversationExternalBySourceKey, openConversationExternalById } =
-    useConversationsApp();
+  const {
+    activeId,
+    selectedConversation,
+    detailHeaderActions,
+    openConversationExternalBySourceKey,
+    openConversationExternalById,
+  } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,
