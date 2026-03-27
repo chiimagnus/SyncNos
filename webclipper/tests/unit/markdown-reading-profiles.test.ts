@@ -87,4 +87,16 @@ describe('markdown reading profile contract', () => {
     expect(String(book.typographyClassName)).toContain('[&_p]:tw-max-w-[74ch]');
     expect(String(book.typographyClassName)).toContain('[&_pre>code]:tw-leading-[1.6]');
   });
+
+  it('keeps all profiles wired with key node typography hooks', () => {
+    for (const profileId of MARKDOWN_READING_PROFILE_IDS) {
+      const preset = MARKDOWN_READING_PROFILE_PRESETS[profileId];
+      const className = String(preset.typographyClassName || '');
+      expect(className).toContain('[&_h1]:tw-text-[');
+      expect(className).toContain('[&_pre>code]:tw-text-[');
+      expect(className).toContain('[&_th]:tw-text-[');
+      expect(className).toContain('[&_.syncnos-md-image-link]:tw-text-[');
+      expect(String(preset.roleOverrides?.user || '')).toContain('[&_a]:tw-font-semibold');
+    }
+  });
 });
