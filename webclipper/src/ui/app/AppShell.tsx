@@ -86,6 +86,39 @@ export default function AppShell() {
     }
   };
 
+  function AppShellRouterProviders({
+    sidebarCollapsed,
+    commentsSidebarCollapsed,
+    setCollapsed,
+    setCommentsCollapsed,
+  }: {
+    sidebarCollapsed: boolean;
+    commentsSidebarCollapsed: boolean;
+    setCollapsed: (collapsed: boolean) => void;
+    setCommentsCollapsed: (collapsed: boolean) => void;
+  }) {
+    const location = useLocation();
+    const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
+    if (initialOpenLocRef.current === undefined) {
+      const search = String(location.search || '');
+      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+      const loc = params.get('loc');
+      initialOpenLocRef.current = loc ? decodeConversationLoc(loc) : null;
+    }
+
+    return (
+      <ConversationsProvider initialOpenLoc={initialOpenLocRef.current ?? null}>
+        <AppShellFrame
+          sidebarCollapsed={sidebarCollapsed}
+          commentsSidebarCollapsed={commentsSidebarCollapsed}
+          setCollapsed={setCollapsed}
+          setCommentsCollapsed={setCommentsCollapsed}
+        />
+        <AppTooltipHost />
+      </ConversationsProvider>
+    );
+  }
+
   function AppShellFrame({
     sidebarCollapsed,
     commentsSidebarCollapsed,
@@ -128,6 +161,7 @@ export default function AppShell() {
     const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
+    const locMountedRef = useRef(false);
     const isArticleConversation = isArticleConversationLike(selectedConversation);
     const canonicalUrl = normalizeHttpUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
@@ -256,6 +290,10 @@ export default function AppShell() {
     }, [showSettingsSheet]);
 
     useEffect(() => {
+      if (!locMountedRef.current) {
+        locMountedRef.current = true;
+        return;
+      }
       if (location.pathname !== '/') return;
 
       const search = String(location.search || '');
@@ -441,15 +479,12 @@ export default function AppShell() {
 
   return (
     <HashRouter>
-      <ConversationsProvider>
-        <AppShellFrame
-          sidebarCollapsed={sidebarCollapsed}
-          commentsSidebarCollapsed={commentsSidebarCollapsed}
-          setCollapsed={setCollapsed}
-          setCommentsCollapsed={setCommentsCollapsed}
-        />
-        <AppTooltipHost />
-      </ConversationsProvider>
+      <AppShellRouterProviders
+        sidebarCollapsed={sidebarCollapsed}
+        commentsSidebarCollapsed={commentsSidebarCollapsed}
+        setCollapsed={setCollapsed}
+        setCommentsCollapsed={setCommentsCollapsed}
+      />
     </HashRouter>
   );
 }

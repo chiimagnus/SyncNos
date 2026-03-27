@@ -113,10 +113,18 @@ function deriveConversationListSiteKey(record: any): string {
 function normalizeConversationListRecord<T extends Record<string, any>>(record: T): T {
   const existingSourceKey = safeString(record?.listSourceKey);
   const existingSiteKey = safeString(record?.listSiteKey);
-  const sourceKey = existingSourceKey ? normalizeListKey(existingSourceKey, 'unknown') : deriveConversationListSourceKey(record);
-  const siteKey = existingSiteKey
-    ? normalizeConversationListSiteFilterKey(existingSiteKey)
-    : normalizeConversationListSiteFilterKey(deriveConversationListSiteKey(record));
+  const derivedSourceKey = deriveConversationListSourceKey(record);
+  const sourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : normalizeListKey(existingSourceKey, 'unknown');
+
+  const derivedSiteKey = normalizeConversationListSiteFilterKey(deriveConversationListSiteKey(record));
+  // When url is present and valid, derivedSiteKey wins. Only fall back to the stored key
+  // when we cannot derive a stable domain value.
+  const siteKey =
+    derivedSiteKey !== 'unknown'
+      ? derivedSiteKey
+      : existingSiteKey
+        ? normalizeConversationListSiteFilterKey(existingSiteKey)
+        : 'unknown';
   if (existingSourceKey === sourceKey && existingSiteKey === siteKey) return record;
   return {
     ...record,

@@ -42,7 +42,21 @@ vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
 const openConversationExternalByLoc = vi.fn();
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
-  ConversationsProvider: ({ children }: { children: React.ReactNode }) => children,
+  ConversationsProvider: ({
+    children,
+    initialOpenLoc,
+  }: {
+    children: React.ReactNode;
+    initialOpenLoc?: { source: string; conversationKey: string } | null;
+  }) => {
+    if (initialOpenLoc) {
+      // Mirrors the real provider: consume initial loc after mount, not during render.
+      Promise.resolve()
+        .then(() => openConversationExternalByLoc(initialOpenLoc))
+        .catch(() => {});
+    }
+    return children;
+  },
   useConversationsApp: () => ({
     items: [],
     activeId: null,

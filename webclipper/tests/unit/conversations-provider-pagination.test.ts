@@ -207,9 +207,10 @@ describe('ConversationsProvider pagination state', () => {
     cleanupDom();
   });
 
-  async function renderProvider() {
+  async function renderProvider(providerProps?: any) {
     await act(async () => {
-      root!.render(createElement(ConversationsProvider, null, createElement(Probe)));
+      root!.render(createElement(ConversationsProvider, providerProps ?? null, createElement(Probe)));
+      await flushMicrotasks();
       await flushMicrotasks();
     });
   }
@@ -345,5 +346,36 @@ describe('ConversationsProvider pagination state', () => {
     expect(Number(latestState.activeId)).toBe(999);
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
+  });
+
+  it('bootstraps initialOpenLoc before fetching the first list page', async () => {
+    const findReq = deferred<any>();
+    findConversationBySourceAndKey.mockImplementation(() => findReq.promise);
+    getConversationListBootstrap.mockResolvedValue(
+      makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+      }),
+    );
+
+    await renderProvider({ initialOpenLoc: { source: 'chatgpt', conversationKey: 'conv-999' } });
+    expect(getConversationListBootstrap).not.toHaveBeenCalled();
+
+    await act(async () => {
+      findReq.resolve({
+        id: 999,
+        source: 'chatgpt',
+        conversationKey: 'conv-999',
+        title: 'Target conversation',
+        url: 'https://example.com/chat/999',
+        sourceType: 'chat',
+        lastCapturedAt: Date.now(),
+      });
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(getConversationListBootstrap).toHaveBeenCalled();
+    expect(Number(latestState.activeId)).toBe(999);
+    expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
   });
 });
