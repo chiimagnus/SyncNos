@@ -1,7 +1,36 @@
 import * as idb from '@services/conversations/data/storage-idb';
+import type {
+  Conversation,
+  ConversationListCursor,
+  ConversationListOpenTarget,
+  ConversationListPage,
+  ConversationListQueryInput,
+} from '@services/conversations/domain/models';
 
-export async function listConversations() {
-  return await idb.getConversations();
+export async function getConversationListBootstrap(
+  queryInput?: ConversationListQueryInput | null,
+  limit?: number | null,
+): Promise<ConversationListPage<Conversation>> {
+  return await idb.getConversationListBootstrap(queryInput, limit);
+}
+
+export async function getConversationListPage(
+  queryInput: ConversationListQueryInput | null | undefined,
+  cursor: ConversationListCursor,
+  limit?: number | null,
+): Promise<ConversationListPage<Conversation>> {
+  return await idb.getConversationListPage(queryInput, cursor, limit);
+}
+
+export async function findConversationBySourceAndKey(
+  source: string,
+  conversationKey: string,
+): Promise<ConversationListOpenTarget | null> {
+  return await idb.findConversationBySourceAndKey(source, conversationKey);
+}
+
+export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
+  return await idb.findConversationById(conversationId);
 }
 
 export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {

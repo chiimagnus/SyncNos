@@ -9,9 +9,13 @@ const writeMocks = vi.hoisted(() => ({
 
 const storageMocks = vi.hoisted(() => ({
   deleteConversationsByIds: vi.fn(),
-  listConversations: vi.fn(),
+  getConversationListBootstrap: vi.fn(),
+  getConversationListPage: vi.fn(),
+  findConversationBySourceAndKey: vi.fn(),
+  findConversationById: vi.fn(),
   getConversationDetail: vi.fn(),
   hasConversation: vi.fn(),
+  mergeConversationsByIds: vi.fn(),
 }));
 
 vi.mock('@services/conversations/data/write', () => ({
@@ -21,9 +25,13 @@ vi.mock('@services/conversations/data/write', () => ({
 
 vi.mock('@services/conversations/data/storage', () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
-  listConversations: storageMocks.listConversations,
+  getConversationListBootstrap: storageMocks.getConversationListBootstrap,
+  getConversationListPage: storageMocks.getConversationListPage,
+  findConversationBySourceAndKey: storageMocks.findConversationBySourceAndKey,
+  findConversationById: storageMocks.findConversationById,
   getConversationDetail: storageMocks.getConversationDetail,
   hasConversation: storageMocks.hasConversation,
+  mergeConversationsByIds: storageMocks.mergeConversationsByIds,
 }));
 
 function createRouter() {
@@ -43,9 +51,13 @@ afterEach(() => {
   writeMocks.writeConversationMessagesSnapshot.mockReset();
   writeMocks.writeConversationSnapshot.mockReset();
   storageMocks.deleteConversationsByIds.mockReset();
-  storageMocks.listConversations.mockReset();
+  storageMocks.getConversationListBootstrap.mockReset();
+  storageMocks.getConversationListPage.mockReset();
+  storageMocks.findConversationBySourceAndKey.mockReset();
+  storageMocks.findConversationById.mockReset();
   storageMocks.getConversationDetail.mockReset();
   storageMocks.hasConversation.mockReset();
+  storageMocks.mergeConversationsByIds.mockReset();
 });
 
 describe('background-router conversations events', () => {

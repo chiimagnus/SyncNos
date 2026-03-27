@@ -10,6 +10,18 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
+const openConversationExternalById = vi.fn();
+const openConversationExternalBySourceKey = vi.fn();
+const consumePendingOpenConversation = vi.fn(() => null);
+
+vi.mock('../../src/ui/conversations/pending-open', () => ({
+  consumePendingOpenConversation: () => consumePendingOpenConversation(),
+  consumePendingOpenConversationId: () => {
+    const pending = consumePendingOpenConversation();
+    const id = Number((pending as any)?.conversationId || 0);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  },
+}));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => ({
@@ -30,6 +42,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     setActiveId,
     clearSelected: vi.fn(),
     exporting: false,
+    listError: null,
     syncFeedback: {
       provider: null,
       phase: 'idle',
@@ -43,13 +56,32 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     syncingNotion: false,
     syncingObsidian: false,
     deleting: false,
+    listSourceFilterKey: 'all',
+    listSiteFilterKey: 'all',
+    listCursor: null,
+    listHasMore: false,
+    listSummary: { totalCount: 1, todayCount: 1 },
+    listFacets: {
+      sources: [{ key: 'gemini', label: 'gemini', count: 1 }],
+      sites: [],
+    },
+    loadingInitialList: false,
+    loadingMoreList: false,
+    setListSourceFilterKeyPersistent: vi.fn(),
+    setListSiteFilterKeyPersistent: vi.fn(),
+    pendingListLocateId: null,
+    requestListLocate: vi.fn(),
+    consumeListLocate: vi.fn(() => null),
+    openConversationExternalByLoc: vi.fn(),
+    openConversationExternalBySourceKey,
+    openConversationExternalById,
+    loadMoreList: vi.fn(async () => {}),
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
     syncSelectedObsidian: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
     loadingList: false,
-    listError: null,
     loadingDetail: false,
     detailError: null,
     detail: {
@@ -109,6 +141,10 @@ describe('ConversationsScene popup Escape behavior', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
+    openConversationExternalById.mockReset();
+    openConversationExternalBySourceKey.mockReset();
+    consumePendingOpenConversation.mockReset();
+    consumePendingOpenConversation.mockReturnValue(null);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -162,5 +198,21 @@ describe('ConversationsScene popup Escape behavior', () => {
       document.dispatchEvent(secondEscape);
     });
     expect(secondEscape.defaultPrevented).toBe(false);
+  });
+
+  it('consumes pending-open source/key target and opens detail via precise API', () => {
+    consumePendingOpenConversation.mockReturnValueOnce({
+      conversationId: 99,
+      source: 'chatgpt',
+      conversationKey: 'conv-99',
+    });
+
+    act(() => {
+      root!.render(createElement(ConversationsScene));
+    });
+
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');
+    expect(openConversationExternalById).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
   });
 });

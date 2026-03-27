@@ -1,6 +1,13 @@
 import { CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { send } from '@platform/runtime/runtime';
-import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
+import type {
+  Conversation,
+  ConversationDetail,
+  ConversationListCursor,
+  ConversationListOpenTarget,
+  ConversationListPage,
+  ConversationListQueryInput,
+} from '@services/conversations/domain/models';
 
 type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
@@ -12,8 +19,55 @@ function unwrap<T>(res: ApiResponse<T>): T {
   throw new Error(message);
 }
 
-export async function listConversations(): Promise<Conversation[]> {
-  const res = await send<ApiResponse<Conversation[]>>(CORE_MESSAGE_TYPES.GET_CONVERSATIONS);
+export async function getConversationListBootstrap(
+  queryInput?: ConversationListQueryInput | null,
+  limit?: number | null,
+): Promise<ConversationListPage<Conversation>> {
+  const res = await send<ApiResponse<ConversationListPage<Conversation>>>(
+    CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP,
+    {
+      query: queryInput || {},
+      limit: Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : undefined,
+    },
+  );
+  return unwrap(res);
+}
+
+export async function getConversationListPage(
+  queryInput: ConversationListQueryInput | null | undefined,
+  cursor: ConversationListCursor,
+  limit?: number | null,
+): Promise<ConversationListPage<Conversation>> {
+  const res = await send<ApiResponse<ConversationListPage<Conversation>>>(
+    CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE,
+    {
+      query: queryInput || {},
+      cursor,
+      limit: Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : undefined,
+    },
+  );
+  return unwrap(res);
+}
+
+export async function findConversationBySourceAndKey(
+  source: string,
+  conversationKey: string,
+): Promise<ConversationListOpenTarget | null> {
+  const res = await send<ApiResponse<ConversationListOpenTarget | null>>(
+    CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY,
+    {
+      source: String(source || '').trim(),
+      conversationKey: String(conversationKey || '').trim(),
+    },
+  );
+  return unwrap(res);
+}
+
+export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
+  const id = Number(conversationId);
+  const res = await send<ApiResponse<ConversationListOpenTarget | null>>(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, {
+    conversationId: id,
+  });
   return unwrap(res);
 }
 

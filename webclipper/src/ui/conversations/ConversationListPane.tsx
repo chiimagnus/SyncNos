@@ -24,20 +24,12 @@ import {
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 
 type SourceMeta = { key: string; label: string };
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
-
-function toSiteFilterKey(domain: string) {
-  const safe = String(domain || '')
-    .trim()
-    .toLowerCase();
-  if (!safe) return SITE_FILTER_UNKNOWN_KEY;
-  return `domain:${safe}`;
-}
+const MAX_LOCATE_LOAD_ROUNDS = 8;
 
 function commonPrefix(a: string, b: string) {
   const left = String(a || '');
@@ -65,27 +57,8 @@ function formatTime(ts?: number) {
   }
 }
 
-function isSameLocalDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 function hasWarningFlags(conversation: Conversation) {
   return Array.isArray((conversation as any).warningFlags) && ((conversation as any).warningFlags as any[]).length > 0;
-}
-
-function isArticleConversation(conversation: Conversation): boolean {
-  return (
-    String((conversation as any)?.sourceType || '')
-      .trim()
-      .toLowerCase() === 'article'
-  );
-}
-
-function getConversationSiteFilterKey(conversation: Conversation): string {
-  if (!isArticleConversation(conversation)) return SITE_FILTER_UNKNOWN_KEY;
-  const hostname = parseHostnameFromUrl((conversation as any).url);
-  if (!hostname) return SITE_FILTER_UNKNOWN_KEY;
-  return toSiteFilterKey(hostname);
 }
 
 function getSourceMeta(raw: unknown): SourceMeta {
@@ -213,21 +186,29 @@ export function ConversationListPane({
     clearSelected,
     openConversationExternalById,
     exporting,
+    listError,
     syncFeedback,
     syncingNotion,
     syncingObsidian,
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
+    listSummary,
+    listFacets,
+    listHasMore,
+    loadingInitialList,
+    loadingMoreList,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
     pendingListLocateId,
     consumeListLocate,
+    loadMoreList,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
     clearSyncFeedback,
     deleteSelected,
+    refreshList,
   } = useConversationsApp();
 
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -235,6 +216,8 @@ export function ConversationListPane({
   const [exportOpen, setExportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const locateLoadRoundRef = useRef<{ id: number; rounds: number }>({ id: 0, rounds: 0 });
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
@@ -250,32 +233,22 @@ export function ConversationListPane({
   );
 
   const sourceOptions = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number }>();
-    for (const c of items) {
-      const meta = getSourceMeta((c as any).source);
-      if (!meta.key) continue;
-      const prev = map.get(meta.key);
-      if (prev) {
-        prev.count += 1;
-        continue;
-      }
-      map.set(meta.key, { key: meta.key, label: meta.label || meta.key, count: 1 });
-    }
-    const opts = Array.from(map.values()).sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.label.localeCompare(b.label);
-    });
-    return [{ key: 'all', label: t('allFilter') }, ...opts];
-  }, [items]);
-
-  const sourceFilteredItems = useMemo(() => {
-    const key =
-      String(listSourceFilterKey || 'all')
-        .trim()
-        .toLowerCase() || 'all';
-    if (key === 'all') return items;
-    return items.filter((c) => getSourceMeta((c as any).source).key === key);
-  }, [items, listSourceFilterKey]);
+    const facets = Array.isArray((listFacets as any)?.sources) ? (listFacets as any).sources : [];
+    const normalized = facets
+      .map((facet: any) => {
+        const key = String(facet?.key || '')
+          .trim()
+          .toLowerCase();
+        if (!key) return null;
+        const meta = getSourceMeta(key);
+        const label = String(meta.label || facet?.label || key).trim();
+        const count = Number(facet?.count) || 0;
+        if (count <= 0) return null;
+        return { key, label, count };
+      })
+      .filter((item: any): item is { key: string; label: string; count: number } => Boolean(item));
+    return [{ key: 'all', label: t('allFilter') }, ...normalized];
+  }, [listFacets]);
 
   const siteOptions = useMemo(() => {
     const key =
@@ -283,64 +256,28 @@ export function ConversationListPane({
         .trim()
         .toLowerCase() || 'all';
     if (key !== 'web') return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }];
-
-    const domainCounts = new Map<string, number>();
-    let unknownCount = 0;
-
-    for (const conversation of sourceFilteredItems) {
-      if (!isArticleConversation(conversation as any)) continue;
-      const hostname = parseHostnameFromUrl((conversation as any).url);
-      if (!hostname) {
-        unknownCount += 1;
-        continue;
-      }
-      domainCounts.set(hostname, (domainCounts.get(hostname) || 0) + 1);
-    }
-
-    const domains = Array.from(domainCounts.entries())
-      .map(([hostname, count]) => ({ key: toSiteFilterKey(hostname), label: hostname, count }))
-      .sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return String(a.label || '').localeCompare(String(b.label || ''));
-      });
-
-    const out: Array<{ key: string; label: string }> = [
-      { key: SITE_FILTER_ALL_KEY, label: t('allFilter') },
-      ...domains,
-    ];
-    if (unknownCount > 0) out.push({ key: SITE_FILTER_UNKNOWN_KEY, label: t('insightUnknownLabel') });
-    return out;
-  }, [listSourceFilterKey, sourceFilteredItems]);
+    const facets = Array.isArray((listFacets as any)?.sites) ? (listFacets as any).sites : [];
+    const options = facets
+      .map((facet: any) => {
+        const facetKey = String(facet?.key || '')
+          .trim()
+          .toLowerCase();
+        if (!facetKey || facetKey === SITE_FILTER_ALL_KEY) return null;
+        const rawLabel = String(facet?.label || '').trim();
+        const fallbackLabel = facetKey.startsWith('domain:') ? facetKey.slice('domain:'.length) : facetKey;
+        const label = facetKey === SITE_FILTER_UNKNOWN_KEY ? t('insightUnknownLabel') : rawLabel || fallbackLabel;
+        const count = Number(facet?.count) || 0;
+        if (count <= 0) return null;
+        return { key: facetKey, label };
+      })
+      .filter((item: any): item is { key: string; label: string } => Boolean(item));
+    return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }, ...options];
+  }, [listFacets, listSourceFilterKey]);
 
   const siteOptionKeys = useMemo(() => new Set(siteOptions.map((opt) => String(opt.key || ''))), [siteOptions]);
-
-  const filteredItems = useMemo(() => {
-    const sourceKey =
-      String(listSourceFilterKey || 'all')
-        .trim()
-        .toLowerCase() || 'all';
-    if (sourceKey !== 'web') return sourceFilteredItems;
-
-    const key =
-      String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
-        .trim()
-        .toLowerCase() || SITE_FILTER_ALL_KEY;
-    if (key === SITE_FILTER_ALL_KEY) return sourceFilteredItems;
-    return sourceFilteredItems.filter((conversation) => getConversationSiteFilterKey(conversation as any) === key);
-  }, [listSiteFilterKey, listSourceFilterKey, sourceFilteredItems]);
-
-  const todayCount = useMemo(() => {
-    const now = new Date();
-    return filteredItems.filter((c) => {
-      const ts = Number((c as any).lastCapturedAt) || 0;
-      if (!ts) return false;
-      try {
-        return isSameLocalDay(new Date(ts), now);
-      } catch {
-        return false;
-      }
-    }).length;
-  }, [filteredItems]);
+  const filteredItems = items;
+  const todayCount = Number((listSummary as any)?.todayCount) || 0;
+  const totalCount = Number((listSummary as any)?.totalCount) || 0;
 
   const visibleIds = useMemo(
     () => filteredItems.map((c) => Number((c as any).id)).filter((x) => Number.isFinite(x) && x > 0),
@@ -358,6 +295,11 @@ export function ConversationListPane({
   const allSelected = total > 0 && selectedCount === total;
   const indeterminate = selectedCount > 0 && selectedCount < total;
   const selectedTotalCount = selectedIds.length;
+  const hasLoadedItems = filteredItems.length > 0;
+  const showPaginationLoadingMore = hasLoadedItems && loadingMoreList;
+  const showPaginationError = hasLoadedItems && !loadingMoreList && Boolean(listError);
+  const showPaginationDone = hasLoadedItems && !loadingInitialList && !loadingMoreList && !listError && !listHasMore;
+  const paginationErrorMessage = String(listError || '').trim();
 
   useEffect(() => {
     const el = selectAllRef.current;
@@ -440,38 +382,93 @@ export function ConversationListPane({
   }, [initialScrollTop, scrollRestoreKey]);
 
   useEffect(() => {
-    const id = Number(pendingListLocateId);
-    if (!Number.isFinite(id) || id <= 0) return;
+    const root = scrollRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!root || !sentinel) return;
+    if (typeof IntersectionObserver !== 'function') return;
+    if (!listHasMore) return;
+    if (listError) return;
 
     let cancelled = false;
-    let attempts = 0;
-
-    const locate = () => {
-      if (cancelled) return;
-
-      const container = scrollRef.current;
-      const selector = `[data-conversation-id="${id}"]`;
-      const row = container ? (container.querySelector(selector) as HTMLElement | null) : null;
-      if (row) {
-        row.scrollIntoView({ block: 'nearest' });
-        consumeListLocate();
-        return;
-      }
-
-      attempts += 1;
-      if (attempts >= 2) {
-        consumeListLocate();
-        return;
-      }
-
-      requestAnimationFrame(locate);
-    };
-
-    locate();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (cancelled) return;
+        const entry = entries[0];
+        if (!entry || !entry.isIntersecting) return;
+        if (loadingMoreList) return;
+        if (!listHasMore) return;
+        if (listError) return;
+        void loadMoreList();
+      },
+      {
+        root,
+        threshold: 0.01,
+        rootMargin: '0px 0px 240px 0px',
+      },
+    );
+    observer.observe(sentinel);
     return () => {
       cancelled = true;
+      observer.disconnect();
     };
-  }, [consumeListLocate, pendingListLocateId]);
+  }, [listError, listHasMore, loadMoreList, loadingMoreList]);
+
+  useEffect(() => {
+    const id = Number(pendingListLocateId);
+    if (!Number.isFinite(id) || id <= 0) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      return;
+    }
+
+    if (locateLoadRoundRef.current.id !== id) {
+      locateLoadRoundRef.current = { id, rounds: 0 };
+    }
+
+    const container = scrollRef.current;
+    const selector = `[data-conversation-id="${id}"]`;
+    const row = container ? (container.querySelector(selector) as HTMLElement | null) : null;
+    if (row) {
+      row.scrollIntoView({ block: 'nearest' });
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
+
+    // The list may not have been loaded yet. Keep the pending locate request
+    // until we have at least one page (or an error) to avoid clearing it too early.
+    if (loadingInitialList || loadingMoreList) return;
+
+    if (listError) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
+
+    if (!listHasMore) {
+      if (!items.length) return;
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
+
+    if (locateLoadRoundRef.current.rounds >= MAX_LOCATE_LOAD_ROUNDS) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
+
+    locateLoadRoundRef.current = { id, rounds: locateLoadRoundRef.current.rounds + 1 };
+    void loadMoreList();
+  }, [
+    consumeListLocate,
+    listError,
+    listHasMore,
+    loadMoreList,
+    loadingInitialList,
+    loadingMoreList,
+    pendingListLocateId,
+    items,
+  ]);
 
   const onSetFilterKey = (key: string) => {
     const next =
@@ -497,13 +494,20 @@ export function ConversationListPane({
     setSyncOpen(false);
   };
 
+  const onRetryPagination = () => {
+    if (listHasMore) {
+      void loadMoreList();
+      return;
+    }
+    void refreshList();
+  };
+
   useEffect(() => {
     const sourceKey =
       String(listSourceFilterKey || 'all')
         .trim()
         .toLowerCase() || 'all';
     if (sourceKey !== 'web') return;
-    if (siteOptions.length <= 1) return;
 
     const current =
       String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
@@ -512,7 +516,7 @@ export function ConversationListPane({
     if (current === SITE_FILTER_ALL_KEY) return;
     if (siteOptionKeys.has(current)) return;
     setListSiteFilterKeyPersistent(SITE_FILTER_ALL_KEY);
-  }, [listSiteFilterKey, listSourceFilterKey, setListSiteFilterKeyPersistent, siteOptionKeys, siteOptions.length]);
+  }, [listSiteFilterKey, listSourceFilterKey, setListSiteFilterKeyPersistent, siteOptionKeys]);
 
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
@@ -629,22 +633,27 @@ export function ConversationListPane({
 
   const armedDeleteKey = deleteConfirm.getArmedKey();
   const deleteConfirming = !!deleteConfirmKey && armedDeleteKey != null && deleteConfirm.isArmed(deleteConfirmKey);
+  const loadedVisibleScopeHint = t('tooltipLoadedVisibleSelectionScope');
+  const selectAllTooltip =
+    total > 0
+      ? `${t('selectAll')} · ${loadedVisibleScopeHint} (${total})`
+      : `${t('selectAll')} · ${loadedVisibleScopeHint}`;
   const deleteTooltip = deleteConfirming
-    ? t('tooltipDeleteSelectedConfirmDetailed')
+    ? `${t('tooltipDeleteSelectedConfirmDetailed')} · ${loadedVisibleScopeHint}`
     : hasSelection
-      ? `${t('tooltipDeleteSelectedDetailed')} (${selectedTotalCount})`
+      ? `${t('tooltipDeleteSelectedDetailed')} (${selectedTotalCount}) · ${loadedVisibleScopeHint}`
       : t('tooltipDeleteSelectedDetailed');
   const exportTooltip = hasSelection
-    ? `${t('tooltipExportDetailed')} (${selectedTotalCount})`
+    ? `${t('tooltipExportDetailed')} (${selectedTotalCount}) · ${loadedVisibleScopeHint}`
     : t('tooltipExportSelectFirstDetailed');
   const singleSyncTooltip = hasSelection
-    ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${singleSyncLabel}`
+    ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${singleSyncLabel} · ${loadedVisibleScopeHint}`
     : t('tooltipSyncSelectFirstDetailed');
   const syncMenuTooltip =
     enabledSyncProviders.length === 0
       ? t('tooltipSyncProvidersDisabledDetailed')
       : hasSelection
-        ? `${t('tooltipSyncDetailed')} (${selectedTotalCount})`
+        ? `${t('tooltipSyncDetailed')} (${selectedTotalCount}) · ${loadedVisibleScopeHint}`
         : t('tooltipSyncSelectFirstDetailed');
 
   useEffect(() => {
@@ -803,6 +812,41 @@ export function ConversationListPane({
               </div>
             );
           })}
+
+          <div ref={loadMoreSentinelRef} aria-hidden="true" className="tw-h-4 tw-w-full tw-shrink-0" />
+
+          {showPaginationLoadingMore ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2 tw-text-center tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('paginationLoadingMore')}
+            </div>
+          ) : null}
+
+          {showPaginationError ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-p-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)]">
+              <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+                <span className="tw-truncate">{t('paginationLoadMoreFailed')}</span>
+                <button
+                  type="button"
+                  className={buttonTintClassName()}
+                  onClick={onRetryPagination}
+                  aria-label={t('paginationRetryLoadMore')}
+                >
+                  {t('paginationRetryLoadMore')}
+                </button>
+              </div>
+              {paginationErrorMessage ? (
+                <p className="tw-mt-1 tw-break-all tw-text-[10px] tw-font-medium tw-text-[var(--error)]">
+                  {paginationErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showPaginationDone ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2 tw-text-center tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('paginationAllLoaded')}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -817,6 +861,7 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
+              {...tooltipAttrs(selectAllTooltip)}
             >
               <input
                 ref={selectAllRef}
@@ -1102,9 +1147,7 @@ export function ConversationListPane({
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
                 <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
                 <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
-                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                  {String(filteredItems.length)}
-                </span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">{String(totalCount)}</span>
               </button>
             ) : (
               <div
@@ -1121,9 +1164,7 @@ export function ConversationListPane({
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[var(--success)]">{String(todayCount)}</span>
                 <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
                 <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
-                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                  {String(filteredItems.length)}
-                </span>
+                <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">{String(totalCount)}</span>
               </div>
             )}
           </div>

@@ -1,8 +1,23 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import {
+  LIST_SITE_KEY_ALL,
+  LIST_SOURCE_KEY_ALL,
+  normalizeConversationListQuery,
+  type ConversationListQueryInput,
+} from '@services/conversations/domain/list-query';
+import type {
+  ConversationListCursor,
+  ConversationListFacets,
+  ConversationListOpenTarget,
+  ConversationListPage,
+  ConversationListSummary,
+} from '@services/conversations/domain/list-pagination';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
+let conversationListStatsCacheKey: string | null = null;
+let conversationListStatsCacheValue: { summary: ConversationListSummary; facets: ConversationListFacets } | null = null;
 
 async function openDb(): Promise<IDBDatabase> {
   if (cachedDb) return cachedDb;
@@ -27,6 +42,8 @@ export async function __closeDbForTests(): Promise<void> {
   } finally {
     cachedDb = null;
     openingDb = null;
+    conversationListStatsCacheKey = null;
+    conversationListStatsCacheValue = null;
   }
 }
 
@@ -64,6 +81,92 @@ function withOptionalId<T extends Record<string, any>>(existingId: unknown, payl
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function normalizeListKey(value: unknown, fallback: string): string {
+  const text = safeString(value).toLowerCase();
+  return text || fallback;
+}
+
+function parseListSiteKeyFromUrl(raw: unknown): string {
+  const text = safeString(raw);
+  if (!text) return 'unknown';
+  try {
+    const url = new URL(text);
+    const protocol = safeString(url.protocol).toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return 'unknown';
+    const host = normalizeListKey(url.hostname, '');
+    return host ? `domain:${host}` : 'unknown';
+  } catch (_e) {
+    return 'unknown';
+  }
+}
+
+function deriveConversationListSourceKey(record: any): string {
+  return normalizeListKey(record?.source, 'unknown');
+}
+
+function deriveConversationListSiteKey(record: any): string {
+  return parseListSiteKeyFromUrl(record?.url);
+}
+
+function normalizeConversationListRecord<T extends Record<string, any>>(record: T): T {
+  const existingSourceKey = safeString(record?.listSourceKey);
+  const existingSiteKey = safeString(record?.listSiteKey);
+  const derivedSourceKey = deriveConversationListSourceKey(record);
+  const sourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : normalizeListKey(existingSourceKey, 'unknown');
+
+  const derivedSiteKey = normalizeConversationListSiteFilterKey(deriveConversationListSiteKey(record));
+  // When url is present and valid, derivedSiteKey wins. Only fall back to the stored key
+  // when we cannot derive a stable domain value.
+  const siteKey =
+    derivedSiteKey !== 'unknown'
+      ? derivedSiteKey
+      : existingSiteKey
+        ? normalizeConversationListSiteFilterKey(existingSiteKey)
+        : 'unknown';
+  if (existingSourceKey === sourceKey && existingSiteKey === siteKey) return record;
+  return {
+    ...record,
+    listSourceKey: sourceKey,
+    listSiteKey: siteKey,
+  } as T;
+}
+
+function toComparableCursor(cursor: ConversationListCursor | null | undefined): ConversationListCursor | null {
+  if (!cursor) return null;
+  const lastCapturedAt = Number(cursor.lastCapturedAt);
+  const id = Number(cursor.id);
+  if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
+  return { lastCapturedAt, id };
+}
+
+function invalidateConversationListStatsCache(): void {
+  conversationListStatsCacheKey = null;
+  conversationListStatsCacheValue = null;
+}
+
+function isSameLocalDayTimestamp(ts: number, now: Date): boolean {
+  if (!Number.isFinite(ts) || ts <= 0) return false;
+  try {
+    const date = new Date(ts);
+    return (
+      date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+    );
+  } catch (_e) {
+    return false;
+  }
+}
+
+function sortFacetItems(items: Array<{ key: string; label: string; count: number }>): Array<{
+  key: string;
+  label: string;
+  count: number;
+}> {
+  return items.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.label || '').localeCompare(String(b.label || ''));
+  });
 }
 
 function normalizeArticleUrl(raw: unknown): string {
@@ -275,7 +378,7 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
   const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
 
-  const baseRecord = {
+  const baseRecord = normalizeConversationListRecord({
     sourceType: nextSourceType,
     source: payload.source,
     conversationKey: payload.conversationKey,
@@ -290,7 +393,7 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
         : [],
     notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
     lastCapturedAt: nextLastCapturedAt,
-  };
+  });
 
   const record: any = withOptionalId(existing && existing.id, baseRecord);
 
@@ -304,12 +407,14 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
     });
     await reqToPromise(stores.conversations.put(record));
     await txDone(t);
+    invalidateConversationListStatsCache();
     return record;
   }
 
   const id = await reqToPromise(stores.conversations.add(record));
   record.id = id as any;
   await txDone(t);
+  invalidateConversationListStatsCache();
   return record;
 }
 
@@ -357,7 +462,7 @@ export async function mergeConversationsByIds(input: {
     };
   }
 
-  const mergedConversation: any = {
+  const mergedConversation: any = normalizeConversationListRecord({
     ...keep,
     sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
     title: mergeStringFallback(keep.title, remove.title),
@@ -367,7 +472,7 @@ export async function mergeConversationsByIds(input: {
     notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
     warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
     lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || Date.now(),
-  };
+  });
 
   await migrateSyncMappingKey(stores.sync_mappings, {
     legacySource: remove.source,
@@ -417,6 +522,7 @@ export async function mergeConversationsByIds(input: {
 
   await reqToPromise(stores.conversations.delete(removeConversationId));
   await txDone(t);
+  invalidateConversationListStatsCache();
 
   return {
     keptConversationId: keepConversationId,
@@ -562,13 +668,265 @@ export async function syncConversationMessagesAppendOnly(
   return await syncConversationMessages(conversationId, messages, { mode: 'append', diff: diff || null });
 }
 
-export async function getConversations(): Promise<Conversation[]> {
+function normalizeConversationListSiteFilterKey(value: unknown): string {
+  const key = normalizeListKey(value, LIST_SITE_KEY_ALL);
+  if (key === LIST_SITE_KEY_ALL || key === 'unknown') return key;
+  return key.startsWith('domain:') ? key : `domain:${key}`;
+}
+
+function resolveConversationListQuery(
+  queryInput?: ConversationListQueryInput | null,
+  limit?: number | null,
+): ReturnType<typeof normalizeConversationListQuery> {
+  const fallbackLimit = Number(limit);
+  const query = normalizeConversationListQuery({
+    ...(queryInput || {}),
+    ...(Number.isFinite(fallbackLimit) && fallbackLimit > 0 ? { limit: fallbackLimit } : null),
+  });
+  return {
+    ...query,
+    siteKey: normalizeConversationListSiteFilterKey(query.siteKey),
+  };
+}
+
+function buildListPageRange(
+  query: ReturnType<typeof normalizeConversationListQuery>,
+  cursor: ConversationListCursor | null,
+): {
+  indexName:
+    | 'by_lastCapturedAt_id'
+    | 'by_listSourceKey_lastCapturedAt_id'
+    | 'by_listSourceKey_listSiteKey_lastCapturedAt_id'
+    | 'by_listSiteKey_lastCapturedAt_id';
+  range: IDBKeyRange | null;
+} {
+  const sourceKey = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
+  const siteKey = normalizeConversationListSiteFilterKey(query.siteKey);
+  const hasSourceFilter = sourceKey !== LIST_SOURCE_KEY_ALL;
+  const hasSiteFilter = siteKey !== LIST_SITE_KEY_ALL;
+  const MIN_KEY = 0;
+  const MAX_KEY = Number.MAX_SAFE_INTEGER;
+
+  const keyRangeApi = globalThis.IDBKeyRange;
+  if (!keyRangeApi) {
+    return {
+      indexName: 'by_lastCapturedAt_id',
+      range: null,
+    };
+  }
+
+  if (hasSourceFilter && hasSiteFilter) {
+    if (!cursor) {
+      return {
+        indexName: 'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+        range: keyRangeApi.bound(
+          [sourceKey, siteKey, MIN_KEY, MIN_KEY] as any,
+          [sourceKey, siteKey, MAX_KEY, MAX_KEY] as any,
+        ),
+      };
+    }
+    return {
+      indexName: 'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+      range: keyRangeApi.bound(
+        [sourceKey, siteKey, MIN_KEY, MIN_KEY] as any,
+        [sourceKey, siteKey, cursor.lastCapturedAt, cursor.id] as any,
+        false,
+        true,
+      ),
+    };
+  }
+
+  if (hasSourceFilter) {
+    if (!cursor) {
+      return {
+        indexName: 'by_listSourceKey_lastCapturedAt_id',
+        range: keyRangeApi.bound([sourceKey, MIN_KEY, MIN_KEY] as any, [sourceKey, MAX_KEY, MAX_KEY] as any),
+      };
+    }
+    return {
+      indexName: 'by_listSourceKey_lastCapturedAt_id',
+      range: keyRangeApi.bound(
+        [sourceKey, MIN_KEY, MIN_KEY] as any,
+        [sourceKey, cursor.lastCapturedAt, cursor.id] as any,
+        false,
+        true,
+      ),
+    };
+  }
+
+  if (hasSiteFilter) {
+    if (!cursor) {
+      return {
+        indexName: 'by_listSiteKey_lastCapturedAt_id',
+        range: keyRangeApi.bound([siteKey, MIN_KEY, MIN_KEY] as any, [siteKey, MAX_KEY, MAX_KEY] as any),
+      };
+    }
+    return {
+      indexName: 'by_listSiteKey_lastCapturedAt_id',
+      range: keyRangeApi.bound(
+        [siteKey, MIN_KEY, MIN_KEY] as any,
+        [siteKey, cursor.lastCapturedAt, cursor.id] as any,
+        false,
+        true,
+      ),
+    };
+  }
+
+  if (!cursor) {
+    return { indexName: 'by_lastCapturedAt_id', range: null };
+  }
+  return {
+    indexName: 'by_lastCapturedAt_id',
+    range: keyRangeApi.upperBound([cursor.lastCapturedAt, cursor.id] as any, true),
+  };
+}
+
+async function readConversationListPageItems(input: {
+  store: IDBObjectStore;
+  query: ReturnType<typeof normalizeConversationListQuery>;
+  cursor: ConversationListCursor | null;
+}): Promise<{ items: Conversation[]; cursor: ConversationListCursor | null; hasMore: boolean }> {
+  const { store, query, cursor } = input;
+  const safeLimit = Number.isFinite(query.limit) && query.limit > 0 ? Math.floor(query.limit) : 1;
+  const rangeInput = buildListPageRange(query, cursor);
+  const idx = store.index(rangeInput.indexName);
+  const request = idx.openCursor((rangeInput.range || null) as any, 'prev');
+
+  const rows = await new Promise<any[]>((resolve, reject) => {
+    const out: any[] = [];
+    request.onerror = () => reject(request.error || new Error('cursor failed'));
+    request.onsuccess = () => {
+      const c = request.result;
+      if (!c) return resolve(out);
+      out.push(normalizeConversationListRecord(c.value || {}));
+      if (out.length >= safeLimit + 1) return resolve(out);
+      c.continue();
+    };
+  });
+
+  const hasMore = rows.length > safeLimit;
+  const pageItems = hasMore ? rows.slice(0, safeLimit) : rows;
+  const tail = pageItems.length ? pageItems[pageItems.length - 1] : null;
+  const nextCursor =
+    hasMore && tail
+      ? toComparableCursor({
+          lastCapturedAt: Number(tail.lastCapturedAt) || 0,
+          id: Number(tail.id) || 0,
+        })
+      : null;
+  return {
+    items: pageItems as Conversation[],
+    cursor: nextCursor,
+    hasMore,
+  };
+}
+
+async function readConversationListSummaryAndFacets(input: {
+  store: IDBObjectStore;
+  query: ReturnType<typeof normalizeConversationListQuery>;
+}): Promise<{ summary: ConversationListSummary; facets: ConversationListFacets }> {
+  const { store, query } = input;
+  const sourceFilter = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
+  const siteFilter = normalizeConversationListSiteFilterKey(query.siteKey);
+  const sourceFacetMap = new Map<string, { key: string; label: string; count: number }>();
+  const siteFacetMap = new Map<string, { key: string; label: string; count: number }>();
+  const siteFacetSourceScope = sourceFilter === LIST_SOURCE_KEY_ALL ? 'web' : sourceFilter;
+
+  const now = new Date();
+  let totalCount = 0;
+  let todayCount = 0;
+
+  const request = store.openCursor();
+  await new Promise<void>((resolve, reject) => {
+    request.onerror = () => reject(request.error || new Error('cursor failed'));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve();
+      const raw = (cursor.value || {}) as any;
+      const rowSourceKey = normalizeListKey(safeString(raw.listSourceKey) || safeString(raw.source), 'unknown');
+      const rowSiteKey = normalizeConversationListSiteFilterKey(
+        safeString(raw.listSiteKey) || deriveConversationListSiteKey(raw),
+      );
+      const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
+
+      const sourceFacet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
+      sourceFacet.count += 1;
+      sourceFacetMap.set(rowSourceKey, sourceFacet);
+
+      if (rowSourceKey === siteFacetSourceScope) {
+        const siteFacet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteLabel, count: 0 };
+        siteFacet.count += 1;
+        siteFacetMap.set(rowSiteKey, siteFacet);
+      }
+
+      const sourceMatch = sourceFilter === LIST_SOURCE_KEY_ALL || rowSourceKey === sourceFilter;
+      const siteMatch = siteFilter === LIST_SITE_KEY_ALL || rowSiteKey === siteFilter;
+      if (sourceMatch && siteMatch) {
+        totalCount += 1;
+        const ts = Number(raw.lastCapturedAt) || 0;
+        if (isSameLocalDayTimestamp(ts, now)) todayCount += 1;
+      }
+      cursor.continue();
+    };
+  });
+
+  return {
+    summary: {
+      totalCount,
+      todayCount,
+    },
+    facets: {
+      sources: sortFacetItems(Array.from(sourceFacetMap.values())),
+      sites: sortFacetItems(Array.from(siteFacetMap.values())),
+    },
+  };
+}
+
+async function readConversationListPage(input: {
+  queryInput?: ConversationListQueryInput | null;
+  cursor?: ConversationListCursor | null;
+  limit?: number | null;
+}): Promise<ConversationListPage<Conversation>> {
+  const query = resolveConversationListQuery(input.queryInput, input.limit);
+  const cursor = toComparableCursor(input.cursor);
+  const statsKey = `${normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL)}::${normalizeConversationListSiteFilterKey(query.siteKey)}`;
+
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations'], 'readonly');
-  const items = (await reqToPromise(stores.conversations.getAll())) as any[];
+  const pagePromise = readConversationListPageItems({ store: stores.conversations, query, cursor });
+  const summaryPromise = (async () => {
+    if (conversationListStatsCacheKey === statsKey && conversationListStatsCacheValue) {
+      return conversationListStatsCacheValue;
+    }
+    const computed = await readConversationListSummaryAndFacets({ store: stores.conversations, query });
+    conversationListStatsCacheKey = statsKey;
+    conversationListStatsCacheValue = computed;
+    return computed;
+  })();
+  const [page, summaryData] = await Promise.all([pagePromise, summaryPromise]);
   await txDone(t);
-  items.sort((a, b) => (b.lastCapturedAt || 0) - (a.lastCapturedAt || 0));
-  return items as any;
+  return {
+    items: page.items,
+    cursor: page.cursor,
+    hasMore: page.hasMore,
+    summary: summaryData.summary,
+    facets: summaryData.facets,
+  };
+}
+
+export async function getConversationListBootstrap(
+  queryInput?: ConversationListQueryInput | null,
+  limit?: number | null,
+): Promise<ConversationListPage<Conversation>> {
+  return await readConversationListPage({ queryInput, cursor: null, limit });
+}
+
+export async function getConversationListPage(
+  queryInput: ConversationListQueryInput | null | undefined,
+  cursor: ConversationListCursor,
+  limit?: number | null,
+): Promise<ConversationListPage<Conversation>> {
+  return await readConversationListPage({ queryInput, cursor, limit });
 }
 
 export async function getConversationBySourceConversationKey(
@@ -584,7 +942,37 @@ export async function getConversationBySourceConversationKey(
   const idx = stores.conversations.index('by_source_conversationKey');
   const item = (await reqToPromise(idx.get([normalizedSource, normalizedKey]) as any)) as any;
   await txDone(t);
-  return item || null;
+  return item ? normalizeConversationListRecord(item) : null;
+}
+
+function toConversationListOpenTarget(input: any): ConversationListOpenTarget | null {
+  if (!input || typeof input !== 'object') return null;
+  const id = Number(input.id);
+  const source = safeString(input.source);
+  const conversationKey = safeString(input.conversationKey);
+  if (!Number.isFinite(id) || id <= 0 || !source || !conversationKey) return null;
+  return {
+    id,
+    source,
+    conversationKey,
+    title: safeString(input.title) || undefined,
+    url: safeString(input.url) || undefined,
+    sourceType: safeString(input.sourceType) || undefined,
+    lastCapturedAt: Number(input.lastCapturedAt) || 0,
+  };
+}
+
+export async function findConversationBySourceAndKey(
+  source: string,
+  conversationKey: string,
+): Promise<ConversationListOpenTarget | null> {
+  const row = await getConversationBySourceConversationKey(source, conversationKey);
+  return toConversationListOpenTarget(row);
+}
+
+export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
+  const row = await getConversationById(conversationId);
+  return toConversationListOpenTarget(row);
 }
 
 export async function getMessagesByConversationId(conversationId: number): Promise<ConversationMessage[]> {
@@ -674,6 +1062,7 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   }
 
   await txDone(t);
+  invalidateConversationListStatsCache();
   return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
 }
 
@@ -684,7 +1073,7 @@ export async function getConversationById(conversationId: number): Promise<Conve
   const { t, stores } = tx(db, ['conversations'], 'readonly');
   const row = (await reqToPromise(stores.conversations.get(id as any))) as any;
   await txDone(t);
-  return (row || null) as Conversation | null;
+  return row ? (normalizeConversationListRecord(row) as Conversation) : null;
 }
 
 export async function getSyncMappingByConversation(

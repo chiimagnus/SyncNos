@@ -6,7 +6,8 @@ import { openDb } from '../../src/platform/idb/schema';
 import {
   __closeDbForTests,
   deleteConversationsByIds,
-  getConversations,
+  getConversationById,
+  getConversationListBootstrap,
   getMessagesByConversationId,
   mergeConversationsByIds,
   syncConversationMessages,
@@ -48,6 +49,11 @@ afterEach(async () => {
   await __closeDbForTests();
 });
 
+async function listAllConversationsForTests() {
+  const page = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 500 }, 500);
+  return page.items;
+}
+
 describe('conversations storage-idb', () => {
   it('upserts conversation and lists conversations sorted by lastCapturedAt desc', async () => {
     await upsertConversation({
@@ -65,10 +71,12 @@ describe('conversations storage-idb', () => {
       lastCapturedAt: 2,
     });
 
-    const items = await getConversations();
+    const items = await listAllConversationsForTests();
     expect(items.length).toBe(2);
     expect(items[0].conversationKey).toBe('k2');
     expect(items[1].conversationKey).toBe('k1');
+    expect(items[0].listSourceKey).toBe('debug');
+    expect(items[0].listSiteKey).toBe('unknown');
   });
 
   it('syncs messages and cleans up removed messages', async () => {
@@ -201,7 +209,7 @@ describe('conversations storage-idb', () => {
     expect(res.deletedMessages).toBe(1);
     expect(res.deletedMappings).toBe(1);
 
-    const items = await getConversations();
+    const items = await listAllConversationsForTests();
     expect(items.length).toBe(0);
   });
 
@@ -321,7 +329,7 @@ describe('conversations storage-idb', () => {
     expect(res.removedConversationId).toBe(removeId);
     expect(res.merged).toBe(true);
 
-    const items = await getConversations();
+    const items = await listAllConversationsForTests();
     expect(items.map((c) => c.conversationKey)).toEqual(['keep']);
     expect(items[0]).toMatchObject({
       conversationKey: 'keep',
@@ -347,5 +355,38 @@ describe('conversations storage-idb', () => {
       notionPageId: 'page_remove',
       lastSyncedMessageKey: 'x',
     });
+  });
+
+  it('maintains listSourceKey/listSiteKey on upsert and merge writes', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'key_keep',
+      title: 'keep',
+      url: '',
+      lastCapturedAt: 1,
+    });
+    const remove = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'key_remove',
+      title: 'remove',
+      url: 'https://example.com/post',
+      lastCapturedAt: 2,
+    });
+
+    expect(keep.listSourceKey).toBe('web');
+    expect(keep.listSiteKey).toBe('unknown');
+    expect(remove.listSourceKey).toBe('web');
+    expect(remove.listSiteKey).toBe('domain:example.com');
+
+    const keepId = Number(keep.id);
+    const removeId = Number(remove.id);
+    await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    const merged = await getConversationById(keepId);
+    expect(merged).toBeTruthy();
+    expect(merged?.listSourceKey).toBe('web');
+    expect(merged?.listSiteKey).toBe('domain:example.com');
   });
 });

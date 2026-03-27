@@ -1,5 +1,5 @@
 export const DB_NAME = 'webclipper';
-export const DB_VERSION = 7;
+export const DB_VERSION = 8;
 
 type MigrationContext = {
   db: IDBDatabase;
@@ -42,6 +42,54 @@ function mergeStringArray(base: unknown, incoming: unknown): string[] {
   pushAll(base);
   pushAll(incoming);
   return Array.from(values);
+}
+
+function parseSiteKeyFromUrl(url: unknown): string {
+  const normalizedUrl = normalizeHttpUrl(url);
+  if (!normalizedUrl) return 'unknown';
+  try {
+    const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
+    return host ? `domain:${host}` : 'unknown';
+  } catch (_e) {
+    return 'unknown';
+  }
+}
+
+function deriveConversationListSourceKey(row: Record<string, unknown> | undefined): string {
+  const source = safeString(row?.source).toLowerCase();
+  return source || 'unknown';
+}
+
+function deriveConversationListSiteKey(row: Record<string, unknown> | undefined): string {
+  return parseSiteKeyFromUrl(row?.url);
+}
+
+function backfillConversationListDerivedKeys({ db, tx }: MigrationContext): void {
+  if (!db.objectStoreNames.contains('conversations')) return;
+  const conversationsStore = tx.objectStore('conversations');
+  const req = conversationsStore.openCursor();
+  req.onsuccess = () => {
+    const cursor = req.result;
+    if (!cursor) return;
+    const value = (cursor.value || {}) as Record<string, unknown>;
+    const nextSourceKey = deriveConversationListSourceKey(value);
+    const nextSiteKey = deriveConversationListSiteKey(value);
+    const hasLegacyDescription = Object.prototype.hasOwnProperty.call(value, 'description');
+    if (
+      safeString(value.listSourceKey) !== nextSourceKey ||
+      safeString(value.listSiteKey) !== nextSiteKey ||
+      hasLegacyDescription
+    ) {
+      const next = {
+        ...value,
+        listSourceKey: nextSourceKey,
+        listSiteKey: nextSiteKey,
+      } as Record<string, unknown>;
+      if (hasLegacyDescription) delete (next as any).description;
+      cursor.update(next as any);
+    }
+    cursor.continue();
+  };
 }
 
 function stripConversationDescriptionField({ db, tx }: MigrationContext): void {
@@ -769,6 +817,18 @@ function ensureConversationsStore(db: IDBDatabase, tx: IDBTransaction | null): v
     const store = db.createObjectStore('conversations', { keyPath: 'id', autoIncrement: true });
     store.createIndex('by_source_conversationKey', ['source', 'conversationKey'], { unique: true });
     store.createIndex('by_lastCapturedAt', 'lastCapturedAt', { unique: false });
+    store.createIndex('by_lastCapturedAt_id', ['lastCapturedAt', 'id'], { unique: false });
+    store.createIndex('by_listSourceKey_lastCapturedAt_id', ['listSourceKey', 'lastCapturedAt', 'id'], {
+      unique: false,
+    });
+    store.createIndex(
+      'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+      ['listSourceKey', 'listSiteKey', 'lastCapturedAt', 'id'],
+      { unique: false },
+    );
+    store.createIndex('by_listSiteKey_lastCapturedAt_id', ['listSiteKey', 'lastCapturedAt', 'id'], {
+      unique: false,
+    });
     return;
   }
 
@@ -779,6 +839,26 @@ function ensureConversationsStore(db: IDBDatabase, tx: IDBTransaction | null): v
   }
   if (!store.indexNames.contains('by_lastCapturedAt')) {
     store.createIndex('by_lastCapturedAt', 'lastCapturedAt', { unique: false });
+  }
+  if (!store.indexNames.contains('by_lastCapturedAt_id')) {
+    store.createIndex('by_lastCapturedAt_id', ['lastCapturedAt', 'id'], { unique: false });
+  }
+  if (!store.indexNames.contains('by_listSourceKey_lastCapturedAt_id')) {
+    store.createIndex('by_listSourceKey_lastCapturedAt_id', ['listSourceKey', 'lastCapturedAt', 'id'], {
+      unique: false,
+    });
+  }
+  if (!store.indexNames.contains('by_listSourceKey_listSiteKey_lastCapturedAt_id')) {
+    store.createIndex(
+      'by_listSourceKey_listSiteKey_lastCapturedAt_id',
+      ['listSourceKey', 'listSiteKey', 'lastCapturedAt', 'id'],
+      { unique: false },
+    );
+  }
+  if (!store.indexNames.contains('by_listSiteKey_lastCapturedAt_id')) {
+    store.createIndex('by_listSiteKey_lastCapturedAt_id', ['listSiteKey', 'lastCapturedAt', 'id'], {
+      unique: false,
+    });
   }
 }
 
@@ -896,6 +976,11 @@ function runUpgrades(request: IDBOpenDBRequest, oldVersion: number): void {
     } catch (_e) {
       // ignore migration failures to avoid open abortion
     }
+  }
+  if (tx && oldVersion < 8) {
+    // Consistency-critical migration for list pagination/filter keys.
+    // Do not swallow failures here, otherwise list indexes and record keys may drift.
+    backfillConversationListDerivedKeys({ db, tx });
   }
 }
 

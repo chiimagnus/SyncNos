@@ -8,7 +8,7 @@ import type { DetailHeaderAction } from '@services/integrations/detail-header-ac
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
-import { consumePendingOpenConversationId } from '@ui/conversations/pending-open';
+import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 
 type NarrowRoute = 'list' | 'detail';
@@ -39,7 +39,13 @@ export function ConversationsScene({
   onOpenInsightsSection,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId, selectedConversation, detailHeaderActions, setActiveId } = useConversationsApp();
+  const {
+    activeId,
+    selectedConversation,
+    detailHeaderActions,
+    openConversationExternalBySourceKey,
+    openConversationExternalById,
+  } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,
@@ -53,11 +59,20 @@ export function ConversationsScene({
 
   useEffect(() => {
     if (!isNarrow) return;
-    const id = consumePendingOpenConversationId();
-    if (!id) return;
-    setActiveId(id);
+    const pending = consumePendingOpenConversation();
+    if (!pending) return;
+    const id = Number(pending.conversationId);
+    const source = String(pending.source || '').trim();
+    const conversationKey = String(pending.conversationKey || '').trim();
+    if (source && conversationKey) {
+      void openConversationExternalBySourceKey(source, conversationKey);
+    } else if (Number.isFinite(id) && id > 0) {
+      void openConversationExternalById(id);
+    } else {
+      return;
+    }
     openDetail();
-  }, [isNarrow, openDetail, setActiveId]);
+  }, [isNarrow, openConversationExternalById, openConversationExternalBySourceKey, openDetail]);
 
   useEffect(() => {
     if (!onPopupHeaderStateChange) return;

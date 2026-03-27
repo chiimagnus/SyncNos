@@ -2,9 +2,12 @@ import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-
 import { storageGet } from '@platform/storage/local';
 import {
   deleteConversationsByIds,
+  findConversationById,
+  findConversationBySourceAndKey,
+  getConversationListBootstrap,
+  getConversationListPage,
   getConversationDetail,
   hasConversation,
-  listConversations,
   mergeConversationsByIds,
 } from '@services/conversations/data/storage';
 import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
@@ -23,10 +26,107 @@ type AnyRouter = {
   eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
+type ListQueryPayload = {
+  sourceKey: string;
+  siteKey: string;
+  limit?: number;
+};
+
+type ListCursorPayload = {
+  lastCapturedAt: number;
+  id: number;
+};
+
+function normalizeListFilterKey(value: unknown, fallback: string): string {
+  const text = String(value || '')
+    .trim()
+    .toLowerCase();
+  return text || fallback;
+}
+
+function normalizeListLimit(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return Math.min(Math.floor(limit), 200);
+}
+
+function parseListQueryPayload(msg: any): { query: ListQueryPayload; errorField?: string } {
+  const rawQuery = msg?.query;
+  if (rawQuery != null && typeof rawQuery !== 'object') {
+    return {
+      query: { sourceKey: 'all', siteKey: 'all' },
+      errorField: 'query',
+    };
+  }
+  const sourceKey = normalizeListFilterKey(rawQuery?.sourceKey, 'all');
+  const siteKey = normalizeListFilterKey(rawQuery?.siteKey, 'all');
+  const rawLimit = msg?.limit ?? rawQuery?.limit;
+  const limit = normalizeListLimit(rawLimit);
+  if (rawLimit != null && rawLimit !== '' && limit == null) {
+    return {
+      query: { sourceKey, siteKey },
+      errorField: 'limit',
+    };
+  }
+  return {
+    query: limit == null ? { sourceKey, siteKey } : { sourceKey, siteKey, limit },
+  };
+}
+
+function parseListCursorPayload(value: unknown): ListCursorPayload | null {
+  if (!value || typeof value !== 'object') return null;
+  const lastCapturedAt = Number((value as any).lastCapturedAt);
+  const id = Number((value as any).id);
+  if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
+  return { lastCapturedAt, id };
+}
+
 export function registerConversationHandlers(router: AnyRouter) {
-  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATIONS, async () => {
-    const items = await listConversations();
-    return router.ok(items);
+  const invalidArgument = (field: string, message: string, received: unknown) => {
+    return router.err(message, {
+      code: 'INVALID_ARGUMENT',
+      field,
+      received,
+    });
+  };
+
+  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP, async (msg) => {
+    const parsed = parseListQueryPayload(msg);
+    if (parsed.errorField === 'query') return invalidArgument('query', 'invalid query', msg?.query);
+    if (parsed.errorField === 'limit')
+      return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
+    const page = await getConversationListBootstrap(parsed.query, parsed.query.limit);
+    return router.ok(page);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE, async (msg) => {
+    const parsed = parseListQueryPayload(msg);
+    if (parsed.errorField === 'query') return invalidArgument('query', 'invalid query', msg?.query);
+    if (parsed.errorField === 'limit')
+      return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
+    const cursor = parseListCursorPayload(msg?.cursor);
+    if (!cursor) return invalidArgument('cursor', 'invalid cursor', msg?.cursor);
+    const page = await getConversationListPage(parsed.query, cursor, parsed.query.limit);
+    return router.ok(page);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, async (msg) => {
+    const source = String(msg?.source || '').trim();
+    const conversationKey = String(msg?.conversationKey || '').trim();
+    if (!source) return invalidArgument('source', 'invalid source', msg?.source);
+    if (!conversationKey) return invalidArgument('conversationKey', 'invalid conversationKey', msg?.conversationKey);
+    const target = await findConversationBySourceAndKey(source, conversationKey);
+    return router.ok(target);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, async (msg) => {
+    const conversationId = Number(msg?.conversationId);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) {
+      return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
+    }
+    const target = await findConversationById(conversationId);
+    return router.ok(target);
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, async (msg) => {

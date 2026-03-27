@@ -31,6 +31,19 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
+function isArticleConversationLike(conversation: any): boolean {
+  const sourceType = String(conversation?.sourceType || '')
+    .trim()
+    .toLowerCase();
+  if (sourceType === 'article') return true;
+
+  const source = String(conversation?.source || '')
+    .trim()
+    .toLowerCase();
+  if (source !== 'web') return false;
+  return Boolean(normalizeHttpUrl(conversation?.url));
+}
+
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
@@ -66,10 +79,7 @@ export function ConversationDetailPane({
 
   const outlineButtonClass = buttonTintClassName();
   const headerIconButtonClass = headerButtonClassName();
-  const isArticle =
-    String((selected as any)?.sourceType || '')
-      .trim()
-      .toLowerCase() === 'article';
+  const isArticle = isArticleConversationLike(selected);
   const canonicalUrl = normalizeHttpUrl((selected as any)?.url);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
