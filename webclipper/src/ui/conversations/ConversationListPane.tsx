@@ -431,6 +431,12 @@ export function ConversationListPane({
       return;
     }
 
+    if (listError) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
+
     if (!listHasMore) {
       locateLoadRoundRef.current = { id: 0, rounds: 0 };
       consumeListLocate();
@@ -448,6 +454,7 @@ export function ConversationListPane({
     void loadMoreList();
   }, [
     consumeListLocate,
+    listError,
     listHasMore,
     loadMoreList,
     loadingInitialList,

@@ -18,6 +18,7 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
+import { setPendingOpenConversationId } from '@ui/conversations/pending-open';
 import { buildConversationRouteFromLoc } from '@services/shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';
@@ -343,7 +344,7 @@ export function InsightPanel(props: {
     const conversationKey = String(item?.openConversationKey || '').trim();
     const conversationId = Number(item?.conversationId);
 
-    openConversationInApp(conversationId, {
+    const openedId = openConversationInApp(conversationId, {
       clearSelected,
       isNarrow,
       setActiveId: (id) => {
@@ -354,6 +355,10 @@ export function InsightPanel(props: {
         void openConversationExternalById(Number(id));
       },
     });
+
+    if (isNarrow && openedId && source && conversationKey) {
+      setPendingOpenConversationId(openedId, { source, conversationKey });
+    }
   };
 
   return (

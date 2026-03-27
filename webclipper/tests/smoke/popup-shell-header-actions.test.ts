@@ -16,6 +16,14 @@ vi.mock('../../src/platform/webext/tabs', () => ({
   tabsCreate: vi.fn(),
 }));
 
+vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/ui/shared/AppTooltip')>();
+  return {
+    ...actual,
+    AppTooltipHost: () => null,
+  };
+});
+
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: ReactNode }) => children,
   useConversationsApp: () => ({
@@ -26,6 +34,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     toggleSelected: vi.fn(),
     setActiveId: vi.fn(),
     clearSelected: vi.fn(),
+    openConversationExternalByLoc: vi.fn(),
+    openConversationExternalBySourceKey: vi.fn(),
     openConversationExternalById: vi.fn(),
     exporting: false,
     syncFeedback: {
@@ -184,6 +194,15 @@ function setupDom() {
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
+  Object.defineProperty(globalThis, 'MutationObserver', {
+    configurable: true,
+    value: dom.window.MutationObserver,
+  });
+  Object.defineProperty(globalThis, 'Event', { configurable: true, value: dom.window.Event });
+  Object.defineProperty(globalThis, 'CustomEvent', {
+    configurable: true,
+    value: dom.window.CustomEvent,
+  });
   Object.defineProperty(globalThis, 'getComputedStyle', {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
@@ -201,6 +220,9 @@ function cleanupDom() {
   delete (globalThis as any).HTMLElement;
   delete (globalThis as any).Node;
   delete (globalThis as any).localStorage;
+  delete (globalThis as any).MutationObserver;
+  delete (globalThis as any).Event;
+  delete (globalThis as any).CustomEvent;
   delete (globalThis as any).getComputedStyle;
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
