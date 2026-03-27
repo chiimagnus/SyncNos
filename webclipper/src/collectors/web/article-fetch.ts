@@ -218,59 +218,29 @@ async function extractArticleOnTab(tabId: number) {
         return out;
       }
 
-      function buildWechatShareMediaGridHtml({ columns = 3 } = {}) {
+      function buildWechatShareMediaGalleryHtml() {
         const imageUrls = extractWechatShareMediaImageUrls();
         if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
 
-        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
-        const tdStyle = 'padding:4px;vertical-align:top;';
-        const imgStyle = 'width:100%;height:auto;display:block;';
-
-        const rows: string[] = [];
-        for (let i = 0; i < imageUrls.length; i += safeColumns) {
-          const slice = imageUrls.slice(i, i + safeColumns);
-          const cells: string[] = [];
-          for (const url of slice) {
-            cells.push(
-              `<td style="${tdStyle}"><img src="${escapeHtml(url)}" alt="" loading="lazy" style="${imgStyle}" /></td>`,
-            );
-          }
-          while (cells.length < safeColumns) cells.push(`<td style="${tdStyle}"></td>`);
-          rows.push(`<tr>${cells.join('')}</tr>`);
-        }
-
-        const tableStyle = 'width:100%;border-collapse:collapse;table-layout:fixed;';
-        return (
-          `<hr />` +
-          `<table data-syncnos-origin="wechat-share-media-grid" style="${tableStyle}"><tbody>${rows.join('')}</tbody></table>`
-        );
+        const imageBlocks = imageUrls
+          .map(
+            (url) =>
+              `<p data-syncnos-origin="wechat-share-media-item"><img src="${escapeHtml(url)}" alt="" loading="lazy" style="max-width:100%;height:auto;display:block;" /></p>`,
+          )
+          .join('');
+        return `<hr /><div data-syncnos-origin="wechat-share-media-gallery">${imageBlocks}</div>`;
       }
 
-      function buildWechatShareMediaGridMarkdown({ columns = 3 } = {}) {
+      function buildWechatShareMediaGalleryMarkdown() {
         const imageUrls = extractWechatShareMediaImageUrls();
         if (!Array.isArray(imageUrls) || !imageUrls.length) return '';
 
-        const safeColumns = Math.max(1, Math.min(6, Number(columns) || 3));
-        const header = `| ${Array.from({ length: safeColumns })
-          .map(() => ' ')
-          .join(' | ')} |`;
-        const sep = `| ${Array.from({ length: safeColumns })
-          .map(() => '---')
-          .join(' | ')} |`;
-
-        const rows: string[] = [];
-        for (let i = 0; i < imageUrls.length; i += safeColumns) {
-          const slice = imageUrls.slice(i, i + safeColumns);
-          const cells: string[] = [];
-          for (const url of slice) {
-            // Use <...> so URLs with parentheses stay valid in Markdown.
-            cells.push(`![](<${url}>)`);
-          }
-          while (cells.length < safeColumns) cells.push(' ');
-          rows.push(`| ${cells.join(' | ')} |`);
+        const lines = ['---', ''];
+        for (const url of imageUrls) {
+          // Use <...> so URLs with parentheses stay valid in Markdown.
+          lines.push(`![](<${url}>)`, '');
         }
-
-        return `---\n\n${header}\n${sep}\n${rows.join('\n')}`;
+        return lines.join('\n').trim();
       }
 
       function isBlockTag(tag: unknown) {
@@ -591,13 +561,13 @@ async function extractArticleOnTab(tabId: number) {
             const content = normalize(article.content || '');
             const text = normalize(article.textContent || '');
             if (content || text) {
-              const wechatGridHtml = buildWechatShareMediaGridHtml({ columns: 3 });
-              const wechatGridMarkdown = buildWechatShareMediaGridMarkdown({ columns: 3 });
+              const wechatGalleryHtml = buildWechatShareMediaGalleryHtml();
+              const wechatGalleryMarkdown = buildWechatShareMediaGalleryMarkdown();
               const htmlBody = normalize(content) || (text ? `<p>${escapeHtml(text)}</p>` : '');
-              const contentWithWechatGrid = wechatGridHtml ? `${htmlBody}${wechatGridHtml}` : htmlBody;
+              const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
               const markdownBase = htmlToMarkdown(content, text);
-              const markdownWithWechatGrid = wechatGridMarkdown
-                ? normalize(`${markdownBase}\n\n${wechatGridMarkdown}`)
+              const markdownWithWechatGallery = wechatGalleryMarkdown
+                ? normalize(`${markdownBase}\n\n${wechatGalleryMarkdown}`)
                 : markdownBase;
               return {
                 ok: true,
@@ -609,8 +579,8 @@ async function extractArticleOnTab(tabId: number) {
                   "meta[name='pubdate']",
                 ]),
                 excerpt: normalize(article.excerpt || ''),
-                contentHTML: buildHtml(contentWithWechatGrid, text),
-                contentMarkdown: markdownWithWechatGrid,
+                contentHTML: buildHtml(contentWithWechatGallery, text),
+                contentMarkdown: markdownWithWechatGallery,
                 textContent: text,
                 warningFlags: [],
               };
