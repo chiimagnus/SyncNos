@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
+import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
 
 vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
@@ -17,6 +18,14 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
   useIsNarrowScreen: () => false,
 }));
 
+vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/ui/shared/AppTooltip')>();
+  return {
+    ...actual,
+    AppTooltipHost: () => null,
+  };
+});
+
 vi.mock('../../src/ui/app/routes/Settings', () => ({
   default: () => createElement('div', null, 'settings'),
 }));
@@ -30,6 +39,8 @@ vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
     ),
 }));
 
+const openConversationExternalByLoc = vi.fn();
+
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   ConversationsProvider: ({ children }: { children: React.ReactNode }) => children,
   useConversationsApp: () => ({
@@ -40,6 +51,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     toggleSelected: vi.fn(),
     setActiveId: vi.fn(),
     clearSelected: vi.fn(),
+    openConversationExternalByLoc,
+    openConversationExternalBySourceKey: vi.fn(),
     openConversationExternalById: vi.fn(),
     exporting: false,
     syncFeedback: {
@@ -92,6 +105,10 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 
 import AppShell from '../../src/ui/app/AppShell';
 
+function flushMicrotasks() {
+  return Promise.resolve().then(() => undefined);
+}
+
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'https://example.com/',
@@ -104,6 +121,15 @@ function setupDom() {
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
+  Object.defineProperty(globalThis, 'MutationObserver', {
+    configurable: true,
+    value: dom.window.MutationObserver,
+  });
+  Object.defineProperty(globalThis, 'Event', { configurable: true, value: dom.window.Event });
+  Object.defineProperty(globalThis, 'CustomEvent', {
+    configurable: true,
+    value: dom.window.CustomEvent,
+  });
   Object.defineProperty(globalThis, 'getComputedStyle', {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
@@ -121,6 +147,9 @@ function cleanupDom() {
   delete (globalThis as any).HTMLElement;
   delete (globalThis as any).Node;
   delete (globalThis as any).localStorage;
+  delete (globalThis as any).MutationObserver;
+  delete (globalThis as any).Event;
+  delete (globalThis as any).CustomEvent;
   delete (globalThis as any).getComputedStyle;
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
@@ -130,6 +159,7 @@ describe('AppShell sidebar collapse', () => {
 
   beforeEach(() => {
     setupDom();
+    openConversationExternalByLoc.mockReset();
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -162,5 +192,21 @@ describe('AppShell sidebar collapse', () => {
     });
 
     expect(document.querySelector('[aria-label="Collapse sidebar"]')).toBeTruthy();
+  });
+
+  it('consumes external loc via provider precise-open API', async () => {
+    const loc = encodeConversationLoc({ source: 'chatgpt', conversationKey: 'conv-42' });
+    window.location.hash = `/?loc=${loc}`;
+
+    await act(async () => {
+      root!.render(createElement(AppShell));
+      await flushMicrotasks();
+    });
+
+    expect(openConversationExternalByLoc).toHaveBeenCalledTimes(1);
+    expect(openConversationExternalByLoc).toHaveBeenCalledWith({
+      source: 'chatgpt',
+      conversationKey: 'conv-42',
+    });
   });
 });

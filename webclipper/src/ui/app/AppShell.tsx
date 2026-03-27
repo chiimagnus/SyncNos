@@ -112,7 +112,7 @@ export default function AppShell() {
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
-    const { items, openConversationExternalById, selectedConversation, detail } = useConversationsApp();
+    const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
     const isArticleConversation =
@@ -264,19 +264,14 @@ export default function AppShell() {
         return;
       }
 
-      const found = items.find(
-        (x) =>
-          String(x.source || '')
-            .trim()
-            .toLowerCase() === decoded.source && String(x.conversationKey || '').trim() === decoded.conversationKey,
-      );
-      if (!found) {
-        if (items.length) processedLocRef.current = loc;
-        return;
-      }
       processedLocRef.current = loc;
-      openConversationExternalById(Number(found.id));
-    }, [items, location.pathname, location.search, openConversationExternalById]);
+      void Promise.resolve(
+        openConversationExternalByLoc({
+          source: decoded.source,
+          conversationKey: decoded.conversationKey,
+        }),
+      ).catch(() => {});
+    }, [location.pathname, location.search, openConversationExternalByLoc]);
 
     useEffect(() => {
       if (location.pathname !== '/') return;
