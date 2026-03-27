@@ -186,6 +186,7 @@ export function ConversationListPane({
     clearSelected,
     openConversationExternalById,
     exporting,
+    listError,
     syncFeedback,
     syncingNotion,
     syncingObsidian,
@@ -207,6 +208,7 @@ export function ConversationListPane({
     syncSelectedObsidian,
     clearSyncFeedback,
     deleteSelected,
+    refreshList,
   } = useConversationsApp();
 
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -293,6 +295,11 @@ export function ConversationListPane({
   const allSelected = total > 0 && selectedCount === total;
   const indeterminate = selectedCount > 0 && selectedCount < total;
   const selectedTotalCount = selectedIds.length;
+  const hasLoadedItems = filteredItems.length > 0;
+  const showPaginationLoadingMore = hasLoadedItems && loadingMoreList;
+  const showPaginationError = hasLoadedItems && !loadingMoreList && Boolean(listError);
+  const showPaginationDone = hasLoadedItems && !loadingInitialList && !loadingMoreList && !listError && !listHasMore;
+  const paginationErrorMessage = String(listError || '').trim();
 
   useEffect(() => {
     const el = selectAllRef.current;
@@ -378,6 +385,7 @@ export function ConversationListPane({
     const root = scrollRef.current;
     const sentinel = loadMoreSentinelRef.current;
     if (!root || !sentinel) return;
+    if (typeof IntersectionObserver !== 'function') return;
 
     let cancelled = false;
     const observer = new IntersectionObserver(
@@ -470,6 +478,14 @@ export function ConversationListPane({
     deleteConfirm.clear();
     setExportOpen(false);
     setSyncOpen(false);
+  };
+
+  const onRetryPagination = () => {
+    if (listHasMore) {
+      void loadMoreList();
+      return;
+    }
+    void refreshList();
   };
 
   useEffect(() => {
@@ -784,6 +800,39 @@ export function ConversationListPane({
           })}
 
           <div ref={loadMoreSentinelRef} aria-hidden="true" className="tw-h-4 tw-w-full tw-shrink-0" />
+
+          {showPaginationLoadingMore ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2 tw-text-center tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('paginationLoadingMore')}
+            </div>
+          ) : null}
+
+          {showPaginationError ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-card))] tw-p-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)]">
+              <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+                <span className="tw-truncate">{t('paginationLoadMoreFailed')}</span>
+                <button
+                  type="button"
+                  className={buttonTintClassName()}
+                  onClick={onRetryPagination}
+                  aria-label={t('paginationRetryLoadMore')}
+                >
+                  {t('paginationRetryLoadMore')}
+                </button>
+              </div>
+              {paginationErrorMessage ? (
+                <p className="tw-mt-1 tw-break-all tw-text-[10px] tw-font-medium tw-text-[var(--error)]">
+                  {paginationErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showPaginationDone ? (
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2 tw-text-center tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('paginationAllLoaded')}
+            </div>
+          ) : null}
         </div>
       </div>
 
