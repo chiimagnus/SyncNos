@@ -12,7 +12,7 @@
   gap: 6px;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-chip);
   cursor: pointer;
 
   /* Typography */
@@ -125,7 +125,7 @@
 
   min-height: 34px;
   padding: 8px 10px;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-inline);
 
   --btn-surface: color-mix(in srgb, var(--bg-card) 88%, transparent);
   border: 1px solid transparent;
@@ -172,10 +172,6 @@
 
 .webclipper-btn--icon-xl {
   --btn-icon-size: 44px;
-}
-
-.webclipper-btn--round {
-  border-radius: var(--radius-inline);
 }
 
 .webclipper-menu-popover-panel {

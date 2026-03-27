@@ -45,9 +45,9 @@
    */
   --radius-outer: 24px;
   --radius-card: 20px;
-  --radius-control: 16px;
-  --radius-chip: 12px;
-  --radius-inline: 10px;
+  --radius-control: 12px;
+  --radius-chip: 10px;
+  --radius-inline: 8px;
   --radius-pill: 999px;
 
   /* Component: chat bubbles */

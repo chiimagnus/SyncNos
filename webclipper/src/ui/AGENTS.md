@@ -285,12 +285,12 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 | `--radius-control` | 控件层 | button/input/menu panel |
 | `--radius-chip` | 标签层 | chip/tag/menu item |
 | `--radius-inline` | 内容内联层 | markdown inline/code/kbd |
-| `--radius-pill` | 圆形/胶囊白名单 | 圆形 icon button、pill badge |
+| `--radius-pill` | 圆形/胶囊白名单 | 非按钮元素（如 avatar / 装饰性圆点） |
 
 工程约束：
 
 1. 新增样式默认使用 `--radius-*`，禁止新增裸 `border-radius: <px>`。
-2. `tw-rounded-[...]` 仅允许用于 `var(--radius-*)` 或 `999px`（pill）语义；禁止再引入固定 px 分叉。
+2. `tw-rounded-[...]` 仅允许用于 `var(--radius-*)`；`999px`（pill）只允许非按钮元素，禁止按钮使用圆形语义。
 3. 任何组件圆角改动都需要保持同心关系，不允许“内层半径大于外层”。
 4. 白名单仅允许：
    - `border-radius: 0`（用于 reset / 去圆角场景）
