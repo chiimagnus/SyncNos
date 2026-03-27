@@ -18,7 +18,7 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
-import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
+import { buildConversationRouteFromLoc } from '@services/shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';
 
@@ -251,8 +251,8 @@ function DailyTrendChart(props: { items: InsightDailyTrendPoint[]; stroke: strin
 
 function TopConversationList(props: {
   items: InsightTopConversation[];
-  getLinkTo: (conversationId: number) => string;
-  onOpenConversation: (conversationId: number) => void;
+  getLinkTo: (item: InsightTopConversation) => string;
+  onOpenConversation: (item: InsightTopConversation) => void;
 }) {
   const { items, getLinkTo, onOpenConversation } = props;
   if (!items.length) {
@@ -280,7 +280,7 @@ function TopConversationList(props: {
           <div className={['tw-text-sm tw-font-black', rankToneClassName(index)].join(' ')}>{index + 1}.</div>
           <div className="tw-min-w-0">
             <Link
-              to={getLinkTo(item.conversationId)}
+              to={getLinkTo(item)}
               replace
               className={[
                 'tw-group tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-text-left',
@@ -293,7 +293,7 @@ function TopConversationList(props: {
               onClick={(event) => {
                 if (event.defaultPrevented) return;
                 if (event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-                onOpenConversation(item.conversationId);
+                onOpenConversation(item);
               }}
             >
               <span className="tw-min-w-0 tw-truncate tw-underline-offset-2 group-hover:tw-underline">
@@ -323,7 +323,7 @@ export function InsightPanel(props: {
   onChangeRange: (next: InsightTimeRange) => void;
 }) {
   const { stats, range, onChangeRange } = props;
-  const { items, openConversationExternalById, clearSelected } = useConversationsApp();
+  const { openConversationExternalByLoc, openConversationExternalById, clearSelected } = useConversationsApp();
   const isNarrow = useIsNarrowScreen();
   const routerLocation = useLocation();
   const fallbackTo = useMemo(() => {
@@ -332,27 +332,27 @@ export function InsightPanel(props: {
     return from || '/';
   }, [routerLocation]);
 
-  const routeByConversationId = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const conversation of items) {
-      const id = Number((conversation as any).id);
-      if (!Number.isFinite(id) || id <= 0) continue;
-      const loc = encodeConversationLoc({
-        source: String((conversation as any).source || ''),
-        conversationKey: String((conversation as any).conversationKey || ''),
-      });
-      map.set(id, buildConversationRouteFromLoc(loc));
-    }
-    return map;
-  }, [items]);
+  const getLinkTo = (item: InsightTopConversation) => {
+    const loc = String(item?.loc || '').trim();
+    if (!loc) return fallbackTo;
+    return buildConversationRouteFromLoc(loc);
+  };
 
-  const getLinkTo = (conversationId: number) => routeByConversationId.get(Number(conversationId)) || fallbackTo;
+  const onOpenConversation = (item: InsightTopConversation) => {
+    const source = String(item?.openSource || '').trim();
+    const conversationKey = String(item?.openConversationKey || '').trim();
+    const conversationId = Number(item?.conversationId);
 
-  const onOpenConversation = (conversationId: number) => {
     openConversationInApp(conversationId, {
       clearSelected,
       isNarrow,
-      setActiveId: (id) => openConversationExternalById(Number(id)),
+      setActiveId: (id) => {
+        if (source && conversationKey) {
+          void openConversationExternalByLoc({ source, conversationKey });
+          return;
+        }
+        void openConversationExternalById(Number(id));
+      },
     });
   };
 

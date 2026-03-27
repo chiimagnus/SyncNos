@@ -2,6 +2,7 @@ import { formatConversationTitle, t } from '@i18n';
 import { openDb } from '@services/shared/idb';
 import type { Conversation } from '@services/conversations/domain/models';
 import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
+import { encodeConversationLoc } from '@services/shared/conversation-loc';
 
 type MessageCountByConversation = Map<number, number>;
 
@@ -22,6 +23,9 @@ export type InsightTopConversation = {
   title: string;
   messageCount: number;
   source: string;
+  openSource: string;
+  openConversationKey: string;
+  loc: string;
 };
 
 export type InsightStats = {
@@ -263,12 +267,17 @@ export function buildInsightStats(
 
       const conversationId = Number(conversation.id);
       const messageCount = Number(data.messageCounts.get(conversationId) || 0);
+      const openSource = safeString(conversation.source).toLowerCase();
+      const openConversationKey = safeString(conversation.conversationKey);
       stats.totalMessages += messageCount;
       topConversations.push({
         conversationId,
         title: normalizeConversationTitle(conversation.title),
         messageCount,
         source: sourceLabel,
+        openSource,
+        openConversationKey,
+        loc: openSource && openConversationKey ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey }) : '',
       });
       continue;
     }

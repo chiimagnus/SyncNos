@@ -15,6 +15,7 @@ import {
   INSIGHT_UNKNOWN_DOMAIN_LABEL,
   INSIGHT_UNTITLED_CONVERSATION,
 } from '../../src/viewmodels/settings/insight-stats';
+import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
 
 async function deleteDb(name: string) {
   await new Promise<void>((resolve, reject) => {
@@ -143,11 +144,17 @@ describe('insight stats', () => {
         title: INSIGHT_UNTITLED_CONVERSATION,
         messageCount: 9,
         source: 'Claude',
+        openSource: 'claude',
+        openConversationKey: 'chat-2',
+        loc: encodeConversationLoc({ source: 'claude', conversationKey: 'chat-2' }),
       }),
       expect.objectContaining({
         title: 'Architecture',
         messageCount: 6,
         source: 'ChatGPT',
+        openSource: 'chatgpt',
+        openConversationKey: 'chat-1',
+        loc: encodeConversationLoc({ source: 'chatgpt', conversationKey: 'chat-1' }),
       }),
     ]);
     expect(stats.articleDomainDistribution).toEqual([
