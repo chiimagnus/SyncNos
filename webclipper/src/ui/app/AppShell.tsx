@@ -408,7 +408,7 @@ export default function AppShell() {
                 }}
               />
               <div
-                className="tw-relative tw-z-10 tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1080px,calc(100vw-40px))] tw-overflow-hidden tw-rounded-3xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]"
+                className="tw-relative tw-z-10 tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1080px,calc(100vw-40px))] tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]"
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 <button

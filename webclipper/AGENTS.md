@@ -54,6 +54,16 @@ npm --prefix webclipper run build        # 构建产物
 npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
 ```
 
+## UI 圆角规范（Concentric Radius）
+
+- 圆角 token 真源：`webclipper/src/ui/styles/tokens.css`（`--radius-outer/card/control/chip/inline/pill`）。
+- UI 规范细则：`webclipper/src/ui/AGENTS.md` 的 `B2.2 · 同心圆角分级`。
+- 约束：新增样式禁止写裸 `border-radius: <px>`，默认使用 `--radius-*`；按钮禁止使用 `999px`/圆形语义，pill 仅用于非按钮元素。
+- 白名单：`border-radius: 0`（reset）与 `webclipper/src/ui/example.html`（示例页）可保留固定值，其余路径需收敛到 token。
+- 扫描命令：
+  - `rg -n "border-radius:\s*[0-9]|tw-rounded-\[" webclipper/src/ui webclipper/src/entrypoints`
+  - `rg -n -- "--radius-" webclipper/src/ui/styles/tokens.css`
+
 ## 贡献约定
 
 - 默认不查看、不编辑 i18n 字段（除非明确要求）。

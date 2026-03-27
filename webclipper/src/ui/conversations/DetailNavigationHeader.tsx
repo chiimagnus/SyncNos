@@ -4,8 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { t } from '@i18n';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
-import { navIconButtonClassName } from '@ui/shared/nav-styles';
-import { buttonTintClassName } from '@ui/shared/button-styles';
+import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 
 export type DetailNavigationHeaderProps = {
@@ -15,8 +14,9 @@ export type DetailNavigationHeaderProps = {
   onBack: () => void;
 };
 
-const backButtonClass = navIconButtonClassName(false);
+const backButtonClass = headerButtonClassName();
 const headerActionButtonClass = buttonTintClassName();
+const headerOpenActionButtonClass = headerButtonClassName();
 
 export function DetailNavigationHeader({ title, subtitle, actions, onBack }: DetailNavigationHeaderProps) {
   const { activeId, updateSelectedConversationUrl, cleanUrlDraft } = useConversationsApp();
@@ -71,7 +71,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
                 <span className="tw-inline-flex tw-min-w-0 tw-items-center tw-gap-2">
                   <input
                     ref={urlInputRef}
-                    className="tw-min-w-0 tw-flex-1 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                    className="tw-min-w-0 tw-flex-1 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
                     value={urlDraft}
                     onChange={(e) => setUrlDraft(e.target.value)}
                     placeholder="https://"
@@ -108,7 +108,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
                   />
                   <button
                     type="button"
-                    className="tw-shrink-0 tw-rounded-lg tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] disabled:tw-opacity-60"
+                    className="tw-shrink-0 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))] disabled:tw-opacity-60"
                     disabled={urlCleaning}
                     onClick={() => {
                       if (urlCleaning) return;
@@ -164,7 +164,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         />
         <DetailHeaderActionBar
           actions={openActions}
-          buttonClassName={headerActionButtonClass}
+          buttonClassName={headerOpenActionButtonClass}
           iconOnly
           menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}

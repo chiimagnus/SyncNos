@@ -689,7 +689,7 @@ export function ConversationListPane({
       >
         <div className="tw-grid tw-gap-2 tw-p-3">
           {filteredItems.length ? null : (
-            <div className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+            <div className="tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('noConversations')}
             </div>
           )}
@@ -706,7 +706,7 @@ export function ConversationListPane({
               : 'tw-border tw-border-[color-mix(in_srgb,var(--border)_82%,transparent)] tw-bg-[var(--bg-card)] hover:tw-border-[color-mix(in_srgb,var(--border)_96%,transparent)]';
             const rowClass = [
               navItemClassName(isActive),
-              'tw-group tw-relative tw-items-start tw-gap-2.5 tw-rounded-xl',
+              'tw-group tw-relative tw-items-start tw-gap-2.5 tw-rounded-[var(--radius-card)]',
               rowSurfaceClass,
             ].join(' ');
 
@@ -741,7 +741,7 @@ export function ConversationListPane({
                       {formatConversationTitle((conversation as any).title)}
                     </div>
                     {hasWarningFlags(conversation as any) ? (
-                      <span className="tw-inline-flex tw-rounded-full tw-border tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_18%,var(--bg-card))] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--text-primary)]">
+                      <span className="tw-inline-flex tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_18%,var(--bg-card))] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--text-primary)]">
                         {t('warningBadge')}
                       </span>
                     ) : null}
@@ -783,7 +783,8 @@ export function ConversationListPane({
 
                     <span
                       className={[
-                        'tw-inline-flex tw-items-center tw-rounded-full tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
+                        'tw-inline-flex tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
+                        'tw-rounded-[var(--radius-chip)]',
                         sourceTagToneClass(sourceKey),
                       ].join(' ')}
                     >

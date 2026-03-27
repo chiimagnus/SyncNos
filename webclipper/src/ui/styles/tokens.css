@@ -39,6 +39,17 @@
   --card-shadow: 0 8px 20px rgb(93 63 35 / 8%);
   --surface-inset-highlight: rgb(255 255 255 / 55%);
 
+  /*
+   * Concentric radius scale (Apple-like):
+   * outer > card > control > chip > inline; circular elements use pill.
+   */
+  --radius-outer: 24px;
+  --radius-card: 20px;
+  --radius-control: 12px;
+  --radius-chip: 10px;
+  --radius-inline: 8px;
+  --radius-pill: 999px;
+
   /* Component: chat bubbles */
   --bubble-user-bg: var(--secondary);
   --bubble-user-border: color-mix(in srgb, var(--secondary) 78%, var(--border));

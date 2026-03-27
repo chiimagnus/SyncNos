@@ -12,7 +12,7 @@
   gap: 6px;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-chip);
   cursor: pointer;
 
   /* Typography */
@@ -125,7 +125,7 @@
 
   min-height: 34px;
   padding: 8px 10px;
-  border-radius: 11px;
+  border-radius: var(--radius-inline);
 
   --btn-surface: color-mix(in srgb, var(--bg-card) 88%, transparent);
   border: 1px solid transparent;
@@ -154,7 +154,24 @@
   height: var(--btn-icon-size);
   min-height: var(--btn-icon-size);
   padding: 0;
+  border-radius: var(--radius-inline);
   font-weight: 900;
+}
+
+.header-button {
+  --btn-icon-size: 36px;
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  min-height: var(--btn-icon-size);
+  padding: 0;
+  border-radius: var(--radius-inline);
+  font-weight: 900;
+  color: var(--text-secondary);
+}
+
+.header-button:hover:not(:disabled),
+.header-button[aria-pressed='true'] {
+  color: var(--text-primary);
 }
 
 .webclipper-btn--icon-sm {
@@ -173,8 +190,12 @@
   --btn-icon-size: 44px;
 }
 
-.webclipper-btn--round {
-  border-radius: 999px;
+.webclipper-menu-popover-panel {
+  border-radius: var(--radius-control);
+}
+
+.webclipper-menu-popover-backdrop {
+  border-radius: var(--radius-card);
 }
 
 .webclipper-btn--tone-muted {

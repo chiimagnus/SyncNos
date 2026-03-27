@@ -113,7 +113,7 @@ export function MenuPopover(props: MenuPopoverProps) {
           className={[
             panelPosClassName,
             backdropOriginClassName,
-            'tw-z-20 tw-pointer-events-none tw-rounded-[18px]',
+            'webclipper-menu-popover-backdrop tw-z-20 tw-pointer-events-none',
             'tw-bg-[color-mix(in_srgb,var(--bg-card)_55%,transparent)]',
             'tw-backdrop-blur-[16px] tw-backdrop-saturate-150',
             'tw-scale-[1.06]',

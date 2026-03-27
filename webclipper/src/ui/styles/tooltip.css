@@ -2,7 +2,7 @@
   --rt-opacity: 1;
   max-width: 320px;
   border: 1px solid rgb(67 71 82 / 64%);
-  border-radius: 10px;
+  border-radius: var(--radius-inline);
   background: rgb(27 30 36 / 95%);
   color: rgb(244 247 252);
   box-shadow: 0 14px 28px rgb(0 0 0 / 30%);

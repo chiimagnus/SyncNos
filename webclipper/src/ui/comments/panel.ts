@@ -168,8 +168,7 @@ export function mountThreadedCommentsPanel(
     if (showCollapseButton) {
       const collapse = document.createElement('button');
       collapse.type = 'button';
-      collapse.className =
-        'webclipper-inpage-comments-panel__collapse webclipper-btn webclipper-btn--icon webclipper-btn--icon-sm webclipper-btn--tone-muted';
+      collapse.className = 'webclipper-inpage-comments-panel__collapse webclipper-btn header-button';
       const collapseLabel = t('closeCommentsSidebar');
       collapse.setAttribute('aria-label', collapseLabel);
       setPanelTooltip(collapse, collapseLabel);
