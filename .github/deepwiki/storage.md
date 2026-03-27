@@ -57,6 +57,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
 - `article_comments` 是独立的本地注释层：它会跟随 article 详情页和 inpage comments panel 使用，并会随 Zip v2 备份 / 导入一起保留；它仍然不进入 Notion / Obsidian 同步。
+- `$` mention（在 ChatGPT/Notion AI 输入框插入本地 item）只读扫描 `conversations` 做候选过滤；插入文本复用现有 “Copy full markdown” 的同源格式化链路，且当前不做截断。
 - `schema.ts` 的 v2 迁移专门处理 NotionAI thread，把 legacy conversation key 重写为 stable key，并同步迁移 mapping。
 - `schema.ts` 的 v4 迁移会归并 legacy article conversations，把 URL 规范化为 canonical key，减少当前页抓取、article 导入与历史数据升级后的重复会话。
 - `schema.ts` 的 v6 迁移会清理 `conversations.description` 旧字段，避免历史冗余字段继续扩散到新记录。
