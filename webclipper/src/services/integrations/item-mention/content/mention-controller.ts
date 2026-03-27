@@ -1,5 +1,7 @@
 import { buildMentionInsertText, searchMentionCandidates } from '@services/integrations/item-mention/client';
+import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptTextareaEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
+import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
 import { moveMentionHighlightIndex } from '@services/integrations/item-mention/content/mention-ui-state';
@@ -16,12 +18,17 @@ function isChatgptHost(hostname: string): boolean {
   return /(^|\.)chatgpt\.com$/.test(host) || /(^|\.)chat\.openai\.com$/.test(host);
 }
 
+function isNotionHost(hostname: string): boolean {
+  const host = String(hostname || '').toLowerCase();
+  return /(^|\.)notion\.so$/.test(host);
+}
+
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-function computePopupPosition(textarea: HTMLTextAreaElement): { left: number; top: number } {
-  const rect = textarea.getBoundingClientRect();
+function computePopupPosition(el: HTMLElement): { left: number; top: number } {
+  const rect = el.getBoundingClientRect();
   const vw = Math.max(1, Number(window.innerWidth) || 1);
   const vh = Math.max(1, Number(window.innerHeight) || 1);
 
@@ -32,13 +39,19 @@ function computePopupPosition(textarea: HTMLTextAreaElement): { left: number; to
 
 export function createItemMentionController(deps: { runtime: RuntimeClient | null }) {
   const runtime = deps.runtime;
-  const adapter = chatgptTextareaEditorAdapter;
 
   return {
     start() {
       if (!runtime || typeof runtime.send !== 'function') return null;
       const rt: RuntimeClient = runtime;
-      if (!isChatgptHost(location?.hostname || '')) return null;
+      const hostname = location?.hostname || '';
+      const pickedAdapter: EditorAdapter | null = isChatgptHost(hostname)
+        ? chatgptTextareaEditorAdapter
+        : isNotionHost(hostname)
+          ? notionAiContentEditableAdapter
+          : null;
+      if (!pickedAdapter) return null;
+      const adapter: EditorAdapter = pickedAdapter;
 
       let stopped = false;
       let session: MentionSessionState | null = null;
@@ -64,8 +77,8 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       function renderPopup() {
         if (!session || !session.open) return hidePopup();
         const editor = adapter.detectActiveEditor();
-        const textarea = editor && editor.kind === 'textarea' ? editor.el : null;
-        const position = textarea ? computePopupPosition(textarea) : { left: 12, top: 12 };
+        const hostEl = (editor?.el as HTMLElement | null) || null;
+        const position = hostEl ? computePopupPosition(hostEl) : { left: 12, top: 12 };
         const highlightIndex = clamp(session.highlightIndex || 0, 0, Math.max(0, items.length - 1));
         const uiItems = items.map((c: any) => ({
           title: String(c?.title || ''),
@@ -147,18 +160,34 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         }
       }
 
+      function eventEditorHandle(e: Event): EditorHandle | null {
+        const target = (e as any)?.target as any;
+        if (!target) return null;
+        const active = adapter.detectActiveEditor();
+        if (!active || !active.el) return null;
+        const el = active.el as any;
+        if (target === el) return active;
+        if (el && typeof el.contains === 'function' && el.contains(target)) return active;
+        return null;
+      }
+
       function refresh(input?: { close?: boolean }) {
         const editor = adapter.detectActiveEditor();
-        const textarea = editor && editor.kind === 'textarea' ? editor.el : null;
-        if (!textarea) {
+        if (!editor || !editor.el) {
           session = null;
           items = [];
           hidePopup();
           return;
         }
 
-        const text = String(textarea.value || '');
-        const cursor = Number(textarea.selectionStart);
+        const text =
+          editor.kind === 'textarea'
+            ? String((editor.el as any).value || '')
+            : String((editor.el as any).textContent || '');
+        const cursor =
+          editor.kind === 'textarea'
+            ? Number((editor.el as any).selectionStart)
+            : Number(adapter.getSelectionRange(editor).end);
         lastText = text;
         lastCursor = Number.isFinite(cursor) ? cursor : text.length;
 
@@ -188,17 +217,13 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
       function onInput(e: Event) {
         if (stopped) return;
-        const target = e?.target as any;
-        if (!target) return;
-        if (target !== adapter.detectActiveEditor()?.el) return;
+        if (!eventEditorHandle(e)) return;
         refresh();
       }
 
       function onKeyDown(e: KeyboardEvent) {
         if (stopped) return;
-        const target = e?.target as any;
-        if (!target) return;
-        if (target !== adapter.detectActiveEditor()?.el) return;
+        if (!eventEditorHandle(e)) return;
 
         if (!session || !session.open) return;
 
@@ -232,9 +257,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
       function onKeyUp(e: KeyboardEvent) {
         if (stopped) return;
-        const target = e?.target as any;
-        if (!target) return;
-        if (target !== adapter.detectActiveEditor()?.el) return;
+        if (!eventEditorHandle(e)) return;
         // Cursor navigation should update trigger boundaries and potentially open/close the popup.
         refresh();
       }
