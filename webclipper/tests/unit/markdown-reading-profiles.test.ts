@@ -48,8 +48,8 @@ describe('markdown reading profile contract', () => {
       expect(readMeasureCh(preset.spec.measure)).toBeLessThanOrEqual(80);
       expect(String(preset.spec.codeScale || '')).toBeTruthy();
       expect(String(preset.typographyClassName || '')).toContain('tw-text-[');
-      expect(String(preset.typographyClassName || '')).toContain('[&_p]:tw-max-w-[');
-      expect(String(preset.roleOverrides?.user || '')).toContain('[&_a]:tw-font-semibold');
+      expect(String(preset.typographyClassName || '')).toContain('[&_p]:tw-max-w-full');
+      expect(String(preset.roleOverrides?.user || '')).toContain('[&_a]:tw-text-[');
 
       expect(Object.keys(preset.spec.headingScale)).toEqual(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
       for (const [heading, size] of Object.entries(preset.spec.headingScale)) {
@@ -72,8 +72,8 @@ describe('markdown reading profile contract', () => {
     expect(Number.parseFloat(notion.spec.fontSize)).toBeLessThan(Number.parseFloat(medium.spec.fontSize));
     expect(readMeasureCh(notion.spec.measure)).toBeLessThan(readMeasureCh(medium.spec.measure));
     expect(Number(notion.spec.lineHeight)).toBeGreaterThanOrEqual(1.5);
-    expect(String(notion.typographyClassName)).toContain('[&_ul]:tw-mb-[0.55rem]');
-    expect(String(notion.typographyClassName)).toContain('[&_blockquote]:tw-mb-[0.75rem]');
+    expect(String(notion.typographyClassName)).toContain('[&_ul]:tw-mb-[0.58rem]');
+    expect(String(notion.typographyClassName)).toContain('[&_blockquote]:tw-mb-[0.8rem]');
   });
 
   it('keeps book profile immersive with serif + CJK fallback', () => {
@@ -84,8 +84,8 @@ describe('markdown reading profile contract', () => {
     expect(readMeasureCh(book.spec.measure)).toBeGreaterThan(readMeasureCh(medium.spec.measure));
     expect(Number(book.spec.lineHeight)).toBeGreaterThanOrEqual(1.5);
     expect(String(book.spec.fontStack)).toContain('Noto Serif CJK SC');
-    expect(String(book.typographyClassName)).toContain('[&_p]:tw-max-w-[74ch]');
-    expect(String(book.typographyClassName)).toContain('[&_pre>code]:tw-leading-[1.6]');
+    expect(String(book.typographyClassName)).toContain('[&_p]:tw-max-w-full');
+    expect(String(book.typographyClassName)).toContain('[&_pre>code]:tw-leading-[1.62]');
   });
 
   it('keeps all profiles wired with key node typography hooks', () => {
@@ -96,7 +96,7 @@ describe('markdown reading profile contract', () => {
       expect(className).toContain('[&_pre>code]:tw-text-[');
       expect(className).toContain('[&_th]:tw-text-[');
       expect(className).toContain('[&_.syncnos-md-image-link]:tw-text-[');
-      expect(String(preset.roleOverrides?.user || '')).toContain('[&_a]:tw-font-semibold');
+      expect(String(preset.roleOverrides?.user || '')).toContain('[&_a]:tw-text-[');
     }
   });
 });
