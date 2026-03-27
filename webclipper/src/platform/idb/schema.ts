@@ -49,7 +49,7 @@ function parseSiteKeyFromUrl(url: unknown): string {
   if (!normalizedUrl) return 'unknown';
   try {
     const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
-    return host || 'unknown';
+    return host ? `domain:${host}` : 'unknown';
   } catch (_e) {
     return 'unknown';
   }

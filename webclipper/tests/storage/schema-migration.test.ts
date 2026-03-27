@@ -258,12 +258,12 @@ describe('storage schema migration (v8 list pagination indexes)', () => {
     const chat = rows.find((row) => row.conversationKey === 'chat-1');
     expect(chat).toBeTruthy();
     expect(chat.listSourceKey).toBe('chatgpt');
-    expect(chat.listSiteKey).toBe('chatgpt.com');
+    expect(chat.listSiteKey).toBe('domain:chatgpt.com');
 
     const article = rows.find((row) => row.conversationKey === 'article:https://example.com/a');
     expect(article).toBeTruthy();
     expect(article.listSourceKey).toBe('web');
-    expect(article.listSiteKey).toBe('example.com');
+    expect(article.listSiteKey).toBe('domain:example.com');
 
     db8.close();
   });
