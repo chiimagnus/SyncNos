@@ -20,11 +20,6 @@ export function navIconButtonClassName(active: boolean): string {
   return 'webclipper-btn webclipper-btn--icon webclipper-btn--tone-muted';
 }
 
-export function navIconButtonSmClassName(active: boolean): string {
-  if (active) return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-sm';
-  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-sm webclipper-btn--tone-muted';
-}
-
 export function navPillButtonClassName(): string {
   return [buttonTintClassName(), 'tw-max-w-[168px]'].join(' ');
 }
