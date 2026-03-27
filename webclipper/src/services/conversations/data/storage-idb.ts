@@ -16,6 +16,8 @@ import { openDb as openSchemaDb } from '@platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
+let conversationListStatsCacheKey: string | null = null;
+let conversationListStatsCacheValue: { summary: ConversationListSummary; facets: ConversationListFacets } | null = null;
 
 async function openDb(): Promise<IDBDatabase> {
   if (cachedDb) return cachedDb;
@@ -40,6 +42,8 @@ export async function __closeDbForTests(): Promise<void> {
   } finally {
     cachedDb = null;
     openingDb = null;
+    conversationListStatsCacheKey = null;
+    conversationListStatsCacheValue = null;
   }
 }
 
@@ -107,9 +111,13 @@ function deriveConversationListSiteKey(record: any): string {
 }
 
 function normalizeConversationListRecord<T extends Record<string, any>>(record: T): T {
-  const sourceKey = deriveConversationListSourceKey(record);
-  const siteKey = deriveConversationListSiteKey(record);
-  if (safeString(record?.listSourceKey) === sourceKey && safeString(record?.listSiteKey) === siteKey) return record;
+  const existingSourceKey = safeString(record?.listSourceKey);
+  const existingSiteKey = safeString(record?.listSiteKey);
+  const sourceKey = existingSourceKey ? normalizeListKey(existingSourceKey, 'unknown') : deriveConversationListSourceKey(record);
+  const siteKey = existingSiteKey
+    ? normalizeConversationListSiteFilterKey(existingSiteKey)
+    : normalizeConversationListSiteFilterKey(deriveConversationListSiteKey(record));
+  if (existingSourceKey === sourceKey && existingSiteKey === siteKey) return record;
   return {
     ...record,
     listSourceKey: sourceKey,
@@ -123,6 +131,11 @@ function toComparableCursor(cursor: ConversationListCursor | null | undefined): 
   const id = Number(cursor.id);
   if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
   return { lastCapturedAt, id };
+}
+
+function invalidateConversationListStatsCache(): void {
+  conversationListStatsCacheKey = null;
+  conversationListStatsCacheValue = null;
 }
 
 function isSameLocalDayTimestamp(ts: number, now: Date): boolean {
@@ -388,12 +401,14 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
     });
     await reqToPromise(stores.conversations.put(record));
     await txDone(t);
+    invalidateConversationListStatsCache();
     return record;
   }
 
   const id = await reqToPromise(stores.conversations.add(record));
   record.id = id as any;
   await txDone(t);
+  invalidateConversationListStatsCache();
   return record;
 }
 
@@ -501,6 +516,7 @@ export async function mergeConversationsByIds(input: {
 
   await reqToPromise(stores.conversations.delete(removeConversationId));
   await txDone(t);
+  invalidateConversationListStatsCache();
 
   return {
     keptConversationId: keepConversationId,
@@ -677,11 +693,13 @@ function buildListPageRange(
     | 'by_listSourceKey_listSiteKey_lastCapturedAt_id'
     | 'by_listSiteKey_lastCapturedAt_id';
   range: IDBKeyRange | null;
-} {
+  } {
   const sourceKey = normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL);
   const siteKey = normalizeConversationListSiteFilterKey(query.siteKey);
   const hasSourceFilter = sourceKey !== LIST_SOURCE_KEY_ALL;
   const hasSiteFilter = siteKey !== LIST_SITE_KEY_ALL;
+  const MIN_KEY = 0;
+  const MAX_KEY = Number.MAX_SAFE_INTEGER;
 
   const keyRangeApi = globalThis.IDBKeyRange;
   if (!keyRangeApi) {
@@ -695,13 +713,16 @@ function buildListPageRange(
     if (!cursor) {
       return {
         indexName: 'by_listSourceKey_listSiteKey_lastCapturedAt_id',
-        range: keyRangeApi.bound([sourceKey, siteKey, -Infinity, -Infinity] as any, [sourceKey, siteKey, Infinity, Infinity] as any),
+        range: keyRangeApi.bound(
+          [sourceKey, siteKey, MIN_KEY, MIN_KEY] as any,
+          [sourceKey, siteKey, MAX_KEY, MAX_KEY] as any,
+        ),
       };
     }
     return {
       indexName: 'by_listSourceKey_listSiteKey_lastCapturedAt_id',
       range: keyRangeApi.bound(
-        [sourceKey, siteKey, -Infinity, -Infinity] as any,
+        [sourceKey, siteKey, MIN_KEY, MIN_KEY] as any,
         [sourceKey, siteKey, cursor.lastCapturedAt, cursor.id] as any,
         false,
         true,
@@ -713,13 +734,13 @@ function buildListPageRange(
     if (!cursor) {
       return {
         indexName: 'by_listSourceKey_lastCapturedAt_id',
-        range: keyRangeApi.bound([sourceKey, -Infinity, -Infinity] as any, [sourceKey, Infinity, Infinity] as any),
+        range: keyRangeApi.bound([sourceKey, MIN_KEY, MIN_KEY] as any, [sourceKey, MAX_KEY, MAX_KEY] as any),
       };
     }
     return {
       indexName: 'by_listSourceKey_lastCapturedAt_id',
       range: keyRangeApi.bound(
-        [sourceKey, -Infinity, -Infinity] as any,
+        [sourceKey, MIN_KEY, MIN_KEY] as any,
         [sourceKey, cursor.lastCapturedAt, cursor.id] as any,
         false,
         true,
@@ -731,13 +752,13 @@ function buildListPageRange(
     if (!cursor) {
       return {
         indexName: 'by_listSiteKey_lastCapturedAt_id',
-        range: keyRangeApi.bound([siteKey, -Infinity, -Infinity] as any, [siteKey, Infinity, Infinity] as any),
+        range: keyRangeApi.bound([siteKey, MIN_KEY, MIN_KEY] as any, [siteKey, MAX_KEY, MAX_KEY] as any),
       };
     }
     return {
       indexName: 'by_listSiteKey_lastCapturedAt_id',
       range: keyRangeApi.bound(
-        [siteKey, -Infinity, -Infinity] as any,
+        [siteKey, MIN_KEY, MIN_KEY] as any,
         [siteKey, cursor.lastCapturedAt, cursor.id] as any,
         false,
         true,
@@ -815,16 +836,19 @@ async function readConversationListSummaryAndFacets(input: {
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) return resolve();
-      const row = normalizeConversationListRecord(cursor.value || {});
-      const rowSourceKey = normalizeListKey(row.listSourceKey, 'unknown');
-      const rowSiteKey = normalizeConversationListSiteFilterKey(row.listSiteKey);
+      const raw = (cursor.value || {}) as any;
+      const rowSourceKey = normalizeListKey(safeString(raw.listSourceKey) || safeString(raw.source), 'unknown');
+      const rowSiteKey = normalizeConversationListSiteFilterKey(
+        safeString(raw.listSiteKey) || deriveConversationListSiteKey(raw),
+      );
+      const rowSiteLabel = rowSiteKey.startsWith('domain:') ? rowSiteKey.slice('domain:'.length) : rowSiteKey;
 
       const sourceFacet = sourceFacetMap.get(rowSourceKey) || { key: rowSourceKey, label: rowSourceKey, count: 0 };
       sourceFacet.count += 1;
       sourceFacetMap.set(rowSourceKey, sourceFacet);
 
       if (rowSourceKey === siteFacetSourceScope) {
-        const siteFacet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteKey, count: 0 };
+        const siteFacet = siteFacetMap.get(rowSiteKey) || { key: rowSiteKey, label: rowSiteLabel, count: 0 };
         siteFacet.count += 1;
         siteFacetMap.set(rowSiteKey, siteFacet);
       }
@@ -833,7 +857,7 @@ async function readConversationListSummaryAndFacets(input: {
       const siteMatch = siteFilter === LIST_SITE_KEY_ALL || rowSiteKey === siteFilter;
       if (sourceMatch && siteMatch) {
         totalCount += 1;
-        const ts = Number(row.lastCapturedAt) || 0;
+        const ts = Number(raw.lastCapturedAt) || 0;
         if (isSameLocalDayTimestamp(ts, now)) todayCount += 1;
       }
       cursor.continue();
@@ -859,11 +883,20 @@ async function readConversationListPage(input: {
 }): Promise<ConversationListPage<Conversation>> {
   const query = resolveConversationListQuery(input.queryInput, input.limit);
   const cursor = toComparableCursor(input.cursor);
+  const statsKey = `${normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL)}::${normalizeConversationListSiteFilterKey(query.siteKey)}`;
 
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations'], 'readonly');
   const pagePromise = readConversationListPageItems({ store: stores.conversations, query, cursor });
-  const summaryPromise = readConversationListSummaryAndFacets({ store: stores.conversations, query });
+  const summaryPromise = (async () => {
+    if (conversationListStatsCacheKey === statsKey && conversationListStatsCacheValue) {
+      return conversationListStatsCacheValue;
+    }
+    const computed = await readConversationListSummaryAndFacets({ store: stores.conversations, query });
+    conversationListStatsCacheKey = statsKey;
+    conversationListStatsCacheValue = computed;
+    return computed;
+  })();
   const [page, summaryData] = await Promise.all([pagePromise, summaryPromise]);
   await txDone(t);
   return {
@@ -1023,6 +1056,7 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
   }
 
   await txDone(t);
+  invalidateConversationListStatsCache();
   return { deletedConversations, deletedMessages, deletedMappings, deletedImageCache };
 }
 

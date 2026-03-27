@@ -386,6 +386,8 @@ export function ConversationListPane({
     const sentinel = loadMoreSentinelRef.current;
     if (!root || !sentinel) return;
     if (typeof IntersectionObserver !== 'function') return;
+    if (!listHasMore) return;
+    if (listError) return;
 
     let cancelled = false;
     const observer = new IntersectionObserver(
@@ -395,6 +397,7 @@ export function ConversationListPane({
         if (!entry || !entry.isIntersecting) return;
         if (loadingMoreList) return;
         if (!listHasMore) return;
+        if (listError) return;
         void loadMoreList();
       },
       {
@@ -408,7 +411,7 @@ export function ConversationListPane({
       cancelled = true;
       observer.disconnect();
     };
-  }, [listHasMore, loadMoreList, loadingMoreList]);
+  }, [listError, listHasMore, loadMoreList, loadingMoreList]);
 
   useEffect(() => {
     const id = Number(pendingListLocateId);
