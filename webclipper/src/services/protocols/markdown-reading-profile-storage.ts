@@ -1,4 +1,7 @@
-import { resolveMarkdownReadingProfileId, type MarkdownReadingProfileId } from '@services/protocols/markdown-reading-profiles';
+import {
+  resolveMarkdownReadingProfileId,
+  type MarkdownReadingProfileId,
+} from '@services/protocols/markdown-reading-profiles';
 
 export const MARKDOWN_READING_PROFILE_STORAGE_KEY = 'markdown_reading_profile_v1';
 

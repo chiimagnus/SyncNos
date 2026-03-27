@@ -768,7 +768,9 @@ export function ConversationListPane({
 
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrs(safeUrl ? t('tooltipOpenChatDetailed') : t('tooltipOpenChatMissingLinkDetailed'))}
+                      {...tooltipAttrs(
+                        safeUrl ? t('tooltipOpenChatDetailed') : t('tooltipOpenChatMissingLinkDetailed'),
+                      )}
                     >
                       <button
                         className={buttonMiniIconClassName(isActive)}

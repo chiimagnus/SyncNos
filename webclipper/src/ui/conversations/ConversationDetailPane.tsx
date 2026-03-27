@@ -95,9 +95,7 @@ export function ConversationDetailPane({
   const [urlCleaning, setUrlCleaning] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
-  const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() =>
-    normalizeStoredMarkdownReadingProfile(''),
-  );
+  const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() => normalizeStoredMarkdownReadingProfile(''));
 
   useEffect(() => {
     setUrlEditing(false);
@@ -217,12 +215,7 @@ export function ConversationDetailPane({
               ) : null}
 
               {onBack ? (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className={headerIconButtonClass}
-                  aria-label={t('backButton')}
-                >
+                <button type="button" onClick={onBack} className={headerIconButtonClass} aria-label={t('backButton')}>
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
                 </button>

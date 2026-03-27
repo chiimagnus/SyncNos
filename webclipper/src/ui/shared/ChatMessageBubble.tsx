@@ -276,7 +276,9 @@ export function ChatMessageBubble({
   const mdRoleOverrides = String(readingProfilePreset.roleOverrides?.[bubbleRole] || '');
 
   return (
-    <section className={[bubbleBase, bubbleRoleClass, profileBubbleClass, profileBubbleRoleClass].filter(Boolean).join(' ')}>
+    <section
+      className={[bubbleBase, bubbleRoleClass, profileBubbleClass, profileBubbleRoleClass].filter(Boolean).join(' ')}
+    >
       {headerLeft || headerRight ? (
         <header className={headerBase}>
           <div className={headerLeftClass}>{headerLeft}</div>

@@ -13,11 +13,7 @@ function extractRootSectionClass(html: string) {
 function extractMarkdownClass(html: string) {
   const match = html.match(/<div class="([^"]+)"[^>]*>/);
   if (!match) throw new Error(`Expected markdown <div class=\"...\">, got: ${html.slice(0, 220)}...`);
-  return match[1]
-    .replaceAll('&amp;', '&')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&lt;', '<');
+  return match[1].replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&gt;', '>').replaceAll('&lt;', '<');
 }
 
 describe('ChatMessageBubble', () => {
@@ -55,7 +51,9 @@ describe('ChatMessageBubble', () => {
     expect(notionClass).toContain('[&_p]:tw-max-w-full');
     expect(notionClass).toContain('[&_ul]:tw-mb-[0.58rem]');
 
-    const bookHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'book' }));
+    const bookHtml = renderToStaticMarkup(
+      createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'book' }),
+    );
     const bookClass = extractMarkdownClass(bookHtml);
     expect(bookClass).toContain('tw-font-[var(--markdown-font-book)]');
     expect(bookClass).toContain('[&_p]:tw-max-w-full');

@@ -4,7 +4,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { MARKDOWN_READING_PROFILE_IDS, resolveMarkdownReadingProfileId } from '../../src/services/protocols/markdown-reading-profiles';
+import {
+  MARKDOWN_READING_PROFILE_IDS,
+  resolveMarkdownReadingProfileId,
+} from '../../src/services/protocols/markdown-reading-profiles';
 import { MARKDOWN_READING_PROFILE_PRESETS } from '../../src/ui/shared/markdown-reading-profile-presets';
 import { ChatMessageBubble } from '../../src/ui/shared/ChatMessageBubble';
 
@@ -20,11 +23,7 @@ function extractRootClass(html: string) {
 function extractMarkdownClass(html: string) {
   const match = html.match(/<div class="([^"]+)"[^>]*><h1>/);
   if (!match) throw new Error(`Expected markdown <div class=\"...\">, got: ${html.slice(0, 220)}...`);
-  return match[1]
-    .replaceAll('&amp;', '&')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&lt;', '<');
+  return match[1].replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&gt;', '>').replaceAll('&lt;', '<');
 }
 
 function readTokensCss() {
@@ -43,7 +42,9 @@ describe('markdown reading profile matrix guards', () => {
   it('covers profile x bubbleRole matrix with stable class contracts', () => {
     for (const profileId of MARKDOWN_READING_PROFILE_IDS) {
       const preset = MARKDOWN_READING_PROFILE_PRESETS[profileId];
-      const expectedFontClass = String(preset.typographyClassName).match(/tw-font-\[var\(--markdown-font-[^)]+\)\]/)?.[0];
+      const expectedFontClass = String(preset.typographyClassName).match(
+        /tw-font-\[var\(--markdown-font-[^)]+\)\]/,
+      )?.[0];
       expect(expectedFontClass).toBeTruthy();
 
       for (const role of ROLES) {
