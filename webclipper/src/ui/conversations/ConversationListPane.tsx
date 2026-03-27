@@ -30,6 +30,7 @@ type SourceMeta = { key: string; label: string };
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
+const MAX_LOCATE_LOAD_ROUNDS = 8;
 
 function toSiteFilterKey(domain: string) {
   const safe = String(domain || '')
@@ -220,6 +221,7 @@ export function ConversationListPane({
     listSourceFilterKey,
     listSiteFilterKey,
     listHasMore,
+    loadingInitialList,
     loadingMoreList,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
@@ -239,6 +241,7 @@ export function ConversationListPane({
   const [syncOpen, setSyncOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const locateLoadRoundRef = useRef<{ id: number; rounds: number }>({ id: 0, rounds: 0 });
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
@@ -473,37 +476,49 @@ export function ConversationListPane({
 
   useEffect(() => {
     const id = Number(pendingListLocateId);
-    if (!Number.isFinite(id) || id <= 0) return;
+    if (!Number.isFinite(id) || id <= 0) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      return;
+    }
 
-    let cancelled = false;
-    let attempts = 0;
+    if (locateLoadRoundRef.current.id !== id) {
+      locateLoadRoundRef.current = { id, rounds: 0 };
+    }
 
-    const locate = () => {
-      if (cancelled) return;
+    const container = scrollRef.current;
+    const selector = `[data-conversation-id="${id}"]`;
+    const row = container ? (container.querySelector(selector) as HTMLElement | null) : null;
+    if (row) {
+      row.scrollIntoView({ block: 'nearest' });
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
 
-      const container = scrollRef.current;
-      const selector = `[data-conversation-id="${id}"]`;
-      const row = container ? (container.querySelector(selector) as HTMLElement | null) : null;
-      if (row) {
-        row.scrollIntoView({ block: 'nearest' });
-        consumeListLocate();
-        return;
-      }
+    if (!listHasMore) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
 
-      attempts += 1;
-      if (attempts >= 2) {
-        consumeListLocate();
-        return;
-      }
+    if (locateLoadRoundRef.current.rounds >= MAX_LOCATE_LOAD_ROUNDS) {
+      locateLoadRoundRef.current = { id: 0, rounds: 0 };
+      consumeListLocate();
+      return;
+    }
 
-      requestAnimationFrame(locate);
-    };
-
-    locate();
-    return () => {
-      cancelled = true;
-    };
-  }, [consumeListLocate, pendingListLocateId]);
+    if (loadingInitialList || loadingMoreList) return;
+    locateLoadRoundRef.current = { id, rounds: locateLoadRoundRef.current.rounds + 1 };
+    void loadMoreList();
+  }, [
+    consumeListLocate,
+    listHasMore,
+    loadMoreList,
+    loadingInitialList,
+    loadingMoreList,
+    pendingListLocateId,
+    items,
+  ]);
 
   const onSetFilterKey = (key: string) => {
     const next =
