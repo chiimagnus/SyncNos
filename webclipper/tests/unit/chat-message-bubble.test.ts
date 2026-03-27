@@ -11,9 +11,13 @@ function extractRootSectionClass(html: string) {
 }
 
 function extractMarkdownClass(html: string) {
-  const match = html.match(/<div class="([^"]+)"[^>]*><p>/);
+  const match = html.match(/<div class="([^"]+)"[^>]*>/);
   if (!match) throw new Error(`Expected markdown <div class=\"...\">, got: ${html.slice(0, 220)}...`);
-  return match[1];
+  return match[1]
+    .replaceAll('&amp;', '&')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&lt;', '<');
 }
 
 describe('ChatMessageBubble', () => {
@@ -50,5 +54,15 @@ describe('ChatMessageBubble', () => {
 
     const bookHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'book' }));
     expect(extractMarkdownClass(bookHtml)).toContain('tw-font-[var(--markdown-font-book)]');
+  });
+
+  it('keeps core readability guard classes mounted on markdown container', () => {
+    const html = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: '# t\n\ntext' }));
+    const cls = extractMarkdownClass(html);
+    expect(cls).toContain('[overflow-wrap:anywhere]');
+    expect(cls).toContain('[&_pre]:tw-overflow-auto');
+    expect(cls).toContain('[&_table]:tw-overflow-x-auto');
+    expect(cls).toContain('[&_.syncnos-md-image-link]');
+    expect(cls).toContain('[&_blockquote]:tw-relative');
   });
 });

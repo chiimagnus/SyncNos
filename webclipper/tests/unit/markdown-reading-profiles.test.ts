@@ -49,6 +49,7 @@ describe('markdown reading profile contract', () => {
       expect(String(preset.spec.codeScale || '')).toBeTruthy();
       expect(String(preset.typographyClassName || '')).toContain('tw-text-[');
       expect(String(preset.typographyClassName || '')).toContain('[&_p]:tw-max-w-[');
+      expect(String(preset.roleOverrides?.user || '')).toContain('[&_a]:tw-font-semibold');
 
       expect(Object.keys(preset.spec.headingScale)).toEqual(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
       for (const [heading, size] of Object.entries(preset.spec.headingScale)) {
