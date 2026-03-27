@@ -19,6 +19,8 @@ const currentState = {
   toggleSelected: vi.fn(),
   setActiveId: vi.fn(),
   clearSelected: vi.fn(),
+  openConversationExternalByLoc: vi.fn(),
+  openConversationExternalBySourceKey: vi.fn(),
   openConversationExternalById: vi.fn(),
   exporting: false,
   syncFeedback: {
@@ -71,6 +73,14 @@ vi.mock('../../src/ui/i18n', () => ({
 vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
   useIsNarrowScreen: () => false,
 }));
+
+vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/ui/shared/AppTooltip')>();
+  return {
+    ...actual,
+    AppTooltipHost: () => null,
+  };
+});
 
 vi.mock('../../src/ui/app/routes/Settings', () => ({
   default: () => createElement('div', null, 'settings'),
@@ -139,6 +149,15 @@ function setupDom() {
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
+  Object.defineProperty(globalThis, 'MutationObserver', {
+    configurable: true,
+    value: dom.window.MutationObserver,
+  });
+  Object.defineProperty(globalThis, 'Event', { configurable: true, value: dom.window.Event });
+  Object.defineProperty(globalThis, 'CustomEvent', {
+    configurable: true,
+    value: dom.window.CustomEvent,
+  });
   Object.defineProperty(globalThis, 'getComputedStyle', {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
