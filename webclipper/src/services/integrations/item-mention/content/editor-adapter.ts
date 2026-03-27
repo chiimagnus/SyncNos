@@ -8,7 +8,12 @@ export type TextareaEditor = {
   el: HTMLTextAreaElement;
 };
 
-export type EditorHandle = TextareaEditor;
+export type ContentEditableEditor = {
+  kind: 'contenteditable';
+  el: HTMLElement;
+};
+
+export type EditorHandle = TextareaEditor | ContentEditableEditor;
 
 export type EditorAdapter = {
   detectActiveEditor: () => EditorHandle | null;
@@ -35,4 +40,3 @@ export function replaceTextRange(input: { text: string; range: EditorRange; repl
   const caret = range.start + replacement.length;
   return { text: next, rangeAfter: { start: caret, end: caret } };
 }
-
