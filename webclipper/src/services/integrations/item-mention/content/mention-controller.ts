@@ -82,6 +82,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       let lastCursor = 0;
       let searchTimer: ReturnType<typeof setTimeout> | null = null;
       let requestSeq = 0;
+      let pickSeq = 0;
       let composing = false;
       const unsubscribeInvalidated = rt.onInvalidated?.(() => stop()) || null;
 
@@ -161,6 +162,15 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         const editor = adapter.detectActiveEditor();
         if (!editor) return;
         if (!items.length) return;
+
+        const pickId = (pickSeq += 1);
+        const sessionSnapshot = {
+          query: session.query,
+          triggerStart: session.triggerStart,
+          triggerEnd: session.triggerEnd,
+        };
+        const editorElSnapshot = editor.el;
+
         const index = clamp(session.highlightIndex || 0, 0, items.length - 1);
         const picked = items[index];
         const conversationId = Number(picked?.conversationId);
@@ -168,12 +178,25 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
         try {
           const payload = await buildMentionInsertText(rt, { conversationId });
+          if (stopped) return;
+          if (pickId !== pickSeq) return;
+          if (!session || !session.open) return;
+          if (
+            session.query !== sessionSnapshot.query ||
+            session.triggerStart !== sessionSnapshot.triggerStart ||
+            session.triggerEnd !== sessionSnapshot.triggerEnd
+          ) {
+            return;
+          }
+          const currentEditor = adapter.detectActiveEditor();
+          if (!currentEditor || currentEditor.el !== editorElSnapshot) return;
+
           const markdown = String(payload?.markdown || '');
           if (!markdown) return;
 
-          const range = { start: session.triggerStart, end: session.triggerEnd };
-          adapter.replaceRange(editor, range, markdown);
-          adapter.focus(editor);
+          const range = { start: sessionSnapshot.triggerStart, end: sessionSnapshot.triggerEnd };
+          adapter.replaceRange(currentEditor, range, markdown);
+          adapter.focus(currentEditor);
 
           session = null;
           items = [];
