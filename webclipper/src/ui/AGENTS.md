@@ -292,6 +292,9 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 1. 新增样式默认使用 `--radius-*`，禁止新增裸 `border-radius: <px>`。
 2. `tw-rounded-[...]` 仅允许用于 `var(--radius-*)` 或 `999px`（pill）语义；禁止再引入固定 px 分叉。
 3. 任何组件圆角改动都需要保持同心关系，不允许“内层半径大于外层”。
+4. 白名单仅允许：
+   - `border-radius: 0`（用于 reset / 去圆角场景）
+   - `webclipper/src/ui/example.html`（视觉示例页，不参与运行时 UI 契约）
 
 自检命令（手动）：
 

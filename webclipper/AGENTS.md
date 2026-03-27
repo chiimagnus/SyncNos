@@ -59,6 +59,7 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
 - 圆角 token 真源：`webclipper/src/ui/styles/tokens.css`（`--radius-outer/card/control/chip/inline/pill`）。
 - UI 规范细则：`webclipper/src/ui/AGENTS.md` 的 `B2.2 · 同心圆角分级`。
 - 约束：新增样式禁止写裸 `border-radius: <px>`，默认使用 `--radius-*`；`999px` 仅用于 pill/圆形元素。
+- 白名单：`border-radius: 0`（reset）与 `webclipper/src/ui/example.html`（示例页）可保留固定值，其余路径需收敛到 token。
 - 扫描命令：
   - `rg -n "border-radius:\s*[0-9]|tw-rounded-\[" webclipper/src/ui webclipper/src/entrypoints`
   - `rg -n -- "--radius-" webclipper/src/ui/styles/tokens.css`
