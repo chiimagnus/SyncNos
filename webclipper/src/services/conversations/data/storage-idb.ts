@@ -359,7 +359,7 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
   const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
 
-  const baseRecord = {
+  const baseRecord = normalizeConversationListRecord({
     sourceType: nextSourceType,
     source: payload.source,
     conversationKey: payload.conversationKey,
@@ -374,7 +374,7 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
         : [],
     notionPageId: payload.notionPageId || (existing ? existing.notionPageId || '' : ''),
     lastCapturedAt: nextLastCapturedAt,
-  };
+  });
 
   const record: any = withOptionalId(existing && existing.id, baseRecord);
 
@@ -441,7 +441,7 @@ export async function mergeConversationsByIds(input: {
     };
   }
 
-  const mergedConversation: any = {
+  const mergedConversation: any = normalizeConversationListRecord({
     ...keep,
     sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
     title: mergeStringFallback(keep.title, remove.title),
@@ -451,7 +451,7 @@ export async function mergeConversationsByIds(input: {
     notionPageId: mergeStringFallback(keep.notionPageId, remove.notionPageId),
     warningFlags: mergeWarningFlags(keep.warningFlags, remove.warningFlags),
     lastCapturedAt: pickMaxFiniteNumber(keep.lastCapturedAt, remove.lastCapturedAt) || Date.now(),
-  };
+  });
 
   await migrateSyncMappingKey(stores.sync_mappings, {
     legacySource: remove.source,
