@@ -68,14 +68,14 @@ export function DetailHeaderActionBar({
   if (!actions.length) return null;
 
   const resolveActionIcon = (action: DetailHeaderAction) => {
-    if (action.slot === 'tools') return <ImageDown size={14} strokeWidth={2} aria-hidden="true" />;
+    if (action.slot === 'tools') return <ImageDown size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.provider === 'obsidian' && action.disabled)
-      return <Link2Off size={14} strokeWidth={2} aria-hidden="true" />;
+      return <Link2Off size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.kind === 'open-target' && action.provider === 'obsidian')
-      return <BookOpen size={14} strokeWidth={2} aria-hidden="true" />;
+      return <BookOpen size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.kind === 'open-target' && action.provider === 'notion')
-      return <FileText size={14} strokeWidth={2} aria-hidden="true" />;
-    if (action.kind === 'external-link') return <ExternalLink size={14} strokeWidth={2} aria-hidden="true" />;
+      return <FileText size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.kind === 'external-link') return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
     return null;
   };
 
@@ -85,8 +85,8 @@ export function DetailHeaderActionBar({
     const icon = resolveActionIcon(action);
     const resolvedTriggerIcon =
       triggerIcon ||
-      (iconOnly ? <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" /> : icon) ||
-      <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" />;
+      (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : icon) ||
+      <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
     const triggerButtonClassName = iconOnly
       ? [buttonClassName, 'webclipper-btn--icon'].join(' ')
       : buttonClassName;
@@ -124,8 +124,8 @@ export function DetailHeaderActionBar({
   const primaryIcon = resolveActionIcon(actions[0]!);
   const resolvedTriggerIcon =
     triggerIcon ||
-    (iconOnly ? <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" /> : primaryIcon) ||
-    <ExternalLink size={15} strokeWidth={2.1} aria-hidden="true" />;
+    (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : primaryIcon) ||
+    <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
   const triggerButtonClassName = iconOnly
     ? [buttonClassName, 'webclipper-btn--icon'].join(' ')
     : buttonClassName;
