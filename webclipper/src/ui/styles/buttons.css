@@ -154,6 +154,7 @@
   height: var(--btn-icon-size);
   min-height: var(--btn-icon-size);
   padding: 0;
+  border-radius: var(--radius-inline);
   font-weight: 900;
 }
 
@@ -174,7 +175,7 @@
 }
 
 .webclipper-btn--round {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-inline);
 }
 
 .webclipper-menu-popover-panel {

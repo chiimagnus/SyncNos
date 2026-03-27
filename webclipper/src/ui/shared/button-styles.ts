@@ -36,11 +36,11 @@ export function menuChevronClassName(): string {
 }
 
 export function buttonIconCircleCardClassName(): string {
-  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xs webclipper-btn--round webclipper-btn--tone-muted';
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xs webclipper-btn--tone-muted';
 }
 
 export function buttonIconCircleGhostClassName(): string {
-  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--round webclipper-btn--tone-muted';
+  return 'webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs webclipper-btn--tone-muted';
 }
 
 export function buttonMiniIconClassName(active: boolean): string {
