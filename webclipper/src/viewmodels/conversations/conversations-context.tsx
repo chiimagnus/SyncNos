@@ -114,6 +114,36 @@ function canonicalizeHttpUrl(raw: unknown): string {
   }
 }
 
+function resolveConversationSourceType(input: { sourceType?: unknown; source?: unknown; url?: unknown }): string | undefined {
+  const explicit = String(input?.sourceType || '')
+    .trim()
+    .toLowerCase();
+  if (explicit) return explicit;
+
+  const source = String(input?.source || '')
+    .trim()
+    .toLowerCase();
+  if (source !== 'web') return undefined;
+
+  return canonicalizeHttpUrl(input?.url) ? 'article' : undefined;
+}
+
+function ensureConversationUiShape(conversation: Conversation): Conversation {
+  const nextSourceType = resolveConversationSourceType({
+    sourceType: (conversation as any)?.sourceType,
+    source: (conversation as any)?.source,
+    url: (conversation as any)?.url,
+  });
+  if (!nextSourceType) return conversation;
+
+  const currentSourceType = String((conversation as any)?.sourceType || '')
+    .trim()
+    .toLowerCase();
+  if (currentSourceType === nextSourceType) return conversation;
+
+  return { ...(conversation as any), sourceType: nextSourceType };
+}
+
 const URL_EDIT_CANCELLED_ERROR = 'SYNCNOS_URL_EDIT_CANCELLED';
 
 async function materializeSyncnosAssetsForExport(input: {
@@ -263,25 +293,37 @@ function toOpenTargetFromConversation(conversation: Conversation | null | undefi
   const conversationKey = String((conversation as any).conversationKey || '').trim();
   if (!source || !conversationKey) return null;
   const lastCapturedAt = Number((conversation as any).lastCapturedAt);
+  const sourceType = resolveConversationSourceType({
+    sourceType: (conversation as any).sourceType,
+    source,
+    url: (conversation as any).url,
+  });
   return {
     id,
     source,
     conversationKey,
     title: String((conversation as any).title || '').trim() || undefined,
     url: String((conversation as any).url || '').trim() || undefined,
-    sourceType: String((conversation as any).sourceType || '').trim() || undefined,
+    sourceType,
     lastCapturedAt: Number.isFinite(lastCapturedAt) ? lastCapturedAt : 0,
   };
 }
 
 function toConversationFromOpenTarget(target: ConversationListOpenTarget): Conversation {
+  const source = String(target.source || '').trim();
+  const url = String(target.url || '').trim() || undefined;
+  const sourceType = resolveConversationSourceType({
+    sourceType: target.sourceType,
+    source,
+    url,
+  });
   return {
     id: Number(target.id),
-    source: String(target.source || '').trim(),
+    source,
     conversationKey: String(target.conversationKey || '').trim(),
     title: String(target.title || '').trim() || undefined,
-    url: String(target.url || '').trim() || undefined,
-    sourceType: String(target.sourceType || '').trim() || undefined,
+    url,
+    sourceType,
     lastCapturedAt: Number.isFinite(Number(target.lastCapturedAt)) ? Number(target.lastCapturedAt) : undefined,
   };
 }
@@ -432,7 +474,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     if (!Number.isFinite(selectedId) || selectedId <= 0) return null;
 
     const loaded = items.find((x) => Number(x.id) === selectedId);
-    if (loaded) return loaded;
+    if (loaded) return ensureConversationUiShape(loaded);
 
     if (!activeConversationSnapshot || Number(activeConversationSnapshot.id) !== selectedId) return null;
     return toConversationFromOpenTarget(activeConversationSnapshot);
@@ -476,9 +518,17 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       if (!target) return;
       const id = Number((target as any).id);
       if (!Number.isFinite(id) || id <= 0) return;
+      const normalizedTarget: ConversationListOpenTarget = {
+        ...target,
+        sourceType: resolveConversationSourceType({
+          sourceType: (target as any)?.sourceType,
+          source: (target as any)?.source,
+          url: (target as any)?.url,
+        }),
+      };
       setListSourceFilterKeyPersistent(LIST_SOURCE_KEY_ALL);
       setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
-      setActiveConversationSnapshot(target);
+      setActiveConversationSnapshot(normalizedTarget);
       setActiveId(id);
       requestListLocate(id);
     },

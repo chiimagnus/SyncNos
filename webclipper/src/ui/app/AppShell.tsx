@@ -32,6 +32,19 @@ const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
 const SIDEBAR_WIDTH_DEFAULT = 370;
 
+function isArticleConversationLike(conversation: any): boolean {
+  const sourceType = String(conversation?.sourceType || '')
+    .trim()
+    .toLowerCase();
+  if (sourceType === 'article') return true;
+
+  const source = String(conversation?.source || '')
+    .trim()
+    .toLowerCase();
+  if (source !== 'web') return false;
+  return Boolean(normalizeHttpUrl(conversation?.url));
+}
+
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -115,10 +128,7 @@ export default function AppShell() {
     const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
     const processedLocRef = useRef<string | null>(null);
-    const isArticleConversation =
-      String((selectedConversation as any)?.sourceType || '')
-        .trim()
-        .toLowerCase() === 'article';
+    const isArticleConversation = isArticleConversationLike(selectedConversation);
     const canonicalUrl = normalizeHttpUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
 

@@ -39,7 +39,7 @@ export function ConversationsScene({
   onOpenInsightsSection,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { activeId, selectedConversation, detailHeaderActions, setActiveId } = useConversationsApp();
+  const { activeId, selectedConversation, detailHeaderActions, openConversationExternalById } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,
@@ -55,9 +55,9 @@ export function ConversationsScene({
     if (!isNarrow) return;
     const id = consumePendingOpenConversationId();
     if (!id) return;
-    setActiveId(id);
+    void openConversationExternalById(id);
     openDetail();
-  }, [isNarrow, openDetail, setActiveId]);
+  }, [isNarrow, openConversationExternalById, openDetail]);
 
   useEffect(() => {
     if (!onPopupHeaderStateChange) return;
