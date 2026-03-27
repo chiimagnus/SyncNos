@@ -12,7 +12,7 @@
   gap: 6px;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   cursor: pointer;
 
   /* Typography */
@@ -125,7 +125,7 @@
 
   min-height: 34px;
   padding: 8px 10px;
-  border-radius: 11px;
+  border-radius: var(--radius-chip);
 
   --btn-surface: color-mix(in srgb, var(--bg-card) 88%, transparent);
   border: 1px solid transparent;
@@ -174,7 +174,15 @@
 }
 
 .webclipper-btn--round {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+}
+
+.webclipper-menu-popover-panel {
+  border-radius: var(--radius-control);
+}
+
+.webclipper-menu-popover-backdrop {
+  border-radius: var(--radius-card);
 }
 
 .webclipper-btn--tone-muted {
