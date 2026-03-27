@@ -39,6 +39,14 @@
   --card-shadow: 0 8px 20px rgb(93 63 35 / 8%);
   --surface-inset-highlight: rgb(255 255 255 / 55%);
 
+  /* Markdown reading profiles */
+  --markdown-font-medium: "Charter", "Iowan Old Style", "Palatino Linotype", "Noto Serif CJK SC", "Source Han Serif SC",
+    "Songti SC", serif;
+  --markdown-font-notion: "Inter", "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --markdown-font-book: "Literata", "Baskerville", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong",
+    serif;
+
   /*
    * Concentric radius scale (Apple-like):
    * outer > card > control > chip > inline; circular elements use pill.

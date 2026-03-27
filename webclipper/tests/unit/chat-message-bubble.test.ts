@@ -10,6 +10,12 @@ function extractRootSectionClass(html: string) {
   return match[1];
 }
 
+function extractMarkdownClass(html: string) {
+  const match = html.match(/<div class="([^"]+)"[^>]*><p>/);
+  if (!match) throw new Error(`Expected markdown <div class=\"...\">, got: ${html.slice(0, 220)}...`);
+  return match[1];
+}
+
 describe('ChatMessageBubble', () => {
   it('renders user messages with green-tinted bubbles without card background conflicts', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown: 'hi' }));
@@ -24,5 +30,25 @@ describe('ChatMessageBubble', () => {
 
     const assistantHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'model', markdown: 'hi' }));
     expect(extractRootSectionClass(assistantHtml)).toContain('tw-bg-[var(--bg-card)]');
+  });
+
+  it('uses medium profile by default and for unknown values', () => {
+    const defaultHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello' }));
+    expect(extractMarkdownClass(defaultHtml)).toContain('tw-font-[var(--markdown-font-medium)]');
+
+    const unknownProfileHtml = renderToStaticMarkup(
+      createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'legacy' }),
+    );
+    expect(extractMarkdownClass(unknownProfileHtml)).toContain('tw-font-[var(--markdown-font-medium)]');
+  });
+
+  it('applies requested profile typography classes', () => {
+    const notionHtml = renderToStaticMarkup(
+      createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'notion' }),
+    );
+    expect(extractMarkdownClass(notionHtml)).toContain('tw-font-[var(--markdown-font-notion)]');
+
+    const bookHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'book' }));
+    expect(extractMarkdownClass(bookHtml)).toContain('tw-font-[var(--markdown-font-book)]');
   });
 });
