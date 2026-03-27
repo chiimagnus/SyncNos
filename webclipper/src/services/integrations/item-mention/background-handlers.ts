@@ -1,7 +1,8 @@
 import { ITEM_MENTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { searchConversationMentionCandidates } from '@services/conversations/data/storage';
+import { getConversationById, getConversationDetail, searchConversationMentionCandidates } from '@services/conversations/data/storage';
 import { normalizeMentionSearchLimit } from '@services/integrations/item-mention/mention-contract';
 import { searchMentionCandidates } from '@services/integrations/item-mention/mention-search';
+import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -34,7 +35,22 @@ export function registerItemMentionHandlers(router: AnyRouter) {
     });
   });
 
-  router.register(ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, async (_msg) => {
-    return router.err('item mention insert not implemented');
+  router.register(ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, async (msg) => {
+    const conversationId = Number(msg?.conversationId);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) {
+      return router.err('invalid conversationId', { code: 'INVALID_ARGUMENT', field: 'conversationId' });
+    }
+
+    const conversation = await getConversationById(conversationId);
+    if (!conversation) return router.err('conversation not found', { code: 'NOT_FOUND' });
+
+    const detail = await getConversationDetail(conversationId);
+    const messages = Array.isArray((detail as any)?.messages) ? (detail as any).messages : [];
+    if (!messages.length) {
+      return router.err('conversation detail empty', { code: 'EMPTY_DETAIL' });
+    }
+
+    const markdown = await formatConversationMarkdownForExternalOutput(conversation as any, detail as any);
+    return router.ok({ conversationId, markdown });
   });
 }

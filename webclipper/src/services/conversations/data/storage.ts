@@ -33,6 +33,10 @@ export async function findConversationById(conversationId: number): Promise<Conv
   return await idb.findConversationById(conversationId);
 }
 
+export async function getConversationById(conversationId: number): Promise<Conversation | null> {
+  return await idb.getConversationById(conversationId);
+}
+
 export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {
   return await idb.getConversationBySourceConversationKey(source, conversationKey);
 }
