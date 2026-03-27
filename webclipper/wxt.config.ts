@@ -86,7 +86,7 @@ export default defineConfig({
     ],
     web_accessible_resources: [
       {
-        resources: ['icons/icon-128.png'],
+        resources: ['icons/icon-16.png', 'icons/icon-48.png', 'icons/icon-128.png'],
         matches: [
           'https://chat.openai.com/*',
           'https://chatgpt.com/*',
@@ -108,6 +108,8 @@ export default defineConfig({
       },
     ],
     icons: {
+      16: 'icons/icon-16.png',
+      48: 'icons/icon-48.png',
       128: 'icons/icon-128.png',
     },
   },
