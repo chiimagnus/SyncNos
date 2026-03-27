@@ -44,8 +44,8 @@
     "Songti SC", serif;
   --markdown-font-notion: "Inter", "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", sans-serif;
-  --markdown-font-book: "Literata", "Baskerville", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong",
-    serif;
+  --markdown-font-book-cjk: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong";
+  --markdown-font-book: "Literata", "Baskerville", "Palatino Linotype", var(--markdown-font-book-cjk), serif;
 
   /*
    * Concentric radius scale (Apple-like):

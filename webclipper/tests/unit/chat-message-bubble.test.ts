@@ -56,7 +56,10 @@ describe('ChatMessageBubble', () => {
     expect(notionClass).toContain('[&_ul]:tw-mb-[0.55rem]');
 
     const bookHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'book' }));
-    expect(extractMarkdownClass(bookHtml)).toContain('tw-font-[var(--markdown-font-book)]');
+    const bookClass = extractMarkdownClass(bookHtml);
+    expect(bookClass).toContain('tw-font-[var(--markdown-font-book)]');
+    expect(bookClass).toContain('[&_p]:tw-max-w-[74ch]');
+    expect(bookClass).toContain('[&_p]:tw-mb-[1.08rem]');
   });
 
   it('keeps core readability guard classes mounted on markdown container', () => {

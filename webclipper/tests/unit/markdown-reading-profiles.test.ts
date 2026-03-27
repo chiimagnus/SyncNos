@@ -75,4 +75,16 @@ describe('markdown reading profile contract', () => {
     expect(String(notion.typographyClassName)).toContain('[&_ul]:tw-mb-[0.55rem]');
     expect(String(notion.typographyClassName)).toContain('[&_blockquote]:tw-mb-[0.75rem]');
   });
+
+  it('keeps book profile immersive with serif + CJK fallback', () => {
+    const medium = MARKDOWN_READING_PROFILE_PRESETS.medium;
+    const book = MARKDOWN_READING_PROFILE_PRESETS.book;
+
+    expect(Number.parseFloat(book.spec.fontSize)).toBeGreaterThanOrEqual(Number.parseFloat(medium.spec.fontSize));
+    expect(readMeasureCh(book.spec.measure)).toBeGreaterThan(readMeasureCh(medium.spec.measure));
+    expect(Number(book.spec.lineHeight)).toBeGreaterThanOrEqual(1.5);
+    expect(String(book.spec.fontStack)).toContain('Noto Serif CJK SC');
+    expect(String(book.typographyClassName)).toContain('[&_p]:tw-max-w-[74ch]');
+    expect(String(book.typographyClassName)).toContain('[&_pre>code]:tw-leading-[1.6]');
+  });
 });
