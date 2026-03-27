@@ -14,6 +14,7 @@ import notionAiModelPickerApi from '@services/integrations/notionai-auto-picker/
 import { createItemMentionController } from '@services/integrations/item-mention/content/mention-controller';
 import normalizeApi from '@services/shared/normalize.ts';
 import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
+import { inpageItemMentionApi } from '@ui/inpage/inpage-item-mention-shadow.ts';
 import { inpageTipApi } from '@ui/inpage/inpage-tip-shadow.ts';
 import { createRuntimeClient } from '@platform/runtime/client.ts';
 
@@ -34,7 +35,7 @@ export default defineContentScript({
     registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
     registerInpageCommentsPanelContentHandlers(runtime);
 
-    const itemMentionController = createItemMentionController({ runtime });
+    const itemMentionController = createItemMentionController({ runtime, ui: inpageItemMentionApi });
     const controller = createContentController({
       runtime,
       collectorsRegistry,

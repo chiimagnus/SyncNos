@@ -5,12 +5,34 @@ import { notionAiContentEditableAdapter } from '@services/integrations/item-ment
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
 import { moveMentionHighlightIndex } from '@services/integrations/item-mention/content/mention-ui-state';
-import { inpageItemMentionApi } from '@ui/inpage/inpage-item-mention-shadow';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
   onInvalidated?: (listener: (error: Error) => void) => () => void;
   isInvalidContextError?: (error: unknown) => boolean;
+};
+
+type ItemMentionUiItem = {
+  title: string;
+  source: string;
+  domain: string;
+};
+
+// Controller stays in `services/**` and must not import UI. UI is injected from entrypoints.
+type ItemMentionUiApi = {
+  render: (input: {
+    open: boolean;
+    items: ItemMentionUiItem[];
+    highlightIndex: number;
+    position?: { left: number; top: number } | null;
+    onPick?: ((index: number) => void) | null;
+  }) => void;
+  cleanup?: () => void;
+};
+
+const noopItemMentionUi: ItemMentionUiApi = {
+  render() {},
+  cleanup() {},
 };
 
 function isChatgptHost(hostname: string): boolean {
@@ -37,8 +59,9 @@ function computePopupPosition(el: HTMLElement): { left: number; top: number } {
   return { left, top };
 }
 
-export function createItemMentionController(deps: { runtime: RuntimeClient | null }) {
+export function createItemMentionController(deps: { runtime: RuntimeClient | null; ui?: ItemMentionUiApi | null }) {
   const runtime = deps.runtime;
+  const ui = deps.ui || noopItemMentionUi;
 
   return {
     start() {
@@ -56,11 +79,9 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       let stopped = false;
       let session: MentionSessionState | null = null;
       let items: any[] = [];
-      let lastText = '';
       let lastCursor = 0;
       let searchTimer: ReturnType<typeof setTimeout> | null = null;
       let requestSeq = 0;
-      let currentQueryKey = '';
       let composing = false;
       const unsubscribeInvalidated = rt.onInvalidated?.(() => stop()) || null;
 
@@ -72,7 +93,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       }
 
       function hidePopup() {
-        inpageItemMentionApi.render({ open: false, items: [], highlightIndex: 0, position: null, onPick: null });
+        ui.render({ open: false, items: [], highlightIndex: 0, position: null, onPick: null });
       }
 
       function renderPopup() {
@@ -86,13 +107,15 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
           source: String(c?.source || ''),
           domain: String(c?.domain || ''),
         }));
-        inpageItemMentionApi.render({
+        ui.render({
           open: true,
           items: uiItems,
           highlightIndex,
           position,
           onPick: (index) => {
-            session = session ? { ...session, highlightIndex: clamp(index, 0, Math.max(0, items.length - 1)) } : session;
+            session = session
+              ? { ...session, highlightIndex: clamp(index, 0, Math.max(0, items.length - 1)) }
+              : session;
             void pickHighlighted();
           },
         });
@@ -101,7 +124,6 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       async function runSearch(query: string) {
         const reqId = (requestSeq += 1);
         const queryKey = String(query || '');
-        currentQueryKey = queryKey;
 
         try {
           const res = await searchMentionCandidates(rt, { query: queryKey, limit: 20 });
@@ -189,7 +211,6 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
           editor.kind === 'textarea'
             ? Number((editor.el as any).selectionStart)
             : Number(adapter.getSelectionRange(editor).end);
-        lastText = text;
         lastCursor = Number.isFinite(cursor) ? cursor : text.length;
 
         const prevQuery = session?.query || '';
@@ -284,7 +305,12 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         if (!editor) return;
         const related = (e as any).relatedTarget as any;
         // If focus stays within the editor host, ignore.
-        if (related && editor.el && typeof (editor.el as any).contains === 'function' && (editor.el as any).contains(related))
+        if (
+          related &&
+          editor.el &&
+          typeof (editor.el as any).contains === 'function' &&
+          (editor.el as any).contains(related)
+        )
           return;
         refresh({ close: true });
       }
@@ -304,7 +330,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         document.removeEventListener('compositionstart', onCompositionStart, true);
         document.removeEventListener('compositionend', onCompositionEnd, true);
         document.removeEventListener('focusout', onFocusOut, true);
-        inpageItemMentionApi.cleanup();
+        ui.cleanup?.();
       }
 
       document.addEventListener('input', onInput, true);
