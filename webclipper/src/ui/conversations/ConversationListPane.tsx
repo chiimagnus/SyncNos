@@ -434,6 +434,10 @@ export function ConversationListPane({
       return;
     }
 
+    // The list may not have been loaded yet. Keep the pending locate request
+    // until we have at least one page (or an error) to avoid clearing it too early.
+    if (loadingInitialList || loadingMoreList) return;
+
     if (listError) {
       locateLoadRoundRef.current = { id: 0, rounds: 0 };
       consumeListLocate();
@@ -441,6 +445,7 @@ export function ConversationListPane({
     }
 
     if (!listHasMore) {
+      if (!items.length) return;
       locateLoadRoundRef.current = { id: 0, rounds: 0 };
       consumeListLocate();
       return;
@@ -452,7 +457,6 @@ export function ConversationListPane({
       return;
     }
 
-    if (loadingInitialList || loadingMoreList) return;
     locateLoadRoundRef.current = { id, rounds: locateLoadRoundRef.current.rounds + 1 };
     void loadMoreList();
   }, [

@@ -302,4 +302,48 @@ describe('ConversationsProvider pagination state', () => {
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
     expect((latestState.items as any[]).some((item) => Number(item.id) === 999)).toBe(false);
   });
+
+  it('preserves requested activeId across bootstrap even when target is not in loaded items', async () => {
+    const bootstrapReq = deferred<any>();
+    getConversationListBootstrap.mockImplementation(() => bootstrapReq.promise);
+    findConversationBySourceAndKey.mockResolvedValue({
+      id: 999,
+      source: 'chatgpt',
+      conversationKey: 'conv-999',
+      title: 'Target conversation',
+      url: 'https://example.com/chat/999',
+      sourceType: 'chat',
+      lastCapturedAt: Date.now(),
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    await act(async () => {
+      await latestState.openConversationExternalBySourceKey('chatgpt', 'conv-999');
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(Number(latestState.activeId)).toBe(999);
+    expect(Number(latestState.pendingListLocateId)).toBe(999);
+    expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
+
+    await act(async () => {
+      bootstrapReq.resolve(
+        makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+          sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+        }),
+      );
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(Number(latestState.activeId)).toBe(999);
+    expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
+  });
 });

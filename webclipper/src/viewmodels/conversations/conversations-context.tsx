@@ -432,7 +432,13 @@ async function loadDetailFor(id: number): Promise<ConversationDetail> {
   return getConversationDetail(id);
 }
 
-export function ConversationsProvider({ children }: { children: React.ReactNode }) {
+export function ConversationsProvider({
+  children,
+  initialOpenLoc = null,
+}: {
+  children: React.ReactNode;
+  initialOpenLoc?: { source: string; conversationKey: string } | null;
+}) {
   const [loadingInitialList, setLoadingInitialList] = useState(false);
   const [loadingMoreList, setLoadingMoreList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -442,8 +448,15 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [listFacets, setListFacets] = useState<ConversationListFacets>(EMPTY_LIST_FACETS);
   const [items, setItems] = useState<Conversation[]>([]);
 
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const didBootstrapRef = useRef(false);
+
   const activeIdRef = useRef<number | null>(null);
+  const [activeId, setActiveIdState] = useState<number | null>(null);
+  const setActiveId = useCallback((id: number | null) => {
+    activeIdRef.current = id;
+    setActiveIdState(id);
+  }, []);
   const listRequestSeqRef = useRef(0);
   const openTargetRequestSeqRef = useRef(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -454,7 +467,12 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
-  const [activeConversationSnapshot, setActiveConversationSnapshot] = useState<ConversationListOpenTarget | null>(null);
+  const activeConversationSnapshotRef = useRef<ConversationListOpenTarget | null>(null);
+  const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(null);
+  const setActiveConversationSnapshot = useCallback((next: ConversationListOpenTarget | null) => {
+    activeConversationSnapshotRef.current = next;
+    setActiveConversationSnapshotState(next);
+  }, []);
   const [pendingListLocateId, setPendingListLocateId] = useState<number | null>(null);
   const pendingListLocateIdRef = useRef<number | null>(null);
   const listFilterScopeRef = useRef<string | null>(null);
@@ -532,7 +550,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       setActiveId(id);
       requestListLocate(id);
     },
-    [requestListLocate, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
+    [requestListLocate, setActiveId, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
   );
 
   const openConversationExternalBySourceKey = useCallback(
@@ -609,18 +627,38 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
 
       const currentActiveId = Number(activeIdRef.current);
-      const nextActiveId =
-        Number.isFinite(currentActiveId) && currentActiveId > 0 && ids.has(currentActiveId)
-          ? currentActiveId
-          : list.length
-            ? Number((list[0] as any).id)
-            : null;
+      const requestedId = Number(pendingListLocateIdRef.current);
+      const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
+      const preservingRequestedActive =
+        Number.isFinite(currentActiveId) &&
+        currentActiveId > 0 &&
+        Number.isFinite(requestedId) &&
+        requestedId > 0 &&
+        requestedId === currentActiveId;
+      const preservingSnapshotActive =
+        Number.isFinite(currentActiveId) &&
+        currentActiveId > 0 &&
+        Number.isFinite(snapshotId) &&
+        snapshotId > 0 &&
+        snapshotId === currentActiveId;
+      const shouldPreserveActive =
+        Number.isFinite(currentActiveId) &&
+        currentActiveId > 0 &&
+        (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
+
+      const nextActiveId = shouldPreserveActive
+        ? currentActiveId
+        : list.length
+          ? Number((list[0] as any).id)
+          : null;
       setActiveId(nextActiveId);
-      const nextActiveConversation =
-        nextActiveId == null
-          ? null
-          : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
-      setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
+      if (!shouldPreserveActive) {
+        const nextActiveConversation =
+          nextActiveId == null
+            ? null
+            : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
+        setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
+      }
     } catch (e) {
       if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
@@ -632,7 +670,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       if (requestSeq !== listRequestSeqRef.current) return;
       setLoadingInitialList(false);
     }
-  }, [listSiteFilterKey, listSourceFilterKey]);
+  }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId]);
 
   const loadMoreList = useCallback(async () => {
     const cursor = listCursor;
@@ -775,8 +813,29 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   }, []);
 
   useEffect(() => {
+    if (didBootstrapRef.current) return;
+    didBootstrapRef.current = true;
+
+    let cancelled = false;
+    void (async () => {
+      const safeSource = String(initialOpenLoc?.source || '').trim();
+      const safeConversationKey = String(initialOpenLoc?.conversationKey || '').trim();
+      if (safeSource && safeConversationKey) {
+        await openConversationExternalByLoc({ source: safeSource, conversationKey: safeConversationKey }).catch(() => {});
+      }
+      if (cancelled) return;
+      setBootstrapped(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialOpenLoc, openConversationExternalByLoc]);
+
+  useEffect(() => {
+    if (!bootstrapped) return;
     void refreshList();
-  }, [refreshList]);
+  }, [bootstrapped, refreshList]);
 
   useEffect(() => {
     const sourceKey =
@@ -806,7 +865,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
     if (!loaded) return;
     const nextSnapshot = toOpenTargetFromConversation(loaded);
-    setActiveConversationSnapshot((prev) => (sameOpenTarget(prev, nextSnapshot) ? prev : nextSnapshot));
+    const prevSnapshot = activeConversationSnapshotRef.current;
+    if (sameOpenTarget(prevSnapshot, nextSnapshot)) return;
+    setActiveConversationSnapshot(nextSnapshot);
   }, [activeId, items]);
 
   const refreshActiveDetail = useCallback(async () => {
