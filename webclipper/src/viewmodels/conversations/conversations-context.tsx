@@ -16,6 +16,8 @@ import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
   deleteConversations,
+  findConversationById,
+  findConversationBySourceAndKey,
   getConversationListBootstrap,
   getConversationDetail,
   mergeConversations,
@@ -314,7 +316,9 @@ type ConversationsAppState = {
   pendingListLocateId: number | null;
   requestListLocate: (conversationId: number) => void;
   consumeListLocate: () => number | null;
-  openConversationExternalById: (conversationId: number) => void;
+  openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
+  openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<void>;
+  openConversationExternalById: (conversationId: number) => Promise<void>;
 
   refreshList: () => Promise<void>;
   refreshActiveDetail: () => Promise<void>;
@@ -351,6 +355,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const [activeId, setActiveId] = useState<number | null>(null);
   const activeIdRef = useRef<number | null>(null);
+  const listRequestSeqRef = useRef(0);
+  const openTargetRequestSeqRef = useRef(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -362,6 +368,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const [activeConversationSnapshot, setActiveConversationSnapshot] = useState<ConversationListOpenTarget | null>(null);
   const [pendingListLocateId, setPendingListLocateId] = useState<number | null>(null);
   const pendingListLocateIdRef = useRef<number | null>(null);
+  const listFilterScopeRef = useRef<string | null>(null);
 
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -417,29 +424,89 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     return Number.isFinite(Number(id)) ? (id as number) : null;
   }, []);
 
-  const openConversationExternalById = useCallback(
-    (conversationId: number) => {
-      const id = Number(conversationId);
+  const applyOpenTarget = useCallback(
+    (target: ConversationListOpenTarget | null) => {
+      if (!target) return;
+      const id = Number((target as any).id);
       if (!Number.isFinite(id) || id <= 0) return;
       setListSourceFilterKeyPersistent(LIST_SOURCE_KEY_ALL);
       setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
-      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
-      setActiveConversationSnapshot(toOpenTargetFromConversation(loaded));
+      setActiveConversationSnapshot(target);
       setActiveId(id);
       requestListLocate(id);
     },
-    [items, requestListLocate, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
+    [requestListLocate, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
+  );
+
+  const openConversationExternalBySourceKey = useCallback(
+    async (source: string, conversationKey: string) => {
+      const safeSource = String(source || '').trim();
+      const safeConversationKey = String(conversationKey || '').trim();
+      if (!safeSource || !safeConversationKey) return;
+
+      const requestSeq = openTargetRequestSeqRef.current + 1;
+      openTargetRequestSeqRef.current = requestSeq;
+
+      const target = await findConversationBySourceAndKey(safeSource, safeConversationKey).catch(() => null);
+      if (requestSeq !== openTargetRequestSeqRef.current) return;
+      applyOpenTarget(target);
+    },
+    [applyOpenTarget],
+  );
+
+  const openConversationExternalByLoc = useCallback(
+    async (input: { source: string; conversationKey: string }) => {
+      await openConversationExternalBySourceKey(input?.source, input?.conversationKey);
+    },
+    [openConversationExternalBySourceKey],
+  );
+
+  const openConversationExternalById = useCallback(
+    async (conversationId: number) => {
+      const id = Number(conversationId);
+      if (!Number.isFinite(id) || id <= 0) return;
+      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
+      if (loaded) {
+        applyOpenTarget(toOpenTargetFromConversation(loaded));
+        return;
+      }
+
+      const requestSeq = openTargetRequestSeqRef.current + 1;
+      openTargetRequestSeqRef.current = requestSeq;
+
+      const target = await findConversationById(id).catch(() => null);
+      if (requestSeq !== openTargetRequestSeqRef.current) return;
+      applyOpenTarget(target);
+    },
+    [applyOpenTarget, items],
   );
 
   const refreshList = useCallback(async () => {
+    const sourceKey =
+      String(listSourceFilterKey || LIST_SOURCE_KEY_ALL)
+        .trim()
+        .toLowerCase() || LIST_SOURCE_KEY_ALL;
+    const rawSiteKey =
+      String(listSiteFilterKey || LIST_SITE_FILTER_ALL_KEY)
+        .trim()
+        .toLowerCase() || LIST_SITE_FILTER_ALL_KEY;
+    const siteKey = sourceKey === 'web' ? rawSiteKey : LIST_SITE_FILTER_ALL_KEY;
+
+    const requestSeq = listRequestSeqRef.current + 1;
+    listRequestSeqRef.current = requestSeq;
+
     setLoadingInitialList(true);
     setLoadingMoreList(false);
     setListError(null);
+    setListCursor(null);
+    setListHasMore(false);
     try {
       const page = await getConversationListBootstrap(
-        { sourceKey: LIST_SOURCE_KEY_ALL, siteKey: LIST_SITE_FILTER_ALL_KEY, limit: LIST_BOOTSTRAP_LIMIT },
+        { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
         LIST_BOOTSTRAP_LIMIT,
       );
+      if (requestSeq !== listRequestSeqRef.current) return;
+
       const list = Array.isArray(page?.items) ? page.items : [];
       setItems(list);
       setListCursor(page?.cursor ?? null);
@@ -464,15 +531,17 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
           : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
       setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
     } catch (e) {
+      if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
       setListCursor(null);
       setListHasMore(false);
       setListSummary(EMPTY_LIST_SUMMARY);
       setListFacets(EMPTY_LIST_FACETS);
     } finally {
+      if (requestSeq !== listRequestSeqRef.current) return;
       setLoadingInitialList(false);
     }
-  }, []);
+  }, [listSiteFilterKey, listSourceFilterKey]);
 
   const updateSelectedConversationUrl = useCallback(
     async (nextUrl: string) => {
@@ -572,6 +641,25 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     void refreshList();
   }, [refreshList]);
+
+  useEffect(() => {
+    const sourceKey =
+      String(listSourceFilterKey || LIST_SOURCE_KEY_ALL)
+        .trim()
+        .toLowerCase() || LIST_SOURCE_KEY_ALL;
+    const siteKey =
+      String(listSiteFilterKey || LIST_SITE_FILTER_ALL_KEY)
+        .trim()
+        .toLowerCase() || LIST_SITE_FILTER_ALL_KEY;
+    const scope = `${sourceKey}::${siteKey}`;
+    if (listFilterScopeRef.current == null) {
+      listFilterScopeRef.current = scope;
+      return;
+    }
+    if (listFilterScopeRef.current === scope) return;
+    listFilterScopeRef.current = scope;
+    setSelectedIds([]);
+  }, [listSiteFilterKey, listSourceFilterKey]);
 
   useEffect(() => {
     const id = Number(activeId);
@@ -924,6 +1012,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     pendingListLocateId,
     requestListLocate,
     consumeListLocate,
+    openConversationExternalByLoc,
+    openConversationExternalBySourceKey,
     openConversationExternalById,
     refreshList,
     refreshActiveDetail,
