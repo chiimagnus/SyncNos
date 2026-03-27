@@ -11,7 +11,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings、image_cache、article_comments | `src/platform/idb/schema.ts`, `src/services/conversations/data/storage-idb.ts`, `src/services/comments/data/storage-idb.ts` |
 | `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | `src/viewmodels/settings/useSettingsSceneController.ts`、settings stores |
 | `localStorage` | WebClipper | 本地 Web Storage | 设置页当前 section、会话来源筛选、App sidebar UI 偏好 | `types.ts`, `ConversationListPane.tsx`, `AppShell.tsx` |
-| `sessionStorage` | WebClipper | 本地 Web Storage | 窄屏 list/detail 路由中的待打开 conversation | `pending-open.ts` |
+| `sessionStorage` | WebClipper | 本地 Web Storage | 窄屏 list/detail 路由中的待打开 conversation payload（id，或 id+source/key） | `pending-open.ts` |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、image-cache、article-comments、manifest | `src/services/sync/backup/export.ts`, `src/services/sync/backup/import.ts` |
 | 外部结果 | 双产品线 | Notion / Obsidian / 文件系统 | 页面、数据库、Markdown、vault 文件 | sync orchestrators / export |
 
@@ -71,11 +71,12 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**A
 | --- | --- | --- | --- |
 | `webclipper_settings_active_section` | `localStorage` | `src/viewmodels/settings/types.ts` | 记住用户上次停留的设置 section |
 | `webclipper_conversations_source_filter_key` | `localStorage` | `ConversationListPane.tsx` | 记住会话列表来源筛选（如 `all / chatgpt / claude`） |
+| `webclipper_conversations_site_filter_key` | `localStorage` | `ConversationListPane.tsx` | `source=web` 时记住站点筛选（如 `all / domain:sspai.com`） |
 | `webclipper_app_source_filter_key` | `localStorage` | 旧版本兼容回读 | 旧的来源筛选键，当前只做 backward compatibility |
-| `webclipper_pending_open_conversation_id` | `sessionStorage` | `pending-open.ts` | 窄屏下从排行 / 列表导航到 detail 时桥接目标会话 id |
+| `webclipper_pending_open_conversation_id` | `sessionStorage` | `pending-open.ts` | 窄屏下从排行 / 列表导航到 detail 的一次性桥接 payload（`conversationId`，可附带 `source + conversationKey`） |
 | `SIDEBAR_COLLAPSED_KEY`, `SIDEBAR_WIDTH_KEY` | `localStorage` | `AppShell.tsx` | 扩展完整 app 页面左侧 sidebar 的折叠与宽度偏好 |
 
-- `pending-open.ts` 的值是一次性消费：`consumePendingOpenConversationId()` 读出后会立刻删除，避免下一次错误复用旧目标。
+- `pending-open.ts` 的值是一次性消费：`consumePendingOpenConversation()`（或兼容 API `consumePendingOpenConversationId()`）读出后会立刻删除，避免下一次错误复用旧目标。
 - `localStorage` 中的来源筛选不影响 IndexedDB 数据，只影响当前列表视图如何过滤显示。
 
 ## WebClipper：Insight 统计视图的数据来源

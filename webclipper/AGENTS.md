@@ -77,6 +77,15 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
   - `ChatMessageBubble` 保持“结构层 + profile 排版层”两层组合，不改 markdown 语义输出。
   - `ConversationDetailPane` 仅消费规范化 profile 值，不自行解析 profile 逻辑。
 
+## 会话分页与定位契约
+
+- 会话列表主链路必须走分页接口：`bootstrap + loadMore`，禁止回退全量 `listConversations` 读取。
+- `ConversationListPane` 的 near-bottom 自动加载由 sentinel + `IntersectionObserver` 触发；需要用 `loadingInitialList/loadingMoreList/listHasMore` 闸门防重入。
+- 列表筛选与统计口径必须来自 provider 的 `listFacets/listSummary`，不要从当前已加载子集反推统计。
+- `Select All` 仅作用“当前已加载且可见项”；批量 `Delete/Export/Sync` 提示文案必须明确同一范围语义。
+- deep-link `loc`、Insight 跳转与外部打开必须走 provider 精确打开链路（`openConversationExternalByLoc/openConversationExternalBySourceKey/openConversationExternalById`），不能再依赖 `items.find()`。
+- 窄屏 list/detail 桥接使用 `pending-open.ts` 的一次性 `sessionStorage` payload（`conversationId` 必填，可附带 `source + conversationKey`）；消费后立即删除，避免重复复用旧目标。
+
 ## 贡献约定
 
 - 默认不查看、不编辑 i18n 字段（除非明确要求）。

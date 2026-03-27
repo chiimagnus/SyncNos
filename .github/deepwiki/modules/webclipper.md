@@ -117,9 +117,12 @@
 - `BackupSection.tsx` 的导入统计现在会展示 comments 相关数量，因此恢复验证时不能只看会话和图片缓存。
 - `ConversationsProvider` 是 popup 与 app 的共享数据入口；大多数 UI bug 都可以沿着 provider → storage → background handler 这条链排查。
 - `ConversationListPane.tsx` 会把来源筛选写入 `localStorage`（`webclipper_conversations_source_filter_key`），因此“为什么列表下次打开还停在 ChatGPT 过滤条件”是预期行为，不是脏状态。
+- 会话列表主链路已经切到分页：provider 维护 `loadingInitialList/loadingMoreList/listHasMore/listCursor`，列表 near-bottom 由 sentinel 自动 `loadMore`，不再允许回退全量读取。
+- `ConversationListPane.tsx` 的筛选和统计口径来自 `listFacets/listSummary`，不是从已加载子集反推；`Select All` 只覆盖当前已加载可见项，批量动作 tooltip 会显式提示该范围。
 - `ConversationListPane.tsx` 的 `source/site` 筛选已启用 `SelectMenu` 的 `adaptiveMaxHeight`：`SelectMenu` 会通过 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再按 `side='top'|'bottom'` 计算可用高度（最小 `80px`），所以 popup 底部条里的菜单高度会随可视区域动态变化。
 - `ConversationListPane.tsx` 底部 `today / total` 统计在提供 `onOpenInsightsSection` 回调时会变成可点击入口：popup 会跳 `'/settings?section=insight'`，app 会在 HashRouter 内导航到同一路由。
-- `ConversationsScene.tsx` 在窄屏下采用 list/detail 双路由；如果某个入口（例如 Insight Top conversations）需要直接开 detail，会通过 `pending-open.ts` 把目标会话先写入 `sessionStorage`，再在 scene 初始化时消费。
+- `AppShell.tsx` 的 `loc` 参数消费已改为 provider 精确打开（`openConversationExternalByLoc`），不再依赖当前 loaded list 的 `items.find()`。
+- `ConversationsScene.tsx` 在窄屏下采用 list/detail 双路由；如果某个入口（例如 Insight Top conversations）需要直接开 detail，会通过 `pending-open.ts` 把目标写入一次性 payload（`conversationId`，可带 `source + conversationKey`），scene 初始化时优先走 source/key 精确打开，缺失时再回退 id。
 - detail header 的单槽位动作由 `DetailHeaderActionBar.tsx` 统一处理：槽位内单动作直出按钮、多动作自动折叠菜单；popup/app 的窄屏头部也沿用同一规则，不再出现“列表详情页和窄屏 header 行为不一致”。
 - `Open in Obsidian` 的文件打开只走 Local REST API `POST /open/{filename}`；当 API 因 App 未启动不可达时，只用 `obsidian://open` 拉起桌面 App，随后再重试 REST API。
 - 文案国际化是运行时自动行为，不依赖用户手动切换设置：`i18n/index.ts` 只看 `navigator.language`，当前显式支持英文与中文两套 locale。
