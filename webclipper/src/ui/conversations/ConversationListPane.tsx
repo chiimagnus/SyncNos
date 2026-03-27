@@ -219,10 +219,13 @@ export function ConversationListPane({
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
+    listHasMore,
+    loadingMoreList,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
     pendingListLocateId,
     consumeListLocate,
+    loadMoreList,
     exportSelectedMarkdown,
     syncSelectedNotion,
     syncSelectedObsidian,
@@ -235,6 +238,7 @@ export function ConversationListPane({
   const [exportOpen, setExportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const copiedTimerRef = useRef<number | null>(null);
@@ -438,6 +442,34 @@ export function ConversationListPane({
     const nextTop = Math.max(0, Number(initialScrollTop) || 0);
     el.scrollTop = nextTop;
   }, [initialScrollTop, scrollRestoreKey]);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!root || !sentinel) return;
+
+    let cancelled = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (cancelled) return;
+        const entry = entries[0];
+        if (!entry || !entry.isIntersecting) return;
+        if (loadingMoreList) return;
+        if (!listHasMore) return;
+        void loadMoreList();
+      },
+      {
+        root,
+        threshold: 0.01,
+        rootMargin: '0px 0px 240px 0px',
+      },
+    );
+    observer.observe(sentinel);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [listHasMore, loadMoreList, loadingMoreList]);
 
   useEffect(() => {
     const id = Number(pendingListLocateId);
@@ -803,6 +835,8 @@ export function ConversationListPane({
               </div>
             );
           })}
+
+          <div ref={loadMoreSentinelRef} aria-hidden="true" className="tw-h-4 tw-w-full tw-shrink-0" />
         </div>
       </div>
 

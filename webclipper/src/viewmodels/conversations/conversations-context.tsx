@@ -19,6 +19,7 @@ import {
   findConversationById,
   findConversationBySourceAndKey,
   getConversationListBootstrap,
+  getConversationListPage,
   getConversationDetail,
   mergeConversations,
   upsertConversation,
@@ -206,6 +207,24 @@ function readInitialListSiteFilterKey(): string {
   return raw || LIST_SITE_FILTER_ALL_KEY;
 }
 
+function normalizeListSourceFilterKey(input: unknown): string {
+  const sourceKey = String(input || '')
+    .trim()
+    .toLowerCase();
+  return sourceKey || LIST_SOURCE_KEY_ALL;
+}
+
+function normalizeListSiteFilterKey(input: unknown): string {
+  const siteKey = String(input || '')
+    .trim()
+    .toLowerCase();
+  return siteKey || LIST_SITE_FILTER_ALL_KEY;
+}
+
+function resolveEffectiveListSiteFilterKey(sourceKey: string, siteKey: string): string {
+  return sourceKey === 'web' ? siteKey : LIST_SITE_FILTER_ALL_KEY;
+}
+
 function normalizeConversationListSummary(input: unknown): ConversationListSummary {
   const totalCountRaw = Number((input as any)?.totalCount);
   const todayCountRaw = Number((input as any)?.todayCount);
@@ -281,6 +300,33 @@ function sameOpenTarget(a: ConversationListOpenTarget | null, b: ConversationLis
   );
 }
 
+function mergeConversationPageItems(prev: Conversation[], next: Conversation[]): Conversation[] {
+  if (!Array.isArray(prev) || !prev.length) return Array.isArray(next) ? next : [];
+  if (!Array.isArray(next) || !next.length) return prev;
+
+  const out: Conversation[] = prev.slice();
+  const indexById = new Map<number, number>();
+  for (let idx = 0; idx < out.length; idx += 1) {
+    const id = Number((out[idx] as any)?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    indexById.set(id, idx);
+  }
+
+  for (const item of next) {
+    const id = Number((item as any)?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const existingIndex = indexById.get(id);
+    if (existingIndex == null) {
+      indexById.set(id, out.length);
+      out.push(item);
+      continue;
+    }
+    out[existingIndex] = item;
+  }
+
+  return out;
+}
+
 type ConversationsAppState = {
   loadingList: boolean;
   loadingInitialList: boolean;
@@ -319,6 +365,7 @@ type ConversationsAppState = {
   openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<void>;
   openConversationExternalById: (conversationId: number) => Promise<void>;
+  loadMoreList: () => Promise<void>;
 
   refreshList: () => Promise<void>;
   refreshActiveDetail: () => Promise<void>;
@@ -482,15 +529,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   );
 
   const refreshList = useCallback(async () => {
-    const sourceKey =
-      String(listSourceFilterKey || LIST_SOURCE_KEY_ALL)
-        .trim()
-        .toLowerCase() || LIST_SOURCE_KEY_ALL;
-    const rawSiteKey =
-      String(listSiteFilterKey || LIST_SITE_FILTER_ALL_KEY)
-        .trim()
-        .toLowerCase() || LIST_SITE_FILTER_ALL_KEY;
-    const siteKey = sourceKey === 'web' ? rawSiteKey : LIST_SITE_FILTER_ALL_KEY;
+    const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
+    const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
+    const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
 
     const requestSeq = listRequestSeqRef.current + 1;
     listRequestSeqRef.current = requestSeq;
@@ -542,6 +583,51 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       setLoadingInitialList(false);
     }
   }, [listSiteFilterKey, listSourceFilterKey]);
+
+  const loadMoreList = useCallback(async () => {
+    const cursor = listCursor;
+    if (!cursor) return;
+    if (!listHasMore) return;
+    if (loadingInitialList || loadingMoreList) return;
+
+    const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
+    const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
+    const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
+
+    const requestSeq = listRequestSeqRef.current + 1;
+    listRequestSeqRef.current = requestSeq;
+
+    setLoadingMoreList(true);
+    setListError(null);
+    try {
+      const page = await getConversationListPage(
+        { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
+        cursor,
+        LIST_BOOTSTRAP_LIMIT,
+      );
+      if (requestSeq !== listRequestSeqRef.current) return;
+
+      const pageItems = Array.isArray(page?.items) ? page.items : [];
+      setItems((prev) => mergeConversationPageItems(prev, pageItems));
+      setListCursor(page?.cursor ?? null);
+      setListHasMore(Boolean(page?.hasMore));
+      setListSummary(normalizeConversationListSummary(page?.summary));
+      setListFacets(normalizeConversationListFacets(page?.facets));
+    } catch (e) {
+      if (requestSeq !== listRequestSeqRef.current) return;
+      setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+    } finally {
+      if (requestSeq !== listRequestSeqRef.current) return;
+      setLoadingMoreList(false);
+    }
+  }, [
+    listCursor,
+    listHasMore,
+    listSiteFilterKey,
+    listSourceFilterKey,
+    loadingInitialList,
+    loadingMoreList,
+  ]);
 
   const updateSelectedConversationUrl = useCallback(
     async (nextUrl: string) => {
@@ -1015,6 +1101,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     openConversationExternalByLoc,
     openConversationExternalBySourceKey,
     openConversationExternalById,
+    loadMoreList,
     refreshList,
     refreshActiveDetail,
     setActiveId,
