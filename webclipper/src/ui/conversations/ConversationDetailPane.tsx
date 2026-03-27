@@ -6,7 +6,7 @@ import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName } from '@ui/shared/button-styles';
-import { navIconButtonSmClassName } from '@ui/shared/nav-styles';
+import { navIconButtonClassName } from '@ui/shared/nav-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -164,7 +164,7 @@ export function ConversationDetailPane({
                 <button
                   type="button"
                   onClick={onExpandSidebar}
-                  className={navIconButtonSmClassName(false)}
+                  className={navIconButtonClassName(false)}
                   aria-label={expandSidebarLabel}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -185,7 +185,7 @@ export function ConversationDetailPane({
                 <button
                   type="button"
                   onClick={onBack}
-                  className={navIconButtonSmClassName(false)}
+                  className={navIconButtonClassName(false)}
                   aria-label={t('backButton')}
                 >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
@@ -334,7 +334,7 @@ export function ConversationDetailPane({
                     // When no selection, explicitly clear the quote.
                     onTriggerCommentsSidebar({ quoteText, locator: selectionLocatorRef.current });
                   }}
-                  className={navIconButtonSmClassName(Boolean(commentsSidebarOpen))}
+                  className={navIconButtonClassName(Boolean(commentsSidebarOpen))}
                   aria-label={commentsSidebarLabel}
                   {...tooltipAttrs(commentsSidebarLabel)}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
