@@ -4,6 +4,7 @@ import type { ThreadedCommentItem } from './types';
 
 const LOCATE_HIGHLIGHT_ATTR = 'data-webclipper-locate-highlight';
 const LOCATE_HIGHLIGHT_STYLE_ID = 'webclipper-comments-locate-highlight-style';
+const LOCATE_HIGHLIGHT_RADIUS = 'var(--radius-inline, 10px)';
 
 type ThreadLocateControllerOptions = {
   locatorEnv: 'inpage' | 'app' | null;
@@ -54,7 +55,7 @@ function ensureLocateHighlightStyle() {
       `[${LOCATE_HIGHLIGHT_ATTR}="1"] {`,
       '  outline: 2px solid rgba(79, 156, 255, 0.95) !important;',
       '  outline-offset: 2px !important;',
-      '  border-radius: 8px !important;',
+      `  border-radius: ${LOCATE_HIGHLIGHT_RADIUS} !important;`,
       '  background-color: rgba(79, 156, 255, 0.12) !important;',
       '  transition: background-color 200ms ease, outline-color 200ms ease !important;',
       '}',

@@ -32,7 +32,7 @@
   max-width: min(300px, 100vw);
   padding: 7px 11px;
   border: 1px solid var(--bubble-surface-border);
-  border-radius: 12px;
+  border-radius: var(--radius-chip);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)), var(--bubble-surface-bg);
   color: var(--bubble-surface-text);
   font:
