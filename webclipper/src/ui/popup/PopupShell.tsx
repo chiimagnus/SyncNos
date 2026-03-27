@@ -66,7 +66,7 @@ function PopupNotionSyncNudgeDialog(props: PopupNotionSyncNudgeDialogProps) {
     >
       <div
         ref={panelRef}
-        className="tw-w-full tw-max-w-[420px] tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-4 tw-text-[var(--text-primary)]"
+        className="tw-w-full tw-max-w-[420px] tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-4 tw-text-[var(--text-primary)]"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="tw-text-sm tw-font-extrabold">{t('popupNotionSyncNudgeTitle')}</div>
@@ -74,7 +74,7 @@ function PopupNotionSyncNudgeDialog(props: PopupNotionSyncNudgeDialogProps) {
           {t('popupNotionSyncNudgeBody')}
         </div>
 
-        <label className="tw-mt-3 tw-flex tw-cursor-pointer tw-select-none tw-items-start tw-gap-2 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2.5">
+        <label className="tw-mt-3 tw-flex tw-cursor-pointer tw-select-none tw-items-start tw-gap-2 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-2.5">
           <input
             type="checkbox"
             checked={dontShowAgain}
@@ -180,7 +180,7 @@ function PopupShellFrame() {
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
             <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
               <img
-                className="tw-size-7 tw-rounded-lg tw-object-contain"
+                className="tw-size-7 tw-rounded-[var(--radius-chip)] tw-object-contain"
                 src={getURL('icons/icon-128.png' as any)}
                 alt=""
                 draggable={false}
