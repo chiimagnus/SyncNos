@@ -40,12 +40,13 @@
   --surface-inset-highlight: rgb(255 255 255 / 55%);
 
   /* Markdown reading profiles */
-  --markdown-font-medium: "Charter", "Iowan Old Style", "Palatino Linotype", "Noto Serif CJK SC", "Source Han Serif SC",
-    "Songti SC", serif;
-  --markdown-font-notion: "Inter", "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB",
-    "Microsoft YaHei", sans-serif;
+  --markdown-font-medium: "Charter", "Iowan Old Style", "Palatino Linotype", "Georgia", "Noto Serif CJK SC",
+    "Source Han Serif SC", "Songti SC", serif;
+  --markdown-font-notion: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Noto Sans CJK SC",
+    "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --markdown-font-book-cjk: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong";
-  --markdown-font-book: "Literata", "Baskerville", "Palatino Linotype", var(--markdown-font-book-cjk), serif;
+  --markdown-font-book: "Iowan Old Style", "Baskerville", "Palatino Linotype", "Times New Roman",
+    var(--markdown-font-book-cjk), serif;
 
   /*
    * Concentric radius scale (Apple-like):

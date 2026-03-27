@@ -201,6 +201,8 @@ export function ChatMessageBubble({
     bubbleRole === 'user'
       ? 'tw-bg-[var(--bubble-user-bg)] tw-border-[var(--bubble-user-border)] tw-text-[var(--secondary-foreground)]'
       : 'tw-bg-[var(--bg-card)] tw-border-[var(--border)] tw-text-[var(--text-primary)]';
+  const profileBubbleClass = String(readingProfilePreset.bubbleClassName || '');
+  const profileBubbleRoleClass = String(readingProfilePreset.bubbleRoleOverrides?.[bubbleRole] || '');
 
   const headerBase = 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-1.5';
   const headerToneClass =
@@ -234,10 +236,9 @@ export function ChatMessageBubble({
     '[&_ul>li+li]:tw-mt-1 [&_ol>li+li]:tw-mt-1',
     '[&_li>p]:tw-mb-1 [&_li>p:last-child]:tw-mb-0',
 
-    // Blockquotes: render as a clean "vertical bar" quote.
-    '[&_blockquote]:tw-relative [&_blockquote]:tw-mt-0 [&_blockquote]:tw-mb-3 [&_blockquote]:tw-mx-0 [&_blockquote]:tw-pl-5 [&_blockquote]:tw-pr-0 [&_blockquote]:tw-py-0 [&_blockquote]:tw-bg-transparent [&_blockquote]:tw-text-[var(--text-primary)]',
-    '[&_blockquote]:before:tw-content-[""] [&_blockquote]:before:tw-absolute [&_blockquote]:before:tw-left-0 [&_blockquote]:before:tw-top-1 [&_blockquote]:before:tw-bottom-1 [&_blockquote]:before:tw-w-1 [&_blockquote]:before:tw-rounded-full [&_blockquote]:before:tw-bg-[color-mix(in_srgb,var(--text-secondary)_40%,transparent)]',
-    '[&_blockquote_blockquote]:tw-mt-2 [&_blockquote_blockquote]:tw-mb-0 [&_blockquote_blockquote]:before:tw-bg-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]',
+    // Blockquotes are profile-controlled; keep only structural safety rules here.
+    '[&_blockquote]:tw-relative [&_blockquote]:tw-mt-0 [&_blockquote]:tw-mx-0',
+    '[&_blockquote_blockquote]:tw-mt-2 [&_blockquote_blockquote]:tw-mb-0',
 
     // Inline code: use currentColor-based translucent background for both bubble variants.
     '[&_code]:tw-px-[5px] [&_code]:tw-py-[1px] [&_code]:tw-rounded-[var(--radius-inline)] [&_code]:tw-bg-[color-mix(in_srgb,currentColor_12%,transparent)] [&_code]:tw-font-mono',
@@ -267,9 +268,7 @@ export function ChatMessageBubble({
     // KaTeX blocks: prevent overflow and keep spacing consistent with other blocks.
     '[&_.katex-display]:tw-my-2 [&_.katex-display]:tw-overflow-x-auto [&_.katex-display]:tw-max-w-full',
 
-    // Links: keep a stable cue.
-    '[&_a]:tw-text-[var(--info)] [&_a]:tw-underline [&_a]:tw-underline-offset-[1px]',
-    '[&_a:hover]:tw-opacity-90',
+    // Links are profile-controlled; keep focus accessibility here.
     '[&_a:focus-visible]:tw-outline [&_a:focus-visible]:tw-outline-2 [&_a:focus-visible]:tw-outline-offset-2 [&_a:focus-visible]:tw-outline-[var(--focus-ring)]',
   ].join(' ');
 
@@ -277,7 +276,7 @@ export function ChatMessageBubble({
   const mdRoleOverrides = String(readingProfilePreset.roleOverrides?.[bubbleRole] || '');
 
   return (
-    <section className={[bubbleBase, bubbleRoleClass].join(' ')}>
+    <section className={[bubbleBase, bubbleRoleClass, profileBubbleClass, profileBubbleRoleClass].filter(Boolean).join(' ')}>
       {headerLeft || headerRight ? (
         <header className={headerBase}>
           <div className={headerLeftClass}>{headerLeft}</div>
