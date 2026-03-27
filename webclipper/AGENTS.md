@@ -64,6 +64,19 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
   - `rg -n "border-radius:\s*[0-9]|tw-rounded-\[" webclipper/src/ui webclipper/src/entrypoints`
   - `rg -n -- "--radius-" webclipper/src/ui/styles/tokens.css`
 
+## Markdown 阅读风格协议
+
+- 协议真源：
+  - `webclipper/src/services/protocols/markdown-reading-profiles.ts`
+  - `webclipper/src/ui/shared/markdown-reading-profile-presets.ts`
+  - `webclipper/src/services/protocols/markdown-reading-profile-storage.ts`
+- 存储键：`markdown_reading_profile_v1`
+- 默认与回退：任何未知值都必须 `normalize -> medium`，禁止直接把脏值传入 UI。
+- 扩展顺序：先改协议与测试，再加 preset，最后接 settings / 运行时消费链；不要直接在 `ChatMessageBubble` 写新分支。
+- UI 实现约束：
+  - `ChatMessageBubble` 保持“结构层 + profile 排版层”两层组合，不改 markdown 语义输出。
+  - `ConversationDetailPane` 仅消费规范化 profile 值，不自行解析 profile 逻辑。
+
 ## 贡献约定
 
 - 默认不查看、不编辑 i18n 字段（除非明确要求）。
