@@ -3,6 +3,7 @@ import buttonsCssRaw from '@ui/styles/buttons.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
 
 function toHostTokensCss(css: string) {
+  // Keep all custom properties (including radius tokens) unchanged for shadow host.
   return css.replaceAll(':root', ':host');
 }
 
