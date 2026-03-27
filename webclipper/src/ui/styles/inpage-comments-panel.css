@@ -169,7 +169,7 @@
   max-width: min(320px, 72vw);
   padding: 8px;
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: var(--panel-bg);
   box-shadow: 0 14px 32px rgb(0 0 0 / 16%);
 }
@@ -182,7 +182,7 @@
 
 .webclipper-inpage-comments-panel__chatwith-state {
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-inline);
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
   color: var(--panel-text-muted);
@@ -212,7 +212,7 @@
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
   padding: var(--comments-panel-body-padding-y);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
 }
@@ -220,7 +220,7 @@
 .webclipper-inpage-comments-panel__notice {
   margin: 0 0 8px 0;
   padding: 6px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-chip);
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
   color: var(--panel-text-muted);
@@ -238,7 +238,7 @@
 .webclipper-inpage-comments-panel__avatar {
   width: 28px;
   height: 28px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in srgb, var(--panel-accent) 55%, var(--panel-border));
   background: color-mix(in srgb, var(--panel-accent) 70%, var(--panel-bg));
   color: var(--panel-accent-foreground);
@@ -261,7 +261,7 @@
 .webclipper-inpage-comments-panel__composer {
   margin: 0 0 14px 0;
   padding: 10px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
   display: flex;
@@ -306,7 +306,7 @@
 
 .webclipper-inpage-comments-panel__thread {
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: var(--comments-panel-body-padding-y);
   background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
 }
@@ -321,7 +321,7 @@
 .webclipper-inpage-comments-panel__thread-quote {
   margin: 0 0 8px 0;
   padding: calc(var(--comments-panel-body-padding-y) - 2px) var(--comments-panel-body-padding-y);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
 }
@@ -329,7 +329,7 @@
 :host([data-variant='sidebar']) .webclipper-inpage-comments-panel__thread-quote {
   border: 0;
   border-left: 3px solid color-mix(in srgb, var(--quote-border) 84%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-chip);
   padding-left: calc(var(--comments-panel-body-padding-y) - 2px);
 }
 
@@ -404,7 +404,7 @@
   text-align: center;
   z-index: 50;
   border: 1px solid rgb(67 71 82 / 64%);
-  border-radius: 10px;
+  border-radius: var(--radius-inline);
   background: rgb(27 30 36 / 95%);
   color: rgb(244 247 252);
   box-shadow: 0 12px 24px rgb(0 0 0 / 30%);
@@ -475,7 +475,7 @@
   overflow: hidden;
   min-height: 34px;
   padding: calc(var(--comments-panel-body-padding-y) - 2px) var(--comments-panel-body-padding-y);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
   color: var(--panel-text);
@@ -490,7 +490,7 @@
 .webclipper-inpage-comments-panel__empty {
   padding: calc(var(--comments-panel-body-padding-y) + 4px) var(--comments-panel-body-padding-y);
   border: 1px dashed var(--panel-border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   color: var(--panel-text-muted);
   text-align: center;
 }
