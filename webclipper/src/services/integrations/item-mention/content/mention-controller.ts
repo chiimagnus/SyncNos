@@ -61,6 +61,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       let searchTimer: ReturnType<typeof setTimeout> | null = null;
       let requestSeq = 0;
       let currentQueryKey = '';
+      let composing = false;
       const unsubscribeInvalidated = rt.onInvalidated?.(() => stop()) || null;
 
       function stopTimers() {
@@ -107,7 +108,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
           if (stopped) return;
           if (reqId !== requestSeq) return;
           if (!session || !session.open) return;
-          if (currentQueryKey !== queryKey) return;
+          if (session.query !== queryKey) return;
 
           items = Array.isArray((res as any).candidates) ? (res as any).candidates : [];
           if (session.highlightIndex >= items.length) {
@@ -227,6 +228,8 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
         if (!session || !session.open) return;
 
+        if (composing && e.key !== 'Escape') return;
+
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault();
           e.stopPropagation();
@@ -262,6 +265,30 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         refresh();
       }
 
+      function onCompositionStart(e: CompositionEvent) {
+        if (stopped) return;
+        if (!eventEditorHandle(e as any)) return;
+        composing = true;
+      }
+
+      function onCompositionEnd(e: CompositionEvent) {
+        if (stopped) return;
+        if (!eventEditorHandle(e as any)) return;
+        composing = false;
+        refresh();
+      }
+
+      function onFocusOut(e: FocusEvent) {
+        if (stopped) return;
+        const editor = eventEditorHandle(e as any);
+        if (!editor) return;
+        const related = (e as any).relatedTarget as any;
+        // If focus stays within the editor host, ignore.
+        if (related && editor.el && typeof (editor.el as any).contains === 'function' && (editor.el as any).contains(related))
+          return;
+        refresh({ close: true });
+      }
+
       function stop() {
         if (stopped) return;
         stopped = true;
@@ -274,12 +301,18 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         document.removeEventListener('input', onInput, true);
         document.removeEventListener('keydown', onKeyDown, true);
         document.removeEventListener('keyup', onKeyUp, true);
+        document.removeEventListener('compositionstart', onCompositionStart, true);
+        document.removeEventListener('compositionend', onCompositionEnd, true);
+        document.removeEventListener('focusout', onFocusOut, true);
         inpageItemMentionApi.cleanup();
       }
 
       document.addEventListener('input', onInput, true);
       document.addEventListener('keydown', onKeyDown, true);
       document.addEventListener('keyup', onKeyUp, true);
+      document.addEventListener('compositionstart', onCompositionStart, true);
+      document.addEventListener('compositionend', onCompositionEnd, true);
+      document.addEventListener('focusout', onFocusOut, true);
 
       // Initial refresh to show recent items if the user already has `$` in the composer.
       try {
