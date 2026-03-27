@@ -18,7 +18,7 @@ export function registerItemMentionHandlers(router: AnyRouter) {
 
     const storageRes = await searchConversationMentionCandidates({
       query,
-      limit: 200,
+      limit: 50,
       maxScan: 2000,
       maxDurationMs: 300,
     });
