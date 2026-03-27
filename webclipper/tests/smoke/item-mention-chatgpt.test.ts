@@ -6,13 +6,6 @@ const uiMocks = vi.hoisted(() => ({
   cleanup: vi.fn(),
 }));
 
-vi.mock('@ui/inpage/inpage-item-mention-shadow', () => ({
-  inpageItemMentionApi: {
-    render: uiMocks.render,
-    cleanup: uiMocks.cleanup,
-  },
-}));
-
 import { createItemMentionController } from '../../src/services/integrations/item-mention/content/mention-controller';
 import { ITEM_MENTION_MESSAGE_TYPES } from '../../src/platform/messaging/message-contracts';
 
@@ -83,6 +76,7 @@ describe('item mention chatgpt controller', () => {
         onInvalidated: () => () => {},
         isInvalidContextError: () => false,
       },
+      ui: uiMocks,
     });
     const active = controller.start();
     expect(active).toBeTruthy();
@@ -138,6 +132,7 @@ describe('item mention chatgpt controller', () => {
 
     const controller = createItemMentionController({
       runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      ui: uiMocks,
     });
     const active = controller.start();
 
@@ -192,6 +187,7 @@ describe('item mention chatgpt controller', () => {
 
     const controller = createItemMentionController({
       runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      ui: uiMocks,
     });
     const active = controller.start();
 
