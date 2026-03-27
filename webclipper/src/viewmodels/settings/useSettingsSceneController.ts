@@ -156,9 +156,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
-  const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() =>
-    normalizeStoredMarkdownReadingProfile(''),
-  );
+  const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() => normalizeStoredMarkdownReadingProfile(''));
 
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);

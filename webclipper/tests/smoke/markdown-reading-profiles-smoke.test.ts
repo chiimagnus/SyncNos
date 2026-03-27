@@ -2,7 +2,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { MARKDOWN_READING_PROFILE_IDS, resolveMarkdownReadingProfileId } from '../../src/services/protocols/markdown-reading-profiles';
+import {
+  MARKDOWN_READING_PROFILE_IDS,
+  resolveMarkdownReadingProfileId,
+} from '../../src/services/protocols/markdown-reading-profiles';
 import { MARKDOWN_READING_PROFILE_PRESETS } from '../../src/ui/shared/markdown-reading-profile-presets';
 import { ChatMessageBubble } from '../../src/ui/shared/ChatMessageBubble';
 
@@ -33,11 +36,7 @@ function extractRootSectionClass(html: string) {
 function extractMarkdownClass(html: string) {
   const match = html.match(/<div class="([^"]+)"[^>]*><h1>/);
   if (!match) throw new Error(`Expected markdown <div class=\"...\">, got: ${html.slice(0, 280)}...`);
-  return match[1]
-    .replaceAll('&amp;', '&')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&lt;', '<');
+  return match[1].replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&gt;', '>').replaceAll('&lt;', '<');
 }
 
 function parseMeasureCh(value: string): number {

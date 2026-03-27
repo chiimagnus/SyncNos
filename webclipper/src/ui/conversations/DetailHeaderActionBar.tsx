@@ -83,10 +83,10 @@ export function DetailHeaderActionBar({
     const action = actions[0]!;
     const buttonLabel = labelOverride || action.label;
     const icon = resolveActionIcon(action);
-    const resolvedTriggerIcon =
-      triggerIcon ||
-      (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : icon) ||
-      <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
+    const resolvedTriggerIcon = triggerIcon ||
+      (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : icon) || (
+        <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
+      );
     const triggerButtonClassName = iconOnly ? buttonClassName : [buttonClassName, 'tw-text-[13px]'].join(' ');
     return (
       <div className={className || 'tw-flex tw-items-center tw-gap-2'}>
@@ -120,10 +120,10 @@ export function DetailHeaderActionBar({
   const resolvedMenuAriaLabel = String(menuAriaLabel || '').trim() || resolvedMenuTriggerAriaLabel;
   const triggerLabel = labelOverride || resolvedMenuTriggerLabel;
   const primaryIcon = resolveActionIcon(actions[0]!);
-  const resolvedTriggerIcon =
-    triggerIcon ||
-    (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : primaryIcon) ||
-    <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
+  const resolvedTriggerIcon = triggerIcon ||
+    (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : primaryIcon) || (
+      <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
+    );
   const triggerButtonClassName = iconOnly ? buttonClassName : [buttonClassName, 'tw-text-[13px]'].join(' ');
 
   const menuButtonClass = buttonMenuItemClassName();

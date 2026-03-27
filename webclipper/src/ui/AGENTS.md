@@ -278,14 +278,14 @@
 
 WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半径 token，按“外层到内层递减”的同心关系落位：
 
-| Token | 语义层级 | 典型组件 |
-| --- | --- | --- |
-| `--radius-outer` | 最外层容器 | app/popup 主壳层 |
-| `--radius-card` | 卡片层 | panel/card/backdrop |
-| `--radius-control` | 控件层 | button/input/menu panel |
-| `--radius-chip` | 标签层 | chip/tag/menu item |
-| `--radius-inline` | 内容内联层 | markdown inline/code/kbd |
-| `--radius-pill` | 圆形/胶囊白名单 | 非按钮元素（如 avatar / 装饰性圆点） |
+| Token              | 语义层级        | 典型组件                             |
+| ------------------ | --------------- | ------------------------------------ |
+| `--radius-outer`   | 最外层容器      | app/popup 主壳层                     |
+| `--radius-card`    | 卡片层          | panel/card/backdrop                  |
+| `--radius-control` | 控件层          | button/input/menu panel              |
+| `--radius-chip`    | 标签层          | chip/tag/menu item                   |
+| `--radius-inline`  | 内容内联层      | markdown inline/code/kbd             |
+| `--radius-pill`    | 圆形/胶囊白名单 | 非按钮元素（如 avatar / 装饰性圆点） |
 
 工程约束：
 

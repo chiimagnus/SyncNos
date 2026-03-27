@@ -56,8 +56,7 @@ const notionSpec: MarkdownReadingProfileSpec = {
 const bookSpec: MarkdownReadingProfileSpec = {
   id: 'book',
   labelKey: 'markdownReadingProfileBookLabel',
-  fontStack:
-    '"Literata","Baskerville","Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong",serif',
+  fontStack: '"Literata","Baskerville","Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong",serif',
   fontSize: '18px',
   lineHeight: '1.88',
   paragraphGap: '1.2rem',
