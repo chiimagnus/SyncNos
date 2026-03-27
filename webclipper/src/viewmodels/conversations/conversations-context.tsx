@@ -550,7 +550,13 @@ export function ConversationsProvider({
       setActiveId(id);
       requestListLocate(id);
     },
-    [requestListLocate, setActiveId, setListSiteFilterKeyPersistent, setListSourceFilterKeyPersistent],
+    [
+      requestListLocate,
+      setActiveConversationSnapshot,
+      setActiveId,
+      setListSiteFilterKeyPersistent,
+      setListSourceFilterKeyPersistent,
+    ],
   );
 
   const openConversationExternalBySourceKey = useCallback(
@@ -667,8 +673,9 @@ export function ConversationsProvider({
       setListSummary(EMPTY_LIST_SUMMARY);
       setListFacets(EMPTY_LIST_FACETS);
     } finally {
-      if (requestSeq !== listRequestSeqRef.current) return;
-      setLoadingInitialList(false);
+      if (requestSeq === listRequestSeqRef.current) {
+        setLoadingInitialList(false);
+      }
     }
   }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId]);
 
@@ -705,8 +712,9 @@ export function ConversationsProvider({
       if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
     } finally {
-      if (requestSeq !== listRequestSeqRef.current) return;
-      setLoadingMoreList(false);
+      if (requestSeq === listRequestSeqRef.current) {
+        setLoadingMoreList(false);
+      }
     }
   }, [
     listCursor,
@@ -868,7 +876,7 @@ export function ConversationsProvider({
     const prevSnapshot = activeConversationSnapshotRef.current;
     if (sameOpenTarget(prevSnapshot, nextSnapshot)) return;
     setActiveConversationSnapshot(nextSnapshot);
-  }, [activeId, items]);
+  }, [activeId, items, setActiveConversationSnapshot]);
 
   const refreshActiveDetail = useCallback(async () => {
     const id = Number(activeIdRef.current);
