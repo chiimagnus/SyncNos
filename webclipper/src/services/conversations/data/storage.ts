@@ -42,6 +42,15 @@ export async function getConversationDetail(conversationId: number) {
   return { conversationId, messages };
 }
 
+export async function searchConversationMentionCandidates(input?: {
+  query?: unknown;
+  limit?: unknown;
+  maxScan?: number;
+  maxDurationMs?: number;
+}) {
+  return await idb.searchConversationMentionCandidates(input);
+}
+
 export async function upsertConversation(payload: any) {
   return await idb.upsertConversation(payload);
 }
