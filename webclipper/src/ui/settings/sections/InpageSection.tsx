@@ -3,6 +3,7 @@ import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
 import { cardClassName, checkboxClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
+import type { MarkdownReadingProfileId } from '@services/protocols/markdown-reading-profiles';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
@@ -10,6 +11,8 @@ export function InpageSection(props: {
   busy: boolean;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
+  markdownReadingProfile: MarkdownReadingProfileId;
+  onChangeMarkdownReadingProfile: (next: MarkdownReadingProfileId) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
@@ -19,11 +22,19 @@ export function InpageSection(props: {
     busy,
     displayMode,
     onChangeDisplayMode,
+    markdownReadingProfile,
+    onChangeMarkdownReadingProfile,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
   } = props;
+
+  const profileSummaryKey: Record<MarkdownReadingProfileId, Parameters<typeof t>[0]> = {
+    medium: 'markdownReadingProfileMediumDesc',
+    notion: 'markdownReadingProfileNotionDesc',
+    book: 'markdownReadingProfileBookDesc',
+  };
 
   return (
     <div className="tw-grid tw-gap-4">
@@ -52,6 +63,31 @@ export function InpageSection(props: {
           </div>
           <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
             {t('inpageDisplayModeHint')}
+          </div>
+
+          <div className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-3">
+            <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('markdownReadingProfileLabel')}
+            </label>
+            <SelectMenu<MarkdownReadingProfileId>
+              value={markdownReadingProfile}
+              onChange={onChangeMarkdownReadingProfile}
+              disabled={busy}
+              ariaLabel={t('markdownReadingProfileLabel')}
+              minWidth={180}
+              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
+              options={[
+                { value: 'medium', label: t('markdownReadingProfileMediumLabel') },
+                { value: 'notion', label: t('markdownReadingProfileNotionLabel') },
+                { value: 'book', label: t('markdownReadingProfileBookLabel') },
+              ]}
+            />
+          </div>
+          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {t('markdownReadingProfileHint')}
+          </div>
+          <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
+            {t(profileSummaryKey[markdownReadingProfile])}
           </div>
         </div>
       </section>
