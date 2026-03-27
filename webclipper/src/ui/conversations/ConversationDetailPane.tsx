@@ -11,6 +11,11 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
+import { storageGet, storageOnChanged } from '@services/shared/storage';
+import {
+  MARKDOWN_READING_PROFILE_STORAGE_KEY,
+  normalizeStoredMarkdownReadingProfile,
+} from '@services/protocols/markdown-reading-profile-storage';
 
 function normalizeHttpUrl(raw: unknown): string {
   const text = String(raw || '').trim();
@@ -90,6 +95,9 @@ export function ConversationDetailPane({
   const [urlCleaning, setUrlCleaning] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
+  const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() =>
+    normalizeStoredMarkdownReadingProfile(''),
+  );
 
   useEffect(() => {
     setUrlEditing(false);
@@ -108,6 +116,33 @@ export function ConversationDetailPane({
     }, 10);
     return () => clearTimeout(timer);
   }, [urlEditing]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    void storageGet([MARKDOWN_READING_PROFILE_STORAGE_KEY])
+      .then((res) => {
+        if (disposed) return;
+        setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(res?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
+      })
+      .catch(() => {
+        if (disposed) return;
+        setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(''));
+      });
+
+    const unsubscribe = storageOnChanged((changes: any, areaName: string) => {
+      if (areaName !== 'local') return;
+      if (!changes || typeof changes !== 'object') return;
+      if (!Object.prototype.hasOwnProperty.call(changes, MARKDOWN_READING_PROFILE_STORAGE_KEY)) return;
+      const nextValue = changes[MARKDOWN_READING_PROFILE_STORAGE_KEY]?.newValue;
+      setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(nextValue));
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, []);
 
   const saveUrlDraft = async () => {
     await updateSelectedConversationUrl(String(urlDraft || ''));
@@ -398,6 +433,7 @@ export function ConversationDetailPane({
                         key={String((m as any).id)}
                         role={isArticle ? 'assistant' : (m as any).role}
                         markdown={text}
+                        readingProfile={markdownReadingProfile}
                         conversationId={
                           Number.isFinite(messageConversationId) && messageConversationId > 0
                             ? messageConversationId

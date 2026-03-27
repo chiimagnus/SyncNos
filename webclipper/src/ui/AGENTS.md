@@ -362,3 +362,22 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 - chat detail：`tools / chat-with / open` 槽位均可显示且可点击。
 - article detail：不出现 `cache-images`。
 - 窄屏模式：header 动作槽位与宽屏详情页一致，无缺槽位或错位分组。
+
+## B7 · Markdown 阅读风格协议（Medium / Notion / Book）
+
+- 协议真源：
+  - `src/services/protocols/markdown-reading-profiles.ts`
+  - `src/ui/shared/markdown-reading-profile-presets.ts`
+  - `src/services/protocols/markdown-reading-profile-storage.ts`
+- 存储键：`markdown_reading_profile_v1`，未知值必须回退 `medium`。
+- UI 接入链路：
+  - 设置页：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx`
+  - 运行时消费：`src/ui/conversations/ConversationDetailPane.tsx -> ChatMessageBubble.tsx`
+- 工程约束：
+  - `ChatMessageBubble` 只维护结构样式；profile 差异统一放在 preset。
+  - 不得为某个 profile 单独开第二套 markdown renderer。
+  - 扩展新 profile 必须先补协议测试与矩阵测试，再暴露到设置 UI。
+- 可读性底线：
+  - 断行保护：`overflow-wrap:anywhere` 必须保留。
+  - `pre/table` 仅允许局部横滚，不允许整页双向滚动。
+  - light/dark + user/assistant 至少走矩阵 smoke 覆盖。

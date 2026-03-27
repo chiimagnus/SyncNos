@@ -12,6 +12,11 @@ import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  MARKDOWN_READING_PROFILE_STORAGE_KEY,
+  buildMarkdownReadingProfileStoragePatch,
+  normalizeStoredMarkdownReadingProfile,
+} from '@services/protocols/markdown-reading-profile-storage';
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
@@ -151,6 +156,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
+  const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() =>
+    normalizeStoredMarkdownReadingProfile(''),
+  );
 
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
@@ -218,6 +226,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
           'ai_chat_cache_images_enabled',
+          MARKDOWN_READING_PROFILE_STORAGE_KEY,
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
           ABOUT_YOU_USER_NAME_STORAGE_KEY,
         ]),
@@ -243,6 +252,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
+      setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(local?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
       setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
 
@@ -282,6 +292,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY)) {
         const nextValue = changes[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY]?.newValue;
         setObsidianSyncEnabled(nextValue !== false);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, MARKDOWN_READING_PROFILE_STORAGE_KEY)) {
+        const nextValue = changes[MARKDOWN_READING_PROFILE_STORAGE_KEY]?.newValue;
+        setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(nextValue));
       }
     });
   }, []);
@@ -576,6 +590,20 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onChangeMarkdownReadingProfile = useCallback(
+    async (next: unknown) => {
+      const normalized = normalizeStoredMarkdownReadingProfile(next);
+      await runTask(
+        async () => {
+          await storageSet(buildMarkdownReadingProfileStoragePatch(normalized));
+          setMarkdownReadingProfile(normalized);
+        },
+        { fallbackMessage: 'save markdown reading profile failed' },
+      );
+    },
+    [runTask],
+  );
+
   useEffect(() => {
     if (!chatWithHydratedRef.current) return;
 
@@ -829,6 +857,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    markdownReadingProfile,
+    onChangeMarkdownReadingProfile,
 
     insightStats,
     insightLoading,
