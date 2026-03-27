@@ -158,6 +158,22 @@
   font-weight: 900;
 }
 
+.header-button {
+  --btn-icon-size: 36px;
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  min-height: var(--btn-icon-size);
+  padding: 0;
+  border-radius: var(--radius-inline);
+  font-weight: 900;
+  color: var(--text-secondary);
+}
+
+.header-button:hover:not(:disabled),
+.header-button[aria-pressed='true'] {
+  color: var(--text-primary);
+}
+
 .webclipper-btn--icon-sm {
   --btn-icon-size: 32px;
 }

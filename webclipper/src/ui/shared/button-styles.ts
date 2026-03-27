@@ -18,6 +18,10 @@ export function buttonMenuItemClassName(): string {
   return 'webclipper-btn webclipper-btn--menu-item';
 }
 
+export function headerButtonClassName(): string {
+  return 'webclipper-btn header-button';
+}
+
 export function menuPopoverPanelClassName(minWidth: 150 | 170): string {
   const width = minWidth === 150 ? 'tw-min-w-[150px]' : 'tw-min-w-[170px]';
   return [

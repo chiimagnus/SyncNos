@@ -15,11 +15,6 @@ export function navItemClassName(active: boolean): string {
   return `${base} tw-bg-transparent tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-card)] hover:tw-text-[var(--text-primary)]`;
 }
 
-export function navIconButtonClassName(active: boolean): string {
-  if (active) return 'webclipper-btn webclipper-btn--icon';
-  return 'webclipper-btn webclipper-btn--icon webclipper-btn--tone-muted';
-}
-
 export function navPillButtonClassName(): string {
   return [buttonTintClassName(), 'tw-max-w-[168px]'].join(' ');
 }

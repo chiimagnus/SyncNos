@@ -5,8 +5,7 @@ import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
-import { buttonTintClassName } from '@ui/shared/button-styles';
-import { navIconButtonClassName } from '@ui/shared/nav-styles';
+import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -61,6 +60,7 @@ export function ConversationDetailPane({
   const toolActions = safeActions.filter((action) => action.slot === 'tools');
 
   const outlineButtonClass = buttonTintClassName();
+  const headerIconButtonClass = headerButtonClassName();
   const isArticle =
     String((selected as any)?.sourceType || '')
       .trim()
@@ -164,7 +164,7 @@ export function ConversationDetailPane({
                 <button
                   type="button"
                   onClick={onExpandSidebar}
-                  className={navIconButtonClassName(false)}
+                  className={headerIconButtonClass}
                   aria-label={expandSidebarLabel}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -185,7 +185,7 @@ export function ConversationDetailPane({
                 <button
                   type="button"
                   onClick={onBack}
-                  className={navIconButtonClassName(false)}
+                  className={headerIconButtonClass}
                   aria-label={t('backButton')}
                 >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
@@ -300,7 +300,7 @@ export function ConversationDetailPane({
               ) : null}
               <DetailHeaderActionBar
                 actions={openActions}
-                buttonClassName={outlineButtonClass}
+                buttonClassName={headerIconButtonClass}
                 iconOnly
                 menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
                 menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}
@@ -334,7 +334,7 @@ export function ConversationDetailPane({
                     // When no selection, explicitly clear the quote.
                     onTriggerCommentsSidebar({ quoteText, locator: selectionLocatorRef.current });
                   }}
-                  className={navIconButtonClassName(Boolean(commentsSidebarOpen))}
+                  className={headerButtonClassName()}
                   aria-label={commentsSidebarLabel}
                   {...tooltipAttrs(commentsSidebarLabel)}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}

@@ -4,8 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { t } from '@i18n';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
-import { navIconButtonClassName } from '@ui/shared/nav-styles';
-import { buttonTintClassName } from '@ui/shared/button-styles';
+import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 
 export type DetailNavigationHeaderProps = {
@@ -15,8 +14,9 @@ export type DetailNavigationHeaderProps = {
   onBack: () => void;
 };
 
-const backButtonClass = navIconButtonClassName(false);
+const backButtonClass = headerButtonClassName();
 const headerActionButtonClass = buttonTintClassName();
+const headerOpenActionButtonClass = headerButtonClassName();
 
 export function DetailNavigationHeader({ title, subtitle, actions, onBack }: DetailNavigationHeaderProps) {
   const { activeId, updateSelectedConversationUrl, cleanUrlDraft } = useConversationsApp();
@@ -164,7 +164,7 @@ export function DetailNavigationHeader({ title, subtitle, actions, onBack }: Det
         />
         <DetailHeaderActionBar
           actions={openActions}
-          buttonClassName={headerActionButtonClass}
+          buttonClassName={headerOpenActionButtonClass}
           iconOnly
           menuTriggerLabel={t('detailHeaderOpenInMenuLabel')}
           menuTriggerAriaLabel={t('detailHeaderOpenInMenuAria')}

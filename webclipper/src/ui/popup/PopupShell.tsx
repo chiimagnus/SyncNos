@@ -9,8 +9,8 @@ import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
 import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
-import { buttonFilledClassName, buttonTintClassName } from '@ui/shared/button-styles';
-import { navIconButtonClassName, navPillButtonClassName } from '@ui/shared/nav-styles';
+import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
+import { navPillButtonClassName } from '@ui/shared/nav-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 
@@ -208,7 +208,7 @@ function PopupShellFrame() {
                 type="button"
                 {...tooltipAttrs(t('openSettings'))}
                 onClick={() => onOpenSettings().catch(() => {})}
-                className={navIconButtonClassName(false)}
+                className={headerButtonClassName()}
                 aria-label={t('openSettingsAria')}
               >
                 <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />

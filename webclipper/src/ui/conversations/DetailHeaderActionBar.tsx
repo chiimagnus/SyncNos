@@ -87,9 +87,7 @@ export function DetailHeaderActionBar({
       triggerIcon ||
       (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : icon) ||
       <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
-    const triggerButtonClassName = iconOnly
-      ? [buttonClassName, 'webclipper-btn--icon'].join(' ')
-      : [buttonClassName, 'tw-text-[13px]'].join(' ');
+    const triggerButtonClassName = iconOnly ? buttonClassName : [buttonClassName, 'tw-text-[13px]'].join(' ');
     return (
       <div className={className || 'tw-flex tw-items-center tw-gap-2'}>
         <button
@@ -126,9 +124,7 @@ export function DetailHeaderActionBar({
     triggerIcon ||
     (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : primaryIcon) ||
     <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
-  const triggerButtonClassName = iconOnly
-    ? [buttonClassName, 'webclipper-btn--icon'].join(' ')
-    : [buttonClassName, 'tw-text-[13px]'].join(' ');
+  const triggerButtonClassName = iconOnly ? buttonClassName : [buttonClassName, 'tw-text-[13px]'].join(' ');
 
   const menuButtonClass = buttonMenuItemClassName();
 

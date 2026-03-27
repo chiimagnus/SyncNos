@@ -5,7 +5,7 @@ import { getURL as runtimeGetURL } from '@services/shared/runtime';
 
 import { t } from '@i18n';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
-import { navIconButtonClassName } from '@ui/shared/nav-styles';
+import { headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
@@ -106,7 +106,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             <button
               type="button"
               onClick={openSettings}
-              className={navIconButtonClassName(false)}
+              className={headerButtonClassName()}
               aria-label={t('openSettingsAria')}
               {...tooltipAttrs(t('openSettings'))}
             >
@@ -117,7 +117,7 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
             <button
               type="button"
               onClick={onCollapse}
-              className={navIconButtonClassName(false)}
+              className={headerButtonClassName()}
               aria-label={t('collapseSidebar')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
