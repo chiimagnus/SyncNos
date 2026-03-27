@@ -50,7 +50,10 @@ describe('ChatMessageBubble', () => {
     const notionHtml = renderToStaticMarkup(
       createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'notion' }),
     );
-    expect(extractMarkdownClass(notionHtml)).toContain('tw-font-[var(--markdown-font-notion)]');
+    const notionClass = extractMarkdownClass(notionHtml);
+    expect(notionClass).toContain('tw-font-[var(--markdown-font-notion)]');
+    expect(notionClass).toContain('[&_p]:tw-max-w-[62ch]');
+    expect(notionClass).toContain('[&_ul]:tw-mb-[0.55rem]');
 
     const bookHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello', readingProfile: 'book' }));
     expect(extractMarkdownClass(bookHtml)).toContain('tw-font-[var(--markdown-font-book)]');
