@@ -24,21 +24,12 @@ import {
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
 
 type SourceMeta = { key: string; label: string };
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
 const MAX_LOCATE_LOAD_ROUNDS = 8;
-
-function toSiteFilterKey(domain: string) {
-  const safe = String(domain || '')
-    .trim()
-    .toLowerCase();
-  if (!safe) return SITE_FILTER_UNKNOWN_KEY;
-  return `domain:${safe}`;
-}
 
 function commonPrefix(a: string, b: string) {
   const left = String(a || '');
@@ -66,27 +57,8 @@ function formatTime(ts?: number) {
   }
 }
 
-function isSameLocalDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 function hasWarningFlags(conversation: Conversation) {
   return Array.isArray((conversation as any).warningFlags) && ((conversation as any).warningFlags as any[]).length > 0;
-}
-
-function isArticleConversation(conversation: Conversation): boolean {
-  return (
-    String((conversation as any)?.sourceType || '')
-      .trim()
-      .toLowerCase() === 'article'
-  );
-}
-
-function getConversationSiteFilterKey(conversation: Conversation): string {
-  if (!isArticleConversation(conversation)) return SITE_FILTER_UNKNOWN_KEY;
-  const hostname = parseHostnameFromUrl((conversation as any).url);
-  if (!hostname) return SITE_FILTER_UNKNOWN_KEY;
-  return toSiteFilterKey(hostname);
 }
 
 function getSourceMeta(raw: unknown): SourceMeta {
@@ -220,6 +192,8 @@ export function ConversationListPane({
     deleting,
     listSourceFilterKey,
     listSiteFilterKey,
+    listSummary,
+    listFacets,
     listHasMore,
     loadingInitialList,
     loadingMoreList,
@@ -257,32 +231,22 @@ export function ConversationListPane({
   );
 
   const sourceOptions = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number }>();
-    for (const c of items) {
-      const meta = getSourceMeta((c as any).source);
-      if (!meta.key) continue;
-      const prev = map.get(meta.key);
-      if (prev) {
-        prev.count += 1;
-        continue;
-      }
-      map.set(meta.key, { key: meta.key, label: meta.label || meta.key, count: 1 });
-    }
-    const opts = Array.from(map.values()).sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.label.localeCompare(b.label);
-    });
-    return [{ key: 'all', label: t('allFilter') }, ...opts];
-  }, [items]);
-
-  const sourceFilteredItems = useMemo(() => {
-    const key =
-      String(listSourceFilterKey || 'all')
-        .trim()
-        .toLowerCase() || 'all';
-    if (key === 'all') return items;
-    return items.filter((c) => getSourceMeta((c as any).source).key === key);
-  }, [items, listSourceFilterKey]);
+    const facets = Array.isArray((listFacets as any)?.sources) ? (listFacets as any).sources : [];
+    const normalized = facets
+      .map((facet: any) => {
+        const key = String(facet?.key || '')
+          .trim()
+          .toLowerCase();
+        if (!key) return null;
+        const meta = getSourceMeta(key);
+        const label = String(meta.label || facet?.label || key).trim();
+        const count = Number(facet?.count) || 0;
+        if (count <= 0) return null;
+        return { key, label, count };
+      })
+      .filter((item: any): item is { key: string; label: string; count: number } => Boolean(item));
+    return [{ key: 'all', label: t('allFilter') }, ...normalized];
+  }, [listFacets]);
 
   const siteOptions = useMemo(() => {
     const key =
@@ -290,64 +254,28 @@ export function ConversationListPane({
         .trim()
         .toLowerCase() || 'all';
     if (key !== 'web') return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }];
-
-    const domainCounts = new Map<string, number>();
-    let unknownCount = 0;
-
-    for (const conversation of sourceFilteredItems) {
-      if (!isArticleConversation(conversation as any)) continue;
-      const hostname = parseHostnameFromUrl((conversation as any).url);
-      if (!hostname) {
-        unknownCount += 1;
-        continue;
-      }
-      domainCounts.set(hostname, (domainCounts.get(hostname) || 0) + 1);
-    }
-
-    const domains = Array.from(domainCounts.entries())
-      .map(([hostname, count]) => ({ key: toSiteFilterKey(hostname), label: hostname, count }))
-      .sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return String(a.label || '').localeCompare(String(b.label || ''));
-      });
-
-    const out: Array<{ key: string; label: string }> = [
-      { key: SITE_FILTER_ALL_KEY, label: t('allFilter') },
-      ...domains,
-    ];
-    if (unknownCount > 0) out.push({ key: SITE_FILTER_UNKNOWN_KEY, label: t('insightUnknownLabel') });
-    return out;
-  }, [listSourceFilterKey, sourceFilteredItems]);
+    const facets = Array.isArray((listFacets as any)?.sites) ? (listFacets as any).sites : [];
+    const options = facets
+      .map((facet: any) => {
+        const facetKey = String(facet?.key || '')
+          .trim()
+          .toLowerCase();
+        if (!facetKey || facetKey === SITE_FILTER_ALL_KEY) return null;
+        const rawLabel = String(facet?.label || '').trim();
+        const fallbackLabel = facetKey.startsWith('domain:') ? facetKey.slice('domain:'.length) : facetKey;
+        const label = facetKey === SITE_FILTER_UNKNOWN_KEY ? t('insightUnknownLabel') : rawLabel || fallbackLabel;
+        const count = Number(facet?.count) || 0;
+        if (count <= 0) return null;
+        return { key: facetKey, label };
+      })
+      .filter((item: any): item is { key: string; label: string } => Boolean(item));
+    return [{ key: SITE_FILTER_ALL_KEY, label: t('allFilter') }, ...options];
+  }, [listFacets, listSourceFilterKey]);
 
   const siteOptionKeys = useMemo(() => new Set(siteOptions.map((opt) => String(opt.key || ''))), [siteOptions]);
-
-  const filteredItems = useMemo(() => {
-    const sourceKey =
-      String(listSourceFilterKey || 'all')
-        .trim()
-        .toLowerCase() || 'all';
-    if (sourceKey !== 'web') return sourceFilteredItems;
-
-    const key =
-      String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
-        .trim()
-        .toLowerCase() || SITE_FILTER_ALL_KEY;
-    if (key === SITE_FILTER_ALL_KEY) return sourceFilteredItems;
-    return sourceFilteredItems.filter((conversation) => getConversationSiteFilterKey(conversation as any) === key);
-  }, [listSiteFilterKey, listSourceFilterKey, sourceFilteredItems]);
-
-  const todayCount = useMemo(() => {
-    const now = new Date();
-    return filteredItems.filter((c) => {
-      const ts = Number((c as any).lastCapturedAt) || 0;
-      if (!ts) return false;
-      try {
-        return isSameLocalDay(new Date(ts), now);
-      } catch {
-        return false;
-      }
-    }).length;
-  }, [filteredItems]);
+  const filteredItems = items;
+  const todayCount = Number((listSummary as any)?.todayCount) || 0;
+  const totalCount = Number((listSummary as any)?.totalCount) || 0;
 
   const visibleIds = useMemo(
     () => filteredItems.map((c) => Number((c as any).id)).filter((x) => Number.isFinite(x) && x > 0),
@@ -550,7 +478,6 @@ export function ConversationListPane({
         .trim()
         .toLowerCase() || 'all';
     if (sourceKey !== 'web') return;
-    if (siteOptions.length <= 1) return;
 
     const current =
       String(listSiteFilterKey || SITE_FILTER_ALL_KEY)
@@ -559,7 +486,7 @@ export function ConversationListPane({
     if (current === SITE_FILTER_ALL_KEY) return;
     if (siteOptionKeys.has(current)) return;
     setListSiteFilterKeyPersistent(SITE_FILTER_ALL_KEY);
-  }, [listSiteFilterKey, listSourceFilterKey, setListSiteFilterKeyPersistent, siteOptionKeys, siteOptions.length]);
+  }, [listSiteFilterKey, listSourceFilterKey, setListSiteFilterKeyPersistent, siteOptionKeys]);
 
   const activateRow = (conversationId: number) => {
     onListScrollTopChange?.(scrollRef.current?.scrollTop || 0);
@@ -1152,7 +1079,7 @@ export function ConversationListPane({
                 <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
                 <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                  {String(filteredItems.length)}
+                  {String(totalCount)}
                 </span>
               </button>
             ) : (
@@ -1171,7 +1098,7 @@ export function ConversationListPane({
                 <span className="tw-text-[var(--text-secondary)] tw-opacity-70">·</span>
                 <span className="tw-text-[var(--text-secondary)]">{t('totalLabel')}</span>
                 <span className="tw-text-[30px] tw-font-extrabold tw-text-[#FFA500]">
-                  {String(filteredItems.length)}
+                  {String(totalCount)}
                 </span>
               </div>
             )}
