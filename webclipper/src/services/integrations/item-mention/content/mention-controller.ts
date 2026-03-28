@@ -3,6 +3,7 @@ import type { EditorAdapter, EditorHandle } from '@services/integrations/item-me
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
 import { deepseekEditorAdapter } from '@services/integrations/item-mention/content/editor-deepseek';
 import { geminiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-gemini';
+import { kimiEditorAdapter } from '@services/integrations/item-mention/content/editor-kimi';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
 import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/item-mention/content/mention-sites';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
@@ -69,6 +70,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         if (siteId === 'notionai') return notionAiContentEditableAdapter;
         if (siteId === 'gemini') return geminiContentEditableAdapter;
         if (siteId === 'deepseek') return deepseekEditorAdapter;
+        if (siteId === 'kimi') return kimiEditorAdapter;
         return null;
       })();
       if (!adapterMaybe) return null;

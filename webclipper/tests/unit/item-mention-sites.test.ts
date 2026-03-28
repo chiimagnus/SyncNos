@@ -32,10 +32,16 @@ describe('item-mention sites', () => {
     expect(isMentionSupportedHost('chat.deepseek.com')).toBe(true);
   });
 
+  it('enables for kimi once adapter is available', () => {
+    expect(isMentionSupportedHost('kimi.moonshot.cn')).toBe(true);
+    expect(isMentionSupportedHost('kimi.com')).toBe(true);
+  });
+
   it('picks site id', () => {
     expect(pickMentionSupportedSiteIdByHostname('chatgpt.com')).toBe('chatgpt');
     expect(pickMentionSupportedSiteIdByHostname('www.notion.so')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('gemini.google.com')).toBe('gemini');
     expect(pickMentionSupportedSiteIdByHostname('chat.deepseek.com')).toBe('deepseek');
+    expect(pickMentionSupportedSiteIdByHostname('kimi.moonshot.cn')).toBe('kimi');
   });
 });
