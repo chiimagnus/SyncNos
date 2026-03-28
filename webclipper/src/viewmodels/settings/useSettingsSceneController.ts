@@ -316,6 +316,21 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     return () => clearInterval(timer);
   }, [pollingNotion, refresh]);
 
+  useEffect(() => {
+    if (!pollingNotion) return;
+    if (notionConnected) {
+      setPollingNotion(false);
+      return;
+    }
+    if (notionLastError) {
+      setPollingNotion(false);
+      return;
+    }
+    if (!notionPendingState) {
+      setPollingNotion(false);
+    }
+  }, [notionConnected, notionLastError, notionPendingState, pollingNotion]);
+
   const notionPageOptions = useMemo(() => {
     const list = Array.isArray(notionPages) ? notionPages.slice() : [];
     const selectedId = String(notionParentPageId || '').trim();
@@ -349,7 +364,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       const cfg = getNotionOAuthDefaults();
       const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-      await storageSet({ notion_oauth_pending_state: state });
+      await storageSet({ notion_oauth_pending_state: state, notion_oauth_last_error: '' });
+      setNotionPendingState(state);
+      setNotionLastError('');
 
       const url = new URL(cfg.authorizationUrl);
       url.searchParams.set('client_id', clientId);

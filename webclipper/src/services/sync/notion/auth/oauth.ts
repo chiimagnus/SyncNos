@@ -119,7 +119,7 @@ export async function ensureDefaultNotionOAuthClientId(): Promise<void> {
   try {
     const res = await storageGet([KEY_CLIENT_ID]);
     const currentId = res?.[KEY_CLIENT_ID] ? String(res[KEY_CLIENT_ID]) : '';
-    if (!currentId) {
+    if (!currentId || currentId !== DEFAULT_NOTION_OAUTH_CLIENT_ID) {
       await storageSet({ [KEY_CLIENT_ID]: DEFAULT_NOTION_OAUTH_CLIENT_ID });
     }
     await storageRemove([KEY_CLIENT_SECRET]);
@@ -143,6 +143,7 @@ export async function handleNotionOAuthCallbackNavigation(
 
   const { code, state, error } = parseQueryFromUrl(url);
   if (error) {
+    await storageRemove([KEY_PENDING_STATE]);
     await storageSet({ [KEY_LAST_ERROR]: error });
     return true;
   }
@@ -165,6 +166,7 @@ export async function handleNotionOAuthCallbackNavigation(
     await storageSet({ [KEY_LAST_ERROR]: '' });
     await removeTab(Number(details?.tabId));
   } catch (e) {
+    await storageRemove([KEY_PENDING_STATE]);
     await storageSet({
       [KEY_LAST_ERROR]: (e as any)?.message ? String((e as any).message) : String(e || 'token exchange failed'),
     });
