@@ -2,6 +2,7 @@ import { buildMentionInsertText, searchMentionCandidates } from '@services/integ
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
+import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/item-mention/content/mention-sites';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
 import { moveMentionHighlightIndex } from '@services/integrations/item-mention/content/mention-ui-state';
@@ -35,16 +36,6 @@ const noopItemMentionUi: ItemMentionUiApi = {
   cleanup() {},
 };
 
-function isChatgptHost(hostname: string): boolean {
-  const host = String(hostname || '').toLowerCase();
-  return /(^|\.)chatgpt\.com$/.test(host) || /(^|\.)chat\.openai\.com$/.test(host);
-}
-
-function isNotionHost(hostname: string): boolean {
-  const host = String(hostname || '').toLowerCase();
-  return /(^|\.)notion\.so$/.test(host);
-}
-
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
@@ -68,13 +59,18 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       if (!runtime || typeof runtime.send !== 'function') return null;
       const rt: RuntimeClient = runtime;
       const hostname = location?.hostname || '';
-      const pickedAdapter: EditorAdapter | null = isChatgptHost(hostname)
-        ? chatgptComposerEditorAdapter
-        : isNotionHost(hostname)
-          ? notionAiContentEditableAdapter
-          : null;
-      if (!pickedAdapter) return null;
-      const adapter: EditorAdapter = pickedAdapter;
+      const siteId = pickMentionSupportedSiteIdByHostname(hostname);
+      if (!siteId) return null;
+
+      const adapter: EditorAdapter =
+        siteId === 'chatgpt'
+          ? chatgptComposerEditorAdapter
+          : siteId === 'notionai'
+            ? notionAiContentEditableAdapter
+            : (() => {
+                // If the site list says it's supported but we don't have an adapter yet, fail closed.
+                throw new Error(`missing item-mention editor adapter for site: ${siteId}`);
+              })();
 
       let stopped = false;
       let session: MentionSessionState | null = null;

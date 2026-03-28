@@ -2,10 +2,18 @@ export type SupportedAiChatSite = {
   id: string;
   name: string;
   hosts: string[];
+  features?: {
+    dollarMention?: boolean;
+  };
 };
 
 export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
-  { id: 'chatgpt', name: 'ChatGPT', hosts: ['chatgpt.com', 'www.chatgpt.com', 'chat.openai.com'] },
+  {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    hosts: ['chatgpt.com', 'www.chatgpt.com', 'chat.openai.com'],
+    features: { dollarMention: true },
+  },
   { id: 'claude', name: 'Claude', hosts: ['claude.ai'] },
   { id: 'gemini', name: 'Gemini', hosts: ['gemini.google.com'] },
   { id: 'googleaistudio', name: 'Google AI Studio', hosts: ['aistudio.google.com', 'makersuite.google.com'] },
@@ -14,7 +22,7 @@ export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
   { id: 'doubao', name: 'Doubao', hosts: ['doubao.com'] },
   { id: 'yuanbao', name: 'Yuanbao', hosts: ['yuanbao.tencent.com'] },
   { id: 'poe', name: 'Poe', hosts: ['poe.com'] },
-  { id: 'notionai', name: 'Notion AI', hosts: ['notion.so'] },
+  { id: 'notionai', name: 'Notion AI', hosts: ['notion.so'], features: { dollarMention: true } },
   { id: 'zai', name: 'z.ai', hosts: ['chat.z.ai'] },
 ] as const;
 
