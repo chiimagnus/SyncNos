@@ -22,12 +22,15 @@ describe('item-mention sites', () => {
 
   it('does not enable for non-mention sites', () => {
     expect(isMentionSupportedHost('claude.ai')).toBe(false);
-    expect(isMentionSupportedHost('gemini.google.com')).toBe(false);
+  });
+
+  it('enables for gemini once adapter is available', () => {
+    expect(isMentionSupportedHost('gemini.google.com')).toBe(true);
   });
 
   it('picks site id', () => {
     expect(pickMentionSupportedSiteIdByHostname('chatgpt.com')).toBe('chatgpt');
     expect(pickMentionSupportedSiteIdByHostname('www.notion.so')).toBe('notionai');
+    expect(pickMentionSupportedSiteIdByHostname('gemini.google.com')).toBe('gemini');
   });
 });
-

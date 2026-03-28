@@ -1,6 +1,7 @@
 import { buildMentionInsertText, searchMentionCandidates } from '@services/integrations/item-mention/client';
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
+import { geminiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-gemini';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
 import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/item-mention/content/mention-sites';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
@@ -62,15 +63,14 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       const siteId = pickMentionSupportedSiteIdByHostname(hostname);
       if (!siteId) return null;
 
-      const adapter: EditorAdapter =
-        siteId === 'chatgpt'
-          ? chatgptComposerEditorAdapter
-          : siteId === 'notionai'
-            ? notionAiContentEditableAdapter
-            : (() => {
-                // If the site list says it's supported but we don't have an adapter yet, fail closed.
-                throw new Error(`missing item-mention editor adapter for site: ${siteId}`);
-              })();
+      const adapterMaybe = (() => {
+        if (siteId === 'chatgpt') return chatgptComposerEditorAdapter;
+        if (siteId === 'notionai') return notionAiContentEditableAdapter;
+        if (siteId === 'gemini') return geminiContentEditableAdapter;
+        return null;
+      })();
+      if (!adapterMaybe) return null;
+      const adapter: EditorAdapter = adapterMaybe;
 
       let stopped = false;
       let session: MentionSessionState | null = null;
