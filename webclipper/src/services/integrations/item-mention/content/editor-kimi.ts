@@ -152,14 +152,17 @@ function findKimiEditor(): EditorHandle | null {
       return { kind: 'contenteditable', el: activeEl as HTMLElement };
   }
 
-  const textarea = doc.querySelector?.('textarea') as Element | null;
-  if (textarea && isTextarea(textarea) && isVisible(textarea))
-    return { kind: 'textarea', el: textarea as HTMLTextAreaElement };
+  const textareas = Array.from(doc.querySelectorAll?.('textarea') || []) as Element[];
+  for (const el of textareas) {
+    if (isTextarea(el) && isVisible(el)) return { kind: 'textarea', el: el as HTMLTextAreaElement };
+  }
 
-  const ce = doc.querySelector?.(
-    '[role="textbox"][contenteditable="true"], [contenteditable="true"][role="textbox"]',
-  ) as Element | null;
-  if (ce && isContentEditable(ce) && isVisible(ce)) return { kind: 'contenteditable', el: ce as HTMLElement };
+  const boxes = Array.from(
+    doc.querySelectorAll?.('[role="textbox"][contenteditable="true"], [contenteditable="true"][role="textbox"]') || [],
+  ) as Element[];
+  for (const el of boxes) {
+    if (isContentEditable(el) && isVisible(el)) return { kind: 'contenteditable', el: el as HTMLElement };
+  }
 
   return null;
 }
