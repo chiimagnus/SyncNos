@@ -88,7 +88,7 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
 
 ## `$` mention（在其他 AI chats 输入框插入本地 item）
 
-- 支持站点：ChatGPT（`chatgpt.com`/`chat.openai.com`）与 Notion AI（`notion.so`）。
+- 支持站点：ChatGPT（`chatgpt.com`/`chat.openai.com`）、Notion AI（`notion.so`）、Gemini（`gemini.google.com`）、DeepSeek（`chat.deepseek.com`）、Kimi（`kimi.moonshot.cn`/`kimi.com`）。
 - 触发：输入框出现 `$` 即弹出候选窗；继续输入实时过滤。
 - 候选：范围为本地 conversations（chat + article）；过滤字段固定为标题/来源/URL 域名；仅 `$` 时按最近保存时间倒序。
 - 键盘：`↑/↓` 移动高亮，`Tab/Enter` 选中并插入，`Esc` 仅关闭候选窗且保留输入文本。
