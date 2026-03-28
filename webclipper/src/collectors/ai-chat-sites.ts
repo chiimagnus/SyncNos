@@ -14,7 +14,7 @@ export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
     hosts: ['chatgpt.com', 'www.chatgpt.com', 'chat.openai.com'],
     features: { dollarMention: true },
   },
-  { id: 'claude', name: 'Claude', hosts: ['claude.ai'] },
+  { id: 'claude', name: 'Claude', hosts: ['claude.ai'], features: { dollarMention: true } },
   { id: 'gemini', name: 'Gemini', hosts: ['gemini.google.com'], features: { dollarMention: true } },
   {
     id: 'googleaistudio',

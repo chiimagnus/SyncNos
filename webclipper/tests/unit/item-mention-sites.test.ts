@@ -21,7 +21,7 @@ describe('item-mention sites', () => {
   });
 
   it('does not enable for non-mention sites', () => {
-    expect(isMentionSupportedHost('claude.ai')).toBe(false);
+    expect(isMentionSupportedHost('example.com')).toBe(false);
   });
 
   it('enables for gemini once adapter is available', () => {
@@ -39,6 +39,7 @@ describe('item-mention sites', () => {
 
   it('picks site id', () => {
     expect(pickMentionSupportedSiteIdByHostname('chatgpt.com')).toBe('chatgpt');
+    expect(pickMentionSupportedSiteIdByHostname('claude.ai')).toBe('claude');
     expect(pickMentionSupportedSiteIdByHostname('www.notion.so')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('gemini.google.com')).toBe('gemini');
     expect(pickMentionSupportedSiteIdByHostname('chat.deepseek.com')).toBe('deepseek');
