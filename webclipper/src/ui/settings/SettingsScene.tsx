@@ -340,7 +340,7 @@ export function SettingsScene(props: SettingsSceneProps) {
             {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
               <div key={groupIndex} className="tw-grid tw-gap-1.5">
                 <div className="tw-px-2 tw-text-[10px] tw-font-black tw-uppercase tw-tracking-[0.16em] tw-text-[var(--text-secondary)] tw-opacity-65">
-                  {group.title}
+                  {t(group.titleKey)}
                 </div>
                 <div>
                   {group.sections.map((section, index) => {

@@ -40,6 +40,11 @@ export function InpageSection(props: {
     book: 'markdownReadingProfileBookDesc',
   };
 
+  const dollarMentionSites = SUPPORTED_AI_CHAT_SITES.filter((site) => site?.features?.dollarMention === true).map(
+    (site) => site.name,
+  );
+  const dollarMentionSitesLabel = dollarMentionSites.join(' / ');
+
   return (
     <div className="tw-grid tw-gap-4">
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
@@ -117,6 +122,11 @@ export function InpageSection(props: {
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('aiChatDollarMentionHint')}
         </div>
+        {!!dollarMentionSitesLabel && (
+          <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
+            {dollarMentionSitesLabel}
+          </div>
+        )}
       </section>
 
       <section className={cardClassName} aria-label={t('aiChatAutoSaveHeading')}>

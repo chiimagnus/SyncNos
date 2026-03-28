@@ -1,7 +1,17 @@
 import { buildMentionInsertText, searchMentionCandidates } from '@services/integrations/item-mention/client';
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
+import { claudeEditorAdapter } from '@services/integrations/item-mention/content/editor-claude';
+import { deepseekEditorAdapter } from '@services/integrations/item-mention/content/editor-deepseek';
+import { doubaoEditorAdapter } from '@services/integrations/item-mention/content/editor-doubao';
+import { geminiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-gemini';
+import { googleAiStudioEditorAdapter } from '@services/integrations/item-mention/content/editor-googleaistudio';
+import { kimiEditorAdapter } from '@services/integrations/item-mention/content/editor-kimi';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
+import { poeEditorAdapter } from '@services/integrations/item-mention/content/editor-poe';
+import { yuanbaoEditorAdapter } from '@services/integrations/item-mention/content/editor-yuanbao';
+import { zaiEditorAdapter } from '@services/integrations/item-mention/content/editor-zai';
+import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/item-mention/content/mention-sites';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
 import { moveMentionHighlightIndex } from '@services/integrations/item-mention/content/mention-ui-state';
@@ -35,16 +45,6 @@ const noopItemMentionUi: ItemMentionUiApi = {
   cleanup() {},
 };
 
-function isChatgptHost(hostname: string): boolean {
-  const host = String(hostname || '').toLowerCase();
-  return /(^|\.)chatgpt\.com$/.test(host) || /(^|\.)chat\.openai\.com$/.test(host);
-}
-
-function isNotionHost(hostname: string): boolean {
-  const host = String(hostname || '').toLowerCase();
-  return /(^|\.)notion\.so$/.test(host);
-}
-
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
@@ -68,13 +68,25 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       if (!runtime || typeof runtime.send !== 'function') return null;
       const rt: RuntimeClient = runtime;
       const hostname = location?.hostname || '';
-      const pickedAdapter: EditorAdapter | null = isChatgptHost(hostname)
-        ? chatgptComposerEditorAdapter
-        : isNotionHost(hostname)
-          ? notionAiContentEditableAdapter
-          : null;
-      if (!pickedAdapter) return null;
-      const adapter: EditorAdapter = pickedAdapter;
+      const siteId = pickMentionSupportedSiteIdByHostname(hostname);
+      if (!siteId) return null;
+
+      const adapterMaybe = (() => {
+        if (siteId === 'chatgpt') return chatgptComposerEditorAdapter;
+        if (siteId === 'claude') return claudeEditorAdapter;
+        if (siteId === 'notionai') return notionAiContentEditableAdapter;
+        if (siteId === 'gemini') return geminiContentEditableAdapter;
+        if (siteId === 'googleaistudio') return googleAiStudioEditorAdapter;
+        if (siteId === 'deepseek') return deepseekEditorAdapter;
+        if (siteId === 'kimi') return kimiEditorAdapter;
+        if (siteId === 'poe') return poeEditorAdapter;
+        if (siteId === 'doubao') return doubaoEditorAdapter;
+        if (siteId === 'yuanbao') return yuanbaoEditorAdapter;
+        if (siteId === 'zai') return zaiEditorAdapter;
+        return null;
+      })();
+      if (!adapterMaybe) return null;
+      const adapter: EditorAdapter = adapterMaybe;
 
       let stopped = false;
       let session: MentionSessionState | null = null;

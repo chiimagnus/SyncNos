@@ -16,7 +16,7 @@
 | `src/services/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击开 popup、article fetch、Google AI Studio 手动保存都在这里 |
 | `src/services/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
 | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
-| `src/services/integrations/item-mention/` | `$` mention 插入能力 | 在 ChatGPT/NotionAI 输入框内通过 `$` 过滤本地 item 并插入同源 Markdown |
+| `src/services/integrations/item-mention/` | `$` mention 插入能力 | 在支持的 AI chat 输入框内通过 `$` 过滤本地 item 并插入同源 Markdown（站点门控真源：`src/collectors/ai-chat-sites.ts` 的 `features.dollarMention`） |
 | `src/ui/inpage/inpage-item-mention-shadow.ts` | `$` mention 候选窗壳 | 候选窗运行在独立 shadow root 中，支持键盘高亮与点击选中 |
 | `src/services/integrations/detail-header-action-types.ts` | 详情头动作槽位契约 | 定义 `open / chat-with / tools` 三类槽位，约束 popup / app 的动作分发 |
 | `src/ui/i18n/index.ts` | 扩展内 UI 文案入口 | 按 `navigator.language` 在英文 / 中文翻译表间切换 |

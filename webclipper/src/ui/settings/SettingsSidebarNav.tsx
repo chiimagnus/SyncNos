@@ -25,7 +25,7 @@ export function SettingsSidebarNav(props: {
               key={groupIndex}
               className={['tw-flex tw-flex-col tw-gap-0.5', groupIndex === 0 ? '' : 'tw-pt-3'].join(' ')}
             >
-              <div className={navGroupTitleClassName()}>{group.title}</div>
+              <div className={navGroupTitleClassName()}>{t(group.titleKey)}</div>
               {group.sections.map((section) => {
                 const active = activeSection === section.key;
                 const label = sectionLabel(section.key);

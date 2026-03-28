@@ -18,13 +18,13 @@ describe('settings section definitions', () => {
   it('groups sections into integrations, behavior, and about areas', () => {
     expect(
       SETTINGS_SECTION_GROUPS.map((group) => ({
-        title: group.title,
+        titleKey: group.titleKey,
         keys: group.sections.map((section) => section.key),
       })),
     ).toEqual([
-      { title: 'Features', keys: ['general', 'chat_with'] },
-      { title: 'Data', keys: ['backup', 'notion', 'obsidian'] },
-      { title: 'About', keys: ['aboutyou', 'aboutme'] },
+      { titleKey: 'settingsGroupFeatures', keys: ['general', 'chat_with'] },
+      { titleKey: 'settingsGroupData', keys: ['backup', 'notion', 'obsidian'] },
+      { titleKey: 'settingsGroupAbout', keys: ['aboutyou', 'aboutme'] },
     ]);
   });
 });
