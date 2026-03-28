@@ -41,7 +41,11 @@ function getNotionDisconnectStorageKeys(deps: Deps): string[] {
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
     const token = await getNotionOAuthToken();
-    return router.ok({ connected: !!(token && token.accessToken), token: token || null });
+    return router.ok({
+      connected: !!(token && token.accessToken),
+      workspaceName: token?.workspaceName ? String(token.workspaceName) : '',
+      token: token || null,
+    });
   });
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
