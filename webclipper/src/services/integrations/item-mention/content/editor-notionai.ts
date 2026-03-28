@@ -128,6 +128,14 @@ function setCaretOffset(root: HTMLElement, offset: number) {
   return true;
 }
 
+function dispatchBubbledInput(el: HTMLElement) {
+  try {
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  } catch (_e) {
+    // ignore
+  }
+}
+
 export const notionAiContentEditableAdapter: EditorAdapter = {
   detectActiveEditor() {
     if (!isNotionAiContext()) return null;
@@ -153,6 +161,7 @@ export const notionAiContentEditableAdapter: EditorAdapter = {
     } catch (_e) {
       // ignore
     }
+    dispatchBubbledInput(el);
     return rangeAfter;
   },
   focus(editor: EditorHandle) {
