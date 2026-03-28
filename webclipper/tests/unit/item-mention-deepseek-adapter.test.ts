@@ -15,7 +15,10 @@ beforeEach(() => {
   Object.defineProperty(globalThis, 'location', { configurable: true, value: dom.window.location });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
-  Object.defineProperty(globalThis, 'HTMLTextAreaElement', { configurable: true, value: (dom.window as any).HTMLTextAreaElement });
+  Object.defineProperty(globalThis, 'HTMLTextAreaElement', {
+    configurable: true,
+    value: (dom.window as any).HTMLTextAreaElement,
+  });
   Object.defineProperty(globalThis, 'getSelection', {
     configurable: true,
     value: dom.window.getSelection.bind(dom.window),
@@ -53,4 +56,3 @@ describe('item-mention deepseek editor adapter', () => {
     expect(after).toEqual({ start: 2, end: 2 });
   });
 });
-

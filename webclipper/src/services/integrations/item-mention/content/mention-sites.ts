@@ -56,4 +56,3 @@ export function pickMentionSupportedSiteIdByHostname(hostname: string): string |
 export function isMentionSupportedHost(hostname: string): boolean {
   return !!pickMentionSupportedSiteIdByHostname(hostname);
 }
-

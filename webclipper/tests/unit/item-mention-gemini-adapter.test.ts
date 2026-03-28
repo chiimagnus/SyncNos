@@ -59,4 +59,3 @@ describe('item-mention gemini contenteditable adapter', () => {
     expect(after).toEqual({ start: 2, end: 2 });
   });
 });
-

@@ -148,15 +148,17 @@ function findKimiEditor(): EditorHandle | null {
   const activeEl = isElement(active) ? active : null;
   if (activeEl) {
     if (isTextarea(activeEl) && isVisible(activeEl)) return { kind: 'textarea', el: activeEl as HTMLTextAreaElement };
-    if (isContentEditable(activeEl) && isVisible(activeEl)) return { kind: 'contenteditable', el: activeEl as HTMLElement };
+    if (isContentEditable(activeEl) && isVisible(activeEl))
+      return { kind: 'contenteditable', el: activeEl as HTMLElement };
   }
 
   const textarea = doc.querySelector?.('textarea') as Element | null;
-  if (textarea && isTextarea(textarea) && isVisible(textarea)) return { kind: 'textarea', el: textarea as HTMLTextAreaElement };
+  if (textarea && isTextarea(textarea) && isVisible(textarea))
+    return { kind: 'textarea', el: textarea as HTMLTextAreaElement };
 
-  const ce = doc.querySelector?.('[role="textbox"][contenteditable="true"], [contenteditable="true"][role="textbox"]') as
-    | Element
-    | null;
+  const ce = doc.querySelector?.(
+    '[role="textbox"][contenteditable="true"], [contenteditable="true"][role="textbox"]',
+  ) as Element | null;
   if (ce && isContentEditable(ce) && isVisible(ce)) return { kind: 'contenteditable', el: ce as HTMLElement };
 
   return null;
@@ -172,7 +174,10 @@ export const kimiEditorAdapter: EditorAdapter = {
       const text = String(el.value || '');
       const start = Number(el.selectionStart);
       const end = Number(el.selectionEnd);
-      return clampRange(text, { start: Number.isFinite(start) ? start : text.length, end: Number.isFinite(end) ? end : text.length });
+      return clampRange(text, {
+        start: Number.isFinite(start) ? start : text.length,
+        end: Number.isFinite(end) ? end : text.length,
+      });
     }
 
     const el = toContentEditableEditor(editor).el;
@@ -185,7 +190,11 @@ export const kimiEditorAdapter: EditorAdapter = {
       const el = toTextareaEditor(editor).el;
       const current = String(el.value || '');
       const normalized = clampRange(current, range);
-      const { text: next, rangeAfter } = replaceTextRange({ text: current, range: normalized, replacement: String(text || '') });
+      const { text: next, rangeAfter } = replaceTextRange({
+        text: current,
+        range: normalized,
+        replacement: String(text || ''),
+      });
       el.value = next;
       try {
         el.selectionStart = rangeAfter.start;
@@ -236,4 +245,3 @@ export const kimiEditorAdapter: EditorAdapter = {
     }
   },
 };
-

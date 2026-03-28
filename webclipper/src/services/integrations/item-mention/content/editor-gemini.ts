@@ -37,7 +37,9 @@ function findGeminiComposer(): HTMLElement | null {
   if (activeEl) {
     const maybe = isContentEditable(activeEl)
       ? activeEl
-      : (activeEl as any).closest?.('[role="textbox"][contenteditable="true"], [contenteditable="true"][role="textbox"]');
+      : (activeEl as any).closest?.(
+          '[role="textbox"][contenteditable="true"], [contenteditable="true"][role="textbox"]',
+        );
     if (isElement(maybe) && isContentEditable(maybe) && isVisible(maybe)) return maybe as HTMLElement;
   }
 
@@ -208,4 +210,3 @@ export const geminiContentEditableAdapter: EditorAdapter = {
     }
   },
 };
-
