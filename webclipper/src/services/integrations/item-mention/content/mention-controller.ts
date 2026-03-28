@@ -2,9 +2,14 @@ import { buildMentionInsertText, searchMentionCandidates } from '@services/integ
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
 import { deepseekEditorAdapter } from '@services/integrations/item-mention/content/editor-deepseek';
+import { doubaoEditorAdapter } from '@services/integrations/item-mention/content/editor-doubao';
 import { geminiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-gemini';
+import { googleAiStudioEditorAdapter } from '@services/integrations/item-mention/content/editor-googleaistudio';
 import { kimiEditorAdapter } from '@services/integrations/item-mention/content/editor-kimi';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
+import { poeEditorAdapter } from '@services/integrations/item-mention/content/editor-poe';
+import { yuanbaoEditorAdapter } from '@services/integrations/item-mention/content/editor-yuanbao';
+import { zaiEditorAdapter } from '@services/integrations/item-mention/content/editor-zai';
 import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/item-mention/content/mention-sites';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
@@ -69,8 +74,13 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         if (siteId === 'chatgpt') return chatgptComposerEditorAdapter;
         if (siteId === 'notionai') return notionAiContentEditableAdapter;
         if (siteId === 'gemini') return geminiContentEditableAdapter;
+        if (siteId === 'googleaistudio') return googleAiStudioEditorAdapter;
         if (siteId === 'deepseek') return deepseekEditorAdapter;
         if (siteId === 'kimi') return kimiEditorAdapter;
+        if (siteId === 'poe') return poeEditorAdapter;
+        if (siteId === 'doubao') return doubaoEditorAdapter;
+        if (siteId === 'yuanbao') return yuanbaoEditorAdapter;
+        if (siteId === 'zai') return zaiEditorAdapter;
         return null;
       })();
       if (!adapterMaybe) return null;

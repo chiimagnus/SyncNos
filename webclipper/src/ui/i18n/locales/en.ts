@@ -66,8 +66,7 @@ export const en = {
   aiChatCacheImagesHint: 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.',
   aiChatDollarMentionHeading: '$ Mention',
   aiChatDollarMentionLabel: 'Enable $ mention',
-  aiChatDollarMentionHint:
-    'Type $ in ChatGPT / Notion AI / Gemini / DeepSeek / Kimi to search saved items and insert them as markdown.',
+  aiChatDollarMentionHint: 'Type $ in supported AI chats to search saved items and insert them as markdown.',
   betaTag: 'BETA',
   inpageSupportedOnlyLabel: 'Only show Inpage button on supported sites',
   inpageSupportedOnlyHint: 'Non-supported sites require a refresh to apply.',

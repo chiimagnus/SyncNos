@@ -68,7 +68,7 @@ export const zh: { [K in TranslationKey]: string } = {
   aiChatCacheImagesHint: '仅影响 AI 对话。采集时会下载图片，避免云链接失效。',
   aiChatDollarMentionHeading: '$ 插入',
   aiChatDollarMentionLabel: '启用 $ 插入条目',
-  aiChatDollarMentionHint: '在 ChatGPT / Notion AI / Gemini / DeepSeek / Kimi 输入 $，可搜索已保存条目并以 Markdown 插入。',
+  aiChatDollarMentionHint: '在支持的 AI Chat 输入 $，可搜索已保存条目并以 Markdown 插入。',
   betaTag: 'Beta',
   inpageSupportedOnlyLabel: '仅在支持站点显示 Inpage 按钮',
   inpageSupportedOnlyHint: '切换后需刷新页面以生效。',
