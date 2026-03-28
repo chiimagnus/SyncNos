@@ -6,6 +6,7 @@ import { registerWebArticleHandlers } from '@collectors/web/article-fetch-backgr
 import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
+import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
 import { ensureDefaultNotionOAuthClientId, setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
@@ -36,6 +37,7 @@ export default defineBackground(() => {
   });
 
   registerConversationHandlers(router);
+  registerItemMentionHandlers(router);
   registerArticleCommentsHandlers(router);
   registerWebArticleHandlers(router);
   registerChatgptDeepResearchHandlers(router);

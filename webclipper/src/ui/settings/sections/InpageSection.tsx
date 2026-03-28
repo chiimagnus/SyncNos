@@ -17,6 +17,8 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
+  aiChatDollarMentionEnabled: boolean;
+  onToggleAiChatDollarMentionEnabled: (next: boolean) => void;
 }) {
   const {
     busy,
@@ -28,6 +30,8 @@ export function InpageSection(props: {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    aiChatDollarMentionEnabled,
+    onToggleAiChatDollarMentionEnabled,
   } = props;
 
   const profileSummaryKey: Record<MarkdownReadingProfileId, Parameters<typeof t>[0]> = {
@@ -64,8 +68,13 @@ export function InpageSection(props: {
           <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
             {t('inpageDisplayModeHint')}
           </div>
+        </div>
+      </section>
 
-          <div className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-3">
+      <section className={cardClassName} aria-label={t('readingHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('readingHeading')}</h2>
+        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
             <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
               {t('markdownReadingProfileLabel')}
             </label>
@@ -89,6 +98,24 @@ export function InpageSection(props: {
           <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
             {t(profileSummaryKey[markdownReadingProfile])}
           </div>
+        </div>
+      </section>
+      <section className={cardClassName} aria-label={t('aiChatDollarMentionHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('aiChatDollarMentionHeading')}
+        </h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={aiChatDollarMentionEnabled}
+            disabled={busy}
+            onChange={(e) => onToggleAiChatDollarMentionEnabled(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('aiChatDollarMentionLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('aiChatDollarMentionHint')}
         </div>
       </section>
 

@@ -99,6 +99,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 - **Insight 里的 clip 数量代表本地 IndexedDB 会话数，而不是 Notion 里已经存在的页面数。** 如果用户删了本地会话、没同步某些会话，或 Notion 侧做了手工变更，两边数字本来就可能不同。
 - **`Chat with AI` 不是“扩展替你把 prompt 发到目标模型”。** 它只负责在本地把 payload 组装好、复制到剪贴板并打开目标网站；后续提交仍由用户在目标站点完成。
 - **`cache-images` 不是“打开开关就自动补齐全部历史图片”。** `ai_chat_cache_images_enabled` 主要影响后续采集；历史会话要在 detail 里手动触发工具动作回填。
+- **`$` mention 不是“去云端搜索/引用外部知识库”。** 它只在 ChatGPT/Notion AI 的输入框里从本地 conversations 过滤候选并插入同源 Markdown；`Tab/Enter` 插入，`Esc` 关闭保留文本。
 - **“能抓到内容”和“能稳定增量同步”不是一个问题。** 例如 Google AI Studio 因虚拟化列表而更依赖手动保存；article 会话则由 `updatedAt` 决定是否重建目标内容。
 
 ## 来源引用（Source References）

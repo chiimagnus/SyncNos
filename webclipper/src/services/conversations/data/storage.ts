@@ -33,6 +33,10 @@ export async function findConversationById(conversationId: number): Promise<Conv
   return await idb.findConversationById(conversationId);
 }
 
+export async function getConversationById(conversationId: number): Promise<Conversation | null> {
+  return await idb.getConversationById(conversationId);
+}
+
 export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {
   return await idb.getConversationBySourceConversationKey(source, conversationKey);
 }
@@ -40,6 +44,15 @@ export async function getConversationBySourceConversationKey(source: string, con
 export async function getConversationDetail(conversationId: number) {
   const messages = await idb.getMessagesByConversationId(conversationId);
   return { conversationId, messages };
+}
+
+export async function searchConversationMentionCandidates(input?: {
+  query?: unknown;
+  limit?: unknown;
+  maxScan?: number;
+  maxDurationMs?: number;
+}) {
+  return await idb.searchConversationMentionCandidates(input);
 }
 
 export async function upsertConversation(payload: any) {

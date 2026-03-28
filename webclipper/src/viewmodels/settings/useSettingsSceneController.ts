@@ -156,6 +156,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
+  const [aiChatDollarMentionEnabled, setAiChatDollarMentionEnabled] = useState<boolean>(true);
   const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() => normalizeStoredMarkdownReadingProfile(''));
 
   // Chat with AI
@@ -224,6 +225,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           'inpage_supported_only',
           'ai_chat_auto_save_enabled',
           'ai_chat_cache_images_enabled',
+          'ai_chat_dollar_mention_enabled',
           MARKDOWN_READING_PROFILE_STORAGE_KEY,
           LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
           ABOUT_YOU_USER_NAME_STORAGE_KEY,
@@ -250,6 +252,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       );
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
       setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
+      setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
       setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(local?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
       setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
       setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
@@ -588,6 +591,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleAiChatDollarMentionEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        await storageSet({ ai_chat_dollar_mention_enabled: next === true });
+        setAiChatDollarMentionEnabled(next === true);
+      });
+    },
+    [runTask],
+  );
+
   const onChangeMarkdownReadingProfile = useCallback(
     async (next: unknown) => {
       const normalized = normalizeStoredMarkdownReadingProfile(next);
@@ -855,6 +868,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    aiChatDollarMentionEnabled,
+    onToggleAiChatDollarMentionEnabled,
     markdownReadingProfile,
     onChangeMarkdownReadingProfile,
 

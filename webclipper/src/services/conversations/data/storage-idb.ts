@@ -1076,6 +1076,117 @@ export async function getConversationById(conversationId: number): Promise<Conve
   return row ? (normalizeConversationListRecord(row) as Conversation) : null;
 }
 
+function normalizeMentionCandidateLimit(value: unknown): number {
+  if (value == null || value === '') return 20;
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit <= 0) return 20;
+  return Math.min(Math.floor(limit), 50);
+}
+
+function stripDomainPrefix(listSiteKey: string): string {
+  const text = safeString(listSiteKey).toLowerCase();
+  if (!text.startsWith('domain:')) return '';
+  return text.slice('domain:'.length);
+}
+
+export async function searchConversationMentionCandidates(input?: {
+  query?: unknown;
+  limit?: unknown;
+  maxScan?: number;
+  maxDurationMs?: number;
+}): Promise<{
+  candidates: Array<{
+    conversationId: number;
+    title: string;
+    source: string;
+    url: string;
+    domain: string;
+    sourceType: string;
+    lastCapturedAt: number;
+  }>;
+  scannedCount: number;
+  truncatedByScanLimit: boolean;
+}> {
+  const query = safeString(input?.query).toLowerCase();
+  const limit = normalizeMentionCandidateLimit(input?.limit);
+  const maxScan =
+    Number.isFinite(input?.maxScan) && (input?.maxScan as number) > 0 ? Math.floor(input!.maxScan!) : 2000;
+  const maxDurationMs =
+    Number.isFinite(input?.maxDurationMs) && (input?.maxDurationMs as number) > 0
+      ? Math.floor(input!.maxDurationMs!)
+      : 300;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  const idx = stores.conversations.index('by_lastCapturedAt_id');
+
+  const candidates: Array<{
+    conversationId: number;
+    title: string;
+    source: string;
+    url: string;
+    domain: string;
+    sourceType: string;
+    lastCapturedAt: number;
+  }> = [];
+  let scannedCount = 0;
+  let truncatedByScanLimit = false;
+  const startedAt = Date.now();
+
+  const cursorReq = idx.openCursor(null, 'prev');
+  await new Promise<void>((resolve, reject) => {
+    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result as IDBCursorWithValue | null;
+      if (!cursor) return resolve();
+
+      scannedCount += 1;
+      const record = normalizeConversationListRecord(cursor.value as any) as any;
+      const conversationId = Number(record?.id);
+      const lastCapturedAt = Number(record?.lastCapturedAt) || 0;
+      const title = safeString(record?.title);
+      const source = safeString(record?.source);
+      const url = safeString(record?.url);
+      const sourceType = safeString(record?.sourceType) || 'chat';
+      const domain =
+        stripDomainPrefix(safeString(record?.listSiteKey)) || stripDomainPrefix(deriveConversationListSiteKey(record));
+
+      const shouldKeep = (() => {
+        if (!Number.isFinite(conversationId) || conversationId <= 0) return false;
+        if (!query) return true;
+        const q = query;
+        if (title.toLowerCase().includes(q)) return true;
+        if (source.toLowerCase().includes(q)) return true;
+        if (domain && domain.toLowerCase().includes(q)) return true;
+        return false;
+      })();
+
+      if (shouldKeep) {
+        candidates.push({
+          conversationId,
+          title,
+          source,
+          url,
+          domain,
+          sourceType,
+          lastCapturedAt,
+        });
+      }
+
+      const elapsed = Date.now() - startedAt;
+      if (candidates.length >= limit || scannedCount >= maxScan || elapsed >= maxDurationMs) {
+        if (scannedCount >= maxScan || elapsed >= maxDurationMs) truncatedByScanLimit = true;
+        return resolve();
+      }
+
+      cursor.continue();
+    };
+  });
+
+  await txDone(t);
+  return { candidates, scannedCount, truncatedByScanLimit };
+}
+
 export async function getSyncMappingByConversation(
   conversationId: number,
 ): Promise<{ conversation: Conversation; mapping: any | null } | null> {

@@ -9,6 +9,7 @@ import {
 } from '@platform/storage/inpage-button-position.ts';
 
 const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
+const STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED = 'ai_chat_dollar_mention_enabled';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -61,6 +62,7 @@ type Deps = {
   runtimeObserver: RuntimeObserverApi | null;
   incrementalUpdater: { computeIncremental?: (snapshot: unknown) => any } | null;
   notionAiModelPicker: { maybeApply?: () => void } | null;
+  itemMention: { start?: () => { stop?: () => void } | null } | null;
 };
 
 const CORE_MESSAGE_TYPES = Object.freeze({
@@ -100,6 +102,21 @@ function readAiChatAutoSaveEnabled(): Promise<boolean> {
   });
 }
 
+function readAiChatDollarMentionEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
+      const local = storageApi?.local;
+      if (!local?.get) return resolve(true);
+      local.get([STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED], (res: any) => {
+        resolve(res?.[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] !== false);
+      });
+    } catch (_e) {
+      resolve(true);
+    }
+  });
+}
+
 export function createContentController(deps: Deps) {
   const runtime = deps.runtime;
   const collectorsRegistry = deps.collectorsRegistry;
@@ -109,6 +126,7 @@ export function createContentController(deps: Deps) {
   const runtimeObserver = deps.runtimeObserver;
   const incrementalUpdater = deps.incrementalUpdater;
   const notionAiModelPicker = deps.notionAiModelPicker;
+  const itemMention = deps.itemMention;
 
   function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
     const value = String(kind || '')
@@ -487,7 +505,94 @@ export function createContentController(deps: Deps) {
     start() {
       const controller = createAutoCaptureController();
       controller.start();
-      return controller;
+
+      const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
+      const hasStorageGet = !!storageApi?.local?.get;
+      // Default to enabled when storage API is unavailable (e.g. tests).
+      // When storage is available, wait for the async read to avoid "first keypress" enabling for users who disabled it.
+      let aiChatDollarMentionEnabled: boolean | null = hasStorageGet ? null : true;
+      let mentionController: { stop?: () => void } | null = null;
+      let stopped = false;
+      let unsubscribeStorage: (() => void) | null = null;
+
+      function stopMention() {
+        const previous = mentionController;
+        mentionController = null;
+        try {
+          previous?.stop?.();
+        } catch (_e) {
+          // ignore
+        }
+      }
+
+      function startMention() {
+        if (stopped) return;
+        if (aiChatDollarMentionEnabled !== true) return;
+        if (!itemMention || typeof itemMention.start !== 'function') return;
+        if (mentionController) return;
+        mentionController = itemMention.start() || null;
+      }
+
+      function applyMentionEnabled(enabled: boolean) {
+        aiChatDollarMentionEnabled = enabled === true;
+        if (aiChatDollarMentionEnabled === true) startMention();
+        else stopMention();
+      }
+
+      if (!itemMention || typeof itemMention.start !== 'function') {
+        // No-op.
+      } else if (!hasStorageGet) {
+        applyMentionEnabled(true);
+      } else {
+        void readAiChatDollarMentionEnabled()
+          .then((enabled) => {
+            applyMentionEnabled(enabled === true);
+          })
+          .catch(() => {
+            applyMentionEnabled(true);
+          });
+
+        const onChanged = storageApi?.onChanged;
+        if (onChanged?.addListener && onChanged?.removeListener) {
+          const listener = (changes: Record<string, any> | null, areaName?: string) => {
+            if (stopped) return;
+            if (areaName && String(areaName) !== 'local') return;
+            const change = changes ? (changes as any)[STORAGE_KEY_AI_CHAT_DOLLAR_MENTION_ENABLED] : null;
+            if (!change) return;
+            applyMentionEnabled(change?.newValue !== false);
+          };
+          try {
+            onChanged.addListener(listener);
+            unsubscribeStorage = () => {
+              try {
+                onChanged.removeListener(listener);
+              } catch (_e) {
+                // ignore
+              }
+            };
+          } catch (_e) {
+            // ignore
+          }
+        }
+      }
+
+      return {
+        stop() {
+          stopped = true;
+          try {
+            unsubscribeStorage?.();
+          } catch (_e) {
+            // ignore
+          }
+          unsubscribeStorage = null;
+          try {
+            stopMention();
+          } catch (_e) {
+            // ignore
+          }
+          controller.stop();
+        },
+      };
     },
   };
 }
