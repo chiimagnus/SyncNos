@@ -1,6 +1,6 @@
 import { buildMentionInsertText, searchMentionCandidates } from '@services/integrations/item-mention/client';
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
-import { chatgptTextareaEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
+import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
 import type { MentionSessionState } from '@services/integrations/item-mention/content/mention-session';
 import { updateMentionSession } from '@services/integrations/item-mention/content/mention-session';
@@ -69,7 +69,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       const rt: RuntimeClient = runtime;
       const hostname = location?.hostname || '';
       const pickedAdapter: EditorAdapter | null = isChatgptHost(hostname)
-        ? chatgptTextareaEditorAdapter
+        ? chatgptComposerEditorAdapter
         : isNotionHost(hostname)
           ? notionAiContentEditableAdapter
           : null;

@@ -1,29 +1,146 @@
 import type {
+  ContentEditableEditor,
   EditorAdapter,
   EditorHandle,
   EditorRange,
-  TextareaEditor,
 } from '@services/integrations/item-mention/content/editor-adapter';
-import { clampRange, replaceTextRange } from '@services/integrations/item-mention/content/editor-adapter';
+import { clampRange } from '@services/integrations/item-mention/content/editor-adapter';
 
-function isTextarea(node: unknown): node is HTMLTextAreaElement {
-  return (
-    !!node && typeof (node as any).tagName === 'string' && String((node as any).tagName).toLowerCase() === 'textarea'
-  );
+function isElement(node: unknown): node is Element {
+  // Avoid referencing DOM globals (`Node`) at module scope; unit tests may not polyfill them.
+  return !!node && typeof (node as any).tagName === 'string';
 }
 
-function setTextareaValueCompat(el: HTMLTextAreaElement, value: string) {
-  // React-controlled textareas often ignore direct assignment unless the native setter + input event fires.
+function isContentEditable(el: Element | null): el is HTMLElement {
+  if (!el) return false;
+  const anyEl = el as any;
+  if (anyEl.isContentEditable === true) return true;
+  const attr = String((el as any).getAttribute?.('contenteditable') || '')
+    .trim()
+    .toLowerCase();
+  return attr === 'true';
+}
+
+function isVisible(el: Element | null): boolean {
+  const anyEl = el as any;
+  if (!anyEl || typeof anyEl.getBoundingClientRect !== 'function') return false;
+  const rect = anyEl.getBoundingClientRect();
+  return rect.width >= 6 && rect.height >= 6;
+}
+
+function findChatgptComposer(): HTMLElement | null {
+  const doc = document;
+  if (!doc) return null;
+
+  const active = doc.activeElement as Element | null;
+  const activeEl = isElement(active) ? active : null;
+  if (activeEl) {
+    const maybe = activeEl.id === 'prompt-textarea' ? activeEl : (activeEl as any).closest?.('#prompt-textarea');
+    if (isElement(maybe) && maybe.id === 'prompt-textarea' && isContentEditable(maybe) && isVisible(maybe)) {
+      return maybe as HTMLElement;
+    }
+  }
+
+  const el = doc.querySelector?.('#prompt-textarea') as Element | null;
+  if (el && isContentEditable(el) && isVisible(el)) return el as HTMLElement;
+  return null;
+}
+
+function toContentEditableEditor(handle: EditorHandle): ContentEditableEditor {
+  const el = (handle as any)?.el as Element | null;
+  if (!handle || (handle as any).kind !== 'contenteditable' || !isContentEditable(el)) {
+    throw new Error('invalid contenteditable editor');
+  }
+  return handle as ContentEditableEditor;
+}
+
+function getSelectionOffsetsWithin(root: HTMLElement): EditorRange {
+  const sel = globalThis.getSelection?.();
+  if (!sel || sel.rangeCount <= 0) {
+    const text = String(root.textContent || '');
+    return { start: text.length, end: text.length };
+  }
+  const range = sel.getRangeAt(0);
+  const within = root.contains(range.commonAncestorContainer);
+  if (!within) {
+    const text = String(root.textContent || '');
+    return { start: text.length, end: text.length };
+  }
+
+  // Compute offsets using `cloneContents().textContent` so offsets match `root.textContent`
+  // semantics (concatenated text nodes, no block separator newlines). This keeps the cursor
+  // math consistent even when ChatGPT uses ProseMirror paragraphs.
+  const startRange = range.cloneRange();
+  startRange.selectNodeContents(root);
+  startRange.setEnd(range.startContainer, range.startOffset);
+  const start = String(startRange.cloneContents()?.textContent || '').length;
+
+  const endRange = range.cloneRange();
+  endRange.selectNodeContents(root);
+  endRange.setEnd(range.endContainer, range.endOffset);
+  const end = String(endRange.cloneContents()?.textContent || '').length;
+
+  return { start, end };
+}
+
+type DomPoint = { node: Node; offset: number };
+
+function resolveTextOffsetToDomPoint(root: HTMLElement, textOffset: number): DomPoint {
+  const normalized = Math.max(0, Math.floor(Number(textOffset) || 0));
+  // `NodeFilter.SHOW_TEXT` is not always present in unit-test environments, so use the numeric value.
+  const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+  let remaining = normalized;
+  let lastText: Text | null = null;
+  let node = walker.nextNode() as Text | null;
+  while (node) {
+    lastText = node;
+    const len = node.data.length;
+    if (remaining <= len) return { node, offset: remaining };
+    remaining -= len;
+    node = walker.nextNode() as Text | null;
+  }
+
+  // Empty editor or offset beyond end: collapse at root end.
+  if (!lastText) return { node: root, offset: normalized <= 0 ? 0 : root.childNodes.length };
+  return { node: lastText, offset: lastText.data.length };
+}
+
+function setSelectionByOffsets(root: HTMLElement, start: number, end: number): boolean {
+  const sel = globalThis.getSelection?.();
+  if (!sel) return false;
+  const range = document.createRange();
+  const a = resolveTextOffsetToDomPoint(root, start);
+  const b = resolveTextOffsetToDomPoint(root, end);
   try {
-    const desc = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
-    if (desc?.set) {
-      desc.set.call(el, value);
-      return;
+    range.setStart(a.node, a.offset);
+    range.setEnd(b.node, b.offset);
+  } catch (_e) {
+    try {
+      range.selectNodeContents(root);
+      range.collapse(false);
+    } catch (_e2) {
+      return false;
+    }
+  }
+  try {
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function insertTextCompat(text: string): boolean {
+  try {
+    const cmd = (document as any).execCommand as any;
+    if (typeof cmd === 'function') {
+      return !!cmd.call(document, 'insertText', false, String(text || ''));
     }
   } catch (_e) {
     // ignore
   }
-  el.value = value;
+  return false;
 }
 
 function dispatchBubbledInput(el: HTMLElement) {
@@ -34,62 +151,56 @@ function dispatchBubbledInput(el: HTMLElement) {
   }
 }
 
-function pickTextarea(): HTMLTextAreaElement | null {
-  const doc = document;
-  const active = doc?.activeElement;
-  if (isTextarea(active)) return active;
-
-  const root = doc?.querySelector?.('main') || doc;
-  const list = Array.from(root?.querySelectorAll?.('textarea') || []) as any[];
-  for (const el of list) {
-    if (!isTextarea(el)) continue;
-    if ((el as any).disabled) continue;
-    if ((el as any).readOnly) continue;
-    return el;
-  }
-  return null;
-}
-
-function toTextareaEditor(handle: EditorHandle): TextareaEditor {
-  if (!handle || (handle as any).kind !== 'textarea' || !isTextarea((handle as any).el)) {
-    throw new Error('invalid textarea editor');
-  }
-  return handle as TextareaEditor;
-}
-
-export const chatgptTextareaEditorAdapter: EditorAdapter = {
+export const chatgptComposerEditorAdapter: EditorAdapter = {
   detectActiveEditor() {
-    const ta = pickTextarea();
-    if (!ta) return null;
-    return { kind: 'textarea', el: ta };
+    const el = findChatgptComposer();
+    if (!el) return null;
+    return { kind: 'contenteditable', el };
   },
   getSelectionRange(editor: EditorHandle): EditorRange {
-    const ta = toTextareaEditor(editor).el;
-    const text = String(ta.value || '');
-    const start = Number(ta.selectionStart);
-    const end = Number(ta.selectionEnd);
-    return clampRange(text, {
-      start: Number.isFinite(start) ? start : text.length,
-      end: Number.isFinite(end) ? end : text.length,
-    });
+    const el = toContentEditableEditor(editor).el;
+    const text = String(el.textContent || '');
+    const offsets = getSelectionOffsetsWithin(el);
+    return clampRange(text, offsets);
   },
   replaceRange(editor: EditorHandle, range: EditorRange, text: string): EditorRange {
-    const ta = toTextareaEditor(editor).el;
-    const current = String(ta.value || '');
-    const { text: next, rangeAfter } = replaceTextRange({ text: current, range, replacement: text });
-    setTextareaValueCompat(ta, next);
-    try {
-      ta.setSelectionRange(rangeAfter.start, rangeAfter.end);
-    } catch (_e) {
-      // ignore
+    const el = toContentEditableEditor(editor).el;
+    const current = String(el.textContent || '');
+    const normalized = clampRange(current, range);
+    const replacement = String(text || '');
+
+    // Select the trigger/query range, then replace via insertText so ProseMirror can handle state updates.
+    setSelectionByOffsets(el, normalized.start, normalized.end);
+    const ok = insertTextCompat(replacement);
+
+    // Fallback to raw DOM mutation if execCommand is unavailable.
+    if (!ok) {
+      try {
+        const sel = globalThis.getSelection?.();
+        if (sel && sel.rangeCount > 0) {
+          const domRange = sel.getRangeAt(0);
+          domRange.deleteContents();
+          domRange.insertNode(document.createTextNode(replacement));
+          domRange.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(domRange);
+        } else {
+          el.textContent = `${String(el.textContent || '')}${replacement}`;
+        }
+      } catch (_e) {
+        // ignore
+      }
     }
-    dispatchBubbledInput(ta);
+
+    const rangeAfter = { start: normalized.start + replacement.length, end: normalized.start + replacement.length };
+    setSelectionByOffsets(el, rangeAfter.start, rangeAfter.end);
+    dispatchBubbledInput(el);
     return rangeAfter;
   },
   focus(editor: EditorHandle) {
-    const ta = toTextareaEditor(editor).el;
+    const el = toContentEditableEditor(editor).el;
     try {
-      ta.focus();
+      (el as any).focus?.();
     } catch (_e) {
       // ignore
     }

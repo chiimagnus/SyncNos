@@ -5,7 +5,7 @@ export type SupportedAiChatSite = {
 };
 
 export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
-  { id: 'chatgpt', name: 'ChatGPT', hosts: ['chatgpt.com', 'chat.openai.com'] },
+  { id: 'chatgpt', name: 'ChatGPT', hosts: ['chatgpt.com', 'www.chatgpt.com', 'chat.openai.com'] },
   { id: 'claude', name: 'Claude', hosts: ['claude.ai'] },
   { id: 'gemini', name: 'Gemini', hosts: ['gemini.google.com'] },
   { id: 'googleaistudio', name: 'Google AI Studio', hosts: ['aistudio.google.com', 'makersuite.google.com'] },

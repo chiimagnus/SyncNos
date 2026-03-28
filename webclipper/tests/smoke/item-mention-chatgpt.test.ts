@@ -15,23 +15,36 @@ function flushMicrotasks() {
 
 let dom: JSDOM | null = null;
 
+function setCaretToEnd(el: HTMLElement) {
+  const sel = globalThis.getSelection?.();
+  if (!sel) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   uiMocks.render.mockReset();
   uiMocks.cleanup.mockReset();
 
-  dom = new JSDOM('<!doctype html><html><body><main><textarea></textarea></main></body></html>', {
-    url: 'https://chatgpt.com/c/123',
-    pretendToBeVisual: true,
-  });
+  dom = new JSDOM(
+    '<!doctype html><html><body><main><div id="prompt-textarea" role="textbox" contenteditable="true"></div></main></body></html>',
+    {
+      url: 'https://chatgpt.com/c/123',
+      pretendToBeVisual: true,
+    },
+  );
   Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
-  Object.defineProperty(globalThis, 'HTMLTextAreaElement', {
-    configurable: true,
-    value: (dom.window as any).HTMLTextAreaElement,
-  });
   Object.defineProperty(globalThis, 'location', { configurable: true, value: dom.window.location });
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: dom.window.getSelection.bind(dom.window),
+  });
 });
 
 afterEach(() => {
@@ -81,11 +94,13 @@ describe('item mention chatgpt controller', () => {
     const active = controller.start();
     expect(active).toBeTruthy();
 
-    const ta = document.querySelector('textarea') as HTMLTextAreaElement;
-    ta.value = '$';
-    ta.focus();
-    ta.setSelectionRange(1, 1);
-    ta.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
+    const el = document.querySelector('#prompt-textarea') as HTMLElement;
+    // Make it "visible" for the adapter.
+    (el as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    el.textContent = '$';
+    (el as any).focus?.();
+    setCaretToEnd(el);
+    el.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
 
     // Debounced search.
     vi.advanceTimersByTime(200);
@@ -136,24 +151,25 @@ describe('item mention chatgpt controller', () => {
     });
     const active = controller.start();
 
-    const ta = document.querySelector('textarea') as HTMLTextAreaElement;
-    ta.value = '$';
-    ta.focus();
-    ta.setSelectionRange(1, 1);
-    ta.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
+    const el = document.querySelector('#prompt-textarea') as HTMLElement;
+    (el as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    el.textContent = '$';
+    (el as any).focus?.();
+    setCaretToEnd(el);
+    el.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
 
     vi.advanceTimersByTime(200);
     await flushMicrotasks();
 
-    ta.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+    el.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
     const last = uiMocks.render.mock.calls[uiMocks.render.mock.calls.length - 1]?.[0];
     expect(last?.highlightIndex).toBe(1);
 
-    ta.value = '$ab';
-    ta.setSelectionRange(3, 3);
-    ta.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
-    ta.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-    expect(ta.value).toBe('$ab');
+    el.textContent = '$ab';
+    setCaretToEnd(el);
+    el.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
+    el.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    expect(el.textContent).toBe('$ab');
 
     active?.stop?.();
   });
@@ -191,19 +207,20 @@ describe('item mention chatgpt controller', () => {
     });
     const active = controller.start();
 
-    const ta = document.querySelector('textarea') as HTMLTextAreaElement;
-    ta.value = '$ab';
-    ta.focus();
-    ta.setSelectionRange(3, 3);
-    ta.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
+    const el = document.querySelector('#prompt-textarea') as HTMLElement;
+    (el as any).getBoundingClientRect = () => ({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 });
+    el.textContent = '$ab';
+    (el as any).focus?.();
+    setCaretToEnd(el);
+    el.dispatchEvent(new dom!.window.Event('input', { bubbles: true }));
 
     vi.advanceTimersByTime(200);
     await flushMicrotasks();
 
-    ta.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    el.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     await flushMicrotasks();
 
-    expect(ta.value).toBe('MD');
+    expect(el.textContent).toBe('MD');
 
     active?.stop?.();
   });
