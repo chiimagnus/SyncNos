@@ -1,5 +1,8 @@
 export const en = {
   // Settings sections
+  settingsGroupFeatures: 'Features',
+  settingsGroupData: 'Data',
+  settingsGroupAbout: 'About',
   section_backup_label: 'Backup',
   section_backup_desc: 'Export/import your database.',
   section_language_label: 'Language',
@@ -59,7 +62,7 @@ export const en = {
   readingHeading: 'Reading',
   aiChatAutoSaveLabel: 'Auto-save AI chats',
   aiChatAutoSaveHint: 'Only applies to supported AI chat sites. Requires a refresh to apply.',
-  aiChatCacheImagesLabel: 'Cache AI chat images locally（退出账号仍可看）',
+  aiChatCacheImagesLabel: 'Cache AI chat images locally (viewable after logout)',
   aiChatCacheImagesHint: 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.',
   aiChatDollarMentionHeading: '$ Mention',
   aiChatDollarMentionLabel: 'Enable $ mention',
