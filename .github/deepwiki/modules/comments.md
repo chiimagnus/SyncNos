@@ -72,7 +72,7 @@ sequenceDiagram
 4. 删除操作会直接走 background handler，再由组件刷新列表。
 
 ### Inpage comments panel
-1. 用户从页面内入口打开评论面板。
+1. 用户从页面内入口打开评论面板（例如双击 inpage 保存按钮打开评论侧边栏）。
 2. `inpage-comments-panel-content-handlers.ts` 先解析选区 / `quoteText`，并用 `buildArticleCommentLocatorFromRange()` 生成可选 `locator`（TextQuote/TextPosition selectors），再尝试解析 article 对应的 `canonicalUrl` 和 `conversationId`。
 3. 若 article 还没建立 conversation，系统会先捕获/解析 article，再把 orphan 评论附着到新的 conversation。
 4. 面板的 open / close / quote / focus / busy 状态现在由 `comment-sidebar-session.ts` 统一调度，不再做正文高亮回显。
@@ -85,7 +85,7 @@ sequenceDiagram
 | `COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS` | 读取评论列表 | article detail, inpage comments panel |
 | `COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT` | 删除评论 | article detail, inpage comments panel |
 | `COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS` | 把先前无 conversation 的评论附着到 article | inpage comments panel |
-| `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` | 打开页面内评论面板 | context menu / content bridge |
+| `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` | 打开页面内评论面板 | content controller（双击 inpage 按钮）/ context menu / content bridge |
 
 - 评论相关消息会通过 background handlers 统一落库，而不是直接在 UI 中操作 IndexedDB。
 - `COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS` 支持按 `canonicalUrl` 或 `conversationId` 读取，方便 article detail 与 orphan attach 两条路径共用。
@@ -126,3 +126,6 @@ sequenceDiagram
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/tests/storage/article-comments-idb.test.ts`
 - `webclipper/tests/domains/backup-article-comments.test.ts`
+
+## 更新记录（Update Notes）
+- 2026-03-29：补齐“inpage 双击保存按钮 → 打开页面内评论侧边栏”的入口说明，并同步 `OPEN_INPAGE_COMMENTS_PANEL` 的依赖方描述。

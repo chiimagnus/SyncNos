@@ -86,9 +86,10 @@ WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生
 2. 权限、content scripts、消息协议、构建产物变更要同时检查 `wxt` 入口、manifest 结果与 CI 脚本是否一致。
 3. Settings / Conversations UI 改动时，不要只改单个组件；同时核对这些真源：
    - `webclipper/src/viewmodels/settings/types.ts`（section 分组与顺序）
-   - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`（`inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / `chat_with_*`）
+   - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`（`inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_dollar_mention_enabled` / `ai_chat_cache_images_enabled` / `chat_with_*`）
    - `webclipper/src/viewmodels/settings/insight-stats.ts`（Insight 统计口径）
    - `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`（Chat with AI 模板 / 平台 / 截断）
+   - `webclipper/src/services/integrations/item-mention/**`（`$ mention`：站点门控、候选搜索、插入载荷构建）
    - `webclipper/src/ui/styles/tokens.css`（主题 token：仅跟随 `prefers-color-scheme`）
    - `webclipper/src/ui/shared/SelectMenu.tsx`（source/site 筛选菜单的 `adaptiveMaxHeight` 与可视区域计算）
    - `webclipper/src/ui/popup/PopupShell.tsx` / `webclipper/src/ui/app/AppShell.tsx`（列表统计跳转 Insight 的路由入口）

@@ -7,7 +7,7 @@
 | App 启动与门控 | `SyncNosApp.swift`, `RootView.swift` | UserDefaults | 控制 onboarding、自动同步、调试开关 |
 | App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
 | App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
-| WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions、manifest icons（当前仅 `icon-128.png`）与 `web_accessible_resources` |
+| WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions、manifest icons（`16/48/128`）与 `web_accessible_resources`（仅暴露 `icon-128.png`） |
 | WebClipper 运行时设置 | SettingsScene + `src/viewmodels/settings/useSettingsSceneController.ts` + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、`inpage_display_mode`、`ai_chat_auto_save_enabled`、`ai_chat_cache_images_enabled`、Chat with AI、Notion AI 模型偏好 |
 | WebClipper UI-only 状态 | `localStorage` / `sessionStorage` | 浏览器本地 Web Storage | 控制设置页当前 section、来源筛选、窄屏下待打开的 conversation |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
@@ -35,6 +35,7 @@
 | `inpage_display_mode` | `chrome.storage.local`, `src/services/bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
 | `SelectMenu.adaptiveMaxHeight` | `ui/shared/SelectMenu.tsx`, `ConversationListPane.tsx` | 默认 `false`；source/site 筛选启用为 `true` | 在菜单展开时基于最近可裁剪容器动态计算 `panelMaxHeight`，减少多余滚动条与裁切 |
 | `ai_chat_auto_save_enabled` | `chrome.storage.local` | 默认 `true` | 控制支持 AI 站点是否自动保存；关闭后仍可手动保存 |
+| `ai_chat_dollar_mention_enabled` | `chrome.storage.local`, `src/services/bootstrap/content-controller.ts` | 默认 `true` | 控制支持站点的 `$ mention` 能力是否启用；关闭后 content script 会停止注入该交互（当前标签页可热更新） |
 | `ai_chat_cache_images_enabled` | `chrome.storage.local`, `src/services/conversations/background/handlers.ts` | 默认 `false` | 控制 chat 消息采集时是否尝试图片内联；历史会话可通过 detail header 的 `cache-images` 手动回填 |
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, `src/viewmodels/settings/useSettingsSceneController.ts` | 用户选择值 | 决定扩展 Notion 的写入根 |
 | `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
@@ -55,7 +56,7 @@
 - 主题仅依赖 CSS 媒体查询：设计 token 在 `tokens.css` 里通过 `prefers-color-scheme` 统一切换，不再维护手动主题开关。
 - Insight 不写入新的 `chrome.storage.local` 键；统计只在用户打开 `Settings → Insight` 时从 IndexedDB 现算，失败时回到错误态或空态。
 - `ai_chat_cache_images_enabled` 只影响 `sourceType='chat'` 的消息内联，article 流程不受影响；它也不会回写新的设置键到 Insight 或列表筛选状态。
-- `wxt.config.ts` 里 WebClipper 的图标配置现在只保留 `icon-128.png`；`icon-16.png` / `icon-48.png` 已删除，`web_accessible_resources` 也只暴露 `icon-128.png`。
+- `wxt.config.ts` 里 WebClipper 的 manifest icons 目前包含 `icon-16.png` / `icon-48.png` / `icon-128.png`；但出于跨站资源暴露收敛的考虑，`web_accessible_resources` 只暴露 `icons/icon-128.png`。
 
 ## 发布参数
 
@@ -79,7 +80,8 @@
 ## 常见误配
 - **改了 `wxt.config.ts` 的 `manifest.version` 却没对齐 tag**：CWS / AMO workflow 会直接报 `manifest version mismatch`。
 - **以为扩展升级后会自动打开设置页**：`background.ts` 仅在首次安装（`details.reason === 'install'`）自动打开 About；更新不会自动弹出设置页。
-- **切了 `inpage_display_mode` 或 `ai_chat_auto_save_enabled` 但当前页不变**：因为 content script 只在启动时读取这些开关，必须刷新或新开页面。
+- **切了 `inpage_display_mode` 或 `ai_chat_auto_save_enabled` 但当前页不变**：这些开关在 content bootstrap / controller 启动时读取，当前页面不会热更新；必须刷新或新开页面。
+- **切了 `ai_chat_dollar_mention_enabled` 但当前页表现不一致**：该开关在 `content-controller.ts` 中会监听 `chrome.storage.onChanged`，通常无需刷新即可启停；但如果当前页因 `inpage_display_mode=off` 未启动 content controller，仍需刷新/重新进入支持站点后才会生效。
 - **打开 `ai_chat_cache_images_enabled` 后旧会话图片仍是外链**：该开关主要影响后续采集写入；历史消息需要在 detail 里手动触发 `cache-images` 才会回填。
 - **以为筛选下拉高度不再固定 `320px` 是样式异常**：`source/site` 筛选菜单现在显式启用 `adaptiveMaxHeight`，会随可视区域动态变化，这是预期行为。
 - **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
@@ -124,6 +126,7 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 - `webclipper/wxt.config.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/services/bootstrap/content.ts`
+- `webclipper/src/services/bootstrap/content-controller.ts`
 - `webclipper/src/services/bootstrap/current-page-capture.ts`
 - `webclipper/src/ui/i18n/index.ts`
 - `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`
@@ -144,6 +147,7 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 - `.github/workflows/webclipper-cws-publish.yml`
 
 ## 更新记录（Update Notes）
+- 2026-03-29：更正 WebClipper manifest icons 事实（`16/48/128` 仍存在，仅 `icon-128.png` 暴露为 `web_accessible_resources`）；补齐 `$ mention` 开关键 `ai_chat_dollar_mention_enabled` 与其“可热更新”的行为边界。
 - 2026-03-25：同步本页 `manifest.version` 单一事实源到 `1.4.1`，并将 WebClipper 的旧目录引用统一迁移到 `src/services/*` 与 `src/ui/i18n/index.ts`。
 - 2026-03-22：同步 WebClipper settings 真路径、Chat with AI 真路径，并将 README 的主题说明收敛为系统跟随。
 - 2026-03-19：将 `manifest.version` 同步并补充 `AutoSyncService.intervalSeconds=5*60` 的 App 侧轮询事实与来源引用。

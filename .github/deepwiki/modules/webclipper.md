@@ -13,7 +13,7 @@
 | `src/entrypoints/content.ts` | 内容脚本入口 | 组装 collectors registry、inpage UI、runtime observer |
 | `src/services/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_display_mode`（兼容旧 `inpage_supported_only`）与支持站点如何影响 UI 启动 |
 | `src/services/bootstrap/current-page-capture.ts` | 当前页抓取服务 | 统一判断当前标签页可否抓取，并区分 chat / article 两条手动抓取路径 |
-| `src/services/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击开 popup、article fetch、Google AI Studio 手动保存都在这里 |
+| `src/services/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击打开页面内评论侧边栏（inpage comments panel）、article fetch、Google AI Studio 手动保存都在这里 |
 | `src/services/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
 | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
 | `src/services/integrations/item-mention/` | `$` mention 插入能力 | 在支持的 AI chat 输入框内通过 `$` 过滤本地 item 并插入同源 Markdown（站点门控真源：`src/collectors/ai-chat-sites.ts` 的 `features.dollarMention`） |
@@ -64,12 +64,12 @@
 | --- | --- | --- |
 | AI 对话站点 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai | 通过 collectors registry 统一注册 |
 | 普通网页文章 | 任意 `http(s)` 页面 | 手动抓取时注入 `readability.js` 提取正文 |
-| inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击开 popup、多击彩蛋提示 |
+| inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击打开页面内评论侧边栏（inpage comments panel）、多击彩蛋提示 |
 | Popup 当前页抓取 | `usePopupCurrentPageCapture.ts` + `current-page-capture.ts` | 先判断当前页可抓取，再用统一按钮触发 chat / article 抓取 |
 | 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除；不属于新的抓取站点 |
 
 - `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
-- `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击尝试打开 popup，多击只触发彩蛋动画与提示。
+- `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击打开页面内评论侧边栏，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
 - article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，**不进入 Notion / Obsidian 同步**，但会进入 Zip v2 备份 / 恢复；如果你改 comments 流程，一定同时看 storage、background handler、shared session、inpage 面板和 backup 目录。
@@ -104,11 +104,12 @@
 | 详情工具动作 | `src/ui/conversations/conversations-context.tsx`, `src/ui/conversations/DetailHeaderActionBar.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/services/conversations/background/image-backfill-job.ts` | chat detail 可显示 `cache-images`；触发后回填图片并刷新详情 |
 | Insight | `src/ui/settings/sections/InsightSection.tsx`, `src/ui/settings/sections/InsightPanel.tsx`, `src/viewmodels/settings/insight-stats.ts` | 只读统计本地会话库，展示总 clips、chat/article 概览、来源分布、Top 3 最长对话与文章域名分布 |
 | i18n | `src/ui/i18n/index.ts`, `src/ui/i18n/locales/*.ts` | UI 文案自动根据浏览器语言在 `en` / `zh` 间切换 |
-| popup 打开 | `src/platform/messaging/ui-background-handlers.ts` | 双击 inpage 按钮时尝试 `openPopup()`，失败则回退提示 |
+| 页面内评论侧边栏打开 | `src/platform/messaging/ui-background-handlers.ts` | 双击 inpage 按钮发送 `UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL`，background 转发 `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` 打开 panel；失败会提示用户点击工具栏图标进行评论 |
 
 - Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, `ai_chat_cache_images_enabled`，以及 Obsidian 连接参数。
 - `General` 分区现在承接了原来分散的“inpage + 自动保存”等设置；主题仅跟随系统 `prefers-color-scheme`（不再提供手动切换）。
 - `ai_chat_cache_images_enabled` 是 `General` 分区里的独立开关：默认 `false`，仅影响 `sourceType='chat'` 的图片内联；article 会话不会显示该工具动作。
+- `ai_chat_dollar_mention_enabled` 也是 `General` 分区的开关：默认 `true`；content controller 会监听 `chrome.storage.onChanged`，因此通常可在当前标签页热更新启停 `$ mention`（不要求刷新页面）。
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
 - detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
 - article comments 只在 article detail 和 inpage panel 中出现；它们是本地评论线程，不占用 `Chat with AI`、`tools` 或 `open` 的动作槽位。
@@ -151,6 +152,7 @@
 | cursor / append / rebuild 异常 | `notion-sync-cursor.test.ts`, Notion / Obsidian orchestrators | 先判断是 mapping 问题还是目标系统问题 |
 | 当前页抓取异常 | `current-page-capture.ts`, `background-router-current-page-capture.test.ts`, `usePopupCurrentPageCapture.ts` | 看 capture state 判定、消息转发与按钮状态 |
 | inpage 行为异常 | `src/services/bootstrap/content.ts`, `src/services/bootstrap/content-controller.ts`, `src/ui/inpage/inpage-button-shadow.ts` | 看 gating、点击动作和 runtime invalidation |
+| `$ mention` 候选 / 插入异常 | `src/services/integrations/item-mention/**`, `src/platform/messaging/message-contracts.ts`, `tests/smoke/background-router-item-mention.test.ts` | 看站点门控（`features.dollarMention`）、设置开关、候选扫描限制与插入 markdown 构建 |
 | source/site 筛选下拉异常（高度、滚动、裁切） | `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx` | 看 `adaptiveMaxHeight`、`findNearestClippingRect()` 与 `side` 设置是否一致 |
 | article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
 | article comments / 锚点异常 | `src/services/comments/data/storage-idb.ts`, `src/services/comments/background/handlers.ts`, `src/ui/conversations/ArticleCommentsSection.tsx`, `src/services/comments/threaded-comments-panel.ts`, `src/ui/inpage/inpage-comments-panel-shadow.ts` | 看 canonicalUrl 归一、reply / delete 路由与 shadow DOM 面板挂载 |
@@ -190,6 +192,11 @@
 - `webclipper/src/ui/i18n/index.ts`
 - `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`
 - `webclipper/src/services/integrations/chatwith/chatwith-detail-header-actions.ts`
+- `webclipper/src/services/integrations/item-mention/mention-contract.ts`
+- `webclipper/src/services/integrations/item-mention/mention-search.ts`
+- `webclipper/src/services/integrations/item-mention/background-handlers.ts`
+- `webclipper/src/services/integrations/item-mention/content/mention-controller.ts`
+- `webclipper/src/services/integrations/item-mention/content/mention-sites.ts`
 - `webclipper/src/services/integrations/detail-header-actions.ts`
 - `webclipper/src/services/integrations/detail-header-action-types.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
@@ -229,3 +236,9 @@
 - `webclipper/tests/domains/backup-article-comments.test.ts`
 - `webclipper/tests/storage/insight-stats.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`
+- `webclipper/tests/unit/item-mention-search.test.ts`
+- `webclipper/tests/smoke/background-router-item-mention.test.ts`
+- `webclipper/tests/smoke/content-controller-item-mention-setting.test.ts`
+
+## 更新记录（Update Notes）
+- 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并补齐 `$ mention` 开关键与调试抓手入口。
