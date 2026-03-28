@@ -14,6 +14,7 @@ export const CORE_MESSAGE_TYPES = {
 export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
   DISCONNECT: 'notionDisconnect',
+  LIST_PARENT_PAGES: 'listNotionParentPages',
   SYNC_CONVERSATIONS: 'notionSyncConversations',
   GET_SYNC_JOB_STATUS: 'getNotionSyncJobStatus',
   CLEAR_SYNC_JOB_STATUS: 'clearNotionSyncJobStatus',
