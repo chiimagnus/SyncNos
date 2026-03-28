@@ -17,7 +17,7 @@ export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
   { id: 'claude', name: 'Claude', hosts: ['claude.ai'] },
   { id: 'gemini', name: 'Gemini', hosts: ['gemini.google.com'], features: { dollarMention: true } },
   { id: 'googleaistudio', name: 'Google AI Studio', hosts: ['aistudio.google.com', 'makersuite.google.com'] },
-  { id: 'deepseek', name: 'DeepSeek', hosts: ['chat.deepseek.com'] },
+  { id: 'deepseek', name: 'DeepSeek', hosts: ['chat.deepseek.com'], features: { dollarMention: true } },
   { id: 'kimi', name: 'Kimi', hosts: ['kimi.moonshot.cn', 'kimi.com'] },
   { id: 'doubao', name: 'Doubao', hosts: ['doubao.com'] },
   { id: 'yuanbao', name: 'Yuanbao', hosts: ['yuanbao.tencent.com'] },

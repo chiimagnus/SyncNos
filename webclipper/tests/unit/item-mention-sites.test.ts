@@ -28,9 +28,14 @@ describe('item-mention sites', () => {
     expect(isMentionSupportedHost('gemini.google.com')).toBe(true);
   });
 
+  it('enables for deepseek once adapter is available', () => {
+    expect(isMentionSupportedHost('chat.deepseek.com')).toBe(true);
+  });
+
   it('picks site id', () => {
     expect(pickMentionSupportedSiteIdByHostname('chatgpt.com')).toBe('chatgpt');
     expect(pickMentionSupportedSiteIdByHostname('www.notion.so')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('gemini.google.com')).toBe('gemini');
+    expect(pickMentionSupportedSiteIdByHostname('chat.deepseek.com')).toBe('deepseek');
   });
 });

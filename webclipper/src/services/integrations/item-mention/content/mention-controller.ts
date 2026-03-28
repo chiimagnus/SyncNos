@@ -1,6 +1,7 @@
 import { buildMentionInsertText, searchMentionCandidates } from '@services/integrations/item-mention/client';
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
+import { deepseekEditorAdapter } from '@services/integrations/item-mention/content/editor-deepseek';
 import { geminiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-gemini';
 import { notionAiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-notionai';
 import { pickMentionSupportedSiteIdByHostname } from '@services/integrations/item-mention/content/mention-sites';
@@ -67,6 +68,7 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         if (siteId === 'chatgpt') return chatgptComposerEditorAdapter;
         if (siteId === 'notionai') return notionAiContentEditableAdapter;
         if (siteId === 'gemini') return geminiContentEditableAdapter;
+        if (siteId === 'deepseek') return deepseekEditorAdapter;
         return null;
       })();
       if (!adapterMaybe) return null;
