@@ -61,10 +61,20 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
       const { pages, resolvedSaved } = await listNotionParentPages(accessToken, { savedPageId });
       return router.ok({ pages, resolvedSaved });
     } catch (error: any) {
-      return router.err(error?.message ? String(error.message) : 'failed to load pages', {
-        code: String(error?.code || '').trim() || null,
-        status: Number(error?.status || 0) || null,
-      });
+      const status = Number(error?.status || 0) || null;
+      const code = String(error?.code || '').trim() || null;
+      const requestId = String(error?.requestId || '').trim() || null;
+
+      let message = error?.notionMessage ? String(error.notionMessage) : '';
+      if (!message.trim()) message = error?.message ? String(error.message) : 'failed to load pages';
+
+      const retryAfterMs = Number(error?.retryAfterMs || 0) || 0;
+      if (status === 429 && retryAfterMs > 0) {
+        const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+        message = `${message} Retry in about ${seconds}s.`;
+      }
+
+      return router.err(message, { code, status, requestId });
     }
   });
 
