@@ -100,6 +100,24 @@ export function InpageSection(props: {
           </div>
         </div>
       </section>
+      <section className={cardClassName} aria-label={t('aiChatDollarMentionHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('aiChatDollarMentionHeading')}
+        </h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={aiChatDollarMentionEnabled}
+            disabled={busy}
+            onChange={(e) => onToggleAiChatDollarMentionEnabled(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('aiChatDollarMentionLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('aiChatDollarMentionHint')}
+        </div>
+      </section>
 
       <section className={cardClassName} aria-label={t('aiChatAutoSaveHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
@@ -154,25 +172,6 @@ export function InpageSection(props: {
               </div>
             );
           })}
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('aiChatDollarMentionHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatDollarMentionHeading')}
-        </h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={aiChatDollarMentionEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleAiChatDollarMentionEnabled(!!e.target.checked)}
-            className={checkboxClassName}
-          />
-          {t('aiChatDollarMentionLabel')}
-        </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatDollarMentionHint')}
         </div>
       </section>
     </div>
