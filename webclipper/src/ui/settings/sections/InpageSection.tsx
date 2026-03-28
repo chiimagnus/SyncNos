@@ -17,6 +17,8 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
+  aiChatDollarMentionEnabled: boolean;
+  onToggleAiChatDollarMentionEnabled: (next: boolean) => void;
 }) {
   const {
     busy,
@@ -28,6 +30,8 @@ export function InpageSection(props: {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    aiChatDollarMentionEnabled,
+    onToggleAiChatDollarMentionEnabled,
   } = props;
 
   const profileSummaryKey: Record<MarkdownReadingProfileId, Parameters<typeof t>[0]> = {
@@ -127,6 +131,20 @@ export function InpageSection(props: {
         </label>
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('aiChatCacheImagesHint')}
+        </div>
+
+        <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={aiChatDollarMentionEnabled}
+            disabled={busy}
+            onChange={(e) => onToggleAiChatDollarMentionEnabled(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('aiChatDollarMentionLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('aiChatDollarMentionHint')}
         </div>
 
         <div className="tw-mt-2.5 tw-grid tw-gap-2">

@@ -60,6 +60,8 @@ export const en = {
   aiChatAutoSaveHint: 'Only applies to supported AI chat sites. Requires a refresh to apply.',
   aiChatCacheImagesLabel: 'Cache AI chat images locally（退出账号仍可看）',
   aiChatCacheImagesHint: 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.',
+  aiChatDollarMentionLabel: 'Enable $ mention',
+  aiChatDollarMentionHint: 'Type $ in ChatGPT / Notion AI to search saved items and insert them as markdown.',
   betaTag: 'BETA',
   inpageSupportedOnlyLabel: 'Only show Inpage button on supported sites',
   inpageSupportedOnlyHint: 'Non-supported sites require a refresh to apply.',

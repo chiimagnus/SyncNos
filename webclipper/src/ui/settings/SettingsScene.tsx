@@ -119,6 +119,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    aiChatDollarMentionEnabled,
+    onToggleAiChatDollarMentionEnabled,
 
     insightStats,
     insightLoading,
@@ -282,6 +284,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
           onToggleAiChatCacheImagesEnabled={(next) => {
             void onToggleAiChatCacheImagesEnabled(next);
+          }}
+          aiChatDollarMentionEnabled={aiChatDollarMentionEnabled}
+          onToggleAiChatDollarMentionEnabled={(next) => {
+            void onToggleAiChatDollarMentionEnabled(next);
           }}
         />
       ) : null}
