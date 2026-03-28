@@ -42,8 +42,6 @@ import {
   formatProgress,
   isZipFile,
   openHttpUrl,
-  retrieveNotionParentPage,
-  searchNotionParentPages,
   unwrap,
   type ApiResponse,
   type NotionPageOption,
@@ -436,23 +434,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setLoadingNotionPages(true);
     await runTask(
       async () => {
-        const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
-        const accessToken = String(status?.token?.accessToken || '');
-        if (!accessToken) throw new Error('Notion not connected');
-
         const savedId = String(notionParentPageId || '').trim();
         const savedTitle = String(notionParentPageTitle || '').trim();
 
-        let pages = await searchNotionParentPages(accessToken);
-        let resolvedSaved = savedId ? (pages.find((page) => page.id === savedId) ?? null) : null;
-
-        if (savedId && !resolvedSaved) {
-          const retrieved = await retrieveNotionParentPage(accessToken, savedId);
-          if (retrieved) {
-            pages = [retrieved, ...pages.filter((page) => page.id !== retrieved.id)];
-            resolvedSaved = retrieved;
-          }
-        }
+        const res = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, {}));
+        const pages = Array.isArray(res?.pages) ? (res.pages as NotionPageOption[]) : [];
+        const resolvedSaved = res?.resolvedSaved ? (res.resolvedSaved as NotionPageOption) : null;
 
         setNotionPages(pages);
 
