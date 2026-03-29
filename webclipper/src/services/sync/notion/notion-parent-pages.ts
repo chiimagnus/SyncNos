@@ -44,7 +44,11 @@ function dedupeOptions(list: NotionParentPageOption[]) {
   return out;
 }
 
-async function searchParentPagesOnce(notionFetch: NotionFetch, accessToken: string, input: { pageSize: number; startCursor?: string | null }) {
+async function searchParentPagesOnce(
+  notionFetch: NotionFetch,
+  accessToken: string,
+  input: { pageSize: number; startCursor?: string | null },
+) {
   const body: any = {
     filter: { property: 'object', value: 'page' },
     sort: { direction: 'descending', timestamp: 'last_edited_time' },
@@ -130,4 +134,3 @@ export async function listNotionParentPages(
     resolvedSaved: savedOpt,
   };
 }
-

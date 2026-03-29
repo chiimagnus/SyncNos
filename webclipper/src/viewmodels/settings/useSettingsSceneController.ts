@@ -207,76 +207,76 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const refreshInternal = useCallback(async () => {
-      const [notionRes, local, obsidianRes] = await Promise.all([
-        send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
-        storageGet([
-          'notion_oauth_client_id',
-          'notion_oauth_pending_state',
-          'notion_oauth_last_error',
-          'notion_parent_page_id',
-          'notion_parent_page_title',
-          'notion_ai_preferred_model_index',
-          NOTION_SYNC_PROVIDER_ENABLED_KEY,
-          OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
-          'inpage_display_mode',
-          'inpage_supported_only',
-          'ai_chat_auto_save_enabled',
-          'ai_chat_cache_images_enabled',
-          'ai_chat_dollar_mention_enabled',
-          MARKDOWN_READING_PROFILE_STORAGE_KEY,
-          LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
-          ABOUT_YOU_USER_NAME_STORAGE_KEY,
-        ]),
-        send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
-      ]);
+    const [notionRes, local, obsidianRes] = await Promise.all([
+      send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
+      storageGet([
+        'notion_oauth_client_id',
+        'notion_oauth_pending_state',
+        'notion_oauth_last_error',
+        'notion_parent_page_id',
+        'notion_parent_page_title',
+        'notion_ai_preferred_model_index',
+        NOTION_SYNC_PROVIDER_ENABLED_KEY,
+        OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
+        'inpage_display_mode',
+        'inpage_supported_only',
+        'ai_chat_auto_save_enabled',
+        'ai_chat_cache_images_enabled',
+        'ai_chat_dollar_mention_enabled',
+        MARKDOWN_READING_PROFILE_STORAGE_KEY,
+        LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
+        ABOUT_YOU_USER_NAME_STORAGE_KEY,
+      ]),
+      send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
+    ]);
 
-      const notionStatus = unwrap(notionRes);
-      const connected = !!notionStatus?.connected;
-      setNotionConnected(connected);
-      setNotionWorkspaceName(String(notionStatus?.workspaceName || notionStatus?.token?.workspaceName || ''));
-      if (!connected) {
-        setPollingNotion(false);
-        setLoadingNotionPages(false);
-        setNotionPages([]);
-      }
+    const notionStatus = unwrap(notionRes);
+    const connected = !!notionStatus?.connected;
+    setNotionConnected(connected);
+    setNotionWorkspaceName(String(notionStatus?.workspaceName || notionStatus?.token?.workspaceName || ''));
+    if (!connected) {
+      setPollingNotion(false);
+      setLoadingNotionPages(false);
+      setNotionPages([]);
+    }
 
-      setNotionClientId(String(local?.notion_oauth_client_id || ''));
-      setNotionPendingState(String(local?.notion_oauth_pending_state || ''));
-      setNotionLastError(String(local?.notion_oauth_last_error || ''));
-      setNotionParentPageId(String(local?.notion_parent_page_id || ''));
-      setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
-      setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || ''));
-      setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
-      setObsidianSyncEnabled(local?.[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY] !== false);
+    setNotionClientId(String(local?.notion_oauth_client_id || ''));
+    setNotionPendingState(String(local?.notion_oauth_pending_state || ''));
+    setNotionLastError(String(local?.notion_oauth_last_error || ''));
+    setNotionParentPageId(String(local?.notion_parent_page_id || ''));
+    setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
+    setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || ''));
+    setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
+    setObsidianSyncEnabled(local?.[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY] !== false);
 
-      const normalizedInpageMode = normalizeInpageDisplayMode(local?.inpage_display_mode);
-      setInpageDisplayMode(
-        normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only),
-      );
-      setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
-      setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
-      setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
-      setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(local?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
-      setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
-      setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
+    const normalizedInpageMode = normalizeInpageDisplayMode(local?.inpage_display_mode);
+    setInpageDisplayMode(
+      normalizedInpageMode || inpageDisplayModeFromLegacySupportedOnly(local?.inpage_supported_only),
+    );
+    setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
+    setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
+    setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
+    setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(local?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
+    setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
+    setAboutYouUserName(normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]));
 
-      const obsidianSettings = unwrap(obsidianRes);
-      setObsidianApiBaseUrl(String(obsidianSettings?.apiBaseUrl || ''));
-      setObsidianAuthHeaderName(String(obsidianSettings?.authHeaderName || ''));
-      setObsidianApiKeyPresent(!!obsidianSettings?.apiKeyPresent);
-      setObsidianApiKeyMasked(String(obsidianSettings?.apiKeyMasked || ''));
-      setObsidianChatFolder(String(obsidianSettings?.chatFolder || ''));
-      setObsidianArticleFolder(String(obsidianSettings?.articleFolder || ''));
-      setObsidianApiKeyDraft('');
-      setObsidianStatus(t('statusIdle'));
+    const obsidianSettings = unwrap(obsidianRes);
+    setObsidianApiBaseUrl(String(obsidianSettings?.apiBaseUrl || ''));
+    setObsidianAuthHeaderName(String(obsidianSettings?.authHeaderName || ''));
+    setObsidianApiKeyPresent(!!obsidianSettings?.apiKeyPresent);
+    setObsidianApiKeyMasked(String(obsidianSettings?.apiKeyMasked || ''));
+    setObsidianChatFolder(String(obsidianSettings?.chatFolder || ''));
+    setObsidianArticleFolder(String(obsidianSettings?.articleFolder || ''));
+    setObsidianApiKeyDraft('');
+    setObsidianStatus(t('statusIdle'));
 
-      const chatWith = await loadChatWithSettings();
-      setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
-      setChatWithMaxChars(String(chatWith.maxChars || DEFAULT_CHAT_WITH_MAX_CHARS));
-      setChatWithPlatforms(
-        Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
-      );
-      chatWithHydratedRef.current = true;
+    const chatWith = await loadChatWithSettings();
+    setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
+    setChatWithMaxChars(String(chatWith.maxChars || DEFAULT_CHAT_WITH_MAX_CHARS));
+    setChatWithPlatforms(
+      Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
+    );
+    chatWithHydratedRef.current = true;
   }, []);
 
   const refresh = useCallback(async () => {

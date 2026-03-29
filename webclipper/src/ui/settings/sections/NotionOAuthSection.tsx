@@ -89,9 +89,7 @@ export function NotionOAuthSection(props: {
               options={[
                 {
                   value: '',
-                  label: notionConnected
-                    ? t('parentPage')
-                    : t('connectNotionFirst'),
+                  label: notionConnected ? t('parentPage') : t('connectNotionFirst'),
                   disabled: true,
                 },
                 ...notionPageOptions.map((p) => ({

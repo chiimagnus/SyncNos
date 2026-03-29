@@ -71,4 +71,3 @@ describe('listNotionParentPages', () => {
     expect(res.pages.map((p) => p.id)).toEqual(['s1', 'p1']);
   });
 });
-
