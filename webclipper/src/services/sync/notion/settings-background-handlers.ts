@@ -1,6 +1,7 @@
 import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { storageRemove } from '@platform/storage/local';
+import { storageGet, storageRemove } from '@platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { listNotionParentPages } from '@services/sync/notion/notion-parent-pages.ts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -41,7 +42,40 @@ function getNotionDisconnectStorageKeys(deps: Deps): string[] {
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
     const token = await getNotionOAuthToken();
-    return router.ok({ connected: !!(token && token.accessToken), token: token || null });
+    return router.ok({
+      connected: !!(token && token.accessToken),
+      workspaceName: token?.workspaceName ? String(token.workspaceName) : '',
+      token: token || null,
+    });
+  });
+
+  router.register(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, async () => {
+    const token = await getNotionOAuthToken();
+    const accessToken = token?.accessToken ? String(token.accessToken) : '';
+    if (!accessToken) return router.err('notion not connected');
+
+    const local = await storageGet(['notion_parent_page_id']).catch(() => ({}));
+    const savedPageId = String((local as any)?.notion_parent_page_id || '').trim();
+
+    try {
+      const { pages, resolvedSaved } = await listNotionParentPages(accessToken, { savedPageId });
+      return router.ok({ pages, resolvedSaved });
+    } catch (error: any) {
+      const status = Number(error?.status || 0) || null;
+      const code = String(error?.code || '').trim() || null;
+      const requestId = String(error?.requestId || '').trim() || null;
+
+      let message = error?.notionMessage ? String(error.notionMessage) : '';
+      if (!message.trim()) message = error?.message ? String(error.message) : 'failed to load pages';
+
+      const retryAfterMs = Number(error?.retryAfterMs || 0) || 0;
+      if (status === 429 && retryAfterMs > 0) {
+        const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+        message = `${message} Retry in about ${seconds}s.`;
+      }
+
+      return router.err(message, { code, status, requestId });
+    }
   });
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {

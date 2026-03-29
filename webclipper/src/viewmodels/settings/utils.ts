@@ -55,76 +55,7 @@ export async function isZipFile(file: File) {
   }
 }
 
-function getPageTitle(page: any) {
-  try {
-    const props = page && page.properties ? page.properties : {};
-    for (const key of Object.keys(props)) {
-      const p = props[key];
-      if (p && p.type === 'title' && Array.isArray(p.title)) {
-        const t = p.title
-          .map((x: any) => x.plain_text || '')
-          .join('')
-          .trim();
-        if (t) return t;
-      }
-    }
-  } catch (_e) {
-    // ignore
-  }
-  return page && page.url ? String(page.url) : 'Untitled';
-}
-
 export type NotionPageOption = { id: string; title: string };
-
-export async function searchNotionParentPages(accessToken: string): Promise<NotionPageOption[]> {
-  const res = await fetch('https://api.notion.com/v1/search', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ filter: { property: 'object', value: 'page' }, page_size: 50 }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`notion api failed: HTTP ${res.status} ${text}`);
-  const json = text ? JSON.parse(text) : {};
-  const results = Array.isArray(json?.results) ? json.results : [];
-  const pages = results.filter((item: any) => {
-    if (!item || item.object !== 'page') return false;
-    if (item.archived === true || item.in_trash === true) return false;
-    const parent = item.parent || null;
-    if (!parent) return true;
-    if (parent.database_id) return false;
-    if (parent.type === 'database_id') return false;
-    return true;
-  });
-  return pages
-    .map((p: any) => ({ id: String(p.id || ''), title: getPageTitle(p) }))
-    .filter((p: NotionPageOption) => !!p.id);
-}
-
-export async function retrieveNotionParentPage(accessToken: string, pageId: string): Promise<NotionPageOption | null> {
-  const safeId = String(pageId || '').trim();
-  if (!safeId) return null;
-  const res = await fetch(`https://api.notion.com/v1/pages/${encodeURIComponent(safeId)}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Notion-Version': '2022-06-28',
-      Accept: 'application/json',
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) return null;
-  const json = text ? JSON.parse(text) : {};
-  if (!json || json.object !== 'page') return null;
-  if (json.archived === true || json.in_trash === true) return null;
-  const id = String(json.id || safeId).trim();
-  if (!id) return null;
-  return { id, title: getPageTitle(json) };
-}
 
 export function openHttpUrl(url: string) {
   const u = String(url || '').trim();

@@ -57,6 +57,15 @@ function mockFetchJsonOk(json: unknown) {
     }) as any;
 }
 
+function mockFetchTextError(status: number, text: string) {
+  return async () =>
+    ({
+      ok: false,
+      status,
+      text: async () => text,
+    }) as any;
+}
+
 describe('notion oauth (ts)', () => {
   it('setupNotionOAuthNavigationListener registers webNavigation listener (chrome)', async () => {
     // @ts-expect-error test global
@@ -93,6 +102,22 @@ describe('notion oauth (ts)', () => {
     expect(Object.prototype.hasOwnProperty.call(chromeMock.__store, 'notion_oauth_client_secret')).toBe(false);
   });
 
+  it('ensureDefaultNotionOAuthClientId rewrites legacy client id to default', async () => {
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const chromeMock = mockChromeStorage({
+      notion_oauth_client_id: 'legacy-client-id',
+    });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    await ensureDefaultNotionOAuthClientId();
+
+    expect(String(chromeMock.__store.notion_oauth_client_id || '')).toMatch(/[0-9a-f-]{36}/i);
+    expect(String(chromeMock.__store.notion_oauth_client_id || '')).not.toBe('legacy-client-id');
+  });
+
   it('handleNotionOAuthCallbackNavigation ignores non-callback urls', async () => {
     // @ts-expect-error test global
     globalThis.browser = undefined;
@@ -112,7 +137,7 @@ describe('notion oauth (ts)', () => {
   it('handleNotionOAuthCallbackNavigation persists error param', async () => {
     // @ts-expect-error test global
     globalThis.browser = undefined;
-    const chromeMock = mockChromeStorage();
+    const chromeMock = mockChromeStorage({ notion_oauth_pending_state: 's1' });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
 
@@ -123,6 +148,7 @@ describe('notion oauth (ts)', () => {
     });
 
     expect(handled).toBe(true);
+    expect(chromeMock.__store.notion_oauth_pending_state).toBeUndefined();
     expect(String(chromeMock.__store.notion_oauth_last_error || '')).toBe('access_denied');
   });
 
@@ -171,5 +197,23 @@ describe('notion oauth (ts)', () => {
     expect(token.workspaceId).toBe('w1');
     expect(token.workspaceName).toBe('W');
     expect(token.createdAt).toBe(456);
+  });
+
+  it('handleNotionOAuthCallbackNavigation clears pending state when token exchange fails', async () => {
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+    const chromeMock = mockChromeStorage({ notion_oauth_pending_state: 's1' });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    const { redirectUri } = getNotionOAuthDefaults();
+    const handled = await handleNotionOAuthCallbackNavigation(
+      { url: `${redirectUri}?code=c&state=s1`, tabId: 8 },
+      { fetchImpl: mockFetchTextError(500, 'worker failed') as any, now: () => 789 },
+    );
+
+    expect(handled).toBe(true);
+    expect(chromeMock.__store.notion_oauth_pending_state).toBeUndefined();
+    expect(String(chromeMock.__store.notion_oauth_last_error || '')).toContain('token exchange failed');
   });
 });

@@ -42,8 +42,6 @@ import {
   formatProgress,
   isZipFile,
   openHttpUrl,
-  retrieveNotionParentPage,
-  searchNotionParentPages,
   unwrap,
   type ApiResponse,
   type NotionPageOption,
@@ -208,8 +206,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     return run;
   }, []);
 
-  const refresh = useCallback(async () => {
-    await runTask(async () => {
+  const refreshInternal = useCallback(async () => {
       const [notionRes, local, obsidianRes] = await Promise.all([
         send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
         storageGet([
@@ -234,8 +231,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       ]);
 
       const notionStatus = unwrap(notionRes);
-      setNotionConnected(!!notionStatus?.connected);
-      setNotionWorkspaceName(String(notionStatus?.workspaceName || ''));
+      const connected = !!notionStatus?.connected;
+      setNotionConnected(connected);
+      setNotionWorkspaceName(String(notionStatus?.workspaceName || notionStatus?.token?.workspaceName || ''));
+      if (!connected) {
+        setPollingNotion(false);
+        setLoadingNotionPages(false);
+        setNotionPages([]);
+      }
 
       setNotionClientId(String(local?.notion_oauth_client_id || ''));
       setNotionPendingState(String(local?.notion_oauth_pending_state || ''));
@@ -274,8 +277,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
       );
       chatWithHydratedRef.current = true;
-    });
-  }, [runTask]);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await runTask(refreshInternal);
+  }, [refreshInternal, runTask]);
 
   useEffect(() => {
     void refresh();
@@ -298,8 +304,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         const nextValue = changes[MARKDOWN_READING_PROFILE_STORAGE_KEY]?.newValue;
         setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(nextValue));
       }
+
+      if (
+        Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_token_v1') ||
+        Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_pending_state') ||
+        Object.prototype.hasOwnProperty.call(changes, 'notion_oauth_last_error')
+      ) {
+        void refresh();
+      }
     });
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     if (!pollingNotion) return;
@@ -315,6 +329,21 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     return () => clearInterval(timer);
   }, [pollingNotion, refresh]);
+
+  useEffect(() => {
+    if (!pollingNotion) return;
+    if (notionConnected) {
+      setPollingNotion(false);
+      return;
+    }
+    if (notionLastError) {
+      setPollingNotion(false);
+      return;
+    }
+    if (!notionPendingState) {
+      setPollingNotion(false);
+    }
+  }, [notionConnected, notionLastError, notionPendingState, pollingNotion]);
 
   const notionPageOptions = useMemo(() => {
     const list = Array.isArray(notionPages) ? notionPages.slice() : [];
@@ -340,7 +369,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
       if (status?.connected) {
         await disconnectNotion();
-        await refresh();
+        setNotionConnected(false);
+        setNotionWorkspaceName('');
+        setNotionPendingState('');
+        setNotionLastError('');
+        setNotionPages([]);
+        setNotionParentPageId('');
+        setNotionParentPageTitle('');
+        setPollingNotion(false);
+        setLoadingNotionPages(false);
+        await refreshInternal();
         return;
       }
 
@@ -349,7 +387,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       const cfg = getNotionOAuthDefaults();
       const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-      await storageSet({ notion_oauth_pending_state: state });
+      await storageSet({ notion_oauth_pending_state: state, notion_oauth_last_error: '' });
+      setNotionPendingState(state);
+      setNotionLastError('');
 
       const url = new URL(cfg.authorizationUrl);
       url.searchParams.set('client_id', clientId);
@@ -362,7 +402,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (!opened) throw new Error('Failed to open Notion OAuth tab');
       setPollingNotion(true);
     });
-  }, [notionClientId, refresh, runTask]);
+  }, [notionClientId, refreshInternal, runTask]);
 
   const onToggleNotionSyncEnabled = useCallback(
     async (enabled: boolean) => {
@@ -394,23 +434,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setLoadingNotionPages(true);
     await runTask(
       async () => {
-        const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
-        const accessToken = String(status?.token?.accessToken || '');
-        if (!accessToken) throw new Error('Notion not connected');
-
         const savedId = String(notionParentPageId || '').trim();
         const savedTitle = String(notionParentPageTitle || '').trim();
 
-        let pages = await searchNotionParentPages(accessToken);
-        let resolvedSaved = savedId ? (pages.find((page) => page.id === savedId) ?? null) : null;
-
-        if (savedId && !resolvedSaved) {
-          const retrieved = await retrieveNotionParentPage(accessToken, savedId);
-          if (retrieved) {
-            pages = [retrieved, ...pages.filter((page) => page.id !== retrieved.id)];
-            resolvedSaved = retrieved;
-          }
-        }
+        const res = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, {}));
+        const pages = Array.isArray(res?.pages) ? (res.pages as NotionPageOption[]) : [];
+        const resolvedSaved = res?.resolvedSaved ? (res.resolvedSaved as NotionPageOption) : null;
 
         setNotionPages(pages);
 
@@ -671,9 +700,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onResetChatWithSettings = useCallback(async () => {
     await runTask(async () => {
       await resetChatWithSettings();
-      await refresh();
+      await refreshInternal();
     });
-  }, [refresh, runTask]);
+  }, [refreshInternal, runTask]);
 
   const handleBackupExport = useCallback(async () => {
     if (busy) return;

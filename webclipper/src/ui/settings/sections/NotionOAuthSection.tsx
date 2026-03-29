@@ -82,7 +82,7 @@ export function NotionOAuthSection(props: {
               className="tw-flex-1 tw-min-w-0"
               buttonClassName={`${buttonClassName} tw-w-full`}
               value={String(notionParentPageId || '')}
-              disabled={busy || !notionConnected}
+              disabled={busy || !notionConnected || loadingNotionPages}
               ariaLabel={t('parentPage')}
               maxHeight={320}
               onChange={(next) => onSaveNotionParentPage(next)}
@@ -90,9 +90,7 @@ export function NotionOAuthSection(props: {
                 {
                   value: '',
                   label: notionConnected
-                    ? notionPageOptions.length
-                      ? t('parentPage')
-                      : t('clickRefresh')
+                    ? t('parentPage')
                     : t('connectNotionFirst'),
                   disabled: true,
                 },
@@ -109,8 +107,9 @@ export function NotionOAuthSection(props: {
               disabled={busy || !notionConnected || loadingNotionPages}
               className="webclipper-btn webclipper-btn--icon"
               aria-label={t('refreshPagesAria')}
+              aria-busy={loadingNotionPages}
             >
-              ↻
+              {loadingNotionPages ? '⏳' : '↻'}
             </button>
           </div>
         </SettingsFormRow>
