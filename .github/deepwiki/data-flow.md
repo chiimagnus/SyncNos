@@ -31,6 +31,7 @@
 3. collectors registry 识别具体站点，把 DOM 统一为 `conversation + messages`。
 4. background conversation handlers 处理 `SYNC_CONVERSATION_MESSAGES`，并把快照写入 IndexedDB；UI 通过相同存储读会话列表与详情。
 5. 当 `ai_chat_cache_images_enabled = true` 且 `sourceType !== 'article'` 时，handler 会在写入前尝试把消息图片内联到 `contentMarkdown`（失败不阻塞主链路）。
+- 若 `ai_chat_dollar_mention_enabled = true` 且当前站点在 `SUPPORTED_AI_CHAT_SITES` 中启用 `features.dollarMention`，content runtime 会启动 `$ mention` controller：输入框内 `$` 触发候选搜索（`ITEM_MENTION_MESSAGE_TYPES.SEARCH_MENTION_CANDIDATES`），选中后构建并插入 conversation markdown（`ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT`）。该链路只读取本地 IndexedDB，不涉及外部 API。
 - Gemini 采集链会主动过滤 `.cdk-visually-hidden` 与 `[hidden]` 里的噪音文案，并把 blob 上传图内联为 `data:image/*`；Kimi 与 z.ai 则扩大附件卡片抓图范围，减少“消息有图但落库丢图”。
 - 图片内联失败会被记录并继续写入消息：设计目标是“先保证会话可保存”，而不是因为图片链路失败导致整条采集失败。
 
@@ -42,7 +43,7 @@
 
 ### 3. 为什么有些来源不自动增量保存
 - Google AI Studio 使用虚拟化渲染；自动 observer 常常只能看到当前可见 turns，容易覆盖历史，因此该来源保留“手动保存优先”的策略。
-- inpage 单击触发保存，双击尝试打开 popup，多击只触发彩蛋提示，不直接改变数据链路。
+- inpage 单击触发保存，双击打开页面内评论侧边栏（inpage comments panel），多击只触发彩蛋提示，不直接改变数据链路。
 
 ### 4. 会话详情里的手动图片补全（cache-images）
 1. 用户在 chat detail header 触发 `cache-images` 工具动作（article 不显示该动作）。
@@ -144,6 +145,11 @@ flowchart LR
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
 - `webclipper/src/services/conversations/data/storage-idb.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
+- `webclipper/src/services/integrations/item-mention/background-handlers.ts`
+- `webclipper/src/services/integrations/item-mention/mention-search.ts`
 - `webclipper/src/services/protocols/conversation-kinds.ts`
 - `webclipper/src/services/sync/notion/notion-sync-orchestrator.ts`
 - `webclipper/src/services/sync/obsidian/obsidian-sync-orchestrator.ts`
+
+## 更新记录（Update Notes）
+- 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并补充 `$ mention` 的本地候选搜索与插入链路说明。

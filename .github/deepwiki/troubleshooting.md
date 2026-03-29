@@ -9,6 +9,7 @@
 | WeRead / Dedao 登录态失效 | Keychain Cookie / SiteLogins | `SiteLoginsStore.swift` | 看 cookieHeader 是否还能匹配目标域名 |
 | 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
 | WebClipper 页面内按钮没出现 | content script / `inpage_display_mode` / 不支持页面 | `content.ts`, `src/services/bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
+| WebClipper `$ mention` 没反应（不出候选或无法插入） | item-mention / settings / 站点门控 | `content-controller.ts`, `src/services/integrations/item-mention/**` | 先确认 `ai_chat_dollar_mention_enabled` 与站点 `features.dollarMention` |
 | WebClipper 底部 `source/site` 筛选下拉出现多余滚动条或被裁切 | `SelectMenu` 自适应高度 / 容器裁剪边界 | `ConversationListPane.tsx`, `SelectMenu.tsx` | 检查 `adaptiveMaxHeight`、`side` 与 `findNearestClippingRect()` 是否生效 |
 | Chat 会话图片一直是外链 / 缓存图片按钮无效 | `ai_chat_cache_images_enabled` / detail tools / backfill job | `src/viewmodels/settings/useSettingsSceneController.ts`, `conversations-context.tsx`, `image-backfill-job.ts` | 先确认是 chat 会话，再看开关、路由消息和回填计数 |
 | Google AI Studio 自动保存不完整 | collector 虚拟化渲染 | `googleaistudio-collector.ts`, `content-controller.ts` | 该来源更依赖手动保存 |
@@ -50,27 +51,34 @@
 ### 1. inpage 按钮不显示或设置没生效
 - content script 会对所有 `http(s)` 页面注入，但是否真正启动 controller 还受 `SUPPORTED_HOST_SUFFIXES` 与 `inpage_display_mode`（兼容旧 `inpage_supported_only`）控制。
 - 如果用户刚切换了设置，当前页面不会热更新；必须刷新或新开页面。
-- 双击保存按钮会尝试 `openPopup()`；若浏览器不支持，UI 会退回提示“点击工具栏图标打开 panel”。
+- 双击保存按钮会尝试打开页面内评论侧边栏（inpage comments panel）；若打开失败，UI 会退回提示“请点击工具栏图标进行评论”。
 
-### 2. Google AI Studio 会话保存不完整
+### 2. `$ mention` 不生效 / 候选为空 / 插入失败
+- 先确认 `Settings → General` 的 `ai_chat_dollar_mention_enabled` 已开启；关闭时不会注入 `$ mention` 交互。
+- 先确认当前站点在 `SUPPORTED_AI_CHAT_SITES` 中启用了 `features.dollarMention`（并非所有已支持采集的 AI 站点都提供 `$ mention`）。
+- 候选来自本地会话库：如果本地还没有保存过任何 conversation，候选为空是预期行为；先手动保存一次再试。
+- 如果候选有但插入失败：插入会从本地取 conversation detail 并构建 Markdown；若该 conversation detail 为空（例如采集不完整或库中只有列表索引没有详情），插入会失败——需要重新采集/保存该会话或先确认详情页能正常打开。
+- 如果切换开关后当前页仍无变化：`ai_chat_dollar_mention_enabled` 通常可在当前标签页热更新启停，但前提是该页面已启动 content controller；若当前页面因 `inpage_display_mode=off` 未启动 controller，仍需刷新或重新进入支持站点。
+
+### 3. Google AI Studio 会话保存不完整
 - 这不是随机故障，而是 collector 已知约束：Google AI Studio 使用虚拟化列表，自动 observer 常常只看到当前可见 turns。
 - 扩展已经在 `content-controller.ts` 中把它排除出自动增量保存，改为手动保存时先 `prepareManualCapture()` 再抓完整历史。
 
-### 3. article 抓取失败或抓到空正文
+### 4. article 抓取失败或抓到空正文
 - article fetch 会先等待 DOM 稳定，再尝试 `Readability`，失败后再走 fallback extract。
 - 典型错误是 `No article content detected`；优先检查页面是否真的有足够正文、是否是 heavily client-side 内容、是否只抓到了壳层容器。
 
-### 4. 会话能看到，但同步到 Notion / Obsidian 失败
+### 5. 会话能看到，但同步到 Notion / Obsidian 失败
 - Notion：先查是否已连接 Notion、是否已选择 `notion_parent_page_id`、当前 kind 对应的 DB / page spec 是否存在、cursor 是否可用。
 - Obsidian：重点检查 `apiBaseUrl`, `authHeaderName`, API Key、目标目录，以及 PATCH 失败后是否已自动回退 full rebuild。
 - 备份导入：Zip v2 是 merge import；“导入后旧记录还在”通常是设计行为，不是导入失败。
 
-### 5. source/site 筛选菜单高度异常（太矮、滚动条过多或被裁切）
+### 6. source/site 筛选菜单高度异常（太矮、滚动条过多或被裁切）
 - 会话列表底部的 `sourceFilterSelect` / `siteFilterSelect` 现在启用 `adaptiveMaxHeight`，不再使用固定 `maxHeight=320`。
 - `SelectMenu` 展开时会调用 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再结合 `side='top'|'bottom'` 计算可用高度；在 popup 底部区域、窄视口或字体缩放变化时，菜单高度动态变化是预期行为。
 - 如果出现明显裁切，先排查调用方是否误把 `adaptiveMaxHeight` 去掉，或 `MenuPopover` 的 `panelMaxHeight` 被覆盖。
 
-### 6. Chat 会话图片缓存没有按预期生效
+### 7. Chat 会话图片缓存没有按预期生效
 - 先确认你操作的是 **chat** 会话：article 不会显示 `cache-images` 工具动作，这是设计行为。
 - `ai_chat_cache_images_enabled` 主要影响后续采集写入；如果是历史会话，需要在 detail header 手动触发 `cache-images` 才会回填。
 - 触发后若提示 `updatedMessages = 0`，通常代表消息里没有可下载图片链接，或链接已失效。
@@ -91,7 +99,7 @@
 | --- | --- | --- |
 | 重新授权 Notion / 重新选择 Parent Page | App / 扩展 Notion 同步入口被阻止 | 先解决“没有写入落点” |
 | 重新登录 WeRead / Dedao / GoodLinks | Cookie Header 失效 | `SiteLoginsStore` 会把新 cookie 写回统一 store |
-| 刷新页面 / 新开页面 | inpage 设置刚修改 | 当前实现不做热更新 |
+| 刷新页面 / 新开页面 | inpage 设置刚修改 | 多数 inpage 相关设置当前实现不做热更新（例外：`ai_chat_dollar_mention_enabled` 通常可热更新） |
 | 手动保存 Google AI Studio | 自动保存不完整 | 让 collector 先滚动并缓存完整 turns |
 | 在 chat detail 手动触发 `cache-images` | 历史消息图片仍是外链 | 只对 chat 生效；完成后应看到更新计数并自动刷新 detail |
 | 重跑 `compile → test → build`（必要时再 `build:firefox`, `check`） | 扩展构建 / 发布问题 | 先分离类型、逻辑、产物问题 |
@@ -107,6 +115,7 @@
 | `macOS/SyncNos/Services/Auth/IAPService.swift` | 试用期、欢迎态、购买缓存 | paywall 逻辑底层事实源 |
 | `webclipper/src/services/bootstrap/content.ts` | inpage gating、支持站点判断 | 为什么按钮出现 / 不出现最先看这里 |
 | `webclipper/src/services/bootstrap/content-controller.ts` | 单击 / 双击 / 手动保存 / article fetch | 页面交互实际入口 |
+| `webclipper/src/services/integrations/item-mention/**` | `$ mention` 候选 / 插入异常 | 站点门控、候选搜索、插入 markdown 的实现都在这里 |
 | `webclipper/src/ui/shared/SelectMenu.tsx` | 下拉菜单高度、键盘导航、裁剪容器计算 | source/site 过滤菜单异常优先看这里 |
 | `webclipper/src/ui/conversations/conversations-context.tsx` | detail tools 动作显隐与回调 | `cache-images` 是否被注入、是否触发 refresh 的第一现场 |
 | `webclipper/src/services/conversations/background/handlers.ts` | 消息路由与图片内联开关 | 看 `ai_chat_cache_images_enabled` 读取与 `BACKFILL_CONVERSATION_IMAGES` 注册 |
@@ -123,6 +132,9 @@
 - `macOS/SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
 - `webclipper/src/services/bootstrap/content.ts`
 - `webclipper/src/services/bootstrap/content-controller.ts`
+- `webclipper/src/services/integrations/item-mention/background-handlers.ts`
+- `webclipper/src/services/integrations/item-mention/mention-contract.ts`
+- `webclipper/src/services/integrations/item-mention/mention-search.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/app/AppShell.tsx`
@@ -139,3 +151,6 @@
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
+
+## 更新记录（Update Notes）
+- 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并新增 `$ mention` 的常见故障排查条目。

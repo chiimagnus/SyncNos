@@ -63,7 +63,7 @@
 | App 为什么会先出现引导或付费墙？ | [business-context.md](business-context.md) | [modules/syncnos-app.md](modules/syncnos-app.md) |
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
 | WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
-| WebClipper 的主题（仅跟随系统）、inpage 开关、AI 自动保存与图片缓存配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
+| WebClipper 的主题（仅跟随系统）、inpage 开关、AI 自动保存、AI `$ mention` 与图片缓存配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
 | WebClipper 的文章评论 / 注释线程改哪里？ | [modules/comments.md](modules/comments.md) | [modules/webclipper.md](modules/webclipper.md), [storage.md](storage.md), [testing.md](testing.md) |
 | WebClipper 底部 `source/site` 筛选菜单为什么高度会动态变化、怎样排查裁切？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [troubleshooting.md](troubleshooting.md) |
 | `Chat with AI` 是怎么从详情页触发的、模板和平台存在哪？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
@@ -85,6 +85,7 @@
 - [GENERATION.md](GENERATION.md)
 
 ## 更新记录（Update Notes）
+- 2026-03-29：同步 WebClipper 新行为与契约：inpage 双击从“打开 popup”调整为“打开页面内评论侧边栏”；补齐 `$ mention`（item-mention）配置键、消息契约与测试入口；更正 manifest icons 事实（`16/48/128` 仍存在，仅 `icon-128.png` 暴露为 `web_accessible_resources`）。
 - 2026-03-25：清理 deepwiki 内 WebClipper 旧目录引用并统一迁移到 `src/services/*` / `src/ui/i18n/*`；同步 comments locator 事实（移除不存在的 `quoteContext`）；更新 `GENERATION.md` 元数据。
 - 2026-03-22：同步 WebClipper settings 真路径、Chat with AI 真路径，并强调 `manifest.version` 以 `configuration.md` 为单一事实源维护。
 - 2026-03-19：Coverage Gaps 增加专项文档可点击链接，便于从索引直接跳转到仓库内技术文档。

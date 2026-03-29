@@ -88,7 +88,19 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
 
 ## `$` mention（在其他 AI chats 输入框插入本地 item）
 
-- 支持站点：ChatGPT（`chatgpt.com`/`chat.openai.com`）、Notion AI（`notion.so`）、Gemini（`gemini.google.com`）、DeepSeek（`chat.deepseek.com`）、Kimi（`kimi.moonshot.cn`/`kimi.com`）。
+- 开关：`ai_chat_dollar_mention_enabled`（`Settings → General`，默认 `true`）。该开关由 `src/services/bootstrap/content-controller.ts` 监听 `chrome.storage.onChanged`，通常可在当前标签页热更新启停；但若当前页面未启动 content controller（例如 `inpage_display_mode=off`），仍需刷新页面或重新进入支持站点。
+- 支持站点：以 `src/collectors/ai-chat-sites.ts` 的 `SUPPORTED_AI_CHAT_SITES[].features.dollarMention === true` 为真源；当前包括：
+  - ChatGPT（`chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`）
+  - Claude（`claude.ai`）
+  - Gemini（`gemini.google.com`）
+  - Google AI Studio（`aistudio.google.com`, `makersuite.google.com`）
+  - DeepSeek（`chat.deepseek.com`）
+  - Kimi（`kimi.moonshot.cn`, `kimi.com`）
+  - Doubao（`doubao.com`）
+  - Yuanbao（`yuanbao.tencent.com`）
+  - Poe（`poe.com`）
+  - Notion AI（`notion.so`）
+  - z.ai（`chat.z.ai`）
 - 触发：输入框出现 `$` 即弹出候选窗；继续输入实时过滤。
 - 候选：范围为本地 conversations（chat + article）；过滤字段固定为标题/来源/URL 域名；仅 `$` 时按最近保存时间倒序。
 - 键盘：`↑/↓` 移动高亮，`Tab/Enter` 选中并插入，`Esc` 仅关闭候选窗且保留输入文本。

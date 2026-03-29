@@ -47,7 +47,7 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | comments | `src/services/comments/` | article 详情评论线程、回复 / 删除、shared session 与 inpage 面板 | `background/handlers.ts`, `data/storage-idb.ts`, `ArticleCommentsSection.tsx` |
 | sync | `src/services/sync/` | Notion / Obsidian / 备份的编排层 | `notion-sync-orchestrator.ts`, `obsidian-sync-orchestrator.ts`, `backup/*` |
 | ui | `src/ui/` | ConversationsScene、SettingsScene、popup/app 壳层，以及主题 token（`prefers-color-scheme`）、窄屏 list/detail 路由和会话级动作解析 | `ConversationsScene.tsx`, `SettingsScene.tsx`, `styles/tokens.css`, `pending-open.ts` |
-| messaging | `src/platform/messaging/` | 消息 type、router、UI 事件 | `message-contracts.ts`, `ui-background-handlers.ts`（含 `BACKFILL_CONVERSATION_IMAGES`） |
+| messaging | `src/platform/messaging/` | 消息 type、router、UI 事件与 tab relay | `message-contracts.ts`, `background-router.ts`, `ui-background-handlers.ts` |
 
 - `content.ts` 把 content runtime 组装成“collectors registry + controller + inpage button/tip + runtime observer + incremental updater + notionAiModelPicker”的组合体。
 - `background.ts` 则把 conversation handlers、article fetch、Notion / Obsidian settings handlers、sync handlers、UI handlers 一次性挂到 router 上，并在实例切换时终止其他 background 实例遗留的 sync job；`onInstalled` 只在首次安装时打开 About，更新不自动弹设置。
@@ -66,8 +66,10 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 | `NotionSyncSourceProtocol` | `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncSourceProtocol.swift` | App 各来源适配器、`NotionSyncEngine` | 把不同来源统一成可同步的条目 / 内容结构 |
 | `NotionSyncConfig` | `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift` | App 同步引擎 | 定义并发、RPS、批量大小、超时与重试策略 |
 | `Notification.Name` 常量 | `macOS/SyncNos/Models/Core/NotificationNames.swift` | App 视图、ViewModel、Service | 统一同步、搜索、窗口、IAP、登录等事件 |
-| `message-contracts.ts` | `webclipper/src/platform/messaging/message-contracts.ts` | content / background / popup / app | 把扩展功能拆成 CORE / NOTION / OBSIDIAN / ARTICLE / COMMENTS / UI 六类消息 |
+| `message-contracts.ts` | `webclipper/src/platform/messaging/message-contracts.ts` | content / background / popup / app | 把扩展功能拆成 CORE / NOTION / OBSIDIAN / ARTICLE / CHATGPT / CURRENT_PAGE / ITEM_MENTION / COMMENTS / UI 等消息组（另有 `CONTENT_MESSAGE_TYPES` 用于 background -> content script 指令，不经 router） |
 | `COMMENTS_MESSAGE_TYPES` | `webclipper/src/platform/messaging/message-contracts.ts` | comments UI / background / content | 定义 article 评论线程的 add / list / delete / attach-orphan 消息 |
+| `ITEM_MENTION_MESSAGE_TYPES` | `webclipper/src/platform/messaging/message-contracts.ts` | `$ mention` content controller、background handlers | 定义 `$ mention` 候选搜索与插入文本构建的消息契约 |
+| `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` | `webclipper/src/platform/messaging/message-contracts.ts` | UI background handlers、content handlers | background 发送到 content script 的“打开 inpage comments panel”指令（不经过 background router） |
 | `CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES` | `webclipper/src/platform/messaging/message-contracts.ts` | `conversations-context.tsx`, background handlers | 提供会话详情“缓存图片”工具动作的前后端消息契约 |
 | `conversation-kinds.ts` | `webclipper/src/services/protocols/conversation-kinds.ts` | Notion / Obsidian orchestrator | 决定 chat/article 的 DB、folder 与重建规则 |
 | `chatwith-settings.ts` | `webclipper/src/services/integrations/chatwith/chatwith-settings.ts` | detail header、SettingsScene controller、backup tests | 统一 `Chat with AI` 的模板、平台列表、字符截断与存储键 |
@@ -133,6 +135,8 @@ flowchart TB
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/services/bootstrap/content.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
+- `webclipper/src/platform/messaging/background-router.ts`
+- `webclipper/src/platform/messaging/ui-background-handlers.ts`
 - `webclipper/src/services/conversations/background/handlers.ts`
 - `webclipper/src/services/conversations/background/image-backfill-job.ts`
 - `webclipper/src/services/conversations/client/repo.ts`
@@ -157,3 +161,6 @@ flowchart TB
 - `webclipper/src/services/protocols/conversation-kinds.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
+
+## 更新记录（Update Notes）
+- 2026-03-29：同步 WebClipper messaging 子系统与 `message-contracts.ts` 的真实分组（补齐 `CHATGPT` / `CURRENT_PAGE` / `ITEM_MENTION` / `CONTENT_MESSAGE_TYPES`），并更正 `ui-background-handlers.ts` 与图片回填消息的归属说明。
