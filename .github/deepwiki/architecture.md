@@ -51,12 +51,12 @@ SyncNos 仓库由三层共同构成：**双产品线运行时**（App 与 WebCli
 
 - `content.ts` 把 content runtime 组装成“collectors registry + controller + inpage button/tip + runtime observer + incremental updater + notionAiModelPicker”的组合体。
 - `background.ts` 则把 conversation handlers、article fetch、Notion / Obsidian settings handlers、sync handlers、UI handlers 一次性挂到 router 上，并在实例切换时终止其他 background 实例遗留的 sync job；`onInstalled` 只在首次安装时打开 About，更新不自动弹设置。
-- `SettingsScene.tsx + src/viewmodels/settings/useSettingsSceneController.ts` 共同承担 WebClipper 的“设置组合根”职责：一方面把 `chrome.storage.local` 里的 theme / inpage / chat-with / Notion / Obsidian 设置喂给 UI，另一方面只在进入 `insight` 分区时懒加载本地统计。
+- `SettingsScene.tsx + src/viewmodels/settings/useSettingsSceneController.ts` 共同承担 WebClipper 的“设置组合根”职责：一方面把 `chrome.storage.local` 里的 theme / inpage / chat-with / Notion / Obsidian 设置喂给 UI，另一方面只在进入 `aboutyou` 分区时懒加载本地统计（旧 `insight` key 会被兼容映射到 `aboutyou`）。
 - `ConversationsScene.tsx + pending-open.ts` 共同承担窄屏下的 list/detail bridge：当用户从 Insight 排行或其他路由跳到对话详情时，会先把目标 `conversationId` 写入 `sessionStorage`，再由 scene 消费并切进 detail。
 - `conversations-context.tsx + DetailHeaderActionBar.tsx + DetailNavigationHeader.tsx` 共同承担会话详情动作分发：`open / chat-with / tools` 三类槽位在主详情页和窄屏 header 使用同一规则，避免两套动作系统分叉。
 - `src/services/conversations/background/handlers.ts + image-backfill-job.ts` 把“图片缓存”拆成两条链：实时采集时按 `ai_chat_cache_images_enabled` 做内联；历史会话通过 `BACKFILL_CONVERSATION_IMAGES` 手动回填并广播刷新事件。
 - `src/services/comments/background/handlers.ts + ArticleCommentsSection.tsx + src/services/comments/threaded-comments-panel.ts + inpage-comments-panel-shadow.ts` 负责 article 本地评论线程：它依赖 `article_comments` store 和 canonical URL 归一，但不进入 Notion / Obsidian 同步链。
-- `ConversationListPane.tsx` 通过 `onOpenInsightsSection` 把列表底部统计组件连接到 popup/app 路由壳层：popup 打开 `'/settings?section=insight'`，app 在 HashRouter 内导航同一参数。
+- `ConversationListPane.tsx` 通过 `onOpenInsightsSection` 把列表底部统计组件连接到 popup/app 路由壳层：popup 打开 `'/settings?section=aboutyou'`，app 在 HashRouter 内导航同一参数。
 - `SelectMenu.tsx + MenuPopover.tsx` 共同定义 WebClipper 下拉面板的高度边界：当 `adaptiveMaxHeight` 启用时，会通过 `findNearestClippingRect()` 查找最近 overflow 裁剪容器并动态计算 `panelMaxHeight`，从而让底部 `source/site` 筛选菜单在受限容器里减少无谓滚动条与裁切。
 
 ## 关键契约

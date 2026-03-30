@@ -15,7 +15,8 @@
 | Google AI Studio 自动保存不完整 | collector 虚拟化渲染 | `googleaistudio-collector.ts`, `content-controller.ts` | 该来源更依赖手动保存 |
 | 网页文章抓取失败 | `Readability` / 页面正文不足 | `article-fetch.ts` | 常见报错是 `No article content detected` |
 | 升级扩展后没有自动跳设置页 | `onInstalled` 行为策略 | `background.ts` | 当前仅首次安装自动打开 About，更新不会自动弹页 |
-| 列表底部统计点击无响应 | popup/app 路由桥接 | `ConversationListPane.tsx`, `PopupShell.tsx`, `AppShell.tsx` | 需确认 `onOpenInsightsSection` 已绑定且目标为 `section=insight` |
+| 列表底部统计点击无响应 | popup/app 路由桥接 | `ConversationListPane.tsx`, `PopupShell.tsx`, `AppShell.tsx` | 需确认 `onOpenInsightsSection` 已绑定且目标为 `section=aboutyou` |
+| Notion Parent Page 下拉刷新失败 / 空列表 | Notion 连接 / 429 / background handlers | `settings-background-handlers.ts`, `notion-parent-pages.ts` | 先确认 Notion 已连接；若提示 `Retry in about Xs.` 多半是 Notion API 429 限流，等待后重试 |
 | Obsidian `Test` 失败或 `Failed to fetch` | Local REST API 设置 | `LocalRestAPI.zh.md`, `SettingsScene` | 重点核对 `http://127.0.0.1:27123`、Insecure HTTP、API Key |
 | 发布 workflow 报版本不匹配 | tag / manifest version | `wxt.config.ts`, release workflows | 校对 `manifest.version == tag 去掉 v` |
 
@@ -73,12 +74,17 @@
 - Obsidian：重点检查 `apiBaseUrl`, `authHeaderName`, API Key、目标目录，以及 PATCH 失败后是否已自动回退 full rebuild。
 - 备份导入：Zip v2 是 merge import；“导入后旧记录还在”通常是设计行为，不是导入失败。
 
-### 6. source/site 筛选菜单高度异常（太矮、滚动条过多或被裁切）
+### 6. Notion Parent Page 下拉为空 / 加载失败 / 提示 Retry
+- Parent Page 列表由 background handlers 拉取：如果 Notion 未连接，会直接提示未连接；如果已连接但列表为空，可能是账号权限或 Notion 侧搜索结果为空。
+- 如果提示类似 `Retry in about 12s.`，通常是 Notion API 429 限流：等待提示的秒数后再次点击刷新即可。
+- 如果 UI 里显示了“已保存的 Parent Page”但下拉列表不含更多候选，这是 `resolvedSaved` 的兜底行为：目的是不让旧选择直接丢失；要获得更多候选，需要等搜索结果恢复或确保该 workspace 下确实存在可用 parent pages。
+
+### 7. source/site 筛选菜单高度异常（太矮、滚动条过多或被裁切）
 - 会话列表底部的 `sourceFilterSelect` / `siteFilterSelect` 现在启用 `adaptiveMaxHeight`，不再使用固定 `maxHeight=320`。
 - `SelectMenu` 展开时会调用 `findNearestClippingRect()` 查找最近 overflow 裁剪容器，再结合 `side='top'|'bottom'` 计算可用高度；在 popup 底部区域、窄视口或字体缩放变化时，菜单高度动态变化是预期行为。
 - 如果出现明显裁切，先排查调用方是否误把 `adaptiveMaxHeight` 去掉，或 `MenuPopover` 的 `panelMaxHeight` 被覆盖。
 
-### 7. Chat 会话图片缓存没有按预期生效
+### 8. Chat 会话图片缓存没有按预期生效
 - 先确认你操作的是 **chat** 会话：article 不会显示 `cache-images` 工具动作，这是设计行为。
 - `ai_chat_cache_images_enabled` 主要影响后续采集写入；如果是历史会话，需要在 detail header 手动触发 `cache-images` 才会回填。
 - 触发后若提示 `updatedMessages = 0`，通常代表消息里没有可下载图片链接，或链接已失效。
@@ -153,4 +159,5 @@
 - `.github/workflows/webclipper-cws-publish.yml`
 
 ## 更新记录（Update Notes）
+- 2026-03-30：同步 Settings 统计入口 deep-link（`section=aboutyou`）与新增 Notion Parent Page 列表刷新（含 429 retry 提示）的故障排查条目。
 - 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并新增 `$ mention` 的常见故障排查条目。

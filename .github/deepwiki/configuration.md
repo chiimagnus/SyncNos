@@ -29,18 +29,23 @@
 | 配置项 | 位置 | 当前值 / 默认 | 作用 |
 | --- | --- | --- | --- |
 | `manifestVersion` | `wxt.config.ts` | `3` | 扩展固定在 MV3 模式 |
-| `manifest.version` | `wxt.config.ts` | `1.4.1` | 商店 workflow 校验的版本事实源 |
+| `manifest.version` | `wxt.config.ts` | `1.5.0` | 商店 workflow 校验的版本事实源 |
 | `entrypointsDir` | `wxt.config.ts` | `src/entrypoints` | 统一 background/content/popup/app 入口目录 |
-| 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=about`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
+| 安装后引导策略 | `src/entrypoints/background.ts` | `install` 打开 `/settings?section=aboutme`；`update` 不自动开标签页 | 保留首次上手引导，同时避免升级打断当前会话 |
 | `inpage_display_mode` | `chrome.storage.local`, `src/services/bootstrap/content.ts` | 默认 `all`；兼容旧 `inpage_supported_only` | 控制 inpage 在 `supported / all / off` 三档中的显示范围 |
 | `SelectMenu.adaptiveMaxHeight` | `ui/shared/SelectMenu.tsx`, `ConversationListPane.tsx` | 默认 `false`；source/site 筛选启用为 `true` | 在菜单展开时基于最近可裁剪容器动态计算 `panelMaxHeight`，减少多余滚动条与裁切 |
 | `ai_chat_auto_save_enabled` | `chrome.storage.local` | 默认 `true` | 控制支持 AI 站点是否自动保存；关闭后仍可手动保存 |
 | `ai_chat_dollar_mention_enabled` | `chrome.storage.local`, `src/services/bootstrap/content-controller.ts` | 默认 `true` | 控制支持站点的 `$ mention` 能力是否启用；关闭后 content script 会停止注入该交互（当前标签页可热更新） |
 | `ai_chat_cache_images_enabled` | `chrome.storage.local`, `src/services/conversations/background/handlers.ts` | 默认 `false` | 控制 chat 消息采集时是否尝试图片内联；历史会话可通过 detail header 的 `cache-images` 手动回填 |
 | `notion_parent_page_id`, `notion_parent_page_title` | `chrome.storage.local`, `src/viewmodels/settings/useSettingsSceneController.ts` | 用户选择值 | 决定扩展 Notion 的写入根 |
+| `notion_oauth_client_id` | `chrome.storage.local`, `src/services/sync/notion/auth/oauth.ts` | 默认写入（best-effort） | Notion OAuth client id（扩展侧只保存 client id，不保存 secret） |
+| `notion_oauth_pending_state` | `chrome.storage.local`, `src/viewmodels/settings/useSettingsSceneController.ts` + `src/services/sync/notion/auth/oauth.ts` | 连接中临时值 | OAuth 发起后写入，用于回调 state 校验与 UI polling 停止条件 |
+| `notion_oauth_last_error` | `chrome.storage.local`, `src/viewmodels/settings/useSettingsSceneController.ts` + `src/services/sync/notion/auth/oauth.ts` | 空字符串或错误信息 | 记录最近一次 OAuth 回调/交换失败原因；UI 会据此展示状态并停止 polling |
 | `notion_ai_preferred_model_index` | `chrome.storage.local` | 空字符串或正整数 | 控制 Notion AI model picker 偏好 |
 | `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1` | `src/services/integrations/chatwith/chatwith-settings.ts`, `chrome.storage.local` | 默认模板 + 平台清单 + `28000` | 控制 Chat with AI 的载荷模板、目标平台和截断长度 |
-| `webclipper_settings_active_section` | `src/viewmodels/settings/types.ts`, `localStorage` | 默认 `general`；支持 `general / chat_with / backup / notion / obsidian / insight / about` | 记住设置页当前选中的 sidebar 分组 / section |
+| `webclipper_sync_provider_notion_enabled` | `chrome.storage.local`, `src/services/sync/sync-provider-gate.ts` | 默认启用（缺省值） | Notion 同步 provider 门控（显式写 `false` 表示禁用） |
+| `webclipper_sync_provider_obsidian_enabled` | `chrome.storage.local`, `src/services/sync/sync-provider-gate.ts` | 默认启用（缺省值） | Obsidian 同步 provider 门控（显式写 `false` 表示禁用） |
+| `webclipper_settings_active_section` | `src/viewmodels/settings/types.ts`, `localStorage` | 默认 `general`；当前稳定值：`general / chat_with / backup / notion / obsidian / aboutyou / aboutme`（兼容旧 `insight / about`） | 记住设置页当前选中的 sidebar 分组 / section |
 | `webclipper_conversations_source_filter_key` | `ConversationListPane.tsx`, `localStorage` | 默认 `all` | 记住会话列表来源筛选 |
 | `webclipper_pending_open_conversation_id` | `pending-open.ts`, `sessionStorage` | 临时值 | 在窄屏 list/detail 路由之间桥接待打开的会话 |
 | Insight 统计限制 | `src/viewmodels/settings/insight-stats.ts` | `INSIGHT_CHAT_SOURCE_LIMIT=4`, `INSIGHT_ARTICLE_DOMAIN_LIMIT=8`, `INSIGHT_TOP_CONVERSATION_LIMIT=3` | 控制平台来源排行、文章域名排行与 Top conversation 截断方式 |
@@ -147,7 +152,8 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 - `.github/workflows/webclipper-cws-publish.yml`
 
 ## 更新记录（Update Notes）
+- 2026-03-30：同步本页 `manifest.version` 单一事实源并对齐当前 tag；更新扩展安装后引导 deep-link（`/settings?section=aboutme`）与 Settings section key（`aboutyou/aboutme`），并补齐 Notion OAuth / Sync Provider gate 的存储键说明。
 - 2026-03-29：更正 WebClipper manifest icons 事实（`16/48/128` 仍存在，仅 `icon-128.png` 暴露为 `web_accessible_resources`）；补齐 `$ mention` 开关键 `ai_chat_dollar_mention_enabled` 与其“可热更新”的行为边界。
-- 2026-03-25：同步本页 `manifest.version` 单一事实源到 `1.4.1`，并将 WebClipper 的旧目录引用统一迁移到 `src/services/*` 与 `src/ui/i18n/index.ts`。
+- 2026-03-25：同步本页 `manifest.version` 单一事实源（对齐当时发布版本），并将 WebClipper 的旧目录引用统一迁移到 `src/services/*` 与 `src/ui/i18n/index.ts`。
 - 2026-03-22：同步 WebClipper settings 真路径、Chat with AI 真路径，并将 README 的主题说明收敛为系统跟随。
 - 2026-03-19：将 `manifest.version` 同步并补充 `AutoSyncService.intervalSeconds=5*60` 的 App 侧轮询事实与来源引用。

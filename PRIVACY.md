@@ -1,12 +1,12 @@
 # Privacy Policy
 
-**Last Updated: February 22, 2026**
+**Last Updated: March 30, 2026**
 
 This Privacy Policy applies to **SyncNos WebClipper** (the “Extension”), a browser extension for Chrome/Chromium and Firefox.
 
 ## 1. Single Purpose
 
-The Extension’s single purpose is to help you save **visible** conversations from supported websites to your browser locally, export them, and (optionally) sync them to Notion **when you manually trigger a sync**.
+The Extension’s single purpose is to help you save **visible** AI conversations (and optionally web articles) from pages you view to your browser locally, export them, and (optionally) sync them to external destinations (e.g., Notion / Obsidian) **when you manually trigger a sync**.
 
 ## 2. What Data the Extension Accesses
 
@@ -15,6 +15,8 @@ When you visit a supported site, the Extension may read content from the current
 - Conversation text (user/assistant messages)
 - Page metadata needed to organize saves (e.g., title and URL)
 - Image URLs embedded in the conversation (for preview/export and optional Notion sync)
+
+When you manually save a web page as an article, the Extension may read the article content from the current page to extract a readable version (title/body) for local storage and export.
 
 The Extension may automatically capture updates while you stay on a supported conversation page, and it also provides an in-page “Save” button for manual capture.
 
@@ -44,11 +46,13 @@ To avoid embedding a Notion OAuth client secret in the Extension, the Extension 
 
 ## 6. Permissions and Why They Are Needed
 
-- `storage`: store your saved conversations, settings, and Notion connection state locally.
-- `downloads`: export your data to local files upon your request.
-- `tabs`: open authorization/help links and improve UX during OAuth flows.
+- `storage`: store settings and small state locally (e.g., Notion connection status, selected parent page ID).
+- `contextMenus`: provide right-click menu actions (e.g., capture/save/export/sync entry points).
+- `tabs`: open/focus the extension app page, open authorization/help links, and improve UX during OAuth flows.
 - `webNavigation`: detect the OAuth redirect/callback navigation to complete the connection flow.
-- Host permissions: run only on supported sites you choose to use and access Notion endpoints required for sync.
+- `activeTab`: access the current tab when you interact with the Extension (e.g., manual capture) without needing persistent access.
+- `scripting`: inject packaged scripts into the current page to enable capture and in-page UI.
+- Host permissions: allow the Extension to run on supported AI chat sites and (when you choose to use it) on arbitrary web pages for manual article capture, and to access Notion endpoints required for sync.
 
 ## 7. Remote Code
 
@@ -60,6 +64,7 @@ We do not sell your data. Data is only sent to third parties when you use those 
 
 - Notion (when you connect/sync)
 - The token exchange proxy endpoint (only for OAuth token exchange)
+- Obsidian Local REST API (on your device, when you configure/sync to Obsidian)
 
 ## 9. Contact
 

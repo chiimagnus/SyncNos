@@ -34,6 +34,7 @@
 | 文件 | 验证点 | 为什么重要 |
 | --- | --- | --- |
 | `tests/unit/notion-sync-cursor.test.ts` | Notion cursor 的 append / rebuild 判断 | 直接决定是否会重复写入或错误重建 |
+| `tests/unit/notion-parent-pages.test.ts` | Notion Parent Page 发现：分页、过滤 database 子页面、savedPageId resolve（search miss 时回退 `GET /pages/:id`） | 防止设置页 Parent Page 下拉在空结果 / 旧选择 / 分页边界下失效 |
 | `tests/storage/schema-migration.test.ts` | IndexedDB v2 / v4 / v6 迁移 + v7 article_comments store：NotionAI stable key、article canonical key 归并与 legacy 字段清理 | 直接关系到旧数据升级与 mapping 延续 |
 | `tests/storage/conversations-idb.test.ts` | conversations / messages 的本地持久化 | 确认 UI 和同步层读到的事实源正确 |
 | `tests/storage/article-comments-idb.test.ts` | `article_comments` 的增删改查、回复、级联删除与 orphan attachment | 确认 article 详情页的本地评论线程不丢、不串、不挂空 |
@@ -45,7 +46,7 @@
 | `tests/collectors/kimi-collector.test.ts`, `tests/collectors/zai-collector.test.ts` | 用户上传附件卡片图片抓取 | 防止附件图片只出现在页面而未进入本地会话 markdown |
 | `tests/smoke/background-router-current-page-capture.test.ts` | popup 当前页抓取与 background relay | 保证当前页抓取不会只在 UI 上“看起来能点” |
 | `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI 详情头动作解析（含 clipboard + external jump） | 覆盖 `open` / `chat-with` 主路径，保证详情头动作协议不回退 |
-| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（`Features = general + chat_with`，`Data = backup + notion + obsidian`，`About = insight + about`） | 防止 Settings 导航回退或新分区被错误挪位 |
+| `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（`Features = general + chat_with`，`Data = backup + notion + obsidian`，`About = aboutyou + aboutme`） | 防止 Settings 导航回退或新分区被错误挪位 |
 | `tests/smoke/background-router-item-mention.test.ts` | `$ mention` 消息路由冒烟（search/build） | 覆盖 `ITEM_MENTION_MESSAGE_TYPES` 在 background router 的注册与输出结构 |
 | `tests/unit/item-mention-search.test.ts` | `$ mention` 候选匹配与排序 | 防止标题/域名/来源匹配规则漂移导致“候选顺序看起来不对” |
 
@@ -56,7 +57,7 @@
 4. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除都可用；刷新后评论仍在本地；如果从外部恢复备份，确认评论线程也能一起恢复；旧备份若不含 `assets/article-comments/index.json` 则仍会缺失。
 5. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `inpage display mode / AI auto-save / AI $ mention / AI chat cache images` 设置行为，以及系统主题随 `prefers-color-scheme` 切换的表现。
 6. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
-7. **WebClipper（Insight）**：打开 `Settings → Insight`，验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 Insight 分区。
+7. **WebClipper（About You / Insight）**：打开 `Settings → About You`（旧称 Insight，对应 section key `aboutyou`），验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 About You 分区。
 8. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
 9. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
 
@@ -131,4 +132,5 @@
 - `.github/workflows/webclipper-cws-publish.yml`
 
 ## 更新记录（Update Notes）
+- 2026-03-30：同步 Settings section key（`aboutyou/aboutme`）与新增 Notion Parent Page 发现链路的代表性单测入口。
 - 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并将 `$ mention` 的测试与手动冒烟项纳入回归清单。

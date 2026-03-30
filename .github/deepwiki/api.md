@@ -10,7 +10,7 @@
 | 契约组 | 常量定义 | 典型用途 | 调用方 |
 | --- | --- | --- | --- |
 | CORE | `CORE_MESSAGE_TYPES` | conversation CRUD、列表分页、消息同步、图片回填 | popup/app/content -> background |
-| NOTION | `NOTION_MESSAGE_TYPES` | 授权状态、手动同步、job 状态 | settings/conversations -> background |
+| NOTION | `NOTION_MESSAGE_TYPES` | 授权状态、Parent Page 列表、手动同步、job 状态、断开连接 | settings/conversations -> background |
 | OBSIDIAN | `OBSIDIAN_MESSAGE_TYPES` | 设置保存、连接测试、同步 | settings/conversations -> background |
 | ARTICLE | `ARTICLE_MESSAGE_TYPES` | 当前标签页正文抓取 | popup -> background |
 | CHATGPT | `CHATGPT_MESSAGE_TYPES` | 提取 deep research / 结构化内容 | content -> background |
@@ -34,6 +34,17 @@
 | `findConversationById` | `conversationId` | conversation 或 `null` | 以 id 定位会话 |
 | `getConversationDetail` | `conversationId` | 详情 + messages | 详情页入口 |
 | `deleteConversations` | `conversationIds[]` | 删除结果 | 同步删除会话、消息与 mapping |
+
+## NOTION 关键消息
+
+| 消息类型 | 入参关键字段 | 返回 | 说明 |
+| --- | --- | --- | --- |
+| `getNotionAuthStatus` | 无 | `{ connected, workspaceName, token }` | 查询 Notion 连接状态；`token` 为完整 token（用于调试与 UI 展示 workspace 名），请避免在日志里输出 `accessToken` |
+| `listNotionParentPages` | 无 | `{ pages, resolvedSaved }` | 拉取可用 Parent Page 列表；`pages[]` 为 `{id,title}`，`resolvedSaved` 用于确保“已保存 page id”在当前列表中可展示（即使不在搜索结果里） |
+| `notionDisconnect` | 无 | `{ disconnected: true, clearedKeys: string[] }` | 断开连接：清理 token，并移除 Parent Page、OAuth 临时状态、Notion DB 缓存与 sync job 等相关存储键 |
+| `notionSyncConversations` | `conversationIds[]` | `{ started: true, provider: 'notion' }` | 手动同步指定会话；依赖已连接 token + 已选择 `notion_parent_page_id`；若 provider 被禁用会返回 extra `{code:'sync_provider_disabled',provider:'notion'}` |
+| `getNotionSyncJobStatus` | 无 | `{ provider: 'notion', job, instanceId }` | 查询后台同步 job 状态（running / done / error 等以 job store 为准） |
+| `clearNotionSyncJobStatus` | 无 | `{ provider: 'notion', job: null, instanceId }` | 清空同步状态，便于 UI 重置提示 |
 
 ## ITEM_MENTION（$ mention）关键消息
 
@@ -65,10 +76,10 @@
 
 | 阶段 | 入口 / 文件 | 关键点 |
 | --- | --- | --- |
-| 用户发起授权 | `src/services/sync/notion/auth/oauth.ts` + Notion authorize URL | 使用 `authorizationUrl=https://api.notion.com/v1/oauth/authorize`，并生成 `state` 写入本地 pending key |
-| 回调拦截 | `handleNotionOAuthCallbackNavigation()` | 只处理 `redirectUri=https://chiimagnus.github.io/syncnos-oauth/callback`，并校验 `state` 一致 |
+| 用户发起授权 | `src/viewmodels/settings/useSettingsSceneController.ts` + Notion authorize URL | UI 生成随机 `state` 并写入 `notion_oauth_pending_state`，同时清空 `notion_oauth_last_error`；随后打开 `authorizationUrl=https://api.notion.com/v1/oauth/authorize` |
+| 回调拦截 | `handleNotionOAuthCallbackNavigation()` | background 仅处理 `redirectUri=https://chiimagnus.github.io/syncnos-oauth/callback`，并校验 `state` 一致；失败会写入 `notion_oauth_last_error` 并清理 pending key |
 | code 交换 | Worker `index.ts` | 扩展向 `/notion/oauth/exchange` 发送 `{ code, redirectUri }`；Worker 在服务端用 `NOTION_CLIENT_ID/SECRET` 调 Notion token endpoint |
-| token 入库 | `setNotionOAuthToken()` | 扩展仅持久化 `access_token` 与 workspace 信息，不落地 `client_secret` |
+| token 入库 | `setNotionOAuthToken()` | 扩展仅持久化 `access_token` 与 workspace 信息，不落地 `client_secret`；code exchange 采用 `12s timeout + 2 次尝试`（仅对 transient 错误重试） |
 
 | 关键参数 | 位置 | 说明 |
 | --- | --- | --- |
@@ -106,6 +117,7 @@ sequenceDiagram
 | 失败场景 | 触发位置 | 处理策略 |
 | --- | --- | --- |
 | OAuth state 不匹配 | `handleNotionOAuthCallbackNavigation` | 拒绝写 token，保留错误信息 |
+| Notion API 429 限流 | `listNotionParentPages`（settings handlers） | message 会附加 `Retry in about Xs.` 提示，并在 extra 中附带 `status/code/requestId`；通常需要等待后重试或降低并发 |
 | worker 限流 429 | Cloudflare worker | 返回 `Retry-After`，前端重试或提示稍后 |
 | Obsidian PATCH 失败 | `obsidian-sync-orchestrator.ts` | 自动回退 full rebuild |
 | 消息 type 未注册 | background router fallback | 返回 `unknown message type` |
@@ -123,6 +135,9 @@ sequenceDiagram
 - `webclipper/src/services/integrations/item-mention/mention-contract.ts`
 - `webclipper/src/services/integrations/item-mention/mention-search.ts`
 - `webclipper/src/services/sync/notion/auth/oauth.ts`
+- `webclipper/src/services/sync/notion/auth/token-store.ts`
+- `webclipper/src/services/sync/notion/settings-background-handlers.ts`
+- `webclipper/src/services/sync/notion/notion-parent-pages.ts`
 - `webclipper/src/services/sync/notion/notion-sync-orchestrator.ts`
 - `webclipper/src/services/sync/obsidian/obsidian-sync-orchestrator.ts`
 - `webclipper/cloudflare-workers/syncnos-notion-oauth/index.ts`
@@ -130,5 +145,6 @@ sequenceDiagram
 - `webclipper/src/platform/messaging/ui-background-handlers.ts`
 
 ## 更新记录（Update Notes）
+- 2026-03-30：补齐 `NOTION_MESSAGE_TYPES` 的设置侧契约（`LIST_PARENT_PAGES/GET_AUTH_STATUS/DISCONNECT`）与返回结构，并同步 Notion OAuth 的 pending/error 状态键与 code exchange 重试边界。
 - 2026-03-29：同步内部消息契约组（补齐 `CHATGPT_MESSAGE_TYPES` / `ITEM_MENTION_MESSAGE_TYPES` / `COMMENTS_MESSAGE_TYPES` / `CONTENT_MESSAGE_TYPES`），并补充 `$ mention` 与“打开 inpage comments panel”的消息链路与失败模式。
 - 2026-03-19：新增 Notion OAuth Worker 的 code exchange 分阶段说明与关键参数矩阵，明确密钥仅在 Worker 侧持有。

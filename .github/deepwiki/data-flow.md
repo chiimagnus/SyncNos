@@ -70,6 +70,14 @@
 - 对 WebClipper 而言，外部目标都不是事实源；**事实源只有 IndexedDB 与非敏感 `chrome.storage.local`**。
 - `conversationKinds` 当前定义了 `chat` 和 `article` 两种 kind：前者默认进入 `SyncNos-AI Chats` / `SyncNos-AIChats`，后者进入 `SyncNos-Web Articles` / `SyncNos-WebArticles`。
 
+### Notion：OAuth 连接、Parent Page 刷新与手动同步
+
+1. **连接（OAuth）**：Settings UI 生成随机 `state`，写入本地 pending key，并打开 Notion authorize URL；background 监听 OAuth 回调 URL，校验 `state` 后通过 Cloudflare Worker 交换 token，成功后写入 token store，并清理 pending/error 状态（UI 会通过 `GET_AUTH_STATUS` polling 刷新连接状态）。
+2. **Parent Page 刷新**：Settings UI 通过 background router 调用 `LIST_PARENT_PAGES`；background 会读取已保存 page id 并调用 `listNotionParentPages()` 统一执行 `/v1/search` 分页、过滤不可用页面，并在必要时 resolve 已保存 page id，返回 `{ pages, resolvedSaved }` 供 UI 兜底展示。
+3. **手动同步**：会话列表选择会话后触发 `notionSyncConversations(conversationIds[])`；background 会先做 sync provider gate、token/parentPageId 校验与“是否已有 running job”判断，再启动 orchestrator detached job，并在结束时广播 `conversationsChanged` 刷新 UI。
+
+> 存储键与门控键的命名以 `configuration.md` 为准（避免多处重复维护同一份 key 列表）。
+
 ## 状态、游标与映射
 
 | 状态对象 | 位置 | 关键字段 | 作用 |
@@ -106,6 +114,7 @@ flowchart LR
 | 失败模式 | 发生位置 | 典型表现 | 恢复方向 |
 | --- | --- | --- | --- |
 | Parent Page / token 缺失 | App / WebClipper Notion 同步前 | 直接阻止写入或报错 | 回到配置页补齐授权与 Parent Page |
+| Parent Page 列表加载失败 / 429 | WebClipper Notion 设置页 | 下拉为空、提示稍后重试或显示 retry seconds | 等待后重试；检查 Notion 连接状态与限流；必要时断开重连 |
 | 登录态过期 | App 在线来源 | WeRead / Dedao 无法抓取 | 重新登录并更新 `SiteLoginsStore` |
 | article 抽取失败 | WebClipper article fetch | `No article content detected` | 检查页面是否有足够正文或改用支持站点保存 |
 | 缓存图片按钮不可见或“点了没变化” | WebClipper detail tools / backfill job | article 会话无按钮，或回填结果 `updatedMessages=0` | 先确认是 chat 会话，再检查消息里是否存在可下载图片链接 |
@@ -145,6 +154,12 @@ flowchart LR
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
 - `webclipper/src/services/conversations/data/storage-idb.ts`
 - `webclipper/src/platform/messaging/message-contracts.ts`
+- `webclipper/src/services/sync/background-handlers.ts`
+- `webclipper/src/services/sync/sync-provider-gate.ts`
+- `webclipper/src/services/sync/notion/auth/oauth.ts`
+- `webclipper/src/services/sync/notion/auth/token-store.ts`
+- `webclipper/src/services/sync/notion/settings-background-handlers.ts`
+- `webclipper/src/services/sync/notion/notion-parent-pages.ts`
 - `webclipper/src/services/integrations/item-mention/background-handlers.ts`
 - `webclipper/src/services/integrations/item-mention/mention-search.ts`
 - `webclipper/src/services/protocols/conversation-kinds.ts`
@@ -152,4 +167,5 @@ flowchart LR
 - `webclipper/src/services/sync/obsidian/obsidian-sync-orchestrator.ts`
 
 ## 更新记录（Update Notes）
+- 2026-03-30：补齐 WebClipper Notion 设置侧数据流（OAuth pending/error、Parent Page 列表刷新与 resolve 逻辑、sync provider gate 的前置校验）。
 - 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并补充 `$ mention` 的本地候选搜索与插入链路说明。
