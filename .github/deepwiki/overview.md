@@ -3,11 +3,11 @@
 ## 仓库是什么
 - SyncNos 是一个围绕“异构内容 → 稳定知识资产”展开的双产品线仓库，而不是单一 app 或单一脚本集合。
 - 正式的业务入口页是 [business-context.md](business-context.md)；本页负责在业务语义之上，再给出目录、入口、运行时和产物层面的整体地图。
-- 两条产品线共享“最终可沉淀到 Notion”的目标，但一个是 macOS App、一个是 MV3 扩展，本地状态、鉴权、同步节奏和测试方式都不同。
+- 两条产品线共享“最终可沉淀到 Notion”的目标，但 `macOS/` 下的 SwiftUI macOS App 已归档，仅保留历史说明；`webclipper/` 仍是当前活动的 MV3 扩展，本地状态、鉴权、同步节奏和测试方式都不同。
 
 | 产品线 | 主目录 | 运行时 | 主要输入 | 主要输出 |
 | --- | --- | --- | --- | --- |
-| SyncNos App | `macOS/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
+| SyncNos App（已归档） | `macOS/` | macOS 14+ / SwiftUI / SwiftData / AppKit | Apple Books / GoodLinks 本地库、WeRead / Dedao 登录态、聊天 OCR | Notion 数据库 / 页面、桌面缓存、搜索结果 |
 | WebClipper | `webclipper/` | MV3 service worker + content script + popup/app React UI | AI 站点 DOM、网页正文、浏览器本地设置、备份包 | IndexedDB、Settings Insight、主题/行为偏好、本地导出、Zip v2 备份（含 `article_comments`）、Notion 页面、Obsidian 文件 |
 
 ## 顶层目录地图

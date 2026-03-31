@@ -1,15 +1,15 @@
 # 仓库指南
 
-SyncNos 仓库当前包含两条产品线：
+SyncNos 仓库当前保留两条产品线记录：`macOS/` 下的 SwiftUI macOS App 已归档，仅保留历史说明；`webclipper/` 仍是当前活动的浏览器扩展。
 
-- `macOS/`：macOS App（源代码位于 `macOS/SyncNos/`），将 Apple Books、GoodLinks、微信读书、得到和微信聊天 OCR 中的高亮笔记同步到 Notion。
+- `macOS/`：已归档的 SwiftUI macOS App，历史说明仅供查阅。
 - `webclipper/`：浏览器扩展，抓取 AI 对话与网页文章，支持本地保存、导出、备份，以及同步到 Notion / Obsidian。
 
 ## 项目结构
 
 ```
 SyncNos/
-├── macOS/                       # macOS App 容器
+├── macOS/                       # 已归档的 macOS App 代码
 │   ├── SyncNos/                 # 源代码
 │   ├── SyncNos.xcodeproj/       # Xcode 工程
 │   ├── Packages/                # 本地 SwiftPM 包

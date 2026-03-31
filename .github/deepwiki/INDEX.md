@@ -2,7 +2,7 @@
 
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
-- **仓库形态**：这是一个双产品线仓库——`macOS/` 是 macOS App 容器（源码位于 `macOS/SyncNos/`），`webclipper/` 是浏览器扩展；两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
+- **仓库形态**：这是一个双产品线仓库——`macOS/` 下的 SwiftUI macOS App 已归档，仅保留历史说明；`webclipper/` 是当前活动的浏览器扩展，两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
 - **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `webclipper/src/entrypoints/content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **稳定事实源**：版本、权限、配置、迁移规则请以 `wxt.config.ts`、`schema.ts`、workflow 与脚本为准；本索引不再保留按日期堆叠的变更流水。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
@@ -13,7 +13,7 @@
 | 仓库总览 | [overview.md](overview.md) | 目录地图、入口文件、主要产物、推荐阅读顺序 |
 | 技术总览 | [architecture.md](architecture.md) | 运行时边界、关键契约、修改热点 |
 | 数据链路 | [data-flow.md](data-flow.md) | 来源 → 本地事实源 → Notion / Obsidian / 导出 |
-| 产品细节 | `modules/` | App 与 WebClipper 各自的实现边界与扩展点 |
+| 产品细节 | `modules/` | App（已归档）与 WebClipper 各自的实现边界与扩展点 |
 
 ## 推荐阅读路径
 
@@ -21,7 +21,7 @@
 1. [business-context.md](business-context.md) — 先理解仓库服务谁、交付什么、有哪些关键规则。
 2. [overview.md](overview.md) — 再建立目录、入口和产物级别的整体地图。
 3. [data-flow.md](data-flow.md) — 看清两个产品线各自如何把输入变成可见结果。
-4. [modules/syncnos-app.md](modules/syncnos-app.md) — 如果你关注阅读高亮、OCR、IAP、菜单栏和 Notion 同步。
+4. [modules/syncnos-app.md](modules/syncnos-app.md) — 如果你要查看已归档的 macOS App 历史说明。
 5. [modules/webclipper.md](modules/webclipper.md) — 如果你关注 AI 对话采集、文章抓取、本地会话和多目标同步。
 6. [storage.md](storage.md) / [troubleshooting.md](troubleshooting.md) — 当你开始追问“数据存在哪”或“为什么失败”。
 
