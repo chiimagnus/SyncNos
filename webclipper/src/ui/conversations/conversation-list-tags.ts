@@ -37,8 +37,7 @@ const SOURCE_TONE_CLASS_MAP: Record<string, string> = {
     'tw-border-[var(--brand-gemini)] tw-bg-[color-mix(in_srgb,var(--brand-gemini)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
   googleaistudio:
     'tw-border-[var(--brand-googleaistudio)] tw-bg-[color-mix(in_srgb,var(--brand-googleaistudio)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  kimi:
-    'tw-border-[var(--brand-kimi)] tw-bg-[color-mix(in_srgb,var(--brand-kimi)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+  kimi: 'tw-border-[var(--brand-kimi)] tw-bg-[color-mix(in_srgb,var(--brand-kimi)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
   doubao:
     'tw-border-[var(--brand-doubao)] tw-bg-[color-mix(in_srgb,var(--brand-doubao)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
   yuanbao:
@@ -54,7 +53,9 @@ function safeString(value: unknown): string {
 }
 
 function normalizeSourceKey(value: unknown): string {
-  const text = safeString(value).toLowerCase().replace(/[\s_-]+/g, '');
+  const text = safeString(value)
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
   return text || 'unknown';
 }
 
@@ -65,10 +66,7 @@ function normalizeListSiteKey(value: unknown): string {
   return key;
 }
 
-function resolveWebLabel(
-  conversation: Pick<Conversation, 'listSiteKey' | 'url'>,
-  translate: Translate,
-): string {
+function resolveWebLabel(conversation: Pick<Conversation, 'listSiteKey' | 'url'>, translate: Translate): string {
   const fromListSiteKey = normalizeListSiteKey(conversation?.listSiteKey);
   if (fromListSiteKey) return fromListSiteKey;
   const fromUrl = parseHostnameFromUrl(conversation?.url);
@@ -88,9 +86,7 @@ function resolveSourceLabel(
   return safeString(rawSource);
 }
 
-export function resolveConversationSourceKey(
-  conversation: Pick<Conversation, 'listSourceKey' | 'source'>,
-): string {
+export function resolveConversationSourceKey(conversation: Pick<Conversation, 'listSourceKey' | 'source'>): string {
   const preferred = safeString(conversation?.listSourceKey);
   const fallback = safeString(conversation?.source);
   return normalizeSourceKey(preferred || fallback);

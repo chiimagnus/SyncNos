@@ -4,9 +4,11 @@ import {
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage';
+import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery } from '@platform/webext/tabs';
+import { storageGet } from '@platform/storage/local';
 
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
@@ -659,7 +661,8 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
 
   const body = textContent;
   const markdown = markdownContent || body;
-  await syncConversationMessages(Number((conversation as any).id), [
+  const conversationId = Number((conversation as any).id);
+  let messagesToSave = [
     {
       messageKey: 'article_body',
       role: 'article',
@@ -668,11 +671,46 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
       sequence: 1,
       updatedAt: capturedAt,
     },
-  ]);
+  ];
+
+  try {
+    const local = await storageGet(['web_article_cache_images_enabled']);
+    if (local?.web_article_cache_images_enabled === true) {
+      const inlined = await inlineChatImagesInMessages({
+        conversationId,
+        conversationUrl: cleanedUrl,
+        messages: messagesToSave,
+        enableHttpImages: true,
+      });
+      messagesToSave = inlined.messages;
+      if (
+        inlined.inlinedCount > 0 ||
+        inlined.downloadedCount > 0 ||
+        inlined.fromCacheCount > 0 ||
+        (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
+      ) {
+        console.info('[ImageInline][ArticleFetch]', {
+          conversationId,
+          inlinedCount: inlined.inlinedCount,
+          downloadedCount: inlined.downloadedCount,
+          fromCacheCount: inlined.fromCacheCount,
+          inlinedBytes: inlined.inlinedBytes,
+          warningFlags: inlined.warningFlags,
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('[ImageInline][ArticleFetch] failed but capture continues', {
+      conversationId,
+      error: error instanceof Error ? error.message : String(error || ''),
+    });
+  }
+
+  await syncConversationMessages(conversationId, messagesToSave);
 
   return {
     isNew: !existed,
-    conversationId: Number((conversation as any).id),
+    conversationId,
     url: cleanedUrl,
     title,
     author,

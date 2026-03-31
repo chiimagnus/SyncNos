@@ -173,4 +173,58 @@ describe('DetailHeaderActionBar', () => {
     expect(button).toBeTruthy();
     expect(button?.disabled).toBe(true);
   });
+
+  it('shows busy and done labels for cache action progress state', async () => {
+    let resolveTrigger: (() => void) | null = null;
+    const onTrigger = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'cache-images',
+              label: 'Cache images',
+              busyLabel: 'Caching images...',
+              showBusyProgress: true,
+              afterTriggerLabel: 'Cache complete',
+              afterTriggerLabelDurationMs: 0,
+              provider: 'local',
+              kind: 'open-target',
+              slot: 'tools',
+              onTrigger,
+            },
+          ],
+          buttonClassName,
+        }),
+      );
+    });
+
+    const button = document.querySelector('[aria-label="Cache images"]') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    expect(button?.textContent || '').toContain('Cache images');
+
+    await act(async () => {
+      button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+    expect(button?.disabled).toBe(true);
+    expect(button?.textContent || '').toContain('Caching images...');
+    expect(document.querySelector('.tw-animate-pulse')).toBeTruthy();
+
+    await act(async () => {
+      resolveTrigger?.();
+      await Promise.resolve();
+    });
+
+    expect(button?.disabled).toBe(false);
+    expect(button?.textContent || '').toContain('Cache complete');
+  });
 });

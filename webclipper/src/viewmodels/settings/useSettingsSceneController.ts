@@ -154,6 +154,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
+  const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
   const [aiChatDollarMentionEnabled, setAiChatDollarMentionEnabled] = useState<boolean>(true);
   const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() => normalizeStoredMarkdownReadingProfile(''));
 
@@ -222,6 +223,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         'inpage_supported_only',
         'ai_chat_auto_save_enabled',
         'ai_chat_cache_images_enabled',
+        'web_article_cache_images_enabled',
         'ai_chat_dollar_mention_enabled',
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
         LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
@@ -255,6 +257,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     );
     setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
+    setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
     setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
     setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(local?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
     setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
@@ -620,6 +623,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleWebArticleCacheImagesEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        await storageSet({ web_article_cache_images_enabled: next === true });
+        setWebArticleCacheImagesEnabled(next === true);
+      });
+    },
+    [runTask],
+  );
+
   const onToggleAiChatDollarMentionEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
@@ -897,6 +910,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    webArticleCacheImagesEnabled,
+    onToggleWebArticleCacheImagesEnabled,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
     markdownReadingProfile,

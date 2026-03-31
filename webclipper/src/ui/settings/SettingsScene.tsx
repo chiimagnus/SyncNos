@@ -119,6 +119,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    webArticleCacheImagesEnabled,
+    onToggleWebArticleCacheImagesEnabled,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
 
@@ -284,6 +286,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
           onToggleAiChatCacheImagesEnabled={(next) => {
             void onToggleAiChatCacheImagesEnabled(next);
+          }}
+          webArticleCacheImagesEnabled={webArticleCacheImagesEnabled}
+          onToggleWebArticleCacheImagesEnabled={(next) => {
+            void onToggleWebArticleCacheImagesEnabled(next);
           }}
           aiChatDollarMentionEnabled={aiChatDollarMentionEnabled}
           onToggleAiChatDollarMentionEnabled={(next) => {

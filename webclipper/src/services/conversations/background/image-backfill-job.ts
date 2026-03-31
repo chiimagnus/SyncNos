@@ -11,9 +11,21 @@ export type BackfillConversationImagesResult = {
   warningFlags: string[];
 };
 
+export type BackfillConversationImagesProgress = {
+  scannedMessages: number;
+  updatedMessages: number;
+  inlinedCount: number;
+  fromCacheCount: number;
+  downloadedCount: number;
+  inlinedBytes: number;
+  warningFlags: string[];
+  latestMessageKey?: string;
+};
+
 export async function backfillConversationImages(input: {
   conversationId: number;
   conversationUrl?: string;
+  onProgress?: (progress: BackfillConversationImagesProgress) => Promise<void> | void;
 }): Promise<BackfillConversationImagesResult> {
   const conversationId = Number(input.conversationId);
   if (!Number.isFinite(conversationId) || conversationId <= 0) {
@@ -28,10 +40,37 @@ export async function backfillConversationImages(input: {
     beforeMarkdown.set(key, String((msg as any).contentMarkdown || ''));
   }
 
+  const progressCallback = typeof input.onProgress === 'function' ? input.onProgress : null;
+  const persistedUpdatedKeys = new Set<string>();
+
   const inlined = await inlineChatImagesInMessages({
     conversationId,
     conversationUrl: input.conversationUrl,
     messages: messages as any,
+    onMessageUpdated: progressCallback
+      ? async (update) => {
+          const key = String(update?.messageKey || '').trim();
+          if (!key) return;
+          if (persistedUpdatedKeys.has(key)) return;
+
+          await syncConversationMessages(conversationId, [update.message], {
+            mode: 'incremental',
+            diff: { added: [], updated: [key], removed: [] },
+          });
+          persistedUpdatedKeys.add(key);
+
+          await progressCallback({
+            scannedMessages: messages.length,
+            updatedMessages: persistedUpdatedKeys.size,
+            inlinedCount: Number(update?.inlinedCount) || 0,
+            fromCacheCount: Number(update?.fromCacheCount) || 0,
+            downloadedCount: Number(update?.downloadedCount) || 0,
+            inlinedBytes: Number(update?.inlinedBytes) || 0,
+            warningFlags: Array.isArray(update?.warningFlags) ? update.warningFlags : [],
+            latestMessageKey: key,
+          });
+        }
+      : undefined,
   });
 
   const updatedKeys: string[] = [];
@@ -43,7 +82,7 @@ export async function backfillConversationImages(input: {
     if (after && after !== before) updatedKeys.push(key);
   }
 
-  if (updatedKeys.length) {
+  if (updatedKeys.length && !progressCallback) {
     await syncConversationMessages(conversationId, inlined.messages, {
       mode: 'incremental',
       diff: { added: [], updated: updatedKeys, removed: [] },

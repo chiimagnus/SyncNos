@@ -380,4 +380,36 @@ describe('ConversationsProvider pagination state', () => {
     expect(Number(latestState.activeId)).toBe(999);
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
   });
+
+  it('provides cache-images tools action for article conversations', async () => {
+    getConversationListBootstrap.mockResolvedValue(
+      makePage(
+        [
+          {
+            ...makeConversation(301, 'web', 'article-301'),
+            sourceType: 'article',
+            url: 'https://example.com/article-301',
+          },
+        ],
+        {
+          sources: [{ key: 'web', label: 'web', count: 1 }],
+          sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
+        },
+      ),
+    );
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(String(latestState.selectedConversation?.sourceType || '')).toBe('article');
+
+    const actions = Array.isArray(latestState.detailHeaderActions) ? latestState.detailHeaderActions : [];
+    const cacheAction = actions.find((action: any) => String(action?.id || '').trim() === 'cache-images');
+    expect(cacheAction).toBeTruthy();
+    expect(String(cacheAction?.slot || '')).toBe('tools');
+  });
 });

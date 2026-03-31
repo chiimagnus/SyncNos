@@ -349,12 +349,23 @@ export type InlineChatImagesResult = {
   warningFlags: string[];
 };
 
+export type InlineChatImageMessageUpdate = {
+  messageKey: string;
+  message: any;
+  inlinedCount: number;
+  fromCacheCount: number;
+  downloadedCount: number;
+  inlinedBytes: number;
+  warningFlags: string[];
+};
+
 export async function inlineChatImagesInMessages(input: {
   conversationId: number;
   conversationUrl?: string;
   messages: any[];
   onlyMessageKeys?: Set<string> | null;
   enableHttpImages?: boolean;
+  onMessageUpdated?: (update: InlineChatImageMessageUpdate) => Promise<void> | void;
 }): Promise<InlineChatImagesResult> {
   const conversationId = Number(input.conversationId);
   const messages = Array.isArray(input.messages) ? input.messages : [];
@@ -472,7 +483,20 @@ export async function inlineChatImagesInMessages(input: {
 
     if (!replacements.size) continue;
     const nextMarkdown = replaceMarkdownImageUrls(markdown, replacements);
-    if (nextMarkdown !== markdown) msg.contentMarkdown = nextMarkdown;
+    if (nextMarkdown !== markdown) {
+      msg.contentMarkdown = nextMarkdown;
+      if (typeof input.onMessageUpdated === 'function') {
+        await input.onMessageUpdated({
+          messageKey: String(msg.messageKey || '').trim(),
+          message: msg,
+          inlinedCount,
+          fromCacheCount,
+          downloadedCount,
+          inlinedBytes,
+          warningFlags: Array.from(warningFlags),
+        });
+      }
+    }
   }
 
   return {

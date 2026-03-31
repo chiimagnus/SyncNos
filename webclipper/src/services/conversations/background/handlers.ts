@@ -216,41 +216,42 @@ export function registerConversationHandlers(router: AnyRouter) {
         String(msg?.conversationSourceType || '')
           .trim()
           .toLowerCase() || 'chat';
-      if (sourceType !== 'article') {
-        const local = await storageGet(['ai_chat_cache_images_enabled']);
-        const enabled = local?.ai_chat_cache_images_enabled === true;
-        const keys =
-          (mode === 'incremental' || mode === 'append') && diff
-            ? new Set(
-                [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
-                  .map((x) => String(x || '').trim())
-                  .filter(Boolean),
-              )
-            : null;
-        const inlined = await inlineChatImagesInMessages({
+      const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+      const enabled =
+        sourceType === 'article'
+          ? local?.web_article_cache_images_enabled === true
+          : local?.ai_chat_cache_images_enabled === true;
+      const keys =
+        (mode === 'incremental' || mode === 'append') && diff
+          ? new Set(
+              [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
+                .map((x) => String(x || '').trim())
+                .filter(Boolean),
+            )
+          : null;
+      const inlined = await inlineChatImagesInMessages({
+        conversationId,
+        conversationUrl: String(msg?.conversationUrl || ''),
+        messages,
+        onlyMessageKeys: keys,
+        enableHttpImages: enabled,
+      });
+      messages = inlined.messages;
+      if (
+        inlined.inlinedCount > 0 ||
+        inlined.downloadedCount > 0 ||
+        inlined.fromCacheCount > 0 ||
+        (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
+      ) {
+        console.info('[ImageInline]', {
           conversationId,
-          conversationUrl: String(msg?.conversationUrl || ''),
-          messages,
-          onlyMessageKeys: keys,
-          enableHttpImages: enabled,
+          mode,
+          inlinedCount: inlined.inlinedCount,
+          downloadedCount: inlined.downloadedCount,
+          fromCacheCount: inlined.fromCacheCount,
+          inlinedBytes: inlined.inlinedBytes,
+          warningFlags: inlined.warningFlags,
         });
-        messages = inlined.messages;
-        if (
-          inlined.inlinedCount > 0 ||
-          inlined.downloadedCount > 0 ||
-          inlined.fromCacheCount > 0 ||
-          (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
-        ) {
-          console.info('[ImageInline]', {
-            conversationId,
-            mode,
-            inlinedCount: inlined.inlinedCount,
-            downloadedCount: inlined.downloadedCount,
-            fromCacheCount: inlined.fromCacheCount,
-            inlinedBytes: inlined.inlinedBytes,
-            warningFlags: inlined.warningFlags,
-          });
-        }
       }
     } catch (error) {
       console.warn('[ImageInline] failed but capture continues', {
@@ -272,7 +273,18 @@ export function registerConversationHandlers(router: AnyRouter) {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const conversationUrl = String(msg?.conversationUrl || '').trim();
-    const res = await backfillConversationImages({ conversationId, conversationUrl });
+    const res = await backfillConversationImages({
+      conversationId,
+      conversationUrl,
+      onProgress: async (progress) => {
+        const updatedMessages = Number(progress?.updatedMessages) || 0;
+        if (updatedMessages <= 0) return;
+        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+          reason: 'upsert',
+          conversationId,
+        });
+      },
+    });
     router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
       reason: 'upsert',
       conversationId,

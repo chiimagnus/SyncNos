@@ -98,8 +98,7 @@ describe('obsidian-markdown-writer', () => {
           messageKey: 'article_body',
           sequence: 1,
           role: 'assistant',
-          contentMarkdown:
-            '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)CleanShot 828×1194 84 KB',
+          contentMarkdown: '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)CleanShot 828×1194 84 KB',
         },
       ],
       comments: [],
@@ -112,6 +111,8 @@ describe('obsidian-markdown-writer', () => {
       },
     });
 
-    expect(md).toContain('![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)\n\nCleanShot 828×1194 84 KB');
+    expect(md).toContain(
+      '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)\n\nCleanShot 828×1194 84 KB',
+    );
   });
 });
