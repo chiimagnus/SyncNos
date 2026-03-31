@@ -23,6 +23,19 @@
   --tertiary: rgb(232 200 106);
   --tertiary-foreground: rgb(44 48 56);
 
+  /* Source brand colors */
+  --brand-chatgpt: #10a37f;
+  --brand-claude: #d97757;
+  --brand-deepseek: #6b7280;
+  --brand-notionai: #111111;
+  --brand-gemini: #4285f4;
+  --brand-googleaistudio: #4285f4;
+  --brand-kimi: #3b82f6;
+  --brand-doubao: #f97316;
+  --brand-yuanbao: #ef4444;
+  --brand-poe: #ec4899;
+  --brand-zai: #14b8a6;
+
   /* Semantic + On-Color */
   --error: rgb(229 62 62);
   --error-foreground: rgb(255 255 255);

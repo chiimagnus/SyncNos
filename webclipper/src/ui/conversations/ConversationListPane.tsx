@@ -10,6 +10,10 @@ import { storageOnChanged } from '@services/shared/storage';
 import { t, formatConversationTitle } from '@i18n';
 import type { SyncProvider } from '@services/sync/models';
 import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
+import {
+  resolveConversationListTag,
+  resolveConversationSourceOptionLabel,
+} from '@ui/conversations/conversation-list-tags';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
 import { navItemClassName } from '@ui/shared/nav-styles';
@@ -24,8 +28,6 @@ import {
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-
-type SourceMeta = { key: string; label: string };
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
@@ -59,57 +61,6 @@ function formatTime(ts?: number) {
 
 function hasWarningFlags(conversation: Conversation) {
   return Array.isArray((conversation as any).warningFlags) && ((conversation as any).warningFlags as any[]).length > 0;
-}
-
-function getSourceMeta(raw: unknown): SourceMeta {
-  const text = String(raw || '').trim();
-  if (!text) return { key: 'unknown', label: '' };
-  const normalized = text.toLowerCase().replace(/[\s_-]+/g, '');
-  const map: Record<string, SourceMeta> = {
-    chatgpt: { key: 'chatgpt', label: t('sourceChatgpt') },
-    claude: { key: 'claude', label: t('sourceClaude') },
-    deepseek: { key: 'deepseek', label: t('sourceDeepseek') },
-    notionai: { key: 'notionai', label: t('sourceNotionai') },
-    gemini: { key: 'gemini', label: t('sourceGemini') },
-    googleaistudio: { key: 'googleaistudio', label: t('sourceGoogleAiStudio') },
-    kimi: { key: 'kimi', label: t('sourceKimi') },
-    doubao: { key: 'doubao', label: t('sourceDoubao') },
-    yuanbao: { key: 'yuanbao', label: t('sourceYuanbao') },
-    poe: { key: 'poe', label: t('sourcePoe') },
-    zai: { key: 'zai', label: t('sourceZai') },
-    web: { key: 'web', label: t('sourceWeb') },
-  };
-  return map[normalized] || { key: 'unknown', label: text };
-}
-
-function sourceTagToneClass(key: string) {
-  const safe = String(key || '')
-    .trim()
-    .toLowerCase();
-  const map: Record<string, string> = {
-    chatgpt:
-      'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    claude:
-      'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    deepseek:
-      'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    notionai:
-      'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    gemini:
-      'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    googleaistudio:
-      'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    kimi: 'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    doubao:
-      'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    yuanbao:
-      'tw-border-[var(--tertiary)] tw-bg-[color-mix(in_srgb,var(--tertiary)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    poe: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    zai: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-    web: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
-    unknown: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
-  };
-  return map[safe] || map.unknown;
 }
 
 function sanitizeHttpUrl(url: unknown) {
@@ -240,8 +191,11 @@ export function ConversationListPane({
           .trim()
           .toLowerCase();
         if (!key) return null;
-        const meta = getSourceMeta(key);
-        const label = String(meta.label || facet?.label || key).trim();
+        const label = resolveConversationSourceOptionLabel({
+          sourceKey: key,
+          fallbackLabel: facet?.label,
+          translate: t,
+        });
         const count = Number(facet?.count) || 0;
         if (count <= 0) return null;
         return { key, label, count };
@@ -706,7 +660,10 @@ export function ConversationListPane({
           {filteredItems.map((conversation) => {
             const id = Number((conversation as any).id);
             const checked = selectedIds.includes(id);
-            const { key: sourceKey, label: sourceLabel } = getSourceMeta((conversation as any).source);
+            const sourceTag = resolveConversationListTag({
+              conversation: conversation as Conversation,
+              translate: t,
+            });
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
@@ -796,10 +753,10 @@ export function ConversationListPane({
                       className={[
                         'tw-inline-flex tw-items-center tw-border tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold',
                         'tw-rounded-[var(--radius-chip)]',
-                        sourceTagToneClass(sourceKey),
+                        sourceTag.toneClassName,
                       ].join(' ')}
                     >
-                      {sourceLabel}
+                      {sourceTag.label}
                     </span>
 
                     {(conversation as any).lastCapturedAt ? (
