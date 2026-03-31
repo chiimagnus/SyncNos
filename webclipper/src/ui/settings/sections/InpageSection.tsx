@@ -17,6 +17,8 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
+  webArticleCacheImagesEnabled: boolean;
+  onToggleWebArticleCacheImagesEnabled: (next: boolean) => void;
   aiChatDollarMentionEnabled: boolean;
   onToggleAiChatDollarMentionEnabled: (next: boolean) => void;
 }) {
@@ -30,6 +32,8 @@ export function InpageSection(props: {
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
+    webArticleCacheImagesEnabled,
+    onToggleWebArticleCacheImagesEnabled,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
   } = props;
@@ -164,6 +168,25 @@ export function InpageSection(props: {
         </label>
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('aiChatCacheImagesHint')}
+        </div>
+
+        <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={webArticleCacheImagesEnabled}
+            disabled={busy}
+            onChange={(e) => onToggleWebArticleCacheImagesEnabled(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          <span className="tw-inline-flex tw-items-center tw-gap-2">
+            <span>{t('webArticleCacheImagesLabel')}</span>
+            <span className="tw-inline-flex tw-items-center tw-rounded-md tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-1.5 tw-py-0.5 tw-text-[10px] tw-font-black tw-tracking-wide tw-text-[var(--text-secondary)]">
+              {t('betaTag')}
+            </span>
+          </span>
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('webArticleCacheImagesHint')}
         </div>
 
         <div className="tw-mt-2.5 tw-grid tw-gap-2">

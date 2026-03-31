@@ -62,8 +62,11 @@ export const en = {
   readingHeading: 'Reading',
   aiChatAutoSaveLabel: 'Auto-save AI chats',
   aiChatAutoSaveHint: 'Only applies to supported AI chat sites. Requires a refresh to apply.',
-  aiChatCacheImagesLabel: 'Cache AI chat images locally (viewable after logout)',
+  aiChatCacheImagesLabel: 'Auto-save AI chat images locally',
   aiChatCacheImagesHint: 'Only affects AI chats. Images are downloaded during capture to avoid broken cloud links.',
+  webArticleCacheImagesLabel: 'Auto-save web article images locally',
+  webArticleCacheImagesHint:
+    'Only affects web articles. Images are downloaded during capture to avoid broken cloud links.',
   aiChatDollarMentionHeading: '$ Mention',
   aiChatDollarMentionLabel: 'Enable $ mention',
   aiChatDollarMentionHint: 'Type $ in supported AI chats to search saved items and insert them as markdown.',
