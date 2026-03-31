@@ -1,6 +1,6 @@
 # 发布
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的发布主线。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的发布主线。
 
 ## 发布面与渠道
 当前仓库的自动化发布主线集中在 **GitHub Release 页面** 与 **WebClipper 多渠道产物**。
@@ -64,7 +64,7 @@ macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的发布主线
 | Edge zip | `syncnos-webclipper-edge-<tag>.zip` | 同上 | GitHub Release |
 | Firefox XPI | `syncnos-webclipper-firefox-<tag>.xpi` / `SyncNos-WebClipper-firefox.xpi` | 同上 | GitHub Release / AMO |
 | AMO Source zip | `SyncNos-WebClipper-amo-source.zip` | 同上 | AMO reviewer source |
-| GitHub Release body | 自动生成 | Release 页面 | 汇总官网、商店与 App Store 链接 |
+| GitHub Release body | 自动生成 | Release 页面 | 汇总官网与商店链接 |
 
 ## 常见失败点
 

@@ -1,6 +1,6 @@
 # 存储
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的本地事实源、备份和迁移说明。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的本地事实源、备份和迁移说明。
 
 ## 存储总览
 SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**WebClipper 侧**用 IndexedDB + `chrome.storage.local` + Zip v2 备份维护本地会话与设置；**Notion / Obsidian / 导出文件**则是派生产物，而不是所有场景下的事实源。

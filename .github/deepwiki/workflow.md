@@ -1,6 +1,6 @@
 # 工作流
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 与仓库文档协作流程。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 与仓库文档协作流程。
 
 ## 协作入口
 

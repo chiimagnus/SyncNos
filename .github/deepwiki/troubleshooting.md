@@ -1,6 +1,6 @@
 # 故障排查
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的故障排查路径。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的故障排查路径。
 
 ## 症状索引
 
@@ -25,7 +25,7 @@ macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的故障排查
 | 问题类型 | 先看页面 | 典型信号 |
 | --- | --- | --- |
 | 授权 / 配置 | [configuration.md](configuration.md) | 缺 Parent Page、API Key、manifest version、URL scheme 等 |
-| 数据落点 / 本地库 | [storage.md](storage.md) | 会话、缓存、Keychain、备份、迁移问题 |
+| 数据落点 / 本地库 | [storage.md](storage.md) | 会话、缓存、备份、迁移问题 |
 | 同步 / 数据链路 | [data-flow.md](data-flow.md) | append / rebuild、cursor、mapping、来源读取问题 |
 | 打包 / 发布 | [release.md](release.md) | tag、渠道参数、产物命名、AMO / CWS 上传失败 |
 

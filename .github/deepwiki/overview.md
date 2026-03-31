@@ -1,6 +1,6 @@
 # 概览
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的目录、入口与运行时总览。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的目录、入口与运行时总览。
 
 ## 仓库是什么
 SyncNos 现在围绕“异构内容 → 稳定知识资产”展开的是 WebClipper 主线；正式的业务入口页是 [business-context.md](business-context.md)，本页负责在业务语义之上再给出目录、入口、运行时和产物层面的整体地图。
@@ -13,7 +13,7 @@ SyncNos 现在围绕“异构内容 → 稳定知识资产”展开的是 WebCli
 
 | 路径 | 角色 | 典型内容 | 阅读建议 |
 | --- | --- | --- | --- |
-| `macOS/` | 已归档的 macOS App 历史资料 | `SyncNos/`, `SyncNos.xcodeproj/`, `Packages/`, `Resource/` | 如需查历史，仅参考归档说明。 |
+| `macOS/` | 已归档历史资料 | `SyncNos/`, `SyncNos.xcodeproj/`, `Packages/`, `Resource/` | 如需查历史，仅参考归档说明。 |
 | `webclipper/` | 浏览器扩展 | `src/entrypoints/`, `src/collectors/`, `src/services/conversations/`, `src/services/comments/`, `src/services/sync/`, `src/ui/` | 先判断改动属于 background / content / popup / app / comments 哪一层。 |
 | `macOS/SyncNos/*.md` / `.github/guide/` | 已归档的专项文档与仓库指南 | 键盘焦点、OCR、Obsidian Local REST API 指南等 | 仅供历史查阅。 |
 | `.github/workflows/` | CI / Release / 商店发布入口 | `release.yml`, `webclipper-release.yml`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 看真实交付链路而不是猜测。 |
@@ -35,9 +35,8 @@ SyncNos 现在围绕“异构内容 → 稳定知识资产”展开的是 WebCli
 
 | 类型 | 来源 / 产物 | 生产或消费方 | 说明 |
 | --- | --- | --- | --- |
-| 阅读来源（已归档） | Apple Books、GoodLinks、WeRead、Dedao、聊天 OCR | 历史 App | 仅供历史查阅，不再作为当前主线 |
 | 页面来源 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai、普通网页 | WebClipper | 扩展先采集为本地会话，再派生到任意目标 |
-| 本地事实源 | SwiftData / UserDefaults / Keychain；IndexedDB / `chrome.storage.local` / `localStorage` / `sessionStorage` | 两条产品线各自维护 | 这是 debug、迁移、恢复、回归时最先要看的地方 |
+| 本地事实源 | IndexedDB / `chrome.storage.local` / `localStorage` / `sessionStorage` | WebClipper | 这是 debug、迁移、恢复、回归时最先要看的地方 |
 | 外部结果 | Notion 数据库 / 页面、Obsidian 文件、Markdown / Zip 导出、Release 附件 | WebClipper + GitHub Actions | 对用户可见，但不是所有情况下都等于事实源 |
 
 - WebClipper 的 Insight 统计面板是**本地会话库的只读视图**：它不生成新的导出产物，也不改变同步链路，而是把 `conversations + messages` 的累计结果变成可见的仪表盘。
@@ -56,7 +55,7 @@ SyncNos 现在围绕“异构内容 → 稳定知识资产”展开的是 WebCli
 | 扩展产物校验 | `npm --prefix webclipper run check` | build 后再跑 `check-dist.mjs` 做完整性检查 |
 
 ## 图表
-![SyncNos 双产品线输出流程图](assets/repository-flow-01.svg)
+![WebClipper 输出流程图](assets/repository-flow-01.svg)
 
 ```mermaid
 flowchart LR

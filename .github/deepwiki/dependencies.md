@@ -1,6 +1,6 @@
 # 依赖关系
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 与发布链路的依赖事实。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 与发布链路的依赖事实。
 
 ## 构建与运行时矩阵
 

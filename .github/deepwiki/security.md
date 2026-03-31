@@ -1,6 +1,6 @@
 # 安全模型（Security）
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的凭据、备份与发布安全模型。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的凭据、备份与发布安全模型。
 
 ## 安全范围
 本页描述仓库内可验证的安全实践：凭据管理、备份边界、扩展权限、OAuth 交换、发布链路校验。
@@ -57,7 +57,6 @@ macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的凭据、备
 
 - 扩展 `host_permissions` 仍较宽，当前依赖运行时 gating 控制行为；后续可继续评估细化范围。
 - Cloudflare worker 采用 `Access-Control-Allow-Origin: *` 以满足扩展调用便捷性，需要配合严格的路径/方法校验与限流。
-- macOS App 已归档，当前安全页不再展开其发布链路与桌面端敏感存储。
 
 ## 来源引用（Source References）
 - `webclipper/wxt.config.ts`

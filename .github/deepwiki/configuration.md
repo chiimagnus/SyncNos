@@ -1,6 +1,6 @@
 # 配置
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的配置、版本与发布真源。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的配置、版本与发布真源。
 
 ## 配置入口
 

@@ -1,6 +1,6 @@
 # 数据流
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的数据链路与外部同步说明。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的数据链路与外部同步说明。
 
 ## 主要流程总览
 
@@ -77,7 +77,7 @@ macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的数据链路
 | WebClipper 图片缓存开关 | `chrome.storage.local` | `ai_chat_cache_images_enabled` | 控制 chat 消息图片内联策略；历史消息需手动触发 backfill |
 
 ## 图表
-![SyncNos 双产品线输出流程图](assets/repository-flow-01.svg)
+![WebClipper 输出流程图](assets/repository-flow-01.svg)
 
 ```mermaid
 flowchart LR

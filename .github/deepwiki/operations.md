@@ -1,9 +1,9 @@
 # 运维与运行操作（Operations）
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的运维与交付操作。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的运维与交付操作。
 
 ## 页面目标
-本页聚焦“如何稳定运行与交付 SyncNos 双产品线”，覆盖：日常运行检查、故障处置路径、发布前后操作、备份与恢复。
+本页聚焦“如何稳定运行与交付 WebClipper”，覆盖：日常运行检查、故障处置路径、发布前后操作、备份与恢复。
 
 - 产品语义入口先读：[business-context.md](business-context.md)
 - 架构与数据边界参考：[architecture.md](architecture.md)、[storage.md](storage.md)、[api.md](api.md)
@@ -68,7 +68,6 @@ flowchart LR
 ## 运维边界与 Coverage Gaps
 
 - 仓库内已覆盖 WebClipper 的自动化发布与扩展运行面。
-- macOS App 已归档，仓库内不再维护桌面端提交/签名链路。
 
 ## 来源引用（Source References）
 - `webclipper/src/entrypoints/background.ts`

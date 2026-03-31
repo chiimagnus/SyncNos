@@ -2,8 +2,8 @@
 
 ## 摘要
 - **正式入口**：先读 [business-context.md](business-context.md)，先建立产品语义，再进入仓库结构与实现细节。
-- **仓库形态**：这是一个双产品线仓库——`macOS/` 下的 SwiftUI macOS App 已归档，仅保留历史说明；`webclipper/` 是当前活动的浏览器扩展，两者都围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
-- **关键入口**：App 入口是 `macOS/SyncNos/SyncNosApp.swift` + `macOS/SyncNos/AppDelegate.swift`；扩展入口是 `webclipper/src/entrypoints/background.ts` + `webclipper/src/entrypoints/content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
+- **仓库形态**：`macOS/` 仅保留历史资料；`webclipper/` 是当前活动的浏览器扩展，两者围绕“把异构内容整理为稳定知识资产”展开，但运行时、存储和用户动作完全不同。
+- **关键入口**：扩展入口是 `webclipper/src/entrypoints/background.ts` + `webclipper/src/entrypoints/content.ts`；发布入口是 `.github/workflows/*.yml` 与 `.github/scripts/webclipper/*.mjs`。
 - **稳定事实源**：版本、权限、配置、迁移规则请以 `wxt.config.ts`、`schema.ts`、workflow 与脚本为准；本索引不再保留按日期堆叠的变更流水。
 - **如何使用本索引**：如果你先想理解“产品做什么”，走 business-first；如果你已经准备改代码，走 engineering-first；如果你要发版本，走 release-first。
 
@@ -13,29 +13,27 @@
 | 仓库总览 | [overview.md](overview.md) | 目录地图、入口文件、主要产物、推荐阅读顺序 |
 | 技术总览 | [architecture.md](architecture.md) | 运行时边界、关键契约、修改热点 |
 | 数据链路 | [data-flow.md](data-flow.md) | 来源 → 本地事实源 → Notion / Obsidian / 导出 |
-| 产品细节 | `modules/` | App（已归档）与 WebClipper 各自的实现边界与扩展点 |
+| 产品细节 | `modules/` | WebClipper 的实现边界与扩展点 |
 
 ## 推荐阅读路径
 
 ### Business-first
 1. [business-context.md](business-context.md) — 先理解仓库服务谁、交付什么、有哪些关键规则。
 2. [overview.md](overview.md) — 再建立目录、入口和产物级别的整体地图。
-3. [data-flow.md](data-flow.md) — 看清两个产品线各自如何把输入变成可见结果。
-4. [modules/syncnos-app.md](modules/syncnos-app.md) — 如果你要查看已归档的 macOS App 历史说明。
-5. [modules/webclipper.md](modules/webclipper.md) — 如果你关注 AI 对话采集、文章抓取、本地会话和多目标同步。
-6. [storage.md](storage.md) / [troubleshooting.md](troubleshooting.md) — 当你开始追问“数据存在哪”或“为什么失败”。
+3. [data-flow.md](data-flow.md) — 看清各条主线如何把输入变成可见结果。
+4. [modules/webclipper.md](modules/webclipper.md) — 如果你关注 AI 对话采集、文章抓取、本地会话和多目标同步。
+5. [storage.md](storage.md) / [troubleshooting.md](troubleshooting.md) — 当你开始追问“数据存在哪”或“为什么失败”。
 
 ### Engineering-first
 1. [architecture.md](architecture.md) — 先看运行时边界、依赖方向、关键契约。
 2. [dependencies.md](dependencies.md) — 确认技术栈、第三方依赖、外部系统与版本规则。
-3. [configuration.md](configuration.md) — 看 manifest、UserDefaults、Keychain、`chrome.storage.local`、发布参数。
-4. [modules/syncnos-app.md](modules/syncnos-app.md) — 进入 App 的启动、门控、同步与缓存实现。
-5. [modules/webclipper.md](modules/webclipper.md) — 进入扩展的 background/content/popup/app 分层与采集策略。
-6. [data-flow.md](data-flow.md) — 对照真实输入输出链路检查改动影响面。
-7. [api.md](api.md) — 确认消息契约、OAuth code exchange、外部 API 调用边界。
-8. [security.md](security.md) — 确认权限边界、敏感信息保护与风险控制面。
-9. [testing.md](testing.md) — 确认验证顺序与现有测试覆盖。
-10. [workflow.md](workflow.md) — 确认协作方式、文档同步与发布边界。
+3. [configuration.md](configuration.md) — 看 manifest、`chrome.storage.local`、发布参数。
+4. [modules/webclipper.md](modules/webclipper.md) — 进入扩展的 background/content/popup/app 分层与采集策略。
+5. [data-flow.md](data-flow.md) — 对照真实输入输出链路检查改动影响面。
+6. [api.md](api.md) — 确认消息契约、OAuth code exchange、外部 API 调用边界。
+7. [security.md](security.md) — 确认权限边界、敏感信息保护与风险控制面。
+8. [testing.md](testing.md) — 确认验证顺序与现有测试覆盖。
+9. [workflow.md](workflow.md) — 确认协作方式、文档同步与发布边界。
 
 ### Release-first
 1. [release.md](release.md) — GitHub Release、CWS、AMO、产物命名和脚本职责。
@@ -51,7 +49,7 @@
 | 业务入口层 | `business-context.md` | 用业务语义把读者送往技术页，而不是停留在 marketing 摘要。 |
 | 基础全景 | `overview.md`, `architecture.md`, `dependencies.md`, `data-flow.md` | 帮你建立仓库全貌、运行时边界和主链路。 |
 | 工程执行 | `configuration.md`, `testing.md`, `workflow.md` | 回答“如何配置、如何验证、如何协作”。 |
-| 产品模块 | `modules/syncnos-app.md`, `modules/webclipper.md` | 回答“改 App 去哪里、改扩展去哪里”。 |
+| 产品模块 | `modules/webclipper.md` | 回答“改扩展去哪里”。 |
 | 专题页面 | [storage.md](storage.md), [release.md](release.md), [troubleshooting.md](troubleshooting.md), [api.md](api.md), [operations.md](operations.md), [security.md](security.md) | 回答“数据落点、交付链路、故障定位、API 契约、运维与安全边界”。 |
 | 参考 | [glossary.md](glossary.md), [GENERATION.md](GENERATION.md) | 统一术语与生成元数据。 |
 
@@ -60,7 +58,6 @@
 | 我想回答的问题 | 先读哪里 | 再读哪里 |
 | --- | --- | --- |
 | 这个仓库到底解决什么问题？ | [business-context.md](business-context.md) | [overview.md](overview.md) |
-| App 为什么会先出现引导或付费墙？ | [business-context.md](business-context.md) | [modules/syncnos-app.md](modules/syncnos-app.md) |
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
 | WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
 | WebClipper 的主题（仅跟随系统）、inpage 开关、AI 自动保存、AI `$ mention` 与图片缓存配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
@@ -77,8 +74,7 @@
 | 怎样验证发布不会炸？ | [release.md](release.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
 
 ## Coverage Gaps
-- **App Store 交付链路**：仓库中能看到 App Store 链接，但没有公开的 App Store 提交 workflow 或脚本；deepwiki 明确把它视为“仓库外渠道信息”。
-- **OCR 与键盘焦点专项文档**：仓库已有 [`macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md`](../../macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md) 与 [`macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md`](../../macOS/SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md)，本版 deepwiki 已在相关页面引用它们，但尚未继续拆成独立 deepwiki 子页。
+- **历史专项文档**：仓库还有键盘焦点与 OCR 的历史说明，但本版 deepwiki 仍以 WebClipper 主线为准，尚未拆成独立 deepwiki 子页。
 - **集成专题页**：当前 Notion / Obsidian / collectors 仍主要分布在 `architecture.md`、`data-flow.md` 与 `modules/` 页面；如果未来这些区域继续膨胀，适合再拆专题页。
 
 ## Generation Metadata

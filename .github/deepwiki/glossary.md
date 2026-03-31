@@ -1,16 +1,16 @@
 # 术语表
 
-macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 与同步 / 发布相关术语。
+macOS/ 历史资料已归档；本页仅保留 WebClipper 与同步 / 发布相关术语。
 
 ## 使用说明
-- 本页按“仓库级 → App → WebClipper → 同步 / 存储 → 发布”分组，确保同一个词在不同页面里不会被误解。
+- 本页按“仓库级 → WebClipper → 同步 / 存储 → 发布”分组，确保同一个词在不同页面里不会被误解。
 - 如果你在其他页面看到 `Parent Page`、`cursor`、`conversation kind`、`EnsureCache`、`inpage_display_mode` 等词，建议先回到这里校准语义。
 
 ## 仓库级术语
 
 | 术语 | 定义 | 常见位置 |
 | --- | --- | --- |
-| 双产品线 | 历史上同时包含已归档的 macOS App 与当前活动的浏览器扩展 | `README.md`, `AGENTS.md` |
+| 历史仓库形态 | 当前仓库包含已归档的 macOS 历史资料与当前活动的浏览器扩展 | `README.md`, `AGENTS.md` |
 | Parent Page | Notion 中承载 SyncNos 产物的父页面 | `business-context.md`, Settings / Notion 配置 |
 | 条目（Item） | 一个可同步对象，如书、文章、会话 | `business-context.md`, `data-flow.md` |
 | 内容片段 | 条目里的高亮、笔记、消息或正文 | `business-context.md`, `data-flow.md` |
