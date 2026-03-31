@@ -26,6 +26,10 @@ const imageInlineMocks = vi.hoisted(() => ({
   inlineChatImagesInMessages: vi.fn(),
 }));
 
+const backfillJobMocks = vi.hoisted(() => ({
+  backfillConversationImages: vi.fn(),
+}));
+
 vi.mock('@services/conversations/data/write', () => ({
   writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
   writeConversationSnapshot: writeMocks.writeConversationSnapshot,
@@ -48,6 +52,10 @@ vi.mock('@platform/storage/local', () => ({
 
 vi.mock('@services/conversations/data/image-inline', () => ({
   inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
+}));
+
+vi.mock('@services/conversations/background/image-backfill-job', () => ({
+  backfillConversationImages: backfillJobMocks.backfillConversationImages,
 }));
 
 function makeInlineResult(messages: any[]) {
@@ -79,6 +87,15 @@ beforeEach(() => {
     const messages = Array.isArray(input?.messages) ? input.messages : [];
     return makeInlineResult(messages);
   });
+  backfillJobMocks.backfillConversationImages.mockResolvedValue({
+    scannedMessages: 0,
+    updatedMessages: 0,
+    inlinedCount: 0,
+    fromCacheCount: 0,
+    downloadedCount: 0,
+    inlinedBytes: 0,
+    warningFlags: [],
+  });
 });
 
 afterEach(() => {
@@ -95,6 +112,7 @@ afterEach(() => {
   storageMocks.mergeConversationsByIds.mockReset();
   localStorageMocks.storageGet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
+  backfillJobMocks.backfillConversationImages.mockReset();
 });
 
 describe('background-router conversations events', () => {
@@ -182,6 +200,53 @@ describe('background-router conversations events', () => {
         enableHttpImages: true,
       }),
     );
+  });
+
+  it('broadcasts incremental updates while backfillConversationImages is running', async () => {
+    const broadcast = vi.fn();
+    backfillJobMocks.backfillConversationImages.mockImplementation(async (input: any) => {
+      await input?.onProgress?.({ updatedMessages: 1 });
+      await input?.onProgress?.({ updatedMessages: 2 });
+      return {
+        scannedMessages: 2,
+        updatedMessages: 2,
+        inlinedCount: 2,
+        fromCacheCount: 1,
+        downloadedCount: 1,
+        inlinedBytes: 2048,
+        warningFlags: [],
+      };
+    });
+
+    const router = createRouter();
+    router.eventsHub.broadcast = broadcast;
+
+    const res = await router.__handleMessageForTests({
+      type: 'backfillConversationImages',
+      conversationId: 888,
+      conversationUrl: 'https://example.com/a',
+    });
+
+    expect(res.ok).toBe(true);
+    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 888,
+        conversationUrl: 'https://example.com/a',
+      }),
+    );
+    expect(broadcast).toHaveBeenCalledTimes(3);
+    expect(broadcast).toHaveBeenNthCalledWith(1, 'conversationsChanged', {
+      reason: 'upsert',
+      conversationId: 888,
+    });
+    expect(broadcast).toHaveBeenNthCalledWith(2, 'conversationsChanged', {
+      reason: 'upsert',
+      conversationId: 888,
+    });
+    expect(broadcast).toHaveBeenNthCalledWith(3, 'conversationsChanged', {
+      reason: 'upsert',
+      conversationId: 888,
+    });
   });
 
   it('broadcasts conversationsChanged after deleteConversations', async () => {

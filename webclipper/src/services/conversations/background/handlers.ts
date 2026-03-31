@@ -273,7 +273,18 @@ export function registerConversationHandlers(router: AnyRouter) {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const conversationUrl = String(msg?.conversationUrl || '').trim();
-    const res = await backfillConversationImages({ conversationId, conversationUrl });
+    const res = await backfillConversationImages({
+      conversationId,
+      conversationUrl,
+      onProgress: async (progress) => {
+        const updatedMessages = Number(progress?.updatedMessages) || 0;
+        if (updatedMessages <= 0) return;
+        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+          reason: 'upsert',
+          conversationId,
+        });
+      },
+    });
     router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
       reason: 'upsert',
       conversationId,
