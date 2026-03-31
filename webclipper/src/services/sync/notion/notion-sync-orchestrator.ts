@@ -21,6 +21,7 @@ import {
   rebuildSectionByArchivingHeading,
   recoverSectionHeadingBlockId,
 } from '@services/sync/notion/notion-managed-sections.ts';
+import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -364,7 +365,7 @@ function fnv1a32(input) {
 }
 
 function computeNotionArticleDigest(messagesList) {
-  const markdown = pickArticleBodyMarkdown(messagesList);
+  const markdown = normalizeStandaloneImageCaptionLines(pickArticleBodyMarkdown(messagesList));
   return fnv1a32(JSON.stringify({ markdown }));
 }
 

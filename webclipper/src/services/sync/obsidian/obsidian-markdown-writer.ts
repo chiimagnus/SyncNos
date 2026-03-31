@@ -1,4 +1,5 @@
 import type { ArticleComment } from '@services/comments/domain/models';
+import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 
 const MESSAGES_HEADING = 'Conversations';
 const ARTICLE_HEADING = 'Article';
@@ -112,7 +113,12 @@ function toArticleBodyMessages(messages: unknown[]): any[] {
 
 function buildArticleBodyMarkdown(messages: any[]) {
   const list = toArticleBodyMessages(messages);
-  const chunks = list.map((m) => safeString(m?.contentMarkdown) || safeString(m?.contentText)).filter((x) => !!x);
+  const chunks = list
+    .map((m) => {
+      const raw = safeString(m?.contentMarkdown) || safeString(m?.contentText);
+      return normalizeStandaloneImageCaptionLines(raw);
+    })
+    .filter((x) => !!x);
   return chunks.join('\n\n').trim();
 }
 

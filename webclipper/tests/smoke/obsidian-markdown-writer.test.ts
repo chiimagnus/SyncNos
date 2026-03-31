@@ -82,4 +82,36 @@ describe('obsidian-markdown-writer', () => {
     expect(md).toContain('  Root');
     expect(md).toContain('  Reply');
   });
+
+  it('normalizes standalone image lines that append caption text', async () => {
+    const w = await loadWriter();
+    const md = w.buildFullNoteMarkdown({
+      conversation: {
+        title: 'T',
+        source: 's',
+        sourceType: 'article',
+        conversationKey: 'k',
+        url: 'https://example.com',
+      },
+      messages: [
+        {
+          messageKey: 'article_body',
+          sequence: 1,
+          role: 'assistant',
+          contentMarkdown:
+            '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)CleanShot 828×1194 84 KB',
+        },
+      ],
+      comments: [],
+      syncnosObject: {
+        source: 's',
+        conversationKey: 'k',
+        schemaVersion: 1,
+        lastSyncedSequence: 1,
+        lastSyncedMessageKey: 'article_body',
+      },
+    });
+
+    expect(md).toContain('![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)\n\nCleanShot 828×1194 84 KB');
+  });
 });
