@@ -53,8 +53,8 @@
 
 ## Coverage Notes
 - 本次重点是“WebClipper inpage 交互与消息契约事实同步”：修正双击入口、补齐 `$ mention` 与消息分组，避免文档与代码行为冲突。
-- deepwiki 继续覆盖双产品线、配置、数据流、存储、测试、发布与排障；并维持“代码/配置优先于文档摘要”的约束。
-- 仍保留的 Coverage Gaps：App Store 提交流程缺少仓库内自动化证据；OCR 与键盘焦点专项文档尚未拆为 deepwiki 独立专题页。
+- deepwiki 继续覆盖配置、数据流、存储、测试、发布与排障；并维持“代码/配置优先于文档摘要”的约束。
+- 仍保留的 Coverage Gaps：历史专项文档尚未拆为 deepwiki 独立专题页。
 
 ## Audit Basis
 

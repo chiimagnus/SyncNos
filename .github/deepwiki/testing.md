@@ -4,19 +4,8 @@
 
 | 产品线 / 层 | 主策略 | 自动化程度 | 核心目标 |
 | --- | --- | --- | --- |
-| SyncNos App | 构建校验 + SwiftUI Preview + 人工冒烟 | 低到中 | 保障来源读取、门控、同步、窗口行为不回退 |
 | WebClipper | `compile` → `test` → `build`（必要时补 `build:firefox` / `check`） | 中到高 | 保障消息协议、存储迁移、同步游标、构建产物稳定 |
 | 发布层 | workflow 校验 + 打包脚本 | 高 | 保障 tag / manifest / 资产生成与上传一致 |
-
-## SyncNos App：验证重点
-
-| 场景 | 推荐方法 | 关注点 |
-| --- | --- | --- |
-| 工程可构建 | `xcodebuild -project macOS/SyncNos.xcodeproj -scheme SyncNos -configuration Debug build` | 工程、依赖和 Swift 编译是否正常 |
-| 引导 / 付费墙 / 主界面切换 | `RootView` 相关 Preview + 手动打开 App | 确认 Onboarding → PayWall → MainListView 顺序不乱 |
-| ViewModel / Service 核心逻辑 | 单元测试或最小 mock 验证 | 数据转换、状态变化、边界条件 |
-| 同步冒烟 | 连接至少一个来源并完成一次同步 | Notion 中出现对应数据库 / 页面 |
-| 键盘 / 焦点 / 窗口行为 | 参考专项文档手工验证 | 主窗口、搜索、快捷键和菜单栏模式不串场 |
 
 ## WebClipper：自动化验证入口
 
@@ -51,15 +40,14 @@
 | `tests/unit/item-mention-search.test.ts` | `$ mention` 候选匹配与排序 | 防止标题/域名/来源匹配规则漂移导致“候选顺序看起来不对” |
 
 ## 手动冒烟建议
-1. **App**：打开应用、确认主窗口 / Settings / Logs 都可打开；走一遍 onboarding / paywall 正常路径；至少连接一个来源并完成一次同步。
-2. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开页面内评论侧边栏（inpage comments panel）、多击提示；用工具栏图标打开 popup 并确认列表刷新；在输入框验证 `$ mention` 候选显示、方向键切换与 Tab/Enter 插入。
-3. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
-4. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除都可用；刷新后评论仍在本地；如果从外部恢复备份，确认评论线程也能一起恢复；旧备份若不含 `assets/article-comments/index.json` 则仍会缺失。
-5. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `inpage display mode / AI auto-save / AI $ mention / AI chat cache images` 设置行为，以及系统主题随 `prefers-color-scheme` 切换的表现。
-6. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与 app 的窄屏 header 也应保持同样行为。
-7. **WebClipper（About You / Insight）**：打开 `Settings → About You`（旧称 Insight，对应 section key `aboutyou`），验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 About You 分区。
-8. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
-9. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
+1. **WebClipper（支持站点）**：在支持 AI 站点验证自动采集、单击保存、双击打开页面内评论侧边栏（inpage comments panel）、多击提示；用工具栏图标打开 popup 并确认列表刷新；在输入框验证 `$ mention` 候选显示、方向键切换与 Tab/Enter 插入。
+2. **WebClipper（普通网页）**：抓一次 article，确认能写出 article conversation，并尝试同步到 Notion 或导出 Markdown。
+3. **WebClipper（文章评论）**：在 article detail 和 inpage comments panel 里验证评论列表、回复、删除都可用；刷新后评论仍在本地；如果从外部恢复备份，确认评论线程也能一起恢复；旧备份若不含 `assets/article-comments/index.json` 则仍会缺失。
+4. **WebClipper（配置）**：验证 Notion Parent Page、Obsidian connection test、备份导出 / 导入、`General` 分区里的 `inpage display mode / AI auto-save / AI $ mention / AI chat cache images` 设置行为，以及系统主题随 `prefers-color-scheme` 切换的表现。
+5. **WebClipper（详情头动作）**：在 chat detail 中验证 `tools / chat-with / open` 三组动作都能按槽位显示；`cache-images` 仅在 chat 可见、article 隐藏；触发后应看到更新计数反馈并刷新 detail；在 popup 与窄屏 header 也应保持同样行为。
+6. **WebClipper（About You / Insight）**：打开 `Settings → About You`（旧称 Insight，对应 section key `aboutyou`），验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 About You 分区。
+7. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
+8. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
 
 ## 发布前检查
 
@@ -88,10 +76,6 @@
 - 需要真的跑代码时，优先遵循仓库已有的命令，不新增新的 lint / test 系统。
 
 ## 来源引用（Source References）
-- `AGENTS.md`
-- `macOS/SyncNos/AGENTS.md`
-- `macOS/SyncNos/Views/RootView.swift`
-- `macOS/SyncNos/键盘导航与焦点管理技术文档（全项目）.md`
 - `webclipper/package.json`
 - `webclipper/tests`
 - `webclipper/tests/unit/notion-sync-cursor.test.ts`

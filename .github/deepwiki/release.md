@@ -1,7 +1,9 @@
 # 发布
 
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的发布主线。
+
 ## 发布面与渠道
-当前仓库的自动化发布主线集中在 **GitHub Release 页面** 与 **WebClipper 多渠道产物**。README 中确实存在 macOS App Store 链接，但仓库内没有公开的 App Store 提交流程，因此 deepwiki 把它视为“仓库外渠道信息”，而不是本仓库的自动化发布主线。
+当前仓库的自动化发布主线集中在 **GitHub Release 页面** 与 **WebClipper 多渠道产物**。
 
 | 渠道 | 产物 | 主要入口 | 自动化程度 |
 | --- | --- | --- | --- |
@@ -10,13 +12,12 @@
 | Edge Add-ons | Edge zip 上传 / 发布 | `.github/workflows/webclipper-edge-publish.yml` | 自动 |
 | Edge（手动分发） | Edge zip 作为 Release 附件 | `.github/workflows/webclipper-release.yml` | 自动构建 |
 | Firefox AMO | XPI + reviewer source zip | `.github/workflows/webclipper-amo-publish.yml` | 自动 |
-| macOS App Store | App Store 页面链接 | `README.md`, `release.yml` body | 仓库内未显式自动化 |
 
 ## Workflow 矩阵
 
 | Workflow | 触发方式 | 主要动作 | 结果 |
 | --- | --- | --- | --- |
-| `release.yml` | `push tags: v*` / `workflow_dispatch` | 创建 GitHub Release 页面，写入官网 / App Store / 扩展下载链接 | Release 页面 |
+| `release.yml` | `push tags: v*` / `workflow_dispatch` | 创建 GitHub Release 页面，写入官网与扩展下载链接 | Release 页面 |
 | `webclipper-release.yml` | `push tags: v*` / `workflow_dispatch` | 安装依赖、构建 Chrome / Edge / Firefox 资产并上传到 Release | zip / xpi 附件 |
 | `webclipper-amo-publish.yml` | `push tags: v*` / `workflow_dispatch` | 校验 manifest 版本、构建 XPI、打包 source zip、调用 AMO API | Firefox 商店版本 |
 | `webclipper-cws-publish.yml` | `push tags: v*` / `workflow_dispatch` | 校验 manifest 版本、构建 Chrome zip、上传 CWS | Chrome 商店版本 |
@@ -63,7 +64,7 @@
 | Edge zip | `syncnos-webclipper-edge-<tag>.zip` | 同上 | GitHub Release |
 | Firefox XPI | `syncnos-webclipper-firefox-<tag>.xpi` / `SyncNos-WebClipper-firefox.xpi` | 同上 | GitHub Release / AMO |
 | AMO Source zip | `SyncNos-WebClipper-amo-source.zip` | 同上 | AMO reviewer source |
-| GitHub Release body | 自动生成 | Release 页面 | 汇总官网、商店与 App Store 链接 |
+| GitHub Release body | 自动生成 | Release 页面 | 汇总官网与商店链接 |
 
 ## 常见失败点
 
@@ -75,11 +76,9 @@
 | CWS 凭据缺失 | `webclipper-cws-publish.yml` | 上传 action 失败 | 检查 CWS secrets |
 | Firefox manifest 补丁缺失 | `package-release-assets.mjs` | AMO validator 报 background / gecko 问题 | 检查脚本补丁分支 |
 | 误把 `package.json` 当商店版本事实源 | 发布认知层 | 版本看起来对，workflow 仍然失败 | 记住商店用的是 `wxt.config.ts` |
-| 误以为 App Store 也由当前 CI 发布 | 仓库认知层 | 找不到相关 workflow | 当前仓库只公开了链接，没有自动提交流程 |
 
 ## Coverage Gaps
-- WebClipper 自动化发布链路已经有足够代码证据；**App Store 提交流程**仍然没有同等级 workflow / 脚本证据。
-- 如果未来仓库补充了签名、证书、App Store Connect 提交流程，再适合为 macOS App 补独立发布专题页。
+- WebClipper 自动化发布链路已经有足够代码证据。
 
 ## 来源引用（Source References）
 - `README.md`

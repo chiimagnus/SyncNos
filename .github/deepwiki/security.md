@@ -1,5 +1,7 @@
 # 安全模型（Security）
 
+macOS/ 历史资料已归档；本页仅保留 WebClipper 的凭据、备份与发布安全模型。
+
 ## 安全范围
 本页描述仓库内可验证的安全实践：凭据管理、备份边界、扩展权限、OAuth 交换、发布链路校验。
 
@@ -11,8 +13,6 @@
 | --- | --- | --- | --- |
 | Notion OAuth token（扩展） | WebClipper | `chrome.storage.local`（token store） | 备份时显式排除 `notion_oauth_token*` |
 | Notion OAuth client secret（扩展） | 用户配置/worker secret | 本地仅短期使用；worker 侧 secret | `ensureDefaultNotionOAuthClientId()` 会移除本地 secret |
-| 站点 Cookie（App） | macOS App | Keychain（`SiteLoginsStore`） | 不进入扩展备份，不明文落仓 |
-| IAP/设备标识（App） | macOS App | UserDefaults + Keychain | 双写策略，敏感值保留 Keychain |
 | 会话与消息内容（扩展） | WebClipper | IndexedDB | 仅本地事实源，外发需用户触发 |
 | 备份包 | WebClipper | 本地 Zip v2 文件 | denylist + 路径安全校验 + schema 校验 |
 
@@ -57,7 +57,6 @@
 
 - 扩展 `host_permissions` 仍较宽，当前依赖运行时 gating 控制行为；后续可继续评估细化范围。
 - Cloudflare worker 采用 `Access-Control-Allow-Origin: *` 以满足扩展调用便捷性，需要配合严格的路径/方法校验与限流。
-- App Store 提交流程不在仓库内，当前无法在此页面给出同级自动化安全检查证据。
 
 ## 来源引用（Source References）
 - `webclipper/wxt.config.ts`
@@ -68,8 +67,6 @@
 - `webclipper/src/services/sync/backup/backup-utils.ts`
 - `webclipper/src/services/sync/backup/import.ts`
 - `webclipper/src/services/sync/backup/zip-utils.ts`
-- `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
-- `macOS/SyncNos/Services/Auth/IAPService.swift`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
 - `.github/workflows/webclipper-edge-publish.yml`
