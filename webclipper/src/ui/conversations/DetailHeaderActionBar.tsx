@@ -41,9 +41,15 @@ export function DetailHeaderActionBar({
       if (action.afterTriggerLabel) {
         setLabelOverride(String(action.afterTriggerLabel));
         if (labelResetTimerRef.current != null) globalThis.clearTimeout(labelResetTimerRef.current);
-        labelResetTimerRef.current = globalThis.setTimeout(() => {
-          setLabelOverride('');
-        }, 2_600);
+        const customDuration = Number(action.afterTriggerLabelDurationMs);
+        const durationMs = Number.isFinite(customDuration) ? Math.max(0, Math.floor(customDuration)) : 2_600;
+        if (durationMs > 0) {
+          labelResetTimerRef.current = globalThis.setTimeout(() => {
+            setLabelOverride('');
+          }, durationMs);
+        } else {
+          labelResetTimerRef.current = null;
+        }
       }
     } catch (error) {
       const message =
@@ -81,7 +87,7 @@ export function DetailHeaderActionBar({
 
   if (actions.length === 1) {
     const action = actions[0]!;
-    const buttonLabel = labelOverride || action.label;
+    const buttonLabel = busy ? String(action.busyLabel || action.label) : labelOverride || action.label;
     const icon = resolveActionIcon(action);
     const resolvedTriggerIcon = triggerIcon ||
       (iconOnly ? <ExternalLink size={16} strokeWidth={2} aria-hidden="true" /> : icon) || (
@@ -108,6 +114,14 @@ export function DetailHeaderActionBar({
             <span className="tw-inline-flex tw-items-center tw-gap-1.5">
               {resolvedTriggerIcon}
               <span className="tw-hidden md:tw-inline tw-whitespace-nowrap">{buttonLabel}</span>
+              {busy && action.showBusyProgress ? (
+                <span
+                  className="tw-hidden md:tw-inline-flex tw-h-1.5 tw-w-14 tw-overflow-hidden tw-rounded-full tw-bg-[var(--bg-sunken)]"
+                  aria-hidden="true"
+                >
+                  <span className="tw-h-full tw-w-1/2 tw-animate-pulse tw-rounded-full tw-bg-[var(--accent)]" />
+                </span>
+              ) : null}
             </span>
           )}
         </button>

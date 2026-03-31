@@ -1029,25 +1029,16 @@ export function ConversationsProvider({
             ? {
                 id: 'cache-images',
                 label: t('detailHeaderCacheImagesLabel'),
+                busyLabel: t('detailHeaderCacheImagesInProgressLabel'),
+                showBusyProgress: true,
                 kind: 'open-target',
                 provider: 'local',
                 slot: 'tools',
+                afterTriggerLabel: t('detailHeaderCacheImagesDoneLabel'),
+                afterTriggerLabelDurationMs: 0,
                 onTrigger: async () => {
-                  const res = await backfillConversationImages(conversationId, conversationUrl);
+                  await backfillConversationImages(conversationId, conversationUrl);
                   await refreshActiveDetail();
-                  const updated = Number(res?.updatedMessages) || 0;
-                  const downloaded = Number(res?.downloadedCount) || 0;
-                  const fromCache = Number(res?.fromCacheCount) || 0;
-                  if (!updated) {
-                    alert(t('detailHeaderCacheImagesNoop'));
-                  } else {
-                    const parts = [
-                      t('detailHeaderCacheImagesSuccess'),
-                      `${t('detailHeaderCacheImagesUpdatedMessages')} ${updated}`,
-                      `(${t('detailHeaderCacheImagesDownloaded')}: ${downloaded}, ${t('detailHeaderCacheImagesCacheHits')}: ${fromCache})`,
-                    ];
-                    alert(parts.filter(Boolean).join(' ').trim());
-                  }
                 },
               }
             : null;

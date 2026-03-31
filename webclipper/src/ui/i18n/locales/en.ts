@@ -361,6 +361,8 @@ export const en = {
   detailHeaderOpenInObsidian: 'Open in Obsidian',
   detailHeaderObsidianApiNotConnected: 'Obsidian API not connected',
   detailHeaderCacheImagesLabel: 'Cache images',
+  detailHeaderCacheImagesInProgressLabel: 'Caching images...',
+  detailHeaderCacheImagesDoneLabel: 'Cache complete',
   detailHeaderCacheImagesSuccess: 'Images cached.',
   detailHeaderCacheImagesUpdatedMessages: 'Updated messages:',
   detailHeaderCacheImagesDownloaded: 'downloaded',

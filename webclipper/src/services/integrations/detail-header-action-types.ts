@@ -7,6 +7,8 @@ export type DetailHeaderActionSlot = 'open' | 'tools';
 export type DetailHeaderAction = {
   id: string;
   label: string;
+  busyLabel?: string;
+  showBusyProgress?: boolean;
   kind: DetailHeaderActionKind;
   provider: DetailHeaderActionProvider;
   slot: DetailHeaderActionSlot;
@@ -14,6 +16,7 @@ export type DetailHeaderAction = {
   href?: string;
   triggerPayload?: Record<string, unknown>;
   afterTriggerLabel?: string;
+  afterTriggerLabelDurationMs?: number;
   onTrigger: () => Promise<void>;
 };
 
