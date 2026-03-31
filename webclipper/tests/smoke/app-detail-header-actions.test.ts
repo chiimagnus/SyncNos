@@ -29,7 +29,7 @@ const currentState = {
       href: 'https://www.notion.so/0123456789abcdef0123456789abcdef',
       onTrigger: vi.fn(async () => {}),
     },
-  ],
+  ] as any[],
 };
 
 vi.mock('../../src/ui/shared/ChatMessageBubble', () => ({
@@ -104,6 +104,17 @@ describe('ConversationDetailPane header actions', () => {
 
   beforeEach(() => {
     setupDom();
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Conversation',
+      source: 'chatgpt',
+      conversationKey: 'conv-11',
+      notionPageId: '01234567-89ab-cdef-0123-456789abcdef',
+    } as any;
+    currentState.detail = {
+      conversationId: 11,
+      messages: [],
+    } as any;
     currentState.detailHeaderActions = [
       {
         id: 'open-in-notion',
@@ -183,6 +194,42 @@ describe('ConversationDetailPane header actions', () => {
 
     expect(document.querySelector('[aria-label="Open destinations"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('shows Cache images for article detail when tools action is provided', async () => {
+    const onTrigger = vi.fn(async () => {});
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-11',
+      url: 'https://example.com/article',
+    } as any;
+    currentState.detailHeaderActions = [
+      {
+        id: 'cache-images',
+        label: 'Cache images',
+        provider: 'local',
+        kind: 'open-target',
+        slot: 'tools',
+        onTrigger,
+      },
+    ];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    const cacheButton = document.querySelector('[aria-label="Cache images"]') as HTMLButtonElement | null;
+    expect(cacheButton).toBeTruthy();
+
+    await act(async () => {
+      cacheButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onTrigger).toHaveBeenCalledTimes(1);
   });
 
   it('shows a comments sidebar toggle in article detail mode', () => {

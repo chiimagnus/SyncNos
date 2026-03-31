@@ -327,15 +327,13 @@ export function ConversationDetailPane({
               </div>
             </div>
             <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">
-              {!isArticle ? (
-                <DetailHeaderActionBar
-                  actions={toolActions}
-                  buttonClassName={outlineButtonClass}
-                  menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
-                  menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
-                  menuAriaLabel={t('detailHeaderToolsMenuAria')}
-                />
-              ) : null}
+              <DetailHeaderActionBar
+                actions={toolActions}
+                buttonClassName={outlineButtonClass}
+                menuTriggerLabel={t('detailHeaderToolsMenuLabel')}
+                menuTriggerAriaLabel={t('detailHeaderToolsMenuAria')}
+                menuAriaLabel={t('detailHeaderToolsMenuAria')}
+              />
               <DetailHeaderActionBar
                 actions={openActions}
                 buttonClassName={headerIconButtonClass}

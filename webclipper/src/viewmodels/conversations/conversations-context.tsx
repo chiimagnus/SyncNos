@@ -1019,15 +1019,7 @@ export function ConversationsProvider({
       .then((actions) => {
         if (cancelled) return;
 
-        const isArticle =
-          String((selectedConversation as any)?.sourceType || '')
-            .trim()
-            .toLowerCase() === 'article';
         const safeActions = Array.isArray(actions) ? actions : [];
-        if (isArticle) {
-          setDetailHeaderActions(safeActions);
-          return;
-        }
 
         const conversationId = Number((selectedConversation as any)?.id);
         const conversationUrl = String((selectedConversation as any)?.url || '');
