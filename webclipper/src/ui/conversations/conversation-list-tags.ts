@@ -24,26 +24,40 @@ const SOURCE_LABEL_MAP: Record<string, SourceLabelMapItem> = {
   web: { key: 'web', i18nKey: 'sourceWeb' },
 };
 
+const SOURCE_BRAND_VAR_MAP: Record<string, string> = {
+  chatgpt: '--brand-chatgpt',
+  claude: '--brand-claude',
+  deepseek: '--brand-deepseek',
+  notionai: '--brand-notionai',
+  gemini: '--brand-gemini',
+  googleaistudio: '--brand-googleaistudio',
+  kimi: '--brand-kimi',
+  doubao: '--brand-doubao',
+  yuanbao: '--brand-yuanbao',
+  poe: '--brand-poe',
+  zai: '--brand-zai',
+};
+
+function toBrandToneClass(cssVariableName: string): string {
+  return [
+    `tw-border-[var(${cssVariableName})]`,
+    `tw-bg-[color-mix(in_srgb,var(${cssVariableName})_12%,var(--bg-card))]`,
+    'tw-text-[var(--text-primary)]',
+  ].join(' ');
+}
+
 const SOURCE_TONE_CLASS_MAP: Record<string, string> = {
-  chatgpt:
-    'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  claude:
-    'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  deepseek:
-    'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  notionai:
-    'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  gemini:
-    'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  googleaistudio:
-    'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  kimi: 'tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  doubao:
-    'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  yuanbao:
-    'tw-border-[var(--tertiary)] tw-bg-[color-mix(in_srgb,var(--tertiary)_16%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  poe: 'tw-border-[var(--secondary)] tw-bg-[color-mix(in_srgb,var(--secondary)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  zai: 'tw-border-[var(--info)] tw-bg-[color-mix(in_srgb,var(--info)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
+  chatgpt: toBrandToneClass(SOURCE_BRAND_VAR_MAP.chatgpt),
+  claude: toBrandToneClass(SOURCE_BRAND_VAR_MAP.claude),
+  deepseek: toBrandToneClass(SOURCE_BRAND_VAR_MAP.deepseek),
+  notionai: toBrandToneClass(SOURCE_BRAND_VAR_MAP.notionai),
+  gemini: toBrandToneClass(SOURCE_BRAND_VAR_MAP.gemini),
+  googleaistudio: toBrandToneClass(SOURCE_BRAND_VAR_MAP.googleaistudio),
+  kimi: toBrandToneClass(SOURCE_BRAND_VAR_MAP.kimi),
+  doubao: toBrandToneClass(SOURCE_BRAND_VAR_MAP.doubao),
+  yuanbao: toBrandToneClass(SOURCE_BRAND_VAR_MAP.yuanbao),
+  poe: toBrandToneClass(SOURCE_BRAND_VAR_MAP.poe),
+  zai: toBrandToneClass(SOURCE_BRAND_VAR_MAP.zai),
   web: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
   unknown: 'tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-text-[var(--text-secondary)]',
 };
