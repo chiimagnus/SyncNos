@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+
 const MAX_TEXT = 1900;
 const MAX_EQUATION_EXPRESSION = 1900;
 const MAX_RICH_TEXT_ITEMS = 100;
@@ -345,7 +347,7 @@ function blocksFromInlineRichText(type, richText) {
 }
 
 function markdownToNotionBlocks(markdown) {
-  const src = String(markdown || '').replace(/\r\n/g, '\n');
+  const src = normalizeStandaloneImageCaptionLines(markdown).replace(/\r\n/g, '\n');
   const lines = src.split('\n');
   const out = [];
 
