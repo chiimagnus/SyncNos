@@ -1,13 +1,11 @@
 # 故障排查
 
+macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的故障排查路径。
+
 ## 症状索引
 
 | 症状 | 可能范围 | 首查位置 | 快速判断 |
 | --- | --- | --- | --- |
-| App 里同步入口不可用或一开始就失败 | Notion 授权 / Parent Page / paywall 门控 | `RootView.swift`, `IAPService.swift`, `NotionSyncEngine.swift` | 先确认 onboarding 已完成、paywall 状态正确、Notion 已配置 |
-| Apple Books / GoodLinks 没读到内容 | 目录授权 / 来源库 | `macOS/SyncNos/AGENTS.md`, 来源服务 | 先确认 macOS 目录权限和来源数据库路径 |
-| WeRead / Dedao 登录态失效 | Keychain Cookie / SiteLogins | `SiteLoginsStore.swift` | 看 cookieHeader 是否还能匹配目标域名 |
-| 聊天 OCR 历史数据异常 | Chats 存储升级 | `ChatCacheService.swift` | 是否经历过 `chats_v3_minimal.store` 的破坏性升级 |
 | WebClipper 页面内按钮没出现 | content script / `inpage_display_mode` / 不支持页面 | `content.ts`, `src/services/bootstrap/content.ts` | 开关切换后要刷新页面；支持站点与普通页面逻辑不同 |
 | WebClipper `$ mention` 没反应（不出候选或无法插入） | item-mention / settings / 站点门控 | `content-controller.ts`, `src/services/integrations/item-mention/**` | 先确认 `ai_chat_dollar_mention_enabled` 与站点 `features.dollarMention` |
 | WebClipper 底部 `source/site` 筛选下拉出现多余滚动条或被裁切 | `SelectMenu` 自适应高度 / 容器裁剪边界 | `ConversationListPane.tsx`, `SelectMenu.tsx` | 检查 `adaptiveMaxHeight`、`side` 与 `findNearestClippingRect()` 是否生效 |
@@ -21,9 +19,8 @@
 | 发布 workflow 报版本不匹配 | tag / manifest version | `wxt.config.ts`, release workflows | 校对 `manifest.version == tag 去掉 v` |
 
 ## 先做哪几步
-1. **先判断产品线**：桌面窗口、OCR、来源登录、IAP、NotionSyncEngine 走 App 线；浏览器页面、popup、export、backup、Obsidian、商店打包走 WebClipper 线。
-2. **先判断是配置问题还是代码问题**：这个仓库很多“没反应”其实是权限、Parent Page、页面刷新、API Key、tag 版本不一致，而不是逻辑 bug。
-3. **先找本地事实源**：App 先查 UserDefaults / Keychain / SwiftData；扩展先查 IndexedDB、`chrome.storage.local`、popup 设置和 workflow 日志。
+1. **先判断是配置问题还是代码问题**：这个仓库很多“没反应”其实是权限、Parent Page、页面刷新、API Key、tag 版本不一致，而不是逻辑 bug。
+2. **先找本地事实源**：扩展先查 IndexedDB、`chrome.storage.local`、popup 设置和 workflow 日志。
 
 | 问题类型 | 先看页面 | 典型信号 |
 | --- | --- | --- |
@@ -31,21 +28,6 @@
 | 数据落点 / 本地库 | [storage.md](storage.md) | 会话、缓存、Keychain、备份、迁移问题 |
 | 同步 / 数据链路 | [data-flow.md](data-flow.md) | append / rebuild、cursor、mapping、来源读取问题 |
 | 打包 / 发布 | [release.md](release.md) | tag、渠道参数、产物命名、AMO / CWS 上传失败 |
-
-## SyncNos App：常见问题
-
-### 1. 启动后不是主列表，而是引导或付费墙
-- 这通常不是 bug，而是 `RootView` 的门控设计：未完成 onboarding 时先显示 `OnboardingView`；已完成 onboarding 但试用 / 购买状态触发时，再显示 `PayWallView`。
-- 排查顺序：`hasCompletedOnboarding` → `IAPService.hasPurchased` / `hasEverPurchasedAnnual` / `isProUnlocked` / `hasShownWelcome` → 当前展示模式。
-
-### 2. 来源有内容但 App 读不到
-- Apple Books / GoodLinks：先查目录授权与来源库路径。
-- WeRead / Dedao：先查 `SiteLoginsStore` 是否还能读到对应域名的 cookieHeader；这个 store 是延迟加载的，不会在启动时就自动报错。
-- Chats / OCR：先确认是不是经历过 v3 minimal 升级；旧 OCR 原始 JSON 本来就不会继续保留。
-
-### 3. 关闭 App 时被拦住
-- 这通常是 `AppDelegate.applicationShouldTerminate` 的保护逻辑：`syncActivityMonitor.isSyncing` 为真时，系统要求用户确认是否强退。
-- 真正要查的是“为什么同步长期没结束”，而不是绕过弹窗本身。
 
 ## WebClipper：常见问题
 
@@ -103,8 +85,7 @@
 
 | 操作 | 适用场景 | 备注 |
 | --- | --- | --- |
-| 重新授权 Notion / 重新选择 Parent Page | App / 扩展 Notion 同步入口被阻止 | 先解决“没有写入落点” |
-| 重新登录 WeRead / Dedao / GoodLinks | Cookie Header 失效 | `SiteLoginsStore` 会把新 cookie 写回统一 store |
+| 重新授权 Notion / 重新选择 Parent Page | 扩展 Notion 同步入口被阻止 | 先解决“没有写入落点” |
 | 刷新页面 / 新开页面 | inpage 设置刚修改 | 多数 inpage 相关设置当前实现不做热更新（例外：`ai_chat_dollar_mention_enabled` 通常可热更新） |
 | 手动保存 Google AI Studio | 自动保存不完整 | 让 collector 先滚动并缓存完整 turns |
 | 在 chat detail 手动触发 `cache-images` | 历史消息图片仍是外链 | 只对 chat 生效；完成后应看到更新计数并自动刷新 detail |
@@ -115,10 +96,6 @@
 
 | 入口 / 文件 | 适用问题 | 为什么先看这里 |
 | --- | --- | --- |
-| `macOS/SyncNos/Views/RootView.swift` | onboarding / paywall / 主界面切换 | 根门控都在这里 |
-| `macOS/SyncNos/AppDelegate.swift` | 菜单栏、同步中退出、URL callback | 生命周期级问题集中在这里 |
-| `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift` | 登录态与 cookie | 统一域名存储与 legacy migration 都在这里 |
-| `macOS/SyncNos/Services/Auth/IAPService.swift` | 试用期、欢迎态、购买缓存 | paywall 逻辑底层事实源 |
 | `webclipper/src/services/bootstrap/content.ts` | inpage gating、支持站点判断 | 为什么按钮出现 / 不出现最先看这里 |
 | `webclipper/src/services/bootstrap/content-controller.ts` | 单击 / 双击 / 手动保存 / article fetch | 页面交互实际入口 |
 | `webclipper/src/services/integrations/item-mention/**` | `$ mention` 候选 / 插入异常 | 站点门控、候选搜索、插入 markdown 的实现都在这里 |
@@ -131,11 +108,6 @@
 | `.github/workflows/webclipper-*.yml` | 发布失败 | 版本校验、secrets、构建顺序的真实来源 |
 
 ## 来源引用（Source References）
-- `macOS/SyncNos/Views/RootView.swift`
-- `macOS/SyncNos/AppDelegate.swift`
-- `macOS/SyncNos/Services/Auth/IAPService.swift`
-- `macOS/SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
-- `macOS/SyncNos/Services/DataSources-From/Chats/ChatCacheService.swift`
 - `webclipper/src/services/bootstrap/content.ts`
 - `webclipper/src/services/bootstrap/content-controller.ts`
 - `webclipper/src/services/integrations/item-mention/background-handlers.ts`

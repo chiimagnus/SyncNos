@@ -1,19 +1,19 @@
 # 业务语境
 
+macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的业务语义与本地事实源说明。
+
 ## 产品定位
-SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的双产品线系统：其中 `macOS/` 下的 SwiftUI macOS App 已归档，仅保留历史说明；浏览器扩展负责把 AI 对话与网页文章先保存为本地事实，再按需导出或同步到 Notion / Obsidian。
+SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的 WebClipper 业务系统，外加 `macOS/` 下已归档的历史说明；浏览器扩展负责把 AI 对话与网页文章先保存为本地事实，再按需导出或同步到 Notion / Obsidian。
 
 | 产品线 | 主要用户 | 解决的问题 | 用户可见结果 |
 | --- | --- | --- | --- |
-| SyncNos App（已归档） | 使用 Apple Books、GoodLinks、微信读书、得到、聊天截图整理知识的 macOS 用户 | 多来源阅读内容分散、同步规则不一致、需要一个统一的 Notion 输出面 | Notion 数据库 / 页面、桌面列表、搜索结果、同步进度 |
 | WebClipper | 想保存 AI 对话、网页长文、备份本地知识资产的浏览器用户 | 页面内容稍纵即逝、各站点格式不同、需要本地优先再决定是否同步 | 本地会话列表、Markdown / Zip、Notion 页面、Obsidian 笔记 |
 
 ## 核心产物
 
 | 产物 | 生产方 | 对用户的意义 | 关键约束 |
 | --- | --- | --- | --- |
-| Notion Parent Page 下的数据库 / 页面 | App + WebClipper | 统一承载阅读条目、AI chats、web articles | 没授权或没选 Parent Page 时必须阻止写入 |
-| App 本地缓存与状态 | SyncNos App | 支撑增量同步、搜索、登录态、IAP 状态 | 敏感数据优先留在本地 Keychain / 加密存储 |
+| Notion Parent Page 下的数据库 / 页面 | WebClipper | 统一承载 AI chats、web articles | 没授权或没选 Parent Page 时必须阻止写入 |
 | WebClipper 本地会话库 | WebClipper | 让采集、导出、备份、二次同步都基于同一份本地事实 | 先落 IndexedDB，再派生到任何外部目标 |
 | WebClipper Insight 仪表盘 | WebClipper | 把“数据库里的行数”转成用户可见的累计成果、来源结构和最长对话 | 只读、本地计算、不得依赖网络或新增 schema |
 | Chat with AI 详情头动作 | WebClipper | 把文章 / 对话内容变成可复制 prompt，并一键跳转到用户启用的 AI 平台 | 先复制到剪贴板，再打开外部站点；不在后台自动发起模型调用 |
@@ -22,19 +22,13 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 
 ## 核心用户旅程
 
-### 旅程 1：阅读高亮进入 Notion
-1. 用户在 App 中完成 Notion OAuth、选择 Parent Page，并至少启用一个数据源。
-2. App 按数据源读取 Apple Books / GoodLinks 数据库，或使用站点登录态读取 WeRead / Dedao，或从聊天截图做 OCR。
-3. ViewModel 调用 `NotionSyncEngine`，由各来源适配器通过 `NotionSyncSourceProtocol` 交给统一同步引擎。
-4. 最终结果不是“原样复制来源”，而是被整理为稳定的数据库 / 页面 / 内容块结构，并记录本地同步状态与映射。
-
-### 旅程 2：AI 对话先变成扩展本地事实，再决定是否同步
+### 旅程 1：AI 对话先变成扩展本地事实，再决定是否同步
 1. 用户打开 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 等页面。
 2. content script 通过 collector 识别站点，把页面 DOM 统一成 `conversation + messages` 结构。
 3. background 把会话写入 IndexedDB；popup / app 读取同一份本地会话数据。
 4. 之后用户可以选择继续同步到 Notion、写入 Obsidian、导出 Markdown / Zip，或做备份 / 恢复。
 
-### 旅程 3：普通网页先抓正文，再进入和 AI 对话并列的 article 流程
+### 旅程 2：普通网页先抓正文，再进入和 AI 对话并列的 article 流程
 1. 用户在普通 `http(s)` 页面触发当前页抓取。
 2. 扩展向页面注入 `readability.js`，尝试抽取标题、作者、发布时间、正文和 markdown 文本。
 3. 抓取结果被保存为 `sourceType = article` 的本地会话，并写入单条 `article_body` 消息。

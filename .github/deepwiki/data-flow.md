@@ -1,27 +1,15 @@
 # 数据流
 
+macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的数据链路与外部同步说明。
+
 ## 主要流程总览
 
 | 流程 | 起点 | 中间层 | 终点 | 增量 / 重建策略 |
 | --- | --- | --- | --- | --- |
-| App 阅读同步 | 本地数据库、登录态、OCR 输入 | Services → Adapter → `NotionSyncEngine` | Notion 页面 / 数据库 | 基于条目时间戳、已同步映射与统一高亮结构 |
 | WebClipper 自动采集 | 支持站点 DOM | content controller → collectors → background storage | IndexedDB conversations / messages | 基于 runtime observer 与增量快照 |
 | WebClipper 手动保存网页 | 当前普通网页 | `Readability` 抽取 → article conversation | IndexedDB `article` 会话 | 重新抓取后按 `updatedAt` 决定下游是否重建 |
 | WebClipper 文章评论 / 注释线程 | article detail / inpage comments panel | comments handlers → `article_comments` store → panel refresh | IndexedDB `article_comments` + shared session panel refresh | local-first / orphan attach |
 | WebClipper 外部同步 | popup / app 中选中的会话 | Notion / Obsidian orchestrator | Notion 页面、Obsidian 文件、导出文件 | 基于 cursor、目标存在性和目标结构决定 append / rebuild |
-
-## SyncNos App：从来源到 Notion
-
-| 阶段 | 入口 | 主要动作 | 结果 |
-| --- | --- | --- | --- |
-| 启动与门控 | `SyncNosApp.swift`, `RootView.swift` | 预热 IAP、自动同步、缓存服务；按需进入 onboarding / paywall | 用户看到正确的起始界面 |
-| 读取来源 | `Services/DataSources-From/` | 读取 Apple Books / GoodLinks、本地登录态、OCR 结果 | 统一的条目与高亮输入 |
-| 统一同步 | `NotionSyncSourceProtocol` + `NotionSyncEngine` | ensure DB / page / properties、取高亮、写 blocks / 属性、记录 pageId | 稳定的 Notion 结构 |
-| 状态更新 | `SyncTimestampStore`, `SyncedHighlightStore`, 缓存服务 | 更新时间戳、已同步映射、本地缓存 | 为后续增量同步提供事实依据 |
-
-- `NotionSyncEngine` 在 single-database 与 per-book-database 两种策略之间切换。
-- `EnsureCache` 会去重同一数据库 / 属性的并发 ensure，降低批量同步里的冲突和长时间无进度。
-- `NotionSyncConfig` 当前默认 `batchConcurrency = 3`、读取 `8 RPS`、写入 `3 RPS`、`append batch size = 50`、请求超时 `120s`。
 
 ## WebClipper：从页面到本地会话
 
@@ -82,8 +70,6 @@
 
 | 状态对象 | 位置 | 关键字段 | 作用 |
 | --- | --- | --- | --- |
-| App 同步时间戳 | App stores / services | `lastSyncTime` 等 | 决定下一次是全量还是增量 |
-| App 已同步高亮映射 | `synced-highlights.store` | Notion 子项映射 | 避免重复遍历 Notion children |
 | WebClipper `sync_mappings` | IndexedDB | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt` | 决定 Notion / Obsidian 是否可增量追加 |
 | WebClipper conversation | IndexedDB | `sourceType`, `source`, `conversationKey`, `lastCapturedAt` | UI 排序、导出、同步、备份的基础 |
 | WebClipper message | IndexedDB | `messageKey`, `sequence`, `updatedAt`, `contentMarkdown` | 生成 Notion blocks / Markdown / Obsidian 内容；图片可在实时采集或 backfill 时内联更新 |
@@ -95,13 +81,6 @@
 
 ```mermaid
 flowchart LR
-  subgraph App[SyncNos App]
-    A[Apple Books / GoodLinks / WeRead / Dedao / OCR] --> B[Services + Adapters]
-    B --> C[SwiftData / Keychain / UserDefaults]
-    B --> D[NotionSyncEngine]
-    D --> N[Notion]
-  end
-
   subgraph Ext[WebClipper]
     E[AI DOM / Web Article] --> F[Collectors / Readability]
     F --> G[IndexedDB]
@@ -113,9 +92,8 @@ flowchart LR
 
 | 失败模式 | 发生位置 | 典型表现 | 恢复方向 |
 | --- | --- | --- | --- |
-| Parent Page / token 缺失 | App / WebClipper Notion 同步前 | 直接阻止写入或报错 | 回到配置页补齐授权与 Parent Page |
+| Parent Page / token 缺失 | WebClipper Notion 同步前 | 直接阻止写入或报错 | 回到配置页补齐授权与 Parent Page |
 | Parent Page 列表加载失败 / 429 | WebClipper Notion 设置页 | 下拉为空、提示稍后重试或显示 retry seconds | 等待后重试；检查 Notion 连接状态与限流；必要时断开重连 |
-| 登录态过期 | App 在线来源 | WeRead / Dedao 无法抓取 | 重新登录并更新 `SiteLoginsStore` |
 | article 抽取失败 | WebClipper article fetch | `No article content detected` | 检查页面是否有足够正文或改用支持站点保存 |
 | 缓存图片按钮不可见或“点了没变化” | WebClipper detail tools / backfill job | article 会话无按钮，或回填结果 `updatedMessages=0` | 先确认是 chat 会话，再检查消息里是否存在可下载图片链接 |
 | 旧版或被裁剪的备份不含文章评论 | WebClipper comments / backup | 旧备份或缺失 `assets/article-comments/index.json` 时，恢复后看不到评论线程 | 当前版本的 Zip v2 已覆盖该链路；若遇到旧备份，先确认是否缺少该索引文件 |
@@ -124,11 +102,6 @@ flowchart LR
 | 发布版本不一致 | workflow | `manifest version mismatch` | 检查 `wxt.config.ts` 与 tag |
 
 ## 来源引用（Source References）
-- `macOS/SyncNos/SyncNosApp.swift`
-- `macOS/SyncNos/Views/RootView.swift`
-- `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift`
-- `macOS/SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
-- `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
 - `webclipper/src/entrypoints/content.ts`
 - `webclipper/src/services/bootstrap/content.ts`
 - `webclipper/src/services/bootstrap/content-controller.ts`

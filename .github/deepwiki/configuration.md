@@ -1,28 +1,15 @@
 # 配置
 
+macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 的配置、版本与发布真源。
+
 ## 配置入口
 
 | 配置面 | 路径 / 界面 | 存储位置 | 说明 |
 | --- | --- | --- | --- |
-| App 启动与门控 | `SyncNosApp.swift`, `RootView.swift` | UserDefaults | 控制 onboarding、自动同步、调试开关 |
-| App URL scheme 与窗口行为 | `Info.plist`, `AppDelegate.swift` | 工程配置 + 本地偏好 | OAuth 回调、菜单栏 / Dock 模式 |
-| App 同步参数 | `NotionSyncConfig.swift` | 代码常量 | 控制并发、RPS、超时、批量大小 |
 | WebClipper manifest | `wxt.config.ts` | 代码配置 | 控制版本、权限、entrypointsDir、host permissions、manifest icons（`16/48/128`）与 `web_accessible_resources`（仅暴露 `icon-128.png`） |
 | WebClipper 运行时设置 | SettingsScene + `src/viewmodels/settings/useSettingsSceneController.ts` + `chrome.storage.local` | 浏览器本地 KV | 控制 Notion parent page、Obsidian、`inpage_display_mode`、`ai_chat_auto_save_enabled`、`ai_chat_cache_images_enabled`、Chat with AI、Notion AI 模型偏好 |
 | WebClipper UI-only 状态 | `localStorage` / `sessionStorage` | 浏览器本地 Web Storage | 控制设置页当前 section、来源筛选、窄屏下待打开的 conversation |
 | 发布参数 | `.github/workflows/*.yml` | workflow inputs / env | 控制 tag、Node 版本、CWS / AMO 行为 |
-
-## macOS App 配置项
-
-| 配置项 | 位置 | 默认 / 约束 | 作用 |
-| --- | --- | --- | --- |
-| `hasCompletedOnboarding` | `RootView.swift`, `OnboardingViewModel.swift` | `false` → 完成后写为 `true` | 决定是否先进入 onboarding |
-| `debug.forceOnboardingEveryLaunch` | `SyncNosApp.swift` | Debug 默认注册为 `false` | 开发时强制每次启动重走 onboarding |
-| `autoSync.appleBooks` / `goodLinks` / `weRead` | `SyncNosApp.swift` | UserDefaults 布尔值 | 决定启动时是否自动开启 AutoSyncService |
-| `AutoSyncService.intervalSeconds` | `AutoSyncService.swift` | `5 * 60`（5 分钟） | 定时增量同步轮询间隔；启动后也会被通知触发即时同步 |
-| `SyncNos.FontScaleLevel` | `macOS/SyncNos/Services/Core/AGENTS.md` | 离散等级 | 控制字体与布局缩放 |
-| `CFBundleURLSchemes = syncnos` | `Info.plist` | 固定 | 处理 OAuth URL callback 兜底 |
-| Notion 同步参数 | `NotionSyncConfig.swift` | `batchConcurrency=3`, `readRPS=8`, `writeRPS=3`, `appendBatchSize=50`, `timeout=120s` | 控制 App 到 Notion 的吞吐与稳定性 |
 
 ## WebClipper 配置项
 
@@ -79,7 +66,6 @@
 | --- | --- | --- | --- |
 | 扩展权限 | `storage`, `contextMenus`, `tabs`, `webNavigation`, `activeTab`, `scripting` | 尽量只保留采集与本地保存所需能力 | 新增权限必须解释原因 |
 | 扩展 host permissions | 支持站点 + Notion + `http://*/*` + `https://*/*` | 允许 content script 在运行时自行判断是否激活 | UI 级别由 `inpage_display_mode` 做 gating（并兼容回读旧 `inpage_supported_only`） |
-| App 敏感存储 | Keychain / 加密服务 | 避免站点 Cookie、加密密钥、试用期关键数据明文落盘 | `SiteLoginsStore`, `EncryptionService`, `IAPService` |
 | 备份导入导出 | denylist + 前缀过滤 | 防止 OAuth token 跟随备份扩散 | Zip v2 仍保留非敏感运行设置 |
 
 ## 常见误配
@@ -91,7 +77,7 @@
 - **以为筛选下拉高度不再固定 `320px` 是样式异常**：`source/site` 筛选菜单现在显式启用 `adaptiveMaxHeight`，会随可视区域动态变化，这是预期行为。
 - **只在 Settings 里连上 Notion、却没选 Parent Page**：扩展仍然不能真正写入 Notion 页面。
 - **Obsidian 使用了错误的 URL / header / API Key**：当前设计默认围绕 `http://127.0.0.1:27123` 与 `Authorization` 头工作。
-- **App 只改 UI 没考虑字体缩放或窗口模式**：新视图若没调用现有字体 / 窗口辅助能力，体验会与主窗口不一致。
+- **WebClipper 只改 UI 没考虑字体缩放或窗口模式**：新视图若没调用现有字体 / 窗口辅助能力，体验会与主窗口不一致。
 
 ## 示例片段
 ### 片段 1：WebClipper 的 manifest 权限和 host permissions 由 `wxt.config.ts` 直接声明
@@ -103,12 +89,11 @@ manifest: {
 }
 ```
 
-### 片段 2：App 同步参数是代码层常量，而不是运行时配置面板
-```swift
-static let batchConcurrency: Int = 3
-static let notionReadRequestsPerSecond: Int = 8
-static let notionWriteRequestsPerSecond: Int = 3
-static let requestTimeoutSeconds: TimeInterval = 120
+### 片段 2：WebClipper 的版本事实源由 `wxt.config.ts` 维护
+```ts
+export default defineConfig({
+  manifest: { version: '1.5.0' }
+})
 ```
 
 ### 片段 3：筛选菜单会根据最近可裁剪容器动态计算可用高度
@@ -122,12 +107,6 @@ const next = Math.floor(Math.max(80, Number.isFinite(available) ? available : 16
 ```
 
 ## 来源引用（Source References）
-- `macOS/SyncNos/SyncNosApp.swift`
-- `macOS/SyncNos/Services/SyncScheduling/AutoSyncService.swift`
-- `macOS/SyncNos/AppDelegate.swift`
-- `macOS/SyncNos/Views/RootView.swift`
-- `macOS/SyncNos/Info.plist`
-- `macOS/SyncNos/Services/DataSources-To/Notion/Config/NotionSyncConfig.swift`
 - `webclipper/wxt.config.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/services/bootstrap/content.ts`

@@ -1,11 +1,12 @@
 # 工作流
 
+macOS/ 下的 SwiftUI App 已归档；本页仅保留 WebClipper 与仓库文档协作流程。
+
 ## 协作入口
 
 | 变更类型 | 先看哪里 | 为什么 |
 | --- | --- | --- |
 | 仓库级行为 / 共享业务规则 | [business-context.md](business-context.md), [INDEX.md](INDEX.md), `AGENTS.md`, `README.md` | 先用 deepwiki 建立上下文，再确认是不是同时影响两条产品线 |
-| App 改动 | [modules/syncnos-app.md](modules/syncnos-app.md), `macOS/SyncNos/AGENTS.md`, `macOS/SyncNos/Services/AGENTS.md` | 先理解产品线边界，再遵守 MVVM、协议注入、SwiftData 后台访问约束 |
 | WebClipper 改动 | [modules/webclipper.md](modules/webclipper.md), `webclipper/AGENTS.md` | 先理解运行时边界，再判断属于 background / content / popup / app 哪一层 |
 | 发布 / 打包改动 | `.github/workflows/*.yml`, `.github/scripts/webclipper/*.mjs` | 防止本地流程与 CI 产物分叉 |
 | 文档 / deepwiki 改动 | 代码 / 配置 / workflow → deepwiki | 文档必须以事实源为准，而不是彼此转述 |
@@ -16,19 +17,10 @@
 | --- | --- | --- |
 | 1 | 先核对代码、配置、脚本与 workflow | 明确真实行为 |
 | 2 | 判断影响面是否跨产品线 | 决定是否要改 `AGENTS.md`、`README.md`、deepwiki |
-| 3 | 用产品线边界组织叙述 | 避免把 App 约束和扩展约束混写 |
+| 3 | 用产品线边界组织叙述 | 避免把历史归档资料和扩展约束混写 |
 | 4 | 未被明确要求时不碰 i18n 字段 | 降低与任务无关的多语言改动风险 |
 | 5 | 更新 deepwiki 时同步 `INDEX.md` 与 `GENERATION.md` | 保证知识入口和元数据一致 |
 | 6 | 若 WebClipper 改动涉及设置结构、视觉 tokens、主题切换或 comments / detail UI，同时同步 `webclipper/AGENTS.md`、`webclipper/src/ui/AGENTS.md` 与 `modules/comments.md` | 避免执行文档和 UI 设计文档继续沿用旧规则 |
-
-## SyncNos App 开发工作流
-
-| 步骤 | 动作 | 关键约束 |
-| --- | --- | --- |
-| 1 | 先判断改动属于 `Models` / `Services` / `ViewModels` / `Views` | 不要跨层混杂职责 |
-| 2 | 涉及 OCR、动态字体、键盘焦点、数据源、同步目标时先读专项文档 | 避免绕开已有约定 |
-| 3 | 改业务逻辑时优先通过协议和 `DIContainer` 注入 | 避免引入新的全局耦合 |
-| 4 | 至少做一次构建和最小人工冒烟 | 不要只靠静态阅读判断正确 |
 
 ## WebClipper 开发工作流
 
@@ -67,15 +59,13 @@
 - **是否需要改仓库级文档**：只要共享业务规则、主入口、验证顺序、发布链路或产品语义变了，就不应只改某个子目录里的说明。
 - **是否需要改 CI / scripts**：如果变动 manifest、产物命名、商店渠道、打包参数，通常也要同步 `.github/workflows/` 与 `.github/scripts/webclipper/`。
 - **是否需要新增权限**：WebClipper 默认强调最小权限 + 运行时 gating；新增权限前要能解释为什么现有权限无法满足需求。
-- **是否需要调整模块边界**：App 保持 `Views → ViewModels → Services → Models`；扩展保持 collectors / conversations / sync / ui 的清晰拆分。
+- **是否需要调整模块边界**：扩展保持 collectors / conversations / sync / ui 的清晰拆分。
 - **是否应该继续硬编码下拉高度**：如果菜单位于底部条、滚动容器或窄视口，优先沿用 `SelectMenu` 的 `adaptiveMaxHeight`，不要回退固定 `maxHeight`。
 - **是否只在一个 header 改了动作按钮**：会话详情动作必须同时校验主详情页与窄屏 `DetailNavigationHeader`，并遵守 `open / chat-with / tools` 槽位约束，避免 popup/app 行为分叉。
 
 ## 来源引用（Source References）
 - `AGENTS.md`
 - `README.md`
-- `macOS/SyncNos/AGENTS.md`
-- `macOS/SyncNos/Services/AGENTS.md`
 - `webclipper/AGENTS.md`
 - `webclipper/package.json`
 - `webclipper/wxt.config.ts`
@@ -90,7 +80,6 @@
 - `webclipper/src/services/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
-- `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
 - `.github/workflows/webclipper-amo-publish.yml`
 - `.github/workflows/webclipper-cws-publish.yml`
