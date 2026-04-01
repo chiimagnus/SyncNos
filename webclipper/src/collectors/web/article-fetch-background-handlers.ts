@@ -1,9 +1,6 @@
 import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from '@collectors/web/article-fetch';
-import {
-  DISCOURSE_OP_NOT_FOUND_ERROR,
-  isDiscourseOpNotFoundErrorMessage,
-} from '@collectors/web/article-fetch-errors';
+import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

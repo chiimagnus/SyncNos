@@ -5,10 +5,7 @@ import {
   upsertConversation,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
-import {
-  DISCOURSE_OP_MISSING_WARNING_FLAG,
-  DISCOURSE_OP_NOT_FOUND_ERROR,
-} from '@collectors/web/article-fetch-errors';
+import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
@@ -96,11 +93,14 @@ function isSameDiscourseTopicFloorUrl(currentUrl: string, expectedUrl: string): 
   );
 }
 
-function buildDiscourseTopicFloorUrl(topic: {
-  origin: string;
-  slug: string;
-  topicId: string;
-}, postNumber: number): string {
+function buildDiscourseTopicFloorUrl(
+  topic: {
+    origin: string;
+    slug: string;
+    topicId: string;
+  },
+  postNumber: number,
+): string {
   return `${topic.origin}/t/${topic.slug}/${topic.topicId}/${Math.max(1, Math.floor(postNumber))}`;
 }
 
@@ -187,7 +187,8 @@ async function extractArticleOnTab(tabId: number) {
       const topicPathPattern = String(discourseTopicPathReSource || '').trim() || '^$';
       const topicPathFlags = String(discourseTopicPathReFlags || '').trim() || 'i';
       const discourseTopicPathRe = new RegExp(topicPathPattern, topicPathFlags);
-      const discourseOpMissingFlag = String(discourseOpMissingWarningFlag || '').trim() || 'discourse_op_missing_on_page';
+      const discourseOpMissingFlag =
+        String(discourseOpMissingWarningFlag || '').trim() || 'discourse_op_missing_on_page';
 
       function normalize(value: unknown) {
         return String(value || '')
@@ -654,11 +655,7 @@ async function extractArticleOnTab(tabId: number) {
               (opNode.querySelector('[data-user-card]') as any)?.getAttribute?.('data-user-card') ||
               '',
           ) ||
-          readMeta([
-            "meta[name='author']",
-            "meta[property='article:author']",
-            "meta[property='og:article:author']",
-          ]);
+          readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
 
         const publishedAt =
           normalize(
@@ -666,19 +663,11 @@ async function extractArticleOnTab(tabId: number) {
               (opNode.querySelector('time') as any)?.textContent ||
               '',
           ) ||
-          readMeta([
-            "meta[property='article:published_time']",
-            "meta[name='publish_date']",
-            "meta[name='pubdate']",
-          ]);
+          readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
 
         const title =
           normalize(document.title || '') ||
-          readMeta([
-            "meta[property='og:title']",
-            "meta[name='twitter:title']",
-            "meta[property='title']",
-          ]);
+          readMeta(["meta[property='og:title']", "meta[name='twitter:title']", "meta[property='title']"]);
 
         return {
           ok: true,
@@ -774,18 +763,18 @@ async function extractArticleOnTab(tabId: number) {
                 : markdownBase;
               return withDiscourseOpWarning(
                 {
-                ok: true,
-                title,
-                author,
-                publishedAt: readMeta([
-                  "meta[property='article:published_time']",
-                  "meta[name='publish_date']",
-                  "meta[name='pubdate']",
-                ]),
-                excerpt: normalize(article.excerpt || ''),
-                contentHTML: buildHtml(contentWithWechatGallery, text),
-                contentMarkdown: markdownWithWechatGallery,
-                textContent: text,
+                  ok: true,
+                  title,
+                  author,
+                  publishedAt: readMeta([
+                    "meta[property='article:published_time']",
+                    "meta[name='publish_date']",
+                    "meta[name='pubdate']",
+                  ]),
+                  excerpt: normalize(article.excerpt || ''),
+                  contentHTML: buildHtml(contentWithWechatGallery, text),
+                  contentMarkdown: markdownWithWechatGallery,
+                  textContent: text,
                   warningFlags: [],
                 },
                 discourseOpMissingOnCurrentPage,
@@ -966,8 +955,7 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
         isNew: false,
         conversationId: existingId,
         url: canonicalUrl,
-        title:
-          normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
+        title: normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
         author: normalizeText((existing as any)?.author || ''),
         publishedAt: normalizeText((existing as any)?.publishedAt || ''),
         warningFlags,

@@ -1,9 +1,6 @@
 import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
-import {
-  DISCOURSE_OP_NOT_FOUND_ERROR,
-  isDiscourseOpNotFoundErrorMessage,
-} from '@collectors/web/article-fetch-errors';
+import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 type RuntimeClient = {

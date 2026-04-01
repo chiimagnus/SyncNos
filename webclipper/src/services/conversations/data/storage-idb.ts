@@ -387,15 +387,15 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
   const existingUrl = existing ? String(existing.url || '').trim() : '';
   const nextUrlCandidate = payloadUrl || existingUrl;
-  const nextUrl = isArticleSource
-    ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate
-    : nextUrlCandidate;
+  const nextUrl = isArticleSource ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate : nextUrlCandidate;
 
   const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
   const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
   const articleDerivedConversationKey = isArticleSource && nextUrl ? `article:${nextUrl}` : '';
   const nextConversationKey = isArticleSource
-    ? normalizeArticleConversationKey(articleDerivedConversationKey || payloadConversationKey || existingConversationKey)
+    ? normalizeArticleConversationKey(
+        articleDerivedConversationKey || payloadConversationKey || existingConversationKey,
+      )
     : String(payloadConversationKey || existingConversationKey || '').trim();
 
   const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
