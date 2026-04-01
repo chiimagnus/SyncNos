@@ -60,6 +60,7 @@ export async function resolveChatWithCommentActions(
     commentText,
     articleTitle: input?.articleTitle,
     canonicalUrl: input?.canonicalUrl,
+    promptTemplate: settings.promptTemplate,
   });
   if (!safeText(payload)) return [];
 
