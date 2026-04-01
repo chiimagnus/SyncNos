@@ -210,4 +210,44 @@ describe('ArticleCommentsSection shared chrome', () => {
       expect(secondResolveActions).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('uses provided locator root in sidebar mode locate flow', async () => {
+    const session = createCommentSidebarSession();
+    const customRoot = document.createElement('div');
+    const getLocatorRoot = vi.fn(() => customRoot);
+
+    await act(async () => {
+      root!.render(
+        createElement(ArticleCommentsSection, {
+          sidebarSession: session,
+          getLocatorRoot,
+        }),
+      );
+    });
+
+    const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(host).toBeTruthy();
+
+    await act(async () => {
+      session.setComments([
+        {
+          id: 1,
+          parentId: null,
+          createdAt: Date.now(),
+          quoteText: 'Root quote',
+          commentText: 'Root comment',
+          locator: { env: 'app', quote: { exact: 'Root quote' }, position: { start: 1 } } as any,
+        },
+      ]);
+    });
+
+    const body = host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-body') as HTMLElement | null;
+    expect(body).toBeTruthy();
+    await act(async () => {
+      body!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(getLocatorRoot).toHaveBeenCalled();
+  });
 });

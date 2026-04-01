@@ -267,4 +267,22 @@ describe('ConversationDetailPane header actions', () => {
     const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
     expect(pressedBtn).toBeTruthy();
   });
+
+  it('does not show comments toggle when selected conversation is not article-like', () => {
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Chat',
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'chat-11',
+      url: '',
+    } as any;
+    currentState.detailHeaderActions = [];
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(document.querySelector('[aria-label="Comment"]')).toBeFalsy();
+  });
 });
