@@ -88,7 +88,6 @@ export function ConversationsScene({
     isNarrow,
     defaultRoute: defaultNarrowRoute,
   });
-  const [commentsOpenedInRoute, setCommentsOpenedInRoute] = useState(false);
   const selectedConversationCanonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
   const canOpenCommentsFromDetail =
     Boolean(commentsSidebarRuntime) && isArticleConversationLike(selectedConversation) && Boolean(selectedConversationCanonicalUrl);
@@ -143,18 +142,8 @@ export function ConversationsScene({
   ]);
 
   useEffect(() => {
-    if (!isNarrow || narrowRoute !== 'comments') {
-      setCommentsOpenedInRoute(false);
-      return;
-    }
-    if (!commentsSidebarRuntime || commentsOpenedInRoute) return;
-    setCommentsOpenedInRoute(true);
-  }, [commentsOpenedInRoute, commentsSidebarRuntime, isNarrow, narrowRoute]);
-
-  useEffect(() => {
     if (!commentsSidebarRuntime) return;
     return commentsSidebarRuntime.subscribeSidebarClose(() => {
-      setCommentsOpenedInRoute(false);
       if (isNarrow && narrowRoute === 'comments') returnToDetail();
     });
   }, [commentsSidebarRuntime, isNarrow, narrowRoute, returnToDetail]);
@@ -184,7 +173,6 @@ export function ConversationsScene({
                   canOpenCommentsFromDetail
                     ? ({ quoteText, locator }) => {
                         if (!commentsSidebarRuntime) return;
-                        setCommentsOpenedInRoute(true);
                         openComments();
                         void commentsSidebarRuntime.sidebarController.open({
                           selectionText: String(quoteText || ''),
