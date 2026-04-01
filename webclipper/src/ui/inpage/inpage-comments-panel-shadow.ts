@@ -7,7 +7,7 @@ import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { normalizePositiveInt } from '@services/shared/numbers';
-import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -43,7 +43,7 @@ function buildConversationFromResolved(input: {
   author: string;
   publishedAt: string;
 }): Conversation {
-  const canonicalUrl = normalizeHttpUrl(input.url) || normalizeHttpUrl(globalThis.location?.href);
+  const canonicalUrl = canonicalizeArticleUrl(input.url) || canonicalizeArticleUrl(globalThis.location?.href);
   const conversationKey = canonicalUrl ? `article:${canonicalUrl}` : `article:${input.conversationId}`;
   return {
     id: Number(input.conversationId),

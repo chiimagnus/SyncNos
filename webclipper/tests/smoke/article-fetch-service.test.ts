@@ -149,6 +149,215 @@ describe('article-fetch-service', () => {
     });
   });
 
+  it('navigates discourse topic to /1 when current floor misses OP and keeps topic-level canonical url', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 31, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    let currentUrl = 'https://linux.do/t/topic/1870532/xxx?u=abc#reply-2';
+    let extractCall = 0;
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      if (Array.isArray(details?.files)) {
+        cb([{}]);
+        return;
+      }
+      extractCall += 1;
+      if (extractCall === 1) {
+        cb([
+          {
+            result: {
+              ok: true,
+              title: 'Topic Title',
+              author: 'Reply Author',
+              publishedAt: '',
+              excerpt: '',
+              contentHTML: '<html><body><p>Reply body</p></body></html>',
+              contentMarkdown: 'Reply body',
+              textContent: 'Reply body',
+              warningFlags: ['discourse_op_missing_on_page'],
+            },
+          },
+        ]);
+        return;
+      }
+
+      cb([
+        {
+          result: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Op Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>OP body</p></body></html>',
+            contentMarkdown: 'OP body',
+            textContent: 'OP body',
+            warningFlags: [],
+          },
+        },
+      ]);
+    });
+
+    const tabsGet = vi.fn((tabId: number, cb: (tab: any) => void) => {
+      cb({ id: tabId, url: currentUrl, title: 'Topic tab' });
+    });
+
+    const tabsUpdate = vi.fn((tabId: number, updateProps: any, cb: (tab: any) => void) => {
+      const base = String(updateProps?.url || currentUrl);
+      currentUrl = `${base}?u=abc#reply-1`;
+      cb({ id: tabId, url: currentUrl, title: 'Topic tab' });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: currentUrl, title: 'Topic tab' }]),
+        get: tabsGet,
+        update: tabsUpdate,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(tabsUpdate).toHaveBeenCalledTimes(1);
+    expect(tabsUpdate.mock.calls[0][1]).toMatchObject({
+      url: 'https://linux.do/t/topic/1870532/1',
+    });
+    expect(data.url).toBe('https://linux.do/t/topic/1870532');
+
+    expect(upsertConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationKey: 'article:https://linux.do/t/topic/1870532',
+        url: 'https://linux.do/t/topic/1870532',
+      }),
+    );
+
+    const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
+    expect(messages[0]).toMatchObject({
+      contentText: 'OP body',
+      contentMarkdown: 'OP body',
+    });
+    expect(currentUrl).toBe('https://linux.do/t/topic/1870532/1?u=abc#reply-1');
+  });
+
+  it('does not navigate to /1 when OP is already extractable on a high discourse floor', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 33, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const currentUrl = 'https://linux.do/t/topic/1870532/820?u=abc#reply-9';
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      if (Array.isArray(details?.files)) {
+        cb([{}]);
+        return;
+      }
+      cb([
+        {
+          result: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Op Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>OP body</p></body></html>',
+            contentMarkdown: 'OP body',
+            textContent: 'OP body',
+            warningFlags: [],
+          },
+        },
+      ]);
+    });
+
+    const tabsUpdate = vi.fn();
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: currentUrl, title: 'Topic tab' }]),
+        update: tabsUpdate,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(tabsUpdate).not.toHaveBeenCalled();
+    expect(data.url).toBe('https://linux.do/t/topic/1870532');
+    const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
+    expect(messages[0]).toMatchObject({
+      contentText: 'OP body',
+      contentMarkdown: 'OP body',
+    });
+  });
+
+  it('fails strictly when discourse OP is still missing on /1', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 41, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      if (Array.isArray(details?.files)) {
+        cb([{}]);
+        return;
+      }
+      cb([
+        {
+          result: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Reply Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>Reply body</p></body></html>',
+            contentMarkdown: 'Reply body',
+            textContent: 'Reply body',
+            warningFlags: ['discourse_op_missing_on_page'],
+          },
+        },
+      ]);
+    });
+
+    const tabsUpdate = vi.fn();
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 77, url: 'https://linux.do/t/topic/1870532/1', title: 'Topic tab' }]),
+        update: tabsUpdate,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    await expect(service.fetchActiveTabArticle()).rejects.toThrow('Discourse OP not found');
+
+    expect(upsertConversation).not.toHaveBeenCalled();
+    expect(syncConversationMessages).not.toHaveBeenCalled();
+    expect(tabsUpdate).not.toHaveBeenCalled();
+  });
+
   it('does not inline article images when web article cache toggle is disabled', async () => {
     const upsertConversation = vi.fn(async (payload: any) => ({ id: 21, ...payload }));
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));

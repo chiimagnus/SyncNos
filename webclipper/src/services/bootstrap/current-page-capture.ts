@@ -1,5 +1,6 @@
 import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
+import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 type RuntimeClient = {
@@ -57,6 +58,13 @@ function errorMessage(error: unknown, fallback: string): string {
   const message = maybeError?.message ?? error;
   const normalized = String(message || fallback || t('captureFailedFallback')).trim();
   return normalized || fallback || t('captureFailedFallback');
+}
+
+function normalizeArticleCaptureErrorMessage(raw: unknown): string {
+  const message = String(raw || '').trim();
+  if (!message) return '';
+  if (isDiscourseOpNotFoundErrorMessage(message)) return DISCOURSE_OP_NOT_FOUND_ERROR;
+  return message;
 }
 
 function normalizeConversationId(value: unknown): number | null {
@@ -186,7 +194,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       if (target.kind === 'article') {
         const response = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
         if (!response?.ok) {
-          throw new Error(response?.error?.message || t('captureFailedFallback'));
+          const normalizedError = normalizeArticleCaptureErrorMessage(response?.error?.message);
+          throw new Error(normalizedError || t('captureFailedFallback'));
         }
         const title = String(response?.data?.title || '');
         const isNew = response?.data?.isNew !== false;

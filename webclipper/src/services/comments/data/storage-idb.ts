@@ -1,5 +1,6 @@
 import type { AddArticleCommentInput, ArticleComment } from '@services/comments/domain/models';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -60,18 +61,8 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
+function normalizeCanonicalUrl(raw: unknown): string {
+  return canonicalizeArticleUrl(raw);
 }
 
 function normalizeConversationId(value: unknown): number | null {
@@ -114,7 +105,7 @@ function toComment(row: any): ArticleComment {
     id: Number(row?.id),
     parentId: normalizeParentId(row?.parentId),
     conversationId: normalizeConversationId(row?.conversationId),
-    canonicalUrl: normalizeHttpUrl(row?.canonicalUrl),
+    canonicalUrl: normalizeCanonicalUrl(row?.canonicalUrl),
     authorName: safeString(row?.authorName) || null,
     quoteText: safeString(row?.quoteText),
     commentText: normalizeCommentText(row?.commentText),
@@ -129,7 +120,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
   const { t, stores } = tx(db, ['article_comments'], 'readwrite');
 
   const now = Date.now();
-  const canonicalUrl = normalizeHttpUrl(input?.canonicalUrl);
+  const canonicalUrl = normalizeCanonicalUrl(input?.canonicalUrl);
   const commentText = normalizeCommentText(input?.commentText);
   const quoteText = safeString(input?.quoteText);
   if (!canonicalUrl) throw new Error('canonicalUrl required');
@@ -156,7 +147,7 @@ export async function addArticleComment(input: AddArticleCommentInput): Promise<
 }
 
 export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string): Promise<ArticleComment[]> {
-  const normalized = normalizeHttpUrl(canonicalUrl);
+  const normalized = normalizeCanonicalUrl(canonicalUrl);
   if (!normalized) return [];
 
   const db = await openDb();
@@ -223,7 +214,7 @@ export async function deleteArticleCommentById(id: number): Promise<boolean> {
 }
 
 export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string): Promise<boolean> {
-  const normalized = normalizeHttpUrl(canonicalUrl);
+  const normalized = normalizeCanonicalUrl(canonicalUrl);
   if (!normalized) return false;
 
   const db = await openDb();
@@ -247,7 +238,7 @@ export async function attachOrphanCommentsToConversation(
   canonicalUrl: string,
   conversationId: number,
 ): Promise<{ updated: number }> {
-  const normalizedUrl = normalizeHttpUrl(canonicalUrl);
+  const normalizedUrl = normalizeCanonicalUrl(canonicalUrl);
   const normalizedConversationId = normalizeConversationId(conversationId);
   if (!normalizedUrl || !normalizedConversationId) return { updated: 0 };
 
@@ -287,8 +278,8 @@ export async function migrateArticleCommentsCanonicalUrl(
   fromCanonicalUrl: string,
   toCanonicalUrl: string,
 ): Promise<{ updated: number }> {
-  const from = normalizeHttpUrl(fromCanonicalUrl);
-  const to = normalizeHttpUrl(toCanonicalUrl);
+  const from = normalizeCanonicalUrl(fromCanonicalUrl);
+  const to = normalizeCanonicalUrl(toCanonicalUrl);
   if (!from) throw new Error('fromCanonicalUrl required');
   if (!to) throw new Error('toCanonicalUrl required');
   if (from === to) return { updated: 0 };

@@ -1,5 +1,6 @@
 import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from '@collectors/web/article-fetch';
+import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -7,6 +8,14 @@ type AnyRouter = {
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
   eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
+
+function normalizeArticleFetchError(error: unknown, fallback: string): string {
+  const raw =
+    (error as any)?.message != null ? String((error as any).message) : String(error != null ? error : fallback || '');
+  const message = raw.trim();
+  if (isDiscourseOpNotFoundErrorMessage(message)) return DISCOURSE_OP_NOT_FOUND_ERROR;
+  return message || fallback;
+}
 
 export function registerWebArticleHandlers(router: AnyRouter) {
   router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg) => {
@@ -23,7 +32,7 @@ export function registerWebArticleHandlers(router: AnyRouter) {
 
       return router.ok(data);
     } catch (e) {
-      return router.err((e as any)?.message ?? String(e ?? 'article fetch failed'));
+      return router.err(normalizeArticleFetchError(e, 'article fetch failed'));
     }
   });
 
@@ -42,7 +51,7 @@ export function registerWebArticleHandlers(router: AnyRouter) {
 
       return router.ok(data);
     } catch (e) {
-      return router.err((e as any)?.message ?? String(e ?? 'article resolve failed'));
+      return router.err(normalizeArticleFetchError(e, 'article resolve failed'));
     }
   });
 }

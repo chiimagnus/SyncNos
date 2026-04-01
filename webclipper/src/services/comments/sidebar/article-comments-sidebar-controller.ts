@@ -5,7 +5,7 @@ import type {
 import { normalizeCommentSidebarQuoteText } from '@services/comments/sidebar/comment-sidebar-session';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
 import { normalizePositiveInt } from '@services/shared/numbers';
-import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import type {
   ArticleCommentsSidebarAdapter,
@@ -39,14 +39,14 @@ function normalizeConversationId(value: unknown): number | null {
 
 function normalizeContext(next: ArticleCommentsSidebarContext): ArticleCommentsSidebarContext {
   return {
-    canonicalUrl: normalizeHttpUrl(next.canonicalUrl),
+    canonicalUrl: canonicalizeArticleUrl(next.canonicalUrl),
     conversationId: normalizeConversationId(next.conversationId),
   };
 }
 
 function buildContextKey(context: ArticleCommentsSidebarContext | null): string {
   if (!context) return '';
-  const canonicalUrl = normalizeHttpUrl(context.canonicalUrl);
+  const canonicalUrl = canonicalizeArticleUrl(context.canonicalUrl);
   if (!canonicalUrl) return '';
   const conversationId = normalizeConversationId(context.conversationId);
   return `${canonicalUrl}#${conversationId ?? ''}`;
@@ -82,7 +82,7 @@ export function createArticleCommentsSidebarController(input: {
     return activeContext;
   };
 
-  const getCanonicalUrl = () => normalizeHttpUrl(activeContext?.canonicalUrl);
+  const getCanonicalUrl = () => canonicalizeArticleUrl(activeContext?.canonicalUrl);
   const getContextKey = () => buildContextKey(activeContext);
 
   const refresh = async (options?: { manageBusy?: boolean }) => {
@@ -128,7 +128,7 @@ export function createArticleCommentsSidebarController(input: {
         if (!value) return false;
 
         const ctx = await ensureContextForAction();
-        const canonicalUrl = normalizeHttpUrl(ctx?.canonicalUrl);
+        const canonicalUrl = canonicalizeArticleUrl(ctx?.canonicalUrl);
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment save');
 
         const quoteText = normalizeCommentSidebarQuoteText(session.getSnapshot().quoteText);
@@ -150,7 +150,7 @@ export function createArticleCommentsSidebarController(input: {
         if (!Number.isFinite(id) || id <= 0) return;
 
         const ctx = await ensureContextForAction();
-        const canonicalUrl = normalizeHttpUrl(ctx?.canonicalUrl);
+        const canonicalUrl = canonicalizeArticleUrl(ctx?.canonicalUrl);
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment reply');
 
         await adapter.addReply({
@@ -195,6 +195,36 @@ export function createArticleCommentsSidebarController(input: {
   const setContext = (next: ArticleCommentsSidebarContext | null) => {
     const normalized = next ? normalizeContext(next) : null;
     if (buildContextKey(activeContext) === buildContextKey(normalized)) return;
+
+    const previousCanonicalUrl = canonicalizeArticleUrl(activeContext?.canonicalUrl);
+    const previousConversationId = normalizeConversationId(activeContext?.conversationId);
+    const nextCanonicalUrl = canonicalizeArticleUrl(normalized?.canonicalUrl);
+    const nextConversationId = normalizeConversationId(normalized?.conversationId);
+
+    if (
+      previousCanonicalUrl &&
+      nextCanonicalUrl &&
+      previousCanonicalUrl !== nextCanonicalUrl &&
+      previousConversationId &&
+      nextConversationId &&
+      previousConversationId === nextConversationId &&
+      typeof adapter.migrateCanonicalUrl === 'function'
+    ) {
+      void adapter
+        .migrateCanonicalUrl({
+          fromCanonicalUrl: previousCanonicalUrl,
+          toCanonicalUrl: nextCanonicalUrl,
+          conversationId: nextConversationId,
+        })
+        .catch((error) => {
+          console.warn('[CommentsSidebar] canonical migration failed', {
+            fromCanonicalUrl: previousCanonicalUrl,
+            toCanonicalUrl: nextCanonicalUrl,
+            conversationId: nextConversationId,
+            error: error instanceof Error ? error.message : String(error || ''),
+          });
+        });
+    }
 
     activeContext = normalized;
     pendingRootLocator = null;

@@ -303,6 +303,8 @@ describe('conversations storage-idb', () => {
     });
     const keepId = Number(keep.id);
     const removeId = Number(remove.id);
+    const keepKey = String(keep.conversationKey || '');
+    const removeKey = String(remove.conversationKey || '');
 
     await syncConversationMessages(removeId, [
       { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
@@ -315,7 +317,7 @@ describe('conversations storage-idb', () => {
     await reqToPromise(
       t.objectStore('sync_mappings').add({
         source: 'web',
-        conversationKey: 'remove',
+        conversationKey: removeKey,
         notionPageId: 'page_remove',
         lastSyncedMessageKey: 'x',
         updatedAt: 1,
@@ -330,9 +332,9 @@ describe('conversations storage-idb', () => {
     expect(res.merged).toBe(true);
 
     const items = await listAllConversationsForTests();
-    expect(items.map((c) => c.conversationKey)).toEqual(['keep']);
+    expect(items.map((c) => c.conversationKey)).toEqual([keepKey]);
     expect(items[0]).toMatchObject({
-      conversationKey: 'keep',
+      conversationKey: keepKey,
       title: 'From remove',
       notionPageId: 'page_remove',
     });
@@ -351,7 +353,7 @@ describe('conversations storage-idb', () => {
     expect(verifyMappings).toHaveLength(1);
     expect(verifyMappings[0]).toMatchObject({
       source: 'web',
-      conversationKey: 'keep',
+      conversationKey: keepKey,
       notionPageId: 'page_remove',
       lastSyncedMessageKey: 'x',
     });

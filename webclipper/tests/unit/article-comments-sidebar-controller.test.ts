@@ -185,4 +185,35 @@ describe('article-comments-sidebar-controller', () => {
     await Promise.resolve();
     expect(panel.getState().comments[0]?.commentText).toBe('B');
   });
+
+  it('setContext: keeps context stable for same discourse topic across different floors', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+
+    const adapter = {
+      list: vi.fn(async () => [{ id: 1, parentId: null, commentText: 'Topic', quoteText: '', createdAt: 1 }]),
+      addRoot: vi.fn(async () => true),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      migrateCanonicalUrl: vi.fn(async () => {}),
+    };
+
+    const controller = createArticleCommentsSidebarController({ session, adapter: adapter as any });
+
+    controller.setContext({ canonicalUrl: 'https://linux.do/t/topic-slug/123/20', conversationId: 9 });
+    await vi.waitFor(() => {
+      expect(panel.getState().comments[0]?.commentText).toBe('Topic');
+    });
+    expect(adapter.list).toHaveBeenCalledTimes(1);
+
+    session.setQuoteText('keep draft');
+    controller.setContext({ canonicalUrl: 'https://linux.do/t/topic-slug/123/1', conversationId: 9 });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(adapter.list).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot().quoteText).toBe('keep draft');
+    expect(adapter.migrateCanonicalUrl).not.toHaveBeenCalled();
+  });
 });

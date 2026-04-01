@@ -4,7 +4,7 @@ import { createArticleCommentsSidebarController } from '@services/comments/sideb
 import { createArticleCommentsSidebarInpageAdapter } from '@services/comments/sidebar/article-comments-sidebar-inpage-adapter';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import { normalizePositiveInt } from '@services/shared/numbers';
-import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow';
 
 type RuntimeClient = {
@@ -88,7 +88,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
       ensureContext: true,
       ensureContextInput: {
         tabId: lastTabId,
-        canonicalUrlFallback: normalizeHttpUrl(location.href),
+        canonicalUrlFallback: canonicalizeArticleUrl(location.href),
         ensureArticle,
       },
     });

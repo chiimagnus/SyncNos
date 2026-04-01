@@ -1,28 +1,11 @@
 import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import type { ArticleCommentsSidebarAdapter } from '@services/comments/sidebar/article-comments-sidebar-adapter';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
-
-function safeString(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeHttpUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
 
 function normalizeConversationId(value: unknown): number | null {
   const id = Number(value);
@@ -45,7 +28,7 @@ export function createArticleCommentsSidebarInpageAdapter(
 
   return {
     async list({ canonicalUrl }) {
-      const normalized = normalizeHttpUrl(canonicalUrl);
+      const normalized = canonicalizeArticleUrl(canonicalUrl);
       if (!normalized) return [];
       if (!rt?.send) return [];
       const res = await rt.send(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, { canonicalUrl: normalized } as any);
@@ -63,7 +46,8 @@ export function createArticleCommentsSidebarInpageAdapter(
     },
     async ensureContext(input) {
       const ensureArticle = input?.ensureArticle !== false;
-      const fallbackUrl = normalizeHttpUrl(input?.canonicalUrlFallback) || normalizeHttpUrl(getLocationHrefFallback());
+      const fallbackUrl =
+        canonicalizeArticleUrl(input?.canonicalUrlFallback) || canonicalizeArticleUrl(getLocationHrefFallback());
 
       if (!rt?.send || !ensureArticle) {
         return { canonicalUrl: fallbackUrl, conversationId: null };
@@ -75,7 +59,7 @@ export function createArticleCommentsSidebarInpageAdapter(
         return { canonicalUrl: fallbackUrl, conversationId: null };
       }
 
-      const canonicalUrl = normalizeHttpUrl(res?.data?.url) || fallbackUrl;
+      const canonicalUrl = canonicalizeArticleUrl(res?.data?.url) || fallbackUrl;
       const conversationId = normalizeConversationId(res?.data?.conversationId);
       if (canonicalUrl && conversationId) {
         try {
@@ -87,9 +71,11 @@ export function createArticleCommentsSidebarInpageAdapter(
       return { canonicalUrl, conversationId };
     },
     async addRoot({ canonicalUrl, conversationId, quoteText, commentText, locator }) {
+      const normalized = canonicalizeArticleUrl(canonicalUrl);
+      if (!normalized) throw new Error('missing canonicalUrl for adding article comment');
       if (!rt?.send) throw new Error('missing runtime for adding article comment');
       const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
-        canonicalUrl,
+        canonicalUrl: normalized,
         conversationId,
         quoteText,
         commentText,
@@ -99,9 +85,11 @@ export function createArticleCommentsSidebarInpageAdapter(
       return true;
     },
     async addReply({ canonicalUrl, conversationId, parentId, commentText }) {
+      const normalized = canonicalizeArticleUrl(canonicalUrl);
+      if (!normalized) throw new Error('missing canonicalUrl for replying article comment');
       if (!rt?.send) throw new Error('missing runtime for replying article comment');
       const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
-        canonicalUrl,
+        canonicalUrl: normalized,
         conversationId,
         parentId,
         quoteText: '',
@@ -113,6 +101,17 @@ export function createArticleCommentsSidebarInpageAdapter(
       if (!rt?.send) throw new Error('missing runtime for deleting article comment');
       const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id } as any);
       if (!res?.ok) throw new Error('failed to delete article comment');
+    },
+    async migrateCanonicalUrl({ fromCanonicalUrl, toCanonicalUrl, conversationId }) {
+      const from = canonicalizeArticleUrl(fromCanonicalUrl);
+      const to = canonicalizeArticleUrl(toCanonicalUrl);
+      if (!from || !to || from === to) return;
+      if (!rt?.send) return;
+      await rt.send(COMMENTS_MESSAGE_TYPES.MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL, {
+        fromCanonicalUrl: from,
+        toCanonicalUrl: to,
+        conversationId,
+      } as any);
     },
   };
 }

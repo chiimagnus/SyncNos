@@ -1,4 +1,5 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
   LIST_SOURCE_KEY_ALL,
@@ -170,17 +171,15 @@ function sortFacetItems(items: Array<{ key: string; label: string; count: number
 }
 
 function normalizeArticleUrl(raw: unknown): string {
-  const text = safeString(raw);
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = safeString(url.protocol).toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
+  return canonicalizeArticleUrl(raw);
+}
+
+function normalizeArticleConversationKey(raw: unknown): string {
+  const key = safeString(raw);
+  if (!key) return '';
+  if (!key.toLowerCase().startsWith('article:')) return key;
+  const canonicalUrl = normalizeArticleUrl(key.slice('article:'.length));
+  return canonicalUrl ? `article:${canonicalUrl}` : key;
 }
 
 function isArticlePayload(payload: any): boolean {
@@ -229,8 +228,16 @@ async function findExistingConversationForPayload(
   payload: any,
 ): Promise<any | null> {
   const source = safeString(payload?.source);
-  const conversationKey = safeString(payload?.conversationKey);
-  if (!source || !conversationKey) return null;
+  let conversationKey = safeString(payload?.conversationKey);
+  if (!source) return null;
+
+  if (isArticlePayload(payload) && source.toLowerCase() === 'web') {
+    const canonicalUrl = normalizeArticleUrl(payload?.url);
+    if (canonicalUrl) conversationKey = `article:${canonicalUrl}`;
+    conversationKey = normalizeArticleConversationKey(conversationKey);
+  }
+
+  if (!conversationKey) return null;
   const idx = conversationsStore.index('by_source_conversationKey');
   let existing: any = await reqToPromise(idx.get([source, conversationKey]) as any);
   if (!existing && isArticlePayload(payload)) {
@@ -373,15 +380,31 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   const existing = await findExistingConversationForPayload(stores.conversations, payload);
 
   const now = Date.now();
-  const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
-  const nextUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+  const nextSource = safeString(payload.source) || (existing ? safeString(existing.source) : '');
   const nextSourceType = payload.sourceType || (existing ? existing.sourceType || 'chat' : 'chat');
+  const isArticleSource = safeString(nextSourceType).toLowerCase() === 'article' && nextSource.toLowerCase() === 'web';
+
+  const payloadUrl = payload.url && String(payload.url).trim() ? String(payload.url).trim() : '';
+  const existingUrl = existing ? String(existing.url || '').trim() : '';
+  const nextUrlCandidate = payloadUrl || existingUrl;
+  const nextUrl = isArticleSource ? normalizeArticleUrl(nextUrlCandidate) || nextUrlCandidate : nextUrlCandidate;
+
+  const payloadConversationKey = payload.conversationKey && String(payload.conversationKey).trim();
+  const existingConversationKey = existing ? String(existing.conversationKey || '').trim() : '';
+  const articleDerivedConversationKey = isArticleSource && nextUrl ? `article:${nextUrl}` : '';
+  const nextConversationKey = isArticleSource
+    ? normalizeArticleConversationKey(
+        articleDerivedConversationKey || payloadConversationKey || existingConversationKey,
+      )
+    : String(payloadConversationKey || existingConversationKey || '').trim();
+
+  const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
   const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
 
   const baseRecord = normalizeConversationListRecord({
     sourceType: nextSourceType,
-    source: payload.source,
-    conversationKey: payload.conversationKey,
+    source: nextSource,
+    conversationKey: nextConversationKey,
     title: nextTitle || (existing ? existing.title || '' : ''),
     url: nextUrl || (existing ? existing.url || '' : ''),
     author: payload.author || (existing ? existing.author || '' : ''),

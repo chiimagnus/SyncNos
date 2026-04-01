@@ -5,31 +5,25 @@ import {
   upsertConversation,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
+import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
-import { tabsGet, tabsQuery } from '@platform/webext/tabs';
+import { tabsGet, tabsQuery, tabsUpdate } from '@platform/webext/tabs';
 import { storageGet } from '@platform/storage/local';
 
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
+const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/([^/]+))?\/?$/i;
+const DISCOURSE_TOPIC_PATH_RE_SOURCE = '^\\/t\\/([^/]+)\\/(\\d+)(?:\\/([^/]+))?\\/?$';
+const DISCOURSE_TOPIC_PATH_RE_FLAGS = 'i';
+const DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS = 10_000;
+const ARTICLE_STABILIZATION_TIMEOUT_MS = 10_000;
+const ARTICLE_STABILIZATION_MIN_TEXT_LENGTH = 240;
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
-}
-
-function normalizeHttpUrl(raw: unknown) {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = String(url.protocol || '').toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
 }
 
 function conversationKeyForUrl(url: string) {
@@ -40,6 +34,93 @@ function normalizeText(text: unknown) {
   return String(text || '')
     .replace(/\r\n/g, '\n')
     .trim();
+}
+
+function parseDiscourseTopicUrl(rawUrl: unknown): {
+  origin: string;
+  slug: string;
+  topicId: string;
+  postNumber: number | null;
+  postSegment: string | null;
+} | null {
+  const normalized = normalizeHttpUrl(rawUrl);
+  if (!normalized) return null;
+  try {
+    const url = new URL(normalized);
+    const parsedPath = parseDiscourseTopicPath(url.pathname);
+    if (!parsedPath) return null;
+    const postNumberRaw = Number(parsedPath.postSegment);
+    return {
+      origin: url.origin,
+      slug: parsedPath.slug,
+      topicId: parsedPath.topicId,
+      postNumber: Number.isFinite(postNumberRaw) && postNumberRaw > 0 ? postNumberRaw : null,
+      postSegment: parsedPath.postSegment,
+    };
+  } catch (_e) {
+    return null;
+  }
+}
+
+function parseDiscourseTopicPath(
+  pathname: unknown,
+  topicPathRe: RegExp = DISCOURSE_TOPIC_PATH_RE,
+): {
+  slug: string;
+  topicId: string;
+  postSegment: string | null;
+} | null {
+  const text = String(pathname || '').trim();
+  if (!text) return null;
+  const match = text.match(topicPathRe);
+  if (!match) return null;
+  return {
+    slug: String(match[1] || '').trim(),
+    topicId: String(match[2] || '').trim(),
+    postSegment: match[3] ? String(match[3]).trim() : null,
+  };
+}
+
+function isSameDiscourseTopicFloorUrl(currentUrl: string, expectedUrl: string): boolean {
+  const current = parseDiscourseTopicUrl(currentUrl);
+  const expected = parseDiscourseTopicUrl(expectedUrl);
+  if (!current || !expected) return false;
+  return (
+    current.origin === expected.origin &&
+    current.slug === expected.slug &&
+    current.topicId === expected.topicId &&
+    current.postNumber === expected.postNumber
+  );
+}
+
+function buildDiscourseTopicFloorUrl(
+  topic: {
+    origin: string;
+    slug: string;
+    topicId: string;
+  },
+  postNumber: number,
+): string {
+  return `${topic.origin}/t/${topic.slug}/${topic.topicId}/${Math.max(1, Math.floor(postNumber))}`;
+}
+
+function hasWarningFlag(warningFlags: unknown, flag: string): boolean {
+  if (!Array.isArray(warningFlags)) return false;
+  return warningFlags.some((item) => String(item || '').trim() === flag);
+}
+
+async function waitForTabUrl(targetTabId: number, expectedUrl: string, timeoutMs = 8_000): Promise<string> {
+  const expected = normalizeHttpUrl(expectedUrl);
+  if (!expected) throw toError('invalid expected navigation url');
+
+  const deadline = Date.now() + Math.max(1_000, Number(timeoutMs) || 8_000);
+  while (Date.now() < deadline) {
+    const tab = await tabsGet(targetTabId);
+    const current = normalizeHttpUrl((tab as any)?.url || '');
+    if (current === expected || isSameDiscourseTopicFloorUrl(current, expected)) return current;
+    await new Promise((resolve) => setTimeout(resolve, 180));
+  }
+  throw toError('timed out waiting for Discourse /1 navigation');
 }
 
 function countWords(text: string) {
@@ -94,9 +175,20 @@ async function ensureReadability(tabId: number) {
 async function extractArticleOnTab(tabId: number) {
   const results = await scriptingExecuteScript({
     target: { tabId, allFrames: false },
-    func: async ({ stabilizationTimeoutMs, stabilizationMinTextLength }: any) => {
+    func: async ({
+      stabilizationTimeoutMs,
+      stabilizationMinTextLength,
+      discourseTopicPathReSource,
+      discourseTopicPathReFlags,
+      discourseOpMissingWarningFlag,
+    }: any) => {
       const timeoutMs = Math.max(1_000, Number(stabilizationTimeoutMs) || 10_000);
       const minTextLength = Math.max(120, Number(stabilizationMinTextLength) || 240);
+      const topicPathPattern = String(discourseTopicPathReSource || '').trim() || '^$';
+      const topicPathFlags = String(discourseTopicPathReFlags || '').trim() || 'i';
+      const discourseTopicPathRe = new RegExp(topicPathPattern, topicPathFlags);
+      const discourseOpMissingFlag =
+        String(discourseOpMissingWarningFlag || '').trim() || 'discourse_op_missing_on_page';
 
       function normalize(value: unknown) {
         return String(value || '')
@@ -441,6 +533,22 @@ async function extractArticleOnTab(tabId: number) {
         };
       }
 
+      function withDiscourseOpWarning<T extends { warningFlags?: unknown }>(
+        payload: T,
+        opMissingOnCurrentPage: boolean,
+      ): T & { warningFlags: string[] } {
+        const existing = Array.isArray(payload?.warningFlags)
+          ? payload.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
+          : [];
+        if (opMissingOnCurrentPage && !existing.includes(discourseOpMissingFlag)) {
+          existing.push(discourseOpMissingFlag);
+        }
+        return {
+          ...payload,
+          warningFlags: existing,
+        };
+      }
+
       async function waitForDomStabilized() {
         const deadline = Date.now() + timeoutMs;
         let last: any = null;
@@ -499,6 +607,81 @@ async function extractArticleOnTab(tabId: number) {
         }
       }
 
+      function parseDiscourseTopicPath(pathname: unknown): {
+        slug: string;
+        topicId: string;
+        postNumber: string | null;
+      } | null {
+        const text = String(pathname || '').trim();
+        if (!text) return null;
+        const match = text.match(discourseTopicPathRe);
+        if (!match) return null;
+        return {
+          slug: String(match[1] || '').trim(),
+          topicId: String(match[2] || '').trim(),
+          postNumber: match[3] ? String(match[3]).trim() : null,
+        };
+      }
+
+      function findDiscourseOpNode(): Element | null {
+        const byArticle = document.querySelector("article[data-post-number='1']");
+        if (byArticle) return byArticle;
+
+        const byTopicPost = document.querySelector(".topic-post[data-post-number='1']");
+        if (byTopicPost) return byTopicPost;
+
+        const byPostId = document.querySelector('#post_1');
+        if (!byPostId) return null;
+        return byPostId.closest('article') || byPostId;
+      }
+
+      function extractDiscourseOpOnly() {
+        const topic = parseDiscourseTopicPath(location.pathname);
+        if (!topic) return null;
+
+        const opNode = findDiscourseOpNode();
+        if (!opNode) return null;
+
+        const cooked = opNode.querySelector('.cooked') as any;
+        const contentNode = (cooked || opNode) as any;
+        const content = normalize(contentNode?.innerHTML || '');
+        const text = normalize(contentNode?.innerText || contentNode?.textContent || '');
+        if (!content && !text) return null;
+
+        const author =
+          normalize(
+            (opNode.querySelector('.topic-meta-data .username') as any)?.textContent ||
+              (opNode.querySelector('.names .username') as any)?.textContent ||
+              (opNode.querySelector('[data-user-card]') as any)?.getAttribute?.('data-user-card') ||
+              '',
+          ) ||
+          readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+
+        const publishedAt =
+          normalize(
+            (opNode.querySelector('time') as any)?.getAttribute?.('datetime') ||
+              (opNode.querySelector('time') as any)?.textContent ||
+              '',
+          ) ||
+          readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
+
+        const title =
+          normalize(document.title || '') ||
+          readMeta(["meta[property='og:title']", "meta[name='twitter:title']", "meta[property='title']"]);
+
+        return {
+          ok: true,
+          title,
+          author,
+          publishedAt,
+          excerpt: '',
+          contentHTML: buildHtml(content, text),
+          contentMarkdown: htmlToMarkdown(content, text),
+          textContent: text,
+          warningFlags: [],
+        };
+      }
+
       function normalizeDetailsElementsForReadability(doc: any) {
         if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
 
@@ -547,6 +730,13 @@ async function extractArticleOnTab(tabId: number) {
         const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
         noisyNodes.forEach((node: any) => node?.remove?.());
 
+        const discourseTopic = parseDiscourseTopicPath(location.pathname);
+        const discourseOpOnly = extractDiscourseOpOnly();
+        if (discourseOpOnly) {
+          return withDiscourseOpWarning(discourseOpOnly, false);
+        }
+        const discourseOpMissingOnCurrentPage = Boolean(discourseTopic);
+
         if (typeof (globalThis as any).Readability === 'function') {
           const cloned = document.cloneNode(true) as any;
           normalizeDetailsElementsForReadability(cloned);
@@ -571,27 +761,30 @@ async function extractArticleOnTab(tabId: number) {
               const markdownWithWechatGallery = wechatGalleryMarkdown
                 ? normalize(`${markdownBase}\n\n${wechatGalleryMarkdown}`)
                 : markdownBase;
-              return {
-                ok: true,
-                title,
-                author,
-                publishedAt: readMeta([
-                  "meta[property='article:published_time']",
-                  "meta[name='publish_date']",
-                  "meta[name='pubdate']",
-                ]),
-                excerpt: normalize(article.excerpt || ''),
-                contentHTML: buildHtml(contentWithWechatGallery, text),
-                contentMarkdown: markdownWithWechatGallery,
-                textContent: text,
-                warningFlags: [],
-              };
+              return withDiscourseOpWarning(
+                {
+                  ok: true,
+                  title,
+                  author,
+                  publishedAt: readMeta([
+                    "meta[property='article:published_time']",
+                    "meta[name='publish_date']",
+                    "meta[name='pubdate']",
+                  ]),
+                  excerpt: normalize(article.excerpt || ''),
+                  contentHTML: buildHtml(contentWithWechatGallery, text),
+                  contentMarkdown: markdownWithWechatGallery,
+                  textContent: text,
+                  warningFlags: [],
+                },
+                discourseOpMissingOnCurrentPage,
+              );
             }
           }
         }
 
         const fallback = fallbackExtract();
-        if (fallback) return fallback;
+        if (fallback) return withDiscourseOpWarning(fallback, discourseOpMissingOnCurrentPage);
         return { ok: false, error: 'No article content detected' };
       } catch (e: any) {
         const message = e && e.message ? String(e.message) : String(e || 'Article extraction failed');
@@ -600,8 +793,11 @@ async function extractArticleOnTab(tabId: number) {
     },
     args: [
       {
-        stabilizationTimeoutMs: 10_000,
-        stabilizationMinTextLength: 240,
+        stabilizationTimeoutMs: ARTICLE_STABILIZATION_TIMEOUT_MS,
+        stabilizationMinTextLength: ARTICLE_STABILIZATION_MIN_TEXT_LENGTH,
+        discourseTopicPathReSource: DISCOURSE_TOPIC_PATH_RE_SOURCE,
+        discourseTopicPathReFlags: DISCOURSE_TOPIC_PATH_RE_FLAGS,
+        discourseOpMissingWarningFlag: DISCOURSE_OP_MISSING_WARNING_FLAG,
       },
     ],
   });
@@ -620,13 +816,32 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
+  const discourseTopic = parseDiscourseTopicUrl(cleanedUrl);
+  const canonicalUrl = canonicalizeArticleUrl(cleanedUrl) || cleanedUrl;
 
   await ensureReadability(targetTabId);
-  const extracted = await extractArticleOnTab(targetTabId);
+  let extracted = await extractArticleOnTab(targetTabId);
+
+  const shouldFallbackToFirstFloor =
+    discourseTopic &&
+    hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG) &&
+    discourseTopic.postNumber !== 1 &&
+    (discourseTopic.postNumber != null || discourseTopic.postSegment != null);
+
+  if (shouldFallbackToFirstFloor) {
+    const firstFloorUrl = buildDiscourseTopicFloorUrl(discourseTopic, 1);
+    await tabsUpdate(targetTabId, { url: firstFloorUrl });
+    await waitForTabUrl(targetTabId, firstFloorUrl, DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS);
+    extracted = await extractArticleOnTab(targetTabId);
+  }
+
+  if (discourseTopic && hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)) {
+    throw toError(DISCOURSE_OP_NOT_FOUND_ERROR);
+  }
 
   const textContent = normalizeText(extracted.textContent || '');
   const markdownContent = normalizeText(extracted.contentMarkdown || '');
-  const title = normalizeText(extracted.title || '') || fallbackTitle(cleanedUrl, tab.title || '');
+  const title = normalizeText(extracted.title || '') || fallbackTitle(canonicalUrl, tab.title || '');
   const author = normalizeText(extracted.author || '');
   const publishedAt = normalizeText(extracted.publishedAt || '');
   const warningFlags = Array.isArray(extracted.warningFlags)
@@ -641,8 +856,8 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     existed = await hasConversation({
       sourceType: ARTICLE_SOURCE_TYPE,
       source: ARTICLE_SOURCE,
-      conversationKey: conversationKeyForUrl(cleanedUrl),
-      url: cleanedUrl,
+      conversationKey: conversationKeyForUrl(canonicalUrl),
+      url: canonicalUrl,
     });
   } catch (_e) {
     existed = false;
@@ -650,9 +865,9 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: ARTICLE_SOURCE,
-    conversationKey: conversationKeyForUrl(cleanedUrl),
+    conversationKey: conversationKeyForUrl(canonicalUrl),
     title,
-    url: cleanedUrl,
+    url: canonicalUrl,
     author,
     publishedAt,
     warningFlags,
@@ -678,7 +893,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     if (local?.web_article_cache_images_enabled === true) {
       const inlined = await inlineChatImagesInMessages({
         conversationId,
-        conversationUrl: cleanedUrl,
+        conversationUrl: canonicalUrl,
         messages: messagesToSave,
         enableHttpImages: true,
       });
@@ -711,7 +926,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   return {
     isNew: !existed,
     conversationId,
-    url: cleanedUrl,
+    url: canonicalUrl,
     title,
     author,
     publishedAt,
@@ -726,8 +941,9 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
+  const canonicalUrl = canonicalizeArticleUrl(cleanedUrl) || cleanedUrl;
 
-  const key = conversationKeyForUrl(cleanedUrl);
+  const key = conversationKeyForUrl(canonicalUrl);
   try {
     const existing = await getConversationBySourceConversationKey(ARTICLE_SOURCE, key);
     const existingId = Number((existing as any)?.id);
@@ -738,8 +954,8 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
       return {
         isNew: false,
         conversationId: existingId,
-        url: cleanedUrl,
-        title: normalizeText((existing as any)?.title || '') || fallbackTitle(cleanedUrl, (tab as any)?.title || ''),
+        url: canonicalUrl,
+        title: normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
         author: normalizeText((existing as any)?.author || ''),
         publishedAt: normalizeText((existing as any)?.publishedAt || ''),
         warningFlags,
