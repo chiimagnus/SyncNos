@@ -6,7 +6,11 @@ import {
 } from '@ui/comments';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
-import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES, CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  CORE_MESSAGE_TYPES,
+  ARTICLE_MESSAGE_TYPES,
+  CHATWITH_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
@@ -77,8 +81,7 @@ function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
         });
         if (groupedResponse?.ok) return true;
         groupedErrorMessage =
-          safeString(groupedResponse?.error?.message) ||
-          `Failed to open grouped platform tab: ${normalizedPlatformId}`;
+          safeString(groupedResponse?.error?.message) || `Failed to open grouped platform tab: ${normalizedPlatformId}`;
       }
 
       const response = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {

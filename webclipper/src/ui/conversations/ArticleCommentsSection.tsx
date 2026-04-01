@@ -102,8 +102,7 @@ function ArticleCommentsPanelMount({
                 typeof resolveChatWithSingleActionLabel === 'function' ? resolveChatWithSingleActionLabel : undefined,
             }
           : null,
-      commentChatWith:
-        commentChatWith && typeof commentChatWith.resolveActions === 'function' ? commentChatWith : null,
+      commentChatWith: commentChatWith && typeof commentChatWith.resolveActions === 'function' ? commentChatWith : null,
     });
     apiRef.current = mounted.api;
     sidebarSession.attachPanel(mounted.api as any);
@@ -113,7 +112,7 @@ function ArticleCommentsPanelMount({
       mounted.cleanup();
       apiRef.current = null;
     };
-  }, [resolveChatWithActions, resolveChatWithSingleActionLabel, sidebarSession, variant]);
+  }, [commentChatWith, resolveChatWithActions, resolveChatWithSingleActionLabel, sidebarSession, variant]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 

@@ -6,7 +6,10 @@ import {
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
 import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 import { buildChatWithCommentPayloadV1 } from '@services/integrations/chatwith/chatwith-comment-payload';
-import { openChatWithPlatform, type ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import {
+  openChatWithPlatform,
+  type ChatWithOpenPlatformPort,
+} from '@services/integrations/chatwith/chatwith-open-port';
 
 export type ResolveChatWithCommentActionsInput = {
   quoteText?: string | null;
@@ -66,8 +69,7 @@ export async function resolveChatWithCommentActions(
   if (!safeText(payload)) return [];
 
   const truncated = truncateForChatWith(payload, settings.maxChars);
-  const singleLabel =
-    enabledPlatforms.length === 1 ? await resolveSingleEnabledChatWithActionLabel() : null;
+  const singleLabel = enabledPlatforms.length === 1 ? await resolveSingleEnabledChatWithActionLabel() : null;
 
   const actions: ChatWithCommentAction[] = [];
   for (const platform of enabledPlatforms) {

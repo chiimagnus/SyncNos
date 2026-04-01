@@ -7,7 +7,10 @@ import {
   type ChatWithAiPlatform,
 } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
-import { openChatWithPlatform, type ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import {
+  openChatWithPlatform,
+  type ChatWithOpenPlatformPort,
+} from '@services/integrations/chatwith/chatwith-open-port';
 
 function buildChatWithPlatformAction(input: {
   conversation: Conversation | null | undefined;

@@ -45,7 +45,8 @@ describe('resolveChatWithCommentActions', () => {
   });
 
   it('returns empty actions when comment text is empty', async () => {
-    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+    const { resolveChatWithCommentActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     const actions = await resolveChatWithCommentActions({
       commentText: '   ',
@@ -58,7 +59,8 @@ describe('resolveChatWithCommentActions', () => {
   });
 
   it('returns empty actions when no platform is enabled', async () => {
-    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+    const { resolveChatWithCommentActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
@@ -76,7 +78,8 @@ describe('resolveChatWithCommentActions', () => {
   });
 
   it('builds single-platform action and copies truncated payload', async () => {
-    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+    const { resolveChatWithCommentActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
@@ -126,7 +129,8 @@ describe('resolveChatWithCommentActions', () => {
   });
 
   it('builds multi-platform actions without single-label resolver', async () => {
-    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+    const { resolveChatWithCommentActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
@@ -149,7 +153,8 @@ describe('resolveChatWithCommentActions', () => {
   });
 
   it('throws when clipboard copy fails', async () => {
-    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+    const { resolveChatWithCommentActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
@@ -169,7 +174,8 @@ describe('resolveChatWithCommentActions', () => {
   });
 
   it('throws when opening platform fails', async () => {
-    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+    const { resolveChatWithCommentActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',

@@ -98,10 +98,7 @@ export async function setChatWithTabReuseEntry(input: {
   await saveChatWithTabReuseStore(store);
 }
 
-export async function removeChatWithTabReuseEntry(input: {
-  platformId: unknown;
-  articleKey: unknown;
-}): Promise<void> {
+export async function removeChatWithTabReuseEntry(input: { platformId: unknown; articleKey: unknown }): Promise<void> {
   const key = buildChatWithTabReuseKey(input?.platformId, input?.articleKey);
   if (!key) return;
 

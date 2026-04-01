@@ -39,7 +39,6 @@ type RenderThreadedCommentsOptions = {
 const COMMENT_CHAT_WITH_ROOT_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith';
 const COMMENT_CHAT_WITH_TRIGGER_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith-trigger';
 const COMMENT_CHAT_WITH_MENU_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith-menu';
-const COMMENT_CHAT_WITH_MENU_ITEM_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith-menu-item';
 
 function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
   const ta = Number(a?.createdAt) || 0;
@@ -101,8 +100,9 @@ function isCommentChatWithMenuOpen(root: HTMLElement): boolean {
 
 export function closeThreadCommentChatWithMenus(threadsRoot: ParentNode, keepWithin?: Element | null): boolean {
   const roots = Array.from(
-    (threadsRoot as ParentNode & { querySelectorAll?: (selectors: string) => NodeListOf<HTMLElement> })
-      .querySelectorAll?.(COMMENT_CHAT_WITH_ROOT_SELECTOR) || [],
+    (
+      threadsRoot as ParentNode & { querySelectorAll?: (selectors: string) => NodeListOf<HTMLElement> }
+    ).querySelectorAll?.(COMMENT_CHAT_WITH_ROOT_SELECTOR) || [],
   ) as HTMLElement[];
   let closed = false;
   for (const root of roots) {
@@ -254,7 +254,8 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
 
     if (commentChatWith) {
       const chatWithWrap = document.createElement('div');
-      chatWithWrap.className = 'webclipper-inpage-comments-panel__comment-chatwith webclipper-inpage-comments-panel__chatwith';
+      chatWithWrap.className =
+        'webclipper-inpage-comments-panel__comment-chatwith webclipper-inpage-comments-panel__chatwith';
       commentActions.appendChild(chatWithWrap);
 
       const trigger = document.createElement('button');
@@ -270,7 +271,8 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
       chatWithWrap.appendChild(trigger);
 
       const menu = document.createElement('div');
-      menu.className = 'webclipper-inpage-comments-panel__comment-chatwith-menu webclipper-inpage-comments-panel__chatwith-menu';
+      menu.className =
+        'webclipper-inpage-comments-panel__comment-chatwith-menu webclipper-inpage-comments-panel__chatwith-menu';
       menu.setAttribute('role', 'menu');
       menu.setAttribute('aria-label', t('detailHeaderChatWithMenuAria'));
       menu.hidden = true;

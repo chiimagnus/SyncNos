@@ -154,8 +154,7 @@ export function registerChatWithBackgroundHandlers(router: AnyRouter) {
       return router.err('invalid articleKey', { code: 'CHATWITH_ARTICLE_KEY_REQUIRED', platformId });
     }
 
-    const articleTabId =
-      normalizePositiveInt(sender?.tab?.id) || normalizePositiveInt(msg?.articleTabId) || null;
+    const articleTabId = normalizePositiveInt(sender?.tab?.id) || normalizePositiveInt(msg?.articleTabId) || null;
     const articleWindowId =
       normalizePositiveInt(sender?.tab?.windowId) || normalizePositiveInt(msg?.articleWindowId) || null;
 

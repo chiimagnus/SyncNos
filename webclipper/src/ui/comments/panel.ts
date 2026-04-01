@@ -3,7 +3,11 @@ import { createTwoStepConfirmController } from '@services/shared/two-step-confir
 import { createChatWithMenuController } from './chatwith';
 import { createDockController } from './dock';
 import { createThreadLocateController } from './locate';
-import { closeThreadCommentChatWithMenuOnEscape, closeThreadCommentChatWithMenus, renderThreadedComments } from './render';
+import {
+  closeThreadCommentChatWithMenuOnEscape,
+  closeThreadCommentChatWithMenus,
+  renderThreadedComments,
+} from './render';
 import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type { MountOptions, ThreadedCommentsPanelApi } from './types';
