@@ -4,10 +4,9 @@ import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
 import { CapturedListSidebar } from '@ui/app/CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '@viewmodels/conversations/conversations-context';
-import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
+import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { AppTooltipHost } from '@ui/shared/AppTooltip';
@@ -147,7 +146,6 @@ export default function AppShell() {
     setCollapsed: (collapsed: boolean) => void;
     setCommentsCollapsed: (collapsed: boolean) => void;
   }) {
-    const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
     const suppressCommentsSidebarCollapseRef = useRef(false);
     const {
       sidebarSession: commentsSidebarSession,
@@ -155,6 +153,7 @@ export default function AppShell() {
       sidebarSnapshot: commentsSidebarSnapshot,
       setLocatorRoot: setCommentsLocatorRoot,
       getLocatorRoot: getCommentsLocatorRoot,
+      subscribeSidebarClose,
     } = useArticleCommentsSidebarRuntime({
       onClose: () => {
         if (suppressCommentsSidebarCollapseRef.current) return;
@@ -464,25 +463,26 @@ export default function AppShell() {
               ].join(' ')}
               aria-hidden={showSettingsSheet}
             >
-              {location.pathname === '/' && narrowHeaderState.mode === 'detail' ? (
-                <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2">
-                  <DetailNavigationHeader
-                    title={narrowHeaderState.title}
-                    subtitle={narrowHeaderState.subtitle}
-                    actions={narrowHeaderState.actions}
-                    onBack={narrowHeaderState.onBack}
-                  />
-                </header>
-              ) : null}
-
               <div className="tw-min-h-0 tw-flex-1">
                 <Routes location={routesLocation}>
                   <Route
                     path="/"
                     element={
                       <ConversationsScene
-                        onPopupHeaderStateChange={setNarrowHeaderState}
+                        inlineNarrowDetailHeader
                         onOpenInsightsSection={() => navigate('/settings?section=aboutyou')}
+                        commentsSidebarRuntime={{
+                          sidebarSession: commentsSidebarSession,
+                          sidebarController: commentsSidebarController,
+                          sidebarSnapshot: commentsSidebarSnapshot,
+                          setLocatorRoot: setCommentsLocatorRoot,
+                          getLocatorRoot: getCommentsLocatorRoot,
+                          subscribeSidebarClose,
+                        }}
+                        narrowCommentsOpenSource="app"
+                        resolveCommentsSidebarChatWithActions={resolveCommentsSidebarChatWithActions}
+                        resolveCommentsSidebarSingleChatWithLabel={resolveCommentsSidebarSingleChatWithLabel}
+                        commentsSidebarCommentChatWith={commentsSidebarCommentChatWithConfig}
                       />
                     }
                   />
