@@ -6,10 +6,14 @@ const writeTextToClipboardMock = vi.fn();
 const resolveSingleEnabledChatWithActionLabelMock = vi.fn();
 const openChatWithPlatformMock = vi.fn();
 
-vi.mock('../../src/services/integrations/chatwith/chatwith-settings', () => ({
-  loadChatWithSettings: (...args: any[]) => loadChatWithSettingsMock(...args),
-  truncateForChatWith: (...args: any[]) => truncateForChatWithMock(...args),
-}));
+vi.mock('../../src/services/integrations/chatwith/chatwith-settings', async () => {
+  const actual = await vi.importActual('../../src/services/integrations/chatwith/chatwith-settings');
+  return {
+    ...(actual as Record<string, unknown>),
+    loadChatWithSettings: (...args: any[]) => loadChatWithSettingsMock(...args),
+    truncateForChatWith: (...args: any[]) => truncateForChatWithMock(...args),
+  };
+});
 
 vi.mock('../../src/services/integrations/chatwith/chatwith-clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),

@@ -36,7 +36,8 @@ export function buildChatWithCommentPayloadV1(input: BuildChatWithCommentPayload
   articleContentLines.push('Comment:', commentText);
 
   const articleContent = articleContentLines.join('\n').trim();
-  const promptTemplate = safeText(input?.promptTemplate) || DEFAULT_COMMENT_CHAT_WITH_TEMPLATE;
+  const rawPromptTemplate = String(input?.promptTemplate ?? '');
+  const promptTemplate = rawPromptTemplate.trim() ? rawPromptTemplate : DEFAULT_COMMENT_CHAT_WITH_TEMPLATE;
 
   const rendered = renderChatWithTemplate(promptTemplate, {
     article_title: articleTitle,
