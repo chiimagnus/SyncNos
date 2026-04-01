@@ -118,7 +118,11 @@ describe('notion-db-manager', () => {
     notionFetchImpl = async (req: any) => {
       calls.push(req);
       if (req.method === 'GET' && req.path === '/v1/databases/db1') {
-        return { id: 'db1', properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' } } };
+        return {
+          id: 'db1',
+          parent: { type: 'page_id', page_id: 'p' },
+          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' } },
+        };
       }
       if (req.method === 'PATCH' && req.path === '/v1/databases/db1') return { ok: true };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
@@ -238,5 +242,121 @@ describe('notion-db-manager', () => {
     const res = await notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p' });
     expect(res.databaseId).toBe('db_new');
     expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
+  });
+
+  it('does not reuse cached database when parent page changed', async () => {
+    const calls: any[] = [];
+    const chromeMock = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: 'db_cached' } });
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'GET' && req.path === '/v1/databases/db_cached') {
+        return {
+          id: 'db_cached',
+          object: 'database',
+          archived: false,
+          in_trash: false,
+          parent: { type: 'page_id', page_id: 'p_old' },
+          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' }, AI: { type: 'multi_select' } },
+        };
+      }
+      if (req.method === 'POST' && req.path === '/v1/search') {
+        return {
+          results: [
+            {
+              id: 'db_new_parent',
+              object: 'database',
+              archived: false,
+              in_trash: false,
+              parent: { type: 'page_id', page_id: 'p_new' },
+              title: [{ plain_text: 'SyncNos-AI Chats' }],
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        };
+      }
+      if (req.method === 'GET' && req.path === '/v1/databases/db_new_parent') {
+        return {
+          id: 'db_new_parent',
+          object: 'database',
+          archived: false,
+          in_trash: false,
+          parent: { type: 'page_id', page_id: 'p_new' },
+          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' }, AI: { type: 'multi_select' } },
+        };
+      }
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    const res = await notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p_new' });
+    expect(res.databaseId).toBe('db_new_parent');
+    expect(res.reused).toBe(true);
+    expect(chromeMock.__removed.some((keys) => keys.includes('notion_db_id_syncnos_ai_chats'))).toBe(true);
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(false);
+  });
+
+  it('searches multiple pages and reuses later exact match under same parent', async () => {
+    const calls: any[] = [];
+    notionFetchImpl = async (req: any) => {
+      calls.push(req);
+      if (req.method === 'POST' && req.path === '/v1/search') {
+        const cursor = String(req?.body?.start_cursor || '').trim();
+        if (!cursor) {
+          return {
+            results: [
+              {
+                id: 'db_other_parent',
+                object: 'database',
+                archived: false,
+                in_trash: false,
+                parent: { type: 'page_id', page_id: 'p_other' },
+                title: [{ plain_text: 'SyncNos-AI Chats' }],
+              },
+            ],
+            has_more: true,
+            next_cursor: 'cursor_2',
+          };
+        }
+        if (cursor === 'cursor_2') {
+          return {
+            results: [
+              {
+                id: 'db_target',
+                object: 'database',
+                archived: false,
+                in_trash: false,
+                parent: { type: 'page_id', page_id: 'p_target' },
+                title: [{ plain_text: 'SyncNos-AI Chats' }],
+              },
+            ],
+            has_more: false,
+            next_cursor: null,
+          };
+        }
+      }
+      if (req.method === 'GET' && req.path === '/v1/databases/db_target') {
+        return {
+          id: 'db_target',
+          object: 'database',
+          archived: false,
+          in_trash: false,
+          parent: { type: 'page_id', page_id: 'p_target' },
+          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' }, AI: { type: 'multi_select' } },
+        };
+      }
+      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    };
+
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    const res = await notionDbManager.ensureDatabase({ accessToken: 't', parentPageId: 'p_target' });
+    expect(res.databaseId).toBe('db_target');
+    expect(res.reused).toBe(true);
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(false);
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/v1/search').length).toBe(2);
   });
 });

@@ -12,13 +12,14 @@ import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { conversationKinds } from '@services/protocols/conversation-kinds';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
   buildMarkdownReadingProfileStoragePatch,
   normalizeStoredMarkdownReadingProfile,
 } from '@services/protocols/markdown-reading-profile-storage';
 import { send } from '@services/shared/runtime';
-import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
+import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import {
@@ -52,6 +53,25 @@ import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/sh
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
+const FALLBACK_NOTION_DB_STORAGE_KEYS = ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
+
+function getNotionDbStorageKeys() {
+  try {
+    const keys = conversationKinds?.getNotionStorageKeys?.();
+    if (Array.isArray(keys) && keys.length) {
+      return Array.from(
+        new Set(
+          keys
+            .map((key) => String(key || '').trim())
+            .filter(Boolean),
+        ),
+      );
+    }
+  } catch (_e) {
+    // ignore and fallback
+  }
+  return FALLBACK_NOTION_DB_STORAGE_KEYS.slice();
+}
 
 function isFirefoxFamilyBrowser() {
   try {
@@ -452,6 +472,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         if (nextId) setNotionParentPageId(nextId);
         if (nextTitle) setNotionParentPageTitle(nextTitle);
 
+        if (savedId && nextId && nextId !== savedId) {
+          await storageRemove(getNotionDbStorageKeys());
+        }
+
         const payload: Record<string, unknown> = {};
         if (nextId && nextId !== savedId) payload.notion_parent_page_id = nextId;
         if (nextTitle && nextTitle !== savedTitle) payload.notion_parent_page_title = nextTitle;
@@ -482,8 +506,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     async (id: string) => {
       const next = String(id || '').trim();
       if (!next) return;
+      const savedId = String(notionParentPageId || '').trim();
 
       await runTask(async () => {
+        if (savedId && next !== savedId) {
+          await storageRemove(getNotionDbStorageKeys());
+        }
+
         setNotionParentPageId(next);
         const match = notionPages.find((page) => page && String(page.id || '').trim() === next) ?? null;
         if (match && match.title) setNotionParentPageTitle(String(match.title || '').trim());
@@ -493,7 +522,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         await storageSet(payload);
       });
     },
-    [notionPages, runTask],
+    [notionPages, notionParentPageId, runTask],
   );
 
   const onSaveNotionAiModelIndex = useCallback(async () => {

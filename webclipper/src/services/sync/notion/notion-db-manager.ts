@@ -6,6 +6,8 @@ import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
 const DEFAULT_DB_TITLE = 'SyncNos-AI Chats';
 const DEFAULT_DB_STORAGE_KEY = 'notion_db_id_syncnos_ai_chats';
+const SEARCH_PAGE_SIZE = 100;
+const SEARCH_MAX_PAGES = 10;
 
 async function getCachedDatabaseId(storageKey) {
   const key = String(storageKey || '').trim() || DEFAULT_DB_STORAGE_KEY;
@@ -67,20 +69,101 @@ function isUsableDatabase(database) {
   return true;
 }
 
+function normalizeNotionId(id) {
+  return String(id || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '');
+}
+
+function readParentPageId(database) {
+  try {
+    const parent = database && database.parent ? database.parent : null;
+    if (!parent || typeof parent !== 'object') return '';
+    if (parent.page_id) return String(parent.page_id).trim();
+    return '';
+  } catch (_e) {
+    return '';
+  }
+}
+
+function matchesParentPage(database, parentPageId) {
+  const expected = normalizeNotionId(parentPageId);
+  if (!expected) return true;
+  const actual = normalizeNotionId(readParentPageId(database));
+  return !!actual && actual === expected;
+}
+
+function readDatabaseTitle(database) {
+  const title = Array.isArray(database && database.title) ? database.title : [];
+  return title
+    .map((x) => x?.plain_text || '')
+    .join('')
+    .trim();
+}
+
+function normalizeTitle(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
+}
+
+function parseHttpStatus(error) {
+  const fromField = Number(error && (error as any).status);
+  if (Number.isFinite(fromField) && fromField > 0) return fromField;
+  const message = String((error && (error as any).message) || error || '');
+  const matched = message.match(/\bHTTP\s+(\d{3})\b/i);
+  return matched ? Number(matched[1]) : 0;
+}
+
+function parseNotionErrorCode(error) {
+  const direct = String((error && (error as any).code) || '').trim();
+  if (direct) return direct;
+  const message = String((error && (error as any).message) || error || '');
+  const matched = message.match(/"code"\s*:\s*"([^"]+)"/i);
+  return matched ? String(matched[1] || '').trim() : '';
+}
+
+function isMissingDatabaseError(error) {
+  const status = parseHttpStatus(error);
+  if (status === 404 || status === 410) return true;
+  const code = parseNotionErrorCode(error).toLowerCase();
+  return code === 'object_not_found';
+}
+
 async function getDatabase(accessToken, databaseId) {
   const notionFetch = getNotionFetch();
   return notionFetch({ accessToken, method: 'GET', path: `/v1/databases/${databaseId}` });
 }
 
-async function searchDatabases(accessToken, query) {
-  const body = {
-    query: query || '',
-    filter: { property: 'object', value: 'database' },
-    sort: { direction: 'descending', timestamp: 'last_edited_time' },
-    page_size: 20,
-  };
+async function searchDatabases(accessToken, { query, parentPageId }) {
   const notionFetch = getNotionFetch();
-  return notionFetch({ accessToken, method: 'POST', path: '/v1/search', body });
+  const results = [];
+  let cursor = '';
+  let pageCount = 0;
+
+  while (pageCount < SEARCH_MAX_PAGES) {
+    pageCount += 1;
+    const body = {
+      query: query || '',
+      filter: { property: 'object', value: 'database' },
+      sort: { direction: 'descending', timestamp: 'last_edited_time' },
+      page_size: SEARCH_PAGE_SIZE,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    };
+    const res = await notionFetch({ accessToken, method: 'POST', path: '/v1/search', body });
+    const pageResults = Array.isArray(res && (res as any).results) ? (res as any).results : [];
+    for (const item of pageResults) {
+      if (!isUsableDatabase(item)) continue;
+      if (!matchesParentPage(item, parentPageId)) continue;
+      results.push(item);
+    }
+    if (!res || !res.has_more || !res.next_cursor) break;
+    cursor = String(res.next_cursor || '').trim();
+    if (!cursor) break;
+  }
+
+  return { results };
 }
 
 async function updateDatabase(accessToken, { databaseId, properties }) {
@@ -150,26 +233,30 @@ async function ensureDatabase({ accessToken, parentPageId, dbSpec }) {
   if (cached) {
     try {
       const db = await getDatabase(accessToken, cached);
-      if (!isUsableDatabase(db)) throw new Error('cached database is archived');
-      await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec: spec });
-      return { databaseId: cached, title: spec.title, reused: true, database: db };
-    } catch (_e) {
-      // Fall through: cached id invalid or no access.
-      await clearCachedDatabaseId(spec.storageKey);
+      if (!isUsableDatabase(db)) {
+        await clearCachedDatabaseId(spec.storageKey);
+      } else if (!matchesParentPage(db, parentPageId)) {
+        await clearCachedDatabaseId(spec.storageKey);
+      } else {
+        await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec: spec });
+        return { databaseId: cached, title: spec.title, reused: true, database: db };
+      }
+    } catch (error) {
+      if (isMissingDatabaseError(error)) {
+        await clearCachedDatabaseId(spec.storageKey);
+      } else {
+        throw error;
+      }
     }
   }
 
-  const found = await searchDatabases(accessToken, spec.title);
+  const found = await searchDatabases(accessToken, { query: spec.title, parentPageId });
   const results = Array.isArray(found.results) ? found.results : [];
+  const wantedTitle = normalizeTitle(spec.title);
   const exact = results.find((d) => {
-    if (!isUsableDatabase(d)) return false;
-    const t = Array.isArray(d.title)
-      ? d.title
-          .map((x) => x.plain_text || '')
-          .join('')
-          .trim()
-      : '';
-    return t === spec.title;
+    if (!matchesParentPage(d, parentPageId)) return false;
+    const title = readDatabaseTitle(d);
+    return normalizeTitle(title) === wantedTitle;
   });
   if (exact && exact.id) {
     await setCachedDatabaseId(spec.storageKey, exact.id);
