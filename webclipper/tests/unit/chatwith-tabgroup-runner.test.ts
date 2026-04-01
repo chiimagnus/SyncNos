@@ -104,9 +104,7 @@ describe('openOrFocusGroupedChatTab', () => {
       return null;
     });
 
-    tabsGroupMock
-      .mockRejectedValueOnce(new Error('direct grouping failed'))
-      .mockResolvedValueOnce(66);
+    tabsGroupMock.mockRejectedValueOnce(new Error('direct grouping failed')).mockResolvedValueOnce(66);
 
     const { openOrFocusGroupedChatTab } = await import('../../src/services/integrations/chatwith/tabgroup-runner');
 
