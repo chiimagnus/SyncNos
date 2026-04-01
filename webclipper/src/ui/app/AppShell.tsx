@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
@@ -12,15 +12,9 @@ import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { AppTooltipHost } from '@ui/shared/AppTooltip';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
-import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
-import {
-  createArticleCommentsSidebarController,
-  type ArticleCommentsSidebarController,
-} from '@services/comments/sidebar/article-comments-sidebar-controller';
-import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
 import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
@@ -154,30 +148,19 @@ export default function AppShell() {
     setCommentsCollapsed: (collapsed: boolean) => void;
   }) {
     const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
-    const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
-    const commentsSidebarControllerRef = useRef<ArticleCommentsSidebarController | null>(null);
     const suppressCommentsSidebarCollapseRef = useRef(false);
-    const commentsLocatorRootRef = useRef<Element | null>(null);
-    if (!commentsSidebarSessionRef.current) {
-      commentsSidebarSessionRef.current = createCommentSidebarSession();
-    }
-    const commentsSidebarSession = commentsSidebarSessionRef.current;
-    if (!commentsSidebarControllerRef.current) {
-      commentsSidebarControllerRef.current = createArticleCommentsSidebarController({
-        session: commentsSidebarSession,
-        adapter: createArticleCommentsSidebarAppAdapter(),
-        onClose: () => {
-          if (suppressCommentsSidebarCollapseRef.current) return;
-          setCommentsCollapsed(true);
-        },
-      });
-    }
-    const commentsSidebarController = commentsSidebarControllerRef.current;
-    const commentsSidebarSnapshot = useSyncExternalStore(
-      (listener) => commentsSidebarSession.subscribe(listener),
-      () => commentsSidebarSession.getSnapshot(),
-      () => commentsSidebarSession.getSnapshot(),
-    );
+    const {
+      sidebarSession: commentsSidebarSession,
+      sidebarController: commentsSidebarController,
+      sidebarSnapshot: commentsSidebarSnapshot,
+      setLocatorRoot: setCommentsLocatorRoot,
+      getLocatorRoot: getCommentsLocatorRoot,
+    } = useArticleCommentsSidebarRuntime({
+      onClose: () => {
+        if (suppressCommentsSidebarCollapseRef.current) return;
+        setCommentsCollapsed(true);
+      },
+    });
     const runtimeClientRef = useRef<ReturnType<typeof createRuntimeClient> | null>(null);
     if (!runtimeClientRef.current) {
       runtimeClientRef.current = createRuntimeClient();
@@ -526,7 +509,7 @@ export default function AppShell() {
                         onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
                         onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
                         onCommentsLocatorRootChange={(root) => {
-                          commentsLocatorRootRef.current = root;
+                          setCommentsLocatorRoot(root);
                         }}
                         commentsSidebarOpen={showCommentsSidebar}
                       />
@@ -540,13 +523,13 @@ export default function AppShell() {
 
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0">
-                  <ArticleCommentsSection
-                    sidebarSession={commentsSidebarSession}
-                    containerClassName="tw-h-full tw-min-h-0"
-                    getLocatorRoot={() => commentsLocatorRootRef.current}
-                    resolveChatWithActions={resolveCommentsSidebarChatWithActions}
-                    resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
-                    commentChatWith={commentsSidebarCommentChatWithConfig}
+                    <ArticleCommentsSection
+                      sidebarSession={commentsSidebarSession}
+                      containerClassName="tw-h-full tw-min-h-0"
+                      getLocatorRoot={getCommentsLocatorRoot}
+                      resolveChatWithActions={resolveCommentsSidebarChatWithActions}
+                      resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
+                      commentChatWith={commentsSidebarCommentChatWithConfig}
                   />
                 </div>
               ) : null}
