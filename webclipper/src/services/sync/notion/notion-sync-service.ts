@@ -35,6 +35,13 @@ function parseHttpStatus(error) {
   return m ? Number(m[1]) : 0;
 }
 
+function normalizeNotionId(id) {
+  return String(id || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '');
+}
+
 function retryDelayMs(error, attempt) {
   const retryAfterMs = error && error.retryAfterMs != null ? Number(error.retryAfterMs) : 0;
   if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
@@ -349,7 +356,10 @@ function pageBelongsToDatabase(page, databaseId) {
   try {
     const parent = page && page.parent ? page.parent : null;
     if (!parent || parent.type !== 'database_id') return false;
-    return parent.database_id === databaseId;
+    const actual = normalizeNotionId(parent.database_id);
+    const expected = normalizeNotionId(databaseId);
+    if (!actual || !expected) return false;
+    return actual === expected;
   } catch (_e) {
     return false;
   }
