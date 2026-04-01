@@ -1,26 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
 import { CapturedListSidebar } from '@ui/app/CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '@viewmodels/conversations/conversations-context';
-import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
+import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { AppTooltipHost } from '@ui/shared/AppTooltip';
-import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
+import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
-import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
-import {
-  createArticleCommentsSidebarController,
-  type ArticleCommentsSidebarController,
-} from '@services/comments/sidebar/article-comments-sidebar-controller';
-import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
 import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
@@ -71,7 +64,8 @@ function openUrlFallback(url: string): boolean {
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const [commentsSidebarCollapsed, setCommentsSidebarCollapsed] = useState(false);
+  const [wideCommentsSidebarCollapsed, setWideCommentsSidebarCollapsed] = useState(false);
+  const [mediumCommentsSidebarCollapsed, setMediumCommentsSidebarCollapsed] = useState(true);
 
   useEffect(() => {
     try {
@@ -85,7 +79,7 @@ export default function AppShell() {
   useEffect(() => {
     try {
       const v = localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY);
-      if (v === '1') setCommentsSidebarCollapsed(true);
+      if (v === '1') setWideCommentsSidebarCollapsed(true);
     } catch (_e) {
       // ignore
     }
@@ -100,8 +94,8 @@ export default function AppShell() {
     }
   };
 
-  const setCommentsCollapsed = (collapsed: boolean) => {
-    setCommentsSidebarCollapsed(collapsed);
+  const setWideCommentsCollapsed = (collapsed: boolean) => {
+    setWideCommentsSidebarCollapsed(collapsed);
     try {
       localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
     } catch (_e) {
@@ -109,80 +103,93 @@ export default function AppShell() {
     }
   };
 
-  function AppShellRouterProviders({
-    sidebarCollapsed,
-    commentsSidebarCollapsed,
-    setCollapsed,
-    setCommentsCollapsed,
-  }: {
-    sidebarCollapsed: boolean;
-    commentsSidebarCollapsed: boolean;
-    setCollapsed: (collapsed: boolean) => void;
-    setCommentsCollapsed: (collapsed: boolean) => void;
-  }) {
-    const location = useLocation();
-    const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
-    if (initialOpenLocRef.current === undefined) {
-      const search = String(location.search || '');
-      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-      const loc = params.get('loc');
-      initialOpenLocRef.current = loc ? decodeConversationLoc(loc) : null;
-    }
+  const AppShellRouterProviders = useMemo(
+    () =>
+      function AppShellRouterProviders({
+        sidebarCollapsed,
+        wideCommentsSidebarCollapsed,
+        mediumCommentsSidebarCollapsed,
+        setCollapsed,
+        setWideCommentsCollapsed,
+        setMediumCommentsCollapsed,
+      }: {
+        sidebarCollapsed: boolean;
+        wideCommentsSidebarCollapsed: boolean;
+        mediumCommentsSidebarCollapsed: boolean;
+        setCollapsed: (collapsed: boolean) => void;
+        setWideCommentsCollapsed: (collapsed: boolean) => void;
+        setMediumCommentsCollapsed: (collapsed: boolean) => void;
+      }) {
+        const location = useLocation();
+        const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
+        if (initialOpenLocRef.current === undefined) {
+          const search = String(location.search || '');
+          const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+          const loc = params.get('loc');
+          initialOpenLocRef.current = loc ? decodeConversationLoc(loc) : null;
+        }
 
-    return (
-      <ConversationsProvider initialOpenLoc={initialOpenLocRef.current ?? null}>
-        <AppShellFrame
-          sidebarCollapsed={sidebarCollapsed}
-          commentsSidebarCollapsed={commentsSidebarCollapsed}
-          setCollapsed={setCollapsed}
-          setCommentsCollapsed={setCommentsCollapsed}
-        />
-        <AppTooltipHost />
-      </ConversationsProvider>
-    );
-  }
+        return (
+          <ConversationsProvider initialOpenLoc={initialOpenLocRef.current ?? null}>
+            <AppShellFrame
+              sidebarCollapsed={sidebarCollapsed}
+              wideCommentsSidebarCollapsed={wideCommentsSidebarCollapsed}
+              mediumCommentsSidebarCollapsed={mediumCommentsSidebarCollapsed}
+              setCollapsed={setCollapsed}
+              setWideCommentsCollapsed={setWideCommentsCollapsed}
+              setMediumCommentsCollapsed={setMediumCommentsCollapsed}
+            />
+            <AppTooltipHost />
+          </ConversationsProvider>
+        );
+      },
+    [],
+  );
 
   function AppShellFrame({
     sidebarCollapsed,
-    commentsSidebarCollapsed,
+    wideCommentsSidebarCollapsed,
+    mediumCommentsSidebarCollapsed,
     setCollapsed,
-    setCommentsCollapsed,
+    setWideCommentsCollapsed,
+    setMediumCommentsCollapsed,
   }: {
     sidebarCollapsed: boolean;
-    commentsSidebarCollapsed: boolean;
+    wideCommentsSidebarCollapsed: boolean;
+    mediumCommentsSidebarCollapsed: boolean;
     setCollapsed: (collapsed: boolean) => void;
-    setCommentsCollapsed: (collapsed: boolean) => void;
+    setWideCommentsCollapsed: (collapsed: boolean) => void;
+    setMediumCommentsCollapsed: (collapsed: boolean) => void;
   }) {
-    const [narrowHeaderState, setNarrowHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
-    const commentsSidebarSessionRef = useRef<CommentSidebarSession | null>(null);
-    const commentsSidebarControllerRef = useRef<ArticleCommentsSidebarController | null>(null);
+    const tier = useResponsiveTier();
+    const isNarrow = tier === 'narrow';
+    const isMedium = tier === 'medium';
+    const isWide = tier === 'wide';
+    const previousTierRef = useRef<typeof tier | null>(null);
     const suppressCommentsSidebarCollapseRef = useRef(false);
-    const commentsLocatorRootRef = useRef<Element | null>(null);
-    if (!commentsSidebarSessionRef.current) {
-      commentsSidebarSessionRef.current = createCommentSidebarSession();
-    }
-    const commentsSidebarSession = commentsSidebarSessionRef.current;
-    if (!commentsSidebarControllerRef.current) {
-      commentsSidebarControllerRef.current = createArticleCommentsSidebarController({
-        session: commentsSidebarSession,
-        adapter: createArticleCommentsSidebarAppAdapter(),
-        onClose: () => {
-          if (suppressCommentsSidebarCollapseRef.current) return;
-          setCommentsCollapsed(true);
-        },
-      });
-    }
-    const commentsSidebarController = commentsSidebarControllerRef.current;
-    const commentsSidebarSnapshot = useSyncExternalStore(
-      (listener) => commentsSidebarSession.subscribe(listener),
-      () => commentsSidebarSession.getSnapshot(),
-      () => commentsSidebarSession.getSnapshot(),
-    );
+    const {
+      sidebarSession: commentsSidebarSession,
+      sidebarController: commentsSidebarController,
+      sidebarSnapshot: commentsSidebarSnapshot,
+      setLocatorRoot: setCommentsLocatorRoot,
+      getLocatorRoot: getCommentsLocatorRoot,
+      subscribeSidebarClose,
+    } = useArticleCommentsSidebarRuntime({
+      onClose: () => {
+        if (suppressCommentsSidebarCollapseRef.current) return;
+        if (isMedium) {
+          setMediumCommentsCollapsed(true);
+          return;
+        }
+        if (isWide) {
+          setWideCommentsCollapsed(true);
+        }
+      },
+    });
     const runtimeClientRef = useRef<ReturnType<typeof createRuntimeClient> | null>(null);
     if (!runtimeClientRef.current) {
       runtimeClientRef.current = createRuntimeClient();
     }
-    const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
     const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
@@ -192,6 +199,8 @@ export default function AppShell() {
     const isArticleConversation = isArticleConversationLike(selectedConversation);
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
+    const commentsSidebarCollapsed = isMedium ? mediumCommentsSidebarCollapsed : wideCommentsSidebarCollapsed;
+    const canAutoOpenCommentsSidebarInWide = isWide && canToggleCommentsSidebar;
 
     const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
       () => ({
@@ -253,7 +262,7 @@ export default function AppShell() {
       canToggleCommentsSidebar &&
       !showSettingsSheet &&
       !commentsSidebarCollapsed &&
-      (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
+      (isMedium || commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
 
     const commentsSidebarCommentChatWithRuntimeRef = useRef<{
       showCommentsSidebar: boolean;
@@ -301,6 +310,20 @@ export default function AppShell() {
     };
 
     useEffect(() => {
+      const previousTier = previousTierRef.current;
+      previousTierRef.current = tier;
+      if (tier !== 'medium') return;
+      if (previousTier == null || previousTier === 'medium') return;
+      setMediumCommentsCollapsed(true);
+      suppressCommentsSidebarCollapseRef.current = true;
+      try {
+        commentsSidebarSession.requestClose();
+      } finally {
+        suppressCommentsSidebarCollapseRef.current = false;
+      }
+    }, [commentsSidebarSession, setMediumCommentsCollapsed, tier]);
+
+    useEffect(() => {
       if (isArticleConversation && canonicalUrl) {
         commentsSidebarController.setContext({
           canonicalUrl,
@@ -321,12 +344,12 @@ export default function AppShell() {
 
     useEffect(() => {
       if (showSettingsSheet) return;
-      if (!canToggleCommentsSidebar) return;
+      if (!canAutoOpenCommentsSidebarInWide) return;
       if (commentsSidebarCollapsed) return;
       if (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen) return;
       void commentsSidebarController.open({ source: 'app-default', focusComposer: false, ensureContext: false });
     }, [
-      canToggleCommentsSidebar,
+      canAutoOpenCommentsSidebarInWide,
       commentsSidebarCollapsed,
       commentsSidebarController,
       commentsSidebarSession,
@@ -336,7 +359,11 @@ export default function AppShell() {
     ]);
 
     const triggerCommentsSidebar = (input: { quoteText: string; locator: any | null }) => {
-      setCommentsCollapsed(false);
+      if (isMedium) {
+        setMediumCommentsCollapsed(false);
+      } else if (isWide) {
+        setWideCommentsCollapsed(false);
+      }
       const quoteText = String(input?.quoteText || '').trim();
       void commentsSidebarController.open({
         selectionText: quoteText,
@@ -456,6 +483,7 @@ export default function AppShell() {
       navigate({ pathname: '/', search: `?${params.toString()}` }, { replace: true });
     }, [location.pathname, location.search, navigate, selectedConversation]);
 
+    const hideSidebarInMedium = isMedium && showCommentsSidebar;
     const renderSidebar = !isNarrow && !sidebarCollapsed;
 
     return (
@@ -466,7 +494,12 @@ export default function AppShell() {
               'tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0',
               columnDividerRightClassName(),
             ].join(' ')}
-            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+            style={{
+              width: `${SIDEBAR_WIDTH_DEFAULT}px`,
+              minWidth: `${SIDEBAR_WIDTH_DEFAULT}px`,
+              display: hideSidebarInMedium ? 'none' : undefined,
+            }}
+            aria-hidden={hideSidebarInMedium ? 'true' : undefined}
           >
             <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
           </aside>
@@ -481,25 +514,26 @@ export default function AppShell() {
               ].join(' ')}
               aria-hidden={showSettingsSheet}
             >
-              {location.pathname === '/' && narrowHeaderState.mode === 'detail' ? (
-                <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2">
-                  <DetailNavigationHeader
-                    title={narrowHeaderState.title}
-                    subtitle={narrowHeaderState.subtitle}
-                    actions={narrowHeaderState.actions}
-                    onBack={narrowHeaderState.onBack}
-                  />
-                </header>
-              ) : null}
-
               <div className="tw-min-h-0 tw-flex-1">
                 <Routes location={routesLocation}>
                   <Route
                     path="/"
                     element={
                       <ConversationsScene
-                        onPopupHeaderStateChange={setNarrowHeaderState}
+                        inlineNarrowDetailHeader
                         onOpenInsightsSection={() => navigate('/settings?section=aboutyou')}
+                        commentsSidebarRuntime={{
+                          sidebarSession: commentsSidebarSession,
+                          sidebarController: commentsSidebarController,
+                          sidebarSnapshot: commentsSidebarSnapshot,
+                          setLocatorRoot: setCommentsLocatorRoot,
+                          getLocatorRoot: getCommentsLocatorRoot,
+                          subscribeSidebarClose,
+                        }}
+                        narrowCommentsOpenSource="app"
+                        resolveCommentsSidebarChatWithActions={resolveCommentsSidebarChatWithActions}
+                        resolveCommentsSidebarSingleChatWithLabel={resolveCommentsSidebarSingleChatWithLabel}
+                        commentsSidebarCommentChatWith={commentsSidebarCommentChatWithConfig}
                       />
                     }
                   />
@@ -526,7 +560,7 @@ export default function AppShell() {
                         onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
                         onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
                         onCommentsLocatorRootChange={(root) => {
-                          commentsLocatorRootRef.current = root;
+                          setCommentsLocatorRoot(root);
                         }}
                         commentsSidebarOpen={showCommentsSidebar}
                       />
@@ -543,7 +577,7 @@ export default function AppShell() {
                   <ArticleCommentsSection
                     sidebarSession={commentsSidebarSession}
                     containerClassName="tw-h-full tw-min-h-0"
-                    getLocatorRoot={() => commentsLocatorRootRef.current}
+                    getLocatorRoot={getCommentsLocatorRoot}
                     resolveChatWithActions={resolveCommentsSidebarChatWithActions}
                     resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
                     commentChatWith={commentsSidebarCommentChatWithConfig}
@@ -599,9 +633,11 @@ export default function AppShell() {
     <HashRouter>
       <AppShellRouterProviders
         sidebarCollapsed={sidebarCollapsed}
-        commentsSidebarCollapsed={commentsSidebarCollapsed}
+        wideCommentsSidebarCollapsed={wideCommentsSidebarCollapsed}
+        mediumCommentsSidebarCollapsed={mediumCommentsSidebarCollapsed}
         setCollapsed={setCollapsed}
-        setCommentsCollapsed={setCommentsCollapsed}
+        setWideCommentsCollapsed={setWideCommentsCollapsed}
+        setMediumCommentsCollapsed={setMediumCommentsSidebarCollapsed}
       />
     </HashRouter>
   );

@@ -80,13 +80,7 @@ function getNotionDbStorageKeys() {
   try {
     const keys = conversationKinds?.getNotionStorageKeys?.();
     if (Array.isArray(keys) && keys.length) {
-      return Array.from(
-        new Set(
-          keys
-            .map((key) => String(key || '').trim())
-            .filter(Boolean),
-        ),
-      );
+      return Array.from(new Set(keys.map((key) => String(key || '').trim()).filter(Boolean)));
     }
   } catch (_e) {
     // ignore and fallback

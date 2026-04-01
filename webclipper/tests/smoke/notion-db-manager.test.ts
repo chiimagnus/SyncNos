@@ -256,7 +256,12 @@ describe('notion-db-manager', () => {
           archived: false,
           in_trash: false,
           parent: { type: 'page_id', page_id: 'p_old' },
-          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' }, AI: { type: 'multi_select' } },
+          properties: {
+            Name: { type: 'title' },
+            Date: { type: 'date' },
+            URL: { type: 'url' },
+            AI: { type: 'multi_select' },
+          },
         };
       }
       if (req.method === 'POST' && req.path === '/v1/search') {
@@ -282,7 +287,12 @@ describe('notion-db-manager', () => {
           archived: false,
           in_trash: false,
           parent: { type: 'page_id', page_id: 'p_new' },
-          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' }, AI: { type: 'multi_select' } },
+          properties: {
+            Name: { type: 'title' },
+            Date: { type: 'date' },
+            URL: { type: 'url' },
+            AI: { type: 'multi_select' },
+          },
         };
       }
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
@@ -344,7 +354,12 @@ describe('notion-db-manager', () => {
           archived: false,
           in_trash: false,
           parent: { type: 'page_id', page_id: 'p_target' },
-          properties: { Name: { type: 'title' }, Date: { type: 'date' }, URL: { type: 'url' }, AI: { type: 'multi_select' } },
+          properties: {
+            Name: { type: 'title' },
+            Date: { type: 'date' },
+            URL: { type: 'url' },
+            AI: { type: 'multi_select' },
+          },
         };
       }
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);

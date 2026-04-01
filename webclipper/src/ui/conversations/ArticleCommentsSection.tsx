@@ -19,6 +19,7 @@ type SidebarModeProps = {
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveChatWithSingleActionLabel?: () => Promise<string | null>;
   commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
+  fullWidth?: boolean;
 };
 
 type EmbeddedModeProps = {
@@ -39,6 +40,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
         resolveChatWithActions={props.resolveChatWithActions}
         resolveChatWithSingleActionLabel={props.resolveChatWithSingleActionLabel}
         commentChatWith={props.commentChatWith}
+        fullWidth={props.fullWidth}
         variant="sidebar"
       />
     );
@@ -62,6 +64,7 @@ function ArticleCommentsPanelMount({
   resolveChatWithActions,
   resolveChatWithSingleActionLabel,
   commentChatWith,
+  fullWidth,
   variant,
 }: {
   sidebarSession: CommentSidebarSession;
@@ -70,6 +73,7 @@ function ArticleCommentsPanelMount({
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveChatWithSingleActionLabel?: () => Promise<string | null>;
   commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
+  fullWidth?: boolean;
   variant?: 'embedded' | 'sidebar';
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -114,6 +118,7 @@ function ArticleCommentsPanelMount({
     const mounted = mountThreadedCommentsPanel(host, {
       overlay: false,
       variant: variant === 'sidebar' ? 'sidebar' : 'embedded',
+      fullWidth,
       showHeader: true,
       showCollapseButton: variant === 'sidebar',
       surfaceBg: 'var(--bg-card)',
@@ -157,7 +162,7 @@ function ArticleCommentsPanelMount({
       mounted.cleanup();
       apiRef.current = null;
     };
-  }, [hasCommentChatWith, hasSidebarChatWith, sidebarSession, variant]);
+  }, [fullWidth, hasCommentChatWith, hasSidebarChatWith, sidebarSession, variant]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 

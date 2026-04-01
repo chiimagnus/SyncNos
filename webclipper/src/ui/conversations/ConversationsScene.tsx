@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
-import { useNarrowListDetailRoute } from '@ui/shared/hooks/useNarrowListDetailRoute';
+import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowListDetailCommentsRoute';
+import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 
 import { t, formatConversationTitle } from '@i18n';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
+import type { ThreadedCommentsPanelChatWithAction, ThreadedCommentsPanelCommentChatWithConfig } from '@ui/comments';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
+import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 
-type NarrowRoute = 'list' | 'detail';
+type NarrowRoute = 'list' | 'detail' | 'comments';
 
 export type PopupHeaderState =
   | { mode: 'list' }
@@ -29,7 +33,25 @@ export type ConversationsSceneProps = {
   inlineNarrowDetailHeader?: boolean;
   onPopupNotionSyncStarted?: () => void;
   onOpenInsightsSection?: () => void;
+  commentsSidebarRuntime?: ArticleCommentsSidebarRuntime;
+  narrowCommentsOpenSource?: 'popup' | 'app';
+  resolveCommentsSidebarChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
+  resolveCommentsSidebarSingleChatWithLabel?: () => Promise<string | null>;
+  commentsSidebarCommentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };
+
+function isArticleConversationLike(conversation: any): boolean {
+  const sourceType = String(conversation?.sourceType || '')
+    .trim()
+    .toLowerCase();
+  if (sourceType === 'article') return true;
+
+  const source = String(conversation?.source || '')
+    .trim()
+    .toLowerCase();
+  if (source !== 'web') return false;
+  return Boolean(canonicalizeArticleUrl(conversation?.url));
+}
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
@@ -37,6 +59,11 @@ export function ConversationsScene({
   inlineNarrowDetailHeader = false,
   onPopupNotionSyncStarted,
   onOpenInsightsSection,
+  commentsSidebarRuntime,
+  narrowCommentsOpenSource = 'popup',
+  resolveCommentsSidebarChatWithActions,
+  resolveCommentsSidebarSingleChatWithLabel,
+  commentsSidebarCommentChatWith,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const {
@@ -50,12 +77,19 @@ export function ConversationsScene({
   const {
     route: narrowRoute,
     openDetail,
+    openComments,
+    returnToDetail,
     returnToList,
     listRestoreKey,
-  } = useNarrowListDetailRoute({
+  } = useNarrowListDetailCommentsRoute({
     isNarrow,
     defaultRoute: defaultNarrowRoute,
   });
+  const selectedConversationCanonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
+  const canOpenCommentsFromDetail =
+    Boolean(commentsSidebarRuntime) &&
+    isArticleConversationLike(selectedConversation) &&
+    Boolean(selectedConversationCanonicalUrl);
 
   useEffect(() => {
     if (!isNarrow) return;
@@ -77,7 +111,7 @@ export function ConversationsScene({
   useEffect(() => {
     if (!onPopupHeaderStateChange) return;
 
-    if (!isNarrow || narrowRoute !== 'detail') {
+    if (!isNarrow || narrowRoute === 'list') {
       onPopupHeaderStateChange({ mode: 'list' });
       return;
     }
@@ -106,6 +140,13 @@ export function ConversationsScene({
     selectedConversation,
   ]);
 
+  useEffect(() => {
+    if (!commentsSidebarRuntime) return;
+    return commentsSidebarRuntime.subscribeSidebarClose(() => {
+      if (isNarrow && narrowRoute === 'comments') returnToDetail();
+    });
+  }, [commentsSidebarRuntime, isNarrow, narrowRoute, returnToDetail]);
+
   const list = (
     <ConversationListPane
       initialScrollTop={listScrollTop}
@@ -125,11 +166,47 @@ export function ConversationsScene({
         <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]">
           <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-card)]">
             {inlineNarrowDetailHeader ? (
-              <ConversationDetailPane onBack={returnToList} />
+              <ConversationDetailPane
+                onBack={returnToList}
+                onTriggerCommentsSidebar={
+                  canOpenCommentsFromDetail
+                    ? ({ quoteText, locator }) => {
+                        if (!commentsSidebarRuntime) return;
+                        openComments();
+                        void commentsSidebarRuntime.sidebarController.open({
+                          selectionText: String(quoteText || ''),
+                          locator: locator ?? null,
+                          focusComposer: true,
+                          source: narrowCommentsOpenSource,
+                          ensureContext: false,
+                        });
+                      }
+                    : undefined
+                }
+                onCommentsLocatorRootChange={(root) => {
+                  commentsSidebarRuntime?.setLocatorRoot(root);
+                }}
+              />
             ) : (
               <ConversationDetailPane hideHeader />
             )}
           </div>
+        </div>
+      );
+    }
+
+    if (narrowRoute === 'comments' && commentsSidebarRuntime) {
+      return (
+        <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]">
+          <ArticleCommentsSection
+            sidebarSession={commentsSidebarRuntime.sidebarSession}
+            containerClassName="tw-h-full tw-min-h-0"
+            getLocatorRoot={commentsSidebarRuntime.getLocatorRoot}
+            resolveChatWithActions={resolveCommentsSidebarChatWithActions}
+            resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
+            commentChatWith={commentsSidebarCommentChatWith}
+            fullWidth
+          />
         </div>
       );
     }

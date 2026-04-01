@@ -47,6 +47,12 @@
   box-shadow: none;
 }
 
+:host([data-layout='full-width']) {
+  width: 100%;
+  border-left: 0;
+  box-shadow: none;
+}
+
 .webclipper-inpage-comments-panel__surface {
   position: relative;
   inset: auto;
@@ -96,6 +102,10 @@
   background: transparent;
   transform: translateX(-50%);
   z-index: 3;
+}
+
+:host([data-layout='full-width']) .webclipper-inpage-comments-panel__resize-handle {
+  display: none;
 }
 
 :host([data-variant='sidebar']) .webclipper-inpage-comments-panel__resize-handle::after {

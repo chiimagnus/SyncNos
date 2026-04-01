@@ -56,6 +56,7 @@ export type MountOptions = {
   showHeader?: boolean;
   showCollapseButton?: boolean;
   variant?: 'embedded' | 'sidebar';
+  fullWidth?: boolean;
   surfaceBg?: string;
   headerDivider?: boolean;
   dockPage?: boolean;

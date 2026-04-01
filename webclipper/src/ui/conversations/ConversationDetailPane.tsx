@@ -7,11 +7,9 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
-import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -81,41 +79,9 @@ export function ConversationDetailPane({
   const outlineButtonClass = buttonTintClassName();
   const headerIconButtonClass = headerButtonClassName();
   const isArticle = isArticleConversationLike(selected);
-  const canonicalUrl = normalizeHttpUrl((selected as any)?.url);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
-  const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
-  const embeddedCommentChatWithRuntimeRef = useRef<{
-    enabled: boolean;
-    hasConversation: boolean;
-    articleTitle: string;
-    canonicalUrl: string;
-  }>({
-    enabled: false,
-    hasConversation: false,
-    articleTitle: '',
-    canonicalUrl: '',
-  });
-  embeddedCommentChatWithRuntimeRef.current = {
-    enabled: hasArticleCommentsPane,
-    hasConversation: Boolean(selected),
-    articleTitle: String((selected as any)?.title || '').trim(),
-    canonicalUrl: canonicalUrl || '',
-  };
-  const embeddedCommentChatWithConfig = useMemo(
-    () =>
-      createThreadedCommentChatWithConfig({
-        resolveContext: () => ({
-          articleTitle: embeddedCommentChatWithRuntimeRef.current.articleTitle,
-          canonicalUrl: embeddedCommentChatWithRuntimeRef.current.canonicalUrl,
-        }),
-        isEnabled: () => embeddedCommentChatWithRuntimeRef.current.enabled,
-        hasConversation: () => embeddedCommentChatWithRuntimeRef.current.hasConversation,
-      }),
-    [],
-  );
-  const activeEmbeddedCommentChatWithConfig = hasArticleCommentsPane ? embeddedCommentChatWithConfig : null;
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -229,7 +195,7 @@ export function ConversationDetailPane({
         {!hideHeader ? (
           <header
             className={[
-              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-flex-col tw-items-stretch tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-flex-row md:tw-items-start md:tw-justify-between md:tw-gap-3 md:tw-pt-4',
+              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-items-start tw-justify-between tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-gap-3 md:tw-pt-4',
               containerPaddingClassName,
             ].join(' ')}
           >
@@ -357,7 +323,7 @@ export function ConversationDetailPane({
                 )}
               </div>
             </div>
-            <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">
+            <div className="tw-flex tw-shrink-0 tw-items-center tw-justify-end tw-gap-2 tw-whitespace-nowrap">
               <DetailHeaderActionBar
                 actions={toolActions}
                 buttonClassName={outlineButtonClass}
@@ -441,17 +407,6 @@ export function ConversationDetailPane({
               ) : null}
               {detailError ? (
                 <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p>
-              ) : null}
-
-              {/* Narrow screens: keep inline comments. */}
-              {hasArticleCommentsPane ? (
-                <div className="md:tw-hidden">
-                  <ArticleCommentsSection
-                    conversationId={Number((selected as any)?.id || activeId || 0)}
-                    canonicalUrl={canonicalUrl}
-                    commentChatWith={activeEmbeddedCommentChatWithConfig}
-                  />
-                </div>
               ) : null}
 
               {detail?.messages?.length ? (

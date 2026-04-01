@@ -4,6 +4,10 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
 
+const { responsiveTierState } = vi.hoisted(() => ({
+  responsiveTierState: { value: 'wide' as 'narrow' | 'medium' | 'wide' },
+}));
+
 vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
@@ -14,8 +18,8 @@ vi.mock('../../src/ui/i18n', () => ({
   },
 }));
 
-vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
-  useIsNarrowScreen: () => false,
+vi.mock('../../src/ui/shared/hooks/useResponsiveTier', () => ({
+  useResponsiveTier: () => responsiveTierState.value,
 }));
 
 vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
@@ -174,6 +178,7 @@ describe('AppShell sidebar collapse', () => {
   beforeEach(() => {
     setupDom();
     openConversationExternalByLoc.mockReset();
+    responsiveTierState.value = 'wide';
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 

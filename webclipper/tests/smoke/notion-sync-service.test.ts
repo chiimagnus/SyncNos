@@ -121,6 +121,12 @@ describe('notion-sync-service', () => {
     expect(notionSyncService.pageBelongsToDatabase(page, 'db2')).toBe(false);
   });
 
+  it('treats dashed and non-dashed Notion database ids as equal', async () => {
+    const page = { parent: { type: 'database_id', database_id: '01234567-89ab-cdef-0123-456789abcdef' } };
+    expect(notionSyncService.pageBelongsToDatabase(page, '0123456789abcdef0123456789abcdef')).toBe(true);
+    expect(notionSyncService.pageBelongsToDatabase(page, 'fedcba9876543210fedcba9876543210')).toBe(false);
+  });
+
   it('detects archived/trashed pages', async () => {
     expect(notionSyncService.isPageArchivedOrTrashed({ archived: true })).toBe(true);
     expect(notionSyncService.isPageArchivedOrTrashed({ in_trash: true })).toBe(true);

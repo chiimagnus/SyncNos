@@ -98,6 +98,12 @@ export function mountThreadedCommentsPanel(
   if (isOverlay) el.setAttribute('data-overlay', '1');
   const variant = options.variant === 'sidebar' ? 'sidebar' : 'embedded';
   if (variant === 'sidebar') el.setAttribute('data-variant', 'sidebar');
+  const isFullWidth = options.fullWidth === true;
+  if (isFullWidth) {
+    el.setAttribute('data-layout', 'full-width');
+    el.style.width = '100%';
+    el.style.borderLeft = '0';
+  }
   if (options.initiallyOpen) el.setAttribute('data-open', '1');
   const showHeader = options.showHeader !== false;
   const showCollapseButton = options.showCollapseButton ?? options.overlay === true;
@@ -133,7 +139,7 @@ export function mountThreadedCommentsPanel(
   shadow.appendChild(surface);
 
   let cleanupSidebarResize: (() => void) | null = null;
-  if (variant === 'sidebar') {
+  if (variant === 'sidebar' && !isFullWidth) {
     const handle = document.createElement('div');
     handle.className = 'webclipper-inpage-comments-panel__resize-handle';
     surface.appendChild(handle);

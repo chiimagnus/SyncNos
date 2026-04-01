@@ -123,4 +123,42 @@ describe('Threaded comments panel locate', () => {
 
     mounted.cleanup();
   });
+
+  it('ignores locate clicks when locator root is missing', () => {
+    document.body.innerHTML = '<div id="article">Hello world</div>';
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const mounted = mountThreadedCommentsPanel(host, {
+      overlay: false,
+      showHeader: false,
+      variant: 'sidebar',
+      locatorEnv: 'app',
+      getLocatorRoot: () => null,
+    });
+
+    mounted.api.setComments([
+      {
+        id: 1,
+        parentId: null,
+        createdAt: 1000,
+        quoteText: 'world',
+        commentText: 'root',
+        locator: { env: 'app', quote: { exact: 'world' }, position: { start: 1 } },
+      },
+    ]);
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    const shadow = panel!.shadowRoot!;
+    const rootComment = shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement | null;
+    expect(rootComment).toBeTruthy();
+
+    rootComment!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(restoreRangeFromArticleCommentLocator).not.toHaveBeenCalled();
+
+    mounted.cleanup();
+  });
 });
