@@ -3,6 +3,10 @@ import { act, createElement, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
+const { responsiveTierState } = vi.hoisted(() => ({
+  responsiveTierState: { value: 'narrow' as 'narrow' | 'medium' | 'wide' },
+}));
+
 vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
@@ -16,8 +20,8 @@ vi.mock('../../src/ui/i18n', () => ({
   },
 }));
 
-vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
-  useIsNarrowScreen: () => true,
+vi.mock('../../src/ui/shared/hooks/useResponsiveTier', () => ({
+  useResponsiveTier: () => responsiveTierState.value,
 }));
 
 vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
@@ -203,6 +207,7 @@ describe('AppShell narrow detail header actions', () => {
 
   beforeEach(() => {
     setupDom();
+    responsiveTierState.value = 'narrow';
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 

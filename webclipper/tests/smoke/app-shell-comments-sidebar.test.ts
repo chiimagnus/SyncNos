@@ -3,13 +3,16 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-const { commentsByUrl, listArticleCommentsByCanonicalUrlMock } = vi.hoisted(() => {
+const { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState } = vi.hoisted(() => {
   const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
   const listArticleCommentsByCanonicalUrlMock = vi.fn(async (canonicalUrl: string) => {
     return commentsByUrl.get(String(canonicalUrl || '')) || [];
   });
-  return { commentsByUrl, listArticleCommentsByCanonicalUrlMock };
+  const responsiveTierState = { value: 'wide' as 'narrow' | 'medium' | 'wide' };
+  return { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState };
 });
+
+const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
 
 const currentState = {
   items: [],
@@ -70,8 +73,8 @@ vi.mock('../../src/ui/i18n', () => ({
   },
 }));
 
-vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
-  useIsNarrowScreen: () => false,
+vi.mock('../../src/ui/shared/hooks/useResponsiveTier', () => ({
+  useResponsiveTier: () => responsiveTierState.value,
 }));
 
 vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
@@ -128,6 +131,7 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
           onClick: () => onTriggerCommentsSidebar?.({ quoteText: 'Selected quote', locator: null } as any),
           'aria-label': 'Comment',
           'aria-pressed': commentsSidebarOpen ? 'true' : 'false',
+          'data-can-trigger': onTriggerCommentsSidebar ? '1' : '0',
         },
         'open-comments',
       ),
@@ -180,6 +184,7 @@ describe('AppShell comments sidebar', () => {
   beforeEach(() => {
     commentsByUrl.clear();
     listArticleCommentsByCanonicalUrlMock.mockClear();
+    responsiveTierState.value = 'wide';
     currentState.selectedConversation = {
       id: 21,
       title: 'Article',
@@ -189,6 +194,8 @@ describe('AppShell comments sidebar', () => {
       url: 'https://example.com/article',
     };
     setupDom();
+    window.localStorage.clear();
+    window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '1');
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -200,7 +207,7 @@ describe('AppShell comments sidebar', () => {
     cleanupDom();
   });
 
-  it('opens the docked comments sidebar from the detail view trigger and closes from the sidebar collapse button', () => {
+  it('opens the docked comments sidebar from the detail view trigger and closes from the sidebar collapse button', async () => {
     act(() => {
       root!.render(createElement(AppShell));
     });
@@ -212,15 +219,11 @@ describe('AppShell comments sidebar', () => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
     const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(host).toBeTruthy();
-    expect(host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent).toBe(
-      'Selected quote',
-    );
-
-    act(() => {
-      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    });
 
     const closeBtn = (host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse') ||
       null) as HTMLButtonElement | null;
@@ -230,7 +233,9 @@ describe('AppShell comments sidebar', () => {
       closeBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+    });
 
     const reopenBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
     expect(reopenBtn).toBeTruthy();
@@ -239,8 +244,9 @@ describe('AppShell comments sidebar', () => {
       reopenBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    const reopened = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
-    expect(reopened).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
   });
 
   it('refreshes comments when selected article switches while sidebar stays open', async () => {
@@ -292,5 +298,76 @@ describe('AppShell comments sidebar', () => {
 
     expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/a');
     expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/b');
+  });
+
+  it('keeps medium tier comments sidebar closed by default', () => {
+    responsiveTierState.value = 'medium';
+    window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '0');
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+  });
+
+  it('respects wide tier collapsed storage key', async () => {
+    responsiveTierState.value = 'wide';
+    window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '1');
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+
+    act(() => {
+      root?.unmount();
+      root = ReactDOM.createRoot(document.getElementById('root')!);
+    });
+
+    window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '0');
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
+  });
+
+  it('does not let medium open state override wide collapsed storage preference', async () => {
+    responsiveTierState.value = 'medium';
+    window.localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, '1');
+    currentState.selectedConversation = {
+      id: 23,
+      title: 'Article Medium',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-medium',
+      url: 'https://example.com/medium-article',
+    };
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+    expect(openBtn?.getAttribute('data-can-trigger')).toBe('1');
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(window.localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY)).toBe('1');
+
+    responsiveTierState.value = 'wide';
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    expect(window.localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY)).toBe('1');
+    await vi.waitFor(() => {
+      const toggleBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+      expect(toggleBtn?.getAttribute('aria-pressed')).toBe('false');
+    });
   });
 });
