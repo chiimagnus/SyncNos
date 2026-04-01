@@ -3,15 +3,18 @@ import { createTestBackgroundRouter } from './background-router-testkit';
 
 const articleFetchMocks = vi.hoisted(() => ({
   fetchActiveTabArticle: vi.fn(),
+  resolveOrCaptureActiveTabArticle: vi.fn(),
 }));
 
 vi.mock('../../src/collectors/web/article-fetch', () => ({
   fetchActiveTabArticle: articleFetchMocks.fetchActiveTabArticle,
+  resolveOrCaptureActiveTabArticle: articleFetchMocks.resolveOrCaptureActiveTabArticle,
 }));
 
 afterEach(() => {
   vi.restoreAllMocks();
   articleFetchMocks.fetchActiveTabArticle.mockReset();
+  articleFetchMocks.resolveOrCaptureActiveTabArticle.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
@@ -67,6 +70,35 @@ describe('background-router article fetch', () => {
     expect(broadcast).toHaveBeenCalledWith('conversationsChanged', {
       reason: 'articleFetch',
       conversationId: 123,
+    });
+  });
+
+  it('preserves strict discourse OP missing error on resolveOrCapture route', async () => {
+    articleFetchMocks.resolveOrCaptureActiveTabArticle.mockRejectedValue(new Error(' discourse op not found '));
+
+    const router = createTestBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: 'resolveOrCaptureActiveTabArticle' });
+
+    expect(res.ok).toBe(false);
+    expect(String(res.error?.message || '')).toContain('Discourse OP not found');
+  });
+
+  it('broadcasts conversationsChanged only for newly captured resolveOrCapture result', async () => {
+    articleFetchMocks.resolveOrCaptureActiveTabArticle.mockResolvedValue({
+      isNew: true,
+      conversationId: 77,
+    });
+
+    const router = createTestBackgroundRouter();
+    const broadcast = vi.fn();
+    router.eventsHub.broadcast = broadcast;
+
+    const res = await router.__handleMessageForTests({ type: 'resolveOrCaptureActiveTabArticle' });
+
+    expect(res.ok).toBe(true);
+    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', {
+      reason: 'articleFetch',
+      conversationId: 77,
     });
   });
 });

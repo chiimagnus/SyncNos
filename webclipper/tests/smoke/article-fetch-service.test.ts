@@ -157,7 +157,7 @@ describe('article-fetch-service', () => {
     storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
-    let currentUrl = 'https://linux.do/t/topic-slug/123/20';
+    let currentUrl = 'https://linux.do/t/topic-slug/123/20?u=abc#reply-2';
     let extractCall = 0;
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {
@@ -277,12 +277,15 @@ describe('article-fetch-service', () => {
       ]);
     });
 
+    const tabsUpdate = vi.fn();
+
     // @ts-expect-error test global
     globalThis.chrome = {
       runtime: { lastError: null },
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) =>
           cb([{ id: 77, url: 'https://linux.do/t/topic-slug/123/1', title: 'Topic tab' }]),
+        update: tabsUpdate,
       },
       scripting: {
         executeScript,
@@ -294,6 +297,7 @@ describe('article-fetch-service', () => {
 
     expect(upsertConversation).not.toHaveBeenCalled();
     expect(syncConversationMessages).not.toHaveBeenCalled();
+    expect(tabsUpdate).not.toHaveBeenCalled();
   });
 
   it('does not inline article images when web article cache toggle is disabled', async () => {
