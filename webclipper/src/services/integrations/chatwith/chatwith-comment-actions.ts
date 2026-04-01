@@ -6,12 +6,14 @@ import {
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
 import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 import { buildChatWithCommentPayloadV1 } from '@services/integrations/chatwith/chatwith-comment-payload';
+import { openChatWithPlatform, type ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 
 export type ResolveChatWithCommentActionsInput = {
   quoteText?: string | null;
   commentText?: string | null;
   articleTitle?: string | null;
   canonicalUrl?: string | null;
+  openPort?: ChatWithOpenPlatformPort | null;
 };
 
 export type ChatWithCommentAction = {
@@ -77,7 +79,12 @@ export async function resolveChatWithCommentActions(
       onTrigger: async () => {
         const copied = await writeTextToClipboard(truncated.text);
         if (!copied) throw new Error('Failed to copy content to clipboard');
-        return `✅ 已复制，可前往 ${platformName}${truncated.truncated ? '… (truncated)' : '。'}`;
+        const opened = await openChatWithPlatform({
+          platform,
+          port: input?.openPort || null,
+        });
+        if (!opened) throw new Error(`Failed to open ${platformName}`);
+        return `✅ 已复制，正在跳转 ${platformName}…${truncated.truncated ? ' (truncated)' : ''}`;
       },
     });
   }

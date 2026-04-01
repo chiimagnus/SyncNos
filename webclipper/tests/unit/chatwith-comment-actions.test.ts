@@ -4,6 +4,7 @@ const loadChatWithSettingsMock = vi.fn();
 const truncateForChatWithMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const resolveSingleEnabledChatWithActionLabelMock = vi.fn();
+const openChatWithPlatformMock = vi.fn();
 
 vi.mock('../../src/services/integrations/chatwith/chatwith-settings', () => ({
   loadChatWithSettings: (...args: any[]) => loadChatWithSettingsMock(...args),
@@ -16,6 +17,10 @@ vi.mock('../../src/services/integrations/chatwith/chatwith-clipboard', () => ({
 
 vi.mock('../../src/services/integrations/chatwith/chatwith-detail-header-actions', () => ({
   resolveSingleEnabledChatWithActionLabel: (...args: any[]) => resolveSingleEnabledChatWithActionLabelMock(...args),
+}));
+
+vi.mock('../../src/services/integrations/chatwith/chatwith-open-port', () => ({
+  openChatWithPlatform: (...args: any[]) => openChatWithPlatformMock(...args),
 }));
 
 describe('resolveChatWithCommentActions', () => {
@@ -32,6 +37,7 @@ describe('resolveChatWithCommentActions', () => {
     }));
     writeTextToClipboardMock.mockResolvedValue(true);
     resolveSingleEnabledChatWithActionLabelMock.mockResolvedValue(null);
+    openChatWithPlatformMock.mockResolvedValue(true);
   });
 
   it('returns empty actions when comment text is empty', async () => {
@@ -91,6 +97,12 @@ describe('resolveChatWithCommentActions', () => {
 
     expect(writeTextToClipboardMock).toHaveBeenCalledTimes(1);
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload-truncated\n');
+    expect(openChatWithPlatformMock).toHaveBeenCalledTimes(1);
+    expect(openChatWithPlatformMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: expect.objectContaining({ id: 'chatgpt', name: 'ChatGPT' }),
+      }),
+    );
     expect(String(notice || '')).toContain('已复制');
     expect(String(notice || '')).toContain('ChatGPT');
     expect(String(notice || '')).toContain('truncated');
@@ -148,5 +160,25 @@ describe('resolveChatWithCommentActions', () => {
     });
 
     await expect(actions[0].onTrigger()).rejects.toThrow('Failed to copy content to clipboard');
+    expect(openChatWithPlatformMock).not.toHaveBeenCalled();
+  });
+
+  it('throws when opening platform fails', async () => {
+    const { resolveChatWithCommentActions } = await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
+
+    loadChatWithSettingsMock.mockResolvedValue({
+      promptTemplate: '',
+      maxChars: 28000,
+      platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
+    });
+    openChatWithPlatformMock.mockResolvedValue(false);
+
+    const actions = await resolveChatWithCommentActions({
+      commentText: 'Root comment text',
+      articleTitle: 'My Article',
+      canonicalUrl: 'https://example.com/article',
+    });
+
+    await expect(actions[0].onTrigger()).rejects.toThrow('Failed to open ChatGPT');
   });
 });

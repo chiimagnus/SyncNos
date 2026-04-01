@@ -7,6 +7,7 @@ import {
   type ChatWithAiPlatform,
 } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
+import { openChatWithPlatform, type ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 
 function buildChatWithPlatformAction(input: {
   conversation: Conversation | null | undefined;
@@ -30,6 +31,13 @@ function buildChatWithPlatformAction(input: {
   const href = String(platform.url || '').trim();
   const label = `Chat with ${String(platform.name || '').trim()}`;
   const after = `✅ 已复制，正在跳转 ${String(platform.name || '').trim()}…${truncated.truncated ? ' (truncated)' : ''}`;
+  const openPort: ChatWithOpenPlatformPort = {
+    openPlatform: async (_platformId, fallbackUrl) => {
+      const target = String(fallbackUrl || '').trim();
+      if (!target) return false;
+      return port.openExternalUrl(target);
+    },
+  };
 
   return {
     id: `chat-with-${String(platform.id || '').trim()}`,
@@ -42,7 +50,10 @@ function buildChatWithPlatformAction(input: {
     onTrigger: async () => {
       const copied = await writeTextToClipboard(truncated.text);
       if (!copied) throw new Error('Failed to copy content to clipboard');
-      const opened = await port.openExternalUrl(href);
+      const opened = await openChatWithPlatform({
+        platform,
+        port: openPort,
+      });
       if (!opened) throw new Error(`Failed to open ${String(platform.name || '').trim()}`);
     },
   };
