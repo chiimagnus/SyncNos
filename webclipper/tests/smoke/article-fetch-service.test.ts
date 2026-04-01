@@ -247,6 +247,55 @@ describe('article-fetch-service', () => {
     expect(currentUrl).toBe('https://linux.do/t/topic-slug/123/1');
   });
 
+  it('fails strictly when discourse OP is still missing on /1', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 41, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      if (Array.isArray(details?.files)) {
+        cb([{}]);
+        return;
+      }
+      cb([
+        {
+          result: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Reply Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>Reply body</p></body></html>',
+            contentMarkdown: 'Reply body',
+            textContent: 'Reply body',
+            warningFlags: ['discourse_op_missing_on_page'],
+          },
+        },
+      ]);
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 77, url: 'https://linux.do/t/topic-slug/123/1', title: 'Topic tab' }]),
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    await expect(service.fetchActiveTabArticle()).rejects.toThrow('Discourse OP not found');
+
+    expect(upsertConversation).not.toHaveBeenCalled();
+    expect(syncConversationMessages).not.toHaveBeenCalled();
+  });
+
   it('does not inline article images when web article cache toggle is disabled', async () => {
     const upsertConversation = vi.fn(async (payload: any) => ({ id: 21, ...payload }));
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));

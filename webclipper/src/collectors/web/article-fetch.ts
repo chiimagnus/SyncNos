@@ -5,6 +5,10 @@ import {
   upsertConversation,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import {
+  DISCOURSE_OP_MISSING_WARNING_FLAG,
+  DISCOURSE_OP_NOT_FOUND_ERROR,
+} from '@collectors/web/article-fetch-errors';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
@@ -15,7 +19,6 @@ const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
 const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/(\d+))?\/?$/i;
-const DISCOURSE_OP_MISSING_WARNING_FLAG = 'discourse_op_missing_on_page';
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
@@ -792,7 +795,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   }
 
   if (discourseTopic && hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)) {
-    throw toError('Discourse OP not found');
+    throw toError(DISCOURSE_OP_NOT_FOUND_ERROR);
   }
 
   const textContent = normalizeText(extracted.textContent || '');

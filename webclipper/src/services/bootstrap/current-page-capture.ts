@@ -1,5 +1,9 @@
 import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
+import {
+  DISCOURSE_OP_NOT_FOUND_ERROR,
+  isDiscourseOpNotFoundErrorMessage,
+} from '@collectors/web/article-fetch-errors';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 type RuntimeClient = {
@@ -62,7 +66,7 @@ function errorMessage(error: unknown, fallback: string): string {
 function normalizeArticleCaptureErrorMessage(raw: unknown): string {
   const message = String(raw || '').trim();
   if (!message) return '';
-  if (/^discourse op not found$/i.test(message)) return 'Discourse OP not found';
+  if (isDiscourseOpNotFoundErrorMessage(message)) return DISCOURSE_OP_NOT_FOUND_ERROR;
   return message;
 }
 

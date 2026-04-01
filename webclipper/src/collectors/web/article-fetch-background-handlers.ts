@@ -1,5 +1,9 @@
 import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from '@collectors/web/article-fetch';
+import {
+  DISCOURSE_OP_NOT_FOUND_ERROR,
+  isDiscourseOpNotFoundErrorMessage,
+} from '@collectors/web/article-fetch-errors';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -12,7 +16,7 @@ function normalizeArticleFetchError(error: unknown, fallback: string): string {
   const raw =
     (error as any)?.message != null ? String((error as any).message) : String(error != null ? error : fallback || '');
   const message = raw.trim();
-  if (/^discourse op not found$/i.test(message)) return 'Discourse OP not found';
+  if (isDiscourseOpNotFoundErrorMessage(message)) return DISCOURSE_OP_NOT_FOUND_ERROR;
   return message || fallback;
 }
 
