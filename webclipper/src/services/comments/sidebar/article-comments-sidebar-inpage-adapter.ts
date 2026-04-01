@@ -7,10 +7,6 @@ type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
 
-function safeString(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
 function normalizeConversationId(value: unknown): number | null {
   const id = Number(value);
   if (!Number.isFinite(id) || id <= 0) return null;
