@@ -28,5 +28,10 @@ export type ArticleCommentsSidebarAdapter = {
     commentText: string;
   }) => Promise<void>;
   delete: (input: { id: number }) => Promise<void>;
+  migrateCanonicalUrl?: (input: {
+    fromCanonicalUrl: string;
+    toCanonicalUrl: string;
+    conversationId: number | null;
+  }) => Promise<void | { updated: number }>;
   ensureContext?: (input?: ArticleCommentsSidebarEnsureContextInput) => Promise<ArticleCommentsSidebarContext>;
 };

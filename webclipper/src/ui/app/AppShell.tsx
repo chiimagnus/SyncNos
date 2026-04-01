@@ -13,7 +13,7 @@ import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { AppTooltipHost } from '@ui/shared/AppTooltip';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
-import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 import {
@@ -42,7 +42,7 @@ function isArticleConversationLike(conversation: any): boolean {
     .trim()
     .toLowerCase();
   if (source !== 'web') return false;
-  return Boolean(normalizeHttpUrl(conversation?.url));
+  return Boolean(canonicalizeArticleUrl(conversation?.url));
 }
 
 export default function AppShell() {
@@ -163,7 +163,7 @@ export default function AppShell() {
     const processedLocRef = useRef<string | null>(null);
     const locMountedRef = useRef(false);
     const isArticleConversation = isArticleConversationLike(selectedConversation);
-    const canonicalUrl = normalizeHttpUrl((selectedConversation as any)?.url);
+    const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';

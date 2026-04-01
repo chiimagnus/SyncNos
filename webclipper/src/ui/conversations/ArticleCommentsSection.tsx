@@ -5,7 +5,7 @@ import {
   type ThreadedCommentsPanelApi,
   type ThreadedCommentsPanelChatWithAction,
 } from '@ui/comments';
-import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
 import type { CommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-contract';
 import { createArticleCommentsSidebarController } from '@services/comments/sidebar/article-comments-sidebar-controller';
@@ -142,7 +142,7 @@ function ArticleCommentsEmbedded({
 
   useEffect(() => {
     controller.setContext({
-      canonicalUrl: normalizeHttpUrl(canonicalUrl),
+      canonicalUrl: canonicalizeArticleUrl(canonicalUrl),
       conversationId: Number(conversationId) > 0 ? Number(conversationId) : null,
     });
   }, [canonicalUrl, conversationId, controller]);
