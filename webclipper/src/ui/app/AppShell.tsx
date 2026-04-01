@@ -161,6 +161,7 @@ export default function AppShell() {
     const isNarrow = tier === 'narrow';
     const isMedium = tier === 'medium';
     const isWide = tier === 'wide';
+    const previousTierRef = useRef<typeof tier | null>(null);
     const suppressCommentsSidebarCollapseRef = useRef(false);
     const {
       sidebarSession: commentsSidebarSession,
@@ -303,6 +304,20 @@ export default function AppShell() {
       if (from) navigate(from, { replace: true });
       else navigate('/', { replace: true });
     };
+
+    useEffect(() => {
+      const previousTier = previousTierRef.current;
+      previousTierRef.current = tier;
+      if (tier !== 'medium') return;
+      if (previousTier == null || previousTier === 'medium') return;
+      setMediumCommentsCollapsed(true);
+      suppressCommentsSidebarCollapseRef.current = true;
+      try {
+        commentsSidebarSession.requestClose();
+      } finally {
+        suppressCommentsSidebarCollapseRef.current = false;
+      }
+    }, [commentsSidebarSession, setMediumCommentsCollapsed, tier]);
 
     useEffect(() => {
       if (isArticleConversation && canonicalUrl) {
