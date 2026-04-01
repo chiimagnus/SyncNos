@@ -10,7 +10,7 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { AppTooltipHost } from '@ui/shared/AppTooltip';
-import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -64,7 +64,8 @@ function openUrlFallback(url: string): boolean {
 export default function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const [commentsSidebarCollapsed, setCommentsSidebarCollapsed] = useState(false);
+  const [wideCommentsSidebarCollapsed, setWideCommentsSidebarCollapsed] = useState(false);
+  const [mediumCommentsSidebarCollapsed, setMediumCommentsSidebarCollapsed] = useState(true);
 
   useEffect(() => {
     try {
@@ -78,7 +79,7 @@ export default function AppShell() {
   useEffect(() => {
     try {
       const v = localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY);
-      if (v === '1') setCommentsSidebarCollapsed(true);
+      if (v === '1') setWideCommentsSidebarCollapsed(true);
     } catch (_e) {
       // ignore
     }
@@ -93,8 +94,8 @@ export default function AppShell() {
     }
   };
 
-  const setCommentsCollapsed = (collapsed: boolean) => {
-    setCommentsSidebarCollapsed(collapsed);
+  const setWideCommentsCollapsed = (collapsed: boolean) => {
+    setWideCommentsSidebarCollapsed(collapsed);
     try {
       localStorage.setItem(COMMENTS_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
     } catch (_e) {
@@ -104,14 +105,18 @@ export default function AppShell() {
 
   function AppShellRouterProviders({
     sidebarCollapsed,
-    commentsSidebarCollapsed,
+    wideCommentsSidebarCollapsed,
+    mediumCommentsSidebarCollapsed,
     setCollapsed,
-    setCommentsCollapsed,
+    setWideCommentsCollapsed,
+    setMediumCommentsCollapsed,
   }: {
     sidebarCollapsed: boolean;
-    commentsSidebarCollapsed: boolean;
+    wideCommentsSidebarCollapsed: boolean;
+    mediumCommentsSidebarCollapsed: boolean;
     setCollapsed: (collapsed: boolean) => void;
-    setCommentsCollapsed: (collapsed: boolean) => void;
+    setWideCommentsCollapsed: (collapsed: boolean) => void;
+    setMediumCommentsCollapsed: (collapsed: boolean) => void;
   }) {
     const location = useLocation();
     const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
@@ -126,9 +131,11 @@ export default function AppShell() {
       <ConversationsProvider initialOpenLoc={initialOpenLocRef.current ?? null}>
         <AppShellFrame
           sidebarCollapsed={sidebarCollapsed}
-          commentsSidebarCollapsed={commentsSidebarCollapsed}
+          wideCommentsSidebarCollapsed={wideCommentsSidebarCollapsed}
+          mediumCommentsSidebarCollapsed={mediumCommentsSidebarCollapsed}
           setCollapsed={setCollapsed}
-          setCommentsCollapsed={setCommentsCollapsed}
+          setWideCommentsCollapsed={setWideCommentsCollapsed}
+          setMediumCommentsCollapsed={setMediumCommentsCollapsed}
         />
         <AppTooltipHost />
       </ConversationsProvider>
@@ -137,15 +144,23 @@ export default function AppShell() {
 
   function AppShellFrame({
     sidebarCollapsed,
-    commentsSidebarCollapsed,
+    wideCommentsSidebarCollapsed,
+    mediumCommentsSidebarCollapsed,
     setCollapsed,
-    setCommentsCollapsed,
+    setWideCommentsCollapsed,
+    setMediumCommentsCollapsed,
   }: {
     sidebarCollapsed: boolean;
-    commentsSidebarCollapsed: boolean;
+    wideCommentsSidebarCollapsed: boolean;
+    mediumCommentsSidebarCollapsed: boolean;
     setCollapsed: (collapsed: boolean) => void;
-    setCommentsCollapsed: (collapsed: boolean) => void;
+    setWideCommentsCollapsed: (collapsed: boolean) => void;
+    setMediumCommentsCollapsed: (collapsed: boolean) => void;
   }) {
+    const tier = useResponsiveTier();
+    const isNarrow = tier === 'narrow';
+    const isMedium = tier === 'medium';
+    const isWide = tier === 'wide';
     const suppressCommentsSidebarCollapseRef = useRef(false);
     const {
       sidebarSession: commentsSidebarSession,
@@ -157,14 +172,19 @@ export default function AppShell() {
     } = useArticleCommentsSidebarRuntime({
       onClose: () => {
         if (suppressCommentsSidebarCollapseRef.current) return;
-        setCommentsCollapsed(true);
+        if (isMedium) {
+          setMediumCommentsCollapsed(true);
+          return;
+        }
+        if (isWide) {
+          setWideCommentsCollapsed(true);
+        }
       },
     });
     const runtimeClientRef = useRef<ReturnType<typeof createRuntimeClient> | null>(null);
     if (!runtimeClientRef.current) {
       runtimeClientRef.current = createRuntimeClient();
     }
-    const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
     const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
@@ -174,6 +194,7 @@ export default function AppShell() {
     const isArticleConversation = isArticleConversationLike(selectedConversation);
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
+    const commentsSidebarCollapsed = isMedium ? mediumCommentsSidebarCollapsed : wideCommentsSidebarCollapsed;
 
     const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
       () => ({
@@ -318,7 +339,11 @@ export default function AppShell() {
     ]);
 
     const triggerCommentsSidebar = (input: { quoteText: string; locator: any | null }) => {
-      setCommentsCollapsed(false);
+      if (isMedium) {
+        setMediumCommentsCollapsed(false);
+      } else if (isWide) {
+        setWideCommentsCollapsed(false);
+      }
       const quoteText = String(input?.quoteText || '').trim();
       void commentsSidebarController.open({
         selectionText: quoteText,
@@ -582,9 +607,11 @@ export default function AppShell() {
     <HashRouter>
       <AppShellRouterProviders
         sidebarCollapsed={sidebarCollapsed}
-        commentsSidebarCollapsed={commentsSidebarCollapsed}
+        wideCommentsSidebarCollapsed={wideCommentsSidebarCollapsed}
+        mediumCommentsSidebarCollapsed={mediumCommentsSidebarCollapsed}
         setCollapsed={setCollapsed}
-        setCommentsCollapsed={setCommentsCollapsed}
+        setWideCommentsCollapsed={setWideCommentsCollapsed}
+        setMediumCommentsCollapsed={setMediumCommentsSidebarCollapsed}
       />
     </HashRouter>
   );
