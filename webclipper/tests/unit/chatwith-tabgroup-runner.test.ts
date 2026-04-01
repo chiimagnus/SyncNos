@@ -92,11 +92,48 @@ describe('openOrFocusGroupedChatTab', () => {
     });
     expect(tabsGroupMock).toHaveBeenCalledWith({
       tabIds: [17, 88],
-      createProperties: { windowId: 7 },
     });
 
     const persisted = (storageState[CHAT_WITH_TAB_REUSE_STORAGE_KEY] || {}) as Record<string, any>;
     expect(persisted['chatgpt::https://example.com/a']?.aiTabId).toBe(88);
+  });
+
+  it('falls back to createProperties grouping when direct grouping fails', async () => {
+    tabsGetMock.mockImplementation(async (tabId: number) => {
+      if (tabId === 17) return { id: 17, windowId: 7, groupId: -1, url: 'https://example.com/a' };
+      return null;
+    });
+
+    tabsGroupMock
+      .mockRejectedValueOnce(new Error('direct grouping failed'))
+      .mockResolvedValueOnce(66);
+
+    const { openOrFocusGroupedChatTab } = await import('../../src/services/integrations/chatwith/tabgroup-runner');
+
+    const result = await openOrFocusGroupedChatTab({
+      platformId: 'chatgpt',
+      articleKey: 'https://example.com/a',
+      platformUrl: 'https://chatgpt.com/',
+      articleTabId: 17,
+    });
+
+    expect(result).toMatchObject({
+      tabId: 88,
+      grouped: true,
+      groupId: 66,
+      degraded: false,
+    });
+
+    expect(tabsGroupMock).toHaveBeenNthCalledWith(1, {
+      tabIds: [17, 88],
+      groupId: undefined,
+      createProperties: undefined,
+    });
+    expect(tabsGroupMock).toHaveBeenNthCalledWith(2, {
+      tabIds: [17, 88],
+      groupId: undefined,
+      createProperties: { windowId: 7 },
+    });
   });
 
   it('reuses stored AI tab and joins existing article group', async () => {

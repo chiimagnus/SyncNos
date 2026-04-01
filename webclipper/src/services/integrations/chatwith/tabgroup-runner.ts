@@ -53,6 +53,7 @@ function normalizeHttpUrl(raw: unknown): string {
 }
 
 function normalizeGroupId(value: unknown): number | null {
+  if (value == null) return null;
   const normalized = Number(value);
   if (!Number.isFinite(normalized) || normalized < 0) return null;
   return Math.trunc(normalized);
@@ -124,6 +125,22 @@ async function focusTabAndWindow(tab: AnyTab | null, fallbackWindowId: number | 
     } catch (_e) {
       // ignore
     }
+  }
+}
+
+async function tryGroupOperation(input: {
+  tabIds: number[];
+  groupId?: number;
+  createProperties?: { windowId?: number };
+}): Promise<number | null> {
+  try {
+    return await tabsGroup({
+      tabIds: input.tabIds,
+      groupId: input.groupId,
+      createProperties: input.createProperties,
+    });
+  } catch (_e) {
+    return null;
   }
 }
 
@@ -206,44 +223,52 @@ export async function openOrFocusGroupedChatTab(
     degraded = true;
     reason = reason || 'tabgroups_unavailable';
   } else {
-    try {
-      let groupTargetTab = aiTab;
-      if (articleWindowId && normalizePositiveInt(groupTargetTab?.windowId) !== articleWindowId) {
-        const moved = await moveTabToWindow(aiTabId, articleWindowId);
-        if (moved) {
-          groupTargetTab = moved;
-          aiTab = moved;
-          await setChatWithTabReuseEntry({
-            platformId,
-            articleKey,
-            aiTabId,
-            updatedAt: Date.now(),
-          });
-        }
-      }
-
-      const currentArticleGroupId = normalizeGroupId(articleTab?.groupId);
-      if (currentArticleGroupId != null) {
-        groupId = await tabsGroup({
-          tabIds: [aiTabId],
-          groupId: currentArticleGroupId,
+    if (articleWindowId && normalizePositiveInt(aiTab?.windowId) !== articleWindowId) {
+      const moved = await moveTabToWindow(aiTabId, articleWindowId);
+      if (moved) {
+        aiTab = moved;
+        await setChatWithTabReuseEntry({
+          platformId,
+          articleKey,
+          aiTabId,
+          updatedAt: Date.now(),
         });
-      } else if (articleWindowId) {
-        groupId = await tabsGroup({
+      }
+    }
+
+    const currentArticleGroupId = normalizeGroupId(articleTab?.groupId);
+    if (currentArticleGroupId != null) {
+      // Primary path: join AI tab into the article's existing group.
+      groupId = await tryGroupOperation({
+        tabIds: [aiTabId],
+        groupId: currentArticleGroupId,
+      });
+
+      // Fallback path: when the existing group id becomes stale/cross-window oddities,
+      // recreate grouping with both tabs.
+      if (normalizeGroupId(groupId) == null) {
+        groupId = await tryGroupOperation({
+          tabIds: [articleTabId, aiTabId],
+        });
+      }
+    } else {
+      // Chrome compatibility: prefer grouping existing tabs directly.
+      // Some environments are picky when createProperties is passed with already-open tabs.
+      groupId = await tryGroupOperation({
+        tabIds: [articleTabId, aiTabId],
+      });
+
+      if (normalizeGroupId(groupId) == null && articleWindowId) {
+        // Secondary fallback: explicitly hint window for implementations that require it.
+        groupId = await tryGroupOperation({
           tabIds: [articleTabId, aiTabId],
           createProperties: { windowId: articleWindowId },
         });
-      } else {
-        groupId = await tabsGroup({
-          tabIds: [articleTabId, aiTabId],
-        });
       }
-      grouped = normalizeGroupId(groupId) != null;
-      if (!grouped) {
-        degraded = true;
-        reason = reason || 'tabgroup_unavailable';
-      }
-    } catch (_e) {
+    }
+
+    grouped = normalizeGroupId(groupId) != null;
+    if (!grouped) {
       degraded = true;
       reason = reason || 'tabgroup_failed';
     }
