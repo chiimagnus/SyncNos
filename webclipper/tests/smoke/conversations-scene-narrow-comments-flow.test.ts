@@ -254,6 +254,10 @@ describe('ConversationsScene narrow comments flow', () => {
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    const commentsPanel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(commentsPanel?.getAttribute('data-layout')).toBe('full-width');
+    expect(commentsPanel?.style.width).toBe('100%');
+    expect(commentsPanel?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__resize-handle')).toBeFalsy();
 
     act(() => {
       currentSidebarCloseListener?.();
@@ -329,5 +333,8 @@ describe('ConversationsScene narrow comments flow', () => {
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    const commentsPanel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(commentsPanel?.getAttribute('data-layout')).toBe('full-width');
+    expect(commentsPanel?.style.width).toBe('100%');
   });
 });

@@ -206,6 +206,7 @@ export function ConversationsScene({
             resolveChatWithActions={resolveCommentsSidebarChatWithActions}
             resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
             commentChatWith={commentsSidebarCommentChatWith}
+            fullWidth
           />
         </div>
       );
