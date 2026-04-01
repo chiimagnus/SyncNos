@@ -8,12 +8,14 @@ import { inlineChatImagesInMessages } from '@services/conversations/data/image-i
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
-import { tabsGet, tabsQuery } from '@platform/webext/tabs';
+import { tabsGet, tabsQuery, tabsUpdate } from '@platform/webext/tabs';
 import { storageGet } from '@platform/storage/local';
 
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
+const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/(\d+))?\/?$/i;
+const DISCOURSE_OP_MISSING_WARNING_FLAG = 'discourse_op_missing_on_page';
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
@@ -27,6 +29,57 @@ function normalizeText(text: unknown) {
   return String(text || '')
     .replace(/\r\n/g, '\n')
     .trim();
+}
+
+function parseDiscourseTopicUrl(rawUrl: unknown): {
+  origin: string;
+  slug: string;
+  topicId: string;
+  postNumber: number | null;
+} | null {
+  const normalized = normalizeHttpUrl(rawUrl);
+  if (!normalized) return null;
+  try {
+    const url = new URL(normalized);
+    const match = String(url.pathname || '').match(DISCOURSE_TOPIC_PATH_RE);
+    if (!match) return null;
+    const postNumberRaw = Number(match[3]);
+    return {
+      origin: url.origin,
+      slug: String(match[1] || '').trim(),
+      topicId: String(match[2] || '').trim(),
+      postNumber: Number.isFinite(postNumberRaw) && postNumberRaw > 0 ? postNumberRaw : null,
+    };
+  } catch (_e) {
+    return null;
+  }
+}
+
+function buildDiscourseTopicFloorUrl(topic: {
+  origin: string;
+  slug: string;
+  topicId: string;
+}, postNumber: number): string {
+  return `${topic.origin}/t/${topic.slug}/${topic.topicId}/${Math.max(1, Math.floor(postNumber))}`;
+}
+
+function hasWarningFlag(warningFlags: unknown, flag: string): boolean {
+  if (!Array.isArray(warningFlags)) return false;
+  return warningFlags.some((item) => String(item || '').trim() === flag);
+}
+
+async function waitForTabUrl(targetTabId: number, expectedUrl: string, timeoutMs = 8_000): Promise<string> {
+  const expected = normalizeHttpUrl(expectedUrl);
+  if (!expected) throw toError('invalid expected navigation url');
+
+  const deadline = Date.now() + Math.max(1_000, Number(timeoutMs) || 8_000);
+  while (Date.now() < deadline) {
+    const tab = await tabsGet(targetTabId);
+    const current = normalizeHttpUrl((tab as any)?.url || '');
+    if (current === expected) return current;
+    await new Promise((resolve) => setTimeout(resolve, 180));
+  }
+  throw toError('timed out waiting for Discourse /1 navigation');
 }
 
 function countWords(text: string) {
@@ -428,6 +481,22 @@ async function extractArticleOnTab(tabId: number) {
         };
       }
 
+      function withDiscourseOpWarning<T extends { warningFlags?: unknown }>(
+        payload: T,
+        opMissingOnCurrentPage: boolean,
+      ): T & { warningFlags: string[] } {
+        const existing = Array.isArray(payload?.warningFlags)
+          ? payload.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
+          : [];
+        if (opMissingOnCurrentPage && !existing.includes('discourse_op_missing_on_page')) {
+          existing.push('discourse_op_missing_on_page');
+        }
+        return {
+          ...payload,
+          warningFlags: existing,
+        };
+      }
+
       async function waitForDomStabilized() {
         const deadline = Date.now() + timeoutMs;
         let last: any = null;
@@ -621,10 +690,12 @@ async function extractArticleOnTab(tabId: number) {
         const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
         noisyNodes.forEach((node: any) => node?.remove?.());
 
+        const discourseTopic = parseDiscourseTopicPath(location.pathname);
         const discourseOpOnly = extractDiscourseOpOnly();
         if (discourseOpOnly) {
-          return discourseOpOnly;
+          return withDiscourseOpWarning(discourseOpOnly, false);
         }
+        const discourseOpMissingOnCurrentPage = Boolean(discourseTopic);
 
         if (typeof (globalThis as any).Readability === 'function') {
           const cloned = document.cloneNode(true) as any;
@@ -650,7 +721,8 @@ async function extractArticleOnTab(tabId: number) {
               const markdownWithWechatGallery = wechatGalleryMarkdown
                 ? normalize(`${markdownBase}\n\n${wechatGalleryMarkdown}`)
                 : markdownBase;
-              return {
+              return withDiscourseOpWarning(
+                {
                 ok: true,
                 title,
                 author,
@@ -663,14 +735,16 @@ async function extractArticleOnTab(tabId: number) {
                 contentHTML: buildHtml(contentWithWechatGallery, text),
                 contentMarkdown: markdownWithWechatGallery,
                 textContent: text,
-                warningFlags: [],
-              };
+                  warningFlags: [],
+                },
+                discourseOpMissingOnCurrentPage,
+              );
             }
           }
         }
 
         const fallback = fallbackExtract();
-        if (fallback) return fallback;
+        if (fallback) return withDiscourseOpWarning(fallback, discourseOpMissingOnCurrentPage);
         return { ok: false, error: 'No article content detected' };
       } catch (e: any) {
         const message = e && e.message ? String(e.message) : String(e || 'Article extraction failed');
@@ -699,10 +773,23 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
+  const discourseTopic = parseDiscourseTopicUrl(cleanedUrl);
   const canonicalUrl = canonicalizeArticleUrl(cleanedUrl) || cleanedUrl;
 
   await ensureReadability(targetTabId);
-  const extracted = await extractArticleOnTab(targetTabId);
+  let extracted = await extractArticleOnTab(targetTabId);
+
+  if (
+    discourseTopic &&
+    discourseTopic.postNumber != null &&
+    discourseTopic.postNumber !== 1 &&
+    hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)
+  ) {
+    const firstFloorUrl = buildDiscourseTopicFloorUrl(discourseTopic, 1);
+    await tabsUpdate(targetTabId, { url: firstFloorUrl });
+    await waitForTabUrl(targetTabId, firstFloorUrl, 8_000);
+    extracted = await extractArticleOnTab(targetTabId);
+  }
 
   const textContent = normalizeText(extracted.textContent || '');
   const markdownContent = normalizeText(extracted.contentMarkdown || '');
