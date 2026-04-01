@@ -326,7 +326,7 @@ export function ConversationDetailPane({
                 )}
               </div>
             </div>
-            <div className="tw-flex tw-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 md:tw-w-auto md:tw-flex-nowrap">
+            <div className="tw-flex tw-shrink-0 tw-items-center tw-justify-end tw-gap-2 tw-whitespace-nowrap">
               <DetailHeaderActionBar
                 actions={toolActions}
                 buttonClassName={outlineButtonClass}

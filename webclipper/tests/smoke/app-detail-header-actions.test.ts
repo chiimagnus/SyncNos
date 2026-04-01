@@ -268,6 +268,37 @@ describe('ConversationDetailPane header actions', () => {
     expect(pressedBtn).toBeTruthy();
   });
 
+  it('keeps the comments toggle in the same header row as title metadata container', () => {
+    currentState.selectedConversation = {
+      id: 12,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-12',
+      url: 'https://example.com/article-12',
+    } as any;
+    currentState.detailHeaderActions = [];
+
+    const onTriggerCommentsSidebar = vi.fn();
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: false }));
+    });
+
+    const header = document.querySelector('header');
+    expect(header).toBeTruthy();
+
+    const commentsBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(commentsBtn).toBeTruthy();
+    const title = header?.querySelector('h2');
+    expect(title).toBeTruthy();
+
+    const commentsContainer = commentsBtn?.parentElement;
+    expect(commentsContainer).toBeTruthy();
+    expect(commentsContainer?.className).toContain('tw-whitespace-nowrap');
+    expect(commentsContainer?.className).not.toContain('tw-flex-wrap');
+  });
+
   it('does not show comments toggle when selected conversation is not article-like', () => {
     currentState.selectedConversation = {
       id: 11,

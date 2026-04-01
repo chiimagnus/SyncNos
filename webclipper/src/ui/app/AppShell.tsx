@@ -258,7 +258,7 @@ export default function AppShell() {
       canToggleCommentsSidebar &&
       !showSettingsSheet &&
       !commentsSidebarCollapsed &&
-      (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
+      (isMedium || commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
 
     const commentsSidebarCommentChatWithRuntimeRef = useRef<{
       showCommentsSidebar: boolean;
@@ -479,7 +479,8 @@ export default function AppShell() {
       navigate({ pathname: '/', search: `?${params.toString()}` }, { replace: true });
     }, [location.pathname, location.search, navigate, selectedConversation]);
 
-    const renderSidebar = !isNarrow && !sidebarCollapsed;
+    const hideSidebarInMedium = isMedium && showCommentsSidebar;
+    const renderSidebar = !isNarrow && !sidebarCollapsed && !hideSidebarInMedium;
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">

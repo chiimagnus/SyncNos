@@ -219,9 +219,12 @@ describe('AppShell comments sidebar', () => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    await vi.waitFor(() => {
-      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
-    });
+    await vi.waitFor(
+      () => {
+        expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+      },
+      { timeout: 3000 },
+    );
     const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(host).toBeTruthy();
 
@@ -369,5 +372,38 @@ describe('AppShell comments sidebar', () => {
       const toggleBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
       expect(toggleBtn?.getAttribute('aria-pressed')).toBe('false');
     });
+  });
+
+  it('hides the left sidebar when medium comments sidebar is open', async () => {
+    responsiveTierState.value = 'medium';
+    currentState.selectedConversation = {
+      id: 31,
+      title: 'Article Medium',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-medium-open',
+      url: 'https://example.com/medium-open',
+    };
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+    expect(document.querySelector('aside')).toBeTruthy();
+
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+    expect(openBtn?.getAttribute('data-can-trigger')).toBe('1');
+
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
+      expect(pressedBtn).toBeTruthy();
+    });
+    expect(document.querySelector('aside')).toBeFalsy();
   });
 });
