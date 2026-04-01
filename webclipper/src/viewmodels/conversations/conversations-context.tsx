@@ -31,6 +31,7 @@ import { resolveDetailHeaderActions } from '@services/integrations/detail-header
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
 import { connectPort } from '@services/shared/ports';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 import {
   useConversationSyncFeedback,
@@ -101,17 +102,7 @@ function inferImageExtFromAsset(asset: { contentType?: string; url?: string }): 
 }
 
 function canonicalizeHttpUrl(raw: unknown): string {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = String(url.protocol || '').toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
+  return canonicalizeArticleUrl(raw);
 }
 
 function resolveConversationSourceType(input: {

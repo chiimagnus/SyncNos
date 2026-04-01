@@ -13,6 +13,7 @@ import {
   DEFAULT_ABOUT_YOU_USER_NAME,
   normalizeUserName,
 } from '@services/shared/user-profile';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -21,23 +22,9 @@ type AnyRouter = {
   eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
-function normalizeHttpUrl(raw: unknown): string {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = String(url.protocol || '').toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
-}
-
 export function registerArticleCommentsHandlers(router: AnyRouter) {
   router.register(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, async (msg) => {
-    const canonicalUrl = normalizeHttpUrl(msg?.canonicalUrl);
+    const canonicalUrl = canonicalizeArticleUrl(msg?.canonicalUrl);
     const conversationId = Number(msg?.conversationId);
 
     if (canonicalUrl) {
@@ -54,7 +41,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
   });
 
   router.register(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, async (msg) => {
-    const canonicalUrl = normalizeHttpUrl(msg?.canonicalUrl);
+    const canonicalUrl = canonicalizeArticleUrl(msg?.canonicalUrl);
     if (!canonicalUrl) return router.err('missing canonicalUrl');
 
     const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
@@ -88,7 +75,7 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
   });
 
   router.register(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, async (msg) => {
-    const canonicalUrl = normalizeHttpUrl(msg?.canonicalUrl);
+    const canonicalUrl = canonicalizeArticleUrl(msg?.canonicalUrl);
     const conversationId = Number(msg?.conversationId);
     if (!canonicalUrl) return router.err('missing canonicalUrl');
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
@@ -101,8 +88,8 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
   });
 
   router.register(COMMENTS_MESSAGE_TYPES.MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL, async (msg) => {
-    const fromCanonicalUrl = normalizeHttpUrl(msg?.fromCanonicalUrl);
-    const toCanonicalUrl = normalizeHttpUrl(msg?.toCanonicalUrl);
+    const fromCanonicalUrl = canonicalizeArticleUrl(msg?.fromCanonicalUrl);
+    const toCanonicalUrl = canonicalizeArticleUrl(msg?.toCanonicalUrl);
     const conversationId = msg?.conversationId != null ? Number(msg.conversationId) : null;
     if (!fromCanonicalUrl) return router.err('missing fromCanonicalUrl');
     if (!toCanonicalUrl) return router.err('missing toCanonicalUrl');

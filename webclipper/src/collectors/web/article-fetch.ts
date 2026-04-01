@@ -5,6 +5,7 @@ import {
   upsertConversation,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cleaner';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery } from '@platform/webext/tabs';
@@ -16,20 +17,6 @@ const READABILITY_FILE = 'src/vendor/readability.js';
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
-}
-
-function normalizeHttpUrl(raw: unknown) {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  try {
-    const url = new URL(text);
-    const protocol = String(url.protocol || '').toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') return '';
-    url.hash = '';
-    return url.toString();
-  } catch (_e) {
-    return '';
-  }
 }
 
 function conversationKeyForUrl(url: string) {
@@ -620,13 +607,14 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
+  const canonicalUrl = canonicalizeArticleUrl(cleanedUrl) || cleanedUrl;
 
   await ensureReadability(targetTabId);
   const extracted = await extractArticleOnTab(targetTabId);
 
   const textContent = normalizeText(extracted.textContent || '');
   const markdownContent = normalizeText(extracted.contentMarkdown || '');
-  const title = normalizeText(extracted.title || '') || fallbackTitle(cleanedUrl, tab.title || '');
+  const title = normalizeText(extracted.title || '') || fallbackTitle(canonicalUrl, tab.title || '');
   const author = normalizeText(extracted.author || '');
   const publishedAt = normalizeText(extracted.publishedAt || '');
   const warningFlags = Array.isArray(extracted.warningFlags)
@@ -641,8 +629,8 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     existed = await hasConversation({
       sourceType: ARTICLE_SOURCE_TYPE,
       source: ARTICLE_SOURCE,
-      conversationKey: conversationKeyForUrl(cleanedUrl),
-      url: cleanedUrl,
+      conversationKey: conversationKeyForUrl(canonicalUrl),
+      url: canonicalUrl,
     });
   } catch (_e) {
     existed = false;
@@ -650,9 +638,9 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const conversation = await upsertConversation({
     sourceType: ARTICLE_SOURCE_TYPE,
     source: ARTICLE_SOURCE,
-    conversationKey: conversationKeyForUrl(cleanedUrl),
+    conversationKey: conversationKeyForUrl(canonicalUrl),
     title,
-    url: cleanedUrl,
+    url: canonicalUrl,
     author,
     publishedAt,
     warningFlags,
@@ -678,7 +666,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     if (local?.web_article_cache_images_enabled === true) {
       const inlined = await inlineChatImagesInMessages({
         conversationId,
-        conversationUrl: cleanedUrl,
+        conversationUrl: canonicalUrl,
         messages: messagesToSave,
         enableHttpImages: true,
       });
@@ -711,7 +699,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   return {
     isNew: !existed,
     conversationId,
-    url: cleanedUrl,
+    url: canonicalUrl,
     title,
     author,
     publishedAt,
@@ -726,8 +714,9 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const cleanedUrl = (await cleanTrackingParamsUrl(normalizedUrl)) || normalizedUrl;
+  const canonicalUrl = canonicalizeArticleUrl(cleanedUrl) || cleanedUrl;
 
-  const key = conversationKeyForUrl(cleanedUrl);
+  const key = conversationKeyForUrl(canonicalUrl);
   try {
     const existing = await getConversationBySourceConversationKey(ARTICLE_SOURCE, key);
     const existingId = Number((existing as any)?.id);
@@ -738,8 +727,9 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
       return {
         isNew: false,
         conversationId: existingId,
-        url: cleanedUrl,
-        title: normalizeText((existing as any)?.title || '') || fallbackTitle(cleanedUrl, (tab as any)?.title || ''),
+        url: canonicalUrl,
+        title:
+          normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
         author: normalizeText((existing as any)?.author || ''),
         publishedAt: normalizeText((existing as any)?.publishedAt || ''),
         warningFlags,
