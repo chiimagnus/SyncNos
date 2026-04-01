@@ -13,6 +13,7 @@ import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
+import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
   buildMarkdownReadingProfileStoragePatch,
@@ -54,6 +55,26 @@ import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/sh
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
 const FALLBACK_NOTION_DB_STORAGE_KEYS = ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
+const FALLBACK_CHAT_DB_SPEC = {
+  title: 'SyncNos-AI Chats',
+  storageKey: 'notion_db_id_syncnos_ai_chats',
+} as const;
+const FALLBACK_ARTICLE_DB_SPEC = {
+  title: 'SyncNos-Web Articles',
+  storageKey: 'notion_db_id_syncnos_web_articles',
+} as const;
+
+function getKindDbSpec(kindId: string, fallback: { title: string; storageKey: string }) {
+  try {
+    const spec = (conversationKinds as any)?.getNotionDbSpecByKindId?.(kindId) as ConversationKindDbSpec | null;
+    const storageKey = String(spec?.storageKey || '').trim();
+    const title = String(spec?.title || '').trim();
+    if (storageKey && title) return { storageKey, title };
+  } catch (_e) {
+    // ignore and fallback
+  }
+  return { ...fallback };
+}
 
 function getNotionDbStorageKeys() {
   try {
@@ -169,6 +190,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   // Notion AI
   const [notionAiModelIndex, setNotionAiModelIndex] = useState<string>('');
+  const chatDbSpec = useMemo(() => getKindDbSpec('chat', FALLBACK_CHAT_DB_SPEC), []);
+  const articleDbSpec = useMemo(() => getKindDbSpec('article', FALLBACK_ARTICLE_DB_SPEC), []);
+  const [notionAdvancedOpen, setNotionAdvancedOpen] = useState(false);
+  const [notionChatDatabaseId, setNotionChatDatabaseId] = useState<string>('');
+  const [notionArticleDatabaseId, setNotionArticleDatabaseId] = useState<string>('');
 
   // Inpage
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
@@ -237,6 +263,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         'notion_parent_page_id',
         'notion_parent_page_title',
         'notion_ai_preferred_model_index',
+        chatDbSpec.storageKey,
+        articleDbSpec.storageKey,
         NOTION_SYNC_PROVIDER_ENABLED_KEY,
         OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY,
         'inpage_display_mode',
@@ -268,6 +296,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionParentPageId(String(local?.notion_parent_page_id || ''));
     setNotionParentPageTitle(String(local?.notion_parent_page_title || ''));
     setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || ''));
+    setNotionChatDatabaseId(String(local?.[chatDbSpec.storageKey] || ''));
+    setNotionArticleDatabaseId(String(local?.[articleDbSpec.storageKey] || ''));
     setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
     setObsidianSyncEnabled(local?.[OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY] !== false);
 
@@ -300,7 +330,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
     );
     chatWithHydratedRef.current = true;
-  }, []);
+  }, [articleDbSpec.storageKey, chatDbSpec.storageKey]);
 
   const refresh = useCallback(async () => {
     await runTask(refreshInternal);
@@ -549,6 +579,44 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     if (ok) await refresh();
   }, [refresh, runTask]);
+
+  const onToggleNotionAdvancedOpen = useCallback(() => {
+    setNotionAdvancedOpen((prev) => !prev);
+  }, []);
+
+  const onSaveNotionDatabaseId = useCallback(
+    async (kind: 'chat' | 'article') => {
+      const spec = kind === 'chat' ? chatDbSpec : articleDbSpec;
+      const raw = kind === 'chat' ? notionChatDatabaseId : notionArticleDatabaseId;
+      const next = String(raw || '').trim();
+
+      await runTask(
+        async () => {
+          await storageSet({ [spec.storageKey]: next });
+          if (kind === 'chat') setNotionChatDatabaseId(next);
+          else setNotionArticleDatabaseId(next);
+        },
+        { fallbackMessage: 'save notion database id failed' },
+      );
+    },
+    [articleDbSpec, chatDbSpec, notionArticleDatabaseId, notionChatDatabaseId, runTask],
+  );
+
+  const onResetNotionDatabaseId = useCallback(
+    async (kind: 'chat' | 'article') => {
+      const spec = kind === 'chat' ? chatDbSpec : articleDbSpec;
+
+      await runTask(
+        async () => {
+          await storageRemove([spec.storageKey]);
+          if (kind === 'chat') setNotionChatDatabaseId('');
+          else setNotionArticleDatabaseId('');
+        },
+        { fallbackMessage: 'reset notion database id failed' },
+      );
+    },
+    [articleDbSpec, chatDbSpec, runTask],
+  );
 
   const onSaveObsidianSettings = useCallback(
     async ({ includeApiKey }: { includeApiKey?: boolean } = {}) => {
@@ -894,6 +962,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionAiModelIndex,
     onSaveNotionAiModelIndex,
     onResetNotionAiModelIndex,
+    notionAdvancedOpen,
+    onToggleNotionAdvancedOpen,
+    notionChatDatabaseId,
+    setNotionChatDatabaseId,
+    notionArticleDatabaseId,
+    setNotionArticleDatabaseId,
+    notionChatDatabaseLabel: chatDbSpec.title,
+    notionArticleDatabaseLabel: articleDbSpec.title,
+    onSaveNotionDatabaseId,
+    onResetNotionDatabaseId,
     notionAiRef,
     notionParentPageId,
     notionPageOptions,

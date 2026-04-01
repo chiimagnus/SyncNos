@@ -4,6 +4,7 @@ type ConversationKindRegistry = {
   register: (definition: ConversationKindDefinition) => boolean;
   pick: (conversation: any) => ConversationKindDefinition | null;
   list: () => ConversationKindDefinition[];
+  getNotionDbSpecByKindId: (kindId: string) => ConversationKindDefinition['notion']['dbSpec'] | null;
   getNotionStorageKeys: () => string[];
   CHAT_KIND_ID: string;
   ARTICLE_KIND_ID: string;
@@ -86,6 +87,14 @@ function pick(conversation: any): ConversationKindDefinition | null {
 
 function list(): ConversationKindDefinition[] {
   return definitions.slice();
+}
+
+function getNotionDbSpecByKindId(kindId: string) {
+  const id = String(kindId || '').trim();
+  if (!id) return null;
+  const definition = definitions.find((item) => String(item?.id || '').trim() === id);
+  if (!definition || !definition.notion || !definition.notion.dbSpec) return null;
+  return definition.notion.dbSpec;
 }
 
 function getNotionStorageKeys(): string[] {
@@ -191,6 +200,7 @@ export const conversationKinds: ConversationKindRegistry = {
   register,
   pick,
   list,
+  getNotionDbSpecByKindId,
   getNotionStorageKeys,
   CHAT_KIND_ID,
   ARTICLE_KIND_ID,

@@ -100,6 +100,11 @@ export const zh: { [K in TranslationKey]: string } = {
   refresh: '刷新',
   refreshPagesAria: '刷新页面列表',
   connectNotionFirst: '请先连接 Notion',
+  advancedShow: '高级选项',
+  advancedHide: '收起高级选项',
+  notionDbIdAiChats: 'AI 对话数据库 ID',
+  notionDbIdWebArticles: '网页文章数据库 ID',
+  notionAdvancedDbIdHint: '可选覆盖项。填写后将直接使用该数据库 ID；清空后恢复按父页面自动复用/创建。',
 
   // NotionAISection
   notionAI: 'Notion AI',
