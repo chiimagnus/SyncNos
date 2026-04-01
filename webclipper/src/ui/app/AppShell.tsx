@@ -21,18 +21,13 @@ import {
   type ArticleCommentsSidebarController,
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
-import type {
-  ThreadedCommentItem,
-  ThreadedCommentsPanelChatWithAction,
-  ThreadedCommentsPanelCommentChatWithConfig,
-  ThreadedCommentsPanelCommentChatWithContext,
-} from '@ui/comments';
+import { createThreadedCommentChatWithConfig } from '@ui/comments';
+import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-detail-header-actions';
-import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { createRuntimeClient } from '@services/shared/runtime-client';
@@ -260,6 +255,42 @@ export default function AppShell() {
       !commentsSidebarCollapsed &&
       (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
 
+    const commentsSidebarCommentChatWithRuntimeRef = useRef<{
+      showCommentsSidebar: boolean;
+      hasConversation: boolean;
+      articleTitle: string;
+      canonicalUrl: string;
+      openPort: ChatWithOpenPlatformPort | null;
+    }>({
+      showCommentsSidebar: false,
+      hasConversation: false,
+      articleTitle: '',
+      canonicalUrl: '',
+      openPort: null,
+    });
+
+    commentsSidebarCommentChatWithRuntimeRef.current = {
+      showCommentsSidebar,
+      hasConversation: Boolean(selectedConversation),
+      articleTitle: String((selectedConversation as any)?.title || '').trim(),
+      canonicalUrl: canonicalUrl || '',
+      openPort: appCommentChatWithOpenPort,
+    };
+
+    const commentsSidebarCommentChatWithConfig = useMemo(
+      () =>
+        createThreadedCommentChatWithConfig({
+          resolveContext: () => ({
+            articleTitle: commentsSidebarCommentChatWithRuntimeRef.current.articleTitle,
+            canonicalUrl: commentsSidebarCommentChatWithRuntimeRef.current.canonicalUrl,
+          }),
+          isEnabled: () => commentsSidebarCommentChatWithRuntimeRef.current.showCommentsSidebar,
+          hasConversation: () => commentsSidebarCommentChatWithRuntimeRef.current.hasConversation,
+          resolveOpenPort: () => commentsSidebarCommentChatWithRuntimeRef.current.openPort,
+        }),
+      [],
+    );
+
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
@@ -359,46 +390,6 @@ export default function AppShell() {
     const resolveCommentsSidebarSingleChatWithLabel = useCallback(async (): Promise<string | null> => {
       return resolveSingleEnabledChatWithActionLabel();
     }, []);
-
-    const resolveCommentsSidebarCommentChatWithContext = useCallback(async () => {
-      const articleTitle = String((selectedConversation as any)?.title || '').trim();
-      return {
-        articleTitle,
-        canonicalUrl: canonicalUrl || '',
-      };
-    }, [canonicalUrl, selectedConversation]);
-
-    const resolveCommentsSidebarCommentChatWithActions = useCallback(
-      async (
-        rootComment: ThreadedCommentItem,
-        context: ThreadedCommentsPanelCommentChatWithContext,
-      ): Promise<ThreadedCommentsPanelChatWithAction[]> => {
-        if (!selectedConversation) return [];
-
-        const actions = await resolveChatWithCommentActions({
-          quoteText: String(rootComment?.quoteText || ''),
-          commentText: String(rootComment?.commentText || ''),
-          articleTitle: String(context?.articleTitle || (selectedConversation as any)?.title || '').trim(),
-          canonicalUrl: String(context?.canonicalUrl || canonicalUrl || '').trim(),
-          openPort: appCommentChatWithOpenPort,
-        });
-
-        return actions;
-      },
-      [appCommentChatWithOpenPort, canonicalUrl, selectedConversation],
-    );
-
-    const commentsSidebarCommentChatWithConfig = useMemo<ThreadedCommentsPanelCommentChatWithConfig | null>(() => {
-      if (!showCommentsSidebar) return null;
-      return {
-        resolveActions: resolveCommentsSidebarCommentChatWithActions,
-        resolveContext: resolveCommentsSidebarCommentChatWithContext,
-      };
-    }, [
-      resolveCommentsSidebarCommentChatWithActions,
-      resolveCommentsSidebarCommentChatWithContext,
-      showCommentsSidebar,
-    ]);
 
     useEffect(() => {
       if (!showSettingsSheet) return;

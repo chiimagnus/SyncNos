@@ -11,13 +11,7 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
-import type {
-  ThreadedCommentItem,
-  ThreadedCommentsPanelChatWithAction,
-  ThreadedCommentsPanelCommentChatWithConfig,
-  ThreadedCommentsPanelCommentChatWithContext,
-} from '@ui/comments';
-import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
+import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -92,34 +86,36 @@ export function ConversationDetailPane({
   const expandSidebarLabel = t('expandSidebar');
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
-  const resolveEmbeddedCommentChatWithContext = useCallback(async () => {
-    return {
-      articleTitle: String((selected as any)?.title || '').trim(),
-      canonicalUrl: canonicalUrl || '',
-    };
-  }, [canonicalUrl, selected]);
-  const resolveEmbeddedCommentChatWithActions = useCallback(
-    async (
-      rootComment: ThreadedCommentItem,
-      context: ThreadedCommentsPanelCommentChatWithContext,
-    ): Promise<ThreadedCommentsPanelChatWithAction[]> => {
-      const actions = await resolveChatWithCommentActions({
-        quoteText: String(rootComment?.quoteText || ''),
-        commentText: String(rootComment?.commentText || ''),
-        articleTitle: String(context?.articleTitle || (selected as any)?.title || '').trim(),
-        canonicalUrl: String(context?.canonicalUrl || canonicalUrl || '').trim(),
-      });
-      return actions;
-    },
-    [canonicalUrl, selected],
+  const embeddedCommentChatWithRuntimeRef = useRef<{
+    enabled: boolean;
+    hasConversation: boolean;
+    articleTitle: string;
+    canonicalUrl: string;
+  }>({
+    enabled: false,
+    hasConversation: false,
+    articleTitle: '',
+    canonicalUrl: '',
+  });
+  embeddedCommentChatWithRuntimeRef.current = {
+    enabled: hasArticleCommentsPane,
+    hasConversation: Boolean(selected),
+    articleTitle: String((selected as any)?.title || '').trim(),
+    canonicalUrl: canonicalUrl || '',
+  };
+  const embeddedCommentChatWithConfig = useMemo(
+    () =>
+      createThreadedCommentChatWithConfig({
+        resolveContext: () => ({
+          articleTitle: embeddedCommentChatWithRuntimeRef.current.articleTitle,
+          canonicalUrl: embeddedCommentChatWithRuntimeRef.current.canonicalUrl,
+        }),
+        isEnabled: () => embeddedCommentChatWithRuntimeRef.current.enabled,
+        hasConversation: () => embeddedCommentChatWithRuntimeRef.current.hasConversation,
+      }),
+    [],
   );
-  const embeddedCommentChatWithConfig = useMemo<ThreadedCommentsPanelCommentChatWithConfig | null>(() => {
-    if (!hasArticleCommentsPane) return null;
-    return {
-      resolveActions: resolveEmbeddedCommentChatWithActions,
-      resolveContext: resolveEmbeddedCommentChatWithContext,
-    };
-  }, [hasArticleCommentsPane, resolveEmbeddedCommentChatWithActions, resolveEmbeddedCommentChatWithContext]);
+  const activeEmbeddedCommentChatWithConfig = hasArticleCommentsPane ? embeddedCommentChatWithConfig : null;
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -453,7 +449,7 @@ export function ConversationDetailPane({
                   <ArticleCommentsSection
                     conversationId={Number((selected as any)?.id || activeId || 0)}
                     canonicalUrl={canonicalUrl}
-                    commentChatWith={embeddedCommentChatWithConfig}
+                    commentChatWith={activeEmbeddedCommentChatWithConfig}
                   />
                 </div>
               ) : null}

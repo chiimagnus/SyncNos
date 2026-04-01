@@ -92,7 +92,8 @@ function ArticleCommentsPanelMount({
   }, [getLocatorRoot]);
 
   useEffect(() => {
-    resolveChatWithActionsRef.current = typeof resolveChatWithActions === 'function' ? resolveChatWithActions : undefined;
+    resolveChatWithActionsRef.current =
+      typeof resolveChatWithActions === 'function' ? resolveChatWithActions : undefined;
   }, [resolveChatWithActions]);
 
   useEffect(() => {

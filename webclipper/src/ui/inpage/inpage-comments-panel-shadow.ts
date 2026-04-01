@@ -1,4 +1,5 @@
 import {
+  createThreadedCommentChatWithConfig,
   mountThreadedCommentsPanel,
   type ThreadedCommentItem,
   type ThreadedCommentsPanelChatWithAction,
@@ -13,7 +14,6 @@ import {
 } from '@services/protocols/message-contracts';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import {
   resolveChatWithDetailHeaderActions,
@@ -188,20 +188,10 @@ async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPa
   };
 }
 
-async function resolveInpageCommentChatWithActions(
-  rootComment: ThreadedCommentItem,
-  context: ThreadedCommentsPanelCommentChatWithContext,
-): Promise<ThreadedCommentsPanelChatWithAction[]> {
-  const actions = await resolveChatWithCommentActions({
-    quoteText: String(rootComment?.quoteText || ''),
-    commentText: String(rootComment?.commentText || ''),
-    articleTitle: String(context?.articleTitle || ''),
-    canonicalUrl: String(context?.canonicalUrl || ''),
-    openPort: createInpageChatWithOpenPort(),
-  });
-
-  return actions;
-}
+const inpageCommentChatWithConfig = createThreadedCommentChatWithConfig({
+  resolveContext: resolveInpageCommentChatWithContext,
+  resolveOpenPort: () => createInpageChatWithOpenPort(),
+});
 
 function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
@@ -227,10 +217,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
       resolveActions: resolveInpageChatWithActions,
       resolveSingleActionLabel: resolveSingleEnabledChatWithActionLabel,
     },
-    commentChatWith: {
-      resolveActions: resolveInpageCommentChatWithActions,
-      resolveContext: resolveInpageCommentChatWithContext,
-    },
+    commentChatWith: inpageCommentChatWithConfig,
   });
   el.id = PANEL_ID;
 
