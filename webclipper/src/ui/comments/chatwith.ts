@@ -93,6 +93,10 @@ export function createChatWithMenuController(options: CreateChatWithMenuControll
     closeMenu();
     void Promise.resolve()
       .then(() => action.onTrigger?.())
+      .then((maybeMessage) => {
+        const message = String(maybeMessage || '').trim();
+        if (message) showNotice(message);
+      })
       .catch((error) => {
         const message =
           error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));

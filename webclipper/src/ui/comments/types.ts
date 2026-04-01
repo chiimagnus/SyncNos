@@ -27,7 +27,7 @@ export type ThreadedCommentsPanelChatWithAction = {
   id: string;
   label: string;
   disabled?: boolean;
-  onTrigger?: () => void | Promise<void>;
+  onTrigger?: () => void | string | Promise<void | string>;
 };
 
 export type ThreadedCommentsPanelChatWithConfig = {

@@ -299,6 +299,10 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
         closeThreadCommentChatWithMenus(threadsEl, null);
         void Promise.resolve()
           .then(() => action.onTrigger?.())
+          .then((maybeMessage) => {
+            const message = String(maybeMessage || '').trim();
+            if (message) showNotice?.(message);
+          })
           .catch((error) => {
             const message =
               error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
