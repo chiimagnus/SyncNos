@@ -195,6 +195,7 @@ export default function AppShell() {
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
     const commentsSidebarCollapsed = isMedium ? mediumCommentsSidebarCollapsed : wideCommentsSidebarCollapsed;
+    const canAutoOpenCommentsSidebarInWide = isWide && canToggleCommentsSidebar;
 
     const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
       () => ({
@@ -324,12 +325,12 @@ export default function AppShell() {
 
     useEffect(() => {
       if (showSettingsSheet) return;
-      if (!canToggleCommentsSidebar) return;
+      if (!canAutoOpenCommentsSidebarInWide) return;
       if (commentsSidebarCollapsed) return;
       if (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen) return;
       void commentsSidebarController.open({ source: 'app-default', focusComposer: false, ensureContext: false });
     }, [
-      canToggleCommentsSidebar,
+      canAutoOpenCommentsSidebarInWide,
       commentsSidebarCollapsed,
       commentsSidebarController,
       commentsSidebarSession,
