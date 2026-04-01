@@ -29,9 +29,16 @@ describe('canonicalizeArticleUrl', () => {
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/1')).toBe(canonical);
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/20?u=abc#frag')).toBe(canonical);
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/20/')).toBe(canonical);
+    expect(canonicalizeArticleUrl('https://linux.do/T/topic-slug/123/99?u=abc')).toBe(canonical);
   });
 
   it('keeps non-discourse urls unchanged except hash removal', () => {
     expect(canonicalizeArticleUrl('https://example.com/path?a=1#frag')).toBe('https://example.com/path?a=1');
+  });
+
+  it('keeps non-topic discourse paths unchanged except hash removal', () => {
+    expect(canonicalizeArticleUrl('https://linux.do/latest?order=created#frag')).toBe(
+      'https://linux.do/latest?order=created',
+    );
   });
 });
