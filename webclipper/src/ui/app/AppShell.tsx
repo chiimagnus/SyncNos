@@ -369,6 +369,7 @@ export default function AppShell() {
         conversation: selectedConversation,
         detail: currentDetail,
         port: defaultDetailHeaderActionPort,
+        openPort: appCommentChatWithOpenPort,
       });
 
       const mapped: ThreadedCommentsPanelChatWithAction[] = [];
@@ -385,7 +386,7 @@ export default function AppShell() {
         });
       }
       return mapped;
-    }, [detail, selectedConversation, showCommentsSidebar]);
+    }, [appCommentChatWithOpenPort, detail, selectedConversation, showCommentsSidebar]);
 
     const resolveCommentsSidebarSingleChatWithLabel = useCallback(async (): Promise<string | null> => {
       return resolveSingleEnabledChatWithActionLabel();
