@@ -103,44 +103,48 @@ export default function AppShell() {
     }
   };
 
-  function AppShellRouterProviders({
-    sidebarCollapsed,
-    wideCommentsSidebarCollapsed,
-    mediumCommentsSidebarCollapsed,
-    setCollapsed,
-    setWideCommentsCollapsed,
-    setMediumCommentsCollapsed,
-  }: {
-    sidebarCollapsed: boolean;
-    wideCommentsSidebarCollapsed: boolean;
-    mediumCommentsSidebarCollapsed: boolean;
-    setCollapsed: (collapsed: boolean) => void;
-    setWideCommentsCollapsed: (collapsed: boolean) => void;
-    setMediumCommentsCollapsed: (collapsed: boolean) => void;
-  }) {
-    const location = useLocation();
-    const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
-    if (initialOpenLocRef.current === undefined) {
-      const search = String(location.search || '');
-      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-      const loc = params.get('loc');
-      initialOpenLocRef.current = loc ? decodeConversationLoc(loc) : null;
-    }
+  const AppShellRouterProviders = useMemo(
+    () =>
+      function AppShellRouterProviders({
+        sidebarCollapsed,
+        wideCommentsSidebarCollapsed,
+        mediumCommentsSidebarCollapsed,
+        setCollapsed,
+        setWideCommentsCollapsed,
+        setMediumCommentsCollapsed,
+      }: {
+        sidebarCollapsed: boolean;
+        wideCommentsSidebarCollapsed: boolean;
+        mediumCommentsSidebarCollapsed: boolean;
+        setCollapsed: (collapsed: boolean) => void;
+        setWideCommentsCollapsed: (collapsed: boolean) => void;
+        setMediumCommentsCollapsed: (collapsed: boolean) => void;
+      }) {
+        const location = useLocation();
+        const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
+        if (initialOpenLocRef.current === undefined) {
+          const search = String(location.search || '');
+          const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+          const loc = params.get('loc');
+          initialOpenLocRef.current = loc ? decodeConversationLoc(loc) : null;
+        }
 
-    return (
-      <ConversationsProvider initialOpenLoc={initialOpenLocRef.current ?? null}>
-        <AppShellFrame
-          sidebarCollapsed={sidebarCollapsed}
-          wideCommentsSidebarCollapsed={wideCommentsSidebarCollapsed}
-          mediumCommentsSidebarCollapsed={mediumCommentsSidebarCollapsed}
-          setCollapsed={setCollapsed}
-          setWideCommentsCollapsed={setWideCommentsCollapsed}
-          setMediumCommentsCollapsed={setMediumCommentsCollapsed}
-        />
-        <AppTooltipHost />
-      </ConversationsProvider>
-    );
-  }
+        return (
+          <ConversationsProvider initialOpenLoc={initialOpenLocRef.current ?? null}>
+            <AppShellFrame
+              sidebarCollapsed={sidebarCollapsed}
+              wideCommentsSidebarCollapsed={wideCommentsSidebarCollapsed}
+              mediumCommentsSidebarCollapsed={mediumCommentsSidebarCollapsed}
+              setCollapsed={setCollapsed}
+              setWideCommentsCollapsed={setWideCommentsCollapsed}
+              setMediumCommentsCollapsed={setMediumCommentsCollapsed}
+            />
+            <AppTooltipHost />
+          </ConversationsProvider>
+        );
+      },
+    [],
+  );
 
   function AppShellFrame({
     sidebarCollapsed,
@@ -480,7 +484,7 @@ export default function AppShell() {
     }, [location.pathname, location.search, navigate, selectedConversation]);
 
     const hideSidebarInMedium = isMedium && showCommentsSidebar;
-    const renderSidebar = !isNarrow && !sidebarCollapsed && !hideSidebarInMedium;
+    const renderSidebar = !isNarrow && !sidebarCollapsed;
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
@@ -490,7 +494,12 @@ export default function AppShell() {
               'tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0',
               columnDividerRightClassName(),
             ].join(' ')}
-            style={{ width: `${SIDEBAR_WIDTH_DEFAULT}px`, minWidth: `${SIDEBAR_WIDTH_DEFAULT}px` }}
+            style={{
+              width: `${SIDEBAR_WIDTH_DEFAULT}px`,
+              minWidth: `${SIDEBAR_WIDTH_DEFAULT}px`,
+              display: hideSidebarInMedium ? 'none' : undefined,
+            }}
+            aria-hidden={hideSidebarInMedium ? 'true' : undefined}
           >
             <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
           </aside>

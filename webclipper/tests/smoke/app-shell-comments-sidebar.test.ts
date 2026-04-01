@@ -89,7 +89,7 @@ vi.mock('../../src/ui/app/routes/Settings', () => ({
   default: () => createElement('div', null, 'settings'),
 }));
 
-vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
+vi.mock('../../src/ui/app/CapturedListSidebar', () => ({
   CapturedListSidebar: () => createElement('div', null, 'sidebar'),
 }));
 
@@ -404,6 +404,8 @@ describe('AppShell comments sidebar', () => {
       const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
       expect(pressedBtn).toBeTruthy();
     });
-    expect(document.querySelector('aside')).toBeFalsy();
+    const sidebarAside = document.querySelector('aside') as HTMLElement | null;
+    expect(sidebarAside).toBeTruthy();
+    expect(sidebarAside?.style.display).toBe('none');
   });
 });
