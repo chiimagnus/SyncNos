@@ -60,14 +60,24 @@ export function SettingsScene(props: SettingsSceneProps) {
     notionConnected,
     pollingNotion,
     loadingNotionPages,
+    notionAdvancedOpen,
     notionAiModelIndex,
     setNotionAiModelIndex,
     notionParentPageId,
+    notionChatDatabaseId,
+    setNotionChatDatabaseId,
+    notionArticleDatabaseId,
+    setNotionArticleDatabaseId,
+    notionChatDatabaseLabel,
+    notionArticleDatabaseLabel,
     notionPageOptions,
     notionStatusText,
     onSaveNotionAiModelIndex,
     onResetNotionAiModelIndex,
     notionAiRef,
+    onToggleNotionAdvancedOpen,
+    onSaveNotionDatabaseId,
+    onResetNotionDatabaseId,
     onNotionConnectOrDisconnect,
     onSaveNotionParentPage,
     onLoadNotionPages,
@@ -147,17 +157,33 @@ export function SettingsScene(props: SettingsSceneProps) {
             notionConnected={!!notionConnected}
             pollingNotion={pollingNotion}
             loadingNotionPages={loadingNotionPages}
+            notionAdvancedOpen={notionAdvancedOpen}
             notionParentPageId={notionParentPageId}
+            notionChatDatabaseId={notionChatDatabaseId}
+            notionArticleDatabaseId={notionArticleDatabaseId}
+            notionChatDatabaseLabel={notionChatDatabaseLabel}
+            notionArticleDatabaseLabel={notionArticleDatabaseLabel}
             notionPageOptions={notionPageOptions}
             notionLogoUrl={getURL('icons/notion.svg' as any)}
             onToggleSyncEnabled={(enabled) => {
               void onToggleNotionSyncEnabled(enabled);
+            }}
+            onToggleAdvancedOpen={() => {
+              onToggleNotionAdvancedOpen();
             }}
             onConnectOrDisconnect={() => {
               void onNotionConnectOrDisconnect();
             }}
             onSaveNotionParentPage={(id) => {
               void onSaveNotionParentPage(id);
+            }}
+            onChangeNotionChatDatabaseId={setNotionChatDatabaseId}
+            onChangeNotionArticleDatabaseId={setNotionArticleDatabaseId}
+            onSaveNotionDatabaseId={(kind) => {
+              void onSaveNotionDatabaseId(kind);
+            }}
+            onResetNotionDatabaseId={(kind) => {
+              void onResetNotionDatabaseId(kind);
             }}
             onLoadNotionPages={() => {
               void onLoadNotionPages();

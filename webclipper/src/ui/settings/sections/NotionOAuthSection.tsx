@@ -1,6 +1,6 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
 import { t } from '@i18n';
-import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 
@@ -11,12 +11,22 @@ export function NotionOAuthSection(props: {
   notionConnected: boolean;
   pollingNotion: boolean;
   loadingNotionPages: boolean;
+  notionAdvancedOpen: boolean;
   notionParentPageId: string;
+  notionChatDatabaseId: string;
+  notionArticleDatabaseId: string;
+  notionChatDatabaseLabel: string;
+  notionArticleDatabaseLabel: string;
   notionPageOptions: NotionPageOption[];
   notionLogoUrl: string;
   onToggleSyncEnabled: (enabled: boolean) => void;
+  onToggleAdvancedOpen: () => void;
   onConnectOrDisconnect: () => void;
   onSaveNotionParentPage: (id: string) => void;
+  onChangeNotionChatDatabaseId: (id: string) => void;
+  onChangeNotionArticleDatabaseId: (id: string) => void;
+  onSaveNotionDatabaseId: (kind: 'chat' | 'article') => void;
+  onResetNotionDatabaseId: (kind: 'chat' | 'article') => void;
   onLoadNotionPages: () => void;
 }) {
   const {
@@ -26,12 +36,22 @@ export function NotionOAuthSection(props: {
     notionConnected,
     pollingNotion,
     loadingNotionPages,
+    notionAdvancedOpen,
     notionParentPageId,
+    notionChatDatabaseId,
+    notionArticleDatabaseId,
+    notionChatDatabaseLabel,
+    notionArticleDatabaseLabel,
     notionPageOptions,
     notionLogoUrl,
     onToggleSyncEnabled,
+    onToggleAdvancedOpen,
     onConnectOrDisconnect,
     onSaveNotionParentPage,
+    onChangeNotionChatDatabaseId,
+    onChangeNotionArticleDatabaseId,
+    onSaveNotionDatabaseId,
+    onResetNotionDatabaseId,
     onLoadNotionPages,
   } = props;
 
@@ -112,6 +132,89 @@ export function NotionOAuthSection(props: {
           </div>
         </SettingsFormRow>
       </div>
+
+      <div className="tw-mt-3">
+        <button
+          type="button"
+          className={buttonClassName}
+          onClick={onToggleAdvancedOpen}
+          disabled={busy || !notionConnected}
+          aria-expanded={notionAdvancedOpen}
+          aria-controls="notion-advanced-settings"
+        >
+          {notionAdvancedOpen ? t('advancedHide') : t('advancedShow')}
+        </button>
+      </div>
+
+      {notionAdvancedOpen ? (
+        <div id="notion-advanced-settings" className="tw-mt-3 tw-grid tw-gap-2">
+          <SettingsFormRow label={t('notionDbIdAiChats')}>
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+              <input
+                value={notionChatDatabaseId}
+                onChange={(e) => onChangeNotionChatDatabaseId(e.target.value)}
+                disabled={busy || !notionConnected}
+                spellCheck={false}
+                placeholder={notionChatDatabaseLabel}
+                aria-label={t('notionDbIdAiChats')}
+                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+              />
+              <button
+                type="button"
+                className={buttonClassName}
+                onClick={() => onSaveNotionDatabaseId('chat')}
+                disabled={busy || !notionConnected}
+              >
+                {t('save')}
+              </button>
+              <button
+                type="button"
+                className={buttonClassName}
+                onClick={() => onResetNotionDatabaseId('chat')}
+                disabled={busy || !notionConnected}
+              >
+                {t('reset')}
+              </button>
+            </div>
+          </SettingsFormRow>
+
+          <SettingsFormRow label={t('notionDbIdWebArticles')}>
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+              <input
+                value={notionArticleDatabaseId}
+                onChange={(e) => onChangeNotionArticleDatabaseId(e.target.value)}
+                disabled={busy || !notionConnected}
+                spellCheck={false}
+                placeholder={notionArticleDatabaseLabel}
+                aria-label={t('notionDbIdWebArticles')}
+                className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+              />
+              <button
+                type="button"
+                className={buttonClassName}
+                onClick={() => onSaveNotionDatabaseId('article')}
+                disabled={busy || !notionConnected}
+              >
+                {t('save')}
+              </button>
+              <button
+                type="button"
+                className={buttonClassName}
+                onClick={() => onResetNotionDatabaseId('article')}
+                disabled={busy || !notionConnected}
+              >
+                {t('reset')}
+              </button>
+            </div>
+          </SettingsFormRow>
+
+          <SettingsFormRow label={t('note')} align="start">
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('notionAdvancedDbIdHint')}
+            </div>
+          </SettingsFormRow>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -99,6 +99,12 @@ export const en = {
   refresh: 'Refresh',
   refreshPagesAria: 'Refresh pages',
   connectNotionFirst: 'Connect Notion first',
+  advancedShow: 'Advanced',
+  advancedHide: 'Hide Advanced',
+  notionDbIdAiChats: 'AI Chats DB ID',
+  notionDbIdWebArticles: 'Web Articles DB ID',
+  notionAdvancedDbIdHint:
+    'Optional override. When filled, SyncNos uses this database ID directly; clear to auto-discover/create under Parent Page.',
 
   // NotionAISection
   notionAI: 'Notion AI',

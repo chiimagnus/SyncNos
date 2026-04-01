@@ -18,6 +18,8 @@ export type ConversationKindDefinition = {
   };
 };
 
+export type ConversationKindDbSpec = ConversationKindDefinition['notion']['dbSpec'];
+
 function assertNonEmptyString(value: unknown, message: string): void {
   if (!value || typeof value !== 'string' || !String(value).trim()) throw new Error(message);
 }
