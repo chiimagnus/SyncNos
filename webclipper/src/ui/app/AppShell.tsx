@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
@@ -21,12 +21,16 @@ import {
   type ArticleCommentsSidebarController,
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
+import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-detail-header-actions';
+import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { createRuntimeClient } from '@services/shared/runtime-client';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -43,6 +47,25 @@ function isArticleConversationLike(conversation: any): boolean {
     .toLowerCase();
   if (source !== 'web') return false;
   return Boolean(canonicalizeArticleUrl(conversation?.url));
+}
+
+function safeString(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function isHttpUrl(raw: unknown): boolean {
+  return /^https?:\/\//i.test(safeString(raw));
+}
+
+function openUrlFallback(url: string): boolean {
+  const target = safeString(url);
+  if (!target || !isHttpUrl(target)) return false;
+  try {
+    globalThis.window?.open(target, '_blank', 'noopener,noreferrer');
+    return true;
+  } catch (_e) {
+    return false;
+  }
 }
 
 export default function AppShell() {
@@ -155,6 +178,10 @@ export default function AppShell() {
       () => commentsSidebarSession.getSnapshot(),
       () => commentsSidebarSession.getSnapshot(),
     );
+    const runtimeClientRef = useRef<ReturnType<typeof createRuntimeClient> | null>(null);
+    if (!runtimeClientRef.current) {
+      runtimeClientRef.current = createRuntimeClient();
+    }
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
@@ -166,6 +193,59 @@ export default function AppShell() {
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
 
+    const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
+      () => ({
+        openPlatform: async (platformId, fallbackUrl, context) => {
+          const normalizedPlatformId = safeString(platformId).toLowerCase();
+          const normalizedFallbackUrl = safeString(fallbackUrl);
+          const normalizedArticleKey = safeString(context?.articleKey);
+          if (!normalizedPlatformId) return false;
+
+          const rt = runtimeClientRef.current;
+          if (!rt?.send) {
+            return openUrlFallback(normalizedFallbackUrl);
+          }
+
+          let groupedErrorMessage = '';
+          if (normalizedArticleKey) {
+            try {
+              const groupedResponse = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
+                platformId: normalizedPlatformId,
+                articleKey: normalizedArticleKey,
+                fallbackUrl: normalizedFallbackUrl,
+              })) as any;
+              if (groupedResponse?.ok) return true;
+              groupedErrorMessage =
+                safeString(groupedResponse?.error?.message) ||
+                `Failed to open grouped platform tab: ${normalizedPlatformId}`;
+            } catch (error) {
+              groupedErrorMessage = safeString((error as any)?.message);
+            }
+          }
+
+          try {
+            const response = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
+              platformId: normalizedPlatformId,
+              fallbackUrl: normalizedFallbackUrl,
+            })) as any;
+            if (response?.ok) return true;
+
+            const message =
+              safeString(response?.error?.message) ||
+              groupedErrorMessage ||
+              `Failed to open platform: ${normalizedPlatformId}`;
+            throw new Error(message);
+          } catch (error) {
+            if (openUrlFallback(normalizedFallbackUrl)) return true;
+            throw error instanceof Error
+              ? error
+              : new Error(String(error || `Failed to open platform: ${normalizedPlatformId}`));
+          }
+        },
+      }),
+      [],
+    );
+
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? (state?.backgroundLocation ?? null) : null;
@@ -174,6 +254,42 @@ export default function AppShell() {
       !showSettingsSheet &&
       !commentsSidebarCollapsed &&
       (commentsSidebarSnapshot.openRequested || commentsSidebarSnapshot.isOpen);
+
+    const commentsSidebarCommentChatWithRuntimeRef = useRef<{
+      showCommentsSidebar: boolean;
+      hasConversation: boolean;
+      articleTitle: string;
+      canonicalUrl: string;
+      openPort: ChatWithOpenPlatformPort | null;
+    }>({
+      showCommentsSidebar: false,
+      hasConversation: false,
+      articleTitle: '',
+      canonicalUrl: '',
+      openPort: null,
+    });
+
+    commentsSidebarCommentChatWithRuntimeRef.current = {
+      showCommentsSidebar,
+      hasConversation: Boolean(selectedConversation),
+      articleTitle: String((selectedConversation as any)?.title || '').trim(),
+      canonicalUrl: canonicalUrl || '',
+      openPort: appCommentChatWithOpenPort,
+    };
+
+    const commentsSidebarCommentChatWithConfig = useMemo(
+      () =>
+        createThreadedCommentChatWithConfig({
+          resolveContext: () => ({
+            articleTitle: commentsSidebarCommentChatWithRuntimeRef.current.articleTitle,
+            canonicalUrl: commentsSidebarCommentChatWithRuntimeRef.current.canonicalUrl,
+          }),
+          isEnabled: () => commentsSidebarCommentChatWithRuntimeRef.current.showCommentsSidebar,
+          hasConversation: () => commentsSidebarCommentChatWithRuntimeRef.current.hasConversation,
+          resolveOpenPort: () => commentsSidebarCommentChatWithRuntimeRef.current.openPort,
+        }),
+      [],
+    );
 
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
@@ -253,6 +369,7 @@ export default function AppShell() {
         conversation: selectedConversation,
         detail: currentDetail,
         port: defaultDetailHeaderActionPort,
+        openPort: appCommentChatWithOpenPort,
       });
 
       const mapped: ThreadedCommentsPanelChatWithAction[] = [];
@@ -269,7 +386,7 @@ export default function AppShell() {
         });
       }
       return mapped;
-    }, [detail, selectedConversation, showCommentsSidebar]);
+    }, [appCommentChatWithOpenPort, detail, selectedConversation, showCommentsSidebar]);
 
     const resolveCommentsSidebarSingleChatWithLabel = useCallback(async (): Promise<string | null> => {
       return resolveSingleEnabledChatWithActionLabel();
@@ -429,6 +546,7 @@ export default function AppShell() {
                     getLocatorRoot={() => commentsLocatorRootRef.current}
                     resolveChatWithActions={resolveCommentsSidebarChatWithActions}
                     resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
+                    commentChatWith={commentsSidebarCommentChatWithConfig}
                   />
                 </div>
               ) : null}

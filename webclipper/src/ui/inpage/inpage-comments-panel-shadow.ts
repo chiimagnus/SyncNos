@@ -1,13 +1,20 @@
 import {
+  createThreadedCommentChatWithConfig,
   mountThreadedCommentsPanel,
   type ThreadedCommentItem,
   type ThreadedCommentsPanelChatWithAction,
+  type ThreadedCommentsPanelCommentChatWithContext,
 } from '@ui/comments';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
-import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import {
+  CORE_MESSAGE_TYPES,
+  ARTICLE_MESSAGE_TYPES,
+  CHATWITH_MESSAGE_TYPES,
+} from '@services/protocols/message-contracts';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
+import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -34,6 +41,57 @@ type RuntimeClient = {
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function openUrlFallback(url: string): boolean {
+  const target = safeString(url);
+  if (!target || !/^https?:\/\//i.test(target)) return false;
+  try {
+    globalThis.window?.open(target, '_blank', 'noopener,noreferrer');
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
+  return {
+    openPlatform: async (platformId, fallbackUrl, context) => {
+      const normalizedPlatformId = safeString(platformId).toLowerCase();
+      const normalizedFallbackUrl = safeString(fallbackUrl);
+      const normalizedArticleKey = safeString(context?.articleKey);
+      if (!normalizedPlatformId) return false;
+
+      const rt = runtimeClient;
+      if (!rt?.send) {
+        return openUrlFallback(normalizedFallbackUrl);
+      }
+
+      let groupedErrorMessage = '';
+      if (normalizedArticleKey) {
+        const groupedResponse = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
+          platformId: normalizedPlatformId,
+          articleKey: normalizedArticleKey,
+          fallbackUrl: normalizedFallbackUrl,
+        });
+        if (groupedResponse?.ok) return true;
+        groupedErrorMessage =
+          safeString(groupedResponse?.error?.message) || `Failed to open grouped platform tab: ${normalizedPlatformId}`;
+      }
+
+      const response = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
+        platformId: normalizedPlatformId,
+        fallbackUrl: normalizedFallbackUrl,
+      });
+      if (response?.ok) return true;
+
+      const message =
+        safeString(response?.error?.message) ||
+        groupedErrorMessage ||
+        `Failed to open platform: ${normalizedPlatformId}`;
+      throw new Error(message);
+    },
+  };
 }
 
 function buildConversationFromResolved(input: {
@@ -94,6 +152,7 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     conversation,
     detail,
     port: defaultDetailHeaderActionPort,
+    openPort: createInpageChatWithOpenPort(),
   });
 
   const mapped: ThreadedCommentsPanelChatWithAction[] = [];
@@ -111,6 +170,28 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
   }
   return mapped;
 }
+
+async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPanelCommentChatWithContext> {
+  const rt = runtimeClient;
+  if (!rt?.send) {
+    throw new Error('Runtime is unavailable in this page context');
+  }
+
+  const resolved = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {});
+  if (!resolved?.ok) {
+    throw new Error(safeString(resolved?.error?.message) || 'Failed to resolve current page article');
+  }
+
+  return {
+    articleTitle: safeString(resolved?.data?.title),
+    canonicalUrl: canonicalizeArticleUrl(resolved?.data?.url) || canonicalizeArticleUrl(globalThis.location?.href),
+  };
+}
+
+const inpageCommentChatWithConfig = createThreadedCommentChatWithConfig({
+  resolveContext: resolveInpageCommentChatWithContext,
+  resolveOpenPort: () => createInpageChatWithOpenPort(),
+});
 
 function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
@@ -136,6 +217,7 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
       resolveActions: resolveInpageChatWithActions,
       resolveSingleActionLabel: resolveSingleEnabledChatWithActionLabel,
     },
+    commentChatWith: inpageCommentChatWithConfig,
   });
   el.id = PANEL_ID;
 

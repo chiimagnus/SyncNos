@@ -27,12 +27,27 @@ export type ThreadedCommentsPanelChatWithAction = {
   id: string;
   label: string;
   disabled?: boolean;
-  onTrigger?: () => void | Promise<void>;
+  onTrigger?: () => void | string | Promise<void | string>;
 };
 
 export type ThreadedCommentsPanelChatWithConfig = {
   resolveActions: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveSingleActionLabel?: () => Promise<string | null>;
+};
+
+export type ThreadedCommentsPanelCommentChatWithContext = {
+  articleTitle?: string | null;
+  canonicalUrl?: string | null;
+};
+
+export type ThreadedCommentsPanelCommentChatWithConfig = {
+  resolveActions: (
+    rootComment: ThreadedCommentItem,
+    context: ThreadedCommentsPanelCommentChatWithContext,
+  ) => Promise<ThreadedCommentsPanelChatWithAction[]>;
+  resolveContext?: () =>
+    | ThreadedCommentsPanelCommentChatWithContext
+    | Promise<ThreadedCommentsPanelCommentChatWithContext>;
 };
 
 export type MountOptions = {
@@ -47,4 +62,5 @@ export type MountOptions = {
   locatorEnv?: 'inpage' | 'app' | null;
   getLocatorRoot?: () => Element | null;
   chatWith?: ThreadedCommentsPanelChatWithConfig | null;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };

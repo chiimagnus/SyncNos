@@ -98,6 +98,40 @@ export async function tabsUpdate(tabId: number, updateProperties: any): Promise<
   throw webextError('tabs.update unavailable');
 }
 
+export async function tabsMove(tabIdsInput: number | number[], moveProperties: any): Promise<AnyTab[]> {
+  const { chrome, browser } = webextApis();
+  const tabIds = (Array.isArray(tabIdsInput) ? tabIdsInput : [tabIdsInput])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id >= 0);
+  if (!tabIds.length) return [];
+
+  const payloadTabIds = tabIds.length === 1 ? tabIds[0] : tabIds;
+
+  if (browser?.tabs?.move) {
+    const moved = await Promise.resolve(browser.tabs.move(payloadTabIds as any, moveProperties));
+    if (!moved) return [];
+    return Array.isArray(moved) ? (moved as AnyTab[]) : [moved as AnyTab];
+  }
+
+  if (chrome?.tabs?.move) {
+    return await new Promise((resolve, reject) => {
+      chrome.tabs.move(payloadTabIds as any, moveProperties, (moved: AnyTab | AnyTab[]) => {
+        if (chrome?.runtime?.lastError) {
+          reject(webextError(webextLastErrorMessage('tabs.move failed')));
+          return;
+        }
+        if (!moved) {
+          resolve([]);
+          return;
+        }
+        resolve(Array.isArray(moved) ? moved : [moved]);
+      });
+    });
+  }
+
+  throw webextError('tabs.move unavailable');
+}
+
 export async function tabsSendMessage(tabId: number, message: Record<string, unknown>): Promise<unknown> {
   const { chrome, browser } = webextApis();
 

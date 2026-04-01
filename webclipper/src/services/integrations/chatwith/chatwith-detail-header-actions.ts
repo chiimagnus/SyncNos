@@ -6,39 +6,32 @@ import {
   truncateForChatWith,
   type ChatWithAiPlatform,
 } from '@services/integrations/chatwith/chatwith-settings';
+import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
+import {
+  openChatWithPlatform,
+  type ChatWithOpenPlatformPort,
+} from '@services/integrations/chatwith/chatwith-open-port';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
-async function writeTextToClipboard(value: string): Promise<boolean> {
-  const text = String(value ?? '');
-  if (!text) return false;
+function safeText(value: unknown): string {
+  return String(value ?? '').trim();
+}
 
-  try {
-    if (globalThis.navigator?.clipboard?.writeText) {
-      await globalThis.navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (_e) {
-    // ignore and fall back
+function resolveArticleKeyForChatWith(conversation: Conversation): string | null {
+  if (!conversation) return null;
+  const sourceType = safeText((conversation as any)?.sourceType);
+  const conversationKey = safeText((conversation as any)?.conversationKey);
+  if (sourceType !== 'article' && !conversationKey.startsWith('article:')) return null;
+
+  const url = canonicalizeArticleUrl((conversation as any)?.url);
+  if (url) return url;
+
+  if (conversationKey.startsWith('article:')) {
+    const raw = conversationKey.slice('article:'.length);
+    const canonical = canonicalizeArticleUrl(raw);
+    return canonical || safeText(raw) || null;
   }
-
-  try {
-    // Best-effort fallback for older runtimes.
-    const doc = globalThis.document;
-    if (!doc) return false;
-    const ta = doc.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', 'true');
-    ta.style.position = 'fixed';
-    ta.style.left = '-9999px';
-    ta.style.top = '0';
-    doc.body?.appendChild(ta);
-    ta.focus();
-    ta.select();
-    const ok = typeof doc.execCommand === 'function' ? doc.execCommand('copy') : false;
-    ta.remove();
-    return Boolean(ok);
-  } catch (_e) {
-    return false;
-  }
+  return null;
 }
 
 function buildChatWithPlatformAction(input: {
@@ -48,6 +41,7 @@ function buildChatWithPlatformAction(input: {
   platform: ChatWithAiPlatform;
   payload: string;
   maxChars: number;
+  openPort?: ChatWithOpenPlatformPort | null;
 }): DetailHeaderAction | null {
   const { conversation, detail, platform, payload, port } = input;
   const maxChars = Number(input.maxChars);
@@ -63,6 +57,15 @@ function buildChatWithPlatformAction(input: {
   const href = String(platform.url || '').trim();
   const label = `Chat with ${String(platform.name || '').trim()}`;
   const after = `✅ 已复制，正在跳转 ${String(platform.name || '').trim()}…${truncated.truncated ? ' (truncated)' : ''}`;
+  const adapterOpenPort: ChatWithOpenPlatformPort = {
+    openPlatform: async (_platformId, fallbackUrl) => {
+      const target = String(fallbackUrl || '').trim();
+      if (!target) return false;
+      return port.openExternalUrl(target);
+    },
+  };
+  const openPort = input.openPort || adapterOpenPort;
+  const articleKey = resolveArticleKeyForChatWith(conversation);
 
   return {
     id: `chat-with-${String(platform.id || '').trim()}`,
@@ -75,7 +78,15 @@ function buildChatWithPlatformAction(input: {
     onTrigger: async () => {
       const copied = await writeTextToClipboard(truncated.text);
       if (!copied) throw new Error('Failed to copy content to clipboard');
-      const opened = await port.openExternalUrl(href);
+      const opened = await openChatWithPlatform({
+        platform,
+        port: openPort,
+        context: articleKey
+          ? {
+              articleKey,
+            }
+          : null,
+      });
       if (!opened) throw new Error(`Failed to open ${String(platform.name || '').trim()}`);
     },
   };
@@ -85,10 +96,12 @@ export async function resolveChatWithDetailHeaderActions({
   conversation,
   detail,
   port,
+  openPort,
 }: {
   conversation: Conversation | null | undefined;
   detail: ConversationDetail | null | undefined;
   port: DetailHeaderActionPort;
+  openPort?: ChatWithOpenPlatformPort | null;
 }): Promise<DetailHeaderAction[]> {
   try {
     if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return [];
@@ -106,6 +119,7 @@ export async function resolveChatWithDetailHeaderActions({
         platform,
         payload,
         maxChars: settings.maxChars,
+        openPort,
       });
       if (action) actions.push(action);
     }

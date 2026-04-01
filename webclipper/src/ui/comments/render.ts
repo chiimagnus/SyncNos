@@ -1,5 +1,10 @@
 import { t } from '@i18n';
-import type { ThreadedCommentItem } from './types';
+import type {
+  ThreadedCommentItem,
+  ThreadedCommentsPanelChatWithAction,
+  ThreadedCommentsPanelCommentChatWithConfig,
+  ThreadedCommentsPanelCommentChatWithContext,
+} from './types';
 
 type DeleteConfirmLike = {
   isArmed: (key: number) => boolean;
@@ -27,7 +32,13 @@ type RenderThreadedCommentsOptions = {
   onLocateFailed: () => void;
   formatTime: (ts: number | null | undefined) => string;
   autosizeTextarea: (textarea: HTMLTextAreaElement | null | undefined) => void;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
+  showNotice?: (message: string) => void;
 };
+
+const COMMENT_CHAT_WITH_ROOT_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith';
+const COMMENT_CHAT_WITH_TRIGGER_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith-trigger';
+const COMMENT_CHAT_WITH_MENU_SELECTOR = '.webclipper-inpage-comments-panel__comment-chatwith-menu';
 
 function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
   const ta = Number(a?.createdAt) || 0;
@@ -47,6 +58,66 @@ function setPanelTooltip(el: HTMLElement, label: string) {
   el.setAttribute('data-webclipper-tooltip', text);
 }
 
+function normalizeChatWithActions(input: unknown): ThreadedCommentsPanelChatWithAction[] {
+  if (!Array.isArray(input)) return [];
+  const out: ThreadedCommentsPanelChatWithAction[] = [];
+  for (const item of input) {
+    const candidate = item as Partial<ThreadedCommentsPanelChatWithAction> | null;
+    const id = String(candidate?.id || '').trim();
+    const label = String(candidate?.label || '').trim();
+    const onTrigger = candidate?.onTrigger;
+    if (!id || !label || typeof onTrigger !== 'function') continue;
+    out.push({
+      id,
+      label,
+      onTrigger,
+      disabled: Boolean(candidate?.disabled),
+    });
+  }
+  return out;
+}
+
+function normalizeCommentChatWithContext(input: unknown): ThreadedCommentsPanelCommentChatWithContext {
+  const raw = (input || {}) as Partial<ThreadedCommentsPanelCommentChatWithContext>;
+  return {
+    articleTitle: String(raw.articleTitle || '').trim(),
+    canonicalUrl: String(raw.canonicalUrl || '').trim(),
+  };
+}
+
+function setCommentChatWithMenuOpen(root: HTMLElement, open: boolean) {
+  const trigger = root.querySelector(COMMENT_CHAT_WITH_TRIGGER_SELECTOR) as HTMLButtonElement | null;
+  const menu = root.querySelector(COMMENT_CHAT_WITH_MENU_SELECTOR) as HTMLElement | null;
+  root.toggleAttribute('data-open', open);
+  if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (menu) menu.hidden = !open;
+}
+
+function isCommentChatWithMenuOpen(root: HTMLElement): boolean {
+  const menu = root.querySelector(COMMENT_CHAT_WITH_MENU_SELECTOR) as HTMLElement | null;
+  return Boolean(menu && !menu.hidden);
+}
+
+export function closeThreadCommentChatWithMenus(threadsRoot: ParentNode, keepWithin?: Element | null): boolean {
+  const roots = Array.from(
+    (
+      threadsRoot as ParentNode & { querySelectorAll?: (selectors: string) => NodeListOf<HTMLElement> }
+    ).querySelectorAll?.(COMMENT_CHAT_WITH_ROOT_SELECTOR) || [],
+  ) as HTMLElement[];
+  let closed = false;
+  for (const root of roots) {
+    if (keepWithin && root.contains(keepWithin)) continue;
+    if (!isCommentChatWithMenuOpen(root)) continue;
+    setCommentChatWithMenuOpen(root, false);
+    closed = true;
+  }
+  return closed;
+}
+
+export function closeThreadCommentChatWithMenuOnEscape(threadsRoot: ParentNode): boolean {
+  return closeThreadCommentChatWithMenus(threadsRoot, null);
+}
+
 export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
   const {
     items,
@@ -64,6 +135,8 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     onLocateFailed,
     formatTime,
     autosizeTextarea,
+    commentChatWith,
+    showNotice,
   } = options;
 
   threadsEl.textContent = '';
@@ -178,6 +251,136 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
       }
     });
     commentActions.appendChild(deleteButton);
+
+    if (commentChatWith) {
+      const chatWithWrap = document.createElement('div');
+      chatWithWrap.className =
+        'webclipper-inpage-comments-panel__comment-chatwith webclipper-inpage-comments-panel__chatwith';
+      commentActions.appendChild(chatWithWrap);
+
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className =
+        'webclipper-inpage-comments-panel__comment-chatwith-trigger webclipper-inpage-comments-panel__chatwith-trigger webclipper-btn webclipper-btn--tone-muted';
+      trigger.textContent = t('detailHeaderChatWithMenuLabel') || 'Chat with...';
+      trigger.setAttribute('aria-haspopup', 'menu');
+      trigger.setAttribute('aria-expanded', 'false');
+      const hasCommentText = String(root?.commentText || '').trim().length > 0;
+      trigger.setAttribute('data-base-disabled', hasCommentText ? '0' : '1');
+      trigger.disabled = isBusy() || !hasCommentText;
+      chatWithWrap.appendChild(trigger);
+
+      const menu = document.createElement('div');
+      menu.className =
+        'webclipper-inpage-comments-panel__comment-chatwith-menu webclipper-inpage-comments-panel__chatwith-menu';
+      menu.setAttribute('role', 'menu');
+      menu.setAttribute('aria-label', t('detailHeaderChatWithMenuAria'));
+      menu.hidden = true;
+      chatWithWrap.appendChild(menu);
+
+      const menuBody = document.createElement('div');
+      menuBody.className =
+        'webclipper-inpage-comments-panel__comment-chatwith-menu-body webclipper-inpage-comments-panel__chatwith-menu-body';
+      menu.appendChild(menuBody);
+
+      const defaultLabel = t('detailHeaderChatWithMenuLabel') || 'Chat with...';
+      let loading = false;
+      let requestId = 0;
+
+      const applyTriggerLabel = (label: string, hasMenu: boolean) => {
+        trigger.textContent = String(label || '').trim() || defaultLabel;
+        if (hasMenu) {
+          trigger.setAttribute('aria-haspopup', 'menu');
+          return;
+        }
+        trigger.removeAttribute('aria-haspopup');
+      };
+
+      const runAction = (action: ThreadedCommentsPanelChatWithAction | null | undefined) => {
+        if (!action || action.disabled) return;
+        closeThreadCommentChatWithMenus(threadsEl, null);
+        void Promise.resolve()
+          .then(() => action.onTrigger?.())
+          .then((maybeMessage) => {
+            const message = String(maybeMessage || '').trim();
+            if (message) showNotice?.(message);
+          })
+          .catch((error) => {
+            const message =
+              error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+            showNotice?.(message);
+          });
+      };
+
+      const renderMenuActions = (actions: ThreadedCommentsPanelChatWithAction[]) => {
+        menuBody.textContent = '';
+        for (const action of actions) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className =
+            'webclipper-inpage-comments-panel__comment-chatwith-menu-item webclipper-btn webclipper-btn--menu-item';
+          button.textContent = action.label;
+          button.setAttribute('data-action-disabled', action.disabled ? '1' : '0');
+          button.disabled = isBusy() || Boolean(action.disabled);
+          button.addEventListener('click', () => {
+            runAction(action);
+          });
+          menuBody.appendChild(button);
+        }
+      };
+
+      trigger.addEventListener('click', () => {
+        if (isBusy() || !hasCommentText) return;
+        if (loading) return;
+        if (isCommentChatWithMenuOpen(chatWithWrap)) {
+          setCommentChatWithMenuOpen(chatWithWrap, false);
+          return;
+        }
+
+        closeThreadCommentChatWithMenus(threadsEl, trigger);
+        loading = true;
+        requestId += 1;
+        const currentRequestId = requestId;
+
+        void Promise.resolve(commentChatWith.resolveContext?.())
+          .then((context) =>
+            commentChatWith.resolveActions(root, normalizeCommentChatWithContext(context || ({} as any))),
+          )
+          .then((items) => {
+            if (!chatWithWrap.isConnected) return;
+            if (currentRequestId !== requestId) return;
+
+            const actions = normalizeChatWithActions(items);
+            if (!actions.length) {
+              applyTriggerLabel(defaultLabel, true);
+              showNotice?.('No AI platforms enabled');
+              return;
+            }
+
+            if (actions.length === 1) {
+              applyTriggerLabel(actions[0].label, false);
+              runAction(actions[0]);
+              return;
+            }
+
+            applyTriggerLabel(defaultLabel, true);
+            renderMenuActions(actions);
+            setCommentChatWithMenuOpen(chatWithWrap, true);
+          })
+          .catch((error) => {
+            if (!chatWithWrap.isConnected) return;
+            if (currentRequestId !== requestId) return;
+            const message =
+              error instanceof Error && error.message ? error.message : String(error || t('actionFailedFallback'));
+            showNotice?.(message);
+          })
+          .finally(() => {
+            if (!chatWithWrap.isConnected) return;
+            if (currentRequestId !== requestId) return;
+            loading = false;
+          });
+      });
+    }
 
     const commentBody = document.createElement('div');
     commentBody.className = 'webclipper-inpage-comments-panel__comment-body';

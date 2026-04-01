@@ -3,7 +3,11 @@ import { createTwoStepConfirmController } from '@services/shared/two-step-confir
 import { createChatWithMenuController } from './chatwith';
 import { createDockController } from './dock';
 import { createThreadLocateController } from './locate';
-import { renderThreadedComments } from './render';
+import {
+  closeThreadCommentChatWithMenuOnEscape,
+  closeThreadCommentChatWithMenus,
+  renderThreadedComments,
+} from './render';
 import { installSidebarResize } from './resize';
 import { buildThreadedCommentsPanelShadowCss } from './shadow-styles';
 import type { MountOptions, ThreadedCommentsPanelApi } from './types';
@@ -100,6 +104,10 @@ export function mountThreadedCommentsPanel(
   const dockPage = options.dockPage === true && options.overlay === true;
   const chatWithConfig =
     options.chatWith && typeof options.chatWith.resolveActions === 'function' ? options.chatWith : null;
+  const commentChatWithConfig =
+    options.commentChatWith && typeof options.commentChatWith.resolveActions === 'function'
+      ? options.commentChatWith
+      : null;
   const surfaceBg = String(options.surfaceBg || '').trim();
 
   const SURFACE_BG_CSS_VAR = '--webclipper-comments-panel-surface-bg';
@@ -383,6 +391,30 @@ export function mountThreadedCommentsPanel(
       }
     });
 
+    const commentChatWithTriggers = shadow.querySelectorAll?.(
+      '.webclipper-inpage-comments-panel__comment-chatwith-trigger',
+    ) as NodeListOf<HTMLButtonElement> | null;
+    commentChatWithTriggers?.forEach?.((node) => {
+      try {
+        const baseDisabled = node.getAttribute('data-base-disabled') === '1';
+        node.disabled = state.busy || baseDisabled;
+      } catch (_e) {
+        // ignore
+      }
+    });
+
+    const commentChatWithMenuItems = shadow.querySelectorAll?.(
+      '.webclipper-inpage-comments-panel__comment-chatwith-menu-item',
+    ) as NodeListOf<HTMLButtonElement> | null;
+    commentChatWithMenuItems?.forEach?.((node) => {
+      try {
+        const actionDisabled = node.getAttribute('data-action-disabled') === '1';
+        node.disabled = state.busy || actionDisabled;
+      } catch (_e) {
+        // ignore
+      }
+    });
+
     if (!state.busy && state.pendingComposerFocus) {
       state.pendingComposerFocus = false;
       focusComposer();
@@ -398,6 +430,7 @@ export function mountThreadedCommentsPanel(
       dockController.setOpen(true);
     } else {
       chatWithMenuController.closeMenu();
+      closeThreadCommentChatWithMenus(threads, null);
       el.removeAttribute('data-open');
       setImportantStyle(el, 'display', 'none');
       dockController.setOpen(false);
@@ -443,6 +476,7 @@ export function mountThreadedCommentsPanel(
   shadow.addEventListener('click', (e) => {
     const target = e.target as Element | null;
     chatWithMenuController.handleShadowClick(target);
+    closeThreadCommentChatWithMenus(threads, target);
     if (deleteConfirm.getArmedKey() == null) return;
     const currentTarget = e.target as Element | null;
     try {
@@ -458,6 +492,14 @@ export function mountThreadedCommentsPanel(
     const keyEvent = e as KeyboardEvent;
     if (keyEvent.isComposing) return;
     if (keyEvent.key === 'Escape' && chatWithMenuController.handleShadowEscape(keyEvent)) {
+      return;
+    }
+    if (keyEvent.key === 'Escape' && closeThreadCommentChatWithMenuOnEscape(threads)) {
+      try {
+        keyEvent.preventDefault();
+      } catch (_e) {
+        // ignore
+      }
       return;
     }
     if (deleteConfirm.getArmedKey() == null) return;
@@ -538,6 +580,8 @@ export function mountThreadedCommentsPanel(
         onLocateFailed: () => showNotice('无法定位'),
         formatTime,
         autosizeTextarea,
+        commentChatWith: commentChatWithConfig,
+        showNotice,
       });
     },
   };

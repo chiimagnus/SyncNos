@@ -4,6 +4,7 @@ import {
   mountThreadedCommentsPanel,
   type ThreadedCommentsPanelApi,
   type ThreadedCommentsPanelChatWithAction,
+  type ThreadedCommentsPanelCommentChatWithConfig,
 } from '@ui/comments';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
@@ -17,6 +18,7 @@ type SidebarModeProps = {
   getLocatorRoot?: () => Element | null;
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveChatWithSingleActionLabel?: () => Promise<string | null>;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };
 
 type EmbeddedModeProps = {
@@ -24,6 +26,7 @@ type EmbeddedModeProps = {
   conversationId: number;
   canonicalUrl: string;
   containerClassName?: string;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };
 
 export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModeProps) {
@@ -35,6 +38,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
         getLocatorRoot={props.getLocatorRoot}
         resolveChatWithActions={props.resolveChatWithActions}
         resolveChatWithSingleActionLabel={props.resolveChatWithSingleActionLabel}
+        commentChatWith={props.commentChatWith}
         variant="sidebar"
       />
     );
@@ -45,6 +49,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
       conversationId={props.conversationId}
       canonicalUrl={props.canonicalUrl}
       containerClassName={props.containerClassName}
+      commentChatWith={props.commentChatWith}
       variant="embedded"
     />
   );
@@ -56,6 +61,7 @@ function ArticleCommentsPanelMount({
   getLocatorRoot,
   resolveChatWithActions,
   resolveChatWithSingleActionLabel,
+  commentChatWith,
   variant,
 }: {
   sidebarSession: CommentSidebarSession;
@@ -63,15 +69,42 @@ function ArticleCommentsPanelMount({
   getLocatorRoot?: () => Element | null;
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveChatWithSingleActionLabel?: () => Promise<string | null>;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   variant?: 'embedded' | 'sidebar';
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<ThreadedCommentsPanelApi | null>(null);
   const locatorRootGetterRef = useRef<(() => Element | null) | null>(null);
+  const resolveChatWithActionsRef = useRef<typeof resolveChatWithActions>(
+    typeof resolveChatWithActions === 'function' ? resolveChatWithActions : undefined,
+  );
+  const resolveChatWithSingleActionLabelRef = useRef<typeof resolveChatWithSingleActionLabel>(
+    typeof resolveChatWithSingleActionLabel === 'function' ? resolveChatWithSingleActionLabel : undefined,
+  );
+  const commentChatWithRef = useRef<ThreadedCommentsPanelCommentChatWithConfig | null>(
+    commentChatWith && typeof commentChatWith.resolveActions === 'function' ? commentChatWith : null,
+  );
+  const hasSidebarChatWith = variant === 'sidebar' && typeof resolveChatWithActions === 'function';
+  const hasCommentChatWith = !!commentChatWith && typeof commentChatWith.resolveActions === 'function';
 
   useEffect(() => {
     locatorRootGetterRef.current = typeof getLocatorRoot === 'function' ? getLocatorRoot : null;
   }, [getLocatorRoot]);
+
+  useEffect(() => {
+    resolveChatWithActionsRef.current =
+      typeof resolveChatWithActions === 'function' ? resolveChatWithActions : undefined;
+  }, [resolveChatWithActions]);
+
+  useEffect(() => {
+    resolveChatWithSingleActionLabelRef.current =
+      typeof resolveChatWithSingleActionLabel === 'function' ? resolveChatWithSingleActionLabel : undefined;
+  }, [resolveChatWithSingleActionLabel]);
+
+  useEffect(() => {
+    commentChatWithRef.current =
+      commentChatWith && typeof commentChatWith.resolveActions === 'function' ? commentChatWith : null;
+  }, [commentChatWith]);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -87,14 +120,34 @@ function ArticleCommentsPanelMount({
       locatorEnv: variant === 'sidebar' ? 'app' : null,
       getLocatorRoot: () =>
         locatorRootGetterRef.current?.() ?? (document.querySelector('.route-scroll') as Element | null) ?? null,
-      chatWith:
-        variant === 'sidebar' && typeof resolveChatWithActions === 'function'
-          ? {
-              resolveActions: resolveChatWithActions,
-              resolveSingleActionLabel:
-                typeof resolveChatWithSingleActionLabel === 'function' ? resolveChatWithSingleActionLabel : undefined,
-            }
-          : null,
+      chatWith: hasSidebarChatWith
+        ? {
+            resolveActions: async () => {
+              const resolver = resolveChatWithActionsRef.current;
+              if (typeof resolver !== 'function') return [];
+              return await resolver();
+            },
+            resolveSingleActionLabel: async () => {
+              const resolver = resolveChatWithSingleActionLabelRef.current;
+              if (typeof resolver !== 'function') return null;
+              return await resolver();
+            },
+          }
+        : null,
+      commentChatWith: hasCommentChatWith
+        ? {
+            resolveActions: async (rootComment, context) => {
+              const resolver = commentChatWithRef.current?.resolveActions;
+              if (typeof resolver !== 'function') return [];
+              return await resolver(rootComment, context);
+            },
+            resolveContext: async () => {
+              const resolver = commentChatWithRef.current?.resolveContext;
+              if (typeof resolver !== 'function') return {};
+              return await resolver();
+            },
+          }
+        : null,
     });
     apiRef.current = mounted.api;
     sidebarSession.attachPanel(mounted.api as any);
@@ -104,7 +157,7 @@ function ArticleCommentsPanelMount({
       mounted.cleanup();
       apiRef.current = null;
     };
-  }, [resolveChatWithActions, resolveChatWithSingleActionLabel, sidebarSession, variant]);
+  }, [hasCommentChatWith, hasSidebarChatWith, sidebarSession, variant]);
 
   const sectionClassName = [containerClassName || '', 'tw-flex tw-min-h-0 tw-flex-col'].filter(Boolean).join(' ');
 
@@ -119,11 +172,13 @@ function ArticleCommentsEmbedded({
   conversationId,
   canonicalUrl,
   containerClassName,
+  commentChatWith,
   variant,
 }: {
   conversationId: number;
   canonicalUrl: string;
   containerClassName?: string;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   variant?: 'embedded' | 'sidebar';
 }) {
   const sessionRef = useRef<CommentSidebarSession | null>(null);
@@ -151,6 +206,7 @@ function ArticleCommentsEmbedded({
     <ArticleCommentsPanelMount
       sidebarSession={session}
       containerClassName={containerClassName}
+      commentChatWith={commentChatWith}
       variant={variant === 'sidebar' ? 'sidebar' : 'embedded'}
     />
   );
