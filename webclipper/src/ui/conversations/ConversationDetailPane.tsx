@@ -8,7 +8,7 @@ import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
 import type {
@@ -113,12 +113,13 @@ export function ConversationDetailPane({
     },
     [canonicalUrl, selected],
   );
-  const embeddedCommentChatWithConfig: ThreadedCommentsPanelCommentChatWithConfig | null = hasArticleCommentsPane
-    ? {
-        resolveActions: resolveEmbeddedCommentChatWithActions,
-        resolveContext: resolveEmbeddedCommentChatWithContext,
-      }
-    : null;
+  const embeddedCommentChatWithConfig = useMemo<ThreadedCommentsPanelCommentChatWithConfig | null>(() => {
+    if (!hasArticleCommentsPane) return null;
+    return {
+      resolveActions: resolveEmbeddedCommentChatWithActions,
+      resolveContext: resolveEmbeddedCommentChatWithContext,
+    };
+  }, [hasArticleCommentsPane, resolveEmbeddedCommentChatWithActions, resolveEmbeddedCommentChatWithContext]);
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {

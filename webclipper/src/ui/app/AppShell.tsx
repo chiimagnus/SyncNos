@@ -388,12 +388,17 @@ export default function AppShell() {
       [appCommentChatWithOpenPort, canonicalUrl, selectedConversation],
     );
 
-    const commentsSidebarCommentChatWithConfig: ThreadedCommentsPanelCommentChatWithConfig | null = showCommentsSidebar
-      ? {
-          resolveActions: resolveCommentsSidebarCommentChatWithActions,
-          resolveContext: resolveCommentsSidebarCommentChatWithContext,
-        }
-      : null;
+    const commentsSidebarCommentChatWithConfig = useMemo<ThreadedCommentsPanelCommentChatWithConfig | null>(() => {
+      if (!showCommentsSidebar) return null;
+      return {
+        resolveActions: resolveCommentsSidebarCommentChatWithActions,
+        resolveContext: resolveCommentsSidebarCommentChatWithContext,
+      };
+    }, [
+      resolveCommentsSidebarCommentChatWithActions,
+      resolveCommentsSidebarCommentChatWithContext,
+      showCommentsSidebar,
+    ]);
 
     useEffect(() => {
       if (!showSettingsSheet) return;
