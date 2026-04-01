@@ -19,6 +19,11 @@ const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
 const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/(\d+))?\/?$/i;
+const DISCOURSE_TOPIC_PATH_RE_SOURCE = '^\\/t\\/([^/]+)\\/(\\d+)(?:\\/(\\d+))?\\/?$';
+const DISCOURSE_TOPIC_PATH_RE_FLAGS = 'i';
+const DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS = 10_000;
+const ARTICLE_STABILIZATION_TIMEOUT_MS = 10_000;
+const ARTICLE_STABILIZATION_MIN_TEXT_LENGTH = 240;
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
@@ -44,18 +49,49 @@ function parseDiscourseTopicUrl(rawUrl: unknown): {
   if (!normalized) return null;
   try {
     const url = new URL(normalized);
-    const match = String(url.pathname || '').match(DISCOURSE_TOPIC_PATH_RE);
-    if (!match) return null;
-    const postNumberRaw = Number(match[3]);
+    const parsedPath = parseDiscourseTopicPath(url.pathname);
+    if (!parsedPath) return null;
+    const postNumberRaw = Number(parsedPath.postNumber);
     return {
       origin: url.origin,
-      slug: String(match[1] || '').trim(),
-      topicId: String(match[2] || '').trim(),
+      slug: parsedPath.slug,
+      topicId: parsedPath.topicId,
       postNumber: Number.isFinite(postNumberRaw) && postNumberRaw > 0 ? postNumberRaw : null,
     };
   } catch (_e) {
     return null;
   }
+}
+
+function parseDiscourseTopicPath(
+  pathname: unknown,
+  topicPathRe: RegExp = DISCOURSE_TOPIC_PATH_RE,
+): {
+  slug: string;
+  topicId: string;
+  postNumber: string | null;
+} | null {
+  const text = String(pathname || '').trim();
+  if (!text) return null;
+  const match = text.match(topicPathRe);
+  if (!match) return null;
+  return {
+    slug: String(match[1] || '').trim(),
+    topicId: String(match[2] || '').trim(),
+    postNumber: match[3] ? String(match[3]).trim() : null,
+  };
+}
+
+function isSameDiscourseTopicFloorUrl(currentUrl: string, expectedUrl: string): boolean {
+  const current = parseDiscourseTopicUrl(currentUrl);
+  const expected = parseDiscourseTopicUrl(expectedUrl);
+  if (!current || !expected) return false;
+  return (
+    current.origin === expected.origin &&
+    current.slug === expected.slug &&
+    current.topicId === expected.topicId &&
+    current.postNumber === expected.postNumber
+  );
 }
 
 function buildDiscourseTopicFloorUrl(topic: {
@@ -79,7 +115,7 @@ async function waitForTabUrl(targetTabId: number, expectedUrl: string, timeoutMs
   while (Date.now() < deadline) {
     const tab = await tabsGet(targetTabId);
     const current = normalizeHttpUrl((tab as any)?.url || '');
-    if (current === expected) return current;
+    if (current === expected || isSameDiscourseTopicFloorUrl(current, expected)) return current;
     await new Promise((resolve) => setTimeout(resolve, 180));
   }
   throw toError('timed out waiting for Discourse /1 navigation');
@@ -137,9 +173,19 @@ async function ensureReadability(tabId: number) {
 async function extractArticleOnTab(tabId: number) {
   const results = await scriptingExecuteScript({
     target: { tabId, allFrames: false },
-    func: async ({ stabilizationTimeoutMs, stabilizationMinTextLength }: any) => {
+    func: async ({
+      stabilizationTimeoutMs,
+      stabilizationMinTextLength,
+      discourseTopicPathReSource,
+      discourseTopicPathReFlags,
+      discourseOpMissingWarningFlag,
+    }: any) => {
       const timeoutMs = Math.max(1_000, Number(stabilizationTimeoutMs) || 10_000);
       const minTextLength = Math.max(120, Number(stabilizationMinTextLength) || 240);
+      const topicPathPattern = String(discourseTopicPathReSource || '').trim() || '^$';
+      const topicPathFlags = String(discourseTopicPathReFlags || '').trim() || 'i';
+      const discourseTopicPathRe = new RegExp(topicPathPattern, topicPathFlags);
+      const discourseOpMissingFlag = String(discourseOpMissingWarningFlag || '').trim() || 'discourse_op_missing_on_page';
 
       function normalize(value: unknown) {
         return String(value || '')
@@ -491,8 +537,8 @@ async function extractArticleOnTab(tabId: number) {
         const existing = Array.isArray(payload?.warningFlags)
           ? payload.warningFlags.map((item) => String(item || '').trim()).filter(Boolean)
           : [];
-        if (opMissingOnCurrentPage && !existing.includes('discourse_op_missing_on_page')) {
-          existing.push('discourse_op_missing_on_page');
+        if (opMissingOnCurrentPage && !existing.includes(discourseOpMissingFlag)) {
+          existing.push(discourseOpMissingFlag);
         }
         return {
           ...payload,
@@ -565,7 +611,7 @@ async function extractArticleOnTab(tabId: number) {
       } | null {
         const text = String(pathname || '').trim();
         if (!text) return null;
-        const match = text.match(/^\/t\/([^/]+)\/(\d+)(?:\/(\d+))?\/?$/i);
+        const match = text.match(discourseTopicPathRe);
         if (!match) return null;
         return {
           slug: String(match[1] || '').trim(),
@@ -756,8 +802,11 @@ async function extractArticleOnTab(tabId: number) {
     },
     args: [
       {
-        stabilizationTimeoutMs: 10_000,
-        stabilizationMinTextLength: 240,
+        stabilizationTimeoutMs: ARTICLE_STABILIZATION_TIMEOUT_MS,
+        stabilizationMinTextLength: ARTICLE_STABILIZATION_MIN_TEXT_LENGTH,
+        discourseTopicPathReSource: DISCOURSE_TOPIC_PATH_RE_SOURCE,
+        discourseTopicPathReFlags: DISCOURSE_TOPIC_PATH_RE_FLAGS,
+        discourseOpMissingWarningFlag: DISCOURSE_OP_MISSING_WARNING_FLAG,
       },
     ],
   });
@@ -790,7 +839,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   ) {
     const firstFloorUrl = buildDiscourseTopicFloorUrl(discourseTopic, 1);
     await tabsUpdate(targetTabId, { url: firstFloorUrl });
-    await waitForTabUrl(targetTabId, firstFloorUrl, 8_000);
+    await waitForTabUrl(targetTabId, firstFloorUrl, DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS);
     extracted = await extractArticleOnTab(targetTabId);
   }
 

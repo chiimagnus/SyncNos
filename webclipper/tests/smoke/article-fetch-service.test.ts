@@ -206,7 +206,8 @@ describe('article-fetch-service', () => {
     });
 
     const tabsUpdate = vi.fn((tabId: number, updateProps: any, cb: (tab: any) => void) => {
-      currentUrl = String(updateProps?.url || currentUrl);
+      const base = String(updateProps?.url || currentUrl);
+      currentUrl = `${base}?u=abc#reply-1`;
       cb({ id: tabId, url: currentUrl, title: 'Topic tab' });
     });
 
@@ -244,7 +245,7 @@ describe('article-fetch-service', () => {
       contentText: 'OP body',
       contentMarkdown: 'OP body',
     });
-    expect(currentUrl).toBe('https://linux.do/t/topic-slug/123/1');
+    expect(currentUrl).toBe('https://linux.do/t/topic-slug/123/1?u=abc#reply-1');
   });
 
   it('fails strictly when discourse OP is still missing on /1', async () => {
