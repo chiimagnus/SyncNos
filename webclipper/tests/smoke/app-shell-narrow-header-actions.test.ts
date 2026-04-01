@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
@@ -83,17 +83,21 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 }));
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
-  ConversationsScene: (props: { onPopupHeaderStateChange?: (state: any) => void }) =>
-    createElement(
+  ConversationsScene: (props: { onPopupHeaderStateChange?: (state: any) => void; inlineNarrowDetailHeader?: boolean }) => {
+    const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty'>('list');
+    const toList = () => {
+      setMode('list');
+      props.onPopupHeaderStateChange?.({ mode: 'list' });
+    };
+    return createElement(
       'div',
       null,
+      createElement('div', { 'data-inline-narrow-detail-header': props.inlineNarrowDetailHeader ? '1' : '0' }),
       createElement(
         'button',
         {
           type: 'button',
-          onClick: () => {
-            props.onPopupHeaderStateChange?.({ mode: 'list' });
-          },
+          onClick: toList,
         },
         'show-list',
       ),
@@ -102,6 +106,7 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         {
           type: 'button',
           onClick: () => {
+            setMode('detail');
             props.onPopupHeaderStateChange?.({
               mode: 'detail',
               title: 'Conversation',
@@ -117,9 +122,7 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
                   onTrigger: async () => {},
                 },
               ],
-              onBack: () => {
-                props.onPopupHeaderStateChange?.({ mode: 'list' });
-              },
+              onBack: toList,
             });
           },
         },
@@ -130,20 +133,22 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         {
           type: 'button',
           onClick: () => {
+            setMode('detail-empty');
             props.onPopupHeaderStateChange?.({
               mode: 'detail',
               title: 'Conversation',
               subtitle: 'chatgpt · key',
               actions: [],
-              onBack: () => {
-                props.onPopupHeaderStateChange?.({ mode: 'list' });
-              },
+              onBack: toList,
             });
           },
         },
         'show-detail-empty',
       ),
-    ),
+      mode === 'detail' ? createElement('button', { 'aria-label': 'Open in Notion' }, 'open-in-notion') : null,
+      mode === 'detail-empty' ? createElement('button', { 'aria-label': 'Back to chats' }, 'back') : null,
+    );
+  },
 }));
 
 import AppShell from '../../src/ui/app/AppShell';
@@ -218,6 +223,7 @@ describe('AppShell narrow detail header actions', () => {
       (el) => el.textContent === 'show-detail',
     ) as HTMLButtonElement | undefined;
     expect(detailButton).toBeTruthy();
+    expect(document.querySelector('[data-inline-narrow-detail-header="1"]')).toBeTruthy();
 
     act(() => {
       detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
