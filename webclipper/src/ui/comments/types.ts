@@ -35,6 +35,21 @@ export type ThreadedCommentsPanelChatWithConfig = {
   resolveSingleActionLabel?: () => Promise<string | null>;
 };
 
+export type ThreadedCommentsPanelCommentChatWithContext = {
+  articleTitle?: string | null;
+  canonicalUrl?: string | null;
+};
+
+export type ThreadedCommentsPanelCommentChatWithConfig = {
+  resolveActions: (
+    rootComment: ThreadedCommentItem,
+    context: ThreadedCommentsPanelCommentChatWithContext,
+  ) => Promise<ThreadedCommentsPanelChatWithAction[]>;
+  resolveContext?: () =>
+    | ThreadedCommentsPanelCommentChatWithContext
+    | Promise<ThreadedCommentsPanelCommentChatWithContext>;
+};
+
 export type MountOptions = {
   overlay?: boolean;
   initiallyOpen?: boolean;
@@ -47,4 +62,5 @@ export type MountOptions = {
   locatorEnv?: 'inpage' | 'app' | null;
   getLocatorRoot?: () => Element | null;
   chatWith?: ThreadedCommentsPanelChatWithConfig | null;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };

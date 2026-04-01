@@ -5,4 +5,6 @@ export type {
   ThreadedCommentsPanelApi,
   ThreadedCommentsPanelChatWithAction,
   ThreadedCommentsPanelChatWithConfig,
+  ThreadedCommentsPanelCommentChatWithConfig,
+  ThreadedCommentsPanelCommentChatWithContext,
 } from './types';
