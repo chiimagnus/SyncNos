@@ -248,6 +248,63 @@ describe('article-fetch-service', () => {
     expect(currentUrl).toBe('https://linux.do/t/topic-slug/123/1?u=abc#reply-1');
   });
 
+  it('does not navigate to /1 when OP is already extractable on a high discourse floor', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 33, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const currentUrl = 'https://linux.do/t/topic-slug/123/820?u=abc#reply-9';
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      if (Array.isArray(details?.files)) {
+        cb([{}]);
+        return;
+      }
+      cb([
+        {
+          result: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Op Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>OP body</p></body></html>',
+            contentMarkdown: 'OP body',
+            textContent: 'OP body',
+            warningFlags: [],
+          },
+        },
+      ]);
+    });
+
+    const tabsUpdate = vi.fn();
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: currentUrl, title: 'Topic tab' }]),
+        update: tabsUpdate,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(tabsUpdate).not.toHaveBeenCalled();
+    expect(data.url).toBe('https://linux.do/t/topic-slug/123');
+    const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
+    expect(messages[0]).toMatchObject({
+      contentText: 'OP body',
+      contentMarkdown: 'OP body',
+    });
+  });
+
   it('fails strictly when discourse OP is still missing on /1', async () => {
     const upsertConversation = vi.fn(async (payload: any) => ({ id: 41, ...payload }));
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
