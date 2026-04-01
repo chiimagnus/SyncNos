@@ -216,8 +216,13 @@ export function createArticleCommentsSidebarController(input: {
           toCanonicalUrl: nextCanonicalUrl,
           conversationId: nextConversationId,
         })
-        .catch(() => {
-          // ignore migration failures; refresh path remains functional
+        .catch((error) => {
+          console.warn('[CommentsSidebar] canonical migration failed', {
+            fromCanonicalUrl: previousCanonicalUrl,
+            toCanonicalUrl: nextCanonicalUrl,
+            conversationId: nextConversationId,
+            error: error instanceof Error ? error.message : String(error || ''),
+          });
         });
     }
 

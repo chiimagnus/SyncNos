@@ -27,6 +27,8 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
     const canonicalUrl = canonicalizeArticleUrl(msg?.canonicalUrl);
     const conversationId = Number(msg?.conversationId);
 
+    // Canonical URL is preferred. When unavailable, fall back to conversationId
+    // so legacy contexts can still load comments.
     if (canonicalUrl) {
       const items = await listArticleCommentsByCanonicalUrl(canonicalUrl);
       return router.ok(items);
