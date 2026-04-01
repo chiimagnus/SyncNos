@@ -17,11 +17,13 @@ export type ArticleCommentsSidebarRuntime = {
   sidebarSnapshot: CommentSidebarSessionSnapshot;
   setLocatorRoot: (root: Element | null) => void;
   getLocatorRoot: () => Element | null;
+  subscribeSidebarClose: (listener: () => void) => () => void;
 };
 
 export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void } = {}): ArticleCommentsSidebarRuntime {
   const onCloseRef = useRef<(() => void) | undefined>(input.onClose);
   onCloseRef.current = input.onClose;
+  const closeListenersRef = useRef<Set<() => void>>(new Set());
 
   const sidebarSessionRef = useRef<CommentSidebarSession | null>(null);
   if (!sidebarSessionRef.current) {
@@ -36,6 +38,13 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
       adapter: createArticleCommentsSidebarAppAdapter(),
       onClose: () => {
         onCloseRef.current?.();
+        for (const listener of closeListenersRef.current) {
+          try {
+            listener();
+          } catch (_error) {
+            // ignore
+          }
+        }
       },
     });
   }
@@ -52,6 +61,13 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
     locatorRootRef.current = root;
   }, []);
   const getLocatorRoot = useCallback(() => locatorRootRef.current, []);
+  const subscribeSidebarClose = useCallback((listener: () => void) => {
+    if (typeof listener !== 'function') return () => {};
+    closeListenersRef.current.add(listener);
+    return () => {
+      closeListenersRef.current.delete(listener);
+    };
+  }, []);
 
   return {
     sidebarSession,
@@ -59,5 +75,6 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
     sidebarSnapshot,
     setLocatorRoot,
     getLocatorRoot,
+    subscribeSidebarClose,
   };
 }
