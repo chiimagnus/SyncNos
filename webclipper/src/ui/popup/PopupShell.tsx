@@ -8,7 +8,7 @@ import { storageGet, storageSet } from '@services/shared/storage';
 import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
-import { DetailNavigationHeader } from '@ui/conversations/DetailNavigationHeader';
+import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { navPillButtonClassName } from '@ui/shared/nav-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
@@ -111,6 +111,7 @@ export default function PopupShell() {
 
 function PopupShellFrame() {
   const [headerState, setHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
+  const commentsSidebarRuntime = useArticleCommentsSidebarRuntime();
   const { refreshList, refreshActiveDetail } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
@@ -218,17 +219,6 @@ function PopupShellFrame() {
         </header>
       ) : null}
 
-      {!showListActions && headerState.mode === 'detail' ? (
-        <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-3 tw-py-2">
-          <DetailNavigationHeader
-            title={headerState.title}
-            subtitle={headerState.subtitle}
-            actions={headerState.actions}
-            onBack={headerState.onBack}
-          />
-        </header>
-      ) : null}
-
       {showListActions && status?.message ? (
         <div
           className={[
@@ -248,10 +238,13 @@ function PopupShellFrame() {
           <div className="tw-flex tw-h-full tw-min-h-0 tw-flex-1 tw-flex-col">
             <ConversationsScene
               onPopupHeaderStateChange={setHeaderState}
+              inlineNarrowDetailHeader
               onPopupNotionSyncStarted={onPopupNotionSyncStarted}
               onOpenInsightsSection={() => {
                 void onOpenInsightSettings().catch(() => {});
               }}
+              commentsSidebarRuntime={commentsSidebarRuntime}
+              narrowCommentsOpenSource="popup"
             />
           </div>
         </section>
