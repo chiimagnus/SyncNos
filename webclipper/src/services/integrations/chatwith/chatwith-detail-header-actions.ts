@@ -16,6 +16,7 @@ function buildChatWithPlatformAction(input: {
   platform: ChatWithAiPlatform;
   payload: string;
   maxChars: number;
+  openPort?: ChatWithOpenPlatformPort | null;
 }): DetailHeaderAction | null {
   const { conversation, detail, platform, payload, port } = input;
   const maxChars = Number(input.maxChars);
@@ -31,13 +32,14 @@ function buildChatWithPlatformAction(input: {
   const href = String(platform.url || '').trim();
   const label = `Chat with ${String(platform.name || '').trim()}`;
   const after = `✅ 已复制，正在跳转 ${String(platform.name || '').trim()}…${truncated.truncated ? ' (truncated)' : ''}`;
-  const openPort: ChatWithOpenPlatformPort = {
+  const adapterOpenPort: ChatWithOpenPlatformPort = {
     openPlatform: async (_platformId, fallbackUrl) => {
       const target = String(fallbackUrl || '').trim();
       if (!target) return false;
       return port.openExternalUrl(target);
     },
   };
+  const openPort = input.openPort || adapterOpenPort;
 
   return {
     id: `chat-with-${String(platform.id || '').trim()}`,
@@ -63,10 +65,12 @@ export async function resolveChatWithDetailHeaderActions({
   conversation,
   detail,
   port,
+  openPort,
 }: {
   conversation: Conversation | null | undefined;
   detail: ConversationDetail | null | undefined;
   port: DetailHeaderActionPort;
+  openPort?: ChatWithOpenPlatformPort | null;
 }): Promise<DetailHeaderAction[]> {
   try {
     if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return [];
@@ -84,6 +88,7 @@ export async function resolveChatWithDetailHeaderActions({
         platform,
         payload,
         maxChars: settings.maxChars,
+        openPort,
       });
       if (action) actions.push(action);
     }

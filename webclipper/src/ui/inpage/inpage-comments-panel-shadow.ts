@@ -6,10 +6,11 @@ import {
 } from '@ui/comments';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
-import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES, CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
+import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -36,6 +37,46 @@ type RuntimeClient = {
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function isHttpUrl(raw: unknown): boolean {
+  const url = safeString(raw);
+  return /^https?:\/\//i.test(url);
+}
+
+function openUrlFallback(url: string): boolean {
+  const target = safeString(url);
+  if (!target || !isHttpUrl(target)) return false;
+  try {
+    globalThis.window?.open(target, '_blank', 'noopener,noreferrer');
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
+  return {
+    openPlatform: async (platformId, fallbackUrl) => {
+      const normalizedPlatformId = safeString(platformId).toLowerCase();
+      const normalizedFallbackUrl = safeString(fallbackUrl);
+      if (!normalizedPlatformId) return false;
+
+      const rt = runtimeClient;
+      if (!rt?.send) {
+        return openUrlFallback(normalizedFallbackUrl);
+      }
+
+      const response = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
+        platformId: normalizedPlatformId,
+        fallbackUrl: normalizedFallbackUrl,
+      });
+      if (response?.ok) return true;
+
+      const message = safeString(response?.error?.message) || `Failed to open platform: ${normalizedPlatformId}`;
+      throw new Error(message);
+    },
+  };
 }
 
 function buildConversationFromResolved(input: {
@@ -96,6 +137,7 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     conversation,
     detail,
     port: defaultDetailHeaderActionPort,
+    openPort: createInpageChatWithOpenPort(),
   });
 
   const mapped: ThreadedCommentsPanelChatWithAction[] = [];
@@ -140,6 +182,7 @@ async function resolveInpageCommentChatWithActions(
     commentText: String(rootComment?.commentText || ''),
     articleTitle: String(context?.articleTitle || ''),
     canonicalUrl: String(context?.canonicalUrl || ''),
+    openPort: createInpageChatWithOpenPort(),
   });
 
   return actions;

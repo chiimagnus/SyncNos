@@ -32,10 +32,6 @@ export async function openChatWithPlatform(input: {
   if (!fallbackUrl || !isHttpUrl(fallbackUrl)) return false;
 
   const port = input.port || defaultChatWithOpenPlatformPort;
-  try {
-    const opened = await port.openPlatform(platformId, fallbackUrl);
-    return Boolean(opened);
-  } catch (_e) {
-    return false;
-  }
+  const opened = await port.openPlatform(platformId, fallbackUrl);
+  return Boolean(opened);
 }
