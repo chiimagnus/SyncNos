@@ -79,10 +79,8 @@ export function ConversationDetailPane({
   const outlineButtonClass = buttonTintClassName();
   const headerIconButtonClass = headerButtonClassName();
   const isArticle = isArticleConversationLike(selected);
-  const canonicalUrl = normalizeHttpUrl((selected as any)?.url);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
-  const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const setMessagesRootRef = useCallback(
