@@ -42,6 +42,16 @@ describe('background-router article fetch', () => {
     expect(String(res.error?.message || '')).toContain('extract failed');
   });
 
+  it('preserves strict discourse OP missing error message', async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error('Discourse OP not found'));
+
+    const router = createTestBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle' });
+
+    expect(res.ok).toBe(false);
+    expect(String(res.error?.message || '')).toContain('Discourse OP not found');
+  });
+
   it('broadcasts conversationsChanged after successful fetch', async () => {
     articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({
       conversationId: 123,

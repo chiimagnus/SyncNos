@@ -8,6 +8,14 @@ type AnyRouter = {
   eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
+function normalizeArticleFetchError(error: unknown, fallback: string): string {
+  const raw =
+    (error as any)?.message != null ? String((error as any).message) : String(error != null ? error : fallback || '');
+  const message = raw.trim();
+  if (/^discourse op not found$/i.test(message)) return 'Discourse OP not found';
+  return message || fallback;
+}
+
 export function registerWebArticleHandlers(router: AnyRouter) {
   router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg) => {
     try {
@@ -23,7 +31,7 @@ export function registerWebArticleHandlers(router: AnyRouter) {
 
       return router.ok(data);
     } catch (e) {
-      return router.err((e as any)?.message ?? String(e ?? 'article fetch failed'));
+      return router.err(normalizeArticleFetchError(e, 'article fetch failed'));
     }
   });
 
@@ -42,7 +50,7 @@ export function registerWebArticleHandlers(router: AnyRouter) {
 
       return router.ok(data);
     } catch (e) {
-      return router.err((e as any)?.message ?? String(e ?? 'article resolve failed'));
+      return router.err(normalizeArticleFetchError(e, 'article resolve failed'));
     }
   });
 }

@@ -59,6 +59,13 @@ function errorMessage(error: unknown, fallback: string): string {
   return normalized || fallback || t('captureFailedFallback');
 }
 
+function normalizeArticleCaptureErrorMessage(raw: unknown): string {
+  const message = String(raw || '').trim();
+  if (!message) return '';
+  if (/^discourse op not found$/i.test(message)) return 'Discourse OP not found';
+  return message;
+}
+
 function normalizeConversationId(value: unknown): number | null {
   const conversationId = Number(value);
   if (!Number.isFinite(conversationId) || conversationId <= 0) return null;
@@ -186,7 +193,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       if (target.kind === 'article') {
         const response = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
         if (!response?.ok) {
-          throw new Error(response?.error?.message || t('captureFailedFallback'));
+          const normalizedError = normalizeArticleCaptureErrorMessage(response?.error?.message);
+          throw new Error(normalizedError || t('captureFailedFallback'));
         }
         const title = String(response?.data?.title || '');
         const isNew = response?.data?.isNew !== false;

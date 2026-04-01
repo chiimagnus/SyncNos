@@ -791,6 +791,10 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     extracted = await extractArticleOnTab(targetTabId);
   }
 
+  if (discourseTopic && hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)) {
+    throw toError('Discourse OP not found');
+  }
+
   const textContent = normalizeText(extracted.textContent || '');
   const markdownContent = normalizeText(extracted.contentMarkdown || '');
   const title = normalizeText(extracted.title || '') || fallbackTitle(canonicalUrl, tab.title || '');
