@@ -7,10 +7,9 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
-import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,

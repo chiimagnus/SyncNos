@@ -241,7 +241,9 @@ describe('ArticleCommentsSection shared chrome', () => {
       ]);
     });
 
-    const body = host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-body') as HTMLElement | null;
+    const body = host?.shadowRoot?.querySelector(
+      '.webclipper-inpage-comments-panel__comment-body',
+    ) as HTMLElement | null;
     expect(body).toBeTruthy();
     await act(async () => {
       body!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));

@@ -574,13 +574,13 @@ export default function AppShell() {
 
               {showCommentsSidebar ? (
                 <div className="tw-h-full tw-min-h-0 tw-shrink-0">
-                    <ArticleCommentsSection
-                      sidebarSession={commentsSidebarSession}
-                      containerClassName="tw-h-full tw-min-h-0"
-                      getLocatorRoot={getCommentsLocatorRoot}
-                      resolveChatWithActions={resolveCommentsSidebarChatWithActions}
-                      resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
-                      commentChatWith={commentsSidebarCommentChatWithConfig}
+                  <ArticleCommentsSection
+                    sidebarSession={commentsSidebarSession}
+                    containerClassName="tw-h-full tw-min-h-0"
+                    getLocatorRoot={getCommentsLocatorRoot}
+                    resolveChatWithActions={resolveCommentsSidebarChatWithActions}
+                    resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
+                    commentChatWith={commentsSidebarCommentChatWithConfig}
                   />
                 </div>
               ) : null}

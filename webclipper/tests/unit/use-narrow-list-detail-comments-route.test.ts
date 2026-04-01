@@ -9,7 +9,13 @@ type HookSnapshot = ReturnType<typeof useNarrowListDetailCommentsRoute>;
 
 let latestSnapshot: HookSnapshot | null = null;
 
-function RouteHarness({ isNarrow, defaultRoute = 'list' }: { isNarrow: boolean; defaultRoute?: 'list' | 'detail' | 'comments' }) {
+function RouteHarness({
+  isNarrow,
+  defaultRoute = 'list',
+}: {
+  isNarrow: boolean;
+  defaultRoute?: 'list' | 'detail' | 'comments';
+}) {
   const snapshot = useNarrowListDetailCommentsRoute({ isNarrow, defaultRoute });
   useEffect(() => {
     latestSnapshot = snapshot;

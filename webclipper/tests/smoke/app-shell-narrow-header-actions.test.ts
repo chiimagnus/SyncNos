@@ -87,7 +87,10 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 }));
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
-  ConversationsScene: (props: { onPopupHeaderStateChange?: (state: any) => void; inlineNarrowDetailHeader?: boolean }) => {
+  ConversationsScene: (props: {
+    onPopupHeaderStateChange?: (state: any) => void;
+    inlineNarrowDetailHeader?: boolean;
+  }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty'>('list');
     const toList = () => {
       setMode('list');

@@ -7,10 +7,7 @@ import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArti
 import { t, formatConversationTitle } from '@i18n';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import type {
-  ThreadedCommentsPanelChatWithAction,
-  ThreadedCommentsPanelCommentChatWithConfig,
-} from '@ui/comments';
+import type { ThreadedCommentsPanelChatWithAction, ThreadedCommentsPanelCommentChatWithConfig } from '@ui/comments';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
@@ -90,7 +87,9 @@ export function ConversationsScene({
   });
   const selectedConversationCanonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
   const canOpenCommentsFromDetail =
-    Boolean(commentsSidebarRuntime) && isArticleConversationLike(selectedConversation) && Boolean(selectedConversationCanonicalUrl);
+    Boolean(commentsSidebarRuntime) &&
+    isArticleConversationLike(selectedConversation) &&
+    Boolean(selectedConversationCanonicalUrl);
 
   useEffect(() => {
     if (!isNarrow) return;
