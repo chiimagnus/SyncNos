@@ -57,14 +57,28 @@ function openUrlFallback(url: string): boolean {
 
 function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
   return {
-    openPlatform: async (platformId, fallbackUrl) => {
+    openPlatform: async (platformId, fallbackUrl, context) => {
       const normalizedPlatformId = safeString(platformId).toLowerCase();
       const normalizedFallbackUrl = safeString(fallbackUrl);
+      const normalizedArticleKey = safeString(context?.articleKey);
       if (!normalizedPlatformId) return false;
 
       const rt = runtimeClient;
       if (!rt?.send) {
         return openUrlFallback(normalizedFallbackUrl);
+      }
+
+      let groupedErrorMessage = '';
+      if (normalizedArticleKey) {
+        const groupedResponse = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
+          platformId: normalizedPlatformId,
+          articleKey: normalizedArticleKey,
+          fallbackUrl: normalizedFallbackUrl,
+        });
+        if (groupedResponse?.ok) return true;
+        groupedErrorMessage =
+          safeString(groupedResponse?.error?.message) ||
+          `Failed to open grouped platform tab: ${normalizedPlatformId}`;
       }
 
       const response = await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
@@ -73,7 +87,10 @@ function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
       });
       if (response?.ok) return true;
 
-      const message = safeString(response?.error?.message) || `Failed to open platform: ${normalizedPlatformId}`;
+      const message =
+        safeString(response?.error?.message) ||
+        groupedErrorMessage ||
+        `Failed to open platform: ${normalizedPlatformId}`;
       throw new Error(message);
     },
   };

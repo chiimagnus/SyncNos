@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
@@ -33,6 +33,9 @@ import {
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
+import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
+import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { createRuntimeClient } from '@services/shared/runtime-client';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -49,6 +52,25 @@ function isArticleConversationLike(conversation: any): boolean {
     .toLowerCase();
   if (source !== 'web') return false;
   return Boolean(canonicalizeArticleUrl(conversation?.url));
+}
+
+function safeString(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function isHttpUrl(raw: unknown): boolean {
+  return /^https?:\/\//i.test(safeString(raw));
+}
+
+function openUrlFallback(url: string): boolean {
+  const target = safeString(url);
+  if (!target || !isHttpUrl(target)) return false;
+  try {
+    globalThis.window?.open(target, '_blank', 'noopener,noreferrer');
+    return true;
+  } catch (_e) {
+    return false;
+  }
 }
 
 export default function AppShell() {
@@ -161,6 +183,10 @@ export default function AppShell() {
       () => commentsSidebarSession.getSnapshot(),
       () => commentsSidebarSession.getSnapshot(),
     );
+    const runtimeClientRef = useRef<ReturnType<typeof createRuntimeClient> | null>(null);
+    if (!runtimeClientRef.current) {
+      runtimeClientRef.current = createRuntimeClient();
+    }
     const isNarrow = useIsNarrowScreen();
     const location = useLocation();
     const navigate = useNavigate();
@@ -171,6 +197,59 @@ export default function AppShell() {
     const isArticleConversation = isArticleConversationLike(selectedConversation);
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const canToggleCommentsSidebar = !isNarrow && isArticleConversation && Boolean(canonicalUrl);
+
+    const appCommentChatWithOpenPort = useMemo<ChatWithOpenPlatformPort>(
+      () => ({
+        openPlatform: async (platformId, fallbackUrl, context) => {
+          const normalizedPlatformId = safeString(platformId).toLowerCase();
+          const normalizedFallbackUrl = safeString(fallbackUrl);
+          const normalizedArticleKey = safeString(context?.articleKey);
+          if (!normalizedPlatformId) return false;
+
+          const rt = runtimeClientRef.current;
+          if (!rt?.send) {
+            return openUrlFallback(normalizedFallbackUrl);
+          }
+
+          let groupedErrorMessage = '';
+          if (normalizedArticleKey) {
+            try {
+              const groupedResponse = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_OR_FOCUS_GROUPED_CHAT_TAB, {
+                platformId: normalizedPlatformId,
+                articleKey: normalizedArticleKey,
+                fallbackUrl: normalizedFallbackUrl,
+              })) as any;
+              if (groupedResponse?.ok) return true;
+              groupedErrorMessage =
+                safeString(groupedResponse?.error?.message) ||
+                `Failed to open grouped platform tab: ${normalizedPlatformId}`;
+            } catch (error) {
+              groupedErrorMessage = safeString((error as any)?.message);
+            }
+          }
+
+          try {
+            const response = (await rt.send(CHATWITH_MESSAGE_TYPES.OPEN_PLATFORM_TAB, {
+              platformId: normalizedPlatformId,
+              fallbackUrl: normalizedFallbackUrl,
+            })) as any;
+            if (response?.ok) return true;
+
+            const message =
+              safeString(response?.error?.message) ||
+              groupedErrorMessage ||
+              `Failed to open platform: ${normalizedPlatformId}`;
+            throw new Error(message);
+          } catch (error) {
+            if (openUrlFallback(normalizedFallbackUrl)) return true;
+            throw error instanceof Error
+              ? error
+              : new Error(String(error || `Failed to open platform: ${normalizedPlatformId}`));
+          }
+        },
+      }),
+      [],
+    );
 
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
@@ -301,11 +380,12 @@ export default function AppShell() {
           commentText: String(rootComment?.commentText || ''),
           articleTitle: String(context?.articleTitle || (selectedConversation as any)?.title || '').trim(),
           canonicalUrl: String(context?.canonicalUrl || canonicalUrl || '').trim(),
+          openPort: appCommentChatWithOpenPort,
         });
 
         return actions;
       },
-      [canonicalUrl, selectedConversation],
+      [appCommentChatWithOpenPort, canonicalUrl, selectedConversation],
     );
 
     const commentsSidebarCommentChatWithConfig: ThreadedCommentsPanelCommentChatWithConfig | null =
