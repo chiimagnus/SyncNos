@@ -7,7 +7,6 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
@@ -86,36 +85,6 @@ export function ConversationDetailPane({
   const expandSidebarLabel = t('expandSidebar');
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
-  const embeddedCommentChatWithRuntimeRef = useRef<{
-    enabled: boolean;
-    hasConversation: boolean;
-    articleTitle: string;
-    canonicalUrl: string;
-  }>({
-    enabled: false,
-    hasConversation: false,
-    articleTitle: '',
-    canonicalUrl: '',
-  });
-  embeddedCommentChatWithRuntimeRef.current = {
-    enabled: hasArticleCommentsPane,
-    hasConversation: Boolean(selected),
-    articleTitle: String((selected as any)?.title || '').trim(),
-    canonicalUrl: canonicalUrl || '',
-  };
-  const embeddedCommentChatWithConfig = useMemo(
-    () =>
-      createThreadedCommentChatWithConfig({
-        resolveContext: () => ({
-          articleTitle: embeddedCommentChatWithRuntimeRef.current.articleTitle,
-          canonicalUrl: embeddedCommentChatWithRuntimeRef.current.canonicalUrl,
-        }),
-        isEnabled: () => embeddedCommentChatWithRuntimeRef.current.enabled,
-        hasConversation: () => embeddedCommentChatWithRuntimeRef.current.hasConversation,
-      }),
-    [],
-  );
-  const activeEmbeddedCommentChatWithConfig = hasArticleCommentsPane ? embeddedCommentChatWithConfig : null;
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -441,17 +410,6 @@ export function ConversationDetailPane({
               ) : null}
               {detailError ? (
                 <p className="tw-mt-2 tw-text-sm tw-font-semibold tw-text-[var(--error)]">{detailError}</p>
-              ) : null}
-
-              {/* Narrow screens: keep inline comments. */}
-              {hasArticleCommentsPane ? (
-                <div className="md:tw-hidden">
-                  <ArticleCommentsSection
-                    conversationId={Number((selected as any)?.id || activeId || 0)}
-                    canonicalUrl={canonicalUrl}
-                    commentChatWith={activeEmbeddedCommentChatWithConfig}
-                  />
-                </div>
               ) : null}
 
               {detail?.messages?.length ? (
