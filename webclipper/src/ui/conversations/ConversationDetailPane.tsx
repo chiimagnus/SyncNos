@@ -11,6 +11,13 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type { ArticleCommentLocator } from '@services/comments/domain/models';
+import type {
+  ThreadedCommentItem,
+  ThreadedCommentsPanelChatWithAction,
+  ThreadedCommentsPanelCommentChatWithConfig,
+  ThreadedCommentsPanelCommentChatWithContext,
+} from '@ui/comments';
+import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -85,6 +92,33 @@ export function ConversationDetailPane({
   const expandSidebarLabel = t('expandSidebar');
   const hasArticleCommentsPane = Boolean(isArticle && selected && canonicalUrl);
   const commentsSidebarLabel = t('openCommentsSidebar');
+  const resolveEmbeddedCommentChatWithContext = useCallback(async () => {
+    return {
+      articleTitle: String((selected as any)?.title || '').trim(),
+      canonicalUrl: canonicalUrl || '',
+    };
+  }, [canonicalUrl, selected]);
+  const resolveEmbeddedCommentChatWithActions = useCallback(
+    async (
+      rootComment: ThreadedCommentItem,
+      context: ThreadedCommentsPanelCommentChatWithContext,
+    ): Promise<ThreadedCommentsPanelChatWithAction[]> => {
+      const actions = await resolveChatWithCommentActions({
+        quoteText: String(rootComment?.quoteText || ''),
+        commentText: String(rootComment?.commentText || ''),
+        articleTitle: String(context?.articleTitle || (selected as any)?.title || '').trim(),
+        canonicalUrl: String(context?.canonicalUrl || canonicalUrl || '').trim(),
+      });
+      return actions;
+    },
+    [canonicalUrl, selected],
+  );
+  const embeddedCommentChatWithConfig: ThreadedCommentsPanelCommentChatWithConfig | null = hasArticleCommentsPane
+    ? {
+        resolveActions: resolveEmbeddedCommentChatWithActions,
+        resolveContext: resolveEmbeddedCommentChatWithContext,
+      }
+    : null;
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -418,6 +452,7 @@ export function ConversationDetailPane({
                   <ArticleCommentsSection
                     conversationId={Number((selected as any)?.id || activeId || 0)}
                     canonicalUrl={canonicalUrl}
+                    commentChatWith={embeddedCommentChatWithConfig}
                   />
                 </div>
               ) : null}

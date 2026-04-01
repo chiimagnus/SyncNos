@@ -21,12 +21,18 @@ import {
   type ArticleCommentsSidebarController,
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
 import { createArticleCommentsSidebarAppAdapter } from '@services/comments/sidebar/article-comments-sidebar-app-adapter';
-import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
+import type {
+  ThreadedCommentItem,
+  ThreadedCommentsPanelChatWithAction,
+  ThreadedCommentsPanelCommentChatWithConfig,
+  ThreadedCommentsPanelCommentChatWithContext,
+} from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
 } from '@services/integrations/chatwith/chatwith-detail-header-actions';
+import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -275,6 +281,41 @@ export default function AppShell() {
       return resolveSingleEnabledChatWithActionLabel();
     }, []);
 
+    const resolveCommentsSidebarCommentChatWithContext = useCallback(async () => {
+      const articleTitle = String((selectedConversation as any)?.title || '').trim();
+      return {
+        articleTitle,
+        canonicalUrl: canonicalUrl || '',
+      };
+    }, [canonicalUrl, selectedConversation]);
+
+    const resolveCommentsSidebarCommentChatWithActions = useCallback(
+      async (
+        rootComment: ThreadedCommentItem,
+        context: ThreadedCommentsPanelCommentChatWithContext,
+      ): Promise<ThreadedCommentsPanelChatWithAction[]> => {
+        if (!selectedConversation) return [];
+
+        const actions = await resolveChatWithCommentActions({
+          quoteText: String(rootComment?.quoteText || ''),
+          commentText: String(rootComment?.commentText || ''),
+          articleTitle: String(context?.articleTitle || (selectedConversation as any)?.title || '').trim(),
+          canonicalUrl: String(context?.canonicalUrl || canonicalUrl || '').trim(),
+        });
+
+        return actions;
+      },
+      [canonicalUrl, selectedConversation],
+    );
+
+    const commentsSidebarCommentChatWithConfig: ThreadedCommentsPanelCommentChatWithConfig | null =
+      showCommentsSidebar
+        ? {
+            resolveActions: resolveCommentsSidebarCommentChatWithActions,
+            resolveContext: resolveCommentsSidebarCommentChatWithContext,
+          }
+        : null;
+
     useEffect(() => {
       if (!showSettingsSheet) return;
       const onKey = (e: KeyboardEvent) => {
@@ -429,6 +470,7 @@ export default function AppShell() {
                     getLocatorRoot={() => commentsLocatorRootRef.current}
                     resolveChatWithActions={resolveCommentsSidebarChatWithActions}
                     resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
+                    commentChatWith={commentsSidebarCommentChatWithConfig}
                   />
                 </div>
               ) : null}

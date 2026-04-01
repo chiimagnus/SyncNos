@@ -110,16 +110,36 @@ describe('ArticleCommentsSection shared chrome', () => {
 
   it('renders the collapse control in sidebar mode', async () => {
     const session = createCommentSidebarSession();
+    const resolveCommentChatWithActions = vi.fn(async () => []);
     await act(async () => {
       root!.render(
         createElement(ArticleCommentsSection, {
           sidebarSession: session,
+          commentChatWith: {
+            resolveActions: resolveCommentChatWithActions,
+            resolveContext: async () => ({
+              articleTitle: 'Example article',
+              canonicalUrl: 'https://example.com/article',
+            }),
+          },
         }),
       );
+    });
+
+    await act(async () => {
+      session.setComments([
+        {
+          id: 1,
+          parentId: null,
+          createdAt: Date.now(),
+          commentText: 'Root comment',
+        },
+      ]);
     });
 
     const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(host).toBeTruthy();
     expect(host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse')).toBeTruthy();
+    expect(host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-chatwith-trigger')).toBeTruthy();
   });
 });

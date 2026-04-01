@@ -2,12 +2,14 @@ import {
   mountThreadedCommentsPanel,
   type ThreadedCommentItem,
   type ThreadedCommentsPanelChatWithAction,
+  type ThreadedCommentsPanelCommentChatWithContext,
 } from '@ui/comments';
 import type { CommentSidebarPanelApi } from '@services/comments/sidebar/comment-sidebar-contract';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { CORE_MESSAGE_TYPES, ARTICLE_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
+import { resolveChatWithCommentActions } from '@services/integrations/chatwith/chatwith-comment-actions';
 import {
   resolveChatWithDetailHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
@@ -112,6 +114,37 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
   return mapped;
 }
 
+async function resolveInpageCommentChatWithContext(): Promise<ThreadedCommentsPanelCommentChatWithContext> {
+  const rt = runtimeClient;
+  if (!rt?.send) {
+    throw new Error('Runtime is unavailable in this page context');
+  }
+
+  const resolved = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {});
+  if (!resolved?.ok) {
+    throw new Error(safeString(resolved?.error?.message) || 'Failed to resolve current page article');
+  }
+
+  return {
+    articleTitle: safeString(resolved?.data?.title),
+    canonicalUrl: canonicalizeArticleUrl(resolved?.data?.url) || canonicalizeArticleUrl(globalThis.location?.href),
+  };
+}
+
+async function resolveInpageCommentChatWithActions(
+  rootComment: ThreadedCommentItem,
+  context: ThreadedCommentsPanelCommentChatWithContext,
+): Promise<ThreadedCommentsPanelChatWithAction[]> {
+  const actions = await resolveChatWithCommentActions({
+    quoteText: String(rootComment?.quoteText || ''),
+    commentText: String(rootComment?.commentText || ''),
+    articleTitle: String(context?.articleTitle || ''),
+    canonicalUrl: String(context?.canonicalUrl || ''),
+  });
+
+  return actions;
+}
+
 function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
 
@@ -135,6 +168,10 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
     chatWith: {
       resolveActions: resolveInpageChatWithActions,
       resolveSingleActionLabel: resolveSingleEnabledChatWithActionLabel,
+    },
+    commentChatWith: {
+      resolveActions: resolveInpageCommentChatWithActions,
+      resolveContext: resolveInpageCommentChatWithContext,
     },
   });
   el.id = PANEL_ID;

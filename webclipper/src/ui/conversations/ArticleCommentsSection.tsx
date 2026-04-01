@@ -4,6 +4,7 @@ import {
   mountThreadedCommentsPanel,
   type ThreadedCommentsPanelApi,
   type ThreadedCommentsPanelChatWithAction,
+  type ThreadedCommentsPanelCommentChatWithConfig,
 } from '@ui/comments';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { createCommentSidebarSession } from '@services/comments/sidebar/comment-sidebar-session';
@@ -17,6 +18,7 @@ type SidebarModeProps = {
   getLocatorRoot?: () => Element | null;
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveChatWithSingleActionLabel?: () => Promise<string | null>;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };
 
 type EmbeddedModeProps = {
@@ -24,6 +26,7 @@ type EmbeddedModeProps = {
   conversationId: number;
   canonicalUrl: string;
   containerClassName?: string;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
 };
 
 export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModeProps) {
@@ -35,6 +38,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
         getLocatorRoot={props.getLocatorRoot}
         resolveChatWithActions={props.resolveChatWithActions}
         resolveChatWithSingleActionLabel={props.resolveChatWithSingleActionLabel}
+        commentChatWith={props.commentChatWith}
         variant="sidebar"
       />
     );
@@ -45,6 +49,7 @@ export function ArticleCommentsSection(props: SidebarModeProps | EmbeddedModePro
       conversationId={props.conversationId}
       canonicalUrl={props.canonicalUrl}
       containerClassName={props.containerClassName}
+      commentChatWith={props.commentChatWith}
       variant="embedded"
     />
   );
@@ -56,6 +61,7 @@ function ArticleCommentsPanelMount({
   getLocatorRoot,
   resolveChatWithActions,
   resolveChatWithSingleActionLabel,
+  commentChatWith,
   variant,
 }: {
   sidebarSession: CommentSidebarSession;
@@ -63,6 +69,7 @@ function ArticleCommentsPanelMount({
   getLocatorRoot?: () => Element | null;
   resolveChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveChatWithSingleActionLabel?: () => Promise<string | null>;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   variant?: 'embedded' | 'sidebar';
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -95,6 +102,8 @@ function ArticleCommentsPanelMount({
                 typeof resolveChatWithSingleActionLabel === 'function' ? resolveChatWithSingleActionLabel : undefined,
             }
           : null,
+      commentChatWith:
+        commentChatWith && typeof commentChatWith.resolveActions === 'function' ? commentChatWith : null,
     });
     apiRef.current = mounted.api;
     sidebarSession.attachPanel(mounted.api as any);
@@ -119,11 +128,13 @@ function ArticleCommentsEmbedded({
   conversationId,
   canonicalUrl,
   containerClassName,
+  commentChatWith,
   variant,
 }: {
   conversationId: number;
   canonicalUrl: string;
   containerClassName?: string;
+  commentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
   variant?: 'embedded' | 'sidebar';
 }) {
   const sessionRef = useRef<CommentSidebarSession | null>(null);
@@ -151,6 +162,7 @@ function ArticleCommentsEmbedded({
     <ArticleCommentsPanelMount
       sidebarSession={session}
       containerClassName={containerClassName}
+      commentChatWith={commentChatWith}
       variant={variant === 'sidebar' ? 'sidebar' : 'embedded'}
     />
   );

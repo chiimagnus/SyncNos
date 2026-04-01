@@ -59,6 +59,9 @@ describe('inpage comments sidebar toggle', () => {
     const collapse = shadow?.querySelector('.webclipper-inpage-comments-panel__collapse') as HTMLButtonElement | null;
     expect(collapse).toBeTruthy();
 
+    api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'Root comment' }]);
+    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__comment-chatwith-trigger')).toBeTruthy();
+
     api.open({ focusComposer: true });
 
     expect(api.isOpen()).toBe(true);
