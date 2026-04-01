@@ -8,6 +8,7 @@ describe('discourse canonical url', () => {
       'https://linux.do/t/topic-slug/123',
       'https://linux.do/t/topic-slug/123/1',
       'https://linux.do/t/topic-slug/123/20',
+      'https://linux.do/t/topic-slug/123/xxx',
       'https://linux.do/t/topic-slug/123/20?u=abc#frag',
       'https://linux.do/t/topic-slug/123/1/',
     ];

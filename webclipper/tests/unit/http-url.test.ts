@@ -28,6 +28,7 @@ describe('canonicalizeArticleUrl', () => {
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123')).toBe(canonical);
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/1')).toBe(canonical);
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/20?u=abc#frag')).toBe(canonical);
+    expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/xxx?u=abc#frag')).toBe(canonical);
     expect(canonicalizeArticleUrl('https://linux.do/t/topic-slug/123/20/')).toBe(canonical);
     expect(canonicalizeArticleUrl('https://linux.do/T/topic-slug/123/99?u=abc')).toBe(canonical);
   });

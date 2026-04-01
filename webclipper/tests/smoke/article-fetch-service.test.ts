@@ -157,7 +157,7 @@ describe('article-fetch-service', () => {
     storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
-    let currentUrl = 'https://linux.do/t/topic-slug/123/20?u=abc#reply-2';
+    let currentUrl = 'https://linux.do/t/topic-slug/123/xxx?u=abc#reply-2';
     let extractCall = 0;
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {

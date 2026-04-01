@@ -1,4 +1,4 @@
-const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/(\d+))?\/?$/i;
+const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/([^/]+))?\/?$/i;
 
 function parseHttpUrl(raw: unknown): URL | null {
   const text = String(raw ?? '').trim();

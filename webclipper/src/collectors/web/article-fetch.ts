@@ -18,8 +18,8 @@ import { storageGet } from '@platform/storage/local';
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
-const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/(\d+))?\/?$/i;
-const DISCOURSE_TOPIC_PATH_RE_SOURCE = '^\\/t\\/([^/]+)\\/(\\d+)(?:\\/(\\d+))?\\/?$';
+const DISCOURSE_TOPIC_PATH_RE = /^\/t\/([^/]+)\/(\d+)(?:\/([^/]+))?\/?$/i;
+const DISCOURSE_TOPIC_PATH_RE_SOURCE = '^\\/t\\/([^/]+)\\/(\\d+)(?:\\/([^/]+))?\\/?$';
 const DISCOURSE_TOPIC_PATH_RE_FLAGS = 'i';
 const DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS = 10_000;
 const ARTICLE_STABILIZATION_TIMEOUT_MS = 10_000;
@@ -44,6 +44,7 @@ function parseDiscourseTopicUrl(rawUrl: unknown): {
   slug: string;
   topicId: string;
   postNumber: number | null;
+  postSegment: string | null;
 } | null {
   const normalized = normalizeHttpUrl(rawUrl);
   if (!normalized) return null;
@@ -51,12 +52,13 @@ function parseDiscourseTopicUrl(rawUrl: unknown): {
     const url = new URL(normalized);
     const parsedPath = parseDiscourseTopicPath(url.pathname);
     if (!parsedPath) return null;
-    const postNumberRaw = Number(parsedPath.postNumber);
+    const postNumberRaw = Number(parsedPath.postSegment);
     return {
       origin: url.origin,
       slug: parsedPath.slug,
       topicId: parsedPath.topicId,
       postNumber: Number.isFinite(postNumberRaw) && postNumberRaw > 0 ? postNumberRaw : null,
+      postSegment: parsedPath.postSegment,
     };
   } catch (_e) {
     return null;
@@ -69,7 +71,7 @@ function parseDiscourseTopicPath(
 ): {
   slug: string;
   topicId: string;
-  postNumber: string | null;
+  postSegment: string | null;
 } | null {
   const text = String(pathname || '').trim();
   if (!text) return null;
@@ -78,7 +80,7 @@ function parseDiscourseTopicPath(
   return {
     slug: String(match[1] || '').trim(),
     topicId: String(match[2] || '').trim(),
-    postNumber: match[3] ? String(match[3]).trim() : null,
+    postSegment: match[3] ? String(match[3]).trim() : null,
   };
 }
 
@@ -831,12 +833,13 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   await ensureReadability(targetTabId);
   let extracted = await extractArticleOnTab(targetTabId);
 
-  if (
+  const shouldFallbackToFirstFloor =
     discourseTopic &&
-    discourseTopic.postNumber != null &&
+    hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG) &&
     discourseTopic.postNumber !== 1 &&
-    hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)
-  ) {
+    (discourseTopic.postNumber != null || discourseTopic.postSegment != null);
+
+  if (shouldFallbackToFirstFloor) {
     const firstFloorUrl = buildDiscourseTopicFloorUrl(discourseTopic, 1);
     await tabsUpdate(targetTabId, { url: firstFloorUrl });
     await waitForTabUrl(targetTabId, firstFloorUrl, DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS);
