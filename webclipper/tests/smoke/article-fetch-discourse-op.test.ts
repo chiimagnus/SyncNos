@@ -59,7 +59,7 @@ describe('article-fetch discourse OP', () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
-    let currentUrl = 'https://linux.do/t/topic-slug/123/20';
+    let currentUrl = 'https://linux.do/t/topic/1870532/820';
     let extractCall = 0;
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {
@@ -117,7 +117,7 @@ describe('article-fetch discourse OP', () => {
       runtime: { lastError: null },
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) =>
-          cb([{ id: 77, url: 'https://linux.do/t/topic-slug/123/20?u=abc#reply-2', title: 'Topic tab' }]),
+          cb([{ id: 77, url: 'https://linux.do/t/topic/1870532/820?u=abc#reply-2', title: 'Topic tab' }]),
         get: tabsGet,
         update: tabsUpdate,
       },
@@ -131,18 +131,18 @@ describe('article-fetch discourse OP', () => {
 
     expect(tabsUpdate).toHaveBeenCalledWith(
       77,
-      expect.objectContaining({ url: 'https://linux.do/t/topic-slug/123/1' }),
+      expect.objectContaining({ url: 'https://linux.do/t/topic/1870532/1' }),
       expect.any(Function),
     );
     expect(data).toMatchObject({
-      url: 'https://linux.do/t/topic-slug/123',
+      url: 'https://linux.do/t/topic/1870532',
       title: 'Topic Title',
       author: 'Op Author',
     });
     expect(storageMocks.upsertConversation).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversationKey: 'article:https://linux.do/t/topic-slug/123',
-        url: 'https://linux.do/t/topic-slug/123',
+        conversationKey: 'article:https://linux.do/t/topic/1870532',
+        url: 'https://linux.do/t/topic/1870532',
       }),
     );
   });
@@ -164,7 +164,7 @@ describe('article-fetch discourse OP', () => {
       runtime: { lastError: null },
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) =>
-          cb([{ id: 21, url: 'https://linux.do/t/topic-slug/123/20?u=abc#tail', title: 'Topic tab' }]),
+          cb([{ id: 21, url: 'https://linux.do/t/topic/1870532/820?u=abc#tail', title: 'Topic tab' }]),
       },
       scripting: {
         executeScript,
@@ -176,12 +176,12 @@ describe('article-fetch discourse OP', () => {
 
     expect(storageMocks.getConversationBySourceConversationKey).toHaveBeenCalledWith(
       'web',
-      'article:https://linux.do/t/topic-slug/123',
+      'article:https://linux.do/t/topic/1870532',
     );
     expect(data).toMatchObject({
       isNew: false,
       conversationId: 88,
-      url: 'https://linux.do/t/topic-slug/123',
+      url: 'https://linux.do/t/topic/1870532',
       title: 'Existing Topic',
       author: 'Author',
     });

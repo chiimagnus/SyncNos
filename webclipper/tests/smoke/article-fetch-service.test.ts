@@ -157,7 +157,7 @@ describe('article-fetch-service', () => {
     storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
-    let currentUrl = 'https://linux.do/t/topic-slug/123/xxx?u=abc#reply-2';
+    let currentUrl = 'https://linux.do/t/topic/1870532/xxx?u=abc#reply-2';
     let extractCall = 0;
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {
@@ -229,14 +229,14 @@ describe('article-fetch-service', () => {
 
     expect(tabsUpdate).toHaveBeenCalledTimes(1);
     expect(tabsUpdate.mock.calls[0][1]).toMatchObject({
-      url: 'https://linux.do/t/topic-slug/123/1',
+      url: 'https://linux.do/t/topic/1870532/1',
     });
-    expect(data.url).toBe('https://linux.do/t/topic-slug/123');
+    expect(data.url).toBe('https://linux.do/t/topic/1870532');
 
     expect(upsertConversation).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversationKey: 'article:https://linux.do/t/topic-slug/123',
-        url: 'https://linux.do/t/topic-slug/123',
+        conversationKey: 'article:https://linux.do/t/topic/1870532',
+        url: 'https://linux.do/t/topic/1870532',
       }),
     );
 
@@ -245,7 +245,7 @@ describe('article-fetch-service', () => {
       contentText: 'OP body',
       contentMarkdown: 'OP body',
     });
-    expect(currentUrl).toBe('https://linux.do/t/topic-slug/123/1?u=abc#reply-1');
+    expect(currentUrl).toBe('https://linux.do/t/topic/1870532/1?u=abc#reply-1');
   });
 
   it('does not navigate to /1 when OP is already extractable on a high discourse floor', async () => {
@@ -256,7 +256,7 @@ describe('article-fetch-service', () => {
     storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
-    const currentUrl = 'https://linux.do/t/topic-slug/123/820?u=abc#reply-9';
+    const currentUrl = 'https://linux.do/t/topic/1870532/820?u=abc#reply-9';
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {
         cb([{}]);
@@ -297,7 +297,7 @@ describe('article-fetch-service', () => {
     const data = await service.fetchActiveTabArticle();
 
     expect(tabsUpdate).not.toHaveBeenCalled();
-    expect(data.url).toBe('https://linux.do/t/topic-slug/123');
+    expect(data.url).toBe('https://linux.do/t/topic/1870532');
     const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
     expect(messages[0]).toMatchObject({
       contentText: 'OP body',
@@ -342,7 +342,7 @@ describe('article-fetch-service', () => {
       runtime: { lastError: null },
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) =>
-          cb([{ id: 77, url: 'https://linux.do/t/topic-slug/123/1', title: 'Topic tab' }]),
+          cb([{ id: 77, url: 'https://linux.do/t/topic/1870532/1', title: 'Topic tab' }]),
         update: tabsUpdate,
       },
       scripting: {
