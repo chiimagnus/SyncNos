@@ -43,14 +43,9 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
-function isHttpUrl(raw: unknown): boolean {
-  const url = safeString(raw);
-  return /^https?:\/\//i.test(url);
-}
-
 function openUrlFallback(url: string): boolean {
   const target = safeString(url);
-  if (!target || !isHttpUrl(target)) return false;
+  if (!target || !/^https?:\/\//i.test(target)) return false;
   try {
     globalThis.window?.open(target, '_blank', 'noopener,noreferrer');
     return true;
