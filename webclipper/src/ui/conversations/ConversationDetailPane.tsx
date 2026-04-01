@@ -198,7 +198,7 @@ export function ConversationDetailPane({
         {!hideHeader ? (
           <header
             className={[
-              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-flex-col tw-items-stretch tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-flex-row md:tw-items-start md:tw-justify-between md:tw-gap-3 md:tw-pt-4',
+              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-items-start tw-justify-between tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-gap-3 md:tw-pt-4',
               containerPaddingClassName,
             ].join(' ')}
           >

@@ -297,6 +297,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(commentsContainer).toBeTruthy();
     expect(commentsContainer?.className).toContain('tw-whitespace-nowrap');
     expect(commentsContainer?.className).not.toContain('tw-flex-wrap');
+    expect(header?.className).not.toContain('tw-flex-col');
   });
 
   it('does not show comments toggle when selected conversation is not article-like', () => {
