@@ -101,4 +101,20 @@ describe('background-router article fetch', () => {
       conversationId: 77,
     });
   });
+
+  it('does not broadcast conversationsChanged for existing resolveOrCapture result', async () => {
+    articleFetchMocks.resolveOrCaptureActiveTabArticle.mockResolvedValue({
+      isNew: false,
+      conversationId: 77,
+    });
+
+    const router = createTestBackgroundRouter();
+    const broadcast = vi.fn();
+    router.eventsHub.broadcast = broadcast;
+
+    const res = await router.__handleMessageForTests({ type: 'resolveOrCaptureActiveTabArticle' });
+
+    expect(res.ok).toBe(true);
+    expect(broadcast).not.toHaveBeenCalled();
+  });
 });
