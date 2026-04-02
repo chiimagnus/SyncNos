@@ -380,7 +380,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
             if (!chatWithWrap.isConnected) return;
             if (currentRequestId !== requestId) return;
             loading = false;
-        });
+          });
       });
     }
 
