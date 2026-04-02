@@ -34,6 +34,7 @@ describe('createMarkdownRenderer', () => {
     const md = createMarkdownRenderer({ openLinksInNewTab: true });
     const html = md.render('![](https://example.com/a.png?token=secret&x=1)');
     expect(html).toContain('<img');
+    expect(html).toContain('referrerpolicy="no-referrer"');
     expect(html).toContain('class="syncnos-md-image"');
     expect(html).toContain('<a href="https://example.com/a.png?token=secret&amp;x=1"');
     expect(html).toContain('target="_blank"');
