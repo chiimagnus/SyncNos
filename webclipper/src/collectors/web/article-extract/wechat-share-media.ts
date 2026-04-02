@@ -87,4 +87,3 @@ export function buildWechatShareMediaGalleryMarkdown(baseHref: string) {
   }
   return normalizeText(lines.join('\n'));
 }
-

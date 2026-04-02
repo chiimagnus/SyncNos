@@ -122,7 +122,9 @@ async function ensureReadability(tabId: number) {
 
 function isNoReceiverError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
-  return /receiving end does not exist|could not establish connection|no receiving end|message port closed/i.test(message);
+  return /receiving end does not exist|could not establish connection|no receiving end|message port closed/i.test(
+    message,
+  );
 }
 
 async function extractArticleOnTab(tabId: number) {
@@ -154,7 +156,9 @@ async function extractArticleOnTab(tabId: number) {
 
   const apiResponse = response as { ok?: boolean; data?: unknown; error?: { message?: unknown } | null } | null;
   if (!apiResponse || apiResponse.ok !== true) {
-    const reason = apiResponse?.error?.message ? String(apiResponse.error.message) : 'article extraction returned empty payload';
+    const reason = apiResponse?.error?.message
+      ? String(apiResponse.error.message)
+      : 'article extraction returned empty payload';
     throw toError(reason);
   }
   return apiResponse.data as any;

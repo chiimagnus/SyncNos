@@ -85,9 +85,13 @@ describe('article-fetch-service', () => {
           publishedAt: '2026-02-20T10:00:00.000Z',
           excerpt: 'Description',
           contentHTML: '<html><body><p>Hello world article text.</p></body></html>',
-          contentMarkdown: ['## Heading', '', '![img](https://example.com/a.png)', '', 'Hello world article text.'].join(
-            '\n',
-          ),
+          contentMarkdown: [
+            '## Heading',
+            '',
+            '![img](https://example.com/a.png)',
+            '',
+            'Hello world article text.',
+          ].join('\n'),
           textContent: 'Hello world article text.',
           warningFlags: [],
         },
@@ -485,7 +489,9 @@ describe('article-fetch-service', () => {
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const runtime = { lastError: null as any };
-    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => cb(Array.isArray(details?.files) ? [{}] : []));
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) =>
+      cb(Array.isArray(details?.files) ? [{}] : []),
+    );
 
     let messageCalls = 0;
     const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
@@ -516,7 +522,8 @@ describe('article-fetch-service', () => {
     globalThis.chrome = {
       runtime,
       tabs: {
-        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: 'https://example.com/retry', title: 'T' }]),
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 77, url: 'https://example.com/retry', title: 'T' }]),
         sendMessage,
       },
       scripting: { executeScript },
@@ -570,7 +577,8 @@ describe('article-fetch-service', () => {
     globalThis.chrome = {
       runtime,
       tabs: {
-        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: 'https://example.com/noread', title: 'T' }]),
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 77, url: 'https://example.com/noread', title: 'T' }]),
         sendMessage,
       },
       scripting: { executeScript },

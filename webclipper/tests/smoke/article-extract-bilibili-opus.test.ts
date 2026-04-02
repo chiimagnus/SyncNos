@@ -61,7 +61,10 @@ describe('article-extract bilibili opus', () => {
     );
 
     setDomGlobals(dom);
-    const extracted = await extractWebArticleFromCurrentPage({ stabilizationTimeoutMs: 1, stabilizationMinTextLength: 1 });
+    const extracted = await extractWebArticleFromCurrentPage({
+      stabilizationTimeoutMs: 1,
+      stabilizationMinTextLength: 1,
+    });
     const markdown = String(extracted.contentMarkdown || '');
 
     expect(markdown).toContain('![](<https://i0.hdslb.com/bfs/new_dyn/a.jpg>)');
@@ -69,4 +72,3 @@ describe('article-extract bilibili opus', () => {
     expect(markdown).toContain('正文段落');
   });
 });
-

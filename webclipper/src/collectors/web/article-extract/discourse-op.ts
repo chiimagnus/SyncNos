@@ -1,7 +1,10 @@
 import { normalizeText } from '@collectors/web/article-extract/url';
 import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
 
-export function parseDiscourseTopicPathOnPage(pathname: unknown, discourseTopicPathRe: RegExp): {
+export function parseDiscourseTopicPathOnPage(
+  pathname: unknown,
+  discourseTopicPathRe: RegExp,
+): {
   slug: string;
   topicId: string;
   postNumber: string | null;
@@ -58,16 +61,14 @@ export function extractDiscourseOpOnly(baseHref: string, discourseTopicPathRe: R
         (opNode.querySelector('.names .username') as any)?.textContent ||
         (opNode.querySelector('[data-user-card]') as any)?.getAttribute?.('data-user-card') ||
         '',
-    ) ||
-    readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+    ) || readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
 
   const publishedAt =
     normalizeText(
       (opNode.querySelector('time') as any)?.getAttribute?.('datetime') ||
         (opNode.querySelector('time') as any)?.textContent ||
         '',
-    ) ||
-    readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
+    ) || readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
 
   const title =
     normalizeText(document.title || '') ||
@@ -83,4 +84,3 @@ export function extractDiscourseOpOnly(baseHref: string, discourseTopicPathRe: R
     textContent: text,
   };
 }
-

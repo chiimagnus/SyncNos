@@ -71,4 +71,3 @@ export function sanitizeSiteImageUrl(raw: unknown, baseHref: string, sanitizer: 
 
   return resolved;
 }
-
