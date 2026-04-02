@@ -316,6 +316,14 @@ export const en = {
   chatWithAddPlatform: 'Add platform',
   chatWithResetDefaultsTitle: 'Reset to defaults',
   chatWithResetButton: 'Reset',
+  chatWithDefaultPromptTemplateV1: [
+    "Let's discuss the content below!",
+    '',
+    'Title: {{article_title}}',
+    'URL: {{article_url}}',
+    '',
+    '{{article_content}}',
+  ].join('\n'),
 
   // InsightSection / InsightPanel
   insightHeading: 'About you',
