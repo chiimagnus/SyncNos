@@ -49,6 +49,15 @@ function compareCommentTimeDesc(a: ThreadedCommentItem, b: ThreadedCommentItem):
   return ib - ia;
 }
 
+function compareCommentTimeAsc(a: ThreadedCommentItem, b: ThreadedCommentItem): number {
+  const ta = Number(a?.createdAt) || 0;
+  const tb = Number(b?.createdAt) || 0;
+  if (ta !== tb) return ta - tb;
+  const ia = Number(a?.id) || 0;
+  const ib = Number(b?.id) || 0;
+  return ia - ib;
+}
+
 function setPanelTooltip(el: HTMLElement, label: string) {
   const text = String(label || '').trim();
   if (!text) {
@@ -160,7 +169,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
   }
 
   for (const [rootId, list] of repliesByRoot) {
-    repliesByRoot.set(rootId, list.sort(compareCommentTimeDesc));
+    repliesByRoot.set(rootId, list.sort(compareCommentTimeAsc));
   }
 
   for (const root of roots) {

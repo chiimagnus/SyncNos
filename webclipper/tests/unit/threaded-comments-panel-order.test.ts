@@ -44,7 +44,7 @@ describe('Threaded comments panel ordering', () => {
     cleanupDom();
   });
 
-  it('orders root threads and replies by createdAt descending', () => {
+  it('orders root threads by createdAt descending and replies by createdAt ascending', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -73,7 +73,7 @@ describe('Threaded comments panel ordering', () => {
     const replies = Array.from(
       threads[0].querySelectorAll('.webclipper-inpage-comments-panel__comment-body.is-reply'),
     ).map((x) => x.textContent?.trim());
-    expect(replies).toEqual(['reply-new', 'reply-old']);
+    expect(replies).toEqual(['reply-old', 'reply-new']);
 
     mounted.cleanup();
   });
