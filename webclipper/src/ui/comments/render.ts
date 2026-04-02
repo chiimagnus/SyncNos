@@ -252,6 +252,8 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
     });
     commentActions.appendChild(deleteButton);
 
+    const replies = repliesByRoot.get(rootId) || [];
+
     if (commentChatWith) {
       const chatWithWrap = document.createElement('div');
       chatWithWrap.className =
@@ -344,7 +346,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
 
         void Promise.resolve(commentChatWith.resolveContext?.())
           .then((context) =>
-            commentChatWith.resolveActions(root, normalizeCommentChatWithContext(context || ({} as any))),
+            commentChatWith.resolveActions(root, normalizeCommentChatWithContext(context || ({} as any)), replies),
           )
           .then((items) => {
             if (!chatWithWrap.isConnected) return;
@@ -378,7 +380,7 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
             if (!chatWithWrap.isConnected) return;
             if (currentRequestId !== requestId) return;
             loading = false;
-          });
+        });
       });
     }
 
@@ -398,7 +400,6 @@ export function renderThreadedComments(options: RenderThreadedCommentsOptions) {
       });
     }
 
-    const replies = repliesByRoot.get(rootId) || [];
     if (replies.length) {
       const repliesWrap = document.createElement('div');
       repliesWrap.className = 'webclipper-inpage-comments-panel__replies';

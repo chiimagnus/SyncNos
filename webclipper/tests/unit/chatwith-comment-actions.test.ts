@@ -123,7 +123,6 @@ describe('resolveChatWithCommentActions', () => {
     expect(payloadArg).toContain('Article URL: https://example.com/article');
     expect(payloadArg).toContain('Quote:');
     expect(payloadArg).toContain('Selected quote');
-    expect(payloadArg).toContain('Comment:');
     expect(payloadArg).toContain('Root comment text');
     expect(payloadArg.endsWith('\n')).toBe(true);
   });

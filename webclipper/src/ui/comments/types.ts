@@ -44,6 +44,7 @@ export type ThreadedCommentsPanelCommentChatWithConfig = {
   resolveActions: (
     rootComment: ThreadedCommentItem,
     context: ThreadedCommentsPanelCommentChatWithContext,
+    replies?: ThreadedCommentItem[] | null,
   ) => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveContext?: () =>
     | ThreadedCommentsPanelCommentChatWithContext
