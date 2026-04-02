@@ -59,6 +59,28 @@ function pickTextFromNode(node: any, prefer: unknown) {
   return normalizeText(node.innerText || node.textContent || '');
 }
 
+function extractUrlsFromStyle(value: unknown): string[] {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  const urls: string[] = [];
+  const re = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^)\s]+))\s*\)/gi;
+  let match: RegExpExecArray | null = null;
+  while ((match = re.exec(raw)) != null) {
+    const url = String(match[1] || match[2] || match[3] || '').trim();
+    if (url) urls.push(url);
+  }
+  return urls;
+}
+
+function urlAllowed(spec: ArticleFetchSiteSpec, url: string): boolean {
+  const allow = Array.isArray(spec.imageUrlAllowList) ? spec.imageUrlAllowList.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  const block = Array.isArray(spec.imageUrlBlockList) ? spec.imageUrlBlockList.map((x) => String(x || '').trim()).filter(Boolean) : [];
+
+  if (allow.length && !allow.some((pattern) => url.includes(pattern))) return false;
+  if (block.length && block.some((pattern) => url.includes(pattern))) return false;
+  return true;
+}
+
 function selectTitle(spec: ArticleFetchSiteSpec, root: Element, text: string) {
   const selectorTitle = spec.titleSelector ? normalizeText((root.querySelector(spec.titleSelector) as any)?.textContent || '') : '';
   if (selectorTitle) return selectorTitle;
@@ -119,7 +141,26 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
       }
       if (!src) src = el?.currentSrc || el?.src || '';
       const url = sanitizeSiteImageUrl(src, baseHref, String(spec.imageSanitizer || 'none'));
-      if (url) urls.push(url);
+      if (url && urlAllowed(spec, url)) urls.push(url);
+    }
+  }
+  if (Array.isArray(spec.imageStyleSelectors) && spec.imageStyleSelectors.length) {
+    for (const selector of spec.imageStyleSelectors) {
+      const safeSelector = String(selector || '').trim();
+      if (!safeSelector) continue;
+      const nodes = Array.from(root.querySelectorAll(safeSelector));
+      for (const node of nodes) {
+        const el = node as any;
+        const styleRaw =
+          (typeof el?.getAttribute === 'function' ? el.getAttribute('style') : '') ||
+          (el?.style?.backgroundImage ? String(el.style.backgroundImage) : '') ||
+          '';
+        const extracted = extractUrlsFromStyle(styleRaw);
+        for (const candidate of extracted) {
+          const url = sanitizeSiteImageUrl(candidate, baseHref, String(spec.imageSanitizer || 'none'));
+          if (url && urlAllowed(spec, url)) urls.push(url);
+        }
+      }
     }
   }
 
@@ -142,4 +183,3 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
     excerpt: '',
   };
 }
-

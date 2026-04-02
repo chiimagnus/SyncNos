@@ -13,6 +13,9 @@ export type ArticleFetchSiteSpec = {
   textPrefer?: ArticleFetchTextPrefer;
 
   imageSelector?: string;
+  imageStyleSelectors?: string[];
   imageSrcAttributes?: string[];
   imageSanitizer?: ArticleFetchImageSanitizer;
+  imageUrlAllowList?: string[];
+  imageUrlBlockList?: string[];
 };

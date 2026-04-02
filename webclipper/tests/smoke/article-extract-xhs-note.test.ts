@@ -43,10 +43,12 @@ describe('article-extract xhs note', () => {
       <body>
         <div id="noteContainer" class="note-container">
           <div class="author"><span class="username">小作者</span></div>
+          <img class="avatar-item" src="https://sns-avatar-qc.xhscdn.com/avatar/1040g2jo31noe4mqc586049n7868krg4dlfk2ti8?imageView2/2/w/120/format/jpg|imageMogr2/strip" />
           <div class="media-container">
             <img src="https://sns-webpic-qc.xhscdn.com/path/one!nd_dft_wlteh_webp_3" />
             <img src="https://sns-webpic-qc.xhscdn.com/path/one!nd_dft_wlteh_webp_3" />
             <img src="https://sns-webpic-qc.xhscdn.com/path/two!nc_n_webp_mw_1" />
+            <div class="swiper-slide" style="background: url(&quot;https://sns-webpic-qc.xhscdn.com/path/three!nc_n_webp_mw_1&quot;) center center / contain no-repeat;"></div>
           </div>
           <div class="note-content">
             <div id="detail-desc" class="desc">
@@ -65,7 +67,8 @@ describe('article-extract xhs note', () => {
 
     expect(markdown).toContain('![](<https://sns-webpic-qc.xhscdn.com/path/one>)');
     expect(markdown).toContain('![](<https://sns-webpic-qc.xhscdn.com/path/two>)');
+    expect(markdown).toContain('![](<https://sns-webpic-qc.xhscdn.com/path/three>)');
+    expect(markdown).not.toContain('sns-avatar-qc.xhscdn.com/avatar');
     expect(markdown).toContain('#话题 看我看到了谁👀 @某人');
   });
 });
-
