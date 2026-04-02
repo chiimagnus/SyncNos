@@ -267,6 +267,25 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(syncTooltip).toContain('tooltipLoadedVisibleSelectionScope');
   });
 
+  it('shows select-all as indeterminate until all conversations are selected', async () => {
+    currentState = buildState({
+      items: [baseConversation(11), baseConversation(22)],
+      selectedIds: [11, 22],
+      listSummary: { totalCount: 693, todayCount: 2 },
+      listHasMore: true,
+    });
+
+    await renderPane();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    const selectAllCheckbox = document.getElementById('chkSelectAll') as HTMLInputElement | null;
+    expect(selectAllCheckbox).toBeTruthy();
+    expect(selectAllCheckbox!.checked).toBe(false);
+    expect(selectAllCheckbox!.indeterminate).toBe(true);
+  });
+
   it('converges pending locate by loading more when target is not in first batch', async () => {
     const consumeListLocate = vi.fn(() => {
       currentState = { ...currentState, pendingListLocateId: null };

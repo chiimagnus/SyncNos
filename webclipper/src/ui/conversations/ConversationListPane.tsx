@@ -246,8 +246,9 @@ export function ConversationListPane({
 
   const total = visibleIds.length;
   const selectedCount = selectedInView.length;
-  const allSelected = total > 0 && selectedCount === total;
-  const indeterminate = selectedCount > 0 && selectedCount < total;
+  const selectStateTotal = totalCount > 0 ? totalCount : total;
+  const allSelected = selectStateTotal > 0 && selectedCount === selectStateTotal;
+  const indeterminate = selectedCount > 0 && selectedCount < selectStateTotal;
   const selectedTotalCount = selectedIds.length;
   const hasLoadedItems = filteredItems.length > 0;
   const showPaginationLoadingMore = hasLoadedItems && loadingMoreList;
