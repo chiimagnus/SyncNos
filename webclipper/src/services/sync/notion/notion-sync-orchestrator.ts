@@ -14,6 +14,7 @@ import {
   buildNotionCommentsBlocks,
   computeNotionCommentsDigest,
 } from '@services/comments/sync/notion-comments-renderer';
+import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from '@services/sync/notion/notion-section-blocks.ts';
 import {
   ensureSectionHeadingBlockId,
@@ -213,6 +214,10 @@ function normalizePagePropertyValue(property) {
   }
   if (prop.date && typeof prop.date === 'object') return String(prop.date.start || '');
   if (prop.url != null) return String(prop.url || '');
+  if (Object.prototype.hasOwnProperty.call(prop, 'number')) {
+    const n = Number(prop.number);
+    return Number.isFinite(n) ? String(n) : '';
+  }
   return JSON.stringify(prop);
 }
 
@@ -603,6 +608,43 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
         const pageSpec = kind && kind.notion && kind.notion.pageSpec ? kind.notion.pageSpec : null;
         if (!dbSpec || !dbSpec.storageKey) throw new Error(`missing notion dbSpec for kind ${kind.id}`);
         if (!pageSpec) throw new Error(`missing notion pageSpec for kind ${kind.id}`);
+        let articleCommentsLoaded = false;
+        let articleCommentsLoadFailed = false;
+        let articleCommentsSourceAvailable = false;
+        let cachedArticleComments: any[] = [];
+        const ensureArticleCommentsLoaded = async (failureMessage: string) => {
+          if (articleCommentsLoaded) return cachedArticleComments;
+          articleCommentsLoaded = true;
+          articleCommentsLoadFailed = false;
+          if (kind.id !== 'article') {
+            cachedArticleComments = [];
+            return cachedArticleComments;
+          }
+          if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
+            articleCommentsSourceAvailable = true;
+            try {
+              const url = String(convo?.url || '').trim();
+              if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
+                await storage.attachOrphanArticleCommentsToConversation(url, id);
+              }
+              const loaded = await storage.getArticleCommentsByConversationId(id);
+              cachedArticleComments = Array.isArray(loaded) ? loaded : [];
+            } catch (e) {
+              articleCommentsLoadFailed = true;
+              warnings.push({
+                code: 'notion_article_comments_fetch_failed',
+                message: String(failureMessage || 'Failed to load local article comments.'),
+                extra: { error: e && e.message ? String(e.message) : String(e) },
+              });
+              cachedArticleComments = [];
+            }
+          } else {
+            articleCommentsSourceAvailable = false;
+            cachedArticleComments = [];
+          }
+          (convo as any).commentThreadCount = computeArticleCommentThreadCount(cachedArticleComments);
+          return cachedArticleComments;
+        };
 
         await writeRunningJob({
           currentConversationId: id,
@@ -644,6 +686,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
         if (!pageId) {
           let created = null;
+          const createProperties =
+            kind.id === 'article'
+              ? (
+                  await ensureArticleCommentsLoaded('Failed to load local article comments; syncing article body only.'),
+                  pageSpec.buildCreateProperties(convo)
+                )
+              : pageSpec.buildCreateProperties(convo);
           await writeRunningJob({
             currentConversationId: id,
             currentConversationTitle: toCurrentConversationTitle(convo, id),
@@ -653,7 +702,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           try {
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
-              properties: pageSpec.buildCreateProperties(convo),
+              properties: createProperties,
               capturedAt: convo.lastCapturedAt,
             });
           } catch (createErr) {
@@ -681,7 +730,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
-              properties: pageSpec.buildCreateProperties(convo),
+              properties: createProperties,
               capturedAt: convo.lastCapturedAt,
             });
           }
@@ -709,29 +758,15 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             const commentsSection = sections.find((s) => s && String(s.id) === 'comments');
             if (!articleSection || !commentsSection) throw new Error('missing web article layout sections');
 
-            let comments: any[] = [];
-            let commentsDigest: string | null = null;
+            const comments = await ensureArticleCommentsLoaded(
+              'Failed to load local article comments; syncing article body only.',
+            );
+            const commentsDigest =
+              !articleCommentsSourceAvailable || articleCommentsLoadFailed
+                ? null
+                : computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
             let commentThreads = 0;
             let commentItems = 0;
-            if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
-              try {
-                const url = String(convo?.url || '').trim();
-                if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                  await storage.attachOrphanArticleCommentsToConversation(url, id);
-                }
-
-                comments = await storage.getArticleCommentsByConversationId(id);
-                commentsDigest = computeNotionCommentsDigest(Array.isArray(comments) ? comments : []);
-              } catch (e) {
-                warnings.push({
-                  code: 'notion_article_comments_fetch_failed',
-                  message: 'Failed to load local article comments; syncing article body only.',
-                  extra: { error: e && e.message ? String(e.message) : String(e) },
-                });
-                comments = [];
-                commentsDigest = null;
-              }
-            }
 
             const articleDigest = computeNotionArticleDigest(messages);
 
@@ -898,6 +933,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentStage: 'uploading_message_blocks',
           });
 
+          await ensureArticleCommentsLoaded('Failed to load local article comments; skipping comment sync in this run.');
           const desiredProperties = pageSpec.buildUpdateProperties(convo);
           const needsPropertyUpdate = pagePropertiesNeedUpdate(existingPage, desiredProperties);
           if (needsPropertyUpdate) {
@@ -932,29 +968,13 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           const shouldUpdateArticle =
             typeof articleDigest === 'string' && String(articleDigest || '') !== prevArticleDigest;
 
-          let articleComments: any[] = [];
+          let articleComments: any[] = Array.isArray(cachedArticleComments) ? cachedArticleComments : [];
           let commentsDigest: string | null = null;
           let commentThreads = 0;
           let commentItems = 0;
-          if (storage && typeof storage.getArticleCommentsByConversationId === 'function') {
-            try {
-              const url = String(convo?.url || '').trim();
-              if (url && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-                await storage.attachOrphanArticleCommentsToConversation(url, id);
-              }
-
-              articleComments = await storage.getArticleCommentsByConversationId(id);
-              commentsDigest = computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
-            } catch (e) {
-              warnings.push({
-                code: 'notion_article_comments_fetch_failed',
-                message: 'Failed to load local article comments; skipping comment sync in this run.',
-                extra: { error: e && e.message ? String(e.message) : String(e) },
-              });
-              articleComments = [];
-              commentsDigest = null;
-            }
-          }
+          commentsDigest = !articleCommentsSourceAvailable || articleCommentsLoadFailed
+            ? null
+            : computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
           const prevCommentsDigest =
             mapping &&
             mapping.notionSectionDigests &&
