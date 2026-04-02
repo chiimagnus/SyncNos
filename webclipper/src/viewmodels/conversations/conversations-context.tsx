@@ -41,7 +41,7 @@ import {
 const LIST_SOURCE_FILTER_STORAGE_KEY = 'webclipper_conversations_source_filter_key';
 const LIST_SITE_FILTER_STORAGE_KEY = 'webclipper_conversations_site_filter_key';
 const LIST_SITE_FILTER_ALL_KEY = LIST_SITE_KEY_ALL;
-const LIST_BOOTSTRAP_LIMIT = 200;
+const LIST_BOOTSTRAP_LIMIT = 100;
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
 const EMPTY_LIST_SUMMARY: ConversationListSummary = { totalCount: 0, todayCount: 0 };
 const EMPTY_LIST_FACETS: ConversationListFacets = { sources: [], sites: [] };
