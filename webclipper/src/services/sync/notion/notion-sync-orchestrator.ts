@@ -689,10 +689,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           let created = null;
           const createProperties =
             kind.id === 'article'
-              ? (
-                  await ensureArticleCommentsLoaded('Failed to load local article comments; syncing article body only.'),
-                  pageSpec.buildCreateProperties(convo)
-                )
+              ? (await ensureArticleCommentsLoaded('Failed to load local article comments; syncing article body only.'),
+                pageSpec.buildCreateProperties(convo))
               : pageSpec.buildCreateProperties(convo);
           await writeRunningJob({
             currentConversationId: id,
@@ -934,7 +932,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             currentStage: 'uploading_message_blocks',
           });
 
-          await ensureArticleCommentsLoaded('Failed to load local article comments; skipping comment sync in this run.');
+          await ensureArticleCommentsLoaded(
+            'Failed to load local article comments; skipping comment sync in this run.',
+          );
           const desiredProperties = pageSpec.buildUpdateProperties(convo);
           const needsPropertyUpdate = pagePropertiesNeedUpdate(existingPage, desiredProperties);
           if (needsPropertyUpdate) {
@@ -973,9 +973,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           let commentsDigest: string | null = null;
           let commentThreads = 0;
           let commentItems = 0;
-          commentsDigest = !articleCommentsSourceAvailable || articleCommentsLoadFailed
-            ? null
-            : computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
+          commentsDigest =
+            !articleCommentsSourceAvailable || articleCommentsLoadFailed
+              ? null
+              : computeNotionCommentsDigest(Array.isArray(articleComments) ? articleComments : []);
           const prevCommentsDigest =
             mapping &&
             mapping.notionSectionDigests &&

@@ -163,4 +163,3 @@ describe('inpage-button drag robustness', () => {
     expect(nextTop).toBeGreaterThan(initialTop + 100);
   });
 });
-

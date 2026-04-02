@@ -141,10 +141,10 @@ function ArticleCommentsPanelMount({
         : null,
       commentChatWith: hasCommentChatWith
         ? {
-            resolveActions: async (rootComment, context) => {
+            resolveActions: async (rootComment, context, replies) => {
               const resolver = commentChatWithRef.current?.resolveActions;
               if (typeof resolver !== 'function') return [];
-              return await resolver(rootComment, context);
+              return await resolver(rootComment, context, replies);
             },
             resolveContext: async () => {
               const resolver = commentChatWithRef.current?.resolveContext;

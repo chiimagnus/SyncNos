@@ -33,7 +33,7 @@ export function buildChatWithCommentPayloadV1(input: BuildChatWithCommentPayload
   if (quoteText) {
     articleContentLines.push('Quote:', quoteText, '');
   }
-  articleContentLines.push('Comment:', commentText);
+  articleContentLines.push(commentText);
 
   const articleContent = articleContentLines.join('\n').trim();
   const rawPromptTemplate = String(input?.promptTemplate ?? '');

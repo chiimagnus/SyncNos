@@ -28,7 +28,7 @@ import {
   DEFAULT_CHAT_WITH_PLATFORMS,
   DEFAULT_CHAT_WITH_PROMPT_TEMPLATE,
   loadChatWithSettings,
-  resetChatWithSettings,
+  resetChatWithPlatforms,
   saveChatWithSettings,
 } from '@services/integrations/chatwith/chatwith-settings';
 import {
@@ -801,12 +801,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setInsightStats(buildInsightStats(data, window));
   }, [activeSection, insightRange]);
 
-  const onResetChatWithSettings = useCallback(async () => {
+  const onResetChatWithPlatforms = useCallback(async () => {
     await runTask(async () => {
-      await resetChatWithSettings();
-      await refreshInternal();
+      await resetChatWithPlatforms();
+      setChatWithPlatforms(DEFAULT_CHAT_WITH_PLATFORMS.slice());
     });
-  }, [refreshInternal, runTask]);
+  }, [runTask]);
 
   const handleBackupExport = useCallback(async () => {
     if (busy) return;
@@ -1033,6 +1033,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
-    onResetChatWithSettings,
+    onResetChatWithPlatforms,
   };
 }

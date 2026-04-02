@@ -88,7 +88,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
-    onResetChatWithSettings,
+    onResetChatWithPlatforms,
 
     obsidianSyncEnabled,
     onToggleObsidianSyncEnabled,
@@ -215,8 +215,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeMaxChars={setChatWithMaxChars}
           platforms={chatWithPlatforms as any}
           onChangePlatforms={setChatWithPlatforms as any}
-          onReset={() => {
-            void onResetChatWithSettings();
+          onResetPlatforms={() => {
+            void onResetChatWithPlatforms();
           }}
         />
       ) : null}

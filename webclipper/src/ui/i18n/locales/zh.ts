@@ -313,6 +313,14 @@ export const zh: { [K in TranslationKey]: string } = {
   chatWithAddPlatform: '添加平台',
   chatWithResetDefaultsTitle: '恢复默认配置',
   chatWithResetButton: '重置',
+  chatWithDefaultPromptTemplateV1: [
+    '我们来讨论讨论下面这些内容吧！',
+    '',
+    'Title: {{article_title}}',
+    'URL: {{article_url}}',
+    '',
+    '{{article_content}}',
+  ].join('\n'),
 
   // InsightSection / InsightPanel
   insightHeading: 'About you',

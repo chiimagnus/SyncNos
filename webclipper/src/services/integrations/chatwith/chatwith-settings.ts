@@ -2,6 +2,7 @@ import { storageGet, storageSet } from '@platform/storage/local';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
+import { t } from '@i18n';
 
 export type ChatWithAiPlatform = {
   id: string;
@@ -22,14 +23,7 @@ export const CHAT_WITH_MAX_CHARS_STORAGE_KEY = 'chat_with_max_chars_v1';
 
 export const DEFAULT_CHAT_WITH_MAX_CHARS = 28_000;
 
-export const DEFAULT_CHAT_WITH_PROMPT_TEMPLATE = [
-  '和我聊聊这个内容说了什么。',
-  '',
-  'Title: {{article_title}}',
-  'URL: {{article_url}}',
-  '',
-  '{{article_content}}',
-].join('\n');
+export const DEFAULT_CHAT_WITH_PROMPT_TEMPLATE = t('chatWithDefaultPromptTemplateV1');
 
 export const DEFAULT_CHAT_WITH_PLATFORMS: ChatWithAiPlatform[] = [
   { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true },
@@ -155,10 +149,8 @@ export async function saveChatWithSettings(settings: ChatWithSettings): Promise<
   });
 }
 
-export async function resetChatWithSettings(): Promise<void> {
+export async function resetChatWithPlatforms(): Promise<void> {
   await storageSet({
-    [CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY]: DEFAULT_CHAT_WITH_PROMPT_TEMPLATE,
-    [CHAT_WITH_MAX_CHARS_STORAGE_KEY]: DEFAULT_CHAT_WITH_MAX_CHARS,
     [CHAT_WITH_PLATFORMS_STORAGE_KEY]: DEFAULT_CHAT_WITH_PLATFORMS,
   });
 }

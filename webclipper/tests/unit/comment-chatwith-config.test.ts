@@ -68,7 +68,7 @@ describe('createThreadedCommentChatWithConfig', () => {
     expect(resolveChatWithCommentActionsMock).toHaveBeenCalledTimes(1);
     expect(resolveChatWithCommentActionsMock).toHaveBeenCalledWith({
       quoteText: 'Selected quote',
-      commentText: 'Root comment',
+      commentText: ['Reply 1:', 'Root comment'].join('\n'),
       articleTitle: 'Article from context',
       canonicalUrl: 'https://example.com/context',
       openPort,
@@ -101,5 +101,65 @@ describe('createThreadedCommentChatWithConfig', () => {
 
     expect(actions).toEqual([]);
     expect(resolveChatWithCommentActionsMock).not.toHaveBeenCalled();
+  });
+
+  it('includes reply text when resolving actions', async () => {
+    const { createThreadedCommentChatWithConfig } = await import('../../src/ui/comments/comment-chatwith-config');
+
+    resolveChatWithCommentActionsMock.mockResolvedValue([]);
+
+    const config = createThreadedCommentChatWithConfig({
+      resolveContext: async () => ({
+        articleTitle: 'Example Article',
+        canonicalUrl: 'https://example.com/article',
+      }),
+    });
+
+    await config.resolveActions(
+      {
+        id: 1,
+        parentId: null,
+        quoteText: 'Selected quote',
+        authorName: 'Chii',
+        commentText: 'Root comment',
+      },
+      {
+        articleTitle: 'Example Article',
+        canonicalUrl: 'https://example.com/article',
+      },
+      [
+        {
+          id: 2,
+          parentId: 1,
+          authorName: 'Alice',
+          quoteText: null,
+          commentText: 'First reply',
+        },
+        {
+          id: 3,
+          parentId: 1,
+          authorName: 'Bob',
+          quoteText: null,
+          commentText: 'Second reply',
+        },
+      ],
+    );
+
+    expect(resolveChatWithCommentActionsMock).toHaveBeenCalledTimes(1);
+    expect(resolveChatWithCommentActionsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteText: 'Selected quote',
+        commentText: [
+          'Reply 1 (Chii):',
+          'Root comment',
+          '',
+          'Reply 2 (Alice):',
+          'First reply',
+          '',
+          'Reply 3 (Bob):',
+          'Second reply',
+        ].join('\n'),
+      }),
+    );
   });
 });
