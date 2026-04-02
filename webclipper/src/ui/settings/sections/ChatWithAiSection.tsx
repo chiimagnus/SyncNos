@@ -27,7 +27,7 @@ export function ChatWithAiSection(props: {
   onChangeMaxChars: (v: string) => void;
   platforms: ChatWithAiPlatform[];
   onChangePlatforms: (next: ChatWithAiPlatform[]) => void;
-  onReset: () => void;
+  onResetPlatforms: () => void;
 }) {
   const {
     busy,
@@ -37,7 +37,7 @@ export function ChatWithAiSection(props: {
     onChangeMaxChars,
     platforms,
     onChangePlatforms,
-    onReset,
+    onResetPlatforms,
   } = props;
 
   const rows = useMemo(() => (Array.isArray(platforms) ? platforms : []), [platforms]);
@@ -169,7 +169,7 @@ export function ChatWithAiSection(props: {
                 type="button"
                 className={buttonClassName}
                 disabled={busy}
-                onClick={onReset}
+                onClick={onResetPlatforms}
                 title={t('chatWithResetDefaultsTitle')}
               >
                 {t('chatWithResetButton')}

@@ -149,10 +149,8 @@ export async function saveChatWithSettings(settings: ChatWithSettings): Promise<
   });
 }
 
-export async function resetChatWithSettings(): Promise<void> {
+export async function resetChatWithPlatforms(): Promise<void> {
   await storageSet({
-    [CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY]: DEFAULT_CHAT_WITH_PROMPT_TEMPLATE,
-    [CHAT_WITH_MAX_CHARS_STORAGE_KEY]: DEFAULT_CHAT_WITH_MAX_CHARS,
     [CHAT_WITH_PLATFORMS_STORAGE_KEY]: DEFAULT_CHAT_WITH_PLATFORMS,
   });
 }
