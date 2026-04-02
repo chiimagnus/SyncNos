@@ -664,6 +664,7 @@ export function ConversationListPane({
               conversation: conversation as Conversation,
               translate: t,
             });
+            const commentThreadCount = Number((conversation as any).commentThreadCount);
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
@@ -758,6 +759,16 @@ export function ConversationListPane({
                     >
                       {sourceTag.label}
                     </span>
+
+                    {Number.isFinite(commentThreadCount) && commentThreadCount > 0 ? (
+                      <span
+                        className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold"
+                        aria-label={`Comment threads ${commentThreadCount}`}
+                      >
+                        {'💬 '}
+                        {commentThreadCount}
+                      </span>
+                    ) : null}
 
                     {(conversation as any).lastCapturedAt ? (
                       <span className="tw-text-[11px] tw-font-semibold">

@@ -20,6 +20,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
         title: 'First chat',
         source: 'gemini',
         conversationKey: 'conv-11',
+        commentThreadCount: 3,
         lastCapturedAt: Date.now(),
         url: 'https://example.com/chat/11',
       },
@@ -192,5 +193,15 @@ describe('ConversationListPane delete button inline confirmation', () => {
     expect(btn!.textContent).toContain('deleteButton');
     expect(btn!.textContent).toContain('×');
     expect(deleteSelected).toHaveBeenCalledTimes(0);
+  });
+
+  it('renders comment thread chip when count is greater than zero', async () => {
+    await act(async () => {
+      root!.render(createElement(ConversationListPane));
+      await flushMicrotasks();
+    });
+
+    expect(document.body.textContent || '').toContain('💬');
+    expect(document.body.textContent || '').toContain('3');
   });
 });
