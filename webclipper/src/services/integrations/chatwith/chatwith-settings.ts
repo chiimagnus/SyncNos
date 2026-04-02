@@ -23,15 +23,6 @@ export const CHAT_WITH_MAX_CHARS_STORAGE_KEY = 'chat_with_max_chars_v1';
 
 export const DEFAULT_CHAT_WITH_MAX_CHARS = 28_000;
 
-const LEGACY_DEFAULT_CHAT_WITH_PROMPT_TEMPLATE_ZH_V1 = [
-  '和我聊聊这个内容说了什么。',
-  '',
-  'Title: {{article_title}}',
-  'URL: {{article_url}}',
-  '',
-  '{{article_content}}',
-].join('\n');
-
 export const DEFAULT_CHAT_WITH_PROMPT_TEMPLATE = t('chatWithDefaultPromptTemplateV1');
 
 export const DEFAULT_CHAT_WITH_PLATFORMS: ChatWithAiPlatform[] = [
@@ -124,13 +115,9 @@ export async function loadChatWithSettings(): Promise<ChatWithSettings> {
       CHAT_WITH_MAX_CHARS_STORAGE_KEY,
     ]);
 
-    const promptTemplateRaw = isNonEmptyString(res?.[CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY])
+    const promptTemplate = isNonEmptyString(res?.[CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY])
       ? String(res[CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY])
       : DEFAULT_CHAT_WITH_PROMPT_TEMPLATE;
-    const promptTemplate =
-      promptTemplateRaw.trim() === LEGACY_DEFAULT_CHAT_WITH_PROMPT_TEMPLATE_ZH_V1.trim()
-        ? DEFAULT_CHAT_WITH_PROMPT_TEMPLATE
-        : promptTemplateRaw;
 
     const maxCharsRaw = Number(res?.[CHAT_WITH_MAX_CHARS_STORAGE_KEY]);
     const maxChars =
