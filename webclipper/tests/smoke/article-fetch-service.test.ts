@@ -72,31 +72,26 @@ describe('article-fetch-service', () => {
     }));
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'Readability Title',
-            author: 'Author',
-            publishedAt: '2026-02-20T10:00:00.000Z',
-            excerpt: 'Description',
-            contentHTML: '<html><body><p>Hello world article text.</p></body></html>',
-            contentMarkdown: [
-              '## Heading',
-              '',
-              '![img](https://example.com/a.png)',
-              '',
-              'Hello world article text.',
-            ].join('\n'),
-            textContent: 'Hello world article text.',
-            warningFlags: [],
-          },
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Readability Title',
+          author: 'Author',
+          publishedAt: '2026-02-20T10:00:00.000Z',
+          excerpt: 'Description',
+          contentHTML: '<html><body><p>Hello world article text.</p></body></html>',
+          contentMarkdown: ['## Heading', '', '![img](https://example.com/a.png)', '', 'Hello world article text.'].join(
+            '\n',
+          ),
+          textContent: 'Hello world article text.',
+          warningFlags: [],
         },
-      ]);
+      });
     });
 
     // @ts-expect-error test global
@@ -105,6 +100,7 @@ describe('article-fetch-service', () => {
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) =>
           cb([{ id: 77, url: 'https://example.com/post#frag', title: 'Fallback Title' }]),
+        sendMessage,
       },
       scripting: {
         executeScript,
@@ -119,7 +115,7 @@ describe('article-fetch-service', () => {
     expect(data.title).toBe('Readability Title');
     expect(data.wordCount).toBeGreaterThan(0);
 
-    expect(executeScript).toHaveBeenCalledTimes(2);
+    expect(executeScript).toHaveBeenCalledTimes(1);
     expect(upsertConversation).toHaveBeenCalledTimes(1);
     expect(upsertConversation.mock.calls[0][0]).toMatchObject({
       sourceType: 'article',
@@ -160,45 +156,43 @@ describe('article-fetch-service', () => {
     let currentUrl = 'https://linux.do/t/topic/1870532/xxx?u=abc#reply-2';
     let extractCall = 0;
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
       extractCall += 1;
       if (extractCall === 1) {
-        cb([
-          {
-            result: {
-              ok: true,
-              title: 'Topic Title',
-              author: 'Reply Author',
-              publishedAt: '',
-              excerpt: '',
-              contentHTML: '<html><body><p>Reply body</p></body></html>',
-              contentMarkdown: 'Reply body',
-              textContent: 'Reply body',
-              warningFlags: ['discourse_op_missing_on_page'],
-            },
+        cb({
+          ok: true,
+          data: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Reply Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>Reply body</p></body></html>',
+            contentMarkdown: 'Reply body',
+            textContent: 'Reply body',
+            warningFlags: ['discourse_op_missing_on_page'],
           },
-        ]);
+        });
         return;
       }
 
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'Topic Title',
-            author: 'Op Author',
-            publishedAt: '',
-            excerpt: '',
-            contentHTML: '<html><body><p>OP body</p></body></html>',
-            contentMarkdown: 'OP body',
-            textContent: 'OP body',
-            warningFlags: [],
-          },
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Topic Title',
+          author: 'Op Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>OP body</p></body></html>',
+          contentMarkdown: 'OP body',
+          textContent: 'OP body',
+          warningFlags: [],
         },
-      ]);
+      });
     });
 
     const tabsGet = vi.fn((tabId: number, cb: (tab: any) => void) => {
@@ -218,6 +212,7 @@ describe('article-fetch-service', () => {
         query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: currentUrl, title: 'Topic tab' }]),
         get: tabsGet,
         update: tabsUpdate,
+        sendMessage,
       },
       scripting: {
         executeScript,
@@ -258,25 +253,24 @@ describe('article-fetch-service', () => {
 
     const currentUrl = 'https://linux.do/t/topic/1870532/820?u=abc#reply-9';
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'Topic Title',
-            author: 'Op Author',
-            publishedAt: '',
-            excerpt: '',
-            contentHTML: '<html><body><p>OP body</p></body></html>',
-            contentMarkdown: 'OP body',
-            textContent: 'OP body',
-            warningFlags: [],
-          },
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Topic Title',
+          author: 'Op Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>OP body</p></body></html>',
+          contentMarkdown: 'OP body',
+          textContent: 'OP body',
+          warningFlags: [],
         },
-      ]);
+      });
     });
 
     const tabsUpdate = vi.fn();
@@ -287,6 +281,7 @@ describe('article-fetch-service', () => {
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: currentUrl, title: 'Topic tab' }]),
         update: tabsUpdate,
+        sendMessage,
       },
       scripting: {
         executeScript,
@@ -314,25 +309,24 @@ describe('article-fetch-service', () => {
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'Topic Title',
-            author: 'Reply Author',
-            publishedAt: '',
-            excerpt: '',
-            contentHTML: '<html><body><p>Reply body</p></body></html>',
-            contentMarkdown: 'Reply body',
-            textContent: 'Reply body',
-            warningFlags: ['discourse_op_missing_on_page'],
-          },
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Topic Title',
+          author: 'Reply Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>Reply body</p></body></html>',
+          contentMarkdown: 'Reply body',
+          textContent: 'Reply body',
+          warningFlags: ['discourse_op_missing_on_page'],
         },
-      ]);
+      });
     });
 
     const tabsUpdate = vi.fn();
@@ -344,6 +338,7 @@ describe('article-fetch-service', () => {
         query: (_query: any, cb: (tabs: any[]) => void) =>
           cb([{ id: 77, url: 'https://linux.do/t/topic/1870532/1', title: 'Topic tab' }]),
         update: tabsUpdate,
+        sendMessage,
       },
       scripting: {
         executeScript,
@@ -367,25 +362,24 @@ describe('article-fetch-service', () => {
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'No Inline Title',
-            author: 'Author',
-            publishedAt: '',
-            excerpt: '',
-            contentHTML: '<html><body><p>Article body.</p></body></html>',
-            contentMarkdown: '![img](https://example.com/no-inline.png)\n\nArticle body.',
-            textContent: 'Article body.',
-            warningFlags: [],
-          },
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'No Inline Title',
+          author: 'Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>Article body.</p></body></html>',
+          contentMarkdown: '![img](https://example.com/no-inline.png)\n\nArticle body.',
+          textContent: 'Article body.',
+          warningFlags: [],
         },
-      ]);
+      });
     });
 
     // @ts-expect-error test global
@@ -394,6 +388,7 @@ describe('article-fetch-service', () => {
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) =>
           cb([{ id: 88, url: 'https://example.com/no-inline#hash', title: 'No Inline Fallback' }]),
+        sendMessage,
       },
       scripting: {
         executeScript,
@@ -443,24 +438,24 @@ describe('article-fetch-service', () => {
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'T',
-            author: '',
-            publishedAt: '',
-            excerpt: '',
-            contentHTML: '<html><body><p>content</p></body></html>',
-            textContent: 'content',
-            warningFlags: [],
-          },
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'T',
+          author: '',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>content</p></body></html>',
+          contentMarkdown: 'content',
+          textContent: 'content',
+          warningFlags: [],
         },
-      ]);
+      });
     });
 
     // @ts-expect-error test global
@@ -468,6 +463,7 @@ describe('article-fetch-service', () => {
       runtime: { lastError: null },
       tabs: {
         query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 9, url: 'https://example.com/a', title: 'A' }]),
+        sendMessage,
       },
       scripting: {
         executeScript,
@@ -476,5 +472,115 @@ describe('article-fetch-service', () => {
 
     const service = await loadArticleFetchService();
     await expect(service.fetchActiveTabArticle()).rejects.toThrow('storage module missing');
+  });
+
+  it('retries extract message once when content script is not ready yet', async () => {
+    vi.useFakeTimers();
+
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 51, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const runtime = { lastError: null as any };
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => cb(Array.isArray(details?.files) ? [{}] : []));
+
+    let messageCalls = 0;
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      messageCalls += 1;
+      if (messageCalls === 1) {
+        runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
+        cb(null);
+        runtime.lastError = null;
+        return;
+      }
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Retry Title',
+          author: '',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>content</p></body></html>',
+          contentMarkdown: 'content',
+          textContent: 'content',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime,
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: 'https://example.com/retry', title: 'T' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const service = await loadArticleFetchService();
+    const pending = service.fetchActiveTabArticle();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    const data = await pending;
+
+    expect(data.title).toBe('Retry Title');
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('continues capture when readability injection fails', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 61, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const runtime = { lastError: null as any };
+    const executeScript = vi.fn((_details: any, cb: (results: any[]) => void) => {
+      runtime.lastError = { message: 'executeScript blocked by page policy' };
+      cb([]);
+      runtime.lastError = null;
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'No Readability Title',
+          author: '',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>content</p></body></html>',
+          contentMarkdown: 'content',
+          textContent: 'content',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime,
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: 'https://example.com/noread', title: 'T' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(data.title).toBe('No Readability Title');
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
   });
 });

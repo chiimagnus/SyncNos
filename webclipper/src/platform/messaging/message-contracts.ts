@@ -56,6 +56,7 @@ export const CHATWITH_MESSAGE_TYPES = {
 // Messages sent to content scripts (not handled by background router).
 export const CONTENT_MESSAGE_TYPES = {
   OPEN_INPAGE_COMMENTS_PANEL: 'openInpageCommentsPanel',
+  EXTRACT_WEB_ARTICLE: 'extractWebArticle',
 } as const;
 
 export const COMMENTS_MESSAGE_TYPES = {

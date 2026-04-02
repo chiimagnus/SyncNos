@@ -62,45 +62,43 @@ describe('article-fetch discourse OP', () => {
     let currentUrl = 'https://linux.do/t/topic/1870532/820';
     let extractCall = 0;
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
-      if (Array.isArray(details?.files)) {
-        cb([{}]);
-        return;
-      }
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
       extractCall += 1;
       if (extractCall === 1) {
-        cb([
-          {
-            result: {
-              ok: true,
-              title: 'Topic Title',
-              author: 'Reply Author',
-              publishedAt: '',
-              excerpt: '',
-              contentHTML: '<html><body><p>Reply body</p></body></html>',
-              contentMarkdown: 'Reply body',
-              textContent: 'Reply body',
-              warningFlags: ['discourse_op_missing_on_page'],
-            },
+        cb({
+          ok: true,
+          data: {
+            ok: true,
+            title: 'Topic Title',
+            author: 'Reply Author',
+            publishedAt: '',
+            excerpt: '',
+            contentHTML: '<html><body><p>Reply body</p></body></html>',
+            contentMarkdown: 'Reply body',
+            textContent: 'Reply body',
+            warningFlags: ['discourse_op_missing_on_page'],
           },
-        ]);
+        });
         return;
       }
 
-      cb([
-        {
-          result: {
-            ok: true,
-            title: 'Topic Title',
-            author: 'Op Author',
-            publishedAt: '',
-            excerpt: '',
-            contentHTML: '<html><body><p>OP body</p></body></html>',
-            contentMarkdown: 'OP body',
-            textContent: 'OP body',
-            warningFlags: [],
-          },
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Topic Title',
+          author: 'Op Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>OP body</p></body></html>',
+          contentMarkdown: 'OP body',
+          textContent: 'OP body',
+          warningFlags: [],
         },
-      ]);
+      });
     });
 
     const tabsGet = vi.fn((tabId: number, cb: (tab: any) => void) => {
@@ -120,6 +118,7 @@ describe('article-fetch discourse OP', () => {
           cb([{ id: 77, url: 'https://linux.do/t/topic/1870532/820?u=abc#reply-2', title: 'Topic tab' }]),
         get: tabsGet,
         update: tabsUpdate,
+        sendMessage,
       },
       scripting: {
         executeScript,
