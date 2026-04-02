@@ -12,6 +12,7 @@ export type Conversation = {
   warningFlags?: string[];
   notionPageId?: string;
   lastCapturedAt?: number;
+  commentThreadCount?: number;
 };
 
 export type ConversationMessage = {

@@ -14,6 +14,7 @@ import type {
   ConversationListSummary,
 } from '@services/conversations/domain/list-pagination';
 import { openDb as openSchemaDb } from '@platform/idb/schema';
+import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -806,10 +807,11 @@ function buildListPageRange(
 
 async function readConversationListPageItems(input: {
   store: IDBObjectStore;
+  articleCommentsStore: IDBObjectStore;
   query: ReturnType<typeof normalizeConversationListQuery>;
   cursor: ConversationListCursor | null;
 }): Promise<{ items: Conversation[]; cursor: ConversationListCursor | null; hasMore: boolean }> {
-  const { store, query, cursor } = input;
+  const { store, articleCommentsStore, query, cursor } = input;
   const safeLimit = Number.isFinite(query.limit) && query.limit > 0 ? Math.floor(query.limit) : 1;
   const rangeInput = buildListPageRange(query, cursor);
   const idx = store.index(rangeInput.indexName);
@@ -829,6 +831,20 @@ async function readConversationListPageItems(input: {
 
   const hasMore = rows.length > safeLimit;
   const pageItems = hasMore ? rows.slice(0, safeLimit) : rows;
+  const articleCommentIndex = articleCommentsStore.index('by_canonicalUrl_createdAt');
+  for (const item of pageItems) {
+    const sourceType = safeString((item as any).sourceType).toLowerCase();
+    if (sourceType !== 'article') continue;
+    const canonicalUrl = normalizeArticleUrl((item as any).url);
+    if (!canonicalUrl) continue;
+    const range = globalThis.IDBKeyRange?.bound
+      ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
+      : null;
+    if (!range) continue;
+    const comments = (await reqToPromise<any[]>(articleCommentIndex.getAll(range) as any)) || [];
+    (item as any).commentThreadCount = computeArticleCommentThreadCount(comments);
+  }
+
   const tail = pageItems.length ? pageItems[pageItems.length - 1] : null;
   const nextCursor =
     hasMore && tail
@@ -915,8 +931,13 @@ async function readConversationListPage(input: {
   const statsKey = `${normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL)}::${normalizeConversationListSiteFilterKey(query.siteKey)}`;
 
   const db = await openDb();
-  const { t, stores } = tx(db, ['conversations'], 'readonly');
-  const pagePromise = readConversationListPageItems({ store: stores.conversations, query, cursor });
+  const { t, stores } = tx(db, ['conversations', 'article_comments'], 'readonly');
+  const pagePromise = readConversationListPageItems({
+    store: stores.conversations,
+    articleCommentsStore: stores.article_comments,
+    query,
+    cursor,
+  });
   const summaryPromise = (async () => {
     if (conversationListStatsCacheKey === statsKey && conversationListStatsCacheValue) {
       return conversationListStatsCacheValue;
