@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
@@ -246,8 +246,9 @@ export function ConversationListPane({
 
   const total = visibleIds.length;
   const selectedCount = selectedInView.length;
-  const allSelected = total > 0 && selectedCount === total;
-  const indeterminate = selectedCount > 0 && selectedCount < total;
+  const selectStateTotal = totalCount > 0 ? totalCount : total;
+  const allSelected = selectStateTotal > 0 && selectedCount === selectStateTotal;
+  const indeterminate = selectedCount > 0 && selectedCount < selectStateTotal;
   const selectedTotalCount = selectedIds.length;
   const hasLoadedItems = filteredItems.length > 0;
   const showPaginationLoadingMore = hasLoadedItems && loadingMoreList;
@@ -255,11 +256,11 @@ export function ConversationListPane({
   const showPaginationDone = hasLoadedItems && !loadingInitialList && !loadingMoreList && !listError && !listHasMore;
   const paginationErrorMessage = String(listError || '').trim();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = selectAllRef.current;
     if (!el) return;
     el.indeterminate = indeterminate;
-  }, [indeterminate]);
+  }, [indeterminate, selectStateTotal, selectedCount]);
 
   const hasSelection = selectedTotalCount > 0;
   const actionBusy = exporting || deleting;
@@ -664,6 +665,7 @@ export function ConversationListPane({
               conversation: conversation as Conversation,
               translate: t,
             });
+            const commentThreadCount = Number((conversation as any).commentThreadCount);
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
 
@@ -758,6 +760,16 @@ export function ConversationListPane({
                     >
                       {sourceTag.label}
                     </span>
+
+                    {Number.isFinite(commentThreadCount) && commentThreadCount > 0 ? (
+                      <span
+                        className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--border)] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold"
+                        aria-label={`Comment threads ${commentThreadCount}`}
+                      >
+                        {'💬 '}
+                        {commentThreadCount}
+                      </span>
+                    ) : null}
 
                     {(conversation as any).lastCapturedAt ? (
                       <span className="tw-text-[11px] tw-font-semibold">

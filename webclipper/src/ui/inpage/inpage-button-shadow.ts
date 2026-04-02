@@ -191,6 +191,33 @@ function readOnPositionChange(el: HTMLElement) {
   return typeof fn === 'function' ? fn : null;
 }
 
+function writeOnClick(el: HTMLElement, onClick?: (() => void) | null) {
+  (el as any).__webclipperOnClick = typeof onClick === 'function' ? onClick : null;
+}
+
+function readOnClick(el: HTMLElement) {
+  const fn = (el as any).__webclipperOnClick;
+  return typeof fn === 'function' ? fn : null;
+}
+
+function writeOnDoubleClick(el: HTMLElement, onDoubleClick?: (() => void) | null) {
+  (el as any).__webclipperOnDoubleClick = typeof onDoubleClick === 'function' ? onDoubleClick : null;
+}
+
+function readOnDoubleClick(el: HTMLElement) {
+  const fn = (el as any).__webclipperOnDoubleClick;
+  return typeof fn === 'function' ? fn : null;
+}
+
+function writeOnCombo(el: HTMLElement, onCombo?: ((payload: { level: number; count: number }) => void) | null) {
+  (el as any).__webclipperOnCombo = typeof onCombo === 'function' ? onCombo : null;
+}
+
+function readOnCombo(el: HTMLElement) {
+  const fn = (el as any).__webclipperOnCombo;
+  return typeof fn === 'function' ? fn : null;
+}
+
 function toExternalStateKey(state: { edge?: unknown; ratio?: unknown } | null | undefined) {
   const edge = state && state.edge ? String(state.edge) : '';
   const ratio = state && Number.isFinite((state as any).ratio) ? String((state as any).ratio) : '';
@@ -228,6 +255,25 @@ function destroyButton(el: HTMLElement | null) {
     }
   }
   el.remove();
+}
+
+function matchesInpageButtonEvent(btn: HTMLElement, e: Event): boolean {
+  const anyEvent = e as any;
+  try {
+    const path = typeof anyEvent.composedPath === 'function' ? anyEvent.composedPath() : null;
+    if (Array.isArray(path) && path.includes(btn)) return true;
+  } catch (_e) {
+    // ignore
+  }
+
+  const target = anyEvent.target as any;
+  if (target === btn) return true;
+  try {
+    const closest = typeof target?.closest === 'function' ? target.closest(`#${INPAGE_BTN_ID}`) : null;
+    return closest === btn;
+  } catch (_e) {
+    return false;
+  }
 }
 
 function ensureButtonShadow(btn: HTMLElement) {
@@ -270,60 +316,9 @@ function ensureButtonShadow(btn: HTMLElement) {
   (btn as any).__webclipperShadowReady = true;
 }
 
-function ensureInpageButton({
-  collectorId,
-  onClick,
-  onDoubleClick,
-  onCombo,
-  positionState,
-  onPositionChange,
-}: {
-  collectorId?: string;
-  onClick?: () => void;
-  onDoubleClick?: () => void;
-  onCombo?: (payload: { level: number; count: number }) => void;
-  positionState?: InpageButtonPositionState | null;
-  onPositionChange?: (state: { edge: InpageButtonPositionEdge; ratio: number }) => void;
-}) {
-  if (!collectorId) return;
-
-  const existing = document.getElementById(INPAGE_BTN_ID) as HTMLElement | null;
-  if (existing) {
-    if (existing.dataset.sourceId === collectorId) {
-      // Ensure Shadow DOM is initialized even if legacy button existed.
-      try {
-        if (!existing.shadowRoot) ensureButtonShadow(existing);
-      } catch (_e) {
-        // ignore
-      }
-      try {
-        writeOnPositionChange(existing, onPositionChange);
-        if (positionState && !existing.classList.contains('is-dragging')) {
-          applyExternalPositionState(existing, positionState);
-        }
-      } catch (_e) {
-        // ignore
-      }
-      return;
-    }
-    destroyButton(existing);
-  }
-
-  // Shadow DOM is disallowed on HTMLButtonElement by the spec; use a custom element as the host.
-  const btn = document.createElement('webclipper-inpage-btn');
-  btn.id = INPAGE_BTN_ID;
-  btn.className = 'webclipper-inpage-btn';
-  btn.dataset.sourceId = collectorId;
-  btn.title = INPAGE_BUTTON_LABEL;
-  btn.setAttribute('aria-label', INPAGE_BUTTON_LABEL);
-  btn.setAttribute('role', 'button');
-  (btn as any).tabIndex = 0;
-  applyButtonHostLayoutStyles(btn);
-
-  ensureButtonShadow(btn);
-
-  writeSnappedState(btn, null);
-  writeOnPositionChange(btn, onPositionChange);
+function ensureButtonInteractions(btn: HTMLElement) {
+  const existing = (btn as any).__webclipperInteractionsReady === true;
+  if (existing) return;
 
   let dragging = false;
   let moved = false;
@@ -372,25 +367,34 @@ function ensureInpageButton({
     comboTimer = null;
 
     if (finalCount === 1) {
-      onClick && onClick();
+      readOnClick(btn)?.();
       return;
     }
 
     if (finalCount === 2) {
-      onDoubleClick && onDoubleClick();
+      readOnDoubleClick(btn)?.();
       return;
     }
 
     const level = resolveComboLevel(finalCount);
     if (!level) return;
     replayEasterAnimation(level);
-    onCombo && onCombo({ level, count: finalCount });
+    readOnCombo(btn)?.({ level, count: finalCount });
   }
 
   function scheduleComboSettle() {
     if (comboTimer) clearTimeout(comboTimer);
     comboTimer = setTimeout(() => settleCombo(), COMBO_WINDOW_MS);
   }
+
+  const stopEvent = (event: Event) => {
+    try {
+      (event as any).preventDefault?.();
+      (event as any).stopPropagation?.();
+    } catch (_e) {
+      // ignore
+    }
+  };
 
   const onClickCapture = (e: MouseEvent) => {
     e.preventDefault();
@@ -403,18 +407,11 @@ function ensureInpageButton({
 
   btn.addEventListener('click', onClickCapture, true);
 
-  const stopEvent = (event: Event) => {
-    try {
-      (event as any).preventDefault?.();
-      (event as any).stopPropagation?.();
-    } catch (_e) {
-      // ignore
-    }
-  };
-
-  const onPointerDown = (e: PointerEvent) => {
+  const onPointerDownCapture = (e: PointerEvent) => {
     if ((e as any).button != null && (e as any).button !== 0) return;
+    if (!matchesInpageButtonEvent(btn, e)) return;
     stopEvent(e);
+
     dragging = true;
     moved = false;
     activePointerId = e.pointerId;
@@ -471,26 +468,10 @@ function ensureInpageButton({
     }
   };
 
-  btn.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointerdown', onPointerDownCapture, true);
   window.addEventListener('pointermove', onPointerMove, true);
   window.addEventListener('pointerup', onPointerUp, true);
   window.addEventListener('pointercancel', onPointerUp, true);
-
-  document.documentElement.appendChild(btn);
-
-  let next = null as any;
-  if (positionState) {
-    try {
-      next = applyExternalPositionState(btn, positionState);
-    } catch (_e) {
-      next = null;
-    }
-  }
-  if (!next) {
-    const rect = btn.getBoundingClientRect();
-    next = snapToClosestEdge(btn, rect.left, rect.top);
-    if (next) writeSnappedState(btn, next);
-  }
 
   const onResize = () => {
     if (!btn.isConnected) return;
@@ -506,11 +487,95 @@ function ensureInpageButton({
     clearEasterAnimation();
     window.removeEventListener('resize', onResize);
     btn.removeEventListener('click', onClickCapture, true);
-    btn.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('pointerdown', onPointerDownCapture, true);
     window.removeEventListener('pointermove', onPointerMove, true);
     window.removeEventListener('pointerup', onPointerUp, true);
     window.removeEventListener('pointercancel', onPointerUp, true);
   };
+
+  (btn as any).__webclipperInteractionsReady = true;
+}
+
+function ensureInpageButton({
+  collectorId,
+  onClick,
+  onDoubleClick,
+  onCombo,
+  positionState,
+  onPositionChange,
+}: {
+  collectorId?: string;
+  onClick?: () => void;
+  onDoubleClick?: () => void;
+  onCombo?: (payload: { level: number; count: number }) => void;
+  positionState?: InpageButtonPositionState | null;
+  onPositionChange?: (state: { edge: InpageButtonPositionEdge; ratio: number }) => void;
+}) {
+  if (!collectorId) return;
+
+  const existing = document.getElementById(INPAGE_BTN_ID) as HTMLElement | null;
+  if (existing) {
+    if (existing.dataset.sourceId === collectorId) {
+      // Ensure Shadow DOM is initialized even if legacy button existed.
+      try {
+        if (!existing.shadowRoot) ensureButtonShadow(existing);
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        applyButtonHostLayoutStyles(existing);
+        ensureButtonInteractions(existing);
+        writeOnClick(existing, onClick);
+        writeOnDoubleClick(existing, onDoubleClick);
+        writeOnCombo(existing, onCombo);
+        writeOnPositionChange(existing, onPositionChange);
+        if (positionState && !existing.classList.contains('is-dragging')) {
+          applyExternalPositionState(existing, positionState);
+        }
+      } catch (_e) {
+        // ignore
+      }
+      return;
+    }
+    destroyButton(existing);
+  }
+
+  // Shadow DOM is disallowed on HTMLButtonElement by the spec; use a custom element as the host.
+  const btn = document.createElement('webclipper-inpage-btn');
+  btn.id = INPAGE_BTN_ID;
+  btn.className = 'webclipper-inpage-btn';
+  btn.dataset.sourceId = collectorId;
+  btn.title = INPAGE_BUTTON_LABEL;
+  btn.setAttribute('aria-label', INPAGE_BUTTON_LABEL);
+  btn.setAttribute('role', 'button');
+  (btn as any).tabIndex = 0;
+  applyButtonHostLayoutStyles(btn);
+
+  ensureButtonShadow(btn);
+
+  writeSnappedState(btn, null);
+  writeOnClick(btn, onClick);
+  writeOnDoubleClick(btn, onDoubleClick);
+  writeOnCombo(btn, onCombo);
+  writeOnPositionChange(btn, onPositionChange);
+
+  document.documentElement.appendChild(btn);
+
+  ensureButtonInteractions(btn);
+
+  let next = null as any;
+  if (positionState) {
+    try {
+      next = applyExternalPositionState(btn, positionState);
+    } catch (_e) {
+      next = null;
+    }
+  }
+  if (!next) {
+    const rect = btn.getBoundingClientRect();
+    next = snapToClosestEdge(btn, rect.left, rect.top);
+    if (next) writeSnappedState(btn, next);
+  }
 }
 
 function cleanupButtons(activeCollectorId: string) {

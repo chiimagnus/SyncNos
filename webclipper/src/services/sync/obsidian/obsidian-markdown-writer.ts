@@ -1,4 +1,5 @@
 import type { ArticleComment } from '@services/comments/domain/models';
+import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 
 const MESSAGES_HEADING = 'Conversations';
@@ -254,13 +255,15 @@ function buildFullNoteMarkdown({
   const url = safeString(c.url);
   const sourceType = safeString(c.sourceType);
 
-  const frontmatter = {
+  const frontmatter: Record<string, unknown> = {
     ...(url ? { url } : null),
     syncnos: syncnosObject || null,
   };
 
   const isArticle = sourceType === 'article';
   if (isArticle) {
+    const commentsRootCount = computeArticleCommentThreadCount(comments || []);
+    frontmatter.comments_root_count = commentsRootCount;
     const articleMd = buildArticleBodyMarkdown(messages || []);
     const commentsMd = buildObsidianCommentsMarkdown(comments || []);
     const sections: string[] = [];

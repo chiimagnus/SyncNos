@@ -67,6 +67,11 @@ function asUrl(value: unknown) {
   }
 }
 
+function asNumber(value: unknown) {
+  const numeric = Number(value);
+  return { number: Number.isFinite(numeric) ? numeric : 0 };
+}
+
 function register(definition: ConversationKindDefinition): boolean {
   const checked = assertKindDef(definition);
   if (definitions.some((item) => item.id === checked.id)) return false;
@@ -162,10 +167,12 @@ const articleKind: ConversationKindDefinition = {
         URL: { url: {} },
         Author: { rich_text: {} },
         Published: { rich_text: {} },
+        'Comment Threads': { number: {} },
       },
       ensureSchemaPatch: {
         Author: { rich_text: {} },
         Published: { rich_text: {} },
+        'Comment Threads': { number: {} },
       },
     },
     pageSpec: {
@@ -177,6 +184,7 @@ const articleKind: ConversationKindDefinition = {
           Date: asDate(data.lastCapturedAt),
           Author: asRichText(data.author),
           Published: asRichText(data.publishedAt),
+          'Comment Threads': asNumber((data as any).commentThreadCount),
         };
       },
       buildUpdateProperties(conversation) {
@@ -186,6 +194,7 @@ const articleKind: ConversationKindDefinition = {
           URL: asUrl(data.url),
           Author: asRichText(data.author),
           Published: asRichText(data.publishedAt),
+          'Comment Threads': asNumber((data as any).commentThreadCount),
         };
       },
     },

@@ -9,6 +9,7 @@ import {
   getConversationListPage,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
+import { addArticleComment } from '@services/comments/data/storage-idb';
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -208,5 +209,53 @@ describe('conversations pagination storage-idb', () => {
 
     const missing = await findConversationBySourceAndKey('chatgpt', 'missing');
     expect(missing).toBeNull();
+  });
+
+  it('injects commentThreadCount for article items only', async () => {
+    const article = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:https://example.com/thread',
+      title: 'article',
+      url: 'https://example.com/thread?utm_source=x',
+      lastCapturedAt: Date.now(),
+    });
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'chat-thread',
+      title: 'chat',
+      url: 'https://chatgpt.com/c/thread',
+      lastCapturedAt: Date.now() - 1,
+    });
+
+    const root = await addArticleComment({
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread?utm_source=x',
+      commentText: 'root',
+      parentId: null,
+      createdAt: 1,
+    });
+    await addArticleComment({
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread?utm_source=x',
+      commentText: 'reply',
+      parentId: root.id,
+      createdAt: 2,
+    });
+    await addArticleComment({
+      conversationId: Number(article.id),
+      canonicalUrl: 'https://example.com/thread?utm_source=x',
+      commentText: 'orphan',
+      parentId: 999,
+      createdAt: 3,
+    });
+
+    const page = await getConversationListBootstrap({ sourceKey: 'all', siteKey: 'all', limit: 10 });
+    const articleItem = page.items.find((item) => item.sourceType === 'article');
+    const chatItem = page.items.find((item) => item.sourceType !== 'article');
+
+    expect(articleItem?.commentThreadCount).toBe(2);
+    expect(chatItem?.commentThreadCount).toBeUndefined();
   });
 });

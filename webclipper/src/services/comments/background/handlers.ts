@@ -3,6 +3,7 @@ import {
   addArticleComment,
   attachOrphanCommentsToConversation,
   deleteArticleCommentById,
+  getArticleCommentDeleteContextById,
   listArticleCommentsByCanonicalUrl,
   listArticleCommentsByConversationId,
   migrateArticleCommentsCanonicalUrl,
@@ -72,7 +73,21 @@ export function registerArticleCommentsHandlers(router: AnyRouter) {
   router.register(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, async (msg) => {
     const id = Number(msg?.id);
     if (!Number.isFinite(id) || id <= 0) return router.err('invalid id');
+    const context = await getArticleCommentDeleteContextById(id);
     const ok = await deleteArticleCommentById(id);
+    if (ok) {
+      const conversationId = Number(context?.conversationId);
+      if (Number.isFinite(conversationId) && conversationId > 0) {
+        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+          reason: 'articleCommentDeleted',
+          conversationId,
+        });
+      } else {
+        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+          reason: 'articleCommentDeleted',
+        });
+      }
+    }
     return router.ok({ ok });
   });
 

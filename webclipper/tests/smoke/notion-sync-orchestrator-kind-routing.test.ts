@@ -98,6 +98,13 @@ describe('notion-sync-orchestrator kind routing', () => {
       getMessagesByConversationId: async () => [
         { messageKey: 'm1', role: 'assistant', contentText: 'hi', sequence: 1, updatedAt: 1 },
       ],
+      getArticleCommentsByConversationId: async (conversationId: number) => {
+        if (conversationId !== 1) return [];
+        return [
+          { id: 1, parentId: null, createdAt: 1, updatedAt: 1, quoteText: 'q', commentText: 'root' },
+          { id: 2, parentId: 1, createdAt: 2, updatedAt: 2, quoteText: '', commentText: 'reply' },
+        ];
+      },
       setConversationNotionPageId: async () => true,
       setSyncCursor: async () => true,
     };
@@ -148,6 +155,7 @@ describe('notion-sync-orchestrator kind routing', () => {
     const chatCreate = createCalls.find((c) => c.databaseId === 'db_chats');
     expect(articleCreate.properties.AI).toBeUndefined();
     expect(articleCreate.properties.Author).toBeTruthy();
+    expect(articleCreate.properties['Comment Threads']).toEqual({ number: 1 });
     expect(chatCreate.properties.AI).toBeTruthy();
 
     // Update properties only happen on subsequent syncs; keep coverage minimal here.

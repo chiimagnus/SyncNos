@@ -267,6 +267,63 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(syncTooltip).toContain('tooltipLoadedVisibleSelectionScope');
   });
 
+  it('shows select-all as indeterminate until all conversations are selected', async () => {
+    currentState = buildState({
+      items: [baseConversation(11), baseConversation(22)],
+      selectedIds: [11, 22],
+      listSummary: { totalCount: 693, todayCount: 2 },
+      listHasMore: true,
+    });
+
+    await renderPane();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    const selectAllCheckbox = document.getElementById('chkSelectAll') as HTMLInputElement | null;
+    expect(selectAllCheckbox).toBeTruthy();
+    expect(selectAllCheckbox!.checked).toBe(false);
+    expect(selectAllCheckbox!.indeterminate).toBe(true);
+  });
+
+  it('re-applies indeterminate state even when it stays true across renders', async () => {
+    currentState = buildState({
+      items: [baseConversation(11), baseConversation(22)],
+      selectedIds: [11, 22],
+      listSummary: { totalCount: 693, todayCount: 2 },
+      listHasMore: true,
+    });
+
+    await renderPane();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    const selectAllCheckbox = document.getElementById('chkSelectAll') as HTMLInputElement | null;
+    expect(selectAllCheckbox).toBeTruthy();
+    expect(selectAllCheckbox!.indeterminate).toBe(true);
+
+    // Simulate browser clearing the indeterminate UI on click; the component should re-apply it.
+    selectAllCheckbox!.indeterminate = false;
+    expect(selectAllCheckbox!.indeterminate).toBe(false);
+
+    currentState = buildState({
+      items: [baseConversation(11), baseConversation(22), baseConversation(33), baseConversation(44)],
+      selectedIds: [11, 22, 33, 44],
+      listSummary: { totalCount: 693, todayCount: 4 },
+      listHasMore: true,
+    });
+    await renderPane();
+    await act(async () => {
+      await flushMicrotasks();
+    });
+
+    const nextCheckbox = document.getElementById('chkSelectAll') as HTMLInputElement | null;
+    expect(nextCheckbox).toBeTruthy();
+    expect(nextCheckbox!.checked).toBe(false);
+    expect(nextCheckbox!.indeterminate).toBe(true);
+  });
+
   it('converges pending locate by loading more when target is not in first batch', async () => {
     const consumeListLocate = vi.fn(() => {
       currentState = { ...currentState, pendingListLocateId: null };

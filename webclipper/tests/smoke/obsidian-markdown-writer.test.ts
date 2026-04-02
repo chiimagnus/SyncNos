@@ -77,6 +77,7 @@ describe('obsidian-markdown-writer', () => {
     expect(md).toContain(`## ${w.ARTICLE_HEADING}`);
     expect(md).toContain(`## ${w.COMMENTS_HEADING}`);
     expect(md).not.toContain(`## ${w.MESSAGES_HEADING}`);
+    expect(md).toContain('comments_root_count: 1');
     expect(md).toContain('> Quoted');
     expect(md.match(/^- You \|/gm)?.length || 0).toBe(2);
     expect(md).toContain('  Root');
@@ -111,6 +112,7 @@ describe('obsidian-markdown-writer', () => {
       },
     });
 
+    expect(md).toContain('comments_root_count: 0');
     expect(md).toContain(
       '![CleanShot](https://cdn3.linux.do/optimized/4X/5/1/2/example.png)\n\nCleanShot 828×1194 84 KB',
     );

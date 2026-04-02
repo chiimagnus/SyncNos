@@ -795,6 +795,7 @@ describe('background-router notion sync', () => {
               URL: { url: 'https://x/article' },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
+              'Comment Threads': { number: 0 },
             },
           }),
           updatePageProperties: async (_t: string, req: any) => {
@@ -1021,6 +1022,7 @@ describe('background-router notion sync', () => {
               URL: { url: 'https://x/article' },
               Author: { rich_text: [] },
               Published: { rich_text: [] },
+              'Comment Threads': { number: 0 },
             },
           }),
           updatePageProperties: async (_t: string, req: any) => {
