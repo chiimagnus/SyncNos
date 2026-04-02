@@ -24,9 +24,14 @@ const READABILITY_FILE = 'src/vendor/readability.js';
 const DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS = 10_000;
 const ARTICLE_STABILIZATION_TIMEOUT_MS = 10_000;
 const ARTICLE_STABILIZATION_MIN_TEXT_LENGTH = 240;
+const CONTENT_MESSAGE_RETRY_DELAY_MS = 320;
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Math.floor(ms))));
 }
 
 function conversationKeyForUrl(url: string) {
@@ -101,20 +106,51 @@ async function resolveTargetTab(tabId?: number) {
 }
 
 async function ensureReadability(tabId: number) {
-  await scriptingExecuteScript({
-    target: { tabId, allFrames: false },
-    files: [READABILITY_FILE],
-  });
+  try {
+    await scriptingExecuteScript({
+      target: { tabId, allFrames: false },
+      files: [READABILITY_FILE],
+    });
+  } catch (error) {
+    // Readability is a best-effort enhancement. Extraction still works via site-spec/readability-missing fallbacks.
+    console.warn('[ArticleFetch] inject readability failed, continue without it', {
+      tabId,
+      error: error instanceof Error ? error.message : String(error || ''),
+    });
+  }
+}
+
+function isNoReceiverError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /receiving end does not exist|could not establish connection|no receiving end|message port closed/i.test(message);
 }
 
 async function extractArticleOnTab(tabId: number) {
-  const response = await tabsSendMessage(tabId, {
+  const payload = {
     type: CONTENT_MESSAGE_TYPES.EXTRACT_WEB_ARTICLE,
     payload: {
       stabilizationTimeoutMs: ARTICLE_STABILIZATION_TIMEOUT_MS,
       stabilizationMinTextLength: ARTICLE_STABILIZATION_MIN_TEXT_LENGTH,
     },
-  });
+  };
+
+  let response: unknown = null;
+  try {
+    response = await tabsSendMessage(tabId, payload);
+  } catch (error) {
+    // Content scripts may not be ready right after navigation; retry once to reduce flaky "no receiver" failures.
+    if (isNoReceiverError(error)) {
+      await sleep(CONTENT_MESSAGE_RETRY_DELAY_MS);
+      response = await tabsSendMessage(tabId, payload);
+    } else {
+      throw error;
+    }
+  }
+
+  if (!response) {
+    await sleep(CONTENT_MESSAGE_RETRY_DELAY_MS);
+    response = await tabsSendMessage(tabId, payload);
+  }
 
   const apiResponse = response as { ok?: boolean; data?: unknown; error?: { message?: unknown } | null } | null;
   if (!apiResponse || apiResponse.ok !== true) {

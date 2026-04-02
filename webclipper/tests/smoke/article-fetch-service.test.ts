@@ -473,4 +473,114 @@ describe('article-fetch-service', () => {
     const service = await loadArticleFetchService();
     await expect(service.fetchActiveTabArticle()).rejects.toThrow('storage module missing');
   });
+
+  it('retries extract message once when content script is not ready yet', async () => {
+    vi.useFakeTimers();
+
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 51, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const runtime = { lastError: null as any };
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => cb(Array.isArray(details?.files) ? [{}] : []));
+
+    let messageCalls = 0;
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      messageCalls += 1;
+      if (messageCalls === 1) {
+        runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
+        cb(null);
+        runtime.lastError = null;
+        return;
+      }
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Retry Title',
+          author: '',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>content</p></body></html>',
+          contentMarkdown: 'content',
+          textContent: 'content',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime,
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: 'https://example.com/retry', title: 'T' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const service = await loadArticleFetchService();
+    const pending = service.fetchActiveTabArticle();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    const data = await pending;
+
+    expect(data.title).toBe('Retry Title');
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('continues capture when readability injection fails', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 61, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+
+    const runtime = { lastError: null as any };
+    const executeScript = vi.fn((_details: any, cb: (results: any[]) => void) => {
+      runtime.lastError = { message: 'executeScript blocked by page policy' };
+      cb([]);
+      runtime.lastError = null;
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'No Readability Title',
+          author: '',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>content</p></body></html>',
+          contentMarkdown: 'content',
+          textContent: 'content',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime,
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) => cb([{ id: 77, url: 'https://example.com/noread', title: 'T' }]),
+        sendMessage,
+      },
+      scripting: { executeScript },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(data.title).toBe('No Readability Title');
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
 });

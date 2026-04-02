@@ -88,6 +88,7 @@ function withDiscourseOpWarning(
 
 async function waitForDomStabilized(timeoutMs: number, minTextLength: number) {
   const deadline = Date.now() + timeoutMs;
+  const startedAt = Date.now();
   let last: any = null;
   let stableTicks = 0;
 
@@ -109,7 +110,13 @@ async function waitForDomStabilized(timeoutMs: number, minTextLength: number) {
       last = sample;
     }
 
-    if (stableTicks >= 2 && sample.readyState.toLowerCase() === 'complete' && sample.textLen >= minTextLength) return;
+    const isComplete = sample.readyState.toLowerCase() === 'complete';
+    const elapsedMs = Date.now() - startedAt;
+    const stableAndComplete = stableTicks >= 2 && isComplete;
+
+    // Short pages (e.g. image-first posts) may never reach `minTextLength`.
+    // Still wait for the DOM to stabilize, but avoid delaying capture for the full timeout.
+    if (stableAndComplete && (sample.textLen >= minTextLength || elapsedMs >= 1_200)) return;
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
 }
