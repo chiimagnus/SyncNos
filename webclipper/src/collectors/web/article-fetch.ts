@@ -337,6 +337,78 @@ async function extractArticleOnTab(tabId: number) {
         return lines.join('\n').trim();
       }
 
+      function dedupeUrls(urls: string[]) {
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const url of urls) {
+          const value = String(url || '').trim();
+          if (!value) continue;
+          if (seen.has(value)) continue;
+          seen.add(value);
+          out.push(value);
+        }
+        return out;
+      }
+
+      function buildMarkdownImageBlocks(urls: string[]) {
+        const unique = dedupeUrls(urls);
+        if (!unique.length) return '';
+        const lines: string[] = [];
+        for (const url of unique) {
+          lines.push(`![](<${url}>)`, '');
+        }
+        return lines.join('\n').trim();
+      }
+
+      function buildHtmlImageBlocks(urls: string[]) {
+        const unique = dedupeUrls(urls);
+        if (!unique.length) return '';
+        return unique
+          .map(
+            (url) =>
+              `<p data-syncnos-origin="image-block"><img src="${escapeHtml(url)}" alt="" loading="lazy" style="max-width:100%;height:auto;display:block;" /></p>`,
+          )
+          .join('');
+      }
+
+      function renderPlainTextAsHtml(text: string) {
+        const normalized = normalize(text);
+        if (!normalized) return '';
+        const lines = normalized.split('\n').map((line) => normalize(line));
+        return lines
+          .filter(Boolean)
+          .map((line) => `<p>${escapeHtml(line)}</p>`)
+          .join('');
+      }
+
+      function sanitizeBilibiliImageUrl(raw: unknown) {
+        const resolved = sanitizeUrl(raw);
+        if (!resolved) return '';
+        try {
+          const url = new URL(resolved);
+          const idx = url.pathname.indexOf('@');
+          if (idx > -1) url.pathname = url.pathname.slice(0, idx);
+          return url.toString();
+        } catch (_e) {
+          const idx = resolved.indexOf('@');
+          return idx > -1 ? resolved.slice(0, idx) : resolved;
+        }
+      }
+
+      function sanitizeXhsImageUrl(raw: unknown) {
+        const resolved = sanitizeUrl(raw);
+        if (!resolved) return '';
+        try {
+          const url = new URL(resolved);
+          const idx = url.pathname.indexOf('!');
+          if (idx > -1) url.pathname = url.pathname.slice(0, idx);
+          return url.toString();
+        } catch (_e) {
+          const idx = resolved.indexOf('!');
+          return idx > -1 ? resolved.slice(0, idx) : resolved;
+        }
+      }
+
       function isBlockTag(tag: unknown) {
         return [
           'p',
@@ -501,6 +573,116 @@ async function extractArticleOnTab(tabId: number) {
         } catch (_e) {
           return normalize(text);
         }
+      }
+
+      function extractBilibiliOpus() {
+        const root = document.querySelector('.bili-opus-view') as any;
+        if (!root) return null;
+
+        const title =
+          normalize((root.querySelector('.opus-module-title__text') as any)?.textContent || '') ||
+          normalize(document.title || '') ||
+          readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
+
+        const author =
+          normalize((root.querySelector('.opus-module-author__name') as any)?.textContent || '') ||
+          readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+
+        const publishedAt =
+          normalize((root.querySelector('.opus-module-author__pub__text') as any)?.textContent || '') ||
+          readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
+
+        const contentNode = root.querySelector('.opus-module-content') as any;
+        const text = normalize(contentNode?.innerText || contentNode?.textContent || '');
+
+        const urls: string[] = [];
+        const pushUrl = (value: unknown) => {
+          const url = sanitizeBilibiliImageUrl(value);
+          if (url) urls.push(url);
+        };
+        const images = Array.from(root.querySelectorAll('.opus-module-top__album img, .horizontal-scroll-album__pic img'));
+        for (const img of images) {
+          const el = img as any;
+          pushUrl(el.getAttribute?.('data-src') || el.getAttribute?.('src') || el.currentSrc || el.src || '');
+        }
+
+        const imageMarkdown = buildMarkdownImageBlocks(urls);
+        const imageHtml = buildHtmlImageBlocks(urls);
+
+        const markdown = normalize([imageMarkdown, text].filter(Boolean).join('\n\n'));
+        const textContent = text || dedupeUrls(urls).join('\n');
+
+        if (!markdown && !textContent) return null;
+
+        const htmlBody = normalize([imageHtml, renderPlainTextAsHtml(text)].filter(Boolean).join(''));
+        return {
+          ok: true,
+          title,
+          author,
+          publishedAt,
+          excerpt: '',
+          contentHTML: buildHtml(htmlBody, textContent),
+          contentMarkdown: markdown,
+          textContent,
+          warningFlags: [],
+        };
+      }
+
+      function extractXhsNote() {
+        const root = document.querySelector('#noteContainer.note-container, #noteContainer') as any;
+        if (!root) return null;
+
+        const descNode =
+          (root.querySelector('#detail-desc') as any) ||
+          (root.querySelector('.note-content #detail-desc') as any) ||
+          (root.querySelector('.note-content .desc') as any);
+        const desc = normalize(descNode?.innerText || descNode?.textContent || '');
+
+        const author =
+          normalize((root.querySelector('.author .username') as any)?.textContent || '') ||
+          readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+
+        const publishedAt =
+          normalize((root.querySelector('.note-content .bottom-container .date') as any)?.textContent || '') ||
+          normalize((root.querySelector('.note-content .date') as any)?.textContent || '') ||
+          readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
+
+        let title =
+          readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']) || normalize(document.title || '');
+        if (!title && desc) {
+          title = desc.length > 64 ? `${desc.slice(0, 64)}…` : desc;
+        }
+
+        const urls: string[] = [];
+        const pushUrl = (value: unknown) => {
+          const url = sanitizeXhsImageUrl(value);
+          if (url) urls.push(url);
+        };
+        const images = Array.from(root.querySelectorAll('.media-container img'));
+        for (const img of images) {
+          const el = img as any;
+          pushUrl(el.getAttribute?.('data-src') || el.getAttribute?.('src') || el.currentSrc || el.src || '');
+        }
+
+        const imageMarkdown = buildMarkdownImageBlocks(urls);
+        const imageHtml = buildHtmlImageBlocks(urls);
+
+        const markdown = normalize([imageMarkdown, desc].filter(Boolean).join('\n\n'));
+        const textContent = desc || dedupeUrls(urls).join('\n');
+        if (!markdown && !textContent) return null;
+
+        const htmlBody = normalize([imageHtml, renderPlainTextAsHtml(desc)].filter(Boolean).join(''));
+        return {
+          ok: true,
+          title,
+          author,
+          publishedAt,
+          excerpt: '',
+          contentHTML: buildHtml(htmlBody, textContent),
+          contentMarkdown: markdown,
+          textContent,
+          warningFlags: [],
+        };
       }
 
       function fallbackExtract() {
@@ -729,6 +911,12 @@ async function extractArticleOnTab(tabId: number) {
         }
         const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
         noisyNodes.forEach((node: any) => node?.remove?.());
+
+        const bilibiliOpus = extractBilibiliOpus();
+        if (bilibiliOpus) return withDiscourseOpWarning(bilibiliOpus, false);
+
+        const xhsNote = extractXhsNote();
+        if (xhsNote) return withDiscourseOpWarning(xhsNote, false);
 
         const discourseTopic = parseDiscourseTopicPath(location.pathname);
         const discourseOpOnly = extractDiscourseOpOnly();
