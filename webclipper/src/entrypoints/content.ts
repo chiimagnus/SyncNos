@@ -5,6 +5,7 @@ import { registerCurrentPageCaptureContentHandlers } from '@services/bootstrap/c
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 import { startContentBootstrap } from '@services/bootstrap/content.ts';
 import { registerInpageCommentsPanelContentHandlers } from '@services/bootstrap/inpage-comments-panel-content-handlers.ts';
+import { registerWebArticleExtractContentHandlers } from '@services/bootstrap/web-article-extract-content-handlers';
 import { createCollectorEnv } from '@collectors/collector-env.ts';
 import { registerAllCollectors } from '@collectors/register-all.ts';
 import { createCollectorsRegistry } from '@collectors/registry.ts';
@@ -34,6 +35,7 @@ export default defineContentScript({
 
     registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
     registerInpageCommentsPanelContentHandlers(runtime);
+    registerWebArticleExtractContentHandlers();
 
     const itemMentionController = createItemMentionController({ runtime, ui: inpageItemMentionApi });
     const controller = createContentController({
