@@ -59,13 +59,21 @@ function fallbackExtract(baseHref: string) {
   if (!root) return null;
   const title =
     normalizeText(document.title || '') || readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
-  const author = readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+  const author = readMeta([
+    "meta[name='author']",
+    "meta[property='article:author']",
+    "meta[property='og:article:author']",
+  ]);
   const text = normalizeText((root as any).innerText || '');
   if (!text) return null;
   return {
     title,
     author,
-    publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
+    publishedAt: readMeta([
+      "meta[property='article:published_time']",
+      "meta[name='publish_date']",
+      "meta[name='pubdate']",
+    ]),
     excerpt: '',
     contentHTML: buildHtml('', text),
     contentMarkdown: htmlToMarkdown('', text, baseHref),
@@ -103,7 +111,12 @@ async function waitForDomStabilized(timeoutMs: number, minTextLength: number) {
       nodeCount,
     };
 
-    if (last && sample.readyState === last.readyState && sample.textLen === last.textLen && sample.nodeCount === last.nodeCount) {
+    if (
+      last &&
+      sample.readyState === last.readyState &&
+      sample.textLen === last.textLen &&
+      sample.nodeCount === last.nodeCount
+    ) {
       stableTicks += 1;
     } else {
       stableTicks = 0;
@@ -202,12 +215,18 @@ function extractByReadability(baseHref: string) {
   const htmlBody = normalizeText(content) || (text ? `<p>${escapeHtml(text)}</p>` : '');
   const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
   const markdownBase = htmlToMarkdown(content, text, baseHref);
-  const markdownWithWechatGallery = wechatGalleryMarkdown ? normalizeText(`${markdownBase}\n\n${wechatGalleryMarkdown}`) : markdownBase;
+  const markdownWithWechatGallery = wechatGalleryMarkdown
+    ? normalizeText(`${markdownBase}\n\n${wechatGalleryMarkdown}`)
+    : markdownBase;
 
   return {
     title,
     author,
-    publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
+    publishedAt: readMeta([
+      "meta[property='article:published_time']",
+      "meta[name='publish_date']",
+      "meta[name='pubdate']",
+    ]),
     excerpt: normalizeText(article.excerpt || ''),
     contentHTML: buildHtml(contentWithWechatGallery, text),
     contentMarkdown: markdownWithWechatGallery,

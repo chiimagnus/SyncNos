@@ -60,7 +60,9 @@ function pickTextFromNode(node: any, prefer: unknown) {
 }
 
 function selectTitle(spec: ArticleFetchSiteSpec, root: Element, text: string) {
-  const selectorTitle = spec.titleSelector ? normalizeText((root.querySelector(spec.titleSelector) as any)?.textContent || '') : '';
+  const selectorTitle = spec.titleSelector
+    ? normalizeText((root.querySelector(spec.titleSelector) as any)?.textContent || '')
+    : '';
   if (selectorTitle) return selectorTitle;
 
   const metaTitle = normalizeText(
@@ -70,7 +72,10 @@ function selectTitle(spec: ArticleFetchSiteSpec, root: Element, text: string) {
       '',
   );
   const documentTitle = normalizeText(document.title || '');
-  const order = Array.isArray(spec.titleFallbackOrder) && spec.titleFallbackOrder.length ? spec.titleFallbackOrder : ['meta', 'document'];
+  const order =
+    Array.isArray(spec.titleFallbackOrder) && spec.titleFallbackOrder.length
+      ? spec.titleFallbackOrder
+      : ['meta', 'document'];
   for (const token of order) {
     if (token === 'meta' && metaTitle) return metaTitle;
     if (token === 'document' && documentTitle) return documentTitle;
@@ -93,7 +98,9 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
     );
 
   const publishedAt =
-    (spec.publishedAtSelector ? normalizeText((root.querySelector(spec.publishedAtSelector) as any)?.textContent || '') : '') ||
+    (spec.publishedAtSelector
+      ? normalizeText((root.querySelector(spec.publishedAtSelector) as any)?.textContent || '')
+      : '') ||
     normalizeText(
       (document.querySelector("meta[property='article:published_time']") as any)?.getAttribute?.('content') ||
         (document.querySelector("meta[name='publish_date']") as any)?.getAttribute?.('content') ||
@@ -136,10 +143,11 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
     title,
     author,
     publishedAt,
-    contentHTML: htmlBody ? `<html><body>${htmlBody}</body></html>` : `<html><body><p>${escapeHtml(textContent)}</p></body></html>`,
+    contentHTML: htmlBody
+      ? `<html><body>${htmlBody}</body></html>`
+      : `<html><body><p>${escapeHtml(textContent)}</p></body></html>`,
     contentMarkdown: markdown,
     textContent,
     excerpt: '',
   };
 }
-

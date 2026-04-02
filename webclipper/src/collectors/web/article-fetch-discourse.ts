@@ -72,4 +72,3 @@ export function buildDiscourseTopicFloorUrl(
 ): string {
   return `${topic.origin}/t/${topic.slug}/${topic.topicId}/${Math.max(1, Math.floor(postNumber))}`;
 }
-

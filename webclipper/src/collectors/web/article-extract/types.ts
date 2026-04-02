@@ -9,4 +9,3 @@ export type ExtractedWebArticle = {
   textContent: string;
   warningFlags: string[];
 };
-

@@ -169,4 +169,3 @@ function renderBlock(node: any, baseHref: string, depth = 0): string {
   const inline = renderInlineChildren(node, baseHref).trim();
   return inline ? `${inline}\n\n` : '';
 }
-

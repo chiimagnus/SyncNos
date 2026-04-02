@@ -73,7 +73,10 @@ describe('article-extract wechat gallery markdown', () => {
     // @ts-expect-error test global
     globalThis.Readability = readability;
 
-    const extracted = await extractWebArticleFromCurrentPage({ stabilizationTimeoutMs: 1, stabilizationMinTextLength: 1 });
+    const extracted = await extractWebArticleFromCurrentPage({
+      stabilizationTimeoutMs: 1,
+      stabilizationMinTextLength: 1,
+    });
     const markdown = String(extracted.contentMarkdown || '');
 
     expect(markdown).toContain('![](<https://mmbiz.qpic.cn/img/a/640?wx_fmt=jpeg>)');
@@ -84,4 +87,3 @@ describe('article-extract wechat gallery markdown', () => {
     expect(markdown).not.toContain('| ![](');
   });
 });
-
