@@ -215,6 +215,7 @@ function normalizePagePropertyValue(property) {
   if (prop.date && typeof prop.date === 'object') return String(prop.date.start || '');
   if (prop.url != null) return String(prop.url || '');
   if (Object.prototype.hasOwnProperty.call(prop, 'number')) {
+    if (prop.number == null) return '';
     const n = Number(prop.number);
     return Number.isFinite(n) ? String(n) : '';
   }
