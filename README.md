@@ -74,7 +74,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 | --- | --- |
 | **Notion** | One-click sync after OAuth. AI chats → `SyncNos-AI Chats` database; web articles → `SyncNos-Web Articles` database. |
 | **Obsidian** | Writes directly to your vault via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Local-to-local, no network involved. |
-| **Markdown / Zip** | Single file or bulk export. Keep an offline copy of everything, including article comment threads. |
+| **Markdown / Zip** | Single file or bulk export. Zip v2 backups preserve article comment threads and cached images for full local recovery. |
 
 ## Core Capabilities
 
@@ -82,9 +82,13 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Local-first storage** — all content lands in IndexedDB before going anywhere else.
 - **Incremental sync** — precise cursor tracking. Only new messages and articles get synced.
 - **Insight dashboard** — total clips, source breakdown, longest conversations — see your knowledge accumulate.
-- **Chat with AI** — copy any local conversation or article to your clipboard and jump to your favorite AI platform to continue the discussion.
-- **Image caching** — optionally cache AI conversation images locally. Backfill historical images from the detail page.
-- **Database backup / restore** — full export and import of your local session database, including article comment threads. Sensitive data (OAuth tokens, etc.) is automatically excluded.
+- **Chat with AI** — copy local conversations/articles with customizable templates, platform list, and max-length controls.
+- **$ Mention in AI chats** — type `$` on supported AI sites to search saved items and insert markdown snippets inline.
+- **Inpage quick actions** — single-click the inpage button to save current content; double-click to open the comments sidebar.
+- **Article comment threads** — local threaded comments for web articles (detail + inpage panel), preserved in Zip v2 backup/restore and article sync flows.
+- **Smart current-page capture** — popup auto-detects page type and runs `Fetch AI Chat` or `Fetch Article`.
+- **Image caching** — optionally cache AI chat and web article images locally. Historical AI chat images can be backfilled from the detail page.
+- **Database backup / restore** — full export and import of your local session database, including `image_cache` and article comment threads. Sensitive data (OAuth tokens, etc.) is automatically excluded.
 - **Theme** — follows system `prefers-color-scheme` only.
 - **Inpage button** — configurable display scope (all sites / supported sites only / off).
 

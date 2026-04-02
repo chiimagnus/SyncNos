@@ -18,7 +18,7 @@
 | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
 | `src/services/integrations/item-mention/` | `$` mention 插入能力 | 在支持的 AI chat 输入框内通过 `$` 过滤本地 item 并插入同源 Markdown（站点门控真源：`src/collectors/ai-chat-sites.ts` 的 `features.dollarMention`） |
 | `src/ui/inpage/inpage-item-mention-shadow.ts` | `$` mention 候选窗壳 | 候选窗运行在独立 shadow root 中，支持键盘高亮与点击选中 |
-| `src/services/integrations/detail-header-action-types.ts` | 详情头动作槽位契约 | 定义 `open / chat-with / tools` 三类槽位，约束 popup / app 的动作分发 |
+| `src/services/integrations/detail-header-action-types.ts` | 详情头动作槽位契约 | 定义 `open / tools` 两类槽位，约束 popup / app 的动作分发（Chat with AI 也复用 `tools`） |
 | `src/ui/i18n/index.ts` | 扩展内 UI 文案入口 | 按 `navigator.language` 在英文 / 中文翻译表间切换 |
 | `src/collectors/` | 站点采集适配器 | 新 AI 站点通常从这里扩展 |
 | `src/services/conversations/data/storage-idb.ts` | 本地会话数据层 | 承载 IndexedDB 事实源 |
@@ -76,7 +76,7 @@
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击打开页面内评论侧边栏，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
-- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，**不进入 Notion / Obsidian 同步**，但会进入 Zip v2 备份 / 恢复；如果你改 comments 流程，一定同时看 storage、background handler、shared session、inpage 面板和 backup 目录。
+- article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，并会在 article 同步时进入 Notion / Obsidian 的评论区段，同时进入 Zip v2 备份 / 恢复；如果你改 comments 流程，一定同时看 storage、background handler、shared session、inpage 面板和 backup 目录。
 
 ## 本地数据与同步结构
 
@@ -100,26 +100,26 @@
 
 | UI 区域 | 主要实现 | 说明 |
 | --- | --- | --- |
-| 会话列表 / 详情 | `src/ui/conversations/ConversationsScene.tsx`, `src/ui/conversations/ConversationDetailPane.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/ui/conversations/conversations-context.tsx`, `src/services/integrations/detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 动作解析逻辑（含窄屏头部） |
+| 会话列表 / 详情 | `src/ui/conversations/ConversationsScene.tsx`, `src/ui/conversations/ConversationDetailPane.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/viewmodels/conversations/conversations-context.tsx`, `src/services/integrations/detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 动作解析逻辑（含窄屏头部） |
 | 文章评论区 | `src/ui/conversations/ConversationDetailPane.tsx`, `src/ui/conversations/ArticleCommentsSection.tsx`, `src/services/comments/threaded-comments-panel.ts`, `src/ui/inpage/inpage-comments-panel-shadow.ts` | article detail / inpage comments panel 共享本地 threaded comments 线程 |
 | 设置页 | `src/ui/settings/SettingsScene.tsx`, `src/ui/settings/SettingsSidebarNav.tsx`, `src/viewmodels/settings/types.ts` | 真实设置中枢，按 `Features / Data / About` 分组组织 `General`、`Chat with AI`、`Backup`、`Notion`、`Obsidian`、`About You`、`About Me`（section key：`aboutyou/aboutme`，兼容旧 `insight/about`） |
 | Markdown 渲染 | `src/ui/shared/markdown.ts`, `src/ui/shared/ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
 | Chat with AI | `src/ui/settings/sections/ChatWithAiSection.tsx`, `src/services/integrations/chatwith/chatwith-settings.ts`, `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | 管理 prompt 模板、平台列表、最大字符数，并把 article / conversation 渲染为可复制载荷，再从 detail header 触发复制 + 跳转 |
-| 详情工具动作 | `src/ui/conversations/conversations-context.tsx`, `src/ui/conversations/DetailHeaderActionBar.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/services/conversations/background/image-backfill-job.ts` | chat detail 可显示 `cache-images`；触发后回填图片并刷新详情 |
+| 详情工具动作 | `src/viewmodels/conversations/conversations-context.tsx`, `src/ui/conversations/DetailHeaderActionBar.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/services/conversations/background/image-backfill-job.ts` | detail 可注入 `cache-images`；触发后回填图片并刷新详情 |
 | Insight | `src/ui/settings/sections/InsightSection.tsx`, `src/ui/settings/sections/InsightPanel.tsx`, `src/viewmodels/settings/insight-stats.ts` | 只读统计本地会话库，展示总 clips、chat/article 概览、来源分布、Top 3 最长对话与文章域名分布 |
 | i18n | `src/ui/i18n/index.ts`, `src/ui/i18n/locales/*.ts` | UI 文案自动根据浏览器语言在 `en` / `zh` 间切换 |
 | 页面内评论侧边栏打开 | `src/platform/messaging/ui-background-handlers.ts` | 双击 inpage 按钮发送 `UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL`，background 转发 `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` 打开 panel；失败会提示用户点击工具栏图标进行评论 |
 
-- Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, `ai_chat_cache_images_enabled`，以及 Obsidian 连接参数。
+- Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, `ai_chat_cache_images_enabled`, `web_article_cache_images_enabled`，以及 Obsidian 连接参数。
 - Notion Parent Page 的下拉刷新不由 UI 直接请求 Notion API：Settings controller 会通过 background router 调用 `NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES`，由 `settings-background-handlers.ts` 读取 token + 已保存 page id，并调用 `notion-parent-pages.ts` 统一分页/过滤/已保存 page resolve；429 会返回带 retry 提示的 message，并在 extra 中附带 `status/code/requestId` 便于排障。
 - `General` 分区现在承接了原来分散的“inpage + 自动保存”等设置；主题仅跟随系统 `prefers-color-scheme`（不再提供手动切换）。
-- `ai_chat_cache_images_enabled` 是 `General` 分区里的独立开关：默认 `false`，仅影响 `sourceType='chat'` 的图片内联；article 会话不会显示该工具动作。
+- `ai_chat_cache_images_enabled` 与 `web_article_cache_images_enabled` 是 `General` 分区里的独立开关：默认都为 `false`，分别影响 chat/article 的图片内联。
 - `ai_chat_dollar_mention_enabled` 也是 `General` 分区的开关：默认 `true`；content controller 会监听 `chrome.storage.onChanged`，因此通常可在当前标签页热更新启停 `$ mention`（不要求刷新页面）。
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
 - detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
 - article comments 只在 article detail 和 inpage panel 中出现；它们是本地评论线程，不占用 `Chat with AI`、`tools` 或 `open` 的动作槽位。
-- detail header 的动作槽位由 `detail-header-action-types.ts` 统一定义为 `open / chat-with / tools`；`ConversationDetailPane` 与 `DetailNavigationHeader` 都按同一槽位拆分渲染。
-- `conversations-context.tsx` 会为非 article 会话注入 `cache-images` 工具动作：点击后调用 `backfillConversationImages()`，后台复扫消息并在成功后刷新当前 detail，同时反馈 `updatedMessages / downloadedCount / fromCacheCount`。
+- detail header 的动作槽位由 `detail-header-action-types.ts` 统一定义为 `open / tools`；`ConversationDetailPane` 与 `DetailNavigationHeader` 都按同一槽位拆分渲染，Chat with AI 动作也落在 `tools`。
+- `conversations-context.tsx` 会在当前会话可用时注入 `cache-images` 工具动作：点击后调用 `backfillConversationImages()`，后台复扫消息并在成功后刷新当前 detail，同时反馈 `updatedMessages / downloadedCount / fromCacheCount`。
 - `src/viewmodels/settings/useSettingsSceneController.ts` 只在 `activeSection === 'aboutyou'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。
 - `SettingsScene.tsx` 会为 About You（Insight）分区放宽 detail 宽度到 `1120px`，因为这一页需要容纳双栏图表与排行布局。
 - `BackupSection.tsx` 的导入统计现在会展示 comments 相关数量，因此恢复验证时不能只看会话和图片缓存。
@@ -143,8 +143,8 @@
 - **改 Insight 统计 / 排行 / 图表**：先看 `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `src/viewmodels/settings/useSettingsSceneController.ts`；这里决定 Top N、Other 分桶、空态 / 错误态和图表布局。
 - **改列表筛选下拉 / 菜单裁切**：先看 `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx`；不要再回退固定 `maxHeight`，否则容易在底部条或窄窗口出现无谓滚动条。
 - **改主题 tokens / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `src/viewmodels/settings/useSettingsSceneController.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略 token 真源。
-- **改 detail header 动作分发**：先看 `src/services/integrations/detail-header-action-types.ts`, `src/services/integrations/detail-header-actions.ts`, `conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
-- **改图片缓存补全流程（cache-images）**：先看 `src/ui/conversations/conversations-context.tsx`, `src/services/conversations/client/repo.ts`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts`；确认仅 chat 会话显示动作，并核对回填后 detail 刷新与计数反馈。
+- **改 detail header 动作分发**：先看 `src/services/integrations/detail-header-action-types.ts`, `src/services/integrations/detail-header-actions.ts`, `src/viewmodels/conversations/conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
+- **改图片缓存补全流程（cache-images）**：先看 `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/client/repo.ts`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts`；核对动作注入条件、回填后 detail 刷新与计数反馈。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
 
@@ -162,7 +162,7 @@
 | article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
 | article comments / 锚点异常 | `src/services/comments/data/storage-idb.ts`, `src/services/comments/background/handlers.ts`, `src/ui/conversations/ArticleCommentsSection.tsx`, `src/services/comments/threaded-comments-panel.ts`, `src/ui/inpage/inpage-comments-panel-shadow.ts` | 看 canonicalUrl 归一、reply / delete 路由与 shadow DOM 面板挂载 |
 | Chat with AI / 打开目标异常 | `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.test.ts`, `app-detail-header-actions.test.ts` | 看模板变量、平台设置、槽位动作分发与 clipboard + 跳转行为 |
-| 详情工具动作异常（cache-images） | `src/ui/conversations/conversations-context.tsx`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts` | 看动作显隐（仅 chat）、`BACKFILL_CONVERSATION_IMAGES` 路由与回填计数是否一致 |
+| 详情工具动作异常（cache-images） | `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts` | 看动作注入、`BACKFILL_CONVERSATION_IMAGES` 路由与回填计数是否一致 |
 | Insight 统计异常 | `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.test.ts`, `settings-sections.test.ts` | 先区分是 IndexedDB 读失败、聚合规则偏差、还是 Settings 导航 / 图表布局回归 |
 
 ## 来源引用（Source References）
@@ -209,6 +209,7 @@
 - `webclipper/src/services/protocols/conversation-kinds.ts`
 - `webclipper/src/services/sync/notion/notion-sync-orchestrator.ts`
 - `webclipper/src/services/sync/obsidian/obsidian-sync-orchestrator.ts`
+- `webclipper/src/services/sync/obsidian/obsidian-markdown-writer.ts`
 - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
 - `webclipper/src/ui/settings/SettingsSidebarNav.tsx`

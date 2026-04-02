@@ -8,7 +8,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 | 存储面 | 产品线 | 介质 | 保存内容 | 主要入口 |
 | --- | --- | --- | --- | --- |
 | IndexedDB | WebClipper | 浏览器本地数据库 | conversations、messages、sync_mappings、image_cache、article_comments | `src/platform/idb/schema.ts`, `src/services/conversations/data/storage-idb.ts`, `src/services/comments/data/storage-idb.ts` |
-| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | `src/viewmodels/settings/useSettingsSceneController.ts`、settings stores |
+| `chrome.storage.local` | WebClipper | 本地 KV | Notion / Obsidian / `inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_cache_images_enabled` / `web_article_cache_images_enabled` / Chat with AI 等运行设置（不缓存 Insight 统计结果） | `src/viewmodels/settings/useSettingsSceneController.ts`、settings stores |
 | `localStorage` | WebClipper | 本地 Web Storage | 设置页当前 section、会话来源筛选、App sidebar UI 偏好 | `types.ts`, `ConversationListPane.tsx`, `AppShell.tsx` |
 | `sessionStorage` | WebClipper | 本地 Web Storage | 窄屏 list/detail 路由中的待打开 conversation payload（id，或 id+source/key） | `pending-open.ts` |
 | Zip v2 备份 | WebClipper | 本地压缩包 | conversations CSV、分源 JSON、storage-local.json、image-cache、article-comments、manifest | `src/services/sync/backup/export.ts`, `src/services/sync/backup/import.ts` |
@@ -24,17 +24,17 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 | `sync_mappings` | object store | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt`, `updatedAt` | 决定是否能增量同步 |
 | `image_cache` | object store | `conversationId + url` 唯一索引、`opfsPath` 等元数据 | 本地图片缓存读取与回填加速 |
 | `article_comments` | object store | `canonicalUrl`, `conversationId`, `parentId`, `authorName?`, `quoteText`, `commentText`, `locator?`, `createdAt`, `updatedAt` | article 详情页的本地评论线程、回复与删除（`locator` 为可选的选区锚点信息） |
-| `chrome.storage.local` | KV | `inpage_display_mode`, `ai_chat_auto_save_enabled`, `ai_chat_cache_images_enabled`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
+| `chrome.storage.local` | KV | `inpage_display_mode`, `ai_chat_auto_save_enabled`, `ai_chat_cache_images_enabled`, `web_article_cache_images_enabled`, `notion_parent_page_id`, `notion_parent_page_title`, `chat_with_*`, Obsidian settings, Notion AI 偏好等 | 保存非敏感运行设置 |
 
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
-- `article_comments` 是独立的本地注释层：它会跟随 article 详情页和 inpage comments panel 使用，并会随 Zip v2 备份 / 导入一起保留；它仍然不进入 Notion / Obsidian 同步。
+- `article_comments` 是独立的本地注释层：它会跟随 article 详情页和 inpage comments panel 使用，并会在 article 同步时进入 Notion / Obsidian 评论区段，同时随 Zip v2 备份 / 导入一起保留。
 - `$` mention（在 ChatGPT/Notion AI 输入框插入本地 item）只读扫描 `conversations` 做候选过滤；插入文本复用现有 “Copy full markdown” 的同源格式化链路，且当前不做截断。
 - `schema.ts` 的 v2 迁移专门处理 NotionAI thread，把 legacy conversation key 重写为 stable key，并同步迁移 mapping。
 - `schema.ts` 的 v4 迁移会归并 legacy article conversations，把 URL 规范化为 canonical key，减少当前页抓取、article 导入与历史数据升级后的重复会话。
 - `schema.ts` 的 v6 迁移会清理 `conversations.description` 旧字段，避免历史冗余字段继续扩散到新记录。
 - `schema.ts` 的 v7 会把 `article_comments` 作为新 store 纳入 schema，并补齐 `by_canonicalUrl_createdAt` 与 `by_conversationId_createdAt` 索引。
-- `ai_chat_cache_images_enabled` 打开后，background 会在 chat 消息写入时尝试图片内联；对历史消息的补齐由 detail tools 的 `cache-images`（`BACKFILL_CONVERSATION_IMAGES`）触发。
+- `ai_chat_cache_images_enabled` / `web_article_cache_images_enabled` 打开后，background 会分别在 chat/article 消息写入时尝试图片内联；对历史消息的补齐由 detail tools 的 `cache-images`（`BACKFILL_CONVERSATION_IMAGES`）触发。
 
 ## WebClipper：UI-only 状态存储
 
@@ -122,7 +122,7 @@ export const DB_VERSION = 7;
 - `webclipper/src/services/comments/background/handlers.ts`
 - `webclipper/src/services/comments/client/repo.ts`
 - `webclipper/src/services/comments/data/storage-idb.ts`
-- `webclipper/src/ui/conversations/conversations-context.tsx`
+- `webclipper/src/viewmodels/conversations/conversations-context.tsx`
 - `webclipper/src/ui/conversations/ArticleCommentsSection.tsx`
 - `webclipper/src/services/comments/threaded-comments-panel.ts`
 - `webclipper/src/ui/inpage/inpage-comments-panel-shadow.ts`

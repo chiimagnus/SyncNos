@@ -64,7 +64,7 @@
 | WebClipper 的文章评论 / 注释线程改哪里？ | [modules/comments.md](modules/comments.md) | [modules/webclipper.md](modules/webclipper.md), [storage.md](storage.md), [testing.md](testing.md) |
 | WebClipper 底部 `source/site` 筛选菜单为什么高度会动态变化、怎样排查裁切？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [troubleshooting.md](troubleshooting.md) |
 | `Chat with AI` 是怎么从详情页触发的、模板和平台存在哪？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
-| `cache-images` 为什么只在 chat detail 出现，且有时提示更新 0 条？ | [modules/webclipper.md](modules/webclipper.md) | [data-flow.md](data-flow.md), [configuration.md](configuration.md), [troubleshooting.md](troubleshooting.md) |
+| `cache-images` 为什么有时提示更新 0 条，图片缓存开关如何按来源生效？ | [modules/webclipper.md](modules/webclipper.md) | [data-flow.md](data-flow.md), [configuration.md](configuration.md), [troubleshooting.md](troubleshooting.md) |
 | 为什么窄屏下从 Insight 点进对话能直接打开 detail？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [architecture.md](architecture.md) |
 | 我应该改哪个目录？ | [overview.md](overview.md) | [architecture.md](architecture.md), `modules/` |
 | 某个数据源 / collector / sync job 影响哪些系统？ | [architecture.md](architecture.md) | [data-flow.md](data-flow.md), [troubleshooting.md](troubleshooting.md) |
@@ -81,6 +81,7 @@
 - [GENERATION.md](GENERATION.md)
 
 ## 更新记录（Update Notes）
+- 2026-04-02：对齐会话详情动作槽位事实（`open / tools`）、更新图片缓存双开关（`ai_chat_cache_images_enabled` / `web_article_cache_images_enabled`）、同步 article comments 已进入 Notion/Obsidian 同步区段；并修复 deepwiki 内 `conversations-context.tsx` 路径到 `src/viewmodels/conversations/conversations-context.tsx`。
 - 2026-03-30：同步 WebClipper Settings section key（`aboutyou/aboutme`）与相关 deep-link（安装后 About Me、统计入口 About You）；补齐 Notion 设置侧链路（`LIST_PARENT_PAGES`、Parent Page 发现/resolve、OAuth pending/error 状态与断开清理）；并刷新 `configuration.md` 的版本事实源对齐规则。
 - 2026-03-29：同步 WebClipper 新行为与契约：inpage 双击从“打开 popup”调整为“打开页面内评论侧边栏”；补齐 `$ mention`（item-mention）配置键、消息契约与测试入口；更正 manifest icons 事实（`16/48/128` 仍存在，仅 `icon-128.png` 暴露为 `web_accessible_resources`）。
 - 2026-03-25：清理 deepwiki 内 WebClipper 旧目录引用并统一迁移到 `src/services/*` / `src/ui/i18n/*`；同步 comments locator 事实（移除不存在的 `quoteContext`）；更新 `GENERATION.md` 元数据。

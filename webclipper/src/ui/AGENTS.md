@@ -347,8 +347,8 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 | 槽位        | 典型动作                          | 真源                                                                                       | UI 约束                                       |
 | ----------- | --------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
 | `open`      | Open in Notion / Open in Obsidian | `src/services/integrations/openin/*`, `src/services/integrations/detail-header-actions.ts` | 单动作直出，多动作菜单                        |
-| `chat-with` | Chat with ChatGPT / Claude / ...  | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts`                     | 先复制 payload，再跳转外链                    |
-| `tools`     | `cache-images`（仅 chat）         | `src/viewmodels/conversations/conversations-context.tsx`                                   | article 不显示；触发后应回馈计数并刷新 detail |
+| `tools`     | Chat with ChatGPT / Claude / ...  | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts`                     | 先复制 payload，再跳转外链                    |
+| `tools`     | `cache-images`                     | `src/viewmodels/conversations/conversations-context.tsx`                                   | 触发后应回馈计数并刷新 detail                 |
 
 - 槽位契约定义在 `src/services/integrations/detail-header-action-types.ts`，不要在组件内硬编码“动作分组字符串”。
 - 主详情页与窄屏 header 必须共享同一分发行为：
@@ -359,8 +359,7 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 
 最小手工验证（popup + app 都要过）：
 
-- chat detail：`tools / chat-with / open` 槽位均可显示且可点击。
-- article detail：不出现 `cache-images`。
+- detail：`open / tools` 槽位都可显示且可点击（Chat with AI 与 cache-images 同属 `tools`）。
 - 窄屏模式：header 动作槽位与宽屏详情页一致，无缺槽位或错位分组。
 
 ## B7 · Markdown 阅读风格协议（Medium / Notion / Book）

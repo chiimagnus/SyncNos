@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `1327be6765cc1875476f8846f2dd531a30bcb023` |
+| Commit hash | `3010574e0ac817a2988fd5b214a54535c7efb491` |
 | Branch name | `main` |
-| Generation timestamp | `2026-03-30 12:22:32 +0800` |
+| Generation timestamp | `2026-04-02 16:46:27 +0800` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Incremental sync update |
@@ -46,10 +46,11 @@
 - `assets/setting-screenshots.png`
 
 ## What Changed In This Update
-- 同步 WebClipper Settings section key 漂移：将文档中的 `insight/about` 更新为 `aboutyou/aboutme`，并对齐相关 deep-link（安装后默认打开 About Me，列表底部统计入口跳 About You）。
-- 补齐 Notion 设置侧文档链路：新增 `LIST_PARENT_PAGES` 消息契约说明、Parent Page 发现（分页/过滤/resolve 已保存 page）与 429 retry 提示；并同步 OAuth pending/error 状态键与断开连接清理范围。
-- 刷新 `configuration.md` 的扩展侧存储键与门控事实：补齐 OAuth/Sync Provider gate 的关键键位，并对齐版本事实源维护规则（避免多处重复写死版本）。
-- 更新 `api.md` / `data-flow.md` / `modules/webclipper.md` / `testing.md` / `troubleshooting.md`：确保消息契约、数据链路、测试入口与排障提示与当前源码一致。
+- 对齐会话详情动作槽位：统一为 `open / tools`，移除文档中的 `chat-with` 独立槽位表述，并说明 Chat with AI 复用 `tools`。
+- 刷新图片缓存链路文档：补齐 `web_article_cache_images_enabled`，并将 cache-images 说明改为“历史会话手动回填 + 统计反馈”。
+- 同步 article comments 事实：更新为会在 article 同步时进入 Notion/Obsidian 评论区段，同时保持 local-first + Zip v2 备份恢复。
+- 修复 deepwiki 中 `conversations-context.tsx` 的路径漂移：统一改为 `src/viewmodels/conversations/conversations-context.tsx`。
+- 更新 `configuration.md` 的版本与权限事实：`manifest.version` 对齐 `1.5.1`，权限列表补齐 `tabGroups`。
 
 ## Coverage Notes
 - 本次重点是“WebClipper inpage 交互与消息契约事实同步”：修正双击入口、补齐 `$ mention` 与消息分组，避免文档与代码行为冲突。

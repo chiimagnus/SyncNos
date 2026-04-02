@@ -3,7 +3,7 @@
 ## 职责
 - 为 WebClipper 的 article 会话提供本地优先的 threaded comments。
 - 允许用户在 article detail 或 inpage comments panel 中添加、回复、删除评论；评论记录可选保存 `locator`（TextQuote/TextPosition selectors）用于恢复选区与上下文，但**不维护持久高亮回显**。
-- 当前定位是**本地注释层**：它是 article 会话的一部分，不进入 Notion / Obsidian 同步，但会跟随 Zip v2 备份 / 导入保留。
+- 当前定位是**local-first 注释层**：它是 article 会话的一部分，会在 article 同步时进入 Notion / Obsidian 的评论区段，并继续跟随 Zip v2 备份 / 导入保留。
 
 ## 关键文件
 
@@ -35,7 +35,7 @@
 | 线程关系 | `parentId` | `null` 表示 root comment；非空表示 reply |
 | orphan 处理 | `conversationId = null` | 页面未解析出会话时先落本地，随后 attach |
 
-- `article_comments` 是 article 的本地注释层，不参与 Notion / Obsidian 的增量同步，但会随 Zip v2 备份 / 导入一起保留。
+- `article_comments` 是 article 的本地注释层，会在 article 同步时参与 Notion / Obsidian 评论区段更新，并随 Zip v2 备份 / 导入一起保留。
 - 旧版或被裁剪的 Zip v2 备份如果缺少 `assets/article-comments/index.json`，恢复时仍会丢失评论线程；排查时先看 manifest。
 - 评论线程会保存 `quoteText` 与可选 `locator`（TextQuote/TextPosition selectors），用于在 threaded panel 中恢复选区并帮助滚动/聚焦；但不会做“持久高亮回显”。
 
