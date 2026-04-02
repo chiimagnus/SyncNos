@@ -102,9 +102,6 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     const escapedAlt = inst.utils.escapeHtml(String(alt || ''));
     const titleRaw = token && typeof token.attrGet === 'function' ? String(token.attrGet('title') || '') : '';
     const titleAttr = titleRaw ? ` title="${inst.utils.escapeHtml(titleRaw)}"` : '';
-    // Many CDNs block hotlinking when the referer is `chrome-extension://...`.
-    // Use `no-referrer` for http(s) images so the browser does not send extension origin as referer.
-    const referrerPolicyAttr = isHttpUrl(safeSrc) && !isDataImageUrl(safeSrc) ? ' referrerpolicy="no-referrer"' : '';
     const assetId = parseSyncnosAssetId(safeSrc);
     if (assetId) {
       const envMap = env && typeof env === 'object' ? (env as any).syncnosAssetSrcById : null;
@@ -114,12 +111,12 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       const placeholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
       const finalSrc = safeResolved || placeholderSrc;
       const escapedFinal = inst.utils.escapeHtml(finalSrc);
-      return `<img src="${escapedFinal}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}${referrerPolicyAttr}>`;
+      return `<img src="${escapedFinal}" alt="${escapedAlt}" data-syncnos-asset-id="${assetId}"${titleAttr}>`;
     }
 
     const escapedSrc = inst.utils.escapeHtml(safeSrc);
 
-    const img = `<img src="${escapedSrc}" alt="${escapedAlt}"${titleAttr}${referrerPolicyAttr}>`;
+    const img = `<img src="${escapedSrc}" alt="${escapedAlt}"${titleAttr}>`;
 
     if (!isHttpUrl(safeSrc) || isDataImageUrl(safeSrc)) return img;
 
