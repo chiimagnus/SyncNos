@@ -2,6 +2,11 @@ import type { AddArticleCommentInput, ArticleComment } from '@services/comments/
 import { openDb as openSchemaDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
+export type ArticleCommentDeleteContext = {
+  conversationId: number | null;
+  canonicalUrl: string;
+};
+
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
 
@@ -176,6 +181,55 @@ export async function listArticleCommentsByConversationId(conversationId: number
   const rows = range ? await reqToPromise<any[]>(idx.getAll(range) as any) : [];
   await txDone(t);
   return (Array.isArray(rows) ? rows : []).map(toComment);
+}
+
+function toDeleteContext(row: any): ArticleCommentDeleteContext {
+  return {
+    conversationId: normalizeConversationId(row?.conversationId),
+    canonicalUrl: normalizeCanonicalUrl(row?.canonicalUrl),
+  };
+}
+
+export async function getArticleCommentDeleteContextById(id: number): Promise<ArticleCommentDeleteContext | null> {
+  const commentId = Number(id);
+  if (!Number.isFinite(commentId) || commentId <= 0) return null;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['article_comments'], 'readonly');
+  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
+  await txDone(t);
+
+  const byId = new Map<number, any>();
+  for (const row of rows) {
+    const rowId = Number(row?.id);
+    if (!Number.isFinite(rowId) || rowId <= 0) continue;
+    byId.set(rowId, row);
+  }
+
+  const target = byId.get(commentId);
+  if (!target) {
+    for (const row of rows) {
+      if (normalizeParentId(row?.parentId) !== commentId) continue;
+      return toDeleteContext(row);
+    }
+    return null;
+  }
+
+  const context = toDeleteContext(target);
+  if (context.conversationId != null && context.canonicalUrl) return context;
+
+  const parentId = normalizeParentId(target?.parentId);
+  if (parentId != null) {
+    const parent = byId.get(parentId);
+    if (parent) {
+      const parentContext = toDeleteContext(parent);
+      return {
+        conversationId: context.conversationId ?? parentContext.conversationId,
+        canonicalUrl: context.canonicalUrl || parentContext.canonicalUrl,
+      };
+    }
+  }
+  return context;
 }
 
 export async function deleteArticleCommentById(id: number): Promise<boolean> {
