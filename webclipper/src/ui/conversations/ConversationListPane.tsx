@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Conversation } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
@@ -256,11 +256,11 @@ export function ConversationListPane({
   const showPaginationDone = hasLoadedItems && !loadingInitialList && !loadingMoreList && !listError && !listHasMore;
   const paginationErrorMessage = String(listError || '').trim();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = selectAllRef.current;
     if (!el) return;
     el.indeterminate = indeterminate;
-  }, [indeterminate]);
+  }, [indeterminate, selectStateTotal, selectedCount]);
 
   const hasSelection = selectedTotalCount > 0;
   const actionBusy = exporting || deleting;
