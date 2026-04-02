@@ -804,9 +804,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onResetChatWithPlatforms = useCallback(async () => {
     await runTask(async () => {
       await resetChatWithPlatforms();
-      await refreshInternal();
+      setChatWithPlatforms(DEFAULT_CHAT_WITH_PLATFORMS.slice());
     });
-  }, [refreshInternal, runTask]);
+  }, [runTask]);
 
   const handleBackupExport = useCallback(async () => {
     if (busy) return;
