@@ -294,10 +294,14 @@ export function ThreadedCommentsPanel({
   };
 
   useLayoutEffect(() => {
+    const allowPendingFocusWhenRequested =
+      snapshot.hasFocusWithinPanel ||
+      snapshot.pendingFocusRootId != null ||
+      pendingReplyFocusRootIdRef.current != null;
     const rootId = resolvePendingFocusTarget({
       pendingFocusRootId: snapshot.pendingFocusRootId,
       fallbackPendingFocusRootId: pendingReplyFocusRootIdRef.current,
-      hasFocusWithinPanel: snapshot.hasFocusWithinPanel,
+      hasFocusWithinPanel: allowPendingFocusWhenRequested,
       existingRootIds: rootIdSet,
     });
     if (rootId == null) return;
@@ -320,7 +324,15 @@ export function ThreadedCommentsPanel({
   }, [rootIdSet, setPendingFocusRootId, snapshot.hasFocusWithinPanel, snapshot.pendingFocusRootId, snapshot.comments]);
 
   useLayoutEffect(() => {
-    const onDocumentPointerDown = () => {
+    const onDocumentPointerDown = (event: PointerEvent) => {
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      for (const node of path) {
+        const element = node as Element | null;
+        if (!element || typeof (element as any).matches !== 'function') continue;
+        if ((element as Element).matches('button[data-webclipper-comment-delete-id]')) {
+          return;
+        }
+      }
       updateArmedDeleteId(null);
     };
     document.addEventListener('pointerdown', onDocumentPointerDown, true);

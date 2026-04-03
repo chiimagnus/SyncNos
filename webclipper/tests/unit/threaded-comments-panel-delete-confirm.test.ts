@@ -139,4 +139,41 @@ describe('Threaded comments panel delete confirmation', () => {
 
     mounted.cleanup();
   });
+
+  it('keeps armed state on delete-button pointerdown so second click really deletes', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    mounted.api.setHandlers({ onDelete });
+    mounted.api.setComments([{ id: 1, parentId: null, createdAt: 1000, commentText: 'root' }]);
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    const shadow = panel!.shadowRoot!;
+
+    const del = shadow.querySelector('button[data-webclipper-comment-delete-id="1"]') as HTMLButtonElement | null;
+    expect(del).toBeTruthy();
+
+    del!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(del!.textContent).toBe('deleteButton');
+    expect(onDelete).toHaveBeenCalledTimes(0);
+
+    const PointerCtor = (window as any).PointerEvent || window.MouseEvent;
+    const pointer = new PointerCtor('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+    del!.dispatchEvent(pointer as Event);
+
+    del!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(1);
+
+    mounted.cleanup();
+  });
 });
