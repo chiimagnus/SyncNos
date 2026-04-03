@@ -1,5 +1,6 @@
 import { t } from '@i18n';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 import type { ThreadedCommentsPanelProps } from './types';
 
@@ -40,6 +41,7 @@ export function ThreadedCommentsPanel({
   showCollapseButton,
   showHeaderChatWith,
   snapshot,
+  readHandlers,
   onRequestClose,
   onHeaderChatWithRootChange,
   setPendingFocusRootId,
@@ -51,16 +53,29 @@ export function ThreadedCommentsPanel({
   const [composerText, setComposerText] = useState('');
   const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
   const [armedDeleteId, setArmedDeleteId] = useState<number | null>(null);
+  const armedDeleteIdRef = useRef<number | null>(null);
   const [openCommentChatWithRootId, setOpenCommentChatWithRootId] = useState<number | null>(null);
   const [commentChatWithMenus, setCommentChatWithMenus] = useState<
     Record<number, { actions: { id: string; label: string; disabled?: boolean; onTrigger?: () => void | string | Promise<void | string> }[] }>
   >({});
   const [localBusyCount, setLocalBusyCount] = useState(0);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerTextRef = useRef('');
   const lastFocusedComposerSignalRef = useRef(0);
+  const lastHandledEscapeSignalRef = useRef(0);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
-  const busy = snapshot.busy || localBusyCount > 0;
+  const externallyBusy = snapshot.busy === true;
+  const busy = externallyBusy || localBusyCount > 0;
+
+  const syncLocalState = (run: () => void) => {
+    try {
+      flushSync(run);
+    } catch (_error) {
+      run();
+    }
+  };
 
   const autosizeTextarea = (textarea: HTMLTextAreaElement | null | undefined) => {
     if (!textarea) return;
@@ -104,10 +119,34 @@ export function ThreadedCommentsPanel({
     }
   };
 
-  const submitComposer = async () => {
-    const text = String(composerText || '').trim();
+  const updateComposerText = (value: string) => {
+    const next = String(value || '');
+    composerTextRef.current = next;
+    syncLocalState(() => {
+      setComposerText(next);
+    });
+  };
+
+  const updateReplyText = (rootId: number, value: string) => {
+    const next = String(value || '');
+    replyTextsRef.current = { ...replyTextsRef.current, [rootId]: next };
+    syncLocalState(() => {
+      setReplyText(rootId, next);
+    });
+  };
+
+  const updateArmedDeleteId = (next: number | null) => {
+    armedDeleteIdRef.current = next;
+    syncLocalState(() => {
+      setArmedDeleteId(next);
+    });
+  };
+
+  const submitComposer = async (rawText?: string | null) => {
+    const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();
     if (!text || busy) return;
-    const onSave = snapshot.handlers.onSave;
+    const latestHandlers = readHandlers?.() || snapshot.handlers;
+    const onSave = latestHandlers.onSave;
     if (typeof onSave !== 'function') return;
     await runBusyTask(async () => {
       const result = await onSave(text);
@@ -116,6 +155,7 @@ export function ThreadedCommentsPanel({
         pendingReplyFocusRootIdRef.current = Math.round(createdRootId);
         setPendingFocusRootId?.(Math.round(createdRootId));
       }
+      composerTextRef.current = '';
       setComposerText('');
       try {
         if (composerTextareaRef.current) {
@@ -128,11 +168,11 @@ export function ThreadedCommentsPanel({
     });
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     autosizeTextarea(composerTextareaRef.current);
   }, [composerText]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const signal = Number(snapshot.focusComposerSignal || 0);
     if (!Number.isFinite(signal) || signal <= 0) return;
     if (signal <= lastFocusedComposerSignalRef.current) return;
@@ -140,6 +180,18 @@ export function ThreadedCommentsPanel({
     focusComposer();
     lastFocusedComposerSignalRef.current = signal;
   }, [busy, snapshot.focusComposerSignal]);
+
+  useLayoutEffect(() => {
+    const signal = Number(snapshot.escapeSignal || 0);
+    if (!Number.isFinite(signal) || signal <= 0) return;
+    if (signal <= lastHandledEscapeSignalRef.current) return;
+    lastHandledEscapeSignalRef.current = signal;
+    if (openCommentChatWithRootId != null) {
+      setOpenCommentChatWithRootId(null);
+      return;
+    }
+    updateArmedDeleteId(null);
+  }, [openCommentChatWithRootId, snapshot.escapeSignal]);
 
   const normalizedItems = Array.isArray(snapshot.comments)
     ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
@@ -161,17 +213,21 @@ export function ThreadedCommentsPanel({
   const setReplyText = (rootId: number, value: string) => {
     setReplyTexts((prev) => {
       if ((prev[rootId] || '') === value) return prev;
-      return { ...prev, [rootId]: value };
+      const next = { ...prev, [rootId]: value };
+      replyTextsRef.current = next;
+      return next;
     });
   };
 
-  const submitReply = async (rootId: number) => {
-    const onReply = snapshot.handlers.onReply;
+  const submitReply = async (rootId: number, rawText?: string | null) => {
+    const latestHandlers = readHandlers?.() || snapshot.handlers;
+    const onReply = latestHandlers.onReply;
     if (typeof onReply !== 'function') return;
-    const text = String(replyTexts[rootId] || '').trim();
+    const text = String(rawText ?? replyTextareaRefs.current[rootId]?.value ?? replyTextsRef.current[rootId] ?? '').trim();
     if (!text || busy) return;
     await runBusyTask(async () => {
       await onReply(rootId, text);
+      replyTextsRef.current = { ...replyTextsRef.current, [rootId]: '' };
       setReplyText(rootId, '');
       pendingReplyFocusRootIdRef.current = rootId;
       setPendingFocusRootId?.(rootId);
@@ -199,7 +255,7 @@ export function ThreadedCommentsPanel({
     if (!ok) onLocateFailed?.();
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const rootId = Number(snapshot.pendingFocusRootId || pendingReplyFocusRootIdRef.current || 0);
     if (!Number.isFinite(rootId) || rootId <= 0) return;
     if (!snapshot.hasFocusWithinPanel) return;
@@ -222,9 +278,9 @@ export function ThreadedCommentsPanel({
     setPendingFocusRootId?.(null);
   }, [rootIdSet, setPendingFocusRootId, snapshot.hasFocusWithinPanel, snapshot.pendingFocusRootId, snapshot.comments]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onDocumentPointerDown = () => {
-      setArmedDeleteId(null);
+      updateArmedDeleteId(null);
     };
     document.addEventListener('pointerdown', onDocumentPointerDown, true);
     return () => {
@@ -233,14 +289,15 @@ export function ThreadedCommentsPanel({
   }, []);
 
   const handleDelete = async (id: number) => {
-    if (busy) return;
+    if (externallyBusy) return;
     if (!Number.isFinite(id) || id <= 0) return;
-    if (armedDeleteId !== id) {
-      setArmedDeleteId(id);
+    if (armedDeleteIdRef.current !== id) {
+      updateArmedDeleteId(id);
       return;
     }
-    setArmedDeleteId(null);
-    const onDelete = snapshot.handlers.onDelete;
+    updateArmedDeleteId(null);
+    const latestHandlers = readHandlers?.() || snapshot.handlers;
+    const onDelete = latestHandlers.onDelete;
     if (typeof onDelete !== 'function') return;
     await runBusyTask(async () => {
       await onDelete(id);
@@ -269,7 +326,9 @@ export function ThreadedCommentsPanel({
     if (busy) return;
     if (!commentChatWith || typeof commentChatWith.resolveActions !== 'function') return;
     if (openCommentChatWithRootId === rootId) {
-      setOpenCommentChatWithRootId(null);
+      syncLocalState(() => {
+        setOpenCommentChatWithRootId(null);
+      });
       return;
     }
     const rootComment = roots.find((item) => Number(item.id) === rootId);
@@ -282,7 +341,9 @@ export function ThreadedCommentsPanel({
     );
     if (!actions.length) {
       showNotice?.('No AI platforms enabled');
-      setOpenCommentChatWithRootId(null);
+      syncLocalState(() => {
+        setOpenCommentChatWithRootId(null);
+      });
       return;
     }
     if (actions.length === 1) {
@@ -293,18 +354,24 @@ export function ThreadedCommentsPanel({
         const msg = error instanceof Error ? error.message : String(error || t('actionFailedFallback'));
         showNotice?.(msg);
       }
-      setOpenCommentChatWithRootId(null);
+      syncLocalState(() => {
+        setOpenCommentChatWithRootId(null);
+      });
       return;
     }
-    setCommentChatWithMenus((prev) => ({ ...prev, [rootId]: { actions } }));
-    setOpenCommentChatWithRootId(rootId);
+    syncLocalState(() => {
+      setCommentChatWithMenus((prev) => ({ ...prev, [rootId]: { actions } }));
+      setOpenCommentChatWithRootId(rootId);
+    });
   };
 
   const triggerCommentChatWithAction = async (rootId: number, actionId: string) => {
     const menu = commentChatWithMenus[rootId];
     const action = menu?.actions.find((item) => item.id === actionId);
     if (!action || action.disabled || busy) return;
-    setOpenCommentChatWithRootId(null);
+    syncLocalState(() => {
+      setOpenCommentChatWithRootId(null);
+    });
     try {
       const message = await action.onTrigger?.();
       if (message) showNotice?.(String(message));
@@ -314,7 +381,7 @@ export function ThreadedCommentsPanel({
     }
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     return () => {
       onHeaderChatWithRootChange?.(null);
     };
@@ -327,20 +394,24 @@ export function ThreadedCommentsPanel({
         const target = event.target as HTMLElement | null;
         if (target?.closest('button[data-webclipper-comment-delete-id]')) return;
         if (!target?.closest('.webclipper-inpage-comments-panel__comment-chatwith')) {
-          setOpenCommentChatWithRootId(null);
+          syncLocalState(() => {
+            setOpenCommentChatWithRootId(null);
+          });
         }
-        setArmedDeleteId(null);
+        updateArmedDeleteId(null);
       }}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return;
         if (openCommentChatWithRootId != null) {
           event.preventDefault();
-          setOpenCommentChatWithRootId(null);
+          syncLocalState(() => {
+            setOpenCommentChatWithRootId(null);
+          });
           return;
         }
-        if (armedDeleteId == null) return;
+        if (armedDeleteIdRef.current == null) return;
         event.preventDefault();
-        setArmedDeleteId(null);
+        updateArmedDeleteId(null);
       }}
     >
       {showHeader ? (
@@ -399,14 +470,15 @@ export function ThreadedCommentsPanel({
               placeholder="Write a comment…"
               rows={1}
               value={composerText}
-              onChange={(event) => setComposerText(event.currentTarget.value)}
+              onInput={(event) => updateComposerText(event.currentTarget.value)}
+              onChange={(event) => updateComposerText(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if ((event.nativeEvent as KeyboardEvent).isComposing) return;
                 if (event.key !== 'Enter') return;
                 if (!(event.metaKey || event.ctrlKey)) return;
                 if (event.shiftKey || event.altKey) return;
                 event.preventDefault();
-                void submitComposer();
+                void submitComposer(event.currentTarget.value);
               }}
               disabled={false}
             />
@@ -431,7 +503,7 @@ export function ThreadedCommentsPanel({
               const rootId = Number(root.id);
               const replies = repliesByRoot.get(rootId) || [];
               return (
-                <div key={rootId} className="webclipper-inpage-comments-panel__thread">
+                <div key={rootId} className="webclipper-inpage-comments-panel__thread" data-thread-root-id={String(rootId)}>
                   {root.quoteText ? (
                     <div
                       className="webclipper-inpage-comments-panel__thread-quote"
@@ -469,8 +541,8 @@ export function ThreadedCommentsPanel({
                               aria-expanded={openCommentChatWithRootId === rootId ? 'true' : 'false'}
                               disabled={busy || !String(root.commentText || '').trim()}
                               data-base-disabled={String(String(root.commentText || '').trim() ? 0 : 1)}
-                              onClick={() => {
-                                void toggleCommentChatWithMenu(rootId);
+                                onClick={() => {
+                                  void toggleCommentChatWithMenu(rootId);
                               }}
                             >
                               {t('detailHeaderChatWithMenuLabel') || 'Chat with...'}
@@ -589,8 +661,12 @@ export function ThreadedCommentsPanel({
                       placeholder="Reply…"
                       rows={1}
                       value={replyTexts[rootId] || ''}
+                      onInput={(event) => {
+                        updateReplyText(rootId, event.currentTarget.value);
+                        autosizeTextarea(event.currentTarget);
+                      }}
                       onChange={(event) => {
-                        setReplyText(rootId, event.currentTarget.value);
+                        updateReplyText(rootId, event.currentTarget.value);
                         autosizeTextarea(event.currentTarget);
                       }}
                       onKeyDown={(event) => {
@@ -599,7 +675,7 @@ export function ThreadedCommentsPanel({
                         if (!(event.metaKey || event.ctrlKey)) return;
                         if (event.shiftKey || event.altKey) return;
                         event.preventDefault();
-                        void submitReply(rootId);
+                        void submitReply(rootId, event.currentTarget.value);
                       }}
                       disabled={false}
                     />

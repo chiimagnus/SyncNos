@@ -40,12 +40,25 @@ async function flushPromises() {
   await Promise.resolve();
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 describe('Threaded comments panel delete confirmation', () => {
   beforeEach(() => {
     setupDom();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushReactScheduler();
     cleanupDom();
   });
 

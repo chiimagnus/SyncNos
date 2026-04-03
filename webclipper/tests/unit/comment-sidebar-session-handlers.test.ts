@@ -41,6 +41,18 @@ async function flushTasks() {
   await Promise.resolve();
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 function seedOneRootComment(session: ReturnType<typeof createCommentSidebarSession>) {
   session.setComments([
     {
@@ -85,7 +97,8 @@ describe('comment sidebar session handlers binding', () => {
     setupDom();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushReactScheduler();
     cleanupDom();
   });
 

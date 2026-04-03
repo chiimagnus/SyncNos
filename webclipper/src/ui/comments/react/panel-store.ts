@@ -10,6 +10,7 @@ export type ThreadedCommentsPanelStore = {
   setComments: (items: ThreadedCommentItem[]) => void;
   setHandlers: (handlers: ThreadedCommentsPanelHandlers) => void;
   setFocusComposerSignal: (signal: number) => void;
+  setEscapeSignal: (signal: number) => void;
   setNotice: (input: { message: string; visible: boolean }) => void;
   setHasFocusWithinPanel: (value: boolean) => void;
   setPendingFocusRootId: (rootId: number | null) => void;
@@ -32,6 +33,7 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStore {
     comments: [],
     handlers: {},
     focusComposerSignal: 0,
+    escapeSignal: 0,
     noticeMessage: '',
     noticeVisible: false,
     hasFocusWithinPanel: false,
@@ -87,6 +89,10 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStore {
     setFocusComposerSignal(signal) {
       const nextSignal = Number(signal);
       patch({ focusComposerSignal: Number.isFinite(nextSignal) ? nextSignal : snapshot.focusComposerSignal });
+    },
+    setEscapeSignal(signal) {
+      const nextSignal = Number(signal);
+      patch({ escapeSignal: Number.isFinite(nextSignal) ? nextSignal : snapshot.escapeSignal });
     },
     setNotice(input) {
       patch({

@@ -44,6 +44,18 @@ function cleanupDom() {
   delete (globalThis as any).getComputedStyle;
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 describe('Threaded comments panel locate', () => {
   beforeEach(() => {
     setupDom();
@@ -51,8 +63,9 @@ describe('Threaded comments panel locate', () => {
     (restoreRangeFromArticleCommentLocator as any).mockReset?.();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
+    await flushReactScheduler();
     cleanupDom();
   });
 
