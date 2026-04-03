@@ -2,6 +2,7 @@ import { t } from '@i18n';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
+import { resolvePendingFocusTarget, resolveTargetRootIdForReply, resolveTargetRootIdFromSaveResult } from './focus-rules';
 import type { ThreadedCommentsPanelProps } from './types';
 
 function compareCommentTimeDesc(
@@ -184,10 +185,10 @@ export function ThreadedCommentsPanel({
     await runBusyTask(async () => {
       const result = await onSave(text);
       if (unmountedRef.current) return;
-      const createdRootId = Number((result as any)?.createdRootId);
-      if (Number.isFinite(createdRootId) && createdRootId > 0) {
-        pendingReplyFocusRootIdRef.current = Math.round(createdRootId);
-        setPendingFocusRootId?.(Math.round(createdRootId));
+      const createdRootId = resolveTargetRootIdFromSaveResult(result);
+      if (createdRootId != null) {
+        pendingReplyFocusRootIdRef.current = createdRootId;
+        setPendingFocusRootId?.(createdRootId);
       }
       composerTextRef.current = '';
       setComposerText('');
@@ -264,8 +265,10 @@ export function ThreadedCommentsPanel({
       if (unmountedRef.current) return;
       replyTextsRef.current = { ...replyTextsRef.current, [rootId]: '' };
       setReplyText(rootId, '');
-      pendingReplyFocusRootIdRef.current = rootId;
-      setPendingFocusRootId?.(rootId);
+      const targetRootId = resolveTargetRootIdForReply(rootId);
+      if (targetRootId == null) return;
+      pendingReplyFocusRootIdRef.current = targetRootId;
+      setPendingFocusRootId?.(targetRootId);
     });
   };
 
@@ -291,10 +294,13 @@ export function ThreadedCommentsPanel({
   };
 
   useLayoutEffect(() => {
-    const rootId = Number(snapshot.pendingFocusRootId || pendingReplyFocusRootIdRef.current || 0);
-    if (!Number.isFinite(rootId) || rootId <= 0) return;
-    if (!snapshot.hasFocusWithinPanel) return;
-    if (!rootIdSet.has(rootId)) return;
+    const rootId = resolvePendingFocusTarget({
+      pendingFocusRootId: snapshot.pendingFocusRootId,
+      fallbackPendingFocusRootId: pendingReplyFocusRootIdRef.current,
+      hasFocusWithinPanel: snapshot.hasFocusWithinPanel,
+      existingRootIds: rootIdSet,
+    });
+    if (rootId == null) return;
     const target = replyTextareaRefs.current[rootId] || null;
     if (!target) return;
     try {
