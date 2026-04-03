@@ -59,6 +59,10 @@ export function ThreadedCommentsPanel({
     Record<number, { actions: { id: string; label: string; disabled?: boolean; onTrigger?: () => void | string | Promise<void | string> }[] }>
   >({});
   const [localBusyCount, setLocalBusyCount] = useState(0);
+  const actionInFlightRef = useRef(false);
+  const unmountedRef = useRef(false);
+  const commentChatWithLoadingRef = useRef<Record<number, boolean>>({});
+  const commentChatWithRequestIdRef = useRef<Record<number, number>>({});
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerTextRef = useRef('');
   const lastFocusedComposerSignalRef = useRef(0);
@@ -111,12 +115,41 @@ export function ThreadedCommentsPanel({
   };
 
   const runBusyTask = async (task: () => Promise<void>) => {
+    if (unmountedRef.current) return false;
+    if (actionInFlightRef.current) return false;
+    actionInFlightRef.current = true;
     setLocalBusyCount((count) => count + 1);
     try {
       await task();
+      return true;
     } finally {
-      setLocalBusyCount((count) => Math.max(0, count - 1));
+      actionInFlightRef.current = false;
+      if (!unmountedRef.current) {
+        setLocalBusyCount((count) => Math.max(0, count - 1));
+      }
     }
+  };
+
+  const setCommentChatWithLoading = (rootId: number, loading: boolean) => {
+    if (!Number.isFinite(rootId) || rootId <= 0) return;
+    const key = Math.round(rootId);
+    if (loading) {
+      commentChatWithLoadingRef.current[key] = true;
+      return;
+    }
+    delete commentChatWithLoadingRef.current[key];
+  };
+
+  const nextCommentChatWithRequestId = (rootId: number): number => {
+    const key = Math.round(rootId);
+    const next = Number(commentChatWithRequestIdRef.current[key] || 0) + 1;
+    commentChatWithRequestIdRef.current[key] = next;
+    return next;
+  };
+
+  const isCommentChatWithRequestCurrent = (rootId: number, requestId: number): boolean => {
+    if (unmountedRef.current) return false;
+    return Number(commentChatWithRequestIdRef.current[Math.round(rootId)] || 0) === Number(requestId);
   };
 
   const updateComposerText = (value: string) => {
@@ -144,12 +177,13 @@ export function ThreadedCommentsPanel({
 
   const submitComposer = async (rawText?: string | null) => {
     const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();
-    if (!text || busy) return;
+    if (!text || busy || actionInFlightRef.current) return;
     const latestHandlers = readHandlers?.() || snapshot.handlers;
     const onSave = latestHandlers.onSave;
     if (typeof onSave !== 'function') return;
     await runBusyTask(async () => {
       const result = await onSave(text);
+      if (unmountedRef.current) return;
       const createdRootId = Number((result as any)?.createdRootId);
       if (Number.isFinite(createdRootId) && createdRootId > 0) {
         pendingReplyFocusRootIdRef.current = Math.round(createdRootId);
@@ -224,9 +258,10 @@ export function ThreadedCommentsPanel({
     const onReply = latestHandlers.onReply;
     if (typeof onReply !== 'function') return;
     const text = String(rawText ?? replyTextareaRefs.current[rootId]?.value ?? replyTextsRef.current[rootId] ?? '').trim();
-    if (!text || busy) return;
+    if (!text || busy || actionInFlightRef.current) return;
     await runBusyTask(async () => {
       await onReply(rootId, text);
+      if (unmountedRef.current) return;
       replyTextsRef.current = { ...replyTextsRef.current, [rootId]: '' };
       setReplyText(rootId, '');
       pendingReplyFocusRootIdRef.current = rootId;
@@ -289,7 +324,7 @@ export function ThreadedCommentsPanel({
   }, []);
 
   const handleDelete = async (id: number) => {
-    if (externallyBusy) return;
+    if (externallyBusy || actionInFlightRef.current) return;
     if (!Number.isFinite(id) || id <= 0) return;
     if (armedDeleteIdRef.current !== id) {
       updateArmedDeleteId(id);
@@ -325,6 +360,7 @@ export function ThreadedCommentsPanel({
   const toggleCommentChatWithMenu = async (rootId: number) => {
     if (busy) return;
     if (!commentChatWith || typeof commentChatWith.resolveActions !== 'function') return;
+    if (commentChatWithLoadingRef.current[Math.round(rootId)]) return;
     if (openCommentChatWithRootId === rootId) {
       syncLocalState(() => {
         setOpenCommentChatWithRootId(null);
@@ -333,36 +369,51 @@ export function ThreadedCommentsPanel({
     }
     const rootComment = roots.find((item) => Number(item.id) === rootId);
     if (!rootComment) return;
-    const replies = repliesByRoot.get(rootId) || [];
-    const context =
-      typeof commentChatWith.resolveContext === 'function' ? await commentChatWith.resolveContext() : {};
-    const actions = normalizeCommentChatWithActions(
-      await commentChatWith.resolveActions(rootComment, context || {}, replies),
-    );
-    if (!actions.length) {
-      showNotice?.('No AI platforms enabled');
-      syncLocalState(() => {
-        setOpenCommentChatWithRootId(null);
-      });
-      return;
-    }
-    if (actions.length === 1) {
-      try {
-        const message = await actions[0].onTrigger?.();
-        if (message) showNotice?.(String(message));
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error || t('actionFailedFallback'));
-        showNotice?.(msg);
+    setCommentChatWithLoading(rootId, true);
+    const requestId = nextCommentChatWithRequestId(rootId);
+    try {
+      const replies = repliesByRoot.get(rootId) || [];
+      const context =
+        typeof commentChatWith.resolveContext === 'function' ? await commentChatWith.resolveContext() : {};
+      const actions = normalizeCommentChatWithActions(
+        await commentChatWith.resolveActions(rootComment, context || {}, replies),
+      );
+      if (!isCommentChatWithRequestCurrent(rootId, requestId)) return;
+      if (!actions.length) {
+        showNotice?.('No AI platforms enabled');
+        syncLocalState(() => {
+          setOpenCommentChatWithRootId(null);
+        });
+        return;
+      }
+      if (actions.length === 1) {
+        try {
+          const message = await actions[0].onTrigger?.();
+          if (!isCommentChatWithRequestCurrent(rootId, requestId)) return;
+          if (message) showNotice?.(String(message));
+        } catch (error) {
+          if (!isCommentChatWithRequestCurrent(rootId, requestId)) return;
+          const msg = error instanceof Error ? error.message : String(error || t('actionFailedFallback'));
+          showNotice?.(msg);
+        }
+        syncLocalState(() => {
+          setOpenCommentChatWithRootId(null);
+        });
+        return;
       }
       syncLocalState(() => {
-        setOpenCommentChatWithRootId(null);
+        setCommentChatWithMenus((prev) => ({ ...prev, [rootId]: { actions } }));
+        setOpenCommentChatWithRootId(rootId);
       });
-      return;
+    } catch (error) {
+      if (!isCommentChatWithRequestCurrent(rootId, requestId)) return;
+      const msg = error instanceof Error ? error.message : String(error || t('actionFailedFallback'));
+      showNotice?.(msg);
+    } finally {
+      if (isCommentChatWithRequestCurrent(rootId, requestId)) {
+        setCommentChatWithLoading(rootId, false);
+      }
     }
-    syncLocalState(() => {
-      setCommentChatWithMenus((prev) => ({ ...prev, [rootId]: { actions } }));
-      setOpenCommentChatWithRootId(rootId);
-    });
   };
 
   const triggerCommentChatWithAction = async (rootId: number, actionId: string) => {
@@ -383,6 +434,9 @@ export function ThreadedCommentsPanel({
 
   useLayoutEffect(() => {
     return () => {
+      unmountedRef.current = true;
+      commentChatWithLoadingRef.current = {};
+      commentChatWithRequestIdRef.current = {};
       onHeaderChatWithRootChange?.(null);
     };
   }, [onHeaderChatWithRootChange]);
