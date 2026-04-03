@@ -1,8 +1,12 @@
 import { t } from '@i18n';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { resolvePendingFocusTarget, resolveTargetRootIdForReply, resolveTargetRootIdFromSaveResult } from './focus-rules';
+import {
+  resolvePendingFocusTarget,
+  resolveTargetRootIdForReply,
+  resolveTargetRootIdFromSaveResult,
+} from './focus-rules';
 import type { ThreadedCommentsPanelProps } from './types';
 
 function compareCommentTimeDesc(
@@ -57,7 +61,17 @@ export function ThreadedCommentsPanel({
   const armedDeleteIdRef = useRef<number | null>(null);
   const [openCommentChatWithRootId, setOpenCommentChatWithRootId] = useState<number | null>(null);
   const [commentChatWithMenus, setCommentChatWithMenus] = useState<
-    Record<number, { actions: { id: string; label: string; disabled?: boolean; onTrigger?: () => void | string | Promise<void | string> }[] }>
+    Record<
+      number,
+      {
+        actions: {
+          id: string;
+          label: string;
+          disabled?: boolean;
+          onTrigger?: () => void | string | Promise<void | string>;
+        }[];
+      }
+    >
   >({});
   const [localBusyCount, setLocalBusyCount] = useState(0);
   const actionInFlightRef = useRef(false);
@@ -74,13 +88,13 @@ export function ThreadedCommentsPanel({
   const externallyBusy = snapshot.busy === true;
   const busy = externallyBusy || localBusyCount > 0;
 
-  const syncLocalState = (run: () => void) => {
+  const syncLocalState = useCallback((run: () => void) => {
     try {
       flushSync(run);
     } catch (_error) {
       run();
     }
-  };
+  }, []);
 
   const autosizeTextarea = (textarea: HTMLTextAreaElement | null | undefined) => {
     if (!textarea) return;
@@ -169,12 +183,12 @@ export function ThreadedCommentsPanel({
     });
   };
 
-  const updateArmedDeleteId = (next: number | null) => {
+  const updateArmedDeleteId = useCallback((next: number | null) => {
     armedDeleteIdRef.current = next;
     syncLocalState(() => {
       setArmedDeleteId(next);
     });
-  };
+  }, [syncLocalState]);
 
   const submitComposer = async (rawText?: string | null) => {
     const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();
@@ -226,7 +240,7 @@ export function ThreadedCommentsPanel({
       return;
     }
     updateArmedDeleteId(null);
-  }, [openCommentChatWithRootId, snapshot.escapeSignal]);
+  }, [openCommentChatWithRootId, snapshot.escapeSignal, updateArmedDeleteId]);
 
   const normalizedItems = Array.isArray(snapshot.comments)
     ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
@@ -258,7 +272,9 @@ export function ThreadedCommentsPanel({
     const latestHandlers = readHandlers?.() || snapshot.handlers;
     const onReply = latestHandlers.onReply;
     if (typeof onReply !== 'function') return;
-    const text = String(rawText ?? replyTextareaRefs.current[rootId]?.value ?? replyTextsRef.current[rootId] ?? '').trim();
+    const text = String(
+      rawText ?? replyTextareaRefs.current[rootId]?.value ?? replyTextsRef.current[rootId] ?? '',
+    ).trim();
     if (!text || busy || actionInFlightRef.current) return;
     await runBusyTask(async () => {
       await onReply(rootId, text);
@@ -295,9 +311,7 @@ export function ThreadedCommentsPanel({
 
   useLayoutEffect(() => {
     const allowPendingFocusWhenRequested =
-      snapshot.hasFocusWithinPanel ||
-      snapshot.pendingFocusRootId != null ||
-      pendingReplyFocusRootIdRef.current != null;
+      snapshot.hasFocusWithinPanel || snapshot.pendingFocusRootId != null || pendingReplyFocusRootIdRef.current != null;
     const rootId = resolvePendingFocusTarget({
       pendingFocusRootId: snapshot.pendingFocusRootId,
       fallbackPendingFocusRootId: pendingReplyFocusRootIdRef.current,
@@ -339,7 +353,7 @@ export function ThreadedCommentsPanel({
     return () => {
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
     };
-  }, []);
+  }, [updateArmedDeleteId]);
 
   const handleDelete = async (id: number) => {
     if (externallyBusy || actionInFlightRef.current) return;
@@ -359,7 +373,12 @@ export function ThreadedCommentsPanel({
 
   const normalizeCommentChatWithActions = (input: unknown[]) => {
     if (!Array.isArray(input)) return [];
-    const out: { id: string; label: string; disabled?: boolean; onTrigger?: () => void | string | Promise<void | string> }[] = [];
+    const out: {
+      id: string;
+      label: string;
+      disabled?: boolean;
+      onTrigger?: () => void | string | Promise<void | string>;
+    }[] = [];
     for (const item of input) {
       const candidate = item as any;
       const id = String(candidate?.id || '').trim();
@@ -530,7 +549,10 @@ export function ThreadedCommentsPanel({
         >
           {snapshot.noticeMessage}
         </div>
-        <div className="webclipper-inpage-comments-panel__quote" style={{ display: snapshot.quoteText ? 'block' : 'none' }}>
+        <div
+          className="webclipper-inpage-comments-panel__quote"
+          style={{ display: snapshot.quoteText ? 'block' : 'none' }}
+        >
           <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
         </div>
         <div className="webclipper-inpage-comments-panel__composer">
@@ -575,7 +597,11 @@ export function ThreadedCommentsPanel({
               const rootId = Number(root.id);
               const replies = repliesByRoot.get(rootId) || [];
               return (
-                <div key={rootId} className="webclipper-inpage-comments-panel__thread" data-thread-root-id={String(rootId)}>
+                <div
+                  key={rootId}
+                  className="webclipper-inpage-comments-panel__thread"
+                  data-thread-root-id={String(rootId)}
+                >
                   {root.quoteText ? (
                     <div
                       className="webclipper-inpage-comments-panel__thread-quote"
@@ -584,7 +610,9 @@ export function ThreadedCommentsPanel({
                         void runLocate(rootId);
                       }}
                     >
-                      <div className="webclipper-inpage-comments-panel__thread-quote-text">{String(root.quoteText)}</div>
+                      <div className="webclipper-inpage-comments-panel__thread-quote-text">
+                        {String(root.quoteText)}
+                      </div>
                     </div>
                   ) : null}
 
@@ -601,7 +629,9 @@ export function ThreadedCommentsPanel({
                         <div className="webclipper-inpage-comments-panel__comment-author">
                           {String(root.authorName || 'You')}
                         </div>
-                        <div className="webclipper-inpage-comments-panel__comment-time">{formatTime(root.createdAt)}</div>
+                        <div className="webclipper-inpage-comments-panel__comment-time">
+                          {formatTime(root.createdAt)}
+                        </div>
                       </div>
                       <div className="webclipper-inpage-comments-panel__comment-actions">
                         {commentChatWith ? (
@@ -613,8 +643,8 @@ export function ThreadedCommentsPanel({
                               aria-expanded={openCommentChatWithRootId === rootId ? 'true' : 'false'}
                               disabled={busy || !String(root.commentText || '').trim()}
                               data-base-disabled={String(String(root.commentText || '').trim() ? 0 : 1)}
-                                onClick={() => {
-                                  void toggleCommentChatWithMenu(rootId);
+                              onClick={() => {
+                                void toggleCommentChatWithMenu(rootId);
                               }}
                             >
                               {t('detailHeaderChatWithMenuLabel') || 'Chat with...'}
@@ -671,7 +701,9 @@ export function ThreadedCommentsPanel({
                         </button>
                       </div>
                     </div>
-                    <div className="webclipper-inpage-comments-panel__comment-body">{String(root.commentText || '')}</div>
+                    <div className="webclipper-inpage-comments-panel__comment-body">
+                      {String(root.commentText || '')}
+                    </div>
                   </div>
 
                   {replies.length ? (

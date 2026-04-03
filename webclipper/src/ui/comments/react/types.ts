@@ -1,8 +1,4 @@
-import type {
-  CommentSaveResult,
-  ThreadedCommentItem,
-  ThreadedCommentsPanelCommentChatWithConfig,
-} from '../types';
+import type { CommentSaveResult, ThreadedCommentItem, ThreadedCommentsPanelCommentChatWithConfig } from '../types';
 
 export type ThreadedCommentsPanelHandlers = {
   onSave?: (text: string) => CommentSaveResult | Promise<CommentSaveResult>;

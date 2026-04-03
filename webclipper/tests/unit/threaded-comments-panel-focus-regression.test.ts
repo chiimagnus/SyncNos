@@ -116,4 +116,3 @@ describe('Threaded comments panel focus regression', () => {
     mounted.cleanup();
   });
 });
-
