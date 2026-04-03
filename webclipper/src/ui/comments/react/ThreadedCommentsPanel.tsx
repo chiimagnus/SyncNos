@@ -45,6 +45,7 @@ export function ThreadedCommentsPanel({
 }: ThreadedCommentsPanelProps) {
   const [composerText, setComposerText] = useState('');
   const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
+  const [armedDeleteId, setArmedDeleteId] = useState<number | null>(null);
   const [localBusyCount, setLocalBusyCount] = useState(0);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastFocusedComposerSignalRef = useRef(0);
@@ -74,6 +75,15 @@ export function ThreadedCommentsPanel({
     } catch (_error) {
       // ignore
     }
+  };
+
+  const setPanelTooltip = (el: HTMLElement, label: string) => {
+    const text = String(label || '').trim();
+    if (!text) {
+      el.removeAttribute('data-webclipper-tooltip');
+      return;
+    }
+    el.setAttribute('data-webclipper-tooltip', text);
   };
 
   const runBusyTask = async (task: () => Promise<void>) => {
@@ -183,13 +193,51 @@ export function ThreadedCommentsPanel({
   }, [rootIdSet, setPendingFocusRootId, snapshot.hasFocusWithinPanel, snapshot.pendingFocusRootId, snapshot.comments]);
 
   useEffect(() => {
+    const onDocumentPointerDown = () => {
+      setArmedDeleteId(null);
+    };
+    document.addEventListener('pointerdown', onDocumentPointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    };
+  }, []);
+
+  const handleDelete = async (id: number) => {
+    if (busy) return;
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (armedDeleteId !== id) {
+      setArmedDeleteId(id);
+      return;
+    }
+    setArmedDeleteId(null);
+    const onDelete = snapshot.handlers.onDelete;
+    if (typeof onDelete !== 'function') return;
+    await runBusyTask(async () => {
+      await onDelete(id);
+    });
+  };
+
+  useEffect(() => {
     return () => {
       onHeaderChatWithRootChange?.(null);
     };
   }, [onHeaderChatWithRootChange]);
 
   return (
-    <div className="webclipper-inpage-comments-panel__surface">
+    <div
+      className="webclipper-inpage-comments-panel__surface"
+      onClick={(event) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('button[data-webclipper-comment-delete-id]')) return;
+        setArmedDeleteId(null);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        if (armedDeleteId == null) return;
+        event.preventDefault();
+        setArmedDeleteId(null);
+      }}
+    >
       {showHeader ? (
         <div className="webclipper-inpage-comments-panel__header">
           <div className="webclipper-inpage-comments-panel__header-title">{t('articleCommentsHeading')}</div>
@@ -295,11 +343,28 @@ export function ThreadedCommentsPanel({
                       <div className="webclipper-inpage-comments-panel__comment-actions">
                         <button
                           type="button"
-                          className="webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon"
+                          className={`webclipper-inpage-comments-panel__icon-btn webclipper-btn ${
+                            armedDeleteId === rootId
+                              ? 'webclipper-btn--danger'
+                              : 'webclipper-btn--danger-tint webclipper-btn--icon'
+                          }`}
+                          data-confirm={armedDeleteId === rootId ? '1' : undefined}
                           data-webclipper-comment-delete-id={String(rootId)}
                           aria-label={t('deleteButton')}
+                          onMouseEnter={(event) => {
+                            const target = event.currentTarget;
+                            setPanelTooltip(
+                              target,
+                              armedDeleteId === rootId
+                                ? t('tooltipDeleteCommentConfirmDetailed')
+                                : t('tooltipDeleteCommentDetailed'),
+                            );
+                          }}
+                          onClick={() => {
+                            void handleDelete(rootId);
+                          }}
                         >
-                          ×
+                          {armedDeleteId === rootId ? t('deleteButton') : '×'}
                         </button>
                       </div>
                     </div>
@@ -323,11 +388,28 @@ export function ThreadedCommentsPanel({
                             <div className="webclipper-inpage-comments-panel__comment-actions">
                               <button
                                 type="button"
-                                className="webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon"
+                                className={`webclipper-inpage-comments-panel__icon-btn webclipper-btn ${
+                                  armedDeleteId === reply.id
+                                    ? 'webclipper-btn--danger'
+                                    : 'webclipper-btn--danger-tint webclipper-btn--icon'
+                                }`}
+                                data-confirm={armedDeleteId === reply.id ? '1' : undefined}
                                 data-webclipper-comment-delete-id={String(reply.id)}
                                 aria-label={t('deleteButton')}
+                                onMouseEnter={(event) => {
+                                  const target = event.currentTarget;
+                                  setPanelTooltip(
+                                    target,
+                                    armedDeleteId === reply.id
+                                      ? t('tooltipDeleteCommentConfirmDetailed')
+                                      : t('tooltipDeleteCommentDetailed'),
+                                  );
+                                }}
+                                onClick={() => {
+                                  void handleDelete(reply.id);
+                                }}
                               >
-                                ×
+                                {armedDeleteId === reply.id ? t('deleteButton') : '×'}
                               </button>
                             </div>
                           </div>
