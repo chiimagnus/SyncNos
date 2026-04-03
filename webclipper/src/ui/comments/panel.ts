@@ -28,7 +28,9 @@ type ThreadedCommentsPanelReactBridgeProps = {
   surfaceBg?: string;
   showHeader: boolean;
   showCollapseButton: boolean;
+  showHeaderChatWith: boolean;
   onRequestClose: () => void;
+  onHeaderChatWithRootChange?: (el: HTMLDivElement | null) => void;
   locateThreadRoot?: (rootId: number) => Promise<boolean>;
   onLocateFailed?: () => void;
 };
@@ -41,7 +43,9 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
     surfaceBg: props.surfaceBg,
     showHeader: props.showHeader,
     showCollapseButton: props.showCollapseButton,
+    showHeaderChatWith: props.showHeaderChatWith,
     snapshot,
+    onHeaderChatWithRootChange: props.onHeaderChatWithRootChange,
     setPendingFocusRootId: props.store.setPendingFocusRootId,
     onRequestClose: props.onRequestClose,
     locateThreadRoot: props.locateThreadRoot,
@@ -166,9 +170,10 @@ export function mountThreadedCommentsPanel(
   style.textContent = buildThreadedCommentsPanelShadowCss();
   shadow.appendChild(style);
   const panelStore = createThreadedCommentsPanelStore();
+  const reactRendererVisible = false;
   const reactRootHost = document.createElement('div');
   reactRootHost.className = 'webclipper-inpage-comments-panel__react-root';
-  setImportantStyle(reactRootHost, 'display', 'none');
+  setImportantStyle(reactRootHost, 'display', reactRendererVisible ? 'contents' : 'none');
   shadow.appendChild(reactRootHost);
   let apiRef: ThreadedCommentsPanelApi;
   let reactRoot: ReactRoot | null = null;
@@ -182,7 +187,12 @@ export function mountThreadedCommentsPanel(
         surfaceBg: surfaceBg || undefined,
         showHeader,
         showCollapseButton,
+        showHeaderChatWith: Boolean(chatWithConfig),
         onRequestClose: () => apiRef?.close(),
+        onHeaderChatWithRootChange: (el) => {
+          if (!reactRendererVisible || !chatWithConfig || !el) return;
+          chatWithMenuController.attachRoot(el);
+        },
         locateThreadRoot: async (rootId) => {
           const root = panelStore
             .getSnapshot()

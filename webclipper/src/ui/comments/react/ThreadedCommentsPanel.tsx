@@ -38,6 +38,7 @@ export function ThreadedCommentsPanel({
   fullWidth,
   showHeader,
   showCollapseButton,
+  showHeaderChatWith,
   snapshot,
   onRequestClose,
   onHeaderChatWithRootChange,
@@ -265,12 +266,14 @@ export function ThreadedCommentsPanel({
         <div className="webclipper-inpage-comments-panel__header">
           <div className="webclipper-inpage-comments-panel__header-title">{t('articleCommentsHeading')}</div>
           <div className="webclipper-inpage-comments-panel__header-actions">
-            <div
-              className="webclipper-inpage-comments-panel__chatwith"
-              ref={(el) => {
-                onHeaderChatWithRootChange?.(el);
-              }}
-            />
+            {showHeaderChatWith ? (
+              <div
+                className="webclipper-inpage-comments-panel__chatwith"
+                ref={(el) => {
+                  onHeaderChatWithRootChange?.(el);
+                }}
+              />
+            ) : null}
             {showCollapseButton ? (
               <button
                 type="button"
