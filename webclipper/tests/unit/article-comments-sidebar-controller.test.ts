@@ -62,7 +62,7 @@ describe('article-comments-sidebar-controller', () => {
 
     const adapter = {
       list: vi.fn(async () => [{ id: 1, parentId: null, commentText: 'hi', quoteText: '', createdAt: 1 }]),
-      addRoot: vi.fn(async () => true),
+      addRoot: vi.fn(async () => ({ id: 1 })),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
       ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
@@ -90,13 +90,13 @@ describe('article-comments-sidebar-controller', () => {
     expect(panel.getState().comments.length).toBe(1);
   });
 
-  it('save root: returns true, refreshes list, and clears quote via session wrapper', async () => {
+  it('save root: returns structured result, refreshes list, and clears quote via session wrapper', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
 
     const adapter = {
       list: vi.fn(async () => []),
-      addRoot: vi.fn(async () => true),
+      addRoot: vi.fn(async () => ({ id: 91 })),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
       ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
@@ -110,7 +110,7 @@ describe('article-comments-sidebar-controller', () => {
     expect(typeof handlers.onSave).toBe('function');
 
     const res = await handlers.onSave('Hello');
-    expect(res).toBe(true);
+    expect(res).toEqual({ ok: true, createdRootId: 91 });
     expect(adapter.addRoot).toHaveBeenCalledWith({
       canonicalUrl: 'https://example.com/article',
       conversationId: 21,
@@ -133,7 +133,7 @@ describe('article-comments-sidebar-controller', () => {
         }
         return [{ id: 2, parentId: null, commentText: 'B', quoteText: '', createdAt: 2 }];
       }),
-      addRoot: vi.fn(async () => true),
+      addRoot: vi.fn(async () => ({ id: 1 })),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
     };
@@ -165,7 +165,7 @@ describe('article-comments-sidebar-controller', () => {
         if (canonicalUrl.includes('/a')) return deferredA.promise;
         return deferredB.promise;
       }),
-      addRoot: vi.fn(async () => true),
+      addRoot: vi.fn(async () => ({ id: 1 })),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
     };
@@ -192,7 +192,7 @@ describe('article-comments-sidebar-controller', () => {
 
     const adapter = {
       list: vi.fn(async () => [{ id: 1, parentId: null, commentText: 'Topic', quoteText: '', createdAt: 1 }]),
-      addRoot: vi.fn(async () => true),
+      addRoot: vi.fn(async () => ({ id: 1 })),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
       migrateCanonicalUrl: vi.fn(async () => {}),
