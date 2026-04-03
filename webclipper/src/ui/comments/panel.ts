@@ -33,6 +33,8 @@ type ThreadedCommentsPanelReactBridgeProps = {
   onHeaderChatWithRootChange?: (el: HTMLDivElement | null) => void;
   locateThreadRoot?: (rootId: number) => Promise<boolean>;
   onLocateFailed?: () => void;
+  commentChatWith: MountOptions['commentChatWith'];
+  showNotice: (message: string) => void;
 };
 
 function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridgeProps) {
@@ -50,6 +52,8 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
     onRequestClose: props.onRequestClose,
     locateThreadRoot: props.locateThreadRoot,
     onLocateFailed: props.onLocateFailed,
+    commentChatWith: props.commentChatWith || null,
+    showNotice: props.showNotice,
   });
 }
 
@@ -170,7 +174,7 @@ export function mountThreadedCommentsPanel(
   style.textContent = buildThreadedCommentsPanelShadowCss();
   shadow.appendChild(style);
   const panelStore = createThreadedCommentsPanelStore();
-  const reactRendererVisible = false;
+  const reactRendererVisible = true;
   const reactRootHost = document.createElement('div');
   reactRootHost.className = 'webclipper-inpage-comments-panel__react-root';
   setImportantStyle(reactRootHost, 'display', reactRendererVisible ? 'contents' : 'none');
@@ -201,6 +205,8 @@ export function mountThreadedCommentsPanel(
           return await locateController.locateThreadRootWithRetry(root);
         },
         onLocateFailed: () => showNotice('无法定位'),
+        commentChatWith: commentChatWithConfig,
+        showNotice,
       }),
     );
   } catch (_e) {
@@ -209,6 +215,7 @@ export function mountThreadedCommentsPanel(
 
   const surface = document.createElement('div');
   surface.className = 'webclipper-inpage-comments-panel__surface';
+  setImportantStyle(surface, 'display', reactRendererVisible ? 'none' : 'flex');
   shadow.appendChild(surface);
 
   let cleanupSidebarResize: (() => void) | null = null;
