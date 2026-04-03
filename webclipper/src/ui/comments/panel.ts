@@ -29,6 +29,8 @@ type ThreadedCommentsPanelReactBridgeProps = {
   showHeader: boolean;
   showCollapseButton: boolean;
   onRequestClose: () => void;
+  locateThreadRoot?: (rootId: number) => Promise<boolean>;
+  onLocateFailed?: () => void;
 };
 
 function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridgeProps) {
@@ -40,7 +42,10 @@ function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridg
     showHeader: props.showHeader,
     showCollapseButton: props.showCollapseButton,
     snapshot,
+    setPendingFocusRootId: props.store.setPendingFocusRootId,
     onRequestClose: props.onRequestClose,
+    locateThreadRoot: props.locateThreadRoot,
+    onLocateFailed: props.onLocateFailed,
   });
 }
 
@@ -178,6 +183,14 @@ export function mountThreadedCommentsPanel(
         showHeader,
         showCollapseButton,
         onRequestClose: () => apiRef?.close(),
+        locateThreadRoot: async (rootId) => {
+          const root = panelStore
+            .getSnapshot()
+            .comments.find((item) => Number(item?.id) === Number(rootId) && !item?.parentId);
+          if (!root) return false;
+          return await locateController.locateThreadRootWithRetry(root);
+        },
+        onLocateFailed: () => showNotice('无法定位'),
       }),
     );
   } catch (_e) {

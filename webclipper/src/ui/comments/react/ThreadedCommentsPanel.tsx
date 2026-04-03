@@ -42,6 +42,8 @@ export function ThreadedCommentsPanel({
   onRequestClose,
   onHeaderChatWithRootChange,
   setPendingFocusRootId,
+  locateThreadRoot,
+  onLocateFailed,
 }: ThreadedCommentsPanelProps) {
   const [composerText, setComposerText] = useState('');
   const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
@@ -167,6 +169,27 @@ export function ThreadedCommentsPanel({
       pendingReplyFocusRootIdRef.current = rootId;
       setPendingFocusRootId?.(rootId);
     });
+  };
+
+  const shouldIgnoreLocateClick = (target: EventTarget | null): boolean => {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = String(el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return true;
+    try {
+      if (el.isContentEditable) return true;
+      if (el.closest('button,input,textarea,a,label,select,option')) return true;
+    } catch (_error) {
+      // ignore
+    }
+    return false;
+  };
+
+  const runLocate = async (rootId: number) => {
+    if (busy || variant !== 'sidebar') return;
+    if (typeof locateThreadRoot !== 'function') return;
+    const ok = await locateThreadRoot(rootId);
+    if (!ok) onLocateFailed?.();
   };
 
   useEffect(() => {
@@ -326,12 +349,24 @@ export function ThreadedCommentsPanel({
               return (
                 <div key={rootId} className="webclipper-inpage-comments-panel__thread">
                   {root.quoteText ? (
-                    <div className="webclipper-inpage-comments-panel__thread-quote">
+                    <div
+                      className="webclipper-inpage-comments-panel__thread-quote"
+                      onClick={(event) => {
+                        if (shouldIgnoreLocateClick(event.target)) return;
+                        void runLocate(rootId);
+                      }}
+                    >
                       <div className="webclipper-inpage-comments-panel__thread-quote-text">{String(root.quoteText)}</div>
                     </div>
                   ) : null}
 
-                  <div className="webclipper-inpage-comments-panel__comment">
+                  <div
+                    className="webclipper-inpage-comments-panel__comment"
+                    onClick={(event) => {
+                      if (shouldIgnoreLocateClick(event.target)) return;
+                      void runLocate(rootId);
+                    }}
+                  >
                     <div className="webclipper-inpage-comments-panel__comment-header">
                       <div className="webclipper-inpage-comments-panel__avatar">You</div>
                       <div className="webclipper-inpage-comments-panel__comment-meta">
