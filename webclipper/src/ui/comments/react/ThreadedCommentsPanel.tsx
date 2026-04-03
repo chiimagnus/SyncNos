@@ -3,6 +3,36 @@ import { useEffect } from 'react';
 
 import type { ThreadedCommentsPanelProps } from './types';
 
+function compareCommentTimeDesc(
+  a: { createdAt?: number | null; id: number },
+  b: { createdAt?: number | null; id: number },
+): number {
+  const ta = Number(a?.createdAt) || 0;
+  const tb = Number(b?.createdAt) || 0;
+  if (tb !== ta) return tb - ta;
+  return Number(b?.id || 0) - Number(a?.id || 0);
+}
+
+function compareCommentTimeAsc(
+  a: { createdAt?: number | null; id: number },
+  b: { createdAt?: number | null; id: number },
+): number {
+  const ta = Number(a?.createdAt) || 0;
+  const tb = Number(b?.createdAt) || 0;
+  if (ta !== tb) return ta - tb;
+  return Number(a?.id || 0) - Number(b?.id || 0);
+}
+
+function formatTime(ts: number | null | undefined): string {
+  const value = Number(ts);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  try {
+    return new Date(value).toLocaleString();
+  } catch (_error) {
+    return '';
+  }
+}
+
 export function ThreadedCommentsPanel({
   variant,
   fullWidth,
@@ -12,6 +42,22 @@ export function ThreadedCommentsPanel({
   onRequestClose,
   onHeaderChatWithRootChange,
 }: ThreadedCommentsPanelProps) {
+  const normalizedItems = Array.isArray(snapshot.comments)
+    ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
+    : [];
+  const roots = normalizedItems.filter((item) => !item.parentId).sort(compareCommentTimeDesc);
+  const repliesByRoot = new Map<number, typeof normalizedItems>();
+  for (const item of normalizedItems) {
+    if (!item?.parentId) continue;
+    const rootId = Number(item.parentId);
+    const list = repliesByRoot.get(rootId) || [];
+    list.push(item);
+    repliesByRoot.set(rootId, list);
+  }
+  for (const [rootId, list] of repliesByRoot) {
+    repliesByRoot.set(rootId, list.sort(compareCommentTimeAsc));
+  }
+
   useEffect(() => {
     return () => {
       onHeaderChatWithRootChange?.(null);
@@ -87,7 +133,96 @@ export function ThreadedCommentsPanel({
           </div>
         </div>
         <div className="webclipper-inpage-comments-panel__threads">
-          <div className="webclipper-inpage-comments-panel__empty">No comments yet</div>
+          {roots.length ? (
+            roots.map((root) => {
+              const rootId = Number(root.id);
+              const replies = repliesByRoot.get(rootId) || [];
+              return (
+                <div key={rootId} className="webclipper-inpage-comments-panel__thread">
+                  {root.quoteText ? (
+                    <div className="webclipper-inpage-comments-panel__thread-quote">
+                      <div className="webclipper-inpage-comments-panel__thread-quote-text">{String(root.quoteText)}</div>
+                    </div>
+                  ) : null}
+
+                  <div className="webclipper-inpage-comments-panel__comment">
+                    <div className="webclipper-inpage-comments-panel__comment-header">
+                      <div className="webclipper-inpage-comments-panel__avatar">You</div>
+                      <div className="webclipper-inpage-comments-panel__comment-meta">
+                        <div className="webclipper-inpage-comments-panel__comment-author">
+                          {String(root.authorName || 'You')}
+                        </div>
+                        <div className="webclipper-inpage-comments-panel__comment-time">{formatTime(root.createdAt)}</div>
+                      </div>
+                      <div className="webclipper-inpage-comments-panel__comment-actions">
+                        <button
+                          type="button"
+                          className="webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon"
+                          data-webclipper-comment-delete-id={String(rootId)}
+                          aria-label={t('deleteButton')}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <div className="webclipper-inpage-comments-panel__comment-body">{String(root.commentText || '')}</div>
+                  </div>
+
+                  {replies.length ? (
+                    <div className="webclipper-inpage-comments-panel__replies">
+                      {replies.map((reply) => (
+                        <div key={reply.id} className="webclipper-inpage-comments-panel__reply">
+                          <div className="webclipper-inpage-comments-panel__reply-header">
+                            <div className="webclipper-inpage-comments-panel__avatar is-small">You</div>
+                            <div className="webclipper-inpage-comments-panel__reply-meta">
+                              <div className="webclipper-inpage-comments-panel__comment-author">
+                                {String(reply.authorName || 'You')}
+                              </div>
+                              <div className="webclipper-inpage-comments-panel__comment-time">
+                                {formatTime(reply.createdAt)}
+                              </div>
+                            </div>
+                            <div className="webclipper-inpage-comments-panel__comment-actions">
+                              <button
+                                type="button"
+                                className="webclipper-inpage-comments-panel__icon-btn webclipper-btn webclipper-btn--danger-tint webclipper-btn--icon"
+                                data-webclipper-comment-delete-id={String(reply.id)}
+                                aria-label={t('deleteButton')}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <div className="webclipper-inpage-comments-panel__comment-body is-reply">
+                            {String(reply.commentText || '')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="webclipper-inpage-comments-panel__reply-composer">
+                    <textarea
+                      className="webclipper-inpage-comments-panel__reply-textarea"
+                      placeholder="Reply…"
+                      rows={1}
+                      disabled={false}
+                    />
+                    <button
+                      type="button"
+                      className="webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon"
+                      aria-label={t('tooltipReplySendDetailed')}
+                      disabled={snapshot.busy}
+                    >
+                      ↑
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="webclipper-inpage-comments-panel__empty">No comments yet</div>
+          )}
         </div>
       </div>
       <span style={{ display: 'none' }} data-variant={variant} data-full-width={fullWidth ? '1' : '0'} />
