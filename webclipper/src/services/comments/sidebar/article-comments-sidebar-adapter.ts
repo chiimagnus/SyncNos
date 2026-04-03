@@ -12,6 +12,10 @@ export type ArticleCommentsSidebarEnsureContextInput = {
   ensureArticle?: boolean;
 };
 
+export type ArticleCommentsSidebarAddRootResult = {
+  id: number;
+};
+
 export type ArticleCommentsSidebarAdapter = {
   list: (input: { canonicalUrl: string }) => Promise<CommentSidebarItem[]>;
   addRoot: (input: {
@@ -20,7 +24,7 @@ export type ArticleCommentsSidebarAdapter = {
     quoteText: string;
     commentText: string;
     locator?: ArticleCommentLocator | null;
-  }) => Promise<void | true>;
+  }) => Promise<ArticleCommentsSidebarAddRootResult>;
   addReply: (input: {
     canonicalUrl: string;
     conversationId: number | null;
