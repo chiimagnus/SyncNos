@@ -1,8 +1,12 @@
 import { t } from '@i18n';
+import { createElement, useSyncExternalStore } from 'react';
+import { createRoot, type Root as ReactRoot } from 'react-dom/client';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { createChatWithMenuController } from './chatwith';
 import { createDockController } from './dock';
 import { createThreadLocateController } from './locate';
+import { ThreadedCommentsPanel } from './react/ThreadedCommentsPanel';
+import { createThreadedCommentsPanelStore, type ThreadedCommentsPanelStore } from './react/panel-store';
 import {
   closeThreadCommentChatWithMenuOnEscape,
   closeThreadCommentChatWithMenus,
@@ -16,6 +20,29 @@ type ThreadedCommentsPanelHandlers = Parameters<ThreadedCommentsPanelApi['setHan
 type SendButtonWithTextGetter = HTMLButtonElement & {
   __webclipperTextValue?: () => string;
 };
+
+type ThreadedCommentsPanelReactBridgeProps = {
+  store: ThreadedCommentsPanelStore;
+  variant: 'embedded' | 'sidebar';
+  fullWidth: boolean;
+  surfaceBg?: string;
+  showHeader: boolean;
+  showCollapseButton: boolean;
+  onRequestClose: () => void;
+};
+
+function ThreadedCommentsPanelReactBridge(props: ThreadedCommentsPanelReactBridgeProps) {
+  const snapshot = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot, props.store.getSnapshot);
+  return createElement(ThreadedCommentsPanel, {
+    variant: props.variant,
+    fullWidth: props.fullWidth,
+    surfaceBg: props.surfaceBg,
+    showHeader: props.showHeader,
+    showCollapseButton: props.showCollapseButton,
+    snapshot,
+    onRequestClose: props.onRequestClose,
+  });
+}
 
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
   el.style.setProperty(name, value, 'important');
@@ -133,6 +160,29 @@ export function mountThreadedCommentsPanel(
   const style = document.createElement('style');
   style.textContent = buildThreadedCommentsPanelShadowCss();
   shadow.appendChild(style);
+  const panelStore = createThreadedCommentsPanelStore();
+  const reactRootHost = document.createElement('div');
+  reactRootHost.className = 'webclipper-inpage-comments-panel__react-root';
+  setImportantStyle(reactRootHost, 'display', 'none');
+  shadow.appendChild(reactRootHost);
+  let apiRef: ThreadedCommentsPanelApi;
+  let reactRoot: ReactRoot | null = null;
+  try {
+    reactRoot = createRoot(reactRootHost);
+    reactRoot.render(
+      createElement(ThreadedCommentsPanelReactBridge, {
+        store: panelStore,
+        variant,
+        fullWidth: isFullWidth,
+        surfaceBg: surfaceBg || undefined,
+        showHeader,
+        showCollapseButton,
+        onRequestClose: () => apiRef?.close(),
+      }),
+    );
+  } catch (_e) {
+    reactRoot = null;
+  }
 
   const surface = document.createElement('div');
   surface.className = 'webclipper-inpage-comments-panel__surface';
@@ -262,6 +312,7 @@ export function mountThreadedCommentsPanel(
   const state = {
     busy: false,
     pendingComposerFocus: false,
+    focusComposerSignal: 0,
     noticeTimer: null as ReturnType<typeof setTimeout> | null,
     handlers: {
       onSave: undefined,
@@ -277,10 +328,12 @@ export function mountThreadedCommentsPanel(
     try {
       notice.textContent = text;
       notice.style.display = 'block';
+      panelStore.setNotice({ message: text, visible: true });
       if (state.noticeTimer) clearTimeout(state.noticeTimer);
       state.noticeTimer = setTimeout(() => {
         notice.style.display = 'none';
         notice.textContent = '';
+        panelStore.setNotice({ message: '', visible: false });
       }, 1600);
     } catch (_e) {
       // ignore
@@ -430,6 +483,7 @@ export function mountThreadedCommentsPanel(
   }
 
   function setOpen(open: boolean) {
+    panelStore.setOpen(open);
     if (open) {
       el.setAttribute('data-open', '1');
       setImportantStyle(el, 'display', 'block');
@@ -518,7 +572,7 @@ export function mountThreadedCommentsPanel(
     deleteConfirm.clear();
   });
 
-  const apiRef: ThreadedCommentsPanelApi = {
+  apiRef = {
     open(input) {
       const wasOpen = el.getAttribute('data-open') === '1';
       setOpen(true);
@@ -529,6 +583,8 @@ export function mountThreadedCommentsPanel(
       }
       if (input?.focusComposer) {
         state.pendingComposerFocus = true;
+        state.focusComposerSignal += 1;
+        panelStore.setFocusComposerSignal(state.focusComposerSignal);
         if (!state.busy) focusComposer();
       }
       apiRef.setBusy(false);
@@ -544,6 +600,7 @@ export function mountThreadedCommentsPanel(
     },
     setBusy(busy) {
       state.busy = !!busy;
+      panelStore.setBusy(state.busy);
       if (state.busy) {
         // If the composer currently has focus (or we just requested focus), keep a refocus request queued.
         try {
@@ -558,6 +615,7 @@ export function mountThreadedCommentsPanel(
       const value = String(text || '');
       quoteText.textContent = value;
       quote.style.display = value ? 'block' : 'none';
+      panelStore.setQuoteText(value);
     },
     setHandlers(handlers: ThreadedCommentsPanelHandlers) {
       state.handlers = handlers || {
@@ -566,8 +624,10 @@ export function mountThreadedCommentsPanel(
         onDelete: null,
         onClose: null,
       };
+      panelStore.setHandlers(state.handlers);
     },
     setComments(items) {
+      panelStore.setComments(items);
       renderThreadedComments({
         items,
         threadsEl: threads,
@@ -626,6 +686,22 @@ export function mountThreadedCommentsPanel(
   } catch (_e) {
     // ignore
   }
+  const onShadowFocusIn = () => {
+    panelStore.setHasFocusWithinPanel(true);
+  };
+  const onShadowFocusOut = () => {
+    try {
+      panelStore.setHasFocusWithinPanel(Boolean(shadow.activeElement));
+    } catch (_e) {
+      panelStore.setHasFocusWithinPanel(false);
+    }
+  };
+  try {
+    shadow.addEventListener('focusin', onShadowFocusIn);
+    shadow.addEventListener('focusout', onShadowFocusOut);
+  } catch (_e) {
+    // ignore
+  }
 
   const cleanup = () => {
     // Ensure we restore page layout even if the panel is removed while open.
@@ -658,6 +734,18 @@ export function mountThreadedCommentsPanel(
     } catch (_e) {
       // ignore
     }
+    try {
+      shadow.removeEventListener('focusin', onShadowFocusIn);
+      shadow.removeEventListener('focusout', onShadowFocusOut);
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      reactRoot?.unmount();
+    } catch (_e) {
+      // ignore
+    }
+    reactRoot = null;
     try {
       el.remove();
     } catch (_e) {
