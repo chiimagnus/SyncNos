@@ -82,7 +82,9 @@ export function createArticleCommentsSidebarInpageAdapter(
         locator: locator ?? null,
       } as any);
       if (!res?.ok) throw new Error('failed to add article comment');
-      return true;
+      const id = Number(res?.data?.id);
+      if (!Number.isFinite(id) || id <= 0) throw new Error('failed to add article comment');
+      return { id };
     },
     async addReply({ canonicalUrl, conversationId, parentId, commentText }) {
       const normalized = canonicalizeArticleUrl(canonicalUrl);
