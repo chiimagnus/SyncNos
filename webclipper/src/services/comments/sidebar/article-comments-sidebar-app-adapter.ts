@@ -27,7 +27,7 @@ export function createArticleCommentsSidebarAppAdapter(): ArticleCommentsSidebar
     async addRoot({ canonicalUrl, conversationId, quoteText, commentText, locator }) {
       const normalized = canonicalizeArticleUrl(canonicalUrl);
       if (!normalized) throw new Error('missing canonicalUrl');
-      await addArticleComment({
+      const comment = await addArticleComment({
         canonicalUrl: normalized,
         conversationId,
         parentId: null,
@@ -35,7 +35,11 @@ export function createArticleCommentsSidebarAppAdapter(): ArticleCommentsSidebar
         commentText,
         locator: locator ?? null,
       } as any);
-      return true;
+      const id = Number(comment?.id);
+      if (!Number.isFinite(id) || id <= 0) {
+        throw new Error('failed to add article comment');
+      }
+      return { id };
     },
     async addReply({ canonicalUrl, conversationId, parentId, commentText }) {
       const normalized = canonicalizeArticleUrl(canonicalUrl);

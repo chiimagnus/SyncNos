@@ -8,6 +8,8 @@ export type ThreadedCommentItem = {
   locator?: unknown | null;
 };
 
+export type CommentSaveResult = void | boolean | { ok: boolean; createdRootId?: number | null };
+
 export type ThreadedCommentsPanelApi = {
   open: (input?: { focusComposer?: boolean }) => void;
   close: () => void;
@@ -16,7 +18,7 @@ export type ThreadedCommentsPanelApi = {
   setQuoteText: (text: string) => void;
   setComments: (items: ThreadedCommentItem[]) => void;
   setHandlers: (handlers: {
-    onSave?: (text: string) => void | boolean | Promise<void | boolean>;
+    onSave?: (text: string) => CommentSaveResult | Promise<CommentSaveResult>;
     onReply?: (parentId: number, text: string) => void | Promise<void>;
     onDelete?: (id: number) => void | Promise<void>;
     onClose?: () => void;

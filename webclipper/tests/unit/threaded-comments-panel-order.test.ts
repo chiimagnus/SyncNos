@@ -35,12 +35,25 @@ function cleanupDom() {
   delete (globalThis as any).getComputedStyle;
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 describe('Threaded comments panel ordering', () => {
   beforeEach(() => {
     setupDom();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushReactScheduler();
     cleanupDom();
   });
 

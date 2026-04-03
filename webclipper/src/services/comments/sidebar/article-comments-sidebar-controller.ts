@@ -132,7 +132,7 @@ export function createArticleCommentsSidebarController(input: {
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment save');
 
         const quoteText = normalizeCommentSidebarQuoteText(session.getSnapshot().quoteText);
-        await adapter.addRoot({
+        const created = await adapter.addRoot({
           canonicalUrl,
           conversationId: normalizeConversationId(ctx?.conversationId),
           quoteText,
@@ -141,7 +141,8 @@ export function createArticleCommentsSidebarController(input: {
         });
         pendingRootLocator = null;
         await refresh();
-        return true;
+        const createdRootId = Number(created?.id);
+        return { ok: true, createdRootId: Number.isFinite(createdRootId) && createdRootId > 0 ? createdRootId : null };
       },
       onReply: async (parentId, text) => {
         const value = safeString(text);

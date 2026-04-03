@@ -34,12 +34,25 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 describe('inpage comments sidebar toggle', () => {
   beforeEach(() => {
     setupDom();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushReactScheduler();
     cleanupDom();
   });
 
