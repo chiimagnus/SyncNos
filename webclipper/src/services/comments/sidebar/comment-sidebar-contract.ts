@@ -15,8 +15,10 @@ export type CommentSidebarItem = {
   locator?: ArticleCommentLocator | null;
 };
 
+export type CommentSaveResult = void | boolean | { ok: boolean; createdRootId?: number | null };
+
 export type CommentSidebarHandlers = {
-  onSave?: (text: string) => void | boolean | Promise<void | boolean>;
+  onSave?: (text: string) => CommentSaveResult | Promise<CommentSaveResult>;
   onReply?: (parentId: number, text: string) => void | Promise<void>;
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
