@@ -45,10 +45,16 @@ export function ThreadedCommentsPanel({
   setPendingFocusRootId,
   locateThreadRoot,
   onLocateFailed,
+  commentChatWith,
+  showNotice,
 }: ThreadedCommentsPanelProps) {
   const [composerText, setComposerText] = useState('');
   const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
   const [armedDeleteId, setArmedDeleteId] = useState<number | null>(null);
+  const [openCommentChatWithRootId, setOpenCommentChatWithRootId] = useState<number | null>(null);
+  const [commentChatWithMenus, setCommentChatWithMenus] = useState<
+    Record<number, { actions: { id: string; label: string; disabled?: boolean; onTrigger?: () => void | string | Promise<void | string> }[] }>
+  >({});
   const [localBusyCount, setLocalBusyCount] = useState(0);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastFocusedComposerSignalRef = useRef(0);
@@ -241,6 +247,73 @@ export function ThreadedCommentsPanel({
     });
   };
 
+  const normalizeCommentChatWithActions = (input: unknown[]) => {
+    if (!Array.isArray(input)) return [];
+    const out: { id: string; label: string; disabled?: boolean; onTrigger?: () => void | string | Promise<void | string> }[] = [];
+    for (const item of input) {
+      const candidate = item as any;
+      const id = String(candidate?.id || '').trim();
+      const label = String(candidate?.label || '').trim();
+      if (!id || !label || typeof candidate?.onTrigger !== 'function') continue;
+      out.push({
+        id,
+        label,
+        disabled: Boolean(candidate?.disabled),
+        onTrigger: candidate?.onTrigger,
+      });
+    }
+    return out;
+  };
+
+  const toggleCommentChatWithMenu = async (rootId: number) => {
+    if (busy) return;
+    if (!commentChatWith || typeof commentChatWith.resolveActions !== 'function') return;
+    if (openCommentChatWithRootId === rootId) {
+      setOpenCommentChatWithRootId(null);
+      return;
+    }
+    const rootComment = roots.find((item) => Number(item.id) === rootId);
+    if (!rootComment) return;
+    const replies = repliesByRoot.get(rootId) || [];
+    const context =
+      typeof commentChatWith.resolveContext === 'function' ? await commentChatWith.resolveContext() : {};
+    const actions = normalizeCommentChatWithActions(
+      await commentChatWith.resolveActions(rootComment, context || {}, replies),
+    );
+    if (!actions.length) {
+      showNotice?.('No AI platforms enabled');
+      setOpenCommentChatWithRootId(null);
+      return;
+    }
+    if (actions.length === 1) {
+      try {
+        const message = await actions[0].onTrigger?.();
+        if (message) showNotice?.(String(message));
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error || t('actionFailedFallback'));
+        showNotice?.(msg);
+      }
+      setOpenCommentChatWithRootId(null);
+      return;
+    }
+    setCommentChatWithMenus((prev) => ({ ...prev, [rootId]: { actions } }));
+    setOpenCommentChatWithRootId(rootId);
+  };
+
+  const triggerCommentChatWithAction = async (rootId: number, actionId: string) => {
+    const menu = commentChatWithMenus[rootId];
+    const action = menu?.actions.find((item) => item.id === actionId);
+    if (!action || action.disabled || busy) return;
+    setOpenCommentChatWithRootId(null);
+    try {
+      const message = await action.onTrigger?.();
+      if (message) showNotice?.(String(message));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error || t('actionFailedFallback'));
+      showNotice?.(msg);
+    }
+  };
+
   useEffect(() => {
     return () => {
       onHeaderChatWithRootChange?.(null);
@@ -253,10 +326,18 @@ export function ThreadedCommentsPanel({
       onClick={(event) => {
         const target = event.target as HTMLElement | null;
         if (target?.closest('button[data-webclipper-comment-delete-id]')) return;
+        if (!target?.closest('.webclipper-inpage-comments-panel__comment-chatwith')) {
+          setOpenCommentChatWithRootId(null);
+        }
         setArmedDeleteId(null);
       }}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return;
+        if (openCommentChatWithRootId != null) {
+          event.preventDefault();
+          setOpenCommentChatWithRootId(null);
+          return;
+        }
         if (armedDeleteId == null) return;
         event.preventDefault();
         setArmedDeleteId(null);
@@ -379,6 +460,46 @@ export function ThreadedCommentsPanel({
                         <div className="webclipper-inpage-comments-panel__comment-time">{formatTime(root.createdAt)}</div>
                       </div>
                       <div className="webclipper-inpage-comments-panel__comment-actions">
+                        {commentChatWith ? (
+                          <div className="webclipper-inpage-comments-panel__comment-chatwith webclipper-inpage-comments-panel__chatwith">
+                            <button
+                              type="button"
+                              className="webclipper-inpage-comments-panel__comment-chatwith-trigger webclipper-inpage-comments-panel__chatwith-trigger webclipper-btn webclipper-btn--tone-muted"
+                              aria-haspopup="menu"
+                              aria-expanded={openCommentChatWithRootId === rootId ? 'true' : 'false'}
+                              disabled={busy || !String(root.commentText || '').trim()}
+                              data-base-disabled={String(String(root.commentText || '').trim() ? 0 : 1)}
+                              onClick={() => {
+                                void toggleCommentChatWithMenu(rootId);
+                              }}
+                            >
+                              {t('detailHeaderChatWithMenuLabel') || 'Chat with...'}
+                            </button>
+                            <div
+                              className="webclipper-inpage-comments-panel__comment-chatwith-menu webclipper-inpage-comments-panel__chatwith-menu"
+                              role="menu"
+                              aria-label={t('detailHeaderChatWithMenuAria')}
+                              hidden={openCommentChatWithRootId !== rootId}
+                            >
+                              <div className="webclipper-inpage-comments-panel__comment-chatwith-menu-body webclipper-inpage-comments-panel__chatwith-menu-body">
+                                {(commentChatWithMenus[rootId]?.actions || []).map((action) => (
+                                  <button
+                                    key={action.id}
+                                    type="button"
+                                    className="webclipper-inpage-comments-panel__comment-chatwith-menu-item webclipper-btn webclipper-btn--menu-item"
+                                    data-action-disabled={action.disabled ? '1' : '0'}
+                                    disabled={busy || Boolean(action.disabled)}
+                                    onClick={() => {
+                                      void triggerCommentChatWithAction(rootId, action.id);
+                                    }}
+                                  >
+                                    {action.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
                         <button
                           type="button"
                           className={`webclipper-inpage-comments-panel__icon-btn webclipper-btn ${
