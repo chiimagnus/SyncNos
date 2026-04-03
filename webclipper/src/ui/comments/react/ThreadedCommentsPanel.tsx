@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { ThreadedCommentsPanelProps } from './types';
 
@@ -42,6 +42,77 @@ export function ThreadedCommentsPanel({
   onRequestClose,
   onHeaderChatWithRootChange,
 }: ThreadedCommentsPanelProps) {
+  const [composerText, setComposerText] = useState('');
+  const [localBusyCount, setLocalBusyCount] = useState(0);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastFocusedComposerSignalRef = useRef(0);
+  const busy = snapshot.busy || localBusyCount > 0;
+
+  const autosizeTextarea = (textarea: HTMLTextAreaElement | null | undefined) => {
+    if (!textarea) return;
+    try {
+      textarea.style.overflowY = 'hidden';
+      textarea.style.height = '0px';
+      const next = Math.max(0, Number(textarea.scrollHeight || 0) || 0);
+      textarea.style.height = `${next}px`;
+    } catch (_error) {
+      // ignore
+    }
+  };
+
+  const focusComposer = () => {
+    const node = composerTextareaRef.current;
+    if (!node) return;
+    try {
+      node.focus();
+      const value = String(node.value || '');
+      node.setSelectionRange(value.length, value.length);
+    } catch (_error) {
+      // ignore
+    }
+  };
+
+  const runBusyTask = async (task: () => Promise<void>) => {
+    setLocalBusyCount((count) => count + 1);
+    try {
+      await task();
+    } finally {
+      setLocalBusyCount((count) => Math.max(0, count - 1));
+    }
+  };
+
+  const submitComposer = async () => {
+    const text = String(composerText || '').trim();
+    if (!text || busy) return;
+    const onSave = snapshot.handlers.onSave;
+    if (typeof onSave !== 'function') return;
+    await runBusyTask(async () => {
+      await onSave(text);
+      setComposerText('');
+      try {
+        if (composerTextareaRef.current) {
+          composerTextareaRef.current.value = '';
+          autosizeTextarea(composerTextareaRef.current);
+        }
+      } catch (_error) {
+        // ignore
+      }
+    });
+  };
+
+  useEffect(() => {
+    autosizeTextarea(composerTextareaRef.current);
+  }, [composerText]);
+
+  useEffect(() => {
+    const signal = Number(snapshot.focusComposerSignal || 0);
+    if (!Number.isFinite(signal) || signal <= 0) return;
+    if (signal <= lastFocusedComposerSignalRef.current) return;
+    if (busy) return;
+    focusComposer();
+    lastFocusedComposerSignalRef.current = signal;
+  }, [busy, snapshot.focusComposerSignal]);
+
   const normalizedItems = Array.isArray(snapshot.comments)
     ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
     : [];
@@ -115,9 +186,20 @@ export function ThreadedCommentsPanel({
           <div className="webclipper-inpage-comments-panel__avatar">You</div>
           <div className="webclipper-inpage-comments-panel__composer-main">
             <textarea
+              ref={composerTextareaRef}
               className="webclipper-inpage-comments-panel__composer-textarea"
               placeholder="Write a comment…"
               rows={1}
+              value={composerText}
+              onChange={(event) => setComposerText(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+                if (event.key !== 'Enter') return;
+                if (!(event.metaKey || event.ctrlKey)) return;
+                if (event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                void submitComposer();
+              }}
               disabled={false}
             />
             <div className="webclipper-inpage-comments-panel__composer-actions">
@@ -125,7 +207,10 @@ export function ThreadedCommentsPanel({
                 type="button"
                 className="webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--filled webclipper-btn--icon"
                 aria-label={t('tooltipCommentSendDetailed')}
-                disabled={snapshot.busy}
+                disabled={busy || !String(composerText || '').trim()}
+                onClick={() => {
+                  void submitComposer();
+                }}
               >
                 ↑
               </button>
