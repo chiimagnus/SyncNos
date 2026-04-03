@@ -12,6 +12,7 @@ export type ThreadedCommentsPanelStore = {
   setFocusComposerSignal: (signal: number) => void;
   setNotice: (input: { message: string; visible: boolean }) => void;
   setHasFocusWithinPanel: (value: boolean) => void;
+  setPendingFocusRootId: (rootId: number | null) => void;
 };
 
 function cloneComments(items: ThreadedCommentItem[]): ThreadedCommentItem[] {
@@ -34,6 +35,7 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStore {
     noticeMessage: '',
     noticeVisible: false,
     hasFocusWithinPanel: false,
+    pendingFocusRootId: null,
   };
 
   const listeners = new Set<() => void>();
@@ -94,6 +96,12 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStore {
     },
     setHasFocusWithinPanel(value) {
       patch({ hasFocusWithinPanel: value === true });
+    },
+    setPendingFocusRootId(rootId) {
+      const normalized = Number(rootId);
+      patch({
+        pendingFocusRootId: Number.isFinite(normalized) && normalized > 0 ? Math.round(normalized) : null,
+      });
     },
   };
 }

@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ThreadedCommentsPanelProps } from './types';
 
@@ -41,11 +41,15 @@ export function ThreadedCommentsPanel({
   snapshot,
   onRequestClose,
   onHeaderChatWithRootChange,
+  setPendingFocusRootId,
 }: ThreadedCommentsPanelProps) {
   const [composerText, setComposerText] = useState('');
+  const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
   const [localBusyCount, setLocalBusyCount] = useState(0);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lastFocusedComposerSignalRef = useRef(0);
+  const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  const pendingReplyFocusRootIdRef = useRef<number | null>(null);
   const busy = snapshot.busy || localBusyCount > 0;
 
   const autosizeTextarea = (textarea: HTMLTextAreaElement | null | undefined) => {
@@ -87,7 +91,12 @@ export function ThreadedCommentsPanel({
     const onSave = snapshot.handlers.onSave;
     if (typeof onSave !== 'function') return;
     await runBusyTask(async () => {
-      await onSave(text);
+      const result = await onSave(text);
+      const createdRootId = Number((result as any)?.createdRootId);
+      if (Number.isFinite(createdRootId) && createdRootId > 0) {
+        pendingReplyFocusRootIdRef.current = Math.round(createdRootId);
+        setPendingFocusRootId?.(Math.round(createdRootId));
+      }
       setComposerText('');
       try {
         if (composerTextareaRef.current) {
@@ -117,6 +126,7 @@ export function ThreadedCommentsPanel({
     ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
     : [];
   const roots = normalizedItems.filter((item) => !item.parentId).sort(compareCommentTimeDesc);
+  const rootIdSet = useMemo(() => new Set(roots.map((item) => Number(item.id))), [roots]);
   const repliesByRoot = new Map<number, typeof normalizedItems>();
   for (const item of normalizedItems) {
     if (!item?.parentId) continue;
@@ -128,6 +138,49 @@ export function ThreadedCommentsPanel({
   for (const [rootId, list] of repliesByRoot) {
     repliesByRoot.set(rootId, list.sort(compareCommentTimeAsc));
   }
+
+  const setReplyText = (rootId: number, value: string) => {
+    setReplyTexts((prev) => {
+      if ((prev[rootId] || '') === value) return prev;
+      return { ...prev, [rootId]: value };
+    });
+  };
+
+  const submitReply = async (rootId: number) => {
+    const onReply = snapshot.handlers.onReply;
+    if (typeof onReply !== 'function') return;
+    const text = String(replyTexts[rootId] || '').trim();
+    if (!text || busy) return;
+    await runBusyTask(async () => {
+      await onReply(rootId, text);
+      setReplyText(rootId, '');
+      pendingReplyFocusRootIdRef.current = rootId;
+      setPendingFocusRootId?.(rootId);
+    });
+  };
+
+  useEffect(() => {
+    const rootId = Number(snapshot.pendingFocusRootId || pendingReplyFocusRootIdRef.current || 0);
+    if (!Number.isFinite(rootId) || rootId <= 0) return;
+    if (!snapshot.hasFocusWithinPanel) return;
+    if (!rootIdSet.has(rootId)) return;
+    const target = replyTextareaRefs.current[rootId] || null;
+    if (!target) return;
+    try {
+      target.focus();
+      const value = String(target.value || '');
+      target.setSelectionRange(value.length, value.length);
+    } catch (_error) {
+      // ignore
+    }
+    try {
+      target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } catch (_error) {
+      // ignore
+    }
+    pendingReplyFocusRootIdRef.current = null;
+    setPendingFocusRootId?.(null);
+  }, [rootIdSet, setPendingFocusRootId, snapshot.hasFocusWithinPanel, snapshot.pendingFocusRootId, snapshot.comments]);
 
   useEffect(() => {
     return () => {
@@ -288,16 +341,35 @@ export function ThreadedCommentsPanel({
 
                   <div className="webclipper-inpage-comments-panel__reply-composer">
                     <textarea
+                      ref={(el) => {
+                        replyTextareaRefs.current[rootId] = el;
+                      }}
                       className="webclipper-inpage-comments-panel__reply-textarea"
                       placeholder="Reply…"
                       rows={1}
+                      value={replyTexts[rootId] || ''}
+                      onChange={(event) => {
+                        setReplyText(rootId, event.currentTarget.value);
+                        autosizeTextarea(event.currentTarget);
+                      }}
+                      onKeyDown={(event) => {
+                        if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+                        if (event.key !== 'Enter') return;
+                        if (!(event.metaKey || event.ctrlKey)) return;
+                        if (event.shiftKey || event.altKey) return;
+                        event.preventDefault();
+                        void submitReply(rootId);
+                      }}
                       disabled={false}
                     />
                     <button
                       type="button"
                       className="webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon"
                       aria-label={t('tooltipReplySendDetailed')}
-                      disabled={snapshot.busy}
+                      disabled={busy || !String(replyTexts[rootId] || '').trim()}
+                      onClick={() => {
+                        void submitReply(rootId);
+                      }}
                     >
                       ↑
                     </button>
