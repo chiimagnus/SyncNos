@@ -19,15 +19,24 @@ SyncNos 现在围绕“异构内容 → 稳定知识资产”展开的是 WebCli
 | `.github/workflows/` | CI / Release / 商店发布入口 | `release.yml`, `webclipper-release.yml`, `webclipper-amo-publish.yml`, `webclipper-cws-publish.yml`, `webclipper-edge-publish.yml` | 看真实交付链路而不是猜测。 |
 | `.github/scripts/webclipper/` | WebClipper 打包 / 发布脚本 | 打包 release assets、AMO source、AMO 发布 | 与 workflow 配套理解渠道差异。 |
 
+**2026-04 重大架构变化**：
+- **评论模块 React 迁移**：`src/ui/comments/react/` 新增完整 React 实现（~810 行），删除 legacy `render.ts`（543 行），引入 `panel-store.ts` + `focus-rules.ts` 架构。
+- **Settings 界面重构**：新增 `SettingsTopTabsNav.tsx`（窄屏顶部标签导航），支持关闭按钮，部分设置项改为 blur 自动保存。
+- **AppShell/ConversationsScene 重构**：引入 `listShell` 属性和 `CapturedListPaneShell` 组件，删除 `CapturedListSidebar.tsx`，popup/app 共享列表架构。
+- **Notion/Obsidian 评论数同步**：新增 `comment-metrics.ts`，Notion 写入 "Comment Threads" 属性，Obsidian frontmatter 写入 `comments_root_count`。
+- **文章提取增强**：新增 bilibili 动态支持，移除小红书适配器，优化 Discourse `<details>` code blocks 处理。
+
 ## 关键入口文件
 
 | 入口 | 路径 | 作用 | 为什么先看这里 |
 | --- | --- | --- | --- |
 | 扩展后台入口 | `webclipper/src/entrypoints/background.ts` | 注册消息处理、sync orchestrator、Notion OAuth 监听、清理孤儿 job；仅首次安装自动打开 About 分区 | 它决定所有后台能力如何挂接，以及安装/升级时是否主动打断用户 |
 | 扩展内容入口 | `webclipper/src/entrypoints/content.ts` | 注册 collectors、inpage UI、runtime observer、增量更新 | 它决定页面采集是如何启动的 |
-| 扩展设置入口 | `webclipper/src/ui/settings/SettingsScene.tsx` | 组织 `General / Chat with AI / Backup / Notion / Obsidian / Insight / About` 分区，并在窄屏下切换 list/detail 路由 | 它决定设置项如何被真正看见和进入 |
+| 扩展设置入口 | `webclipper/src/ui/settings/SettingsScene.tsx` | 组织 `General / Chat with AI / Backup / Notion / Obsidian / Insight / About` 分区，窄屏使用顶部标签导航，宽屏使用侧边栏导航，支持关闭按钮 | 它决定设置项如何被真正看见和进入 |
 | 扩展共享下拉入口 | `webclipper/src/ui/shared/SelectMenu.tsx` | 统一菜单键盘行为与面板高度策略；`adaptiveMaxHeight` 会按最近可裁剪容器计算可视高度 | 它解释为什么底部 `source/site` 筛选菜单会随视口动态变高/变矮 |
-| 扩展主题入口 | `webclipper/src/ui/styles/tokens.css` | 仅依赖 `prefers-color-scheme` 驱动 token 亮暗切换 | 它解释“为什么 popup / app / inpage 会随系统暗色” |
+| 扩展主题入口 | `webclipper/src/ui/styles/tokens.css` | 仅依赖 `prefers-color-scheme` 驱动 token 亮暗切换 | 它解释"为什么 popup / app / inpage 会随系统暗色" |
+| 评论 React 入口 | `webclipper/src/ui/comments/react/ThreadedCommentsPanel.tsx` | 完整的 React 评论组件：composer、threads、replies、删除确认、Chat with AI 菜单、聚焦逻辑 | 评论模块已完成 React 迁移，不再是 DOM 直接操作 |
+| 评论 Panel Store | `webclipper/src/ui/comments/react/panel-store.ts` | 外部 store 实现 `getSnapshot/subscribe` 模式，桥接 background handlers 与 React 渲染 | 理解评论状态如何从 background 流向 React 组件 |
 | WXT / manifest 入口 | `webclipper/wxt.config.ts` | 版本号、权限、host permissions、entrypointsDir | 它是发布版本和能力边界的代码事实源 |
 | 脚本入口 | `webclipper/package.json` | `dev`, `compile`, `test`, `build`, `check` | 它定义扩展侧默认验证顺序 |
 
@@ -84,16 +93,28 @@ flowchart LR
 - `webclipper/wxt.config.ts`
 - `webclipper/src/entrypoints/background.ts`
 - `webclipper/src/entrypoints/content.ts`
+- `webclipper/src/ui/comments/react/ThreadedCommentsPanel.tsx`
+- `webclipper/src/ui/comments/react/panel-store.ts`
+- `webclipper/src/ui/comments/react/focus-rules.ts`
+- `webclipper/src/services/comments/domain/comment-metrics.ts`
+- `webclipper/src/ui/settings/SettingsScene.tsx`
+- `webclipper/src/ui/settings/SettingsTopTabsNav.tsx`
+- `webclipper/src/ui/conversations/CapturedListPaneShell.tsx`
+- `webclipper/src/ui/conversations/ConversationsScene.tsx`
+- `webclipper/src/ui/popup/PopupShell.tsx`
+- `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/services/comments/background/handlers.ts`
 - `webclipper/src/services/comments/data/storage-idb.ts`
+- `webclipper/src/services/sync/notion/notion-sync-orchestrator.ts`
+- `webclipper/src/services/sync/obsidian/obsidian-markdown-writer.ts`
 - `webclipper/src/services/sync/backup/export.ts`
 - `webclipper/src/services/sync/backup/import.ts`
 - `webclipper/src/services/sync/backup/backup-utils.ts`
-- `webclipper/src/ui/popup/PopupShell.tsx`
-- `webclipper/src/ui/app/AppShell.tsx`
 - `webclipper/src/ui/conversations/ConversationListPane.tsx`
 - `webclipper/src/ui/shared/SelectMenu.tsx`
-- `webclipper/src/ui/settings/SettingsScene.tsx`
 - `webclipper/src/viewmodels/settings/insight-stats.ts`
 - `.github/workflows/release.yml`
 - `.github/workflows/webclipper-release.yml`
+
+## 更新记录（Update Notes）
+- 2026-04-04：同步 2026-04 重大架构变化——评论模块 React 迁移、Settings 顶部标签导航、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强（bilibili 新增、小红书移除）。
