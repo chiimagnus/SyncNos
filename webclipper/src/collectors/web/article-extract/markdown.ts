@@ -168,7 +168,7 @@ function renderBlock(node: any, baseHref: string, depth = 0): string {
   }
 
   if (tag === 'pre') {
-    const codeNode = node.querySelector ? (node.querySelector(':scope > code') || node.querySelector('code')) : null;
+    const codeNode = node.querySelector ? node.querySelector(':scope > code') || node.querySelector('code') : null;
     const value = normalizeText(codeNode?.textContent || node.textContent || '');
     return value ? `\n\`\`\`\n${value}\n\`\`\`\n\n` : '';
   }

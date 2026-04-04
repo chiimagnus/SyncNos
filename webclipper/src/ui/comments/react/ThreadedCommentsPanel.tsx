@@ -520,10 +520,7 @@ export function ThreadedCommentsPanel({
           <div className="webclipper-inpage-comments-panel__header-title">{t('articleCommentsHeading')}</div>
           <div className="webclipper-inpage-comments-panel__header-actions">
             {showHeaderChatWith ? (
-              <div
-                className="webclipper-inpage-comments-panel__chatwith"
-                ref={headerChatWithRootRef}
-              />
+              <div className="webclipper-inpage-comments-panel__chatwith" ref={headerChatWithRootRef} />
             ) : null}
             {showCollapseButton ? (
               <button

@@ -79,8 +79,7 @@ export function InsightSection(props: {
   onChangeUserName: (next: string) => void;
   onSaveUserName: () => void;
 }) {
-  const { loading, error, stats, hasLoaded, range, onChangeRange, userName, onChangeUserName, onSaveUserName } =
-    props;
+  const { loading, error, stats, hasLoaded, range, onChangeRange, userName, onChangeUserName, onSaveUserName } = props;
 
   if (loading || !hasLoaded) {
     return (

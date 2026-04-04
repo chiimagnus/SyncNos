@@ -37,4 +37,3 @@ describe('article-extract markdown', () => {
     expect(md).not.toContain('将代码复制到剪贴板');
   });
 });
-
