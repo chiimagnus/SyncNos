@@ -23,6 +23,9 @@ function setupDom() {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
   });
+
+  (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
+  (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
 }
 
 function cleanupDom() {
@@ -99,7 +102,7 @@ describe('Threaded comments panel focus regression', () => {
     composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
 
     const send = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__composer-actions .webclipper-inpage-comments-panel__send',
+      '[data-webclipper-root-composer="1"] .webclipper-inpage-comments-panel__send',
     ) as HTMLButtonElement | null;
     expect(send).toBeTruthy();
     send!.click();
@@ -108,7 +111,7 @@ describe('Threaded comments panel focus regression', () => {
     await flushPromises();
 
     const replyTextarea = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__reply-textarea',
+      '.webclipper-inpage-comments-panel__thread .webclipper-inpage-comments-panel__reply-textarea',
     ) as HTMLTextAreaElement | null;
     expect(replyTextarea).toBeTruthy();
     expect(shadow.activeElement).toBe(replyTextarea);

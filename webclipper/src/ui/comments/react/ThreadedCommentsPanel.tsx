@@ -560,41 +560,36 @@ export function ThreadedCommentsPanel({
         >
           <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
         </div>
-        <div className="webclipper-inpage-comments-panel__composer">
-          <div className="webclipper-inpage-comments-panel__avatar">You</div>
-          <div className="webclipper-inpage-comments-panel__composer-main">
-            <textarea
-              ref={composerTextareaRef}
-              className="webclipper-inpage-comments-panel__composer-textarea"
-              placeholder="Write a comment…"
-              rows={1}
-              value={composerText}
-              onInput={(event) => updateComposerText(event.currentTarget.value)}
-              onChange={(event) => updateComposerText(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-                if (event.key !== 'Enter') return;
-                if (!(event.metaKey || event.ctrlKey)) return;
-                if (event.shiftKey || event.altKey) return;
-                event.preventDefault();
-                void submitComposer(event.currentTarget.value);
-              }}
-              disabled={false}
-            />
-            <div className="webclipper-inpage-comments-panel__composer-actions">
-              <button
-                type="button"
-                className="webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--filled webclipper-btn--icon"
-                aria-label={t('tooltipCommentSendDetailed')}
-                disabled={busy || !String(composerText || '').trim()}
-                onClick={() => {
-                  void submitComposer();
-                }}
-              >
-                ↑
-              </button>
-            </div>
-          </div>
+        <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
+          <textarea
+            ref={composerTextareaRef}
+            className="webclipper-inpage-comments-panel__composer-textarea"
+            placeholder="Write a comment…"
+            rows={1}
+            value={composerText}
+            onInput={(event) => updateComposerText(event.currentTarget.value)}
+            onChange={(event) => updateComposerText(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+              if (event.key !== 'Enter') return;
+              if (!(event.metaKey || event.ctrlKey)) return;
+              if (event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              void submitComposer(event.currentTarget.value);
+            }}
+            disabled={false}
+          />
+          <button
+            type="button"
+            className="webclipper-inpage-comments-panel__send webclipper-btn webclipper-btn--icon"
+            aria-label={t('tooltipCommentSendDetailed')}
+            disabled={busy || !String(composerText || '').trim()}
+            onClick={() => {
+              void submitComposer();
+            }}
+          >
+            ↑
+          </button>
         </div>
         <div className="webclipper-inpage-comments-panel__threads">
           {roots.length ? (
