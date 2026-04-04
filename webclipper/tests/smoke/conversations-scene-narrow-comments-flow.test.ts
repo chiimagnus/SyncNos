@@ -24,6 +24,7 @@ let currentSidebarCloseListener: (() => void) | null = null;
 const attachPanel = vi.fn();
 const detachPanel = vi.fn();
 const sessionSubscribe = vi.fn(() => () => {});
+const setContext = vi.fn();
 const getSessionSnapshot = vi.fn(() => ({
   attached: true,
   isOpen: true,
@@ -179,6 +180,7 @@ describe('ConversationsScene narrow comments flow', () => {
     detachPanel.mockReset();
     sessionSubscribe.mockReset();
     sessionSubscribe.mockImplementation(() => () => {});
+    setContext.mockReset();
     getSessionSnapshot.mockReset();
     getSessionSnapshot.mockReturnValue({
       attached: true,
@@ -217,6 +219,7 @@ describe('ConversationsScene narrow comments flow', () => {
       } as any,
       sidebarController: {
         open: sidebarOpen,
+        setContext,
       } as any,
       sidebarSnapshot: {} as any,
       setLocatorRoot,
@@ -234,6 +237,10 @@ describe('ConversationsScene narrow comments flow', () => {
       );
     });
 
+    expect(setContext).toHaveBeenCalledWith({
+      canonicalUrl: 'https://example.com/article/11',
+      conversationId: 11,
+    });
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
 
     const row = document.querySelector('[data-conversation-id="11"]') as HTMLElement | null;
@@ -304,6 +311,7 @@ describe('ConversationsScene narrow comments flow', () => {
       } as any,
       sidebarController: {
         open: sidebarOpen,
+        setContext,
       } as any,
       sidebarSnapshot: {} as any,
       setLocatorRoot,
@@ -321,6 +329,10 @@ describe('ConversationsScene narrow comments flow', () => {
       );
     });
 
+    expect(setContext).toHaveBeenCalledWith({
+      canonicalUrl: 'https://example.com/article/11',
+      conversationId: 11,
+    });
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 

@@ -92,6 +92,22 @@ export function ConversationsScene({
     Boolean(selectedConversationCanonicalUrl);
 
   useEffect(() => {
+    if (!commentsSidebarRuntime) return;
+    const controller = commentsSidebarRuntime.sidebarController;
+    if (!controller || typeof controller.setContext !== 'function') return;
+
+    if (isArticleConversationLike(selectedConversation) && selectedConversationCanonicalUrl) {
+      controller.setContext({
+        canonicalUrl: selectedConversationCanonicalUrl,
+        conversationId: Number((selectedConversation as any)?.id || 0) || null,
+      });
+      return;
+    }
+
+    controller.setContext(null);
+  }, [commentsSidebarRuntime, selectedConversation, selectedConversationCanonicalUrl]);
+
+  useEffect(() => {
     if (!isNarrow) return;
     const pending = consumePendingOpenConversation();
     if (!pending) return;
