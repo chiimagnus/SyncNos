@@ -121,15 +121,15 @@ function PopupShellFrame() {
     },
   });
 
-  const onOpenSettings = async () => {
+  const onOpenSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings' });
     window.close();
-  };
+  }, []);
 
-  const onOpenInsightSettings = async () => {
+  const onOpenInsightSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings?section=aboutyou' });
     window.close();
-  };
+  }, []);
 
   const onPopupNotionSyncStarted = () => {
     void (async () => {
