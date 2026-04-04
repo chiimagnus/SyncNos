@@ -3,13 +3,11 @@ import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'r
 import { Settings as SettingsIcon } from 'lucide-react';
 import { t } from '@i18n';
 import Settings from '@ui/app/Settings';
-import { CapturedListSidebar } from '@ui/app/CapturedListSidebar';
 import { ConversationsProvider, useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
@@ -28,7 +26,6 @@ import { createRuntimeClient } from '@services/shared/runtime-client';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
-const SIDEBAR_WIDTH_DEFAULT = 370;
 
 function isArticleConversationLike(conversation: any): boolean {
   const sourceType = String(conversation?.sourceType || '')
@@ -259,6 +256,7 @@ export default function AppShell() {
     const showSettingsSheet = !isNarrow && location.pathname === '/settings';
     const state: any = (location as any)?.state ?? {};
     const backgroundLocation = showSettingsSheet ? (state?.backgroundLocation ?? null) : null;
+    const settingsOpen = location.pathname === '/settings';
     const showCommentsSidebar =
       canToggleCommentsSidebar &&
       !showSettingsSheet &&
@@ -308,6 +306,64 @@ export default function AppShell() {
       const from = String(state?.from || '').trim();
       if (from) navigate(from, { replace: true });
       else navigate('/', { replace: true });
+    };
+
+    const openSettings = () => {
+      if (settingsOpen) {
+        closeSettings();
+        return;
+      }
+
+      navigate('/settings', {
+        state: {
+          backgroundLocation: {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          },
+          from: `${location.pathname || '/'}${location.search || ''}`,
+        },
+      });
+    };
+
+    const openInsightSettings = () => {
+      if (settingsOpen) {
+        navigate('/settings?section=aboutyou', { replace: true, state: location.state });
+        return;
+      }
+
+      navigate('/settings?section=aboutyou', {
+        state: {
+          backgroundLocation: {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          },
+          from: `${location.pathname || '/'}${location.search || ''}`,
+        },
+      });
+    };
+
+    const openProviderSettings = (section: string) => {
+      const safeSection =
+        String(section || '')
+          .trim()
+          .toLowerCase() || 'notion';
+      const route = `/settings?section=${encodeURIComponent(safeSection)}`;
+      if (settingsOpen) {
+        navigate(route, { replace: true, state: location.state });
+        return;
+      }
+      navigate(route, {
+        state: {
+          backgroundLocation: {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          },
+          from: `${location.pathname || '/'}${location.search || ''}`,
+        },
+      });
     };
 
     useEffect(() => {
@@ -485,27 +541,10 @@ export default function AppShell() {
     }, [location.pathname, location.search, navigate, selectedConversation]);
 
     const hideSidebarInMedium = isMedium && showCommentsSidebar;
-    const renderSidebar = !isNarrow && !sidebarCollapsed;
+    const wideHideList = !isNarrow && (sidebarCollapsed || hideSidebarInMedium);
 
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-        {renderSidebar ? (
-          <aside
-            className={[
-              'tw-relative tw-flex tw-flex-col tw-bg-[var(--bg-primary)] tw-p-0',
-              columnDividerRightClassName(),
-            ].join(' ')}
-            style={{
-              width: `${SIDEBAR_WIDTH_DEFAULT}px`,
-              minWidth: `${SIDEBAR_WIDTH_DEFAULT}px`,
-              display: hideSidebarInMedium ? 'none' : undefined,
-            }}
-            aria-hidden={hideSidebarInMedium ? 'true' : undefined}
-          >
-            <CapturedListSidebar onCollapse={() => setCollapsed(true)} />
-          </aside>
-        ) : null}
-
         <main className="tw-relative tw-min-w-0 tw-flex-1 tw-overflow-hidden">
           {isNarrow ? (
             <div
@@ -526,7 +565,7 @@ export default function AppShell() {
                           rightSlot: (
                             <button
                               type="button"
-                              onClick={() => navigate('/settings')}
+                              onClick={openSettings}
                               className={headerButtonClassName()}
                               aria-label={t('openSettingsAria')}
                               {...tooltipAttrs(t('openSettings'))}
@@ -536,7 +575,8 @@ export default function AppShell() {
                             </button>
                           ),
                         }}
-                        onOpenInsightsSection={() => navigate('/settings?section=aboutyou')}
+                        onOpenInsightsSection={openInsightSettings}
+                        onOpenSettingsSection={openProviderSettings}
                         commentsSidebarRuntime={{
                           sidebarSession: commentsSidebarSession,
                           sidebarController: commentsSidebarController,
@@ -562,7 +602,7 @@ export default function AppShell() {
             <div className="tw-flex tw-h-full tw-min-h-0 tw-min-w-0">
               <div
                 className={[
-                  'route-scroll tw-h-full tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden',
+                  'tw-h-full tw-min-w-0 tw-flex-1 tw-overflow-hidden',
                   showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
                 ].join(' ')}
                 aria-hidden={showSettingsSheet}
@@ -571,13 +611,60 @@ export default function AppShell() {
                   <Route
                     path="/"
                     element={
-                      <ConversationDetailPane
-                        onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
-                        onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
-                        onCommentsLocatorRootChange={(root) => {
-                          setCommentsLocatorRoot(root);
+                      <ConversationsScene
+                        wideChrome="none"
+                        wideHideList={wideHideList}
+                        wideDetail={
+                          <ConversationDetailPane
+                            onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
+                            onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
+                            onCommentsLocatorRootChange={(root) => {
+                              setCommentsLocatorRoot(root);
+                            }}
+                            commentsSidebarOpen={showCommentsSidebar}
+                          />
+                        }
+                        listShell={{
+                          rightSlot: (
+                            <>
+                              <button
+                                type="button"
+                                onClick={openSettings}
+                                className={headerButtonClassName()}
+                                aria-label={t('openSettingsAria')}
+                                {...tooltipAttrs(t('openSettings'))}
+                              >
+                                <span className="tw-sr-only">{t('settingsLabel')}</span>
+                                <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setCollapsed(true)}
+                                className={headerButtonClassName()}
+                                aria-label={t('collapseSidebar')}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                  <path
+                                    d="M6.25 3.25L3 6.5L6.25 9.75"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M3.2 6.5H12.75"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              </button>
+                            </>
+                          ),
                         }}
-                        commentsSidebarOpen={showCommentsSidebar}
+                        onOpenInsightsSection={openInsightSettings}
+                        onOpenSettingsSection={openProviderSettings}
                       />
                     }
                   />

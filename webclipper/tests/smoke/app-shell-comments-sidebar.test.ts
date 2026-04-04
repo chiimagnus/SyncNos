@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
+import type { ReactNode } from 'react';
 
 const { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState } = vi.hoisted(() => {
   const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
@@ -88,9 +89,14 @@ vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
 vi.mock('../../src/ui/app/routes/Settings', () => ({
   default: () => createElement('div', null, 'settings'),
 }));
-
-vi.mock('../../src/ui/app/CapturedListSidebar', () => ({
-  CapturedListSidebar: () => createElement('div', null, 'sidebar'),
+vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
+  ConversationsScene: (props: { wideDetail?: ReactNode; wideHideList?: boolean }) =>
+    createElement(
+      'div',
+      null,
+      props.wideHideList ? null : createElement('aside', null, 'list'),
+      props.wideDetail ?? null,
+    ),
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -404,8 +410,6 @@ describe('AppShell comments sidebar', () => {
       const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
       expect(pressedBtn).toBeTruthy();
     });
-    const sidebarAside = document.querySelector('aside') as HTMLElement | null;
-    expect(sidebarAside).toBeTruthy();
-    expect(sidebarAside?.style.display).toBe('none');
+    expect(document.querySelector('aside')).toBeFalsy();
   });
 });

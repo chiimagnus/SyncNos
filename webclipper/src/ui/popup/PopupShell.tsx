@@ -129,6 +129,15 @@ function PopupShellFrame() {
     window.close();
   }, []);
 
+  const onOpenProviderSettings = useCallback(async (section: string) => {
+    const safeSection =
+      String(section || '')
+        .trim()
+        .toLowerCase() || 'notion';
+    await openOrFocusExtensionAppTab({ route: `/settings?section=${encodeURIComponent(safeSection)}` });
+    window.close();
+  }, []);
+
   const onPopupNotionSyncStarted = () => {
     void (async () => {
       const dismissed = await getPopupNotionSyncNudgeDismissed().catch(() => false);
@@ -223,6 +232,9 @@ function PopupShellFrame() {
               onPopupNotionSyncStarted={onPopupNotionSyncStarted}
               onOpenInsightsSection={() => {
                 void onOpenInsightSettings().catch(() => {});
+              }}
+              onOpenSettingsSection={(section) => {
+                void onOpenProviderSettings(section).catch(() => {});
               }}
               commentsSidebarRuntime={commentsSidebarRuntime}
               narrowCommentsOpenSource="popup"
