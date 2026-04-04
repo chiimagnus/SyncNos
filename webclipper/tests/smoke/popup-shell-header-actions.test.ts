@@ -82,18 +82,18 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
-    onPopupHeaderStateChange?: (state: any) => void;
     inlineNarrowDetailHeader?: boolean;
+    renderList?: (list: ReactNode) => ReactNode;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
       setMode('list');
-      props.onPopupHeaderStateChange?.({ mode: 'list' });
     };
     return createElement(
       'div',
       null,
       createElement('div', { 'data-inline-narrow-detail-header': props.inlineNarrowDetailHeader ? '1' : '0' }),
+      mode === 'list' ? props.renderList?.(createElement('div', { 'data-list-shell': '1' }, 'list')) ?? null : null,
       createElement(
         'button',
         {
@@ -108,23 +108,6 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
           type: 'button',
           onClick: () => {
             setMode('detail');
-            props.onPopupHeaderStateChange?.({
-              mode: 'detail',
-              title: 'Conversation',
-              subtitle: 'chatgpt · key',
-              actions: [
-                {
-                  id: 'open-in-notion',
-                  label: 'Open in Notion',
-                  kind: 'external-link',
-                  provider: 'notion',
-                  slot: 'open',
-                  href: 'https://www.notion.so/example',
-                  onTrigger: vi.fn(async () => {}),
-                },
-              ],
-              onBack: toList,
-            });
           },
         },
         'show-detail',
@@ -135,13 +118,6 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
           type: 'button',
           onClick: () => {
             setMode('detail-empty');
-            props.onPopupHeaderStateChange?.({
-              mode: 'detail',
-              title: 'Conversation',
-              subtitle: 'chatgpt · key',
-              actions: [],
-              onBack: toList,
-            });
           },
         },
         'show-detail-empty',
@@ -152,31 +128,6 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
           type: 'button',
           onClick: () => {
             setMode('detail-menu');
-            props.onPopupHeaderStateChange?.({
-              mode: 'detail',
-              title: 'Conversation',
-              subtitle: 'chatgpt · key',
-              actions: [
-                {
-                  id: 'open-in-notion',
-                  label: 'Open in Notion',
-                  provider: 'notion',
-                  kind: 'external-link',
-                  slot: 'open',
-                  href: 'https://www.notion.so/example',
-                  onTrigger: vi.fn(async () => {}),
-                },
-                {
-                  id: 'open-in-obsidian',
-                  label: 'Open in Obsidian',
-                  provider: 'obsidian',
-                  kind: 'open-target',
-                  slot: 'open',
-                  onTrigger: vi.fn(async () => {}),
-                },
-              ],
-              onBack: toList,
-            });
           },
         },
         'show-detail-menu',

@@ -1,17 +1,15 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 
-import { getURL as runtimeGetURL } from '@services/shared/runtime';
-
 import { t } from '@i18n';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 
 export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) {
   const routerLocation = useLocation();
   const navigate = useNavigate();
-  const logoUrl = runtimeGetURL('icons/icon-128.png');
 
   const state: any = (routerLocation as any)?.state ?? {};
   const settingsOpen = routerLocation.pathname === '/settings';
@@ -81,65 +79,45 @@ export function CapturedListSidebar({ onCollapse }: { onCollapse: () => void }) 
   };
 
   return (
-    <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col">
-      <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-primary)]">
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-px-3 tw-py-3">
-          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="SyncNos"
-                className="tw-size-8 tw-rounded-xl tw-object-contain"
-                draggable={false}
+    <CapturedListPaneShell
+      rightSlot={
+        <>
+          <button
+            type="button"
+            onClick={openSettings}
+            className={headerButtonClassName()}
+            aria-label={t('openSettingsAria')}
+            {...tooltipAttrs(t('openSettings'))}
+          >
+            <span className="tw-sr-only">{t('settingsLabel')}</span>
+            <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onCollapse}
+            className={headerButtonClassName()}
+            aria-label={t('collapseSidebar')}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M6.25 3.25L3 6.5L6.25 9.75"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
-            ) : (
-              <span
-                className="tw-inline-flex tw-size-8 tw-items-center tw-justify-center tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-text-[11px] tw-font-black tw-tracking-[0.12em] tw-text-[var(--text-primary)]"
-                aria-hidden="true"
-              >
-                SN
-              </span>
-            )}
-          </div>
-
-          <div className="tw-flex tw-items-center tw-gap-2">
-            <button
-              type="button"
-              onClick={openSettings}
-              className={headerButtonClassName()}
-              aria-label={t('openSettingsAria')}
-              {...tooltipAttrs(t('openSettings'))}
-            >
-              <span className="tw-sr-only">{t('settingsLabel')}</span>
-              <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onCollapse}
-              className={headerButtonClassName()}
-              aria-label={t('collapseSidebar')}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M6.25 3.25L3 6.5L6.25 9.75"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
+              <path d="M3.2 6.5H12.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        </>
+      }
+    >
       <ConversationListPane
         onOpenConversation={() => navigate('/')}
         onOpenInsightsSection={openInsightSettings}
         onOpenSettingsSection={openProviderSettings}
       />
-    </div>
+    </CapturedListPaneShell>
   );
 }

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowListDetailCommentsRoute';
 import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 
-import { t, formatConversationTitle } from '@i18n';
-import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { ThreadedCommentsPanelChatWithAction, ThreadedCommentsPanelCommentChatWithConfig } from '@ui/comments';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
@@ -17,19 +16,8 @@ import { columnDividerRightClassName } from '@ui/shared/column-styles';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
-export type PopupHeaderState =
-  | { mode: 'list' }
-  | {
-      mode: 'detail';
-      title: string;
-      subtitle: string;
-      actions: DetailHeaderAction[];
-      onBack: () => void;
-    };
-
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupHeaderStateChange?: (state: PopupHeaderState) => void;
   inlineNarrowDetailHeader?: boolean;
   onPopupNotionSyncStarted?: () => void;
   onOpenInsightsSection?: () => void;
@@ -38,6 +26,7 @@ export type ConversationsSceneProps = {
   resolveCommentsSidebarChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveCommentsSidebarSingleChatWithLabel?: () => Promise<string | null>;
   commentsSidebarCommentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
+  renderList?: (list: ReactNode) => ReactNode;
 };
 
 function isArticleConversationLike(conversation: any): boolean {
@@ -55,7 +44,6 @@ function isArticleConversationLike(conversation: any): boolean {
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
-  onPopupHeaderStateChange,
   inlineNarrowDetailHeader = false,
   onPopupNotionSyncStarted,
   onOpenInsightsSection,
@@ -64,12 +52,11 @@ export function ConversationsScene({
   resolveCommentsSidebarChatWithActions,
   resolveCommentsSidebarSingleChatWithLabel,
   commentsSidebarCommentChatWith,
+  renderList,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const {
-    activeId,
     selectedConversation,
-    detailHeaderActions,
     openConversationExternalBySourceKey,
     openConversationExternalById,
   } = useConversationsApp();
@@ -109,45 +96,13 @@ export function ConversationsScene({
   }, [isNarrow, openConversationExternalById, openConversationExternalBySourceKey, openDetail]);
 
   useEffect(() => {
-    if (!onPopupHeaderStateChange) return;
-
-    if (!isNarrow || narrowRoute === 'list') {
-      onPopupHeaderStateChange({ mode: 'list' });
-      return;
-    }
-
-    const title = activeId ? formatConversationTitle(selectedConversation?.title) : t('chatsTitle');
-    const subtitle = activeId && selectedConversation ? String((selectedConversation as any).url || '').trim() : '';
-
-    onPopupHeaderStateChange({
-      mode: 'detail',
-      title,
-      subtitle,
-      actions: detailHeaderActions,
-      onBack: returnToList,
-    });
-
-    return () => {
-      onPopupHeaderStateChange({ mode: 'list' });
-    };
-  }, [
-    activeId,
-    detailHeaderActions,
-    isNarrow,
-    narrowRoute,
-    onPopupHeaderStateChange,
-    returnToList,
-    selectedConversation,
-  ]);
-
-  useEffect(() => {
     if (!commentsSidebarRuntime) return;
     return commentsSidebarRuntime.subscribeSidebarClose(() => {
       if (isNarrow && narrowRoute === 'comments') returnToDetail();
     });
   }, [commentsSidebarRuntime, isNarrow, narrowRoute, returnToDetail]);
 
-  const list = (
+  const listPane = (
     <ConversationListPane
       initialScrollTop={listScrollTop}
       scrollRestoreKey={listRestoreKey}
@@ -159,6 +114,7 @@ export function ConversationsScene({
       onOpenInsightsSection={onOpenInsightsSection}
     />
   );
+  const list = renderList ? renderList(listPane) : listPane;
 
   if (isNarrow) {
     if (narrowRoute === 'detail') {
