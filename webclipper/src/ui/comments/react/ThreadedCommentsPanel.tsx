@@ -88,6 +88,13 @@ export function ThreadedCommentsPanel({
   const externallyBusy = snapshot.busy === true;
   const busy = externallyBusy || localBusyCount > 0;
 
+  const headerChatWithRootRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      onHeaderChatWithRootChange?.(el);
+    },
+    [onHeaderChatWithRootChange],
+  );
+
   const syncLocalState = useCallback((run: () => void) => {
     try {
       flushSync(run);
@@ -515,9 +522,7 @@ export function ThreadedCommentsPanel({
             {showHeaderChatWith ? (
               <div
                 className="webclipper-inpage-comments-panel__chatwith"
-                ref={(el) => {
-                  onHeaderChatWithRootChange?.(el);
-                }}
+                ref={headerChatWithRootRef}
               />
             ) : null}
             {showCollapseButton ? (
