@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { t } from '@i18n';
@@ -26,7 +25,6 @@ import {
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { createRuntimeClient } from '@services/shared/runtime-client';
-import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 
 const SIDEBAR_COLLAPSED_KEY = 'webclipper_app_sidebar_collapsed';
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -489,30 +487,6 @@ export default function AppShell() {
     const hideSidebarInMedium = isMedium && showCommentsSidebar;
     const renderSidebar = !isNarrow && !sidebarCollapsed;
 
-    const renderNarrowList = useCallback(
-      (list: ReactNode) => {
-        return (
-          <CapturedListPaneShell
-            rightSlot={
-              <button
-                type="button"
-                onClick={() => navigate('/settings')}
-                className={headerButtonClassName()}
-                aria-label={t('openSettingsAria')}
-                {...tooltipAttrs(t('openSettings'))}
-              >
-                <span className="tw-sr-only">{t('settingsLabel')}</span>
-                <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
-              </button>
-            }
-          >
-            {list}
-          </CapturedListPaneShell>
-        );
-      },
-      [navigate],
-    );
-
     return (
       <div className="tw-flex tw-h-[100dvh] tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
         {renderSidebar ? (
@@ -548,7 +522,20 @@ export default function AppShell() {
                     element={
                       <ConversationsScene
                         inlineNarrowDetailHeader
-                        renderList={renderNarrowList}
+                        listShell={{
+                          rightSlot: (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/settings')}
+                              className={headerButtonClassName()}
+                              aria-label={t('openSettingsAria')}
+                              {...tooltipAttrs(t('openSettings'))}
+                            >
+                              <span className="tw-sr-only">{t('settingsLabel')}</span>
+                              <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
+                            </button>
+                          ),
+                        }}
                         onOpenInsightsSection={() => navigate('/settings?section=aboutyou')}
                         commentsSidebarRuntime={{
                           sidebarSession: commentsSidebarSession,

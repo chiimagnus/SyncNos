@@ -13,8 +13,14 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
+import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
+
+export type ConversationsSceneListShellConfig = {
+  rightSlot?: ReactNode;
+  belowHeader?: ReactNode;
+};
 
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
@@ -26,7 +32,7 @@ export type ConversationsSceneProps = {
   resolveCommentsSidebarChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveCommentsSidebarSingleChatWithLabel?: () => Promise<string | null>;
   commentsSidebarCommentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
-  renderList?: (list: ReactNode) => ReactNode;
+  listShell?: ConversationsSceneListShellConfig;
 };
 
 function isArticleConversationLike(conversation: any): boolean {
@@ -52,7 +58,7 @@ export function ConversationsScene({
   resolveCommentsSidebarChatWithActions,
   resolveCommentsSidebarSingleChatWithLabel,
   commentsSidebarCommentChatWith,
-  renderList,
+  listShell,
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const {
@@ -114,7 +120,13 @@ export function ConversationsScene({
       onOpenInsightsSection={onOpenInsightsSection}
     />
   );
-  const list = renderList ? renderList(listPane) : listPane;
+  const list = listShell ? (
+    <CapturedListPaneShell rightSlot={listShell.rightSlot} belowHeader={listShell.belowHeader}>
+      {listPane}
+    </CapturedListPaneShell>
+  ) : (
+    listPane
+  );
 
   if (isNarrow) {
     if (narrowRoute === 'detail') {

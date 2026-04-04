@@ -83,7 +83,7 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
     inlineNarrowDetailHeader?: boolean;
-    renderList?: (list: ReactNode) => ReactNode;
+    listShell?: { rightSlot?: ReactNode; belowHeader?: ReactNode };
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
@@ -93,7 +93,7 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
       'div',
       null,
       createElement('div', { 'data-inline-narrow-detail-header': props.inlineNarrowDetailHeader ? '1' : '0' }),
-      mode === 'list' ? props.renderList?.(createElement('div', { 'data-list-shell': '1' }, 'list')) ?? null : null,
+      mode === 'list' ? createElement('div', { 'data-list-shell': '1' }, props.listShell?.rightSlot ?? null) : null,
       createElement(
         'button',
         {
