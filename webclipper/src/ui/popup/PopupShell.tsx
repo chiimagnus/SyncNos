@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 
-import { getURL } from '@services/shared/runtime';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
 
 import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
-import { ConversationsScene, type PopupHeaderState } from '@ui/conversations/ConversationsScene';
+import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { navPillButtonClassName } from '@ui/shared/nav-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 
@@ -110,7 +108,6 @@ export default function PopupShell() {
 }
 
 function PopupShellFrame() {
-  const [headerState, setHeaderState] = useState<PopupHeaderState>({ mode: 'list' });
   const commentsSidebarRuntime = useArticleCommentsSidebarRuntime();
   const { refreshList, refreshActiveDetail } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
@@ -122,17 +119,25 @@ function PopupShellFrame() {
     },
   });
 
-  const onOpenSettings = async () => {
+  const onOpenSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings' });
     window.close();
-  };
+  }, []);
 
-  const onOpenInsightSettings = async () => {
+  const onOpenInsightSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings?section=aboutyou' });
     window.close();
-  };
+  }, []);
 
-  const showListActions = headerState.mode !== 'detail';
+  const onOpenProviderSettings = useCallback(async (section: string) => {
+    const safeSection =
+      String(section || '')
+        .trim()
+        .toLowerCase() || 'notion';
+    await openOrFocusExtensionAppTab({ route: `/settings?section=${encodeURIComponent(safeSection)}` });
+    window.close();
+  }, []);
+
   const onPopupNotionSyncStarted = () => {
     void (async () => {
       const dismissed = await getPopupNotionSyncNudgeDismissed().catch(() => false);
@@ -176,72 +181,60 @@ function PopupShellFrame() {
         lineHeight: 1.45,
       }}
     >
-      {showListActions ? (
-        <header className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
-              <img
-                className="tw-size-7 tw-rounded-[var(--radius-chip)] tw-object-contain"
-                src={getURL('icons/icon-128.png' as any)}
-                alt=""
-                draggable={false}
-              />
-              <span className="tw-min-w-0 tw-truncate tw-text-[13px] tw-font-black tw-tracking-[-0.01em]">SyncNos</span>
-            </div>
-
-            <div className="tw-flex tw-shrink-0 tw-items-center tw-gap-2">
-              <span
-                className="tw-inline-flex"
-                {...tooltipAttrs(buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel)}
-              >
-                <button
-                  type="button"
-                  onClick={() => capture().catch(() => {})}
-                  disabled={buttonDisabled}
-                  className={navPillButtonClassName()}
-                  aria-label={buttonLabel}
-                >
-                  <span className="tw-truncate">{buttonLabel}</span>
-                </button>
-              </span>
-
-              <button
-                type="button"
-                {...tooltipAttrs(t('openSettings'))}
-                onClick={() => onOpenSettings().catch(() => {})}
-                className={headerButtonClassName()}
-                aria-label={t('openSettingsAria')}
-              >
-                <SettingsIcon size={14} strokeWidth={2} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-        </header>
-      ) : null}
-
-      {showListActions && status?.message ? (
-        <div
-          className={[
-            'tw-border-b tw-px-3 tw-py-2 tw-text-[11px] tw-font-semibold',
-            status.kind === 'error'
-              ? 'tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--error)]'
-              : 'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--success)]',
-          ].join(' ')}
-          role={status.kind === 'error' ? 'alert' : 'status'}
-        >
-          {status.message}
-        </div>
-      ) : null}
-
       <main className="tw-min-h-0 tw-flex-1 tw-overflow-hidden">
         <section id="viewChats" className="tw-h-full tw-min-h-0" aria-label={t('chatsAria')}>
           <div className="tw-flex tw-h-full tw-min-h-0 tw-flex-1 tw-flex-col">
             <ConversationsScene
-              onPopupHeaderStateChange={setHeaderState}
               inlineNarrowDetailHeader
+              listShell={{
+                rightSlot: (
+                  <>
+                    <span
+                      className="tw-inline-flex"
+                      {...tooltipAttrs(buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel)}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => capture().catch(() => {})}
+                        disabled={buttonDisabled}
+                        className={[buttonTintClassName(), 'tw-max-w-[168px]'].join(' ')}
+                        aria-label={buttonLabel}
+                      >
+                        <span className="tw-truncate">{buttonLabel}</span>
+                      </button>
+                    </span>
+
+                    <button
+                      type="button"
+                      {...tooltipAttrs(t('openSettings'))}
+                      onClick={() => onOpenSettings().catch(() => {})}
+                      className={headerButtonClassName()}
+                      aria-label={t('openSettingsAria')}
+                    >
+                      <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
+                    </button>
+                  </>
+                ),
+                belowHeader: status?.message ? (
+                  <div
+                    className={[
+                      'tw-border-b tw-px-3 tw-py-2 tw-text-[11px] tw-font-semibold',
+                      status.kind === 'error'
+                        ? 'tw-border-[var(--error)] tw-bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-card))] tw-text-[var(--error)]'
+                        : 'tw-border-[var(--success)] tw-bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-card))] tw-text-[var(--success)]',
+                    ].join(' ')}
+                    role={status.kind === 'error' ? 'alert' : 'status'}
+                  >
+                    {status.message}
+                  </div>
+                ) : null,
+              }}
               onPopupNotionSyncStarted={onPopupNotionSyncStarted}
               onOpenInsightsSection={() => {
                 void onOpenInsightSettings().catch(() => {});
+              }}
+              onOpenSettingsSection={(section) => {
+                void onOpenProviderSettings(section).catch(() => {});
               }}
               commentsSidebarRuntime={commentsSidebarRuntime}
               narrowCommentsOpenSource="popup"

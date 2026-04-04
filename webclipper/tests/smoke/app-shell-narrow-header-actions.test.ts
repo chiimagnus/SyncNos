@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
+import type { ReactNode } from 'react';
 
 const { responsiveTierState } = vi.hoisted(() => ({
   responsiveTierState: { value: 'narrow' as 'narrow' | 'medium' | 'wide' },
@@ -11,6 +12,7 @@ vi.mock('../../src/ui/i18n', () => ({
   t: (key: string) => {
     const labels: Record<string, string> = {
       backToChatsAria: 'Back to chats',
+      openSettingsAria: 'Open Settings',
       settingsDialogAria: 'Settings dialog',
       closeSettings: 'Close settings',
       resizeSidebar: 'Resize sidebar',
@@ -34,10 +36,6 @@ vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
 
 vi.mock('../../src/ui/app/routes/Settings', () => ({
   default: () => createElement('div', null, 'settings'),
-}));
-
-vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
-  CapturedListSidebar: () => createElement('div', null, 'sidebar'),
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -88,18 +86,18 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
-    onPopupHeaderStateChange?: (state: any) => void;
     inlineNarrowDetailHeader?: boolean;
+    listShell?: { rightSlot?: ReactNode };
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty'>('list');
     const toList = () => {
       setMode('list');
-      props.onPopupHeaderStateChange?.({ mode: 'list' });
     };
     return createElement(
       'div',
       null,
       createElement('div', { 'data-inline-narrow-detail-header': props.inlineNarrowDetailHeader ? '1' : '0' }),
+      mode === 'list' ? createElement('div', { 'data-list-header': '1' }, props.listShell?.rightSlot ?? null) : null,
       createElement(
         'button',
         {
@@ -114,23 +112,6 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
           type: 'button',
           onClick: () => {
             setMode('detail');
-            props.onPopupHeaderStateChange?.({
-              mode: 'detail',
-              title: 'Conversation',
-              subtitle: 'chatgpt · key',
-              actions: [
-                {
-                  id: 'open-in-notion',
-                  label: 'Open in Notion',
-                  kind: 'external-link',
-                  provider: 'notion',
-                  slot: 'open',
-                  href: 'https://www.notion.so/example',
-                  onTrigger: async () => {},
-                },
-              ],
-              onBack: toList,
-            });
           },
         },
         'show-detail',
@@ -141,13 +122,6 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
           type: 'button',
           onClick: () => {
             setMode('detail-empty');
-            props.onPopupHeaderStateChange?.({
-              mode: 'detail',
-              title: 'Conversation',
-              subtitle: 'chatgpt · key',
-              actions: [],
-              onBack: toList,
-            });
           },
         },
         'show-detail-empty',
@@ -227,6 +201,7 @@ describe('AppShell narrow detail header actions', () => {
       root!.render(createElement(AppShell));
     });
 
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
     const detailButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'show-detail',
     ) as HTMLButtonElement | undefined;
@@ -237,6 +212,7 @@ describe('AppShell narrow detail header actions', () => {
       detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
   });
 
@@ -245,6 +221,7 @@ describe('AppShell narrow detail header actions', () => {
       root!.render(createElement(AppShell));
     });
 
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
     const detailButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'show-detail-empty',
     ) as HTMLButtonElement | undefined;
@@ -254,6 +231,7 @@ describe('AppShell narrow detail header actions', () => {
       detailButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
+    expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Back to chats"]')).toBeTruthy();
   });

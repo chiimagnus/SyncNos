@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
+import type { ReactNode } from 'react';
 
 const { responsiveTierState } = vi.hoisted(() => ({
   responsiveTierState: { value: 'wide' as 'narrow' | 'medium' | 'wide' },
@@ -33,13 +34,17 @@ vi.mock('../../src/ui/shared/AppTooltip', async (importOriginal) => {
 vi.mock('../../src/ui/app/routes/Settings', () => ({
   default: () => createElement('div', null, 'settings'),
 }));
-
-vi.mock('../../src/ui/app/conversations/CapturedListSidebar', () => ({
-  CapturedListSidebar: ({ onCollapse }: { onCollapse: () => void }) =>
+vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
+  ConversationsScene: (props: {
+    listShell?: { rightSlot?: ReactNode };
+    wideDetail?: ReactNode;
+    wideHideList?: boolean;
+  }) =>
     createElement(
       'div',
       null,
-      createElement('button', { type: 'button', onClick: onCollapse, 'aria-label': 'Collapse sidebar' }, 'collapse'),
+      props.wideHideList ? null : createElement('div', null, props.listShell?.rightSlot ?? null),
+      props.wideDetail ?? null,
     ),
 }));
 

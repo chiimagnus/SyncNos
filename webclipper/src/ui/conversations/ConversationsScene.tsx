@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowListDetailCommentsRoute';
 import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 
-import { t, formatConversationTitle } from '@i18n';
-import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { ThreadedCommentsPanelChatWithAction, ThreadedCommentsPanelCommentChatWithConfig } from '@ui/comments';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
@@ -14,30 +13,32 @@ import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
+import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
-export type PopupHeaderState =
-  | { mode: 'list' }
-  | {
-      mode: 'detail';
-      title: string;
-      subtitle: string;
-      actions: DetailHeaderAction[];
-      onBack: () => void;
-    };
+export type ConversationsSceneListShellConfig = {
+  rightSlot?: ReactNode;
+  belowHeader?: ReactNode;
+};
+
+export type ConversationsSceneWideChrome = 'card' | 'none';
 
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupHeaderStateChange?: (state: PopupHeaderState) => void;
   inlineNarrowDetailHeader?: boolean;
   onPopupNotionSyncStarted?: () => void;
   onOpenInsightsSection?: () => void;
+  onOpenSettingsSection?: (section: string) => void;
   commentsSidebarRuntime?: ArticleCommentsSidebarRuntime;
   narrowCommentsOpenSource?: 'popup' | 'app';
   resolveCommentsSidebarChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
   resolveCommentsSidebarSingleChatWithLabel?: () => Promise<string | null>;
   commentsSidebarCommentChatWith?: ThreadedCommentsPanelCommentChatWithConfig | null;
+  listShell?: ConversationsSceneListShellConfig;
+  wideDetail?: ReactNode;
+  wideHideList?: boolean;
+  wideChrome?: ConversationsSceneWideChrome;
 };
 
 function isArticleConversationLike(conversation: any): boolean {
@@ -55,21 +56,23 @@ function isArticleConversationLike(conversation: any): boolean {
 
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
-  onPopupHeaderStateChange,
   inlineNarrowDetailHeader = false,
   onPopupNotionSyncStarted,
   onOpenInsightsSection,
+  onOpenSettingsSection,
   commentsSidebarRuntime,
   narrowCommentsOpenSource = 'popup',
   resolveCommentsSidebarChatWithActions,
   resolveCommentsSidebarSingleChatWithLabel,
   commentsSidebarCommentChatWith,
+  listShell,
+  wideDetail,
+  wideHideList = false,
+  wideChrome = 'card',
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const {
-    activeId,
     selectedConversation,
-    detailHeaderActions,
     openConversationExternalBySourceKey,
     openConversationExternalById,
   } = useConversationsApp();
@@ -109,55 +112,35 @@ export function ConversationsScene({
   }, [isNarrow, openConversationExternalById, openConversationExternalBySourceKey, openDetail]);
 
   useEffect(() => {
-    if (!onPopupHeaderStateChange) return;
-
-    if (!isNarrow || narrowRoute === 'list') {
-      onPopupHeaderStateChange({ mode: 'list' });
-      return;
-    }
-
-    const title = activeId ? formatConversationTitle(selectedConversation?.title) : t('chatsTitle');
-    const subtitle = activeId && selectedConversation ? String((selectedConversation as any).url || '').trim() : '';
-
-    onPopupHeaderStateChange({
-      mode: 'detail',
-      title,
-      subtitle,
-      actions: detailHeaderActions,
-      onBack: returnToList,
-    });
-
-    return () => {
-      onPopupHeaderStateChange({ mode: 'list' });
-    };
-  }, [
-    activeId,
-    detailHeaderActions,
-    isNarrow,
-    narrowRoute,
-    onPopupHeaderStateChange,
-    returnToList,
-    selectedConversation,
-  ]);
-
-  useEffect(() => {
     if (!commentsSidebarRuntime) return;
     return commentsSidebarRuntime.subscribeSidebarClose(() => {
       if (isNarrow && narrowRoute === 'comments') returnToDetail();
     });
   }, [commentsSidebarRuntime, isNarrow, narrowRoute, returnToDetail]);
 
-  const list = (
+  const listPane = (
     <ConversationListPane
       initialScrollTop={listScrollTop}
       scrollRestoreKey={listRestoreKey}
       onListScrollTopChange={setListScrollTop}
       onPopupNotionSyncStarted={onPopupNotionSyncStarted}
-      onOpenConversation={() => {
-        openDetail();
-      }}
+      onOpenConversation={
+        isNarrow
+          ? () => {
+              openDetail();
+            }
+          : undefined
+      }
       onOpenInsightsSection={onOpenInsightsSection}
+      onOpenSettingsSection={onOpenSettingsSection}
     />
+  );
+  const list = listShell ? (
+    <CapturedListPaneShell rightSlot={listShell.rightSlot} belowHeader={listShell.belowHeader}>
+      {listPane}
+    </CapturedListPaneShell>
+  ) : (
+    listPane
   );
 
   if (isNarrow) {
@@ -218,18 +201,25 @@ export function ConversationsScene({
     );
   }
 
+  const wideContainerClassName =
+    wideChrome === 'none'
+      ? 'tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]'
+      : 'tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]';
+
   return (
-    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-      <aside
-        className={[
-          'tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
-          columnDividerRightClassName(),
-        ].join(' ')}
-      >
-        {list}
-      </aside>
+    <div className={wideContainerClassName}>
+      {wideHideList ? null : (
+        <aside
+          className={[
+            'tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
+            columnDividerRightClassName(),
+          ].join(' ')}
+        >
+          {list}
+        </aside>
+      )}
       <main className="route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-card)] tw-overflow-auto tw-overflow-x-hidden">
-        <ConversationDetailPane />
+        {wideDetail ?? <ConversationDetailPane />}
       </main>
     </div>
   );
