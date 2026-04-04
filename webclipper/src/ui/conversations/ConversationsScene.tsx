@@ -71,11 +71,8 @@ export function ConversationsScene({
   wideChrome = 'card',
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const {
-    selectedConversation,
-    openConversationExternalBySourceKey,
-    openConversationExternalById,
-  } = useConversationsApp();
+  const { selectedConversation, openConversationExternalBySourceKey, openConversationExternalById } =
+    useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,

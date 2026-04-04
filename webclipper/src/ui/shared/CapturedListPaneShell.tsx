@@ -42,4 +42,3 @@ export function CapturedListPaneShell({ rightSlot, belowHeader, children }: Capt
     </div>
   );
 }
-
