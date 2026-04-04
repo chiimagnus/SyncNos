@@ -70,6 +70,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
+    onSaveChatWithSettings,
     onResetChatWithPlatforms,
 
     obsidianSyncEnabled,
@@ -124,6 +125,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     setInsightRange,
     aboutYouUserName,
     onChangeAboutYouUserName,
+    onSaveAboutYouUserName,
   } = useSettingsSceneController({ activeSection, focusKey });
 
   const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
@@ -197,6 +199,9 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeMaxChars={setChatWithMaxChars}
           platforms={chatWithPlatforms as any}
           onChangePlatforms={setChatWithPlatforms as any}
+          onSave={() => {
+            void onSaveChatWithSettings();
+          }}
           onResetPlatforms={() => {
             void onResetChatWithPlatforms();
           }}
@@ -273,6 +278,9 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeRange={setInsightRange}
           userName={aboutYouUserName}
           onChangeUserName={onChangeAboutYouUserName}
+          onSaveUserName={() => {
+            void onSaveAboutYouUserName();
+          }}
         />
       ) : null}
 

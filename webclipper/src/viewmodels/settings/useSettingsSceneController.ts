@@ -203,7 +203,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [chatWithMaxChars, setChatWithMaxChars] = useState<string>(String(DEFAULT_CHAT_WITH_MAX_CHARS));
   const [chatWithPlatforms, setChatWithPlatforms] = useState<any[]>(DEFAULT_CHAT_WITH_PLATFORMS.slice());
   const chatWithHydratedRef = useRef(false);
-  const chatWithSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Insight
   const [insightStats, setInsightStats] = useState<InsightStats | null>(null);
@@ -213,7 +212,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [insightRange, setInsightRange] = useState<InsightTimeRange>('7d');
   const insightSourceDataRef = useRef<InsightStatsSourceData | null>(null);
   const [aboutYouUserName, setAboutYouUserName] = useState<string>('');
-  const aboutYouUserNameSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
@@ -748,27 +746,26 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
-  useEffect(() => {
+  const onSaveChatWithSettings = useCallback(async () => {
     if (!chatWithHydratedRef.current) return;
 
-    // Write-through (debounced) to avoid requiring an explicit Save click.
-    if (chatWithSaveTimerRef.current != null) clearTimeout(chatWithSaveTimerRef.current);
-    chatWithSaveTimerRef.current = setTimeout(() => {
-      const max = Number(String(chatWithMaxChars || '').trim());
-      void saveChatWithSettings({
-        promptTemplate: String(chatWithPromptTemplate || ''),
-        maxChars: Number.isFinite(max) ? Math.floor(max) : DEFAULT_CHAT_WITH_MAX_CHARS,
-        platforms: Array.isArray(chatWithPlatforms) ? (chatWithPlatforms as any) : [],
-      } as any).catch(() => {
-        // Don't block the UI on transient storage errors.
-      });
-    }, 450);
-
-    return () => {
-      if (chatWithSaveTimerRef.current != null) clearTimeout(chatWithSaveTimerRef.current);
-      chatWithSaveTimerRef.current = null;
-    };
-  }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate]);
+    // Save on explicit UI boundaries (onBlur / Enter), instead of debounced write-through.
+    const max = Number(String(chatWithMaxChars || '').trim());
+    await runTask(
+      async () => {
+        await saveChatWithSettings({
+          promptTemplate: String(chatWithPromptTemplate || ''),
+          maxChars: Number.isFinite(max) ? Math.floor(max) : DEFAULT_CHAT_WITH_MAX_CHARS,
+          platforms: Array.isArray(chatWithPlatforms) ? (chatWithPlatforms as any) : [],
+        } as any);
+      },
+      {
+        useBusy: false,
+        clearError: false,
+        fallbackMessage: 'save chat with settings failed',
+      },
+    );
+  }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate, runTask]);
 
   useEffect(() => {
     if (activeSection !== 'aboutyou') return;
@@ -933,14 +930,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [activeSection, focusKey]);
 
   const onChangeAboutYouUserName = useCallback((next: string) => {
-    const value = normalizeUserName(next);
-    setAboutYouUserName(value);
-    if (aboutYouUserNameSaveTimerRef.current) clearTimeout(aboutYouUserNameSaveTimerRef.current);
-    aboutYouUserNameSaveTimerRef.current = setTimeout(() => {
-      aboutYouUserNameSaveTimerRef.current = null;
-      void storageSet({ [ABOUT_YOU_USER_NAME_STORAGE_KEY]: value });
-    }, 200);
+    setAboutYouUserName(normalizeUserName(next));
   }, []);
+
+  const onSaveAboutYouUserName = useCallback(async () => {
+    const value = normalizeUserName(aboutYouUserName);
+    await runTask(
+      async () => {
+        await storageSet({ [ABOUT_YOU_USER_NAME_STORAGE_KEY]: value });
+        setAboutYouUserName(value);
+      },
+      { useBusy: false, clearError: false, fallbackMessage: 'save user name failed' },
+    );
+  }, [aboutYouUserName, runTask]);
 
   return {
     busy,
@@ -1026,6 +1028,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setInsightRange,
     aboutYouUserName,
     onChangeAboutYouUserName,
+    onSaveAboutYouUserName,
 
     chatWithPromptTemplate,
     setChatWithPromptTemplate,
@@ -1033,6 +1036,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
+    onSaveChatWithSettings,
     onResetChatWithPlatforms,
   };
 }

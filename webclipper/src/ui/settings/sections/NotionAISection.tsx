@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from 'react';
+
 import { t } from '@i18n';
 import { buttonClassName, cardClassName, textInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
@@ -10,6 +12,12 @@ export function NotionAISection(props: {
   onReset: () => void;
 }) {
   const { busy, modelIndex, onChangeModelIndex, onSave, onReset } = props;
+
+  const onEnterToSave = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    onSave();
+  };
 
   return (
     <section className={cardClassName} aria-label={t('notionAI')}>
@@ -27,6 +35,8 @@ export function NotionAISection(props: {
                 id="notionAiModelIndex"
                 value={modelIndex}
                 onChange={(e) => onChangeModelIndex(e.target.value)}
+                onBlur={onSave}
+                onKeyDown={onEnterToSave}
                 disabled={busy}
                 type="number"
                 inputMode="numeric"
@@ -36,15 +46,6 @@ export function NotionAISection(props: {
                 aria-label={t('modelIndex')}
                 className={`${textInputClassName} tw-w-[120px]`}
               />
-              <button
-                id="btnNotionAiModelSave"
-                className={buttonClassName}
-                onClick={onSave}
-                disabled={busy}
-                type="button"
-              >
-                {t('save')}
-              </button>
               <button
                 id="btnNotionAiModelReset"
                 className={buttonClassName}

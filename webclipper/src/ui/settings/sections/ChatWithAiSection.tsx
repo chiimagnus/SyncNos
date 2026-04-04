@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { t } from '@i18n';
 import type { ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
@@ -27,6 +27,7 @@ export function ChatWithAiSection(props: {
   onChangeMaxChars: (v: string) => void;
   platforms: ChatWithAiPlatform[];
   onChangePlatforms: (next: ChatWithAiPlatform[]) => void;
+  onSave: () => void;
   onResetPlatforms: () => void;
 }) {
   const {
@@ -37,10 +38,12 @@ export function ChatWithAiSection(props: {
     onChangeMaxChars,
     platforms,
     onChangePlatforms,
+    onSave,
     onResetPlatforms,
   } = props;
 
   const rows = useMemo(() => (Array.isArray(platforms) ? platforms : []), [platforms]);
+  const rootRef = useRef<HTMLElement | null>(null);
 
   const updatePlatform = (id: string, patch: Partial<ChatWithAiPlatform>) => {
     const next = rows.map((p) => {
@@ -63,7 +66,18 @@ export function ChatWithAiSection(props: {
   };
 
   return (
-    <section className={cardClassName} aria-label={t('chatWithSectionTitle')}>
+    <section
+      ref={rootRef as any}
+      className={cardClassName}
+      aria-label={t('chatWithSectionTitle')}
+      onBlurCapture={(e) => {
+        const root = rootRef.current;
+        if (!root) return;
+        const related = (e as any)?.relatedTarget as Node | null;
+        if (related && root.contains(related)) return;
+        onSave();
+      }}
+    >
       <div className="tw-flex tw-items-center tw-gap-2">
         <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
           {t('chatWithSectionTitle')}
