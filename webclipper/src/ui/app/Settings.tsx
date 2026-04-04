@@ -13,7 +13,7 @@ export default function Settings() {
   const routerLocation = useLocation();
   const navigate = useNavigate();
 
-  type SearchParams = { section: SettingsSectionKey; focus: string; explicit: boolean };
+  type SearchParams = { section: SettingsSectionKey; focus: string };
 
   const params = useMemo<SearchParams>(() => {
     const s = new URLSearchParams(routerLocation.search || '');
@@ -23,16 +23,15 @@ export default function Settings() {
     const rawFocus = String(s.get('focus') || '')
       .trim()
       .toLowerCase();
-    const explicit = s.has('section') || s.has('focus');
 
     // Backward compat: older deep links may use `section=notion-ai`.
     if (rawSection === 'notion-ai') {
-      return { section: 'notion', focus: rawFocus || 'notion-ai', explicit: true };
+      return { section: 'notion', focus: rawFocus || 'notion-ai' };
     }
 
     const section: SettingsSectionKey = coerceSettingsSectionKey(rawSection) ?? readStoredSettingsSection();
     const focus = rawFocus;
-    return { section, focus, explicit };
+    return { section, focus };
   }, [routerLocation.search]);
 
   const activeSection = params.section;
@@ -49,12 +48,19 @@ export default function Settings() {
     );
   };
 
+  const closeSettings = () => {
+    const state: any = (routerLocation as any)?.state ?? {};
+    const from = String(state?.from || '').trim();
+    if (from) navigate(from, { replace: true });
+    else navigate('/', { replace: true });
+  };
+
   return (
     <SettingsScene
       activeSection={activeSection}
       focusKey={focusKey}
       onSelectSection={setActiveSection}
-      defaultNarrowRoute={params.explicit ? 'detail' : 'list'}
+      onClose={closeSettings}
     />
   );
 }

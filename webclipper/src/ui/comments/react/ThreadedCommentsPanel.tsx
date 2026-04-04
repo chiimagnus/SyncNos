@@ -183,12 +183,15 @@ export function ThreadedCommentsPanel({
     });
   };
 
-  const updateArmedDeleteId = useCallback((next: number | null) => {
-    armedDeleteIdRef.current = next;
-    syncLocalState(() => {
-      setArmedDeleteId(next);
-    });
-  }, [syncLocalState]);
+  const updateArmedDeleteId = useCallback(
+    (next: number | null) => {
+      armedDeleteIdRef.current = next;
+      syncLocalState(() => {
+        setArmedDeleteId(next);
+      });
+    },
+    [syncLocalState],
+  );
 
   const submitComposer = async (rawText?: string | null) => {
     const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();

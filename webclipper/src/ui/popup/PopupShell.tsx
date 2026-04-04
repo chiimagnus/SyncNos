@@ -191,7 +191,9 @@ function PopupShellFrame() {
                   <>
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrs(buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel)}
+                      {...tooltipAttrs(
+                        buttonDisabled ? status?.message || t('currentPageCannotBeCaptured') : buttonLabel,
+                      )}
                     >
                       <button
                         type="button"
