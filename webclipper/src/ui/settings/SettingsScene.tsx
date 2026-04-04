@@ -2,11 +2,12 @@ import { getURL } from '@services/shared/runtime';
 
 import { t } from '@i18n';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
+import { headerButtonClassName } from '@ui/shared/button-styles';
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
 import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
-import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@viewmodels/settings/types';
+import { type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { ChatWithAiSection } from '@ui/settings/sections/ChatWithAiSection';
@@ -20,10 +21,11 @@ export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
   focusKey?: string;
   onSelectSection: (key: SettingsSectionKey) => void;
+  onClose?: () => void;
 };
 
 export function SettingsScene(props: SettingsSceneProps) {
-  const { activeSection, focusKey = '', onSelectSection } = props;
+  const { activeSection, focusKey = '', onSelectSection, onClose } = props;
 
   const isNarrow = useIsNarrowScreen();
 
@@ -312,7 +314,20 @@ export function SettingsScene(props: SettingsSceneProps) {
     return (
       <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
         <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)]">
-          <SettingsTopTabsNav activeSection={activeSection} onSelectSection={setActiveSection} />
+          <SettingsTopTabsNav
+            activeSection={activeSection}
+            onSelectSection={setActiveSection}
+            rightSlot={
+              onClose ? (
+                <button type="button" onClick={onClose} className={headerButtonClassName()} aria-label={t('closeSettings')}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </button>
+              ) : null
+            }
+          />
         </div>
 
         <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-primary)] tw-p-3">

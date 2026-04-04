@@ -48,11 +48,19 @@ export default function Settings() {
     );
   };
 
+  const closeSettings = () => {
+    const state: any = (routerLocation as any)?.state ?? {};
+    const from = String(state?.from || '').trim();
+    if (from) navigate(from, { replace: true });
+    else navigate('/', { replace: true });
+  };
+
   return (
     <SettingsScene
       activeSection={activeSection}
       focusKey={focusKey}
       onSelectSection={setActiveSection}
+      onClose={closeSettings}
     />
   );
 }
