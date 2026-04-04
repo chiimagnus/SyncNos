@@ -1,4 +1,5 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
+import type { KeyboardEvent } from 'react';
 import { t } from '@i18n';
 import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
@@ -54,6 +55,12 @@ export function NotionOAuthSection(props: {
     onResetNotionDatabaseId,
     onLoadNotionPages,
   } = props;
+
+  const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>, kind: 'chat' | 'article') => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    onSaveNotionDatabaseId(kind);
+  };
 
   return (
     <section className={cardClassName} aria-label={t('notionOAuth')}>
@@ -153,20 +160,14 @@ export function NotionOAuthSection(props: {
               <input
                 value={notionChatDatabaseId}
                 onChange={(e) => onChangeNotionChatDatabaseId(e.target.value)}
+                onBlur={() => onSaveNotionDatabaseId('chat')}
+                onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'chat')}
                 disabled={busy || !notionConnected}
                 spellCheck={false}
                 placeholder={notionChatDatabaseLabel}
                 aria-label={t('notionDbIdAiChats')}
                 className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
               />
-              <button
-                type="button"
-                className={buttonClassName}
-                onClick={() => onSaveNotionDatabaseId('chat')}
-                disabled={busy || !notionConnected}
-              >
-                {t('save')}
-              </button>
               <button
                 type="button"
                 className={buttonClassName}
@@ -183,20 +184,14 @@ export function NotionOAuthSection(props: {
               <input
                 value={notionArticleDatabaseId}
                 onChange={(e) => onChangeNotionArticleDatabaseId(e.target.value)}
+                onBlur={() => onSaveNotionDatabaseId('article')}
+                onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'article')}
                 disabled={busy || !notionConnected}
                 spellCheck={false}
                 placeholder={notionArticleDatabaseLabel}
                 aria-label={t('notionDbIdWebArticles')}
                 className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
               />
-              <button
-                type="button"
-                className={buttonClassName}
-                onClick={() => onSaveNotionDatabaseId('article')}
-                disabled={busy || !notionConnected}
-              >
-                {t('save')}
-              </button>
               <button
                 type="button"
                 className={buttonClassName}

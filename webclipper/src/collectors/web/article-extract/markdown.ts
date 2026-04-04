@@ -4,6 +4,42 @@ function normalizeInlineText(value: unknown) {
   return String(value || '').replace(/\s+/g, ' ');
 }
 
+function normalizeDetailsElementsForMarkdown(root: Element) {
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+
+  const detailsNodes = Array.from(root.querySelectorAll('details') as any) as any[];
+  if (!detailsNodes.length) return;
+
+  const doc = root.ownerDocument || document;
+  for (const details of detailsNodes) {
+    const detailsEl = details as any;
+    if (!detailsEl || typeof detailsEl.replaceWith !== 'function') continue;
+
+    const summary = typeof detailsEl.querySelector === 'function' ? detailsEl.querySelector(':scope > summary') : null;
+    const summaryText = normalizeText(summary?.textContent || '');
+
+    const container = doc.createElement('div');
+    container.setAttribute('data-syncnos-origin', 'details');
+
+    if (summaryText) {
+      const label = doc.createElement('p');
+      const strong = doc.createElement('strong');
+      strong.textContent = summaryText;
+      label.appendChild(strong);
+      container.appendChild(label);
+    }
+
+    const children = Array.from((detailsEl.childNodes || []) as any) as any[];
+    for (const child of children) {
+      if (!child) continue;
+      if (summary && child === summary) continue;
+      container.appendChild(child);
+    }
+
+    detailsEl.replaceWith(container);
+  }
+}
+
 function escapeMarkdownLabel(value: unknown) {
   return String(value || '').replace(/\]/g, '\\]');
 }
@@ -43,6 +79,7 @@ export function htmlToMarkdown(html: unknown, text: unknown, baseHref: string) {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = normalizedHtml;
     const root = wrapper.querySelector('article') || wrapper;
+    normalizeDetailsElementsForMarkdown(root);
     const md = renderBlock(root, baseHref);
     return normalizeText(md);
   } catch (_e) {
@@ -131,7 +168,8 @@ function renderBlock(node: any, baseHref: string, depth = 0): string {
   }
 
   if (tag === 'pre') {
-    const value = normalizeText(node.textContent || '');
+    const codeNode = node.querySelector ? node.querySelector(':scope > code') || node.querySelector('code') : null;
+    const value = normalizeText(codeNode?.textContent || node.textContent || '');
     return value ? `\n\`\`\`\n${value}\n\`\`\`\n\n` : '';
   }
 

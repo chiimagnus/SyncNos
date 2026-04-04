@@ -2,7 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 
 vi.mock('../../src/ui/i18n', () => ({
-  t: (key: string) => key,
+  t: (key: string) => {
+    const labels: Record<string, string> = {
+      articleCommentsHeading: 'Comments',
+      closeCommentsSidebar: 'Collapse comments sidebar',
+      detailHeaderChatWithMenuLabel: 'Chat with...',
+      detailHeaderChatWithMenuAria: 'Chat with',
+      actionFailedFallback: 'Action failed.',
+      tooltipCommentSendDetailed: 'Send',
+    };
+    return labels[key] || key;
+  },
 }));
 
 import { mountThreadedCommentsPanel } from '@ui/comments';
@@ -23,9 +33,6 @@ function setupDom() {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
   });
-
-  (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
-  (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
 }
 
 function cleanupDom() {
@@ -36,11 +43,6 @@ function cleanupDom() {
   delete (globalThis as any).Node;
   delete (globalThis as any).MutationObserver;
   delete (globalThis as any).getComputedStyle;
-}
-
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
 }
 
 async function flushReactScheduler() {
@@ -55,7 +57,7 @@ async function flushReactScheduler() {
   await Promise.resolve();
 }
 
-describe('Threaded comments panel focus regression', () => {
+describe('Threaded comments panel header chatwith stability', () => {
   beforeEach(() => {
     setupDom();
   });
@@ -65,56 +67,45 @@ describe('Threaded comments panel focus regression', () => {
     cleanupDom();
   });
 
-  it('focuses reply textarea after comment save even if focus briefly moves outside', async () => {
+  it('does not re-attach header chatwith root while typing', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
-    mounted.api.setComments([]);
+    const resolveSingleActionLabel = vi.fn(async () => 'Chat with...');
+    const resolveActions = vi.fn(async () => []);
 
-    let nextId = 1;
-    mounted.api.setHandlers({
-      onSave: async (text) => {
-        const id = nextId++;
-        mounted.api.setComments([
-          {
-            id,
-            parentId: null,
-            createdAt: Date.now(),
-            commentText: String(text),
-          },
-        ]);
-        return { ok: true, createdRootId: id };
+    const mounted = mountThreadedCommentsPanel(host, {
+      overlay: false,
+      showHeader: true,
+      chatWith: {
+        resolveActions,
+        resolveSingleActionLabel,
       },
     });
 
+    await flushReactScheduler();
+
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
-    expect(panel).toBeTruthy();
-    const shadow = panel!.shadowRoot!;
+    const shadow = panel?.shadowRoot;
+    expect(shadow).toBeTruthy();
 
-    const composer = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__composer-textarea',
+    const textarea = shadow?.querySelector(
+      'textarea.webclipper-inpage-comments-panel__composer-textarea',
     ) as HTMLTextAreaElement | null;
-    expect(composer).toBeTruthy();
+    expect(textarea).toBeTruthy();
 
-    composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
-    composer!.value = 'hello comment';
-    composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
+    textarea!.value = 'a';
+    textarea!.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await flushReactScheduler();
+    textarea!.value = 'ab';
+    textarea!.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await flushReactScheduler();
+    textarea!.value = 'abc';
+    textarea!.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await flushReactScheduler();
 
-    const send = shadow.querySelector(
-      '[data-webclipper-root-composer="1"] .webclipper-inpage-comments-panel__send',
-    ) as HTMLButtonElement | null;
-    expect(send).toBeTruthy();
-    send!.click();
-
-    composer!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
-    await flushPromises();
-
-    const replyTextarea = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__thread .webclipper-inpage-comments-panel__reply-textarea',
-    ) as HTMLTextAreaElement | null;
-    expect(replyTextarea).toBeTruthy();
-    expect(shadow.activeElement).toBe(replyTextarea);
+    expect(resolveSingleActionLabel).toHaveBeenCalledTimes(1);
+    expect(resolveActions).toHaveBeenCalledTimes(0);
 
     mounted.cleanup();
   });

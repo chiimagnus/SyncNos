@@ -70,6 +70,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
+    onSaveChatWithSettings,
     onResetChatWithPlatforms,
 
     obsidianSyncEnabled,
@@ -124,6 +125,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     setInsightRange,
     aboutYouUserName,
     onChangeAboutYouUserName,
+    onSaveAboutYouUserName,
   } = useSettingsSceneController({ activeSection, focusKey });
 
   const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
@@ -197,6 +199,9 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeMaxChars={setChatWithMaxChars}
           platforms={chatWithPlatforms as any}
           onChangePlatforms={setChatWithPlatforms as any}
+          onSave={() => {
+            void onSaveChatWithSettings();
+          }}
           onResetPlatforms={() => {
             void onResetChatWithPlatforms();
           }}
@@ -273,6 +278,9 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeRange={setInsightRange}
           userName={aboutYouUserName}
           onChangeUserName={onChangeAboutYouUserName}
+          onSaveUserName={() => {
+            void onSaveAboutYouUserName();
+          }}
         />
       ) : null}
 
@@ -319,7 +327,12 @@ export function SettingsScene(props: SettingsSceneProps) {
             onSelectSection={setActiveSection}
             rightSlot={
               onClose ? (
-                <button type="button" onClick={onClose} className={headerButtonClassName()} aria-label={t('closeSettings')}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={headerButtonClassName()}
+                  aria-label={t('closeSettings')}
+                >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                     <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

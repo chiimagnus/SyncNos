@@ -35,8 +35,8 @@ function InsightStateCard(props: { title: string; detail?: string; tone?: 'defau
   );
 }
 
-function UserNameCard(props: { value: string; onChange: (next: string) => void }) {
-  const { value, onChange } = props;
+function UserNameCard(props: { value: string; onChange: (next: string) => void; onSave: () => void }) {
+  const { value, onChange, onSave } = props;
   return (
     <section className={cardClassName} aria-label={t('aboutYouUserNameSectionAria')}>
       <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
@@ -51,6 +51,12 @@ function UserNameCard(props: { value: string; onChange: (next: string) => void }
         ].join(' ')}
         value={value}
         onChange={(e) => onChange(String((e.target as any)?.value || ''))}
+        onBlur={onSave}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          onSave();
+        }}
         placeholder={t('aboutYouUserNamePlaceholder')}
         autoComplete="off"
         spellCheck={false}
@@ -71,13 +77,14 @@ export function InsightSection(props: {
   onChangeRange: (next: InsightTimeRange) => void;
   userName: string;
   onChangeUserName: (next: string) => void;
+  onSaveUserName: () => void;
 }) {
-  const { loading, error, stats, hasLoaded, range, onChangeRange, userName, onChangeUserName } = props;
+  const { loading, error, stats, hasLoaded, range, onChangeRange, userName, onChangeUserName, onSaveUserName } = props;
 
   if (loading || !hasLoaded) {
     return (
       <div className="tw-grid tw-gap-4">
-        <UserNameCard value={userName} onChange={onChangeUserName} />
+        <UserNameCard value={userName} onChange={onChangeUserName} onSave={onSaveUserName} />
         <InsightStateCard title={t('insightLoadingTitle')} />
       </div>
     );
@@ -86,7 +93,7 @@ export function InsightSection(props: {
   if (error) {
     return (
       <div className="tw-grid tw-gap-4">
-        <UserNameCard value={userName} onChange={onChangeUserName} />
+        <UserNameCard value={userName} onChange={onChangeUserName} onSave={onSaveUserName} />
         <InsightStateCard title={t('insightErrorTitle')} detail={error} tone="error" />
       </div>
     );
@@ -95,7 +102,7 @@ export function InsightSection(props: {
   if (!stats || !hasInsightData(stats)) {
     return (
       <div className="tw-grid tw-gap-4">
-        <UserNameCard value={userName} onChange={onChangeUserName} />
+        <UserNameCard value={userName} onChange={onChangeUserName} onSave={onSaveUserName} />
         <InsightStateCard title={t('insightEmptyTitle')} />
       </div>
     );
@@ -103,7 +110,7 @@ export function InsightSection(props: {
 
   return (
     <div className="tw-grid tw-gap-4">
-      <UserNameCard value={userName} onChange={onChangeUserName} />
+      <UserNameCard value={userName} onChange={onChangeUserName} onSave={onSaveUserName} />
       <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />
     </div>
   );
