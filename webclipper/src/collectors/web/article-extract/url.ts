@@ -69,5 +69,17 @@ export function sanitizeSiteImageUrl(raw: unknown, baseHref: string, sanitizer: 
     }
   }
 
+  if (sanitizer === 'stripQuerySuffix') {
+    try {
+      const url = new URL(resolved);
+      url.search = '';  // 清空所有查询参数
+      return url.toString();
+    } catch (_e) {
+      // fallback: 简单字符串截断
+      const qAt = resolved.indexOf('?');
+      return qAt > -1 ? resolved.slice(0, qAt) : resolved;
+    }
+  }
+
   return resolved;
 }

@@ -18,6 +18,24 @@ import {
   parseDiscourseTopicUrl,
 } from '@collectors/web/article-fetch-discourse';
 
+/**
+ * 检查是否包含防盗链图片
+ * 动态导入避免与 image-download-proxy 的循环依赖
+ */
+async function hasAntiHotlinkImages(markdown: string): Promise<boolean> {
+  try {
+    const { ANTI_HOTLINK_REFERER_MAP } = await import('@platform/webext/image-download-proxy');
+    const domains = Object.keys(ANTI_HOTLINK_REFERER_MAP);
+    return domains.some((domain) => {
+      const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(escaped, 'i').test(markdown);
+    });
+  } catch {
+    // 模块加载失败时保守处理：不强制缓存
+    return false;
+  }
+}
+
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
@@ -244,7 +262,10 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
 
   try {
     const local = await storageGet(['web_article_cache_images_enabled']);
-    if (local?.web_article_cache_images_enabled === true) {
+    const hasAntiHotlink = await hasAntiHotlinkImages(markdown);
+    const shouldCacheImages = local?.web_article_cache_images_enabled === true || hasAntiHotlink;
+
+    if (shouldCacheImages) {
       const inlined = await inlineChatImagesInMessages({
         conversationId,
         conversationUrl: canonicalUrl,
@@ -252,6 +273,14 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
         enableHttpImages: true,
       });
       messagesToSave = inlined.messages;
+
+      if (hasAntiHotlink && !local?.web_article_cache_images_enabled) {
+        console.info('[ArticleFetch] auto-caching anti-hotlink images (user setting is off)', {
+          conversationId,
+          url: canonicalUrl,
+        });
+      }
+
       if (
         inlined.inlinedCount > 0 ||
         inlined.downloadedCount > 0 ||

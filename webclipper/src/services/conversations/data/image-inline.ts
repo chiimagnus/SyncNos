@@ -316,6 +316,48 @@ async function downloadImageAsBlob(input: {
   const safeUrl = String(input.url || '').trim();
   if (!isHttpUrl(safeUrl)) return { ok: false, reason: 'fetch' };
 
+  // 尝试使用智能下载（自动处理防盗链 Referer）
+  try {
+    const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');
+    const result = await downloadImageSmart({
+      url: safeUrl,
+      maxBytes: input.maxBytes,
+    });
+
+    if (result.ok) {
+      // 智能下载成功
+      return {
+        ok: true,
+        blob: result.blob,
+        byteSize: result.byteSize,
+        contentType: result.contentType,
+      };
+    }
+
+    // 智能下载失败，记录日志并 fallthrough 到普通 fetch
+    // ⚠️ 注意：对于防盗链图片，fallback 路径（普通 fetch）无法设置 Referer header，仍会 403
+    // fallback 的意义在于：非防盗链图片在 downloadImageSmart 内部异常时，仍有最后的下载机会
+    // Firefox 下防盗链图片必定 403（DNR 不可用），这是已知限制
+    if (result.reason !== 'fetch' && result.reason !== 'http' && result.reason !== 'invalid_input') {
+      // non_image / empty / too_large 这些是内容问题，不需要 fallback
+      return { ok: false, reason: result.reason } as const;
+    }
+
+    console.info('[ImageInline] smart download failed, falling back to plain fetch', {
+      url: safeUrl,
+      reason: result.reason,
+    });
+  } catch (e) {
+    // 模块加载失败或其他异常，记录日志并 fallthrough
+    console.warn('[ImageInline] smart download exception, falling back to plain fetch', {
+      url: safeUrl,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  // 普通下载逻辑（fallback）
+  // ⚠️ 区分：referrer（fetch 选项）控制 Referrer-Policy，不是具体的 Referer header 值
+  // 少数派需要的是 Referer: https://sspai.com/ 这个具体的 header 值，不是 ReferrerPolicy
   const referrer = isHttpUrl(input.referrer) ? String(input.referrer) : undefined;
   try {
     const res = await fetch(safeUrl, {
