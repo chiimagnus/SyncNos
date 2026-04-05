@@ -124,7 +124,7 @@ export function usePopupOpenInpageCommentsSidebar() {
   const tooltip = useMemo(() => {
     if (opening) return t('fetchingDots');
     if (checking) return t('checkingDots');
-    if (eligible) return t('openCommentsSidebar');
+    if (eligible) return t('openCommentsSidebarTooltip');
     return disabledReason || t('currentPageCannotBeCaptured');
   }, [checking, disabledReason, eligible, opening]);
 
