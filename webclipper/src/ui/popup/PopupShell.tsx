@@ -113,7 +113,7 @@ function PopupShellFrame() {
   const { refreshList, refreshActiveDetail } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
-  const openInpageCommentsSidebar = usePopupOpenInpageCommentsSidebar();
+  const commentsButton = usePopupOpenInpageCommentsSidebar();
   const { buttonDisabled, buttonLabel, capture, status } = usePopupCurrentPageCapture({
     onCaptured: async () => {
       await refreshList();
@@ -208,19 +208,21 @@ function PopupShellFrame() {
                       </button>
                     </span>
 
-                    <button
-                      type="button"
-                      {...tooltipAttrs(t('openCommentsSidebar'))}
-                      onClick={() => {
-                        void openInpageCommentsSidebar().then((ok) => {
-                          if (ok) window.close();
-                        });
-                      }}
-                      className={headerButtonClassName()}
-                      aria-label={t('openCommentsSidebar')}
-                    >
-                      <MessageSquareText size={16} strokeWidth={1.6} aria-hidden="true" />
-                    </button>
+                    <span className="tw-inline-flex" {...tooltipAttrs(commentsButton.tooltip)}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void commentsButton.open().then((ok) => {
+                            if (ok) window.close();
+                          });
+                        }}
+                        disabled={commentsButton.disabled}
+                        className={headerButtonClassName()}
+                        aria-label={t('openCommentsSidebar')}
+                      >
+                        <MessageSquareText size={16} strokeWidth={1.6} aria-hidden="true" />
+                      </button>
+                    </span>
 
                     <button
                       type="button"

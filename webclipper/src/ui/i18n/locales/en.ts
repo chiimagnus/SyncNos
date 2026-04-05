@@ -204,6 +204,7 @@ export const en = {
   articleCommentsEmpty: 'No comments yet.',
   openCommentsSidebar: 'Comment',
   closeCommentsSidebar: 'Collapse comments sidebar',
+  commentsSidebarArticleOnlyHint: 'Only available for web articles',
   tooltipCommentSendDetailed: 'Send comment',
   tooltipReplySendDetailed: 'Send reply (Ctrl/Cmd + Enter)',
   tooltipDeleteCommentDetailed: 'Delete comment',
