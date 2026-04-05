@@ -206,6 +206,7 @@ export const en = {
   closeCommentsSidebar: 'Collapse comments sidebar',
   openCommentsSidebarTooltip: 'Open comments sidebar',
   commentsSidebarArticleOnlyHint: 'Only available for web articles',
+  commentsSidebarUnavailableHint: 'Comments sidebar is unavailable on this page',
   tooltipCommentSendDetailed: 'Send comment',
   tooltipReplySendDetailed: 'Send reply (Ctrl/Cmd + Enter)',
   tooltipDeleteCommentDetailed: 'Delete comment',

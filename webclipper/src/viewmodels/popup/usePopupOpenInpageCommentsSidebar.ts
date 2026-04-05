@@ -48,7 +48,7 @@ export function usePopupOpenInpageCommentsSidebar() {
   const [opening, setOpening] = useState(false);
   const [eligible, setEligible] = useState(false);
   const [disabledReason, setDisabledReason] = useState<string>(() =>
-    runtimeAvailable ? t('checkingDots') : t('currentPageCannotBeCaptured'),
+    runtimeAvailable ? t('checkingDots') : t('commentsSidebarUnavailableHint'),
   );
 
   const refreshEligibility = useCallback(async () => {
@@ -61,7 +61,7 @@ export function usePopupOpenInpageCommentsSidebar() {
       if (!state.available) {
         if (!mountedRef.current) return;
         setEligible(false);
-        setDisabledReason(state.reason || t('currentPageCannotBeCaptured'));
+        setDisabledReason(t('commentsSidebarUnavailableHint'));
         return;
       }
 
@@ -76,10 +76,10 @@ export function usePopupOpenInpageCommentsSidebar() {
       setEligible(true);
       setDisabledReason(t('openCommentsSidebar'));
     } catch (error) {
-      const message = (error as any)?.message ?? String(error ?? t('currentPageCannotBeCaptured'));
+      const message = (error as any)?.message ?? String(error ?? '');
       if (!mountedRef.current) return;
       setEligible(false);
-      setDisabledReason(message);
+      setDisabledReason(message || t('commentsSidebarUnavailableHint'));
     } finally {
       if (mountedRef.current) setChecking(false);
     }
@@ -125,7 +125,7 @@ export function usePopupOpenInpageCommentsSidebar() {
     if (opening) return t('fetchingDots');
     if (checking) return t('checkingDots');
     if (eligible) return t('openCommentsSidebarTooltip');
-    return disabledReason || t('currentPageCannotBeCaptured');
+    return disabledReason || t('commentsSidebarUnavailableHint');
   }, [checking, disabledReason, eligible, opening]);
 
   return { disabled, tooltip, open };
