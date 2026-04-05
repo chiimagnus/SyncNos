@@ -14,7 +14,20 @@ type AnyRouter = {
 
 export function registerUiMessageHandlers(router: AnyRouter) {
   router.register(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, async (msg: any, sender: any) => {
-    const tabId = Number(sender?.tab?.id);
+    const explicitTabId = Number((msg as any)?.tabId);
+    const senderTabId = Number(sender?.tab?.id);
+    let tabId =
+      Number.isFinite(explicitTabId) && explicitTabId > 0
+        ? explicitTabId
+        : Number.isFinite(senderTabId) && senderTabId > 0
+          ? senderTabId
+          : 0;
+
+    if (!Number.isFinite(tabId) || tabId <= 0) {
+      const active = await getActiveTab();
+      if (active.ok) tabId = active.tab.id;
+    }
+
     if (!Number.isFinite(tabId) || tabId <= 0) {
       return router.err('current tab is unavailable', { code: 'OPEN_INPAGE_COMMENTS_PANEL_UNAVAILABLE' });
     }
@@ -25,7 +38,7 @@ export function registerUiMessageHandlers(router: AnyRouter) {
         payload: {
           tabId,
           selectionText: String((msg as any)?.selectionText || ''),
-          source: 'doubleclick',
+          source: String((msg as any)?.source || 'doubleclick'),
         },
       });
       return router.ok({ opened: true });
