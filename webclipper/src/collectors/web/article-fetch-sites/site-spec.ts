@@ -1,5 +1,5 @@
 export type ArticleFetchTextPrefer = 'innerText' | 'textContent';
-export type ArticleFetchImageSanitizer = 'none' | 'stripAtSuffix' | 'stripBangSuffix';
+export type ArticleFetchImageSanitizer = 'none' | 'stripAtSuffix' | 'stripBangSuffix' | 'stripQuerySuffix';
 
 export type ArticleFetchSiteSpec = {
   id: string;
