@@ -9,6 +9,9 @@ import {
   type AntiHotlinkRuleValidationIssue,
 } from '@platform/webext/anti-hotlink-rules-store';
 
+// Re-export for settings UI (viewmodels layer)
+export type { AntiHotlinkRuleValidationIssue };
+
 export type AntiHotlinkRuleDraft = {
   domain: string;
   referer: string;
@@ -34,7 +37,9 @@ function toStoredRules(drafts: ReadonlyArray<AntiHotlinkRuleDraft>): Array<{ dom
   }));
 }
 
-export async function loadAntiHotlinkRulesForSettings(options: { forceRefresh?: boolean } = {}): Promise<AntiHotlinkRuleDraft[]> {
+export async function loadAntiHotlinkRulesForSettings(
+  options: { forceRefresh?: boolean } = {},
+): Promise<AntiHotlinkRuleDraft[]> {
   const rules = await getAntiHotlinkRulesSnapshot({
     forceRefresh: options.forceRefresh === true,
   });

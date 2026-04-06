@@ -39,7 +39,7 @@ import {
   saveAntiHotlinkRulesForSettings,
   type AntiHotlinkRuleDraft,
 } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
-import type { AntiHotlinkRuleValidationIssue } from '@platform/webext/anti-hotlink-rules-store';
+import type { AntiHotlinkRuleValidationIssue } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
 import {
   buildInsightStats,
   getInsightStatsSourceData,

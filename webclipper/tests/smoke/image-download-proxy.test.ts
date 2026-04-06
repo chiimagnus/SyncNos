@@ -40,7 +40,7 @@ describe('image-download-proxy', () => {
         id: 'test-extension-id',
       },
     };
-    
+
     // 设置 fetch global
     (globalThis as any).fetch = mockFetch;
   });
@@ -50,7 +50,7 @@ describe('image-download-proxy', () => {
       ok: true,
       blob: () => Promise.resolve(new Blob(['test'], { type: 'image/jpeg' })),
       headers: {
-        get: (key: string) => key === 'content-type' ? 'image/jpeg' : null,
+        get: (key: string) => (key === 'content-type' ? 'image/jpeg' : null),
       },
       ...overrides,
     };

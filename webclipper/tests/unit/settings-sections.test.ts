@@ -127,9 +127,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     const onToggleAdvanced = vi.fn();
     renderInpage({ onToggleAntiHotlinkAdvancedOpen: onToggleAdvanced });
 
-    const button = document.querySelector('button[aria-controls="anti-hotlink-domains-editor"]') as
-      | HTMLButtonElement
-      | null;
+    const button = document.querySelector(
+      'button[aria-controls="anti-hotlink-domains-editor"]',
+    ) as HTMLButtonElement | null;
     expect(button).toBeTruthy();
     expect(document.querySelector('#anti-hotlink-domains-editor')).toBeFalsy();
 
@@ -143,7 +143,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     renderInpage({
       antiHotlinkAdvancedOpen: true,
       antiHotlinkRules: [{ domain: 'https://bad-domain', referer: 'notaurl' }],
-      antiHotlinkRuleErrors: [{ domain: 'Domain must be a valid hostname.', referer: 'Referer must be a valid http(s) URL.' }],
+      antiHotlinkRuleErrors: [
+        { domain: 'Domain must be a valid hostname.', referer: 'Referer must be a valid http(s) URL.' },
+      ],
     });
 
     expect(document.querySelector('#anti-hotlink-domains-editor')).toBeTruthy();
@@ -170,9 +172,15 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.querySelector('input[aria-label="Referer 1"]')).toBeTruthy();
 
     const buttons = Array.from(document.querySelectorAll('button'));
-    const addButton = buttons.find((button) => button.textContent?.trim() === 'Add domain') as HTMLButtonElement | undefined;
-    const deleteButton = buttons.find((button) => button.textContent?.trim() === 'Delete') as HTMLButtonElement | undefined;
-    const resetButton = buttons.find((button) => button.textContent?.trim() === 'Reset') as HTMLButtonElement | undefined;
+    const addButton = buttons.find((button) => button.textContent?.trim() === 'Add domain') as
+      | HTMLButtonElement
+      | undefined;
+    const deleteButton = buttons.find((button) => button.textContent?.trim() === 'Delete') as
+      | HTMLButtonElement
+      | undefined;
+    const resetButton = buttons.find((button) => button.textContent?.trim() === 'Reset') as
+      | HTMLButtonElement
+      | undefined;
 
     expect(addButton).toBeTruthy();
     expect(deleteButton).toBeTruthy();

@@ -8,12 +8,7 @@ export type AntiHotlinkRule = {
 export type AntiHotlinkRuleValidationIssue = {
   index: number;
   field: 'domain' | 'referer';
-  code:
-    | 'domain_required'
-    | 'domain_invalid'
-    | 'domain_duplicate'
-    | 'referer_required'
-    | 'referer_invalid';
+  code: 'domain_required' | 'domain_invalid' | 'domain_duplicate' | 'referer_required' | 'referer_invalid';
   message: string;
 };
 
@@ -166,7 +161,9 @@ async function loadRulesFromStorage(): Promise<AntiHotlinkRule[]> {
   return sanitizeAntiHotlinkRules(local[ANTI_HOTLINK_RULES_STORAGE_KEY]);
 }
 
-export async function getAntiHotlinkRulesSnapshot(options: { forceRefresh?: boolean } = {}): Promise<AntiHotlinkRule[]> {
+export async function getAntiHotlinkRulesSnapshot(
+  options: { forceRefresh?: boolean } = {},
+): Promise<AntiHotlinkRule[]> {
   const forceRefresh = options.forceRefresh === true;
   if (!forceRefresh && cachedRules) {
     return cloneRules(cachedRules);
@@ -232,7 +229,10 @@ export function getAntiHotlinkRefererFromRules(url: unknown, rules: ReadonlyArra
   return null;
 }
 
-export async function getAntiHotlinkReferer(url: unknown, options: { forceRefresh?: boolean } = {}): Promise<string | null> {
+export async function getAntiHotlinkReferer(
+  url: unknown,
+  options: { forceRefresh?: boolean } = {},
+): Promise<string | null> {
   const rules = await getAntiHotlinkRulesSnapshot(options);
   return getAntiHotlinkRefererFromRules(url, rules);
 }

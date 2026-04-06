@@ -54,9 +54,7 @@ async function getAntiHotlinkReferer(url: string): Promise<string | null> {
  * Feature-detect DNR 支持
  */
 function isDnrSupported(): boolean {
-  return !!(
-    (globalThis as any).chrome?.declarativeNetRequest?.updateSessionRules
-  );
+  return !!(globalThis as any).chrome?.declarativeNetRequest?.updateSessionRules;
 }
 
 /**
@@ -88,13 +86,13 @@ async function registerRefererRule(ruleId: number, url: string, referer: string)
   let domainPrefix: string;
   try {
     const { origin } = new URL(url);
-    domainPrefix = `|${origin}/`;  // 例如: '|https://cdnfile.sspai.com/'
+    domainPrefix = `|${origin}/`; // 例如: '|https://cdnfile.sspai.com/'
   } catch {
-    domainPrefix = `|${url}`;  // fallback: 使用完整 URL
+    domainPrefix = `|${url}`; // fallback: 使用完整 URL
   }
 
   const condition = {
-    urlFilter: domainPrefix,  // ⚠️ filter list syntax: 匹配该域名下所有 URL
+    urlFilter: domainPrefix, // ⚠️ filter list syntax: 匹配该域名下所有 URL
     resourceTypes: ['xmlhttprequest'],
   } as any;
 
@@ -105,19 +103,23 @@ async function registerRefererRule(ruleId: number, url: string, referer: string)
   }
 
   await chrome.declarativeNetRequest.updateSessionRules({
-    addRules: [{
-      id: ruleId,  // ⚠️ 必须是正整数！
-      priority: 1,
-      action: {
-        type: 'modifyHeaders',
-        requestHeaders: [{
-          header: 'Referer',
-          operation: 'set',
-          value: referer,
-        }],
+    addRules: [
+      {
+        id: ruleId, // ⚠️ 必须是正整数！
+        priority: 1,
+        action: {
+          type: 'modifyHeaders',
+          requestHeaders: [
+            {
+              header: 'Referer',
+              operation: 'set',
+              value: referer,
+            },
+          ],
+        },
+        condition,
       },
-      condition,
-    }],
+    ],
   });
 }
 
@@ -135,7 +137,10 @@ async function removeRefererRule(ruleId: number): Promise<void> {
 /**
  * 普通下载（公共逻辑）
  */
-async function downloadWithPlainFetch(url: string, maxBytes: number): Promise<
+async function downloadWithPlainFetch(
+  url: string,
+  maxBytes: number,
+): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
   | { ok: false; reason: 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
 > {

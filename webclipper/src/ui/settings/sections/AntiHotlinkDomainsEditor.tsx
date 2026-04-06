@@ -103,8 +103,12 @@ export function AntiHotlinkDomainsEditor(props: {
                 </div>
 
                 <div className="tw-grid tw-gap-1 tw-pl-14">
-                  {domainError ? <div className="tw-text-xs tw-font-semibold tw-text-red-500">{domainError}</div> : null}
-                  {refererError ? <div className="tw-text-xs tw-font-semibold tw-text-red-500">{refererError}</div> : null}
+                  {domainError ? (
+                    <div className="tw-text-xs tw-font-semibold tw-text-red-500">{domainError}</div>
+                  ) : null}
+                  {refererError ? (
+                    <div className="tw-text-xs tw-font-semibold tw-text-red-500">{refererError}</div>
+                  ) : null}
                 </div>
               </div>
             );

@@ -90,9 +90,8 @@ describe('anti-hotlink-rules-store', () => {
   });
 
   it('supports hostname lookup and markdown domain detection', async () => {
-    const { getAntiHotlinkRefererFromRules, includesAnyAntiHotlinkDomain } = await import(
-      '../../src/platform/webext/anti-hotlink-rules-store'
-    );
+    const { getAntiHotlinkRefererFromRules, includesAnyAntiHotlinkDomain } =
+      await import('../../src/platform/webext/anti-hotlink-rules-store');
 
     const rules = [
       { domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' },
@@ -109,9 +108,8 @@ describe('anti-hotlink-rules-store', () => {
   });
 
   it('settings service blocks invalid drafts before writing to storage', async () => {
-    const { saveAntiHotlinkRulesForSettings } = await import(
-      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
-    );
+    const { saveAntiHotlinkRulesForSettings } =
+      await import('../../src/services/integrations/anti-hotlink/anti-hotlink-settings');
 
     const result = await saveAntiHotlinkRulesForSettings([
       { domain: 'https://cdnfile.sspai.com', referer: 'https://sspai.com/' },
@@ -128,9 +126,8 @@ describe('anti-hotlink-rules-store', () => {
 
   it('settings service loads and resets through platform rule store', async () => {
     const { ANTI_HOTLINK_RULES_STORAGE_KEY } = await import('../../src/platform/webext/anti-hotlink-rules-store');
-    const { loadAntiHotlinkRulesForSettings, resetAntiHotlinkRulesForSettings } = await import(
-      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
-    );
+    const { loadAntiHotlinkRulesForSettings, resetAntiHotlinkRulesForSettings } =
+      await import('../../src/services/integrations/anti-hotlink/anti-hotlink-settings');
 
     store[ANTI_HOTLINK_RULES_STORAGE_KEY] = [{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }];
 
@@ -143,9 +140,8 @@ describe('anti-hotlink-rules-store', () => {
 
   it('settings service can persist an explicit empty rules list', async () => {
     const { ANTI_HOTLINK_RULES_STORAGE_KEY } = await import('../../src/platform/webext/anti-hotlink-rules-store');
-    const { loadAntiHotlinkRulesForSettings, saveAntiHotlinkRulesForSettings } = await import(
-      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
-    );
+    const { loadAntiHotlinkRulesForSettings, saveAntiHotlinkRulesForSettings } =
+      await import('../../src/services/integrations/anti-hotlink/anti-hotlink-settings');
 
     const result = await saveAntiHotlinkRulesForSettings([]);
     expect(result.ok).toBe(true);
@@ -157,9 +153,8 @@ describe('anti-hotlink-rules-store', () => {
 
   it('settings service can force-refresh to sync external storage writes', async () => {
     const { ANTI_HOTLINK_RULES_STORAGE_KEY } = await import('../../src/platform/webext/anti-hotlink-rules-store');
-    const { loadAntiHotlinkRulesForSettings } = await import(
-      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
-    );
+    const { loadAntiHotlinkRulesForSettings } =
+      await import('../../src/services/integrations/anti-hotlink/anti-hotlink-settings');
 
     store[ANTI_HOTLINK_RULES_STORAGE_KEY] = [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }];
     const first = await loadAntiHotlinkRulesForSettings();
