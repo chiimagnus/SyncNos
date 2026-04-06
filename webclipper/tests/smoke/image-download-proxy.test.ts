@@ -141,6 +141,20 @@ describe('image-download-proxy', () => {
       expect(mockUpdateSessionRules).not.toHaveBeenCalled();
     });
 
+    it('respects explicit empty anti-hotlink rules list', async () => {
+      localStorageState.set('anti_hotlink_rules_v1', []);
+      const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');
+      mockFetch.mockResolvedValue(mockFetchResponse({}));
+
+      const result = await downloadImageSmart({
+        url: 'https://cdnfile.sspai.com/test.jpg',
+        maxBytes: 1_000_000,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(mockUpdateSessionRules).not.toHaveBeenCalled();
+    });
+
     it('falls back to built-in default rules when storage read fails', async () => {
       storageGetMock.mockRejectedValueOnce(new Error('storage offline'));
       const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');

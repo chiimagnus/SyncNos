@@ -140,4 +140,18 @@ describe('anti-hotlink-rules-store', () => {
     const reset = await resetAntiHotlinkRulesForSettings();
     expect(reset).toEqual([{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }]);
   });
+
+  it('settings service can persist an explicit empty rules list', async () => {
+    const { ANTI_HOTLINK_RULES_STORAGE_KEY } = await import('../../src/platform/webext/anti-hotlink-rules-store');
+    const { loadAntiHotlinkRulesForSettings, saveAntiHotlinkRulesForSettings } = await import(
+      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
+    );
+
+    const result = await saveAntiHotlinkRulesForSettings([]);
+    expect(result.ok).toBe(true);
+    expect(store[ANTI_HOTLINK_RULES_STORAGE_KEY]).toEqual([]);
+
+    const loaded = await loadAntiHotlinkRulesForSettings();
+    expect(loaded).toEqual([]);
+  });
 });
