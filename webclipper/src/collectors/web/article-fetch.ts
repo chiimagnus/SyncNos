@@ -11,6 +11,7 @@ import { cleanTrackingParamsUrl } from '@services/url-cleaning/tracking-param-cl
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery, tabsSendMessage, tabsUpdate } from '@platform/webext/tabs';
 import { storageGet } from '@platform/storage/local';
+import { getAntiHotlinkRulesSnapshot, includesAnyAntiHotlinkDomain } from '@platform/webext/anti-hotlink-rules-store';
 import { CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import {
   buildDiscourseTopicFloorUrl,
@@ -18,20 +19,14 @@ import {
   parseDiscourseTopicUrl,
 } from '@collectors/web/article-fetch-discourse';
 
-/**
- * 检查是否包含防盗链图片
- * 动态导入避免与 image-download-proxy 的循环依赖
- */
 async function hasAntiHotlinkImages(markdown: string): Promise<boolean> {
   try {
-    const { ANTI_HOTLINK_REFERER_MAP } = await import('@platform/webext/image-download-proxy');
-    const domains = Object.keys(ANTI_HOTLINK_REFERER_MAP);
-    return domains.some((domain) => {
-      const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return new RegExp(escaped, 'i').test(markdown);
+    const rules = await getAntiHotlinkRulesSnapshot();
+    return includesAnyAntiHotlinkDomain(markdown, rules);
+  } catch (error) {
+    console.warn('[ArticleFetch] anti-hotlink rules unavailable, skip forced image cache', {
+      error: error instanceof Error ? error.message : String(error || ''),
     });
-  } catch {
-    // 模块加载失败时保守处理：不强制缓存
     return false;
   }
 }
