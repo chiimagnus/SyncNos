@@ -33,7 +33,7 @@ export function AntiHotlinkDomainsEditor(props: {
     <section
       id={id}
       ref={rootRef as any}
-      className="tw-mt-3 tw-grid tw-gap-2 tw-rounded-2xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3"
+      className="tw-mt-3 tw-grid tw-gap-3 tw-pl-4 tw-border-l-2 tw-border-[var(--border)]"
       aria-label={t('antiHotlinkRulesLabel')}
       onBlurCapture={(e) => {
         const root = rootRef.current;
@@ -48,7 +48,7 @@ export function AntiHotlinkDomainsEditor(props: {
       </div>
 
       {rows.length ? (
-        <div className="tw-grid tw-gap-2">
+        <div className="tw-grid tw-gap-3">
           {rows.map((row, index) => {
             const domainError = String(rowErrors[index]?.domain || '');
             const refererError = String(rowErrors[index]?.referer || '');
@@ -56,7 +56,7 @@ export function AntiHotlinkDomainsEditor(props: {
             return (
               <div
                 key={index}
-                className={`tw-grid tw-gap-1.5 tw-rounded-xl tw-border tw-bg-[var(--bg-card)] tw-p-2 ${
+                className={`tw-grid tw-gap-2 tw-border-b tw-pb-3 last:tw-border-b-0 last:tw-pb-0 ${
                   hasError ? 'tw-border-red-400/70' : 'tw-border-[var(--border)]'
                 }`}
               >
