@@ -120,9 +120,6 @@ export function AntiHotlinkDomainsEditor(props: {
         <button type="button" className={buttonClassName} disabled={busy} onClick={onAddRule}>
           {t('antiHotlinkAddRule')}
         </button>
-        <button type="button" className={buttonClassName} disabled={busy} onClick={onApplyRules}>
-          {t('antiHotlinkApply')}
-        </button>
         <button type="button" className={buttonClassName} disabled={busy} onClick={onResetRules}>
           {t('reset')}
         </button>

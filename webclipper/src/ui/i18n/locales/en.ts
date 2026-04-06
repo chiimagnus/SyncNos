@@ -76,7 +76,6 @@ export const en = {
   antiHotlinkRefererPlaceholder: 'https://sspai.com/',
   antiHotlinkAddRule: 'Add domain',
   antiHotlinkDeleteRule: 'Delete',
-  antiHotlinkApply: 'Apply',
   antiHotlinkNoRules: 'No anti-hotlink domains configured.',
   aiChatDollarMentionHeading: '$ Mention',
   aiChatDollarMentionLabel: 'Enable $ mention',

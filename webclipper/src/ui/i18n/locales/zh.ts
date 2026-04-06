@@ -76,7 +76,6 @@ export const zh: { [K in TranslationKey]: string } = {
   antiHotlinkRefererPlaceholder: 'https://sspai.com/',
   antiHotlinkAddRule: '添加域名',
   antiHotlinkDeleteRule: '删除',
-  antiHotlinkApply: '应用',
   antiHotlinkNoRules: '尚未配置防盗链域名。',
   aiChatDollarMentionHeading: '$ 插入',
   aiChatDollarMentionLabel: '启用 $ 插入条目',
