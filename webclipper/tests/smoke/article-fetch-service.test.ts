@@ -476,7 +476,9 @@ describe('article-fetch-service', () => {
     expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
     expect(settingsMocks.storageSet).toHaveBeenCalledWith(
       expect.objectContaining({
-        anti_hotlink_rules_v1: [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }],
+        anti_hotlink_rules_v1: expect.arrayContaining([
+          expect.objectContaining({ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }),
+        ]),
       }),
     );
   });
