@@ -32,6 +32,15 @@ import {
   saveChatWithSettings,
 } from '@services/integrations/chatwith/chatwith-settings';
 import {
+  ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
+  getDefaultAntiHotlinkRulesForSettings,
+  loadAntiHotlinkRulesForSettings,
+  resetAntiHotlinkRulesForSettings,
+  saveAntiHotlinkRulesForSettings,
+  type AntiHotlinkRuleDraft,
+} from '@services/integrations/anti-hotlink/anti-hotlink-settings';
+import type { AntiHotlinkRuleValidationIssue } from '@platform/webext/anti-hotlink-rules-store';
+import {
   buildInsightStats,
   getInsightStatsSourceData,
   getInsightTimeRangeWindow,
@@ -111,6 +120,26 @@ function toErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   const text = String(error || '').trim();
   return text || fallback;
+}
+
+type AntiHotlinkRuleRowError = {
+  domain?: string;
+  referer?: string;
+};
+
+function mapAntiHotlinkValidationIssuesToRowErrors(
+  issues: ReadonlyArray<AntiHotlinkRuleValidationIssue>,
+): AntiHotlinkRuleRowError[] {
+  const rows: AntiHotlinkRuleRowError[] = [];
+  for (const issue of issues || []) {
+    const index = Number(issue?.index);
+    if (!Number.isFinite(index) || index < 0) continue;
+    const row = rows[index] || {};
+    if (issue.field === 'domain') row.domain = issue.message;
+    if (issue.field === 'referer') row.referer = issue.message;
+    rows[index] = row;
+  }
+  return rows;
 }
 
 type RunTaskOptions = {
@@ -195,6 +224,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
+  const [antiHotlinkAdvancedOpen, setAntiHotlinkAdvancedOpen] = useState<boolean>(false);
+  const [antiHotlinkRules, setAntiHotlinkRules] = useState<AntiHotlinkRuleDraft[]>(() =>
+    getDefaultAntiHotlinkRulesForSettings(),
+  );
+  const [antiHotlinkRuleErrors, setAntiHotlinkRuleErrors] = useState<AntiHotlinkRuleRowError[]>([]);
   const [aiChatDollarMentionEnabled, setAiChatDollarMentionEnabled] = useState<boolean>(true);
   const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() => normalizeStoredMarkdownReadingProfile(''));
 
@@ -246,7 +280,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, []);
 
   const refreshInternal = useCallback(async () => {
-    const [notionRes, local, obsidianRes] = await Promise.all([
+    const [notionRes, local, obsidianRes, antiHotlinkRulesDraft] = await Promise.all([
       send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
       storageGet([
         'notion_oauth_client_id',
@@ -264,12 +298,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         'ai_chat_auto_save_enabled',
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
+        ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
         'ai_chat_dollar_mention_enabled',
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
         LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
         ABOUT_YOU_USER_NAME_STORAGE_KEY,
       ]),
       send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
+      loadAntiHotlinkRulesForSettings(),
     ]);
 
     const notionStatus = unwrap(notionRes);
@@ -300,6 +336,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
+    setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
+    setAntiHotlinkRuleErrors([]);
     setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
     setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(local?.[MARKDOWN_READING_PROFILE_STORAGE_KEY]));
     setLastBackupExportAt(Number(local?.[LAST_BACKUP_EXPORT_AT_STORAGE_KEY] || 0) || 0);
@@ -348,6 +386,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, MARKDOWN_READING_PROFILE_STORAGE_KEY)) {
         const nextValue = changes[MARKDOWN_READING_PROFILE_STORAGE_KEY]?.newValue;
         setMarkdownReadingProfile(normalizeStoredMarkdownReadingProfile(nextValue));
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY)) {
+        void refresh();
       }
 
       if (
@@ -722,6 +763,97 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleAntiHotlinkAdvancedOpen = useCallback(() => {
+    setAntiHotlinkAdvancedOpen((open) => !open);
+  }, []);
+
+  const onChangeAntiHotlinkRule = useCallback((index: number, patch: Partial<AntiHotlinkRuleDraft>) => {
+    setAntiHotlinkRules((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      if (index < 0 || index >= list.length) return list;
+      return list.map((row, rowIndex) => {
+        if (rowIndex !== index) return row;
+        return {
+          domain: patch.domain == null ? String(row.domain || '') : String(patch.domain),
+          referer: patch.referer == null ? String(row.referer || '') : String(patch.referer),
+        };
+      });
+    });
+    setAntiHotlinkRuleErrors((prev) => {
+      const next = Array.isArray(prev) ? prev.slice() : [];
+      if (index < 0 || index >= next.length) return next;
+      const row = { ...(next[index] || {}) };
+      if (Object.prototype.hasOwnProperty.call(patch, 'domain')) delete row.domain;
+      if (Object.prototype.hasOwnProperty.call(patch, 'referer')) delete row.referer;
+      next[index] = row;
+      return next;
+    });
+  }, []);
+
+  const onAddAntiHotlinkRule = useCallback(() => {
+    setAntiHotlinkRules((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.concat([{ domain: '', referer: 'https://' }]);
+    });
+    setAntiHotlinkRuleErrors((prev) => {
+      const list = Array.isArray(prev) ? prev.slice() : [];
+      list.push({});
+      return list;
+    });
+  }, []);
+
+  const onRemoveAntiHotlinkRule = useCallback((index: number) => {
+    setAntiHotlinkRules((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      if (index < 0 || index >= list.length) return list;
+      return list.filter((_, rowIndex) => rowIndex !== index);
+    });
+    setAntiHotlinkRuleErrors((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      if (index < 0 || index >= list.length) return list;
+      return list.filter((_, rowIndex) => rowIndex !== index);
+    });
+  }, []);
+
+  const onApplyAntiHotlinkRules = useCallback(async () => {
+    await runTask(
+      async () => {
+        const result = await saveAntiHotlinkRulesForSettings(antiHotlinkRules);
+        if (!result.ok) {
+          setAntiHotlinkRuleErrors(mapAntiHotlinkValidationIssuesToRowErrors(result.issues));
+          return;
+        }
+        setAntiHotlinkRules(
+          result.rules.map((rule) => ({
+            domain: String(rule.domain || ''),
+            referer: String(rule.referer || ''),
+          })),
+        );
+        setAntiHotlinkRuleErrors([]);
+      },
+      {
+        useBusy: false,
+        clearError: false,
+        fallbackMessage: 'save anti-hotlink rules failed',
+      },
+    );
+  }, [antiHotlinkRules, runTask]);
+
+  const onResetAntiHotlinkRules = useCallback(async () => {
+    await runTask(
+      async () => {
+        const resetRules = await resetAntiHotlinkRulesForSettings();
+        setAntiHotlinkRules(resetRules);
+        setAntiHotlinkRuleErrors([]);
+      },
+      {
+        useBusy: false,
+        clearError: false,
+        fallbackMessage: 'reset anti-hotlink rules failed',
+      },
+    );
+  }, [runTask]);
+
   const onToggleAiChatDollarMentionEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
@@ -1015,6 +1147,15 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    antiHotlinkAdvancedOpen,
+    onToggleAntiHotlinkAdvancedOpen,
+    antiHotlinkRules,
+    antiHotlinkRuleErrors,
+    onChangeAntiHotlinkRule,
+    onAddAntiHotlinkRule,
+    onRemoveAntiHotlinkRule,
+    onApplyAntiHotlinkRules,
+    onResetAntiHotlinkRules,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
     markdownReadingProfile,

@@ -1,4 +1,5 @@
 import {
+  ANTI_HOTLINK_RULES_STORAGE_KEY,
   DEFAULT_ANTI_HOTLINK_RULES,
   getAntiHotlinkRulesSnapshot,
   resetAntiHotlinkRulesSnapshot,
@@ -16,6 +17,8 @@ export type AntiHotlinkRuleDraft = {
 export type SaveAntiHotlinkRulesResult =
   | { ok: true; rules: AntiHotlinkRule[] }
   | { ok: false; issues: AntiHotlinkRuleValidationIssue[] };
+
+export const ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY = ANTI_HOTLINK_RULES_STORAGE_KEY;
 
 function toDraftRules(rules: ReadonlyArray<AntiHotlinkRule>): AntiHotlinkRuleDraft[] {
   return rules.map((rule) => ({
