@@ -1,12 +1,36 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+const localStorageState = new Map<string, unknown>();
+const storageGetMock = vi.fn();
+const storageSetMock = vi.fn();
+
+vi.mock('@platform/storage/local', () => ({
+  storageGet: (...args: unknown[]) => storageGetMock(...args),
+  storageSet: (...args: unknown[]) => storageSetMock(...args),
+}));
+
 describe('image-download-proxy', () => {
   const mockUpdateSessionRules = vi.fn().mockResolvedValue(undefined);
   const mockFetch = vi.fn();
 
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
-    
+    localStorageState.clear();
+
+    storageGetMock.mockImplementation(async (keys: string[]) => {
+      const out: Record<string, unknown> = {};
+      for (const key of keys || []) {
+        if (localStorageState.has(key)) out[key] = localStorageState.get(key);
+      }
+      return out;
+    });
+    storageSetMock.mockImplementation(async (items: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(items || {})) {
+        localStorageState.set(key, value);
+      }
+    });
+
     // 设置 chrome global
     (globalThis as any).chrome = {
       declarativeNetRequest: {
@@ -49,6 +73,22 @@ describe('image-download-proxy', () => {
 
       expect(result.ok).toBe(true);
       expect(mockUpdateSessionRules).toHaveBeenCalledTimes(2); // 注册 + 清理
+    });
+
+    it('uses persisted custom anti-hotlink rules', async () => {
+      localStorageState.set('anti_hotlink_rules_v1', [{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }]);
+      const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');
+      mockFetch.mockResolvedValue(mockFetchResponse({}));
+
+      const result = await downloadImageSmart({
+        url: 'https://picx.zhimg.com/v2-123.jpg',
+        maxBytes: 1_000_000,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(mockUpdateSessionRules).toHaveBeenCalledTimes(2);
+      const addCall = mockUpdateSessionRules.mock.calls[0][0];
+      expect(addCall.addRules[0].action.requestHeaders[0].value).toBe('https://www.zhihu.com/');
     });
   });
 
@@ -99,6 +139,20 @@ describe('image-download-proxy', () => {
 
       expect(result.ok).toBe(true);
       expect(mockUpdateSessionRules).not.toHaveBeenCalled();
+    });
+
+    it('falls back to built-in default rules when storage read fails', async () => {
+      storageGetMock.mockRejectedValueOnce(new Error('storage offline'));
+      const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');
+      mockFetch.mockResolvedValue(mockFetchResponse({}));
+
+      const result = await downloadImageSmart({
+        url: 'https://cdnfile.sspai.com/test.jpg',
+        maxBytes: 1_000_000,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(mockUpdateSessionRules).toHaveBeenCalledTimes(2);
     });
 
     it('returns blob on success', async () => {

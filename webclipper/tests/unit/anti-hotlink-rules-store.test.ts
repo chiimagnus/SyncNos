@@ -88,4 +88,22 @@ describe('anti-hotlink-rules-store', () => {
       ]),
     );
   });
+
+  it('supports hostname lookup and markdown domain detection', async () => {
+    const { getAntiHotlinkRefererFromRules, includesAnyAntiHotlinkDomain } = await import(
+      '../../src/platform/webext/anti-hotlink-rules-store'
+    );
+
+    const rules = [
+      { domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' },
+      { domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' },
+    ];
+
+    expect(getAntiHotlinkRefererFromRules('https://cdnfile.sspai.com/cover.png?x=1', rules)).toBe('https://sspai.com/');
+    expect(getAntiHotlinkRefererFromRules('https://example.com/a.png', rules)).toBe(null);
+    expect(getAntiHotlinkRefererFromRules('notaurl', rules)).toBe(null);
+
+    expect(includesAnyAntiHotlinkDomain('![img](https://picx.zhimg.com/v2-1.jpg)', rules)).toBe(true);
+    expect(includesAnyAntiHotlinkDomain('![img](https://example.com/a.png)', rules)).toBe(false);
+  });
 });
