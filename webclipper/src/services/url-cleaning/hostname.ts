@@ -1,8 +1,8 @@
-function safeString(value: unknown): string {
+export function safeString(value: unknown): string {
   return String(value ?? '').trim();
 }
 
-function normalizeHostname(value: string): string {
+export function normalizeHostname(value: unknown): string {
   const raw = safeString(value).toLowerCase();
   if (!raw) return '';
   const trimmedDot = raw.endsWith('.') ? raw.slice(0, -1) : raw;
