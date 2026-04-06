@@ -60,7 +60,16 @@ export default defineConfig({
     name: 'SyncNos-AI+Web Clipper',
     version: '1.5.1',
     description: 'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
-    permissions: ['storage', 'contextMenus', 'tabs', 'tabGroups', 'webNavigation', 'activeTab', 'scripting', 'declarativeNetRequestWithHostAccess'],
+    permissions: [
+      'storage',
+      'contextMenus',
+      'tabs',
+      'tabGroups',
+      'webNavigation',
+      'activeTab',
+      'scripting',
+      'declarativeNetRequestWithHostAccess',
+    ],
     host_permissions: [
       'https://chat.openai.com/*',
       'https://chatgpt.com/*',

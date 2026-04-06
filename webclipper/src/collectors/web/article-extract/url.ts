@@ -72,7 +72,7 @@ export function sanitizeSiteImageUrl(raw: unknown, baseHref: string, sanitizer: 
   if (sanitizer === 'stripQuerySuffix') {
     try {
       const url = new URL(resolved);
-      url.search = '';  // 清空所有查询参数
+      url.search = ''; // 清空所有查询参数
       return url.toString();
     } catch (_e) {
       // fallback: 简单字符串截断

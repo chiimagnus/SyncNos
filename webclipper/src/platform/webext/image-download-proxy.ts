@@ -1,9 +1,15 @@
+import {
+  buildAntiHotlinkRefererMap,
+  DEFAULT_ANTI_HOTLINK_RULES,
+  getAntiHotlinkReferer as getAntiHotlinkRefererFromStore,
+} from '@platform/webext/anti-hotlink-rules-store';
+
 /**
  * 通用防盗链图片下载服务
  *
  * - 基于域名映射的自动 Referer 注入（DNR API）
  * - Firefox 兼容（DNR 不可用时降级为普通 fetch）
- * - 未来添加新网站只需在 ANTI_HOTLINK_REFERER_MAP 中加一行
+ * - Referer 规则可通过 settings 持久化管理（失败时回退内置默认值）
  *
  * > 性能说明：当前设计每次请求注册/清理独立规则。
  * > 如果一篇文章有 N 张防盗链图片，会执行 N 次注册/清理。
@@ -11,37 +17,36 @@
  * > 未来可优化为"一次注册域名规则，所有图片共享"。
  */
 
-// ============================================================================
-// 配置表：防盗链网站的 Referer 映射
-// ============================================================================
-
-/**
- * 防盗链网站的 Referer 映射
- * Key: CDN 域名（exact match）
- * Value: 需要注入的 Referer
- *
- * 未来添加新网站只需在此加一行
- */
-export const ANTI_HOTLINK_REFERER_MAP: Record<string, string> = {
-  'cdnfile.sspai.com': 'https://sspai.com/',
-  // 未来可扩展：
-  // 'mmbiz.qpic.cn': 'https://mp.weixin.qq.com/',  // 微信公众号
-  // 'picx.zhimg.com': 'https://www.zhihu.com/',    // 知乎
-};
+export const ANTI_HOTLINK_REFERER_MAP: Record<string, string> = Object.freeze(
+  buildAntiHotlinkRefererMap(DEFAULT_ANTI_HOTLINK_RULES),
+);
 
 // ============================================================================
 // 工具函数
 // ============================================================================
 
-/**
- * 检查 URL 是否需要防盗链处理，返回对应的 Referer
- */
-function getAntiHotlinkReferer(url: string): string | null {
+function getFallbackReferer(url: string): string | null {
   try {
     const { hostname } = new URL(url);
     return ANTI_HOTLINK_REFERER_MAP[hostname] || null;
-  } catch {
+  } catch (_error) {
     return null;
+  }
+}
+
+/**
+ * 检查 URL 是否需要防盗链处理，返回对应的 Referer。
+ * 读取持久化配置失败时，回退内置默认值，不中断主流程。
+ */
+async function getAntiHotlinkReferer(url: string): Promise<string | null> {
+  try {
+    return await getAntiHotlinkRefererFromStore(url);
+  } catch (error) {
+    console.warn('[image-download-proxy] anti-hotlink rules unavailable, using built-in fallback', {
+      url,
+      error: error instanceof Error ? error.message : String(error || ''),
+    });
+    return getFallbackReferer(url);
   }
 }
 
@@ -49,9 +54,7 @@ function getAntiHotlinkReferer(url: string): string | null {
  * Feature-detect DNR 支持
  */
 function isDnrSupported(): boolean {
-  return !!(
-    (globalThis as any).chrome?.declarativeNetRequest?.updateSessionRules
-  );
+  return !!(globalThis as any).chrome?.declarativeNetRequest?.updateSessionRules;
 }
 
 /**
@@ -83,13 +86,13 @@ async function registerRefererRule(ruleId: number, url: string, referer: string)
   let domainPrefix: string;
   try {
     const { origin } = new URL(url);
-    domainPrefix = `|${origin}/`;  // 例如: '|https://cdnfile.sspai.com/'
+    domainPrefix = `|${origin}/`; // 例如: '|https://cdnfile.sspai.com/'
   } catch {
-    domainPrefix = `|${url}`;  // fallback: 使用完整 URL
+    domainPrefix = `|${url}`; // fallback: 使用完整 URL
   }
 
   const condition = {
-    urlFilter: domainPrefix,  // ⚠️ filter list syntax: 匹配该域名下所有 URL
+    urlFilter: domainPrefix, // ⚠️ filter list syntax: 匹配该域名下所有 URL
     resourceTypes: ['xmlhttprequest'],
   } as any;
 
@@ -100,19 +103,23 @@ async function registerRefererRule(ruleId: number, url: string, referer: string)
   }
 
   await chrome.declarativeNetRequest.updateSessionRules({
-    addRules: [{
-      id: ruleId,  // ⚠️ 必须是正整数！
-      priority: 1,
-      action: {
-        type: 'modifyHeaders',
-        requestHeaders: [{
-          header: 'Referer',
-          operation: 'set',
-          value: referer,
-        }],
+    addRules: [
+      {
+        id: ruleId, // ⚠️ 必须是正整数！
+        priority: 1,
+        action: {
+          type: 'modifyHeaders',
+          requestHeaders: [
+            {
+              header: 'Referer',
+              operation: 'set',
+              value: referer,
+            },
+          ],
+        },
+        condition,
       },
-      condition,
-    }],
+    ],
   });
 }
 
@@ -130,7 +137,10 @@ async function removeRefererRule(ruleId: number): Promise<void> {
 /**
  * 普通下载（公共逻辑）
  */
-async function downloadWithPlainFetch(url: string, maxBytes: number): Promise<
+async function downloadWithPlainFetch(
+  url: string,
+  maxBytes: number,
+): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
   | { ok: false; reason: 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
 > {
@@ -185,7 +195,7 @@ export async function downloadImageSmart(input: {
   }
 
   // 检查是否需要防盗链处理
-  const referer = getAntiHotlinkReferer(safeUrl);
+  const referer = await getAntiHotlinkReferer(safeUrl);
 
   // 不需要防盗链处理，直接普通下载
   if (!referer) {

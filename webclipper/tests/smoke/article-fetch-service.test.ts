@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = {
   hasConversation: vi.fn(),
@@ -8,6 +8,7 @@ const storageMocks = {
 
 const settingsMocks = {
   storageGet: vi.fn(),
+  storageSet: vi.fn(),
 };
 
 const imageInlineMocks = {
@@ -26,6 +27,7 @@ vi.mock('@services/conversations/data/storage', () => ({
 
 vi.mock('@platform/storage/local', () => ({
   storageGet: settingsMocks.storageGet,
+  storageSet: settingsMocks.storageSet,
 }));
 
 vi.mock('@services/conversations/data/image-inline', () => ({
@@ -37,12 +39,18 @@ async function loadArticleFetchService() {
   return module.default || module;
 }
 
+beforeEach(() => {
+  vi.resetModules();
+  settingsMocks.storageSet.mockResolvedValue(undefined);
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   storageMocks.hasConversation.mockReset();
   storageMocks.upsertConversation.mockReset();
   storageMocks.syncConversationMessages.mockReset();
   settingsMocks.storageGet.mockReset();
+  settingsMocks.storageSet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.chrome;
@@ -409,6 +417,180 @@ describe('article-fetch-service', () => {
     expect(messages[0]).toMatchObject({
       contentMarkdown: '![img](https://example.com/no-inline.png)\n\nArticle body.',
     });
+  });
+
+  it('auto inlines anti-hotlink article images even when toggle is disabled', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 71, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => ({
+      messages: Array.isArray(input?.messages) ? input.messages : [],
+      inlinedCount: 1,
+      downloadedCount: 1,
+      fromCacheCount: 0,
+      inlinedBytes: 256,
+      warningFlags: [],
+    }));
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Anti-hotlink Title',
+          author: 'Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>Article body.</p></body></html>',
+          contentMarkdown: '![img](https://cdnfile.sspai.com/asset/a.png)\n\nArticle body.',
+          textContent: 'Article body.',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 91, url: 'https://sspai.com/post/1', title: 'Anti-hotlink fallback' }]),
+        sendMessage,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(data.conversationId).toBe(71);
+    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
+    expect(settingsMocks.storageSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        anti_hotlink_rules_v1: [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }],
+      }),
+    );
+  });
+
+  it('keeps capture successful when anti-hotlink rule lookup fails', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 72, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
+      if (Array.isArray(keys) && keys.includes('web_article_cache_images_enabled')) {
+        return { web_article_cache_images_enabled: false };
+      }
+      throw new Error('anti-hotlink rules read failed');
+    });
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Fallback Capture Title',
+          author: 'Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>Article body.</p></body></html>',
+          contentMarkdown: '![img](https://cdnfile.sspai.com/asset/a.png)\n\nArticle body.',
+          textContent: 'Article body.',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 92, url: 'https://sspai.com/post/2', title: 'Fallback Capture' }]),
+        sendMessage,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(data.conversationId).toBe(72);
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(syncConversationMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not force inline when anti-hotlink rules are explicitly empty', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 73, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
+      if (Array.isArray(keys) && keys.includes('web_article_cache_images_enabled')) {
+        return { web_article_cache_images_enabled: false };
+      }
+      if (Array.isArray(keys) && keys.includes('anti_hotlink_rules_v1')) {
+        return { anti_hotlink_rules_v1: [] };
+      }
+      return {};
+    });
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'No Force Cache',
+          author: 'Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>Article body.</p></body></html>',
+          contentMarkdown: '![img](https://cdnfile.sspai.com/asset/a.png)\n\nArticle body.',
+          textContent: 'Article body.',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 93, url: 'https://sspai.com/post/3', title: 'No Force Cache' }]),
+        sendMessage,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(data.conversationId).toBe(73);
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
   });
 
   it('rejects non-http active tab url', async () => {

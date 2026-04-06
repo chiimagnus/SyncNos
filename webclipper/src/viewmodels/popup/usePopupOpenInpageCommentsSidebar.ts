@@ -88,7 +88,7 @@ export function usePopupOpenInpageCommentsSidebar() {
   useEffect(() => {
     if (!runtimeAvailable) return;
     void refreshEligibility();
-  }, [refreshEligibility]);
+  }, [refreshEligibility, runtimeAvailable]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -1,9 +1,14 @@
 import { t } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { cardClassName, checkboxClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import type { MarkdownReadingProfileId } from '@services/protocols/markdown-reading-profiles';
+import {
+  AntiHotlinkDomainsEditor,
+  type AntiHotlinkRuleEditorError,
+  type AntiHotlinkRuleEditorRow,
+} from '@ui/settings/sections/AntiHotlinkDomainsEditor';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
 
@@ -19,6 +24,15 @@ export function InpageSection(props: {
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
   onToggleWebArticleCacheImagesEnabled: (next: boolean) => void;
+  antiHotlinkAdvancedOpen: boolean;
+  onToggleAntiHotlinkAdvancedOpen: () => void;
+  antiHotlinkRules: AntiHotlinkRuleEditorRow[];
+  antiHotlinkRuleErrors: AntiHotlinkRuleEditorError[];
+  onChangeAntiHotlinkRule: (index: number, patch: Partial<AntiHotlinkRuleEditorRow>) => void;
+  onAddAntiHotlinkRule: () => void;
+  onRemoveAntiHotlinkRule: (index: number) => void;
+  onApplyAntiHotlinkRules: () => void;
+  onResetAntiHotlinkRules: () => void;
   aiChatDollarMentionEnabled: boolean;
   onToggleAiChatDollarMentionEnabled: (next: boolean) => void;
 }) {
@@ -34,6 +48,15 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    antiHotlinkAdvancedOpen,
+    onToggleAntiHotlinkAdvancedOpen,
+    antiHotlinkRules,
+    antiHotlinkRuleErrors,
+    onChangeAntiHotlinkRule,
+    onAddAntiHotlinkRule,
+    onRemoveAntiHotlinkRule,
+    onApplyAntiHotlinkRules,
+    onResetAntiHotlinkRules,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
   } = props;
@@ -188,6 +211,32 @@ export function InpageSection(props: {
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('webArticleCacheImagesHint')}
         </div>
+
+        <div className="tw-mt-3">
+          <button
+            type="button"
+            className={buttonClassName}
+            onClick={onToggleAntiHotlinkAdvancedOpen}
+            disabled={busy}
+            aria-expanded={antiHotlinkAdvancedOpen}
+            aria-controls="anti-hotlink-domains-editor"
+          >
+            {antiHotlinkAdvancedOpen ? t('advancedHide') : t('advancedShow')}
+          </button>
+        </div>
+        {antiHotlinkAdvancedOpen ? (
+          <AntiHotlinkDomainsEditor
+            id="anti-hotlink-domains-editor"
+            busy={busy}
+            rules={antiHotlinkRules}
+            errors={antiHotlinkRuleErrors}
+            onChangeRule={onChangeAntiHotlinkRule}
+            onAddRule={onAddAntiHotlinkRule}
+            onRemoveRule={onRemoveAntiHotlinkRule}
+            onApplyRules={onApplyAntiHotlinkRules}
+            onResetRules={onResetAntiHotlinkRules}
+          />
+        ) : null}
 
         <div className="tw-mt-2.5 tw-grid tw-gap-2">
           {SUPPORTED_AI_CHAT_SITES.map((site) => {
