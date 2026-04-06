@@ -12,4 +12,3 @@ export const XIAOHONGSHU_NOTE_SITE_SPEC: ArticleFetchSiteSpec = {
   imageSrcAttributes: ['data-src', 'data-original', 'src'],
   imageSanitizer: 'none',
 };
-
