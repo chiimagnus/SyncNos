@@ -67,6 +67,17 @@ export const en = {
   webArticleCacheImagesLabel: 'Auto-save web article images locally',
   webArticleCacheImagesHint:
     'Only affects web articles. Images are downloaded during capture to avoid broken cloud links.',
+  antiHotlinkRulesLabel: 'Anti-hotlink domains',
+  antiHotlinkRulesHint:
+    'Add CDN hostname + referer URL. Matched domains are force-cached during article capture even when the auto-save toggle is off.',
+  antiHotlinkDomainLabel: 'Domain',
+  antiHotlinkRefererLabel: 'Referer',
+  antiHotlinkDomainPlaceholder: 'cdnfile.sspai.com',
+  antiHotlinkRefererPlaceholder: 'https://sspai.com/',
+  antiHotlinkAddRule: 'Add domain',
+  antiHotlinkDeleteRule: 'Delete',
+  antiHotlinkApply: 'Apply',
+  antiHotlinkNoRules: 'No anti-hotlink domains configured.',
   aiChatDollarMentionHeading: '$ Mention',
   aiChatDollarMentionLabel: 'Enable $ mention',
   aiChatDollarMentionHint: 'Type $ in supported AI chats to search saved items and insert them as markdown.',

@@ -114,6 +114,15 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    antiHotlinkAdvancedOpen,
+    onToggleAntiHotlinkAdvancedOpen,
+    antiHotlinkRules,
+    antiHotlinkRuleErrors,
+    onChangeAntiHotlinkRule,
+    onAddAntiHotlinkRule,
+    onRemoveAntiHotlinkRule,
+    onApplyAntiHotlinkRules,
+    onResetAntiHotlinkRules,
     aiChatDollarMentionEnabled,
     onToggleAiChatDollarMentionEnabled,
 
@@ -306,6 +315,19 @@ export function SettingsScene(props: SettingsSceneProps) {
           webArticleCacheImagesEnabled={webArticleCacheImagesEnabled}
           onToggleWebArticleCacheImagesEnabled={(next) => {
             void onToggleWebArticleCacheImagesEnabled(next);
+          }}
+          antiHotlinkAdvancedOpen={antiHotlinkAdvancedOpen}
+          onToggleAntiHotlinkAdvancedOpen={onToggleAntiHotlinkAdvancedOpen}
+          antiHotlinkRules={antiHotlinkRules}
+          antiHotlinkRuleErrors={antiHotlinkRuleErrors}
+          onChangeAntiHotlinkRule={onChangeAntiHotlinkRule}
+          onAddAntiHotlinkRule={onAddAntiHotlinkRule}
+          onRemoveAntiHotlinkRule={onRemoveAntiHotlinkRule}
+          onApplyAntiHotlinkRules={() => {
+            void onApplyAntiHotlinkRules();
+          }}
+          onResetAntiHotlinkRules={() => {
+            void onResetAntiHotlinkRules();
           }}
           aiChatDollarMentionEnabled={aiChatDollarMentionEnabled}
           onToggleAiChatDollarMentionEnabled={(next) => {
