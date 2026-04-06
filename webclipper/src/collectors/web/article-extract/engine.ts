@@ -150,6 +150,25 @@ async function waitForWechatShareMediaHydrated() {
   }
 }
 
+function isXiaohongshuNotePage() {
+  const hostname = String(location.hostname || '').toLowerCase();
+  if (!hostname || !hostname.endsWith('xiaohongshu.com')) return false;
+  return Boolean(document.querySelector('#noteContainer'));
+}
+
+async function waitForXiaohongshuNoteHydrated() {
+  if (!isXiaohongshuNotePage()) return;
+
+  const deadline = Date.now() + 4_000;
+  while (Date.now() < deadline) {
+    const root = document.querySelector('#noteContainer') as any;
+    const text = root ? normalizeText(String((root as any).innerText || '')) : '';
+    const imgCount = root ? Number(root.querySelectorAll?.('img')?.length || 0) : 0;
+    if (text.length >= 80 || imgCount >= 1) return;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
 function normalizeDetailsElementsForReadability(doc: any) {
   if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
 
@@ -242,6 +261,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   await waitForDomStabilized(timeoutMs, minTextLength);
   await waitForWechatShareMediaHydrated();
+  await waitForXiaohongshuNoteHydrated();
 
   const wechatRoot = document.querySelector('#js_content') as any;
   if (wechatRoot) {
