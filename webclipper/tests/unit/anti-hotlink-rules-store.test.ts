@@ -154,4 +154,22 @@ describe('anti-hotlink-rules-store', () => {
     const loaded = await loadAntiHotlinkRulesForSettings();
     expect(loaded).toEqual([]);
   });
+
+  it('settings service can force-refresh to sync external storage writes', async () => {
+    const { ANTI_HOTLINK_RULES_STORAGE_KEY } = await import('../../src/platform/webext/anti-hotlink-rules-store');
+    const { loadAntiHotlinkRulesForSettings } = await import(
+      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
+    );
+
+    store[ANTI_HOTLINK_RULES_STORAGE_KEY] = [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }];
+    const first = await loadAntiHotlinkRulesForSettings();
+    expect(first).toEqual([{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }]);
+
+    store[ANTI_HOTLINK_RULES_STORAGE_KEY] = [{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }];
+    const stale = await loadAntiHotlinkRulesForSettings();
+    expect(stale).toEqual([{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }]);
+
+    const refreshed = await loadAntiHotlinkRulesForSettings({ forceRefresh: true });
+    expect(refreshed).toEqual([{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }]);
+  });
 });

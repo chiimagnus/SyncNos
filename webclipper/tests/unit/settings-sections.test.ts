@@ -152,4 +152,46 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.body.textContent || '').toContain('Domain must be a valid hostname.');
     expect(document.body.textContent || '').toContain('Referer must be a valid http(s) URL.');
   });
+
+  it('wires editor add/edit/remove/apply/reset callbacks', () => {
+    const onAddRule = vi.fn();
+    const onRemoveRule = vi.fn();
+    const onApplyRules = vi.fn();
+    const onResetRules = vi.fn();
+
+    renderInpage({
+      antiHotlinkAdvancedOpen: true,
+      antiHotlinkRules: [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }],
+      onAddAntiHotlinkRule: onAddRule,
+      onRemoveAntiHotlinkRule: onRemoveRule,
+      onApplyAntiHotlinkRules: onApplyRules,
+      onResetAntiHotlinkRules: onResetRules,
+    });
+
+    expect(document.querySelector('input[aria-label="Domain 1"]')).toBeTruthy();
+    expect(document.querySelector('input[aria-label="Referer 1"]')).toBeTruthy();
+
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const addButton = buttons.find((button) => button.textContent?.trim() === 'Add domain') as HTMLButtonElement | undefined;
+    const deleteButton = buttons.find((button) => button.textContent?.trim() === 'Delete') as HTMLButtonElement | undefined;
+    const applyButton = buttons.find((button) => button.textContent?.trim() === 'Apply') as HTMLButtonElement | undefined;
+    const resetButton = buttons.find((button) => button.textContent?.trim() === 'Reset') as HTMLButtonElement | undefined;
+
+    expect(addButton).toBeTruthy();
+    expect(deleteButton).toBeTruthy();
+    expect(applyButton).toBeTruthy();
+    expect(resetButton).toBeTruthy();
+
+    act(() => {
+      addButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      deleteButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      applyButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      resetButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onAddRule).toHaveBeenCalledTimes(1);
+    expect(onRemoveRule).toHaveBeenCalledWith(0);
+    expect(onApplyRules).toHaveBeenCalledTimes(1);
+    expect(onResetRules).toHaveBeenCalledTimes(1);
+  });
 });

@@ -305,7 +305,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         ABOUT_YOU_USER_NAME_STORAGE_KEY,
       ]),
       send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
-      loadAntiHotlinkRulesForSettings(),
+      loadAntiHotlinkRulesForSettings({ forceRefresh: true }),
     ]);
 
     const notionStatus = unwrap(notionRes);

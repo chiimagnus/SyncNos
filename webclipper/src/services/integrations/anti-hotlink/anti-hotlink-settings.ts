@@ -34,8 +34,10 @@ function toStoredRules(drafts: ReadonlyArray<AntiHotlinkRuleDraft>): Array<{ dom
   }));
 }
 
-export async function loadAntiHotlinkRulesForSettings(): Promise<AntiHotlinkRuleDraft[]> {
-  const rules = await getAntiHotlinkRulesSnapshot();
+export async function loadAntiHotlinkRulesForSettings(options: { forceRefresh?: boolean } = {}): Promise<AntiHotlinkRuleDraft[]> {
+  const rules = await getAntiHotlinkRulesSnapshot({
+    forceRefresh: options.forceRefresh === true,
+  });
   return toDraftRules(rules);
 }
 
