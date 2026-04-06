@@ -481,6 +481,61 @@ describe('article-fetch-service', () => {
     );
   });
 
+  it('keeps capture successful when anti-hotlink rule lookup fails', async () => {
+    const upsertConversation = vi.fn(async (payload: any) => ({ id: 72, ...payload }));
+    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
+    storageMocks.hasConversation.mockResolvedValue(false);
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
+      if (Array.isArray(keys) && keys.includes('web_article_cache_images_enabled')) {
+        return { web_article_cache_images_enabled: false };
+      }
+      throw new Error('anti-hotlink rules read failed');
+    });
+
+    const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
+      cb(Array.isArray(details?.files) ? [{}] : []);
+    });
+
+    const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      cb({
+        ok: true,
+        data: {
+          ok: true,
+          title: 'Fallback Capture Title',
+          author: 'Author',
+          publishedAt: '',
+          excerpt: '',
+          contentHTML: '<html><body><p>Article body.</p></body></html>',
+          contentMarkdown: '![img](https://cdnfile.sspai.com/asset/a.png)\n\nArticle body.',
+          textContent: 'Article body.',
+          warningFlags: [],
+        },
+      });
+    });
+
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      tabs: {
+        query: (_query: any, cb: (tabs: any[]) => void) =>
+          cb([{ id: 92, url: 'https://sspai.com/post/2', title: 'Fallback Capture' }]),
+        sendMessage,
+      },
+      scripting: {
+        executeScript,
+      },
+    };
+
+    const service = await loadArticleFetchService();
+    const data = await service.fetchActiveTabArticle();
+
+    expect(data.conversationId).toBe(72);
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(syncConversationMessages).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects non-http active tab url', async () => {
     storageMocks.upsertConversation.mockResolvedValue({ id: 1 });
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });

@@ -20,6 +20,7 @@ export type AntiHotlinkRuleValidationIssue = {
 export const ANTI_HOTLINK_RULES_STORAGE_KEY = 'anti_hotlink_rules_v1';
 
 const DEFAULT_RULES_INTERNAL: AntiHotlinkRule[] = [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }];
+const HTTP_URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
 
 export const DEFAULT_ANTI_HOTLINK_RULES: ReadonlyArray<AntiHotlinkRule> = Object.freeze(
   DEFAULT_RULES_INTERNAL.map((rule) => Object.freeze({ ...rule })),
@@ -237,7 +238,22 @@ export async function getAntiHotlinkReferer(url: unknown, options: { forceRefres
 }
 
 export function includesAnyAntiHotlinkDomain(text: unknown, rules: ReadonlyArray<AntiHotlinkRule>): boolean {
-  const source = String(text ?? '').toLowerCase();
-  if (!source) return false;
-  return rules.some((rule) => source.includes(String(rule.domain || '').toLowerCase()));
+  const source = String(text ?? '');
+  if (!source || !rules.length) return false;
+
+  const domainSet = new Set<string>();
+  for (const rule of rules) {
+    const domain = normalizeDomain(rule.domain);
+    if (!domain) continue;
+    domainSet.add(domain);
+  }
+  if (!domainSet.size) return false;
+
+  HTTP_URL_RE.lastIndex = 0;
+  let matched: RegExpExecArray | null = null;
+  while ((matched = HTTP_URL_RE.exec(source)) != null) {
+    const host = parseHostnameFromHttpUrl(matched[0]);
+    if (host && domainSet.has(host)) return true;
+  }
+  return false;
 }

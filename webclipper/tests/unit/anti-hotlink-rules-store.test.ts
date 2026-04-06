@@ -105,5 +105,6 @@ describe('anti-hotlink-rules-store', () => {
 
     expect(includesAnyAntiHotlinkDomain('![img](https://picx.zhimg.com/v2-1.jpg)', rules)).toBe(true);
     expect(includesAnyAntiHotlinkDomain('![img](https://example.com/a.png)', rules)).toBe(false);
+    expect(includesAnyAntiHotlinkDomain('![img](https://notcdnfile.sspai.com.evil/a.png)', rules)).toBe(false);
   });
 });
