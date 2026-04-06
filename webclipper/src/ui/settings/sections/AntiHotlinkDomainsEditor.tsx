@@ -60,50 +60,51 @@ export function AntiHotlinkDomainsEditor(props: {
                   hasError ? 'tw-border-red-400/70' : 'tw-border-[var(--border)]'
                 }`}
               >
-                <label className="tw-grid tw-gap-1 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                  <span>{t('antiHotlinkDomainLabel')}</span>
-                  <input
-                    value={String(row?.domain || '')}
-                    disabled={busy}
-                    onChange={(e) => onChangeRule(index, { domain: e.target.value })}
-                    placeholder={t('antiHotlinkDomainPlaceholder')}
-                    aria-label={`${t('antiHotlinkDomainLabel')} ${index + 1}`}
-                    className={textInputClassName}
-                    spellCheck={false}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                  />
-                </label>
-                {domainError ? <div className="tw-text-xs tw-font-semibold tw-text-red-500">{domainError}</div> : null}
+                <div className="tw-flex tw-flex-wrap tw-items-center tw-gap-3">
+                  <label className="tw-flex tw-min-w-[260px] tw-flex-[1.1] tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                    <span className="tw-shrink-0 tw-w-12">{t('antiHotlinkDomainLabel')}</span>
+                    <input
+                      value={String(row?.domain || '')}
+                      disabled={busy}
+                      onChange={(e) => onChangeRule(index, { domain: e.target.value })}
+                      placeholder={t('antiHotlinkDomainPlaceholder')}
+                      aria-label={`${t('antiHotlinkDomainLabel')} ${index + 1}`}
+                      className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                      spellCheck={false}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                    />
+                  </label>
 
-                <label className="tw-grid tw-gap-1 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                  <span>{t('antiHotlinkRefererLabel')}</span>
-                  <input
-                    value={String(row?.referer || '')}
-                    disabled={busy}
-                    onChange={(e) => onChangeRule(index, { referer: e.target.value })}
-                    placeholder={t('antiHotlinkRefererPlaceholder')}
-                    aria-label={`${t('antiHotlinkRefererLabel')} ${index + 1}`}
-                    className={textInputClassName}
-                    spellCheck={false}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                  />
-                </label>
-                {refererError ? (
-                  <div className="tw-text-xs tw-font-semibold tw-text-red-500">{refererError}</div>
-                ) : null}
+                  <label className="tw-flex tw-min-w-[340px] tw-flex-[1.6] tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                    <span className="tw-shrink-0 tw-w-16">{t('antiHotlinkRefererLabel')}</span>
+                    <input
+                      value={String(row?.referer || '')}
+                      disabled={busy}
+                      onChange={(e) => onChangeRule(index, { referer: e.target.value })}
+                      placeholder={t('antiHotlinkRefererPlaceholder')}
+                      aria-label={`${t('antiHotlinkRefererLabel')} ${index + 1}`}
+                      className={`${textInputClassName} tw-min-w-0 tw-flex-1`}
+                      spellCheck={false}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                    />
+                  </label>
 
-                <div className="tw-flex tw-justify-end">
                   <button
                     type="button"
-                    className={dangerButtonClassName}
+                    className={`${dangerButtonClassName} tw-self-stretch`}
                     disabled={busy}
                     onClick={() => onRemoveRule(index)}
                     aria-label={`${t('antiHotlinkDeleteRule')} ${index + 1}`}
                   >
                     {t('antiHotlinkDeleteRule')}
                   </button>
+                </div>
+
+                <div className="tw-grid tw-gap-1 tw-pl-14">
+                  {domainError ? <div className="tw-text-xs tw-font-semibold tw-text-red-500">{domainError}</div> : null}
+                  {refererError ? <div className="tw-text-xs tw-font-semibold tw-text-red-500">{refererError}</div> : null}
                 </div>
               </div>
             );
