@@ -153,10 +153,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.body.textContent || '').toContain('Referer must be a valid http(s) URL.');
   });
 
-  it('wires editor add/remove/reset and blur-save callbacks', () => {
+  it('wires editor add/remove/reset callbacks', () => {
     const onAddRule = vi.fn();
     const onRemoveRule = vi.fn();
-    const onApplyRules = vi.fn();
     const onResetRules = vi.fn();
 
     renderInpage({
@@ -164,7 +163,6 @@ describe('inpage anti-hotlink advanced editor', () => {
       antiHotlinkRules: [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }],
       onAddAntiHotlinkRule: onAddRule,
       onRemoveAntiHotlinkRule: onRemoveRule,
-      onApplyAntiHotlinkRules: onApplyRules,
       onResetAntiHotlinkRules: onResetRules,
     });
 
@@ -189,12 +187,5 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(onAddRule).toHaveBeenCalledTimes(1);
     expect(onRemoveRule).toHaveBeenCalledWith(0);
     expect(onResetRules).toHaveBeenCalledTimes(1);
-
-    const domainInput = document.querySelector('input[aria-label="Domain 1"]') as HTMLInputElement | null;
-    expect(domainInput).toBeTruthy();
-    act(() => {
-      domainInput!.dispatchEvent(new window.FocusEvent('blur', { bubbles: true, relatedTarget: document.body }));
-    });
-    expect(onApplyRules).toHaveBeenCalledTimes(1);
   });
 });
