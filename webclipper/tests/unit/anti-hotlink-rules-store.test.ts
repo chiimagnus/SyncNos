@@ -37,7 +37,10 @@ describe('anti-hotlink-rules-store', () => {
     const first = await mod.getAntiHotlinkRulesSnapshot();
     const second = await mod.getAntiHotlinkRulesSnapshot();
 
-    expect(first).toEqual([{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }]);
+    expect(first).toEqual([
+      { domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' },
+      { domain: 'sns-webpic-qc.xhscdn.com', referer: 'https://www.xiaohongshu.com/' },
+    ]);
     expect(second).toEqual(first);
     expect(storageSetMock).toHaveBeenCalledTimes(1);
     expect(store[mod.ANTI_HOTLINK_RULES_STORAGE_KEY]).toEqual(first);
@@ -135,7 +138,10 @@ describe('anti-hotlink-rules-store', () => {
     expect(loaded).toEqual([{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }]);
 
     const reset = await resetAntiHotlinkRulesForSettings();
-    expect(reset).toEqual([{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }]);
+    expect(reset).toEqual([
+      { domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' },
+      { domain: 'sns-webpic-qc.xhscdn.com', referer: 'https://www.xiaohongshu.com/' },
+    ]);
   });
 
   it('settings service can persist an explicit empty rules list', async () => {

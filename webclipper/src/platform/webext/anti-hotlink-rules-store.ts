@@ -14,7 +14,10 @@ export type AntiHotlinkRuleValidationIssue = {
 
 export const ANTI_HOTLINK_RULES_STORAGE_KEY = 'anti_hotlink_rules_v1';
 
-const DEFAULT_RULES_INTERNAL: AntiHotlinkRule[] = [{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }];
+const DEFAULT_RULES_INTERNAL: AntiHotlinkRule[] = [
+  { domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' },
+  { domain: 'sns-webpic-qc.xhscdn.com', referer: 'https://www.xiaohongshu.com/' },
+];
 const HTTP_URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
 
 export const DEFAULT_ANTI_HOTLINK_RULES: ReadonlyArray<AntiHotlinkRule> = Object.freeze(
