@@ -107,4 +107,37 @@ describe('anti-hotlink-rules-store', () => {
     expect(includesAnyAntiHotlinkDomain('![img](https://example.com/a.png)', rules)).toBe(false);
     expect(includesAnyAntiHotlinkDomain('![img](https://notcdnfile.sspai.com.evil/a.png)', rules)).toBe(false);
   });
+
+  it('settings service blocks invalid drafts before writing to storage', async () => {
+    const { saveAntiHotlinkRulesForSettings } = await import(
+      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
+    );
+
+    const result = await saveAntiHotlinkRulesForSettings([
+      { domain: 'https://cdnfile.sspai.com', referer: 'https://sspai.com/' },
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'domain_invalid', field: 'domain' })]),
+      );
+    }
+    expect(storageSetMock).not.toHaveBeenCalled();
+  });
+
+  it('settings service loads and resets through platform rule store', async () => {
+    const { ANTI_HOTLINK_RULES_STORAGE_KEY } = await import('../../src/platform/webext/anti-hotlink-rules-store');
+    const { loadAntiHotlinkRulesForSettings, resetAntiHotlinkRulesForSettings } = await import(
+      '../../src/services/integrations/anti-hotlink/anti-hotlink-settings'
+    );
+
+    store[ANTI_HOTLINK_RULES_STORAGE_KEY] = [{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }];
+
+    const loaded = await loadAntiHotlinkRulesForSettings();
+    expect(loaded).toEqual([{ domain: 'picx.zhimg.com', referer: 'https://www.zhihu.com/' }]);
+
+    const reset = await resetAntiHotlinkRulesForSettings();
+    expect(reset).toEqual([{ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }]);
+  });
 });
