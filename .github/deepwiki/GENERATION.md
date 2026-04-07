@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `3b48a31a` |
-| Branch name | `crh` (HEAD), `main` (origin/main) |
-| Generation timestamp | `2026-04-05 00:00:00 +0800` |
+| Commit hash | `2023855db9ccb17de797d6bd6ccdc99f51c9fb78` |
+| Branch name | `main` (HEAD), `origin/main` |
+| Generation timestamp | `2026-04-07 19:35:49 +0800` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Major incremental sync update |
@@ -93,6 +93,12 @@
 - 支持 reset 平台列表功能
 - 评论级 Chat with AI 菜单（整条线程上下文）
 
+### 7. 2026-04 配置 / 存储同步
+- `manifest.version` 对齐到 `1.5.2`
+- `DB_VERSION` 对齐到 `8`，补齐列表分页 / 筛选索引回填
+- Inpage 分区承载 `markdown_reading_profile_v1` 与 `anti_hotlink_rules_v1`
+- `article` 抓取在命中 anti-hotlink 规则时会自动缓存图片，即使 web article cache toggle 关闭也不会中断主链路
+
 ### 更新的页面
 - `business-context.md`：更新核心产物、用户旅程、业务规则、术语、最容易误判的点、来源引用
 - `overview.md`：更新顶层目录地图、关键入口文件、来源引用
@@ -100,8 +106,8 @@
 - `modules/comments.md`：**完全重写**，反映 React 迁移后的新架构
 
 ## Coverage Notes
-- 本次重点是同步 2026-04 的重大架构变化：评论模块 React 迁移、Settings 重构、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强。
-- `data-flow.md` 和 `modules/webclipper.md` 也需要更新，但将在后续增量更新中完成（保持本次更新范围可控）。
+- 本次重点是同步 2026-04 的重大架构变化：评论模块 React 迁移、Settings 重构、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强，以及 1.5.2 / DB v8 / Inpage 规则事实。
+- `data-flow.md`、`modules/webclipper.md`、`configuration.md`、`storage.md`、`testing.md`、`workflow.md`、`security.md`、`glossary.md` 已在本轮增量中同步。
 - deepwiki 继续覆盖配置、数据流、存储、测试、发布与排障；并维持"代码/配置优先于文档摘要"的约束。
 
 ## Audit Basis
@@ -118,7 +124,5 @@
 | Git 历史 | 85 commits since 2026-04-02 |
 
 ## Notes For Next Update
-- `data-flow.md` 需要更新：评论 React 迁移后的数据流、评论数同步到 Notion/Obsidian 的链路。
-- `modules/webclipper.md` 需要更新：Settings 重构、AppShell listShell、ConversationsScene 三路由、Chat with AI prompt 模板可配置。
-- `configuration.md` 需要更新：版本号（如果从 1.5.1 升级）、新增设置键（prompt 模板、blur 自动保存）。
 - 若 manifest、DB schema 或发布 workflow 再次变更，优先更新 `configuration.md`、`storage.md`、`release.md`，再回写索引与元数据。
+- 如果后续继续演进 Inpage 规则或 markdown 阅读风格，优先同步 `webclipper/src/ui/AGENTS.md` 与 `webclipper/AGENTS.md`，再回写 deepwiki 相关页。

@@ -60,7 +60,7 @@
 | 这个仓库到底解决什么问题？ | [business-context.md](business-context.md) | [overview.md](overview.md) |
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
 | WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
-| WebClipper 的主题（仅跟随系统）、inpage 开关、AI 自动保存、AI `$ mention` 与图片缓存配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
+| WebClipper 的主题（仅跟随系统）、inpage 开关、AI 自动保存、AI `$ mention`、图片缓存、Inpage 阅读风格与 anti-hotlink 配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
 | WebClipper 的文章评论 / 注释线程改哪里？ | [modules/comments.md](modules/comments.md) | [modules/webclipper.md](modules/webclipper.md), [storage.md](storage.md), [testing.md](testing.md) |
 | WebClipper 底部 `source/site` 筛选菜单为什么高度会动态变化、怎样排查裁切？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [troubleshooting.md](troubleshooting.md) |
 | `Chat with AI` 是怎么从详情页触发的、模板和平台存在哪？ | [modules/webclipper.md](modules/webclipper.md) | [configuration.md](configuration.md), [testing.md](testing.md) |
@@ -82,6 +82,7 @@
 
 ## 更新记录（Update Notes）
 - 2026-04-05：同步 2026-04 重大架构变化（85 commits）——评论模块 React 迁移、Settings 顶部标签导航、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强（bilibili 新增、小红书移除）、Chat with AI prompt 模板可配置；更新 `business-context.md`、`overview.md`、`architecture.md`、`modules/comments.md`、`GENERATION.md`。
+- 2026-04-07：同步 WebClipper 配置 / 存储 / 模块文档到 `1.5.2` 与 `DB_VERSION = 8`，补齐 Inpage 阅读风格与 anti-hotlink 规则说明，并刷新 `storage.md`、`configuration.md`、`modules/webclipper.md`、`data-flow.md`、`testing.md`、`workflow.md`、`security.md`、`glossary.md`。
 - 2026-04-02：对齐会话详情动作槽位事实（`open / tools`）、更新图片缓存双开关（`ai_chat_cache_images_enabled` / `web_article_cache_images_enabled`）、同步 article comments 已进入 Notion/Obsidian 同步区段；并修复 deepwiki 内 `conversations-context.tsx` 路径到 `src/viewmodels/conversations/conversations-context.tsx`。
 - 2026-03-30：同步 WebClipper Settings section key（`aboutyou/aboutme`）与相关 deep-link（安装后 About Me、统计入口 About You）；补齐 Notion 设置侧链路（`LIST_PARENT_PAGES`、Parent Page 发现/resolve、OAuth pending/error 状态与断开清理）；并刷新 `configuration.md` 的版本事实源对齐规则。
 - 2026-03-29：同步 WebClipper 新行为与契约：inpage 双击从"打开 popup"调整为"打开页面内评论侧边栏"；补齐 `$ mention`（item-mention）配置键、消息契约与测试入口；更正 manifest icons 事实（`16/48/128` 仍存在，仅 `icon-128.png` 暴露为 `web_accessible_resources`）。

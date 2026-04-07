@@ -28,7 +28,7 @@
 | `src/services/sync/notion/notion-sync-orchestrator.ts` | Notion 同步 | 同步时加载评论并计算 `commentThreadCount`，写入 Notion "Comment Threads" 属性 |
 | `src/services/sync/obsidian/obsidian-markdown-writer.ts` | Obsidian 写入 | frontmatter 写入 `comments_root_count`，Markdown 包含 `## Comments` 章节 |
 | `src/platform/messaging/message-contracts.ts` | 消息契约 | 定义 5 个 `COMMENTS_MESSAGE_TYPES`：LIST、ADD、DELETE、ATTACH_ORPHAN、**MIGRATE_CANONICAL_URL** |
-| `src/platform/idb/schema.ts` | IndexedDB schema | 在 `DB_VERSION = 7` 时创建 `article_comments` store 和索引 |
+| `src/platform/idb/schema.ts` | IndexedDB schema | `article_comments` store 在 v7 引入并通过当前 `DB_VERSION = 8` schema 持续保留；`ensureArticleCommentsStore` 负责补齐索引 |
 | `src/services/sync/backup/export.ts` / `import.ts` | 备份导出 / 导入 | Zip v2 把 `article_comments` 归档到 `assets/article-comments/index.json` |
 
 ## 存储模型

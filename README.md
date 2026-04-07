@@ -88,6 +88,8 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Article comment threads** — local threaded comments for web articles (detail + inpage panel), preserved in Zip v2 backup/restore and article sync flows.
 - **Smart current-page capture** — popup auto-detects page type and runs `Fetch AI Chat` or `Fetch Article`.
 - **Image caching** — optionally cache AI chat and web article images locally. Historical AI chat images can be backfilled from the detail page.
+- **Anti-hotlink image caching** — article images that match anti-hotlink rules are cached automatically, even if web article image caching is turned off.
+- **Markdown reading profiles** — choose Medium / Notion / Book in Inpage settings to tune how markdown is rendered in popup and app views.
 - **Database backup / restore** — full export and import of your local session database, including `image_cache` and article comment threads. Sensitive data (OAuth tokens, etc.) is automatically excluded.
 - **Theme** — follows system `prefers-color-scheme` only.
 - **Inpage button** — configurable display scope (all sites / supported sites only / off).

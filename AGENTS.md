@@ -49,6 +49,7 @@ npm --prefix webclipper run check            # 产物校验
 3. Settings / Conversations UI 改动时，不要只改单个组件；同时核对这些真源：
    - `webclipper/src/viewmodels/settings/types.ts`（section 分组与顺序）
    - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`（`inpage_display_mode` / `ai_chat_auto_save_enabled` / `ai_chat_dollar_mention_enabled` / `ai_chat_cache_images_enabled` / `web_article_cache_images_enabled` / `chat_with_*`）
+   - `webclipper/src/ui/settings/sections/InpageSection.tsx`（`markdown_reading_profile_v1` / `anti_hotlink_rules_v1`）
    - `webclipper/src/viewmodels/settings/insight-stats.ts`（Insight 统计口径）
    - `webclipper/src/services/integrations/chatwith/chatwith-settings.ts`（Chat with AI 模板 / 平台 / 截断）
    - `webclipper/src/services/integrations/item-mention/**`（`$ mention`：站点门控、候选搜索、插入载荷构建）

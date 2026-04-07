@@ -1,6 +1,8 @@
 # SyncNos 项目规范与架构指南
 
-> 本文件是 `macOS/SyncNos/`（macOS App 主工程）的开发规范与架构约定，已融合仓库的通用开发规范；若与通用规范冲突，以本文件为准。
+> **归档说明**：`macOS/SyncNos/` 已不再是当前活动主线；它只保留历史参考。当前活文档以仓库根目录 `AGENTS.md`、`.github/deepwiki/` 和 `README.md` 为准，若内容冲突，以根文档为准。
+
+> 本文件是 `macOS/SyncNos/`（macOS App 主工程）的历史开发规范与架构约定；不建议将其作为当前开发依据。
 
 ## 项目概述
 

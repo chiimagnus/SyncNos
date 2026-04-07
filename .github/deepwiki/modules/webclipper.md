@@ -14,6 +14,10 @@
 | `src/services/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_display_mode`（兼容旧 `inpage_supported_only`）与支持站点如何影响 UI 启动 |
 | `src/services/bootstrap/current-page-capture.ts` | 当前页抓取服务 | 统一判断当前标签页可否抓取，并区分 chat / article 两条手动抓取路径 |
 | `src/services/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击打开页面内评论侧边栏（inpage comments panel）、article fetch、Google AI Studio 手动保存都在这里 |
+| `src/platform/webext/anti-hotlink-rules-store.ts` | 反防盗链规则真值与 referer 映射 | 维护 `anti_hotlink_rules_v1`，为图片下载代理和 article fetch 提供 domain → referer 规则 |
+| `src/services/integrations/anti-hotlink/anti-hotlink-settings.ts` | 反防盗链设置读写与验证 | 把 Settings 面板里的规则编辑、校验、reset/restore 接到本地存储 |
+| `src/services/protocols/markdown-reading-profiles.ts` | Markdown 阅读风格协议 | 定义 Medium / Notion / Book 三档阅读样式的规范与回退 |
+| `src/ui/shared/markdown-reading-profile-presets.ts` | Markdown 阅读风格 preset | 为 popup / app 详情页提供 profile 预设与渲染入口 |
 | `src/services/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
 | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
 | `src/services/integrations/item-mention/` | `$` mention 插入能力 | 在支持的 AI chat 输入框内通过 `$` 过滤本地 item 并插入同源 Markdown（站点门控真源：`src/collectors/ai-chat-sites.ts` 的 `features.dollarMention`） |
@@ -32,14 +36,14 @@
 | `src/ui/inpage/inpage-comments-panel-shadow.ts` | inpage comments 面板壳 | 让页面内评论面板运行在独立 shadow root 中 |
 | `src/services/bootstrap/inpage-comments-panel-content-handlers.ts` | inpage comments 内容脚手架 | 连接 content script 与 comments panel 逻辑，并通过 shared session 统一状态 |
 | `src/services/comments/sidebar/comment-sidebar-session.ts` | 评论侧边栏共享会话 | 统一 open / close / quote / focus / busy 语义 |
-| `src/platform/idb/schema.ts` | DB schema 与迁移 | 处理 NotionAI stable key migration 与 `article_comments`（DB_VERSION = 7） |
+| `src/platform/idb/schema.ts` | DB schema 与迁移 | 处理 NotionAI stable key migration、`article_comments`（v7 引入）与 list pagination indexes（DB_VERSION = 8） |
 | `src/services/sync/notion/notion-sync-orchestrator.ts` | Notion 同步编排 | 控制 DB / page / cursor / rebuild |
 | `src/services/sync/notion/auth/oauth.ts` | Notion OAuth | 处理 code exchange、state 校验、timeout/retry，并维护 OAuth 连接中的本地状态 |
 | `src/services/sync/notion/auth/token-store.ts` | Notion token store | 统一读写 / 清理 `notion_oauth_token_v1`，供 background handlers 与 orchestrator 使用 |
 | `src/services/sync/notion/notion-parent-pages.ts` | Notion Parent Page 发现 | 通过 `/v1/search` 分页拉取可用 parent pages，并解析已保存 page id 的可用性 |
 | `src/services/sync/notion/settings-background-handlers.ts` | Notion 设置路由 | 实现 `GET_AUTH_STATUS / LIST_PARENT_PAGES / DISCONNECT`，将 UI 请求转换为 Notion API 调用并输出稳定错误形态 |
 | `src/services/sync/obsidian/obsidian-sync-orchestrator.ts` | Obsidian 同步编排 | 控制 append / rebuild / rename / fallback |
-| `src/ui/settings/SettingsScene.tsx` | 设置页总入口 | 管理 Notion、Notion AI、Obsidian、Backup、Chat with AI、About You（含 Insight 统计）、Inpage、About Me |
+| `src/ui/settings/SettingsScene.tsx` | 设置页总入口 | 管理 Notion、Notion AI、Obsidian、Backup、Chat with AI、Inpage、About You（含 Insight 统计）、About Me；Inpage 里包含阅读风格与 anti-hotlink 设置 |
 | `src/viewmodels/settings/useSettingsSceneController.ts` | 设置页状态控制器 | 统一管理存储读写、连接状态、备份动作，并按需懒加载 About You（Insight 统计） |
 | `src/viewmodels/settings/insight-stats.ts` | Insight 聚合引擎 | 从 IndexedDB 的 `conversations` + `messages` 现算本地 clip 统计 |
 | `src/ui/settings/sections/InsightSection.tsx` | Insight 状态容器 | 管理 loading / error / empty / populated 四类状态 |
@@ -73,6 +77,7 @@
 | 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除；不属于新的抓取站点 |
 
 - `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
+- `anti_hotlink_rules_v1` 由 `AntiHotlinkDomainsEditor` 维护；文章抓取命中规则时会自动走图片缓存链路，即使 `web_article_cache_images_enabled` 关闭也不会把整页抓取变成失败。
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击打开页面内评论侧边栏，多击只触发彩蛋动画与提示。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
@@ -83,7 +88,7 @@
 | 区域 | 主要实现 | 关键点 |
 | --- | --- | --- |
 | 本地会话库 | `src/services/conversations/data/storage-idb.ts` | `upsertConversation()` / `syncConversationMessages()` 负责 conversation + message 快照更新 |
-| Schema 与迁移 | `src/platform/idb/schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=7`，处理 NotionAI stable key、legacy article canonical key 迁移、legacy 字段清理与 `article_comments` store |
+| Schema 与迁移 | `src/platform/idb/schema.ts` | `DB_NAME='webclipper'`, `DB_VERSION=8`，处理 NotionAI stable key、legacy article canonical key 迁移、legacy 字段清理、`article_comments` store 与 list pagination / filter 索引 |
 | 会话种类 | `src/services/protocols/conversation-kinds.ts` | `chat` 与 `article` 决定 Notion DB、Obsidian folder 与重建规则 |
 | 文章评论线程 | `src/services/comments/data/storage-idb.ts`, `src/services/comments/background/handlers.ts` | `article_comments` 负责 article 详情页的本地评论、回复与删除 |
 | Notion 同步 | `notion-sync-orchestrator.ts` | 需要 token + `notion_parent_page_id`，cursor 命中 append，否则 rebuild |
@@ -94,7 +99,7 @@
 - article 评论通过 `article_comments` 独立存储，并以 `canonicalUrl` + `conversationId` 组织线程；它是 article 会话的本地注释层，而不是新的远端同步目标。
 - Notion orchestrator 会按 kind 选择 `SyncNos-AI Chats` 或 `SyncNos-Web Articles` 数据库，并在数据库缓存失效时尝试恢复一次。
 - Obsidian orchestrator 在 patch 失败时不是直接报错，而是尽量回退全量重建，优先保证文件最终可恢复到正确状态。
-- `schema.ts` 的升级链路采用 `oldVersion < 2 / < 4 / < 6` 分段处理：分别覆盖 NotionAI key 归一、article canonical 归并与 `conversations.description` 旧字段清理；`article_comments` 作为 v7 新 store 直接纳入 schema。
+- `schema.ts` 的升级链路采用 `oldVersion < 2 / < 4 / < 6 / < 8` 分段处理：分别覆盖 NotionAI key 归一、article canonical 归并、`conversations.description` 旧字段清理、`article_comments` store 保留与列表分页索引回填。
 
 ## 设置与 UI 入口
 
@@ -110,10 +115,11 @@
 | i18n | `src/ui/i18n/index.ts`, `src/ui/i18n/locales/*.ts` | UI 文案自动根据浏览器语言在 `en` / `zh` 间切换 |
 | 页面内评论侧边栏打开 | `src/platform/messaging/ui-background-handlers.ts` | 双击 inpage 按钮发送 `UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL`，background 转发 `CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL` 打开 panel；失败会提示用户点击工具栏图标进行评论 |
 
-- Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, `ai_chat_cache_images_enabled`, `web_article_cache_images_enabled`，以及 Obsidian 连接参数。
+- Settings controller 会负责读取 / 保存 `notion_parent_page_id`, `notion_parent_page_title`, `notion_ai_preferred_model_index`, `ai_chat_cache_images_enabled`, `web_article_cache_images_enabled`, `anti_hotlink_rules_v1`, `markdown_reading_profile_v1`，以及 Obsidian 连接参数。
 - Notion Parent Page 的下拉刷新不由 UI 直接请求 Notion API：Settings controller 会通过 background router 调用 `NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES`，由 `settings-background-handlers.ts` 读取 token + 已保存 page id，并调用 `notion-parent-pages.ts` 统一分页/过滤/已保存 page resolve；429 会返回带 retry 提示的 message，并在 extra 中附带 `status/code/requestId` 便于排障。
 - `General` 分区现在承接了原来分散的“inpage + 自动保存”等设置；主题仅跟随系统 `prefers-color-scheme`（不再提供手动切换）。
 - `ai_chat_cache_images_enabled` 与 `web_article_cache_images_enabled` 是 `General` 分区里的独立开关：默认都为 `false`，分别影响 chat/article 的图片内联。
+- `Inpage` 分区承载 `markdown_reading_profile_v1` 与 `anti_hotlink_rules_v1`：前者只改 markdown 阅读样式，后者决定文章图片是否需要补 referer 并自动缓存。
 - `ai_chat_dollar_mention_enabled` 也是 `General` 分区的开关：默认 `true`；content controller 会监听 `chrome.storage.onChanged`，因此通常可在当前标签页热更新启停 `$ mention`（不要求刷新页面）。
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
 - detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
@@ -180,6 +186,8 @@
 - `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
+- `webclipper/src/platform/webext/anti-hotlink-rules-store.ts`
+- `webclipper/src/platform/webext/image-download-proxy.ts`
 - `webclipper/src/platform/idb/schema.ts`
 - `webclipper/src/services/conversations/data/storage-idb.ts`
 - `webclipper/src/services/conversations/background/handlers.ts`
@@ -187,6 +195,9 @@
 - `webclipper/src/services/comments/background/handlers.ts`
 - `webclipper/src/services/comments/client/repo.ts`
 - `webclipper/src/services/comments/data/storage-idb.ts`
+- `webclipper/src/services/integrations/anti-hotlink/anti-hotlink-settings.ts`
+- `webclipper/src/services/protocols/markdown-reading-profiles.ts`
+- `webclipper/src/ui/shared/markdown-reading-profile-presets.ts`
 - `webclipper/src/services/bootstrap/inpage-comments-panel-content-handlers.ts`
 - `webclipper/src/services/comments/sidebar/comment-sidebar-session.ts`
 - `webclipper/src/services/sync/backup/export.ts`
@@ -212,6 +223,8 @@
 - `webclipper/src/services/sync/obsidian/obsidian-markdown-writer.ts`
 - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
+- `webclipper/src/ui/settings/sections/InpageSection.tsx`
+- `webclipper/src/ui/settings/sections/AntiHotlinkDomainsEditor.tsx`
 - `webclipper/src/ui/settings/SettingsSidebarNav.tsx`
 - `webclipper/src/viewmodels/settings/types.ts`
 - `webclipper/src/ui/settings/sections/ChatWithAiSection.tsx`

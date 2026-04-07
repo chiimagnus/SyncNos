@@ -18,6 +18,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | WebClipper Insight 仪表盘 | WebClipper | 把"数据库里的行数"转成用户可见的累计成果、来源结构和最长对话 | 只读、本地计算、不得依赖网络或新增 schema |
 | Chat with AI 详情头动作 | WebClipper | 把文章 / 对话内容变成可复制 prompt，并一键跳转到用户启用的 AI 平台 | 先复制到剪贴板，再打开外部站点；不在后台自动发起模型调用；prompt 模板可在设置中自定义 |
 | WebClipper 文章评论 / 注释线程 | WebClipper | 给 article detail 和 inpage comments panel 提供本地 threaded comments（React 实现） | local-first 注释层；article 同步时会进入 Notion / Obsidian 的评论区段（含根评论数统计），同时继续随 Zip v2 备份 / 导入保留 |
+| WebClipper Inpage 设置 | WebClipper | 控制 markdown 阅读风格与反防盗链图片规则 | `markdown_reading_profile_v1` 影响 popup / app 详情页排版；`anti_hotlink_rules_v1` 命中时会自动补 referer 并缓存图片 |
 | Markdown / Zip / Obsidian | WebClipper | 支持离线保存、迁移、个人知识库接入 | 备份排除 Notion OAuth token 等敏感键；Obsidian frontmatter 含 `comments_root_count` |
 
 ## 核心用户旅程
@@ -39,7 +40,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 2. 设置控制器仅在第一次进入该 section 时调用 `getInsightStats()`，从 IndexedDB 的 `conversations` 与 `messages` 现算本地统计。
 3. 仪表盘把结果展示为总 clips、AI Conversations、Web Articles、来源分布、文章域名分布和 Top 3 longest conversations。
 4. 这个视图是**只读的**：它帮助用户"看见积累"，但不会写回新缓存、不会发网络请求，也不会改变 Notion / Obsidian 的同步状态。
-5. Settings 界面现在使用顶部标签导航（窄屏）或侧边栏导航（宽屏），支持关闭按钮返回；部分设置项（如 Inpage Display Mode、AI Chat Auto Save 等）改为 blur 自动保存。
+5. Settings 界面现在使用顶部标签导航（窄屏）或侧边栏导航（宽屏），支持关闭按钮返回；部分设置项（如 Inpage Display Mode、AI Chat Auto Save 等）改为 blur 自动保存；Inpage 分区负责阅读风格与 anti-hotlink 规则。
 
 ### 旅程 4：用户从详情页把本地内容带去别的 AI 平台继续聊
 1. 用户在 popup / app 的 conversation detail 中打开某条 article 或 chat。
@@ -56,7 +57,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | **WebClipper 本地优先** | 扩展数据层 | Notion / Obsidian / 导出都不是事实源，事实源是本地 IndexedDB | 删除、迁移、备份和重建都先围绕本地会话库发生 |
 | **Insight 只读，不成为新事实源** | WebClipper Settings | 统计页如果写回缓存或引入额外 schema，会把"观察数据"变成"业务状态" | `Settings → Insight` 每次只读聚合 `conversations` / `messages`，失败时显示错误或空态 |
 | **Chat with AI 是"复制 + 跳转"，不是后台代聊** | detail header + settings | 这样才能保持用户对 prompt 与目标平台的控制权，也避免扩展暗中持有额外会话状态 | 没有 detail messages、平台未启用或 URL 无效时，动作直接不出现；prompt 模板可在设置中自定义 |
-| **图片缓存是"可选增强"，不是采集成功前提** | `ai_chat_cache_images_enabled` / `web_article_cache_images_enabled` + detail tools | 用户希望"离线可读"时可开启，但不应因图片链路失败影响文本采集 | 实时采集里的图片内联失败不会阻断保存；历史会话可手动触发 `cache-images` 回填 |
+| **图片缓存是"可选增强"，不是采集成功前提** | `ai_chat_cache_images_enabled` / `web_article_cache_images_enabled` + `anti_hotlink_rules_v1` + detail tools | 用户希望"离线可读"时可开启，但不应因图片链路失败影响文本采集 | 实时采集里的图片内联失败不会阻断保存；命中 anti-hotlink 规则时即使关闭 web article cache 也会自动缓存；历史会话可手动触发 `cache-images` 回填 |
 | **主题仅跟随系统** | `prefers-color-scheme` + `tokens.css` | 避免维护额外的主题切换状态与 UI；所有 UI 统一随系统暗色设置 | popup / app / inpage 全部只依赖 CSS 媒体查询，不再有 `data-theme` 手动覆盖 |
 | **升级不应打断当前会话** | `background.ts` 的 `onInstalled` 行为 | 扩展升级后自动弹设置页会打断正在进行的阅读/对话流程 | 当前仅首次安装自动打开 About；更新保持静默 |
 | **敏感信息尽量不出本机** | WebClipper 备份 | 站点 Cookie、加密密钥、Notion OAuth token 都不能随意进备份或明文落盘 | 备份显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret` |

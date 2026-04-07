@@ -381,3 +381,14 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
   - 断行保护：`overflow-wrap:anywhere` 必须保留。
   - `pre/table` 仅允许局部横滚，不允许整页双向滚动。
   - light/dark + user/assistant 至少走矩阵 smoke 覆盖。
+
+## B8 · Anti-hotlink 规则协议
+
+- 规则真源：
+  - `src/platform/webext/anti-hotlink-rules-store.ts`
+  - `src/services/integrations/anti-hotlink/anti-hotlink-settings.ts`
+  - `src/ui/settings/sections/AntiHotlinkDomainsEditor.tsx`
+- 存储键：`anti_hotlink_rules_v1`
+- 默认规则：`cdnfile.sspai.com -> https://sspai.com/`、`sns-webpic-qc.xhscdn.com -> https://www.xiaohongshu.com/`
+- UI 接入链路：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx`
+- 行为约束：文章命中规则时会自动补 referer 并走图片缓存；`web_article_cache_images_enabled` 只控制普通 article 图片缓存开关，不得阻断规则命中后的自动缓存。
