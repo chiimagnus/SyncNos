@@ -111,6 +111,49 @@ describe('DetailHeaderActionBar', () => {
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 
+  it('renders menu items as vertical flex buttons that can wrap text', async () => {
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            {
+              id: 'open-in-notion',
+              label: 'Open in Notion',
+              provider: 'notion',
+              kind: 'external-link',
+              slot: 'open',
+              href: 'https://www.notion.so/example',
+              onTrigger: vi.fn(async () => {}),
+            },
+            {
+              id: 'open-in-obsidian',
+              label: 'Open in Obsidian',
+              provider: 'obsidian',
+              kind: 'open-target',
+              slot: 'open',
+              onTrigger: vi.fn(async () => {}),
+            },
+          ],
+          buttonClassName,
+        }),
+      );
+    });
+
+    const trigger = document.querySelector('[aria-label="Open destinations"]') as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+
+    await act(async () => {
+      trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const menuItems = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    expect(menuItems).toHaveLength(2);
+    expect(menuItems[0]?.className || '').toContain('tw-flex');
+    expect(menuItems[0]?.className || '').toContain('tw-whitespace-normal');
+    expect(menuItems[0]?.className || '').toContain('tw-break-words');
+  });
+
   it('reports an error instead of swallowing a failed action trigger', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis.window, 'alert', {

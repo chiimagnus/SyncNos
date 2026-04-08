@@ -15,7 +15,7 @@ export function buttonDangerTintClassName(): string {
 }
 
 export function buttonMenuItemClassName(): string {
-  return 'webclipper-btn webclipper-btn--menu-item';
+  return 'webclipper-btn webclipper-btn--menu-item tw-flex tw-whitespace-normal tw-break-words';
 }
 
 export function headerButtonClassName(): string {
