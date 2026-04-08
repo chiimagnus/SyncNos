@@ -53,7 +53,7 @@ describe('inpage button idle fade', () => {
     cleanupDom();
   });
 
-  it('fades after 1s without button interaction and only button interaction restores it', () => {
+  it('fades after 10s without button interaction and only button interaction restores it', () => {
     inpageButtonApi.ensureInpageButton({ collectorId: 'chatgpt' });
 
     const btn = document.getElementById('webclipper-inpage-btn') as HTMLElement | null;
@@ -61,7 +61,7 @@ describe('inpage button idle fade', () => {
     expect(btn!.shadowRoot).toBeTruthy();
     expect(btn!.classList.contains('is-idle')).toBe(false);
 
-    vi.advanceTimersByTime(999);
+    vi.advanceTimersByTime(9_999);
     expect(btn!.classList.contains('is-idle')).toBe(false);
 
     vi.advanceTimersByTime(1);
@@ -75,7 +75,7 @@ describe('inpage button idle fade', () => {
     btn!.dispatchEvent(new window.Event('pointermove', { bubbles: true }));
     expect(btn!.classList.contains('is-idle')).toBe(false);
 
-    vi.advanceTimersByTime(1_000);
+    vi.advanceTimersByTime(10_000);
     expect(btn!.classList.contains('is-idle')).toBe(true);
   });
 });
