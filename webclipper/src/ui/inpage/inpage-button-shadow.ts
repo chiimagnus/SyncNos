@@ -4,6 +4,8 @@ type InpageRuntime = { getURL?: (path: string) => string } | null;
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const EDGE_GAP = 0;
 const INPAGE_BUTTON_LABEL = 'WebClipper: Save';
+const INPAGE_BUTTON_IDLE_TIMEOUT_MS = 10_000;
+const INPAGE_BUTTON_IDLE_CLASS = 'is-idle';
 const COMBO_WINDOW_MS = 400;
 const EASTER_CLASSES = Object.freeze({
   3: 'is-easter-3',
@@ -20,6 +22,8 @@ function toButtonHostCss(css: string) {
   return css
     .replaceAll('.webclipper-inpage-btn:hover', ':host(:hover)')
     .replaceAll('.webclipper-inpage-btn:focus-visible', ':host(:focus-visible)')
+    .replaceAll('.webclipper-inpage-btn.is-dragging', ':host(.is-dragging)')
+    .replaceAll('.webclipper-inpage-btn.is-idle', ':host(.is-idle)')
     .replaceAll('.webclipper-inpage-btn.is-easter-3', ':host(.is-easter-3)')
     .replaceAll('.webclipper-inpage-btn.is-easter-5', ':host(.is-easter-5)')
     .replaceAll('.webclipper-inpage-btn.is-easter-7', ':host(.is-easter-7)')
@@ -330,6 +334,58 @@ function ensureButtonInteractions(btn: HTMLElement) {
   let comboCount = 0;
   let comboTimer: any = null;
   let easterTimer: any = null;
+  let idleTimer: any = null;
+
+  const activityCleanupFns: Array<() => void> = [];
+
+  function clearIdleTimer() {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  }
+
+  function scheduleIdleState() {
+    clearIdleTimer();
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      if (!btn.isConnected) return;
+      btn.classList.add(INPAGE_BUTTON_IDLE_CLASS);
+    }, INPAGE_BUTTON_IDLE_TIMEOUT_MS);
+  }
+
+  function markActive() {
+    if (!btn.isConnected) return;
+    btn.classList.remove(INPAGE_BUTTON_IDLE_CLASS);
+    scheduleIdleState();
+  }
+
+  function addActivityListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ) {
+    btn.addEventListener(type, listener, options as any);
+    activityCleanupFns.push(() => {
+      try {
+        btn.removeEventListener(type, listener, options as any);
+      } catch (_e) {
+        // ignore
+      }
+    });
+  }
+
+  const onButtonActivity = () => {
+    markActive();
+  };
+
+  // Idle timer should be reset only by direct interactions with the inpage button itself.
+  addActivityListener('pointerenter', onButtonActivity, true);
+  addActivityListener('pointermove', onButtonActivity, true);
+  addActivityListener('pointerdown', onButtonActivity, true);
+  addActivityListener('focusin', onButtonActivity, true);
+  addActivityListener('keydown', onButtonActivity, true);
+  addActivityListener('touchstart', onButtonActivity, true);
 
   function clearEasterAnimation() {
     if (easterTimer) {
@@ -401,6 +457,7 @@ function ensureButtonInteractions(btn: HTMLElement) {
     e.stopPropagation();
     if (dragging) return;
     if (moved) return;
+    markActive();
     comboCount += 1;
     scheduleComboSettle();
   };
@@ -411,6 +468,7 @@ function ensureButtonInteractions(btn: HTMLElement) {
     if ((e as any).button != null && (e as any).button !== 0) return;
     if (!matchesInpageButtonEvent(btn, e)) return;
     stopEvent(e);
+    markActive();
 
     dragging = true;
     moved = false;
@@ -485,6 +543,14 @@ function ensureButtonInteractions(btn: HTMLElement) {
   (btn as any).__webclipperCleanup = () => {
     resetComboState();
     clearEasterAnimation();
+    clearIdleTimer();
+    for (const cleanup of activityCleanupFns.splice(0, activityCleanupFns.length)) {
+      try {
+        cleanup();
+      } catch (_e) {
+        // ignore
+      }
+    }
     window.removeEventListener('resize', onResize);
     btn.removeEventListener('click', onClickCapture, true);
     window.removeEventListener('pointerdown', onPointerDownCapture, true);
@@ -494,6 +560,7 @@ function ensureButtonInteractions(btn: HTMLElement) {
   };
 
   (btn as any).__webclipperInteractionsReady = true;
+  markActive();
 }
 
 function ensureInpageButton({

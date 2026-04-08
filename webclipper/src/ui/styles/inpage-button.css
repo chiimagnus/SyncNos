@@ -26,6 +26,7 @@
   box-shadow: none;
   isolation: isolate;
   transition:
+    opacity 180ms ease,
     transform 120ms ease,
     filter 120ms ease,
     box-shadow 120ms ease,
@@ -41,9 +42,20 @@
   transition: none;
 }
 
+.webclipper-inpage-btn.is-idle {
+  opacity: 0.36;
+}
+
 .webclipper-inpage-btn.is-dragging:hover {
   transform: none;
   filter: none;
+}
+
+.webclipper-inpage-btn:hover,
+.webclipper-inpage-btn:focus-visible,
+.webclipper-inpage-btn.is-dragging,
+.webclipper-inpage-btn.is-saving {
+  opacity: 1;
 }
 
 .webclipper-inpage-btn:focus-visible {
