@@ -273,6 +273,7 @@
 4. **按下态（active）**：把两条 inset 的颜色对调（反转），并 `translateY(1px)`。
 5. **主题兼容**：stroke 色值用 `color-mix()` 从当前 surface token（`--bg-card` / `--accent` / `--error`）派生，禁止硬编码亮暗色值。
 6. **选中态走 aria**：toggle 用 `aria-pressed='true'`；`SelectMenu` 的选中项用 `aria-checked='true'`（样式在 `buttons.css` 统一处理）。
+7. **inpage 空闲淡化**：`webclipper-inpage-btn` 在固定 10 秒无“按钮本体交互”后进入 `is-idle` 半透明态；仅按钮本体交互会重置计时，hover / focus / drag / saving 需恢复可见，阈值不做设置项。
 
 ### B2.2 · 同心圆角分级（Concentric Radius）
 
