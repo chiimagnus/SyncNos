@@ -176,9 +176,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
 
-    const headerTitle = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__header-title',
-    ) as HTMLElement | null;
+    const headerTitle = shadow.querySelector('.webclipper-inpage-comments-panel__header-title') as HTMLElement | null;
     expect(headerTitle).toBeTruthy();
     expect(headerTitle?.textContent).toBe('articleCommentsHeading');
 

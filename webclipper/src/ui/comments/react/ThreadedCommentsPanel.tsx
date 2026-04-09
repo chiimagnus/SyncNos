@@ -239,24 +239,27 @@ export function ThreadedCommentsPanel({
     }
   };
 
-  const requestComposerSelection = useCallback((trigger: 'button' | 'auto', autoSignature?: string | null) => {
-    if (trigger === 'auto') {
-      const normalizedSignature = String(autoSignature || 'empty');
-      if (normalizedSignature === 'empty') {
-        if (isPanelTextInputFocused()) return;
-        const suppressUntil = Number(suppressEmptyAutoSelectionUntilRef.current || 0);
-        if (Date.now() <= suppressUntil) return;
+  const requestComposerSelection = useCallback(
+    (trigger: 'button' | 'auto', autoSignature?: string | null) => {
+      if (trigger === 'auto') {
+        const normalizedSignature = String(autoSignature || 'empty');
+        if (normalizedSignature === 'empty') {
+          if (isPanelTextInputFocused()) return;
+          const suppressUntil = Number(suppressEmptyAutoSelectionUntilRef.current || 0);
+          if (Date.now() <= suppressUntil) return;
+        }
+        if (normalizedSignature === lastAutoSelectionSignatureRef.current) return;
+        lastAutoSelectionSignatureRef.current = normalizedSignature;
       }
-      if (normalizedSignature === lastAutoSelectionSignatureRef.current) return;
-      lastAutoSelectionSignatureRef.current = normalizedSignature;
-    }
-    const latestHandlers = readHandlers?.() || snapshot.handlers;
-    const handler = latestHandlers.onComposerSelectionRequest;
-    if (typeof handler !== 'function') return;
-    void Promise.resolve(handler({ trigger })).catch(() => {
-      // ignore
-    });
-  }, [readHandlers, snapshot.handlers]);
+      const latestHandlers = readHandlers?.() || snapshot.handlers;
+      const handler = latestHandlers.onComposerSelectionRequest;
+      if (typeof handler !== 'function') return;
+      void Promise.resolve(handler({ trigger })).catch(() => {
+        // ignore
+      });
+    },
+    [readHandlers, snapshot.handlers],
+  );
 
   const suppressNextEmptyAutoSelection = () => {
     suppressEmptyAutoSelectionUntilRef.current = Date.now() + 320;

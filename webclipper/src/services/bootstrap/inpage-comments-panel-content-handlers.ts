@@ -53,11 +53,7 @@ function resolveInpageSelectionPayload(): {
 }
 
 export type InpageCommentsPanelController = {
-  open: (input?: {
-    tabId?: number | null;
-    focusComposer?: boolean;
-    ensureArticle?: boolean;
-  }) => Promise<void>;
+  open: (input?: { tabId?: number | null; focusComposer?: boolean; ensureArticle?: boolean }) => Promise<void>;
 };
 
 export function createInpageCommentsPanelController(runtime: RuntimeClient | null): InpageCommentsPanelController {
@@ -70,11 +66,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
   let lastTabId: number | null = null;
 
-  async function open(input?: {
-    tabId?: number | null;
-    focusComposer?: boolean;
-    ensureArticle?: boolean;
-  }) {
+  async function open(input?: { tabId?: number | null; focusComposer?: boolean; ensureArticle?: boolean }) {
     // Only handle on top frame to avoid duplicate panels.
     try {
       if (globalThis.top && globalThis.top !== globalThis.self) return;
