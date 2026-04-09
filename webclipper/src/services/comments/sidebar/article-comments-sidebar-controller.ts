@@ -192,14 +192,26 @@ export function createArticleCommentsSidebarController(input: {
         const resolveComposerSelection = input.resolveComposerSelection;
         if (typeof resolveComposerSelection !== 'function') return;
         const requestSeq = ++composerSelectionRequestSeq;
-        let payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined;
+        const applyIfLatest = (payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined) => {
+          if (requestSeq !== composerSelectionRequestSeq) return;
+          applyComposerSelection(payload ?? { selectionText: '', locator: null });
+        };
         try {
-          payload = await resolveComposerSelection(request);
+          const resolved = resolveComposerSelection(request);
+          if (resolved && typeof (resolved as PromiseLike<unknown>).then === 'function') {
+            void Promise.resolve(resolved)
+              .then((payload) => {
+                applyIfLatest(payload as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
+              })
+              .catch(() => {
+                applyIfLatest({ selectionText: '', locator: null });
+              });
+            return;
+          }
+          applyIfLatest(resolved as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
         } catch (_error) {
-          payload = { selectionText: '', locator: null };
+          applyIfLatest({ selectionText: '', locator: null });
         }
-        if (requestSeq !== composerSelectionRequestSeq) return;
-        applyComposerSelection(payload ?? { selectionText: '', locator: null });
       },
     };
 
