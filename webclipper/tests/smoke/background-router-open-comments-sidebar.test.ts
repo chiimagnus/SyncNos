@@ -20,7 +20,7 @@ describe('background-router open inpage comments sidebar', () => {
     const res = await router.__handleMessageForTests(
       {
         type: 'openCurrentTabInpageCommentsPanel',
-        selectionText: 'double clicked quote',
+        source: 'popup',
       },
       { tab: { id: 17 } },
     );
@@ -30,8 +30,7 @@ describe('background-router open inpage comments sidebar', () => {
       type: 'openInpageCommentsPanel',
       payload: {
         tabId: 17,
-        selectionText: 'double clicked quote',
-        source: 'doubleclick',
+        source: 'popup',
       },
     });
   });
@@ -41,7 +40,6 @@ describe('background-router open inpage comments sidebar', () => {
     const res = await router.__handleMessageForTests(
       {
         type: 'openCurrentTabInpageCommentsPanel',
-        selectionText: 'quote',
       },
       { tab: undefined },
     );

@@ -1,5 +1,4 @@
 import type { CurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
-import { t } from '@i18n';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
@@ -68,10 +67,6 @@ type Deps = {
 const CORE_MESSAGE_TYPES = Object.freeze({
   UPSERT_CONVERSATION: 'upsertConversation',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
-});
-
-const UI_MESSAGE_TYPES = Object.freeze({
-  OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL: 'openCurrentTabInpageCommentsPanel',
 });
 
 const EASTER_EGG_LINES = Object.freeze({
@@ -372,18 +367,6 @@ export function createContentController(deps: Deps) {
       }
     };
 
-    const openCommentsSidebar = async () => {
-      try {
-        const selectionText = String(globalThis.getSelection?.()?.toString() || '').trim();
-        const response = await send(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
-          selectionText,
-        });
-        if (!response?.ok) showInpageTip(t('clickToolbarIconToOpenCommentsSidebar'), 'error');
-      } catch (_error) {
-        showInpageTip(t('clickToolbarIconToOpenCommentsSidebar'), 'error');
-      }
-    };
-
     const showComboLine = (payload: { level: number }) => {
       const level = Number(payload?.level);
       if (!Number.isFinite(level)) return;
@@ -399,7 +382,6 @@ export function createContentController(deps: Deps) {
       inpageButton?.ensureInpageButton?.({
         collectorId: inpageCollector?.id,
         onClick: clickSave,
-        onDoubleClick: openCommentsSidebar,
         onCombo: showComboLine,
         positionState,
         onPositionChange: (state: any) => {

@@ -410,7 +410,7 @@ describe('AppShell comments sidebar', () => {
     expect(quoteAfterReplyTyping).toBe(selectedText);
   });
 
-  it('clears quote when locator root is unavailable in app flow', async () => {
+  it('keeps quote empty when locator root is unavailable in app flow', async () => {
     detailPaneMockState.provideLocatorRoot = false;
 
     act(() => {
@@ -431,10 +431,8 @@ describe('AppShell comments sidebar', () => {
     const shadow = host.shadowRoot;
     expect(shadow).toBeTruthy();
 
-    await vi.waitFor(() => {
-      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
-      expect(quoteText).toBe('Selected quote');
-    });
+    const initialQuoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    expect(initialQuoteText).toBe('');
 
     act(() => {
       document.dispatchEvent(new window.Event('selectionchange'));

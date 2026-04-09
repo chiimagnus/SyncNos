@@ -287,12 +287,11 @@ describe('ConversationDetailPane header actions', () => {
     expect(openBtn).toBeTruthy();
 
     act(() => {
-      openBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
     expect(onTriggerCommentsSidebar).toHaveBeenCalledTimes(1);
-    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith({ quoteText: '', locator: null });
+    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith();
 
     act(() => {
       root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: true }));
@@ -302,7 +301,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(pressedBtn).toBeTruthy();
   });
 
-  it('passes selected message text and locator when opening comments sidebar', () => {
+  it('does not pass selected message text or locator when opening comments sidebar', () => {
     currentState.selectedConversation = {
       id: 13,
       title: 'Article',
@@ -335,15 +334,12 @@ describe('ConversationDetailPane header actions', () => {
     expect(openBtn).toBeTruthy();
 
     act(() => {
-      openBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
     expect(onTriggerCommentsSidebar).toHaveBeenCalledTimes(1);
-    const payload = onTriggerCommentsSidebar.mock.calls[0]?.[0] as any;
-    expect(payload?.quoteText).toBe('beta');
-    expect(payload?.locator).toBeTruthy();
-    expect(payload?.locator?.env).toBe('app');
+    const firstCallArgs = onTriggerCommentsSidebar.mock.calls[0] || [];
+    expect(firstCallArgs.length).toBe(0);
 
     restoreSelection();
   });

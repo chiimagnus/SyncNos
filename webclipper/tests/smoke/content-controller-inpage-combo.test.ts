@@ -71,6 +71,7 @@ function createHarness(options?: {
       },
     },
     notionAiModelPicker: null,
+    itemMention: null,
   });
   controller.start();
 
@@ -89,44 +90,17 @@ afterEach(() => {
 });
 
 describe('content-controller inpage combo', () => {
-  it('does not show fallback tip when comments sidebar open succeeds', async () => {
-    const harness = createHarness({
-      sendImpl: async (type: string) => {
-        if (type === 'openCurrentTabInpageCommentsPanel') return { ok: true, data: { opened: true } };
-        return { ok: true, data: {} };
-      },
-    });
+  it('does not wire double-click callback to open comments sidebar', async () => {
+    const harness = createHarness();
 
     await harness.runTick();
     const cfg = harness.getButtonConfig();
-    expect(typeof cfg?.onDoubleClick).toBe('function');
 
-    await cfg.onDoubleClick();
-
-    expect(harness.sendCalls.some((c) => c.type === 'openCurrentTabInpageCommentsPanel')).toBe(true);
+    expect(cfg?.onDoubleClick).toBeUndefined();
+    expect(harness.sendCalls.some((c) => c.type === 'openCurrentTabInpageCommentsPanel')).toBe(false);
     expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
     expect(harness.tipCalls.some((c) => String(c.text).includes('toolbar icon'))).toBe(false);
-  });
-
-  it('shows fallback tip when comments sidebar open fails', async () => {
-    const harness = createHarness({
-      sendImpl: async (type: string) => {
-        if (type === 'openCurrentTabInpageCommentsPanel') return { ok: false, error: { message: 'unsupported' } };
-        return { ok: true, data: {} };
-      },
-    });
-
-    await harness.runTick();
-    const cfg = harness.getButtonConfig();
-    expect(typeof cfg?.onDoubleClick).toBe('function');
-
-    await cfg.onDoubleClick();
-
-    expect(harness.sendCalls.some((c) => c.type === 'openCurrentTabInpageCommentsPanel')).toBe(true);
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
-    expect(harness.tipCalls.some((c) => String(c.text).includes('toolbar icon'))).toBe(true);
   });
 
   it('emits easter-egg line for combo callback', async () => {

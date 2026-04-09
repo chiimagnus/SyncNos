@@ -166,12 +166,10 @@ export function ConversationsScene({
                 onBack={returnToList}
                 onTriggerCommentsSidebar={
                   canOpenCommentsFromDetail
-                    ? ({ quoteText, locator }) => {
+                    ? () => {
                         if (!commentsSidebarRuntime) return;
                         openComments();
                         void commentsSidebarRuntime.sidebarController.open({
-                          selectionText: String(quoteText || ''),
-                          locator: locator ?? null,
                           focusComposer: true,
                           source: narrowCommentsOpenSource,
                           ensureContext: false,

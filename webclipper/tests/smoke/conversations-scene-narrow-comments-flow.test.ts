@@ -266,8 +266,6 @@ describe('ConversationsScene narrow comments flow', () => {
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
     expect(sidebarOpen).toHaveBeenLastCalledWith({
-      selectionText: '',
-      locator: null,
       focusComposer: true,
       source: 'popup',
       ensureContext: false,
@@ -357,8 +355,6 @@ describe('ConversationsScene narrow comments flow', () => {
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
     expect(sidebarOpen).toHaveBeenLastCalledWith({
-      selectionText: '',
-      locator: null,
       focusComposer: true,
       source: 'popup',
       ensureContext: false,

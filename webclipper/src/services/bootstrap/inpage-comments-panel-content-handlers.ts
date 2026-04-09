@@ -11,13 +11,7 @@ type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
 
-function safeString(value: unknown): string {
-  return String(value || '').trim();
-}
-
-function pickQuoteFromSelection(fallback: unknown): string {
-  const fromPayload = safeString(fallback);
-  if (fromPayload) return fromPayload;
+function pickQuoteFromSelection(): string {
   try {
     const selection = globalThis.getSelection?.();
     const text = selection ? String(selection.toString() || '') : '';
@@ -44,11 +38,11 @@ function pickLocatorFromSelection(): any | null {
   }
 }
 
-function resolveInpageSelectionPayload(fallbackSelectionText?: unknown): {
+function resolveInpageSelectionPayload(): {
   selectionText: string;
   locator: any | null;
 } {
-  const selectionText = pickQuoteFromSelection(fallbackSelectionText);
+  const selectionText = pickQuoteFromSelection();
   if (!selectionText) {
     return { selectionText: '', locator: null };
   }
@@ -61,7 +55,6 @@ function resolveInpageSelectionPayload(fallbackSelectionText?: unknown): {
 export type InpageCommentsPanelController = {
   open: (input?: {
     tabId?: number | null;
-    selectionText?: string | null;
     focusComposer?: boolean;
     ensureArticle?: boolean;
   }) => Promise<void>;
@@ -79,7 +72,6 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
 
   async function open(input?: {
     tabId?: number | null;
-    selectionText?: string | null;
     focusComposer?: boolean;
     ensureArticle?: boolean;
   }) {
@@ -91,12 +83,9 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
     }
 
     lastTabId = normalizePositiveInt(input?.tabId) || lastTabId;
-    const selectionPayload = resolveInpageSelectionPayload(input?.selectionText);
     const ensureArticle = input?.ensureArticle !== false;
 
     await controller.open({
-      selectionText: selectionPayload.selectionText,
-      locator: selectionPayload.locator,
       focusComposer: input?.focusComposer === true,
       source: 'inpage',
       ensureContext: true,
@@ -124,7 +113,6 @@ export function registerInpageCommentsPanelContentHandlers(runtime: RuntimeClien
     void controller
       .open({
         tabId: normalizePositiveInt(msg?.payload?.tabId) || null,
-        selectionText: msg?.payload?.selectionText,
         focusComposer: true,
         ensureArticle: true,
       })

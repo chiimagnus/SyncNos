@@ -44,7 +44,6 @@ export const en = {
   contextMenuRootTitle: 'SyncNos WebClipper',
   contextMenuSaveCurrentPage: 'Save current page',
   contextMenuSaveCurrentAiChat: 'Save current AI chat',
-  contextMenuAddComment: 'Add comment',
   contextMenuInpageGroupTitle: 'Inpage Button',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
@@ -261,7 +260,6 @@ export const en = {
   updatedPrefix: 'Updated: ',
   saved: 'Saved',
   updated: 'Updated',
-  clickToolbarIconToOpenCommentsSidebar: 'Click toolbar icon to comment',
   activeTabNotFound: 'Active tab not found',
   noVisibleConversationFound: 'No visible conversation found',
 

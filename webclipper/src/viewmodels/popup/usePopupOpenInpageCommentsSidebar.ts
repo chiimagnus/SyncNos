@@ -108,7 +108,6 @@ export function usePopupOpenInpageCommentsSidebar() {
       const response = await send<ApiResponse<{ opened: boolean }>>(
         UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
         {
-          selectionText: '',
           source: 'popup',
         },
       );

@@ -46,7 +46,6 @@ export const zh: { [K in TranslationKey]: string } = {
   contextMenuRootTitle: 'SyncNos WebClipper',
   contextMenuSaveCurrentPage: '保存当前页面',
   contextMenuSaveCurrentAiChat: '保存当前 AI 对话',
-  contextMenuAddComment: '添加评论',
   contextMenuInpageGroupTitle: '页面内按钮',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',
@@ -257,7 +256,6 @@ export const zh: { [K in TranslationKey]: string } = {
   updatedPrefix: '已更新：',
   saved: '已保存',
   updated: '已更新',
-  clickToolbarIconToOpenCommentsSidebar: '请点击工具栏图标进行评论',
   activeTabNotFound: '未找到当前标签页',
   noVisibleConversationFound: '未找到可见对话',
 
