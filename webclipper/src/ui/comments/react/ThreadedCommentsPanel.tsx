@@ -39,6 +39,32 @@ function formatTime(ts: number | null | undefined): string {
   }
 }
 
+function buildNodePathSignature(node: Node | null | undefined): string {
+  if (!node) return '';
+  const parts: string[] = [];
+  let cursor: Node | null = node;
+  let depth = 0;
+  while (cursor && depth < 12) {
+    const parentNode: Node | null = cursor.parentNode;
+    const index = parentNode ? Array.prototype.indexOf.call(parentNode.childNodes, cursor) : -1;
+    parts.push(`${cursor.nodeType}:${index}`);
+    cursor = parentNode;
+    depth += 1;
+  }
+  return parts.reverse().join('/');
+}
+
+function buildSelectionSignature(selection: Selection | null | undefined): string {
+  if (!selection || Number(selection.rangeCount || 0) <= 0) return 'empty';
+  const text = String(selection.toString() || '').trim();
+  if (!text) return 'empty';
+  const anchorPath = buildNodePathSignature(selection.anchorNode);
+  const focusPath = buildNodePathSignature(selection.focusNode);
+  const anchorOffset = Number(selection.anchorOffset || 0);
+  const focusOffset = Number(selection.focusOffset || 0);
+  return `${text}#${anchorPath}:${anchorOffset}|${focusPath}:${focusOffset}`;
+}
+
 export function ThreadedCommentsPanel({
   variant,
   fullWidth,
@@ -82,6 +108,8 @@ export function ThreadedCommentsPanel({
   const composerTextRef = useRef('');
   const lastFocusedComposerSignalRef = useRef(0);
   const lastHandledEscapeSignalRef = useRef(0);
+  const lastAutoSelectionSignatureRef = useRef('');
+  const suppressEmptyAutoSelectionUntilRef = useRef(0);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
@@ -190,6 +218,53 @@ export function ThreadedCommentsPanel({
     });
   };
 
+  const isPanelTextInputFocused = () => {
+    const composer = composerTextareaRef.current;
+    let activeElement: Element | null = null;
+    const rootNode = composer?.getRootNode?.();
+    if (rootNode && typeof (rootNode as ShadowRoot).activeElement !== 'undefined') {
+      activeElement = ((rootNode as ShadowRoot).activeElement as Element | null) ?? null;
+    } else {
+      activeElement = (document.activeElement as Element | null) ?? null;
+    }
+    if (!activeElement) return false;
+    try {
+      return Boolean(
+        activeElement.closest(
+          '.webclipper-inpage-comments-panel__composer-textarea,.webclipper-inpage-comments-panel__reply-textarea',
+        ),
+      );
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  const requestComposerSelection = useCallback(
+    (trigger: 'button' | 'auto', autoSignature?: string | null) => {
+      if (trigger === 'auto') {
+        const normalizedSignature = String(autoSignature || 'empty');
+        if (normalizedSignature === 'empty') {
+          if (isPanelTextInputFocused()) return;
+          const suppressUntil = Number(suppressEmptyAutoSelectionUntilRef.current || 0);
+          if (Date.now() <= suppressUntil) return;
+        }
+        if (normalizedSignature === lastAutoSelectionSignatureRef.current) return;
+        lastAutoSelectionSignatureRef.current = normalizedSignature;
+      }
+      const latestHandlers = readHandlers?.() || snapshot.handlers;
+      const handler = latestHandlers.onComposerSelectionRequest;
+      if (typeof handler !== 'function') return;
+      void Promise.resolve(handler({ trigger })).catch(() => {
+        // ignore
+      });
+    },
+    [readHandlers, snapshot.handlers],
+  );
+
+  const suppressNextEmptyAutoSelection = () => {
+    suppressEmptyAutoSelectionUntilRef.current = Date.now() + 320;
+  };
+
   const updateArmedDeleteId = useCallback(
     (next: number | null) => {
       armedDeleteIdRef.current = next;
@@ -239,6 +314,30 @@ export function ThreadedCommentsPanel({
     focusComposer();
     lastFocusedComposerSignalRef.current = signal;
   }, [busy, snapshot.focusComposerSignal]);
+
+  useLayoutEffect(() => {
+    if (!snapshot.open) {
+      lastAutoSelectionSignatureRef.current = '';
+      return;
+    }
+    const latestHandlers = readHandlers?.() || snapshot.handlers;
+    if (typeof latestHandlers.onComposerSelectionRequest !== 'function') return;
+
+    const onSelectionChange = () => {
+      let signature = 'empty';
+      try {
+        signature = buildSelectionSignature(globalThis.getSelection?.());
+      } catch (_error) {
+        signature = 'empty';
+      }
+      requestComposerSelection('auto', signature);
+    };
+
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  }, [readHandlers, requestComposerSelection, snapshot.handlers, snapshot.open]);
 
   useLayoutEffect(() => {
     const signal = Number(snapshot.escapeSignal || 0);
@@ -567,6 +666,12 @@ export function ThreadedCommentsPanel({
             placeholder="Write a comment…"
             rows={1}
             value={composerText}
+            onPointerDown={() => {
+              suppressNextEmptyAutoSelection();
+            }}
+            onFocus={() => {
+              suppressNextEmptyAutoSelection();
+            }}
             onInput={(event) => updateComposerText(event.currentTarget.value)}
             onChange={(event) => updateComposerText(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -765,6 +870,12 @@ export function ThreadedCommentsPanel({
                       placeholder="Reply…"
                       rows={1}
                       value={replyTexts[rootId] || ''}
+                      onPointerDown={() => {
+                        suppressNextEmptyAutoSelection();
+                      }}
+                      onFocus={() => {
+                        suppressNextEmptyAutoSelection();
+                      }}
                       onInput={(event) => {
                         updateReplyText(rootId, event.currentTarget.value);
                         autosizeTextarea(event.currentTarget);

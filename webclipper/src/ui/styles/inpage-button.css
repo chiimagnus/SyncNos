@@ -43,7 +43,7 @@
 }
 
 .webclipper-inpage-btn.is-idle {
-  opacity: 0.10;
+  opacity: 0.1;
 }
 
 .webclipper-inpage-btn.is-dragging:hover {

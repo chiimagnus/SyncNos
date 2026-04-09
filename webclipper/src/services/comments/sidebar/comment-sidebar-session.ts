@@ -193,6 +193,11 @@ export function createCommentSidebarSession(initialPanel?: CommentSidebarPanelAp
         return res as any;
       };
     }
+    if (typeof base.onComposerSelectionRequest === 'function') {
+      wrapped.onComposerSelectionRequest = async (input) => {
+        await base.onComposerSelectionRequest?.(input);
+      };
+    }
     handlers = wrapped;
     try {
       panel?.setHandlers(handlers);

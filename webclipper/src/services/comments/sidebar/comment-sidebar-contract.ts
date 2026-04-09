@@ -17,11 +17,16 @@ export type CommentSidebarItem = {
 
 export type CommentSaveResult = void | boolean | { ok: boolean; createdRootId?: number | null };
 
+export type CommentSidebarComposerSelectionRequest = {
+  trigger: 'button' | 'auto';
+};
+
 export type CommentSidebarHandlers = {
   onSave?: (text: string) => CommentSaveResult | Promise<CommentSaveResult>;
   onReply?: (parentId: number, text: string) => void | Promise<void>;
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
+  onComposerSelectionRequest?: (input: CommentSidebarComposerSelectionRequest) => void | Promise<void>;
 };
 
 export type CommentSidebarPanelApi = {

@@ -1,5 +1,6 @@
 import type {
   CommentSidebarHandlers,
+  CommentSidebarComposerSelectionRequest,
   CommentSidebarSession,
 } from '@services/comments/sidebar/comment-sidebar-contract';
 import { normalizeCommentSidebarQuoteText } from '@services/comments/sidebar/comment-sidebar-session';
@@ -20,6 +21,11 @@ export type ArticleCommentsSidebarControllerOpenInput = {
   source?: string;
   ensureContext?: boolean;
   ensureContextInput?: ArticleCommentsSidebarEnsureContextInput;
+};
+
+export type ArticleCommentsSidebarControllerComposerSelectionPayload = {
+  selectionText?: string | null;
+  locator?: unknown;
 };
 
 export type ArticleCommentsSidebarController = {
@@ -61,6 +67,13 @@ export function createArticleCommentsSidebarController(input: {
   session: CommentSidebarSession;
   adapter: ArticleCommentsSidebarAdapter;
   onClose?: () => void;
+  resolveComposerSelection?: (
+    request: CommentSidebarComposerSelectionRequest,
+  ) =>
+    | ArticleCommentsSidebarControllerComposerSelectionPayload
+    | null
+    | undefined
+    | Promise<ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined>;
 }): ArticleCommentsSidebarController {
   const session = input.session;
   const adapter = input.adapter;
@@ -70,6 +83,13 @@ export function createArticleCommentsSidebarController(input: {
   let lastEnsureContextInput: ArticleCommentsSidebarEnsureContextInput | undefined;
   let pendingRootLocator: ArticleCommentLocator | null = null;
   let refreshRunId = 0;
+  let composerSelectionRequestSeq = 0;
+
+  const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
+    const quoteText = normalizeCommentSidebarQuoteText(payload?.selectionText);
+    session.setQuoteText(quoteText);
+    pendingRootLocator = quoteText ? normalizeLocator(payload?.locator) : null;
+  };
 
   const ensureContext = async (
     ensure: boolean,
@@ -168,6 +188,33 @@ export function createArticleCommentsSidebarController(input: {
         await adapter.delete({ id: commentId });
         await refresh();
       },
+      onComposerSelectionRequest: async (request) => {
+        const resolveComposerSelection = input.resolveComposerSelection;
+        if (typeof resolveComposerSelection !== 'function') return;
+        const requestSeq = ++composerSelectionRequestSeq;
+        const applyIfLatest = (
+          payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined,
+        ) => {
+          if (requestSeq !== composerSelectionRequestSeq) return;
+          applyComposerSelection(payload ?? { selectionText: '', locator: null });
+        };
+        try {
+          const resolved = resolveComposerSelection(request);
+          if (resolved && typeof (resolved as PromiseLike<unknown>).then === 'function') {
+            void Promise.resolve(resolved)
+              .then((payload) => {
+                applyIfLatest(payload as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
+              })
+              .catch(() => {
+                applyIfLatest({ selectionText: '', locator: null });
+              });
+            return;
+          }
+          applyIfLatest(resolved as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
+        } catch (_error) {
+          applyIfLatest({ selectionText: '', locator: null });
+        }
+      },
     };
 
     session.setHandlers(handlers);
@@ -177,8 +224,9 @@ export function createArticleCommentsSidebarController(input: {
 
   const open = async (openInput?: ArticleCommentsSidebarControllerOpenInput) => {
     const selectionText = openInput?.selectionText;
-    if (selectionText != null) session.setQuoteText(normalizeCommentSidebarQuoteText(selectionText));
-    if (selectionText != null) pendingRootLocator = normalizeLocator(openInput?.locator);
+    if (selectionText != null) {
+      applyComposerSelection({ selectionText, locator: openInput?.locator });
+    }
     session.requestOpen({ focusComposer: openInput?.focusComposer === true, source: openInput?.source });
 
     const shouldEnsureContext = openInput?.ensureContext !== false;

@@ -78,6 +78,27 @@ describe('inpage-button click combos', () => {
     expect(calls).toEqual(['double']);
   });
 
+  it('resets combo window after double-click so subsequent single click can still save', () => {
+    const api = loadInpageButton();
+    const calls: string[] = [];
+
+    api.ensureInpageButton({
+      collectorId: 'gemini',
+      onClick: () => calls.push('save'),
+      onDoubleClick: () => calls.push('double'),
+    });
+
+    const btn = document.getElementById('webclipper-inpage-btn');
+    btn?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    btn?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    vi.advanceTimersByTime(401);
+
+    btn?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    vi.advanceTimersByTime(401);
+
+    expect(calls).toEqual(['double', 'save']);
+  });
+
   it('uses highest combo level and suppresses double when count >= 3', () => {
     const api = loadInpageButton();
     const calls: string[] = [];

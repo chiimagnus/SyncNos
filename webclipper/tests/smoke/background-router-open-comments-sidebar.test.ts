@@ -20,7 +20,7 @@ describe('background-router open inpage comments sidebar', () => {
     const res = await router.__handleMessageForTests(
       {
         type: 'openCurrentTabInpageCommentsPanel',
-        selectionText: 'double clicked quote',
+        source: 'popup',
       },
       { tab: { id: 17 } },
     );
@@ -30,9 +30,21 @@ describe('background-router open inpage comments sidebar', () => {
       type: 'openInpageCommentsPanel',
       payload: {
         tabId: 17,
-        selectionText: 'double clicked quote',
-        source: 'doubleclick',
+        source: 'popup',
       },
     });
+  });
+
+  it('returns error when sender tab id is unavailable and does not relay', async () => {
+    const router = createTestBackgroundRouter();
+    const res = await router.__handleMessageForTests(
+      {
+        type: 'openCurrentTabInpageCommentsPanel',
+      },
+      { tab: undefined },
+    );
+
+    expect(res.ok).toBe(false);
+    expect(tabsSendMessage).not.toHaveBeenCalled();
   });
 });

@@ -104,6 +104,7 @@ describe('ArticleCommentsSection shared chrome', () => {
     const shadow = host?.shadowRoot;
     expect(shadow).toBeTruthy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__header-title')?.textContent).toBe('Comments');
+    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__collapse')).toBeFalsy();
     expect(document.querySelector('section')).toBeTruthy();
   });

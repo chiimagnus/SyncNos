@@ -46,7 +46,6 @@ export const zh: { [K in TranslationKey]: string } = {
   contextMenuRootTitle: 'SyncNos WebClipper',
   contextMenuSaveCurrentPage: '保存当前页面',
   contextMenuSaveCurrentAiChat: '保存当前 AI 对话',
-  contextMenuAddComment: '添加评论',
   contextMenuInpageGroupTitle: '页面内按钮',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',
@@ -213,6 +212,7 @@ export const zh: { [K in TranslationKey]: string } = {
   openCommentsSidebarTooltip: '打开评论侧边栏',
   commentsSidebarArticleOnlyHint: '仅支持在网页文章中使用评论侧边栏',
   commentsSidebarUnavailableHint: '当前页面不支持打开评论侧边栏',
+  attachSelectedQuote: '附加选区',
   tooltipCommentSendDetailed: '发送评论',
   tooltipReplySendDetailed: '发送回复（Ctrl/Cmd + Enter）',
   tooltipDeleteCommentDetailed: '删除评论',
@@ -256,7 +256,6 @@ export const zh: { [K in TranslationKey]: string } = {
   updatedPrefix: '已更新：',
   saved: '已保存',
   updated: '已更新',
-  clickToolbarIconToOpenCommentsSidebar: '请点击工具栏图标进行评论',
   activeTabNotFound: '未找到当前标签页',
   noVisibleConversationFound: '未找到可见对话',
 

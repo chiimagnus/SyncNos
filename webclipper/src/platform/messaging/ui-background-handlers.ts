@@ -37,8 +37,7 @@ export function registerUiMessageHandlers(router: AnyRouter) {
         type: CONTENT_MESSAGE_TYPES.OPEN_INPAGE_COMMENTS_PANEL,
         payload: {
           tabId,
-          selectionText: String((msg as any)?.selectionText || ''),
-          source: String((msg as any)?.source || 'doubleclick'),
+          source: String((msg as any)?.source || 'popup'),
         },
       });
       return router.ok({ opened: true });

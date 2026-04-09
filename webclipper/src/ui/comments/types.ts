@@ -10,6 +10,10 @@ export type ThreadedCommentItem = {
 
 export type CommentSaveResult = void | boolean | { ok: boolean; createdRootId?: number | null };
 
+export type ThreadedCommentsPanelComposerSelectionRequest = {
+  trigger: 'button' | 'auto';
+};
+
 export type ThreadedCommentsPanelApi = {
   open: (input?: { focusComposer?: boolean }) => void;
   close: () => void;
@@ -22,6 +26,7 @@ export type ThreadedCommentsPanelApi = {
     onReply?: (parentId: number, text: string) => void | Promise<void>;
     onDelete?: (id: number) => void | Promise<void>;
     onClose?: () => void;
+    onComposerSelectionRequest?: (input: ThreadedCommentsPanelComposerSelectionRequest) => void | Promise<void>;
   }) => void;
 };
 

@@ -113,6 +113,7 @@ export function mountThreadedCommentsPanel(
       onReply: undefined,
       onDelete: undefined,
       onClose: undefined,
+      onComposerSelectionRequest: undefined,
     },
   };
 
@@ -413,6 +414,7 @@ export function mountThreadedCommentsPanel(
         onReply: undefined,
         onDelete: undefined,
         onClose: undefined,
+        onComposerSelectionRequest: undefined,
       };
       syncReactUpdate(() => {
         panelStore.setHandlers(handlersRef.current);

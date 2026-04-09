@@ -8,8 +8,6 @@ import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
-import type { ArticleCommentLocator } from '@services/comments/domain/models';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -47,7 +45,7 @@ export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
   onExpandSidebar?: () => void;
-  onTriggerCommentsSidebar?: (input: { quoteText: string; locator: ArticleCommentLocator | null }) => void;
+  onTriggerCommentsSidebar?: () => void;
   onCommentsLocatorRootChange?: (root: Element | null) => void;
   commentsSidebarOpen?: boolean;
 };
@@ -94,8 +92,6 @@ export function ConversationDetailPane({
     },
     [onCommentsLocatorRootChange],
   );
-  const selectionQuoteRef = useRef<string>('');
-  const selectionLocatorRef = useRef<ArticleCommentLocator | null>(null);
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
@@ -152,41 +148,6 @@ export function ConversationDetailPane({
   const saveUrlDraft = async () => {
     await updateSelectedConversationUrl(String(urlDraft || ''));
     setUrlEditing(false);
-  };
-
-  const readSelectionQuote = (): string => {
-    const root = messagesRootRef.current;
-    if (!root) return '';
-    try {
-      const sel = globalThis.getSelection?.();
-      if (!sel || sel.rangeCount <= 0) return '';
-      const text = String(sel.toString() || '').trim();
-      if (!text) return '';
-      const anchor = sel.anchorNode as any as Node | null;
-      const focus = sel.focusNode as any as Node | null;
-      if (anchor && !root.contains(anchor)) return '';
-      if (focus && !root.contains(focus)) return '';
-      return text;
-    } catch (_e) {
-      return '';
-    }
-  };
-
-  const readSelectionRange = (): Range | null => {
-    const root = messagesRootRef.current;
-    if (!root) return null;
-    try {
-      const sel = globalThis.getSelection?.();
-      if (!sel || sel.rangeCount <= 0) return null;
-      const range = sel.getRangeAt(0);
-      const anchor = sel.anchorNode as any as Node | null;
-      const focus = sel.focusNode as any as Node | null;
-      if (anchor && !root.contains(anchor)) return null;
-      if (focus && !root.contains(focus)) return null;
-      return range.cloneRange();
-    } catch (_e) {
-      return null;
-    }
   };
 
   return (
@@ -343,29 +304,8 @@ export function ConversationDetailPane({
               {onTriggerCommentsSidebar ? (
                 <button
                   type="button"
-                  onMouseDown={(e) => {
-                    selectionQuoteRef.current = readSelectionQuote();
-                    selectionLocatorRef.current = null;
-                    const range = readSelectionRange();
-                    if (range && messagesRootRef.current) {
-                      const locatorRoot = messagesRootRef.current;
-                      selectionLocatorRef.current = buildArticleCommentLocatorFromRange({
-                        env: 'app',
-                        root: locatorRoot,
-                        range,
-                      });
-                    }
-                    // Avoid the button stealing focus and potentially collapsing selection before we read it.
-                    try {
-                      e.preventDefault();
-                    } catch (_e2) {
-                      // ignore
-                    }
-                  }}
                   onClick={() => {
-                    const quoteText = String(selectionQuoteRef.current || '').trim();
-                    // When no selection, explicitly clear the quote.
-                    onTriggerCommentsSidebar({ quoteText, locator: selectionLocatorRef.current });
+                    onTriggerCommentsSidebar();
                   }}
                   className={headerButtonClassName()}
                   aria-label={commentsSidebarLabel}

@@ -79,6 +79,7 @@
 - `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
 - `anti_hotlink_rules_v1` 由 `AntiHotlinkDomainsEditor` 维护；文章抓取命中规则时会自动走图片缓存链路，即使 `web_article_cache_images_enabled` 关闭也不会把整页抓取变成失败。
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击打开页面内评论侧边栏，多击只触发彩蛋动画与提示。
+- 评论侧边栏打开后，页面 `selectionchange` 会自动附加当前选区；reply 输入框不触发附加，也不触发“空选区清空”。
 - Google AI Studio 由于虚拟化渲染，自动保存常常不完整；collector 与 controller 已经显式把它改为“手动保存优先”。
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
 - article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，并会在 article 同步时进入 Notion / Obsidian 的评论区段，同时进入 Zip v2 备份 / 恢复；如果你改 comments 流程，一定同时看 storage、background handler、shared session、inpage 面板和 backup 目录。
@@ -124,6 +125,7 @@
 - Chat with AI 配置是新的一级设置分区，默认持久化 `chat_with_prompt_template_v1`, `chat_with_ai_platforms_v1`, `chat_with_max_chars_v1`，支持自定义平台、模板变量和截断长度。
 - detail header 的 `Chat with AI` 动作并不固定只有一个：只要某个平台在设置中 `enabled = true` 且当前 detail 有可用 messages，就会生成对应 `Chat with <platform>` 按钮；触发时先复制 payload，再打开平台首页。
 - article comments 只在 article detail 和 inpage panel 中出现；它们是本地评论线程，不占用 `Chat with AI`、`tools` 或 `open` 的动作槽位。
+- article comments 的“选区附加引用”属于根输入框行为：根输入框交互可覆盖/清空引用，reply 输入框仅负责回复文本输入，不应影响引用区。
 - detail header 的动作槽位由 `detail-header-action-types.ts` 统一定义为 `open / tools`；`ConversationDetailPane` 与 `DetailNavigationHeader` 都按同一槽位拆分渲染，Chat with AI 动作也落在 `tools`。
 - `conversations-context.tsx` 会在当前会话可用时注入 `cache-images` 工具动作：点击后调用 `backfillConversationImages()`，后台复扫消息并在成功后刷新当前 detail，同时反馈 `updatedMessages / downloadedCount / fromCacheCount`。
 - `src/viewmodels/settings/useSettingsSceneController.ts` 只在 `activeSection === 'aboutyou'` 且尚未加载过时调用 `getInsightStats()`；统计失败只回到设置页内的错误态，不会额外写缓存或发网络请求。

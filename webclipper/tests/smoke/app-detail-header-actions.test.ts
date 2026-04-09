@@ -33,7 +33,7 @@ const currentState = {
 };
 
 vi.mock('../../src/ui/shared/ChatMessageBubble', () => ({
-  ChatMessageBubble: () => createElement('div', null, 'message'),
+  ChatMessageBubble: ({ markdown }: { markdown?: string }) => createElement('div', null, String(markdown || 'message')),
 }));
 
 vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
@@ -78,6 +78,10 @@ function setupDom() {
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: dom.window.getSelection.bind(dom.window),
+  });
   Object.defineProperty(globalThis, 'getComputedStyle', {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
@@ -95,8 +99,38 @@ function cleanupDom() {
   delete (globalThis as any).HTMLElement;
   delete (globalThis as any).Node;
   delete (globalThis as any).localStorage;
+  delete (globalThis as any).getSelection;
   delete (globalThis as any).getComputedStyle;
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+}
+
+function mockSelectionRange(textNode: Text, start: number, end: number): () => void {
+  const range = document.createRange();
+  range.setStart(textNode, start);
+  range.setEnd(textNode, end);
+
+  const quote = String(textNode.textContent || '').slice(start, end);
+  const selectionMock = {
+    rangeCount: 1,
+    anchorNode: textNode,
+    focusNode: textNode,
+    toString: () => quote,
+    getRangeAt: () => range,
+    removeAllRanges: () => {},
+    addRange: () => {},
+  } as any;
+
+  const spy = vi.spyOn(globalThis, 'getSelection').mockImplementation(() => selectionMock as Selection);
+  return () => spy.mockRestore();
+}
+
+function findTextNodeContaining(root: ParentNode, needle: string): Text | null {
+  const walker = document.createTreeWalker(root as Node, window.NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    if (String(node.textContent || '').includes(needle)) return node;
+  }
+  return null;
 }
 
 describe('ConversationDetailPane header actions', () => {
@@ -253,12 +287,11 @@ describe('ConversationDetailPane header actions', () => {
     expect(openBtn).toBeTruthy();
 
     act(() => {
-      openBtn!.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
     expect(onTriggerCommentsSidebar).toHaveBeenCalledTimes(1);
-    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith({ quoteText: '', locator: null });
+    expect(onTriggerCommentsSidebar).toHaveBeenCalledWith();
 
     act(() => {
       root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: true }));
@@ -266,6 +299,49 @@ describe('ConversationDetailPane header actions', () => {
 
     const pressedBtn = document.querySelector('[aria-label="Comment"][aria-pressed="true"]');
     expect(pressedBtn).toBeTruthy();
+  });
+
+  it('does not pass selected message text or locator when opening comments sidebar', () => {
+    currentState.selectedConversation = {
+      id: 13,
+      title: 'Article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-13',
+      url: 'https://example.com/article-13',
+    } as any;
+    currentState.detail = {
+      conversationId: 13,
+      messages: [{ id: 'm-1', role: 'assistant', contentText: 'Alpha beta gamma' }],
+    } as any;
+    currentState.detailHeaderActions = [];
+
+    const onTriggerCommentsSidebar = vi.fn();
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane, { onTriggerCommentsSidebar, commentsSidebarOpen: false }));
+    });
+
+    const textNode = findTextNodeContaining(document.body, 'Alpha beta gamma');
+    expect(textNode).toBeTruthy();
+
+    const full = String(textNode?.textContent || '');
+    const start = full.indexOf('beta');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const restoreSelection = mockSelectionRange(textNode!, start, start + 'beta'.length);
+
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onTriggerCommentsSidebar).toHaveBeenCalledTimes(1);
+    const firstCallArgs = onTriggerCommentsSidebar.mock.calls[0] || [];
+    expect(firstCallArgs.length).toBe(0);
+
+    restoreSelection();
   });
 
   it('keeps the comments toggle in the same header row as title metadata container', () => {

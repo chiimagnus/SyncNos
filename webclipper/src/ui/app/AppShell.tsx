@@ -415,16 +415,13 @@ export default function AppShell() {
       showSettingsSheet,
     ]);
 
-    const triggerCommentsSidebar = (input: { quoteText: string; locator: any | null }) => {
+    const triggerCommentsSidebar = () => {
       if (isMedium) {
         setMediumCommentsCollapsed(false);
       } else if (isWide) {
         setWideCommentsCollapsed(false);
       }
-      const quoteText = String(input?.quoteText || '').trim();
       void commentsSidebarController.open({
-        selectionText: quoteText,
-        locator: input?.locator ?? null,
         focusComposer: true,
         source: 'app',
         ensureContext: false,
