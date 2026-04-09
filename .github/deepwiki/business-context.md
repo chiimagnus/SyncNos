@@ -34,6 +34,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 2. 扩展向页面注入 `readability.js`，尝试抽取标题、作者、发布时间、正文和 markdown 文本。
 3. 抓取结果被保存为 `sourceType = article` 的本地会话，并写入单条 `article_body` 消息。
 4. 后续 Notion / Obsidian / 备份 / 导出都把 article 当作与 chat 并列的一种会话类型处理；用户也可以在 article detail 或 inpage comments panel 里留下本地注释线程，这些评论会随 article 同步进入 Notion / Obsidian 的评论区段，并随 Zip v2 备份 / 导入保留。
+5. 当评论侧栏已打开时，根输入框会尝试自动附加当前选区（同一交互去重）；若无选区则清空引用；reply 输入框不会触发附加/清空。
 
 ### 旅程 3：用户在 Settings 里查看自己的本地积累到底有多大
 1. 用户可以直接进入 WebClipper 的 `Settings → Insight`，也可以从会话列表底部 `today/total` 统计点击跳转到该分区。
@@ -63,7 +64,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 | **敏感信息尽量不出本机** | WebClipper 备份 | 站点 Cookie、加密密钥、Notion OAuth token 都不能随意进备份或明文落盘 | 备份显式排除 `notion_oauth_token*` 与 `notion_oauth_client_secret` |
 | **采集站点 ≠ UI 一定显示** | WebClipper inpage 逻辑 | 扩展虽然对所有 `http(s)` 注入 content script，但 inpage 按钮是否启动还受 `inpage_display_mode` 控制 | 切换该设置后必须刷新或新开页面；旧 `inpage_supported_only` 只做兼容回读 |
 | **并非所有站点都适合自动增量采集** | Google AI Studio collector | 虚拟列表会导致自动采集只看到可见消息 | 该来源保留"手动保存优先"的策略 |
-| **评论操作需防重入** | Comments React 模块 | 评论保存/回复/删除如果并发会引发竞态和重复提交 | 使用 `actionInFlightRef` 和 `runBusyTask` 做防重入保护；删除改为二次确认模式 |
+| **评论操作需防重入且保持 root-only 选区语义** | Comments React 模块 | 评论保存/回复/删除如果并发会引发竞态和重复提交；reply 输入误触会污染引用区 | 使用 `actionInFlightRef` 和 `runBusyTask` 做防重入保护；删除改为二次确认模式；仅根输入框允许附加/清空选区引用 |
 | **评论级 Chat with AI 复制整条线程** | `chatwith-comment-actions.ts` | 单条评论发送到 AI 平台时需要带上下文才有意义 | 评论级 Chat with AI 会把该评论及其所有回复一起打包复制，而非仅复制单条 |
 
 ## 仓库级术语

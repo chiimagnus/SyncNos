@@ -97,6 +97,18 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
 - deep-link `loc`、Insight 跳转与外部打开必须走 provider 精确打开链路（`openConversationExternalByLoc/openConversationExternalBySourceKey/openConversationExternalById`），不能再依赖 `items.find()`。
 - 窄屏 list/detail 桥接使用 `pending-open.ts` 的一次性 `sessionStorage` payload（`conversationId` 必填，可附带 `source + conversationKey`）；消费后立即删除，避免重复复用旧目标。
 
+## 评论侧栏选区附加契约
+
+- 行为边界（真源）：`webclipper/src/ui/comments/react/ThreadedCommentsPanel.tsx` + `webclipper/src/services/comments/sidebar/article-comments-sidebar-controller.ts`。
+- 仅根输入框（root composer）可以触发自动附加选区；reply 输入框不得触发附加或清空。
+- 触发时机：根输入框 `pointerdown / focus`，并对同一交互去重（避免一次点击触发两次附加）。
+- 空选区语义：允许由根输入框交互触发“清空引用（quote + locator）”；reply 交互不能污染引用区。
+- 调整此行为时必须同时回归：
+  - `tests/unit/threaded-comments-panel-auto-attach-selection.test.ts`
+  - `tests/unit/article-comments-sidebar-controller.test.ts`
+  - `tests/smoke/app-shell-comments-sidebar.test.ts`
+  - `tests/smoke/inpage-comments-sidebar-toggle.test.ts`
+
 ## `$` mention（在其他 AI chats 输入框插入本地 item）
 
 - 开关：`ai_chat_dollar_mention_enabled`（`Settings → General`，默认 `true`）。该开关由 `src/services/bootstrap/content-controller.ts` 监听 `chrome.storage.onChanged`，通常可在当前标签页热更新启停；但若当前页面未启动 content controller（例如 `inpage_display_mode=off`），仍需刷新页面或重新进入支持站点。
