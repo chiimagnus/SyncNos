@@ -104,6 +104,8 @@ describe('content-controller inpage combo', () => {
     await cfg.onDoubleClick();
 
     expect(harness.sendCalls.some((c) => c.type === 'openCurrentTabInpageCommentsPanel')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
     expect(harness.tipCalls.some((c) => String(c.text).includes('toolbar icon'))).toBe(false);
   });
 
@@ -122,6 +124,8 @@ describe('content-controller inpage combo', () => {
     await cfg.onDoubleClick();
 
     expect(harness.sendCalls.some((c) => c.type === 'openCurrentTabInpageCommentsPanel')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
     expect(harness.tipCalls.some((c) => String(c.text).includes('toolbar icon'))).toBe(true);
   });
 

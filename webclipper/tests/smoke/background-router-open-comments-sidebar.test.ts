@@ -35,4 +35,18 @@ describe('background-router open inpage comments sidebar', () => {
       },
     });
   });
+
+  it('returns error when sender tab id is unavailable and does not relay', async () => {
+    const router = createTestBackgroundRouter();
+    const res = await router.__handleMessageForTests(
+      {
+        type: 'openCurrentTabInpageCommentsPanel',
+        selectionText: 'quote',
+      },
+      { tab: undefined },
+    );
+
+    expect(res.ok).toBe(false);
+    expect(tabsSendMessage).not.toHaveBeenCalled();
+  });
 });
