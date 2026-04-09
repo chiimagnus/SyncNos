@@ -44,6 +44,20 @@ function pickLocatorFromSelection(): any | null {
   }
 }
 
+function resolveInpageSelectionPayload(fallbackSelectionText?: unknown): {
+  selectionText: string;
+  locator: any | null;
+} {
+  const selectionText = pickQuoteFromSelection(fallbackSelectionText);
+  if (!selectionText) {
+    return { selectionText: '', locator: null };
+  }
+  return {
+    selectionText,
+    locator: pickLocatorFromSelection(),
+  };
+}
+
 export type InpageCommentsPanelController = {
   open: (input?: {
     tabId?: number | null;
@@ -58,6 +72,7 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
   const controller = createArticleCommentsSidebarController({
     session: sidebarSession,
     adapter: createArticleCommentsSidebarInpageAdapter(runtime),
+    resolveComposerSelection: () => resolveInpageSelectionPayload(),
   });
 
   let lastTabId: number | null = null;
@@ -76,13 +91,12 @@ export function createInpageCommentsPanelController(runtime: RuntimeClient | nul
     }
 
     lastTabId = normalizePositiveInt(input?.tabId) || lastTabId;
-    const quoteText = pickQuoteFromSelection(input?.selectionText);
-    const locator = quoteText ? pickLocatorFromSelection() : null;
+    const selectionPayload = resolveInpageSelectionPayload(input?.selectionText);
     const ensureArticle = input?.ensureArticle !== false;
 
     await controller.open({
-      selectionText: quoteText,
-      locator,
+      selectionText: selectionPayload.selectionText,
+      locator: selectionPayload.locator,
       focusComposer: input?.focusComposer === true,
       source: 'inpage',
       ensureContext: true,
