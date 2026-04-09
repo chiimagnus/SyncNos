@@ -108,7 +108,7 @@
 | --- | --- | --- |
 | 会话列表 / 详情 | `src/ui/conversations/ConversationsScene.tsx`, `src/ui/conversations/ConversationDetailPane.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/viewmodels/conversations/conversations-context.tsx`, `src/services/integrations/detail-header-actions.ts` | popup 与 app 共享同一套会话读取、选择与 detail header 动作解析逻辑（含窄屏头部） |
 | 文章评论区 | `src/ui/conversations/ConversationDetailPane.tsx`, `src/ui/conversations/ArticleCommentsSection.tsx`, `src/services/comments/threaded-comments-panel.ts`, `src/ui/inpage/inpage-comments-panel-shadow.ts` | article detail / inpage comments panel 共享本地 threaded comments 线程 |
-| 设置页 | `src/ui/settings/SettingsScene.tsx`, `src/ui/settings/SettingsSidebarNav.tsx`, `src/viewmodels/settings/types.ts` | 真实设置中枢，按 `Features / Data / About` 分组组织 `General`、`Chat with AI`、`Backup`、`Notion`、`Obsidian`、`About You`、`About Me`（section key：`aboutyou/aboutme`，兼容旧 `insight/about`） |
+| 设置页 | `src/ui/settings/SettingsScene.tsx`, `src/ui/settings/SettingsTopTabsNav.tsx`, `src/ui/settings/SettingsSidebarNav.tsx`, `src/viewmodels/settings/types.ts` | 真实设置中枢：窄屏走顶部标签导航、宽屏走侧边栏导航；分组覆盖 `General`、`Chat with AI`、`Backup`、`Notion`、`Obsidian`、`About You`、`About Me`（section key：`aboutyou/aboutme`，兼容旧 `insight/about`） |
 | Markdown 渲染 | `src/ui/shared/markdown.ts`, `src/ui/shared/ChatMessageBubble.tsx` | 统一消息气泡与导出文本显示 |
 | Chat with AI | `src/ui/settings/sections/ChatWithAiSection.tsx`, `src/services/integrations/chatwith/chatwith-settings.ts`, `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | 管理 prompt 模板、平台列表、最大字符数，并把 article / conversation 渲染为可复制载荷，再从 detail header 触发复制 + 跳转 |
 | 详情工具动作 | `src/viewmodels/conversations/conversations-context.tsx`, `src/ui/conversations/DetailHeaderActionBar.tsx`, `src/ui/conversations/DetailNavigationHeader.tsx`, `src/services/conversations/background/image-backfill-job.ts` | detail 可注入 `cache-images`；触发后回填图片并刷新详情 |
@@ -225,6 +225,7 @@
 - `webclipper/src/services/sync/obsidian/obsidian-markdown-writer.ts`
 - `webclipper/src/viewmodels/settings/useSettingsSceneController.ts`
 - `webclipper/src/ui/settings/SettingsScene.tsx`
+- `webclipper/src/ui/settings/SettingsTopTabsNav.tsx`
 - `webclipper/src/ui/settings/sections/InpageSection.tsx`
 - `webclipper/src/ui/settings/sections/AntiHotlinkDomainsEditor.tsx`
 - `webclipper/src/ui/settings/SettingsSidebarNav.tsx`

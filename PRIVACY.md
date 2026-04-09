@@ -1,12 +1,12 @@
 # Privacy Policy
 
-**Last Updated: March 30, 2026**
+**Last Updated: April 9, 2026**
 
 This Privacy Policy applies to **SyncNos WebClipper** (the “Extension”), a browser extension for Chrome/Chromium and Firefox.
 
 ## 1. Single Purpose
 
-The Extension’s single purpose is to help you save **visible** AI conversations (and optionally web articles) from pages you view to your browser locally, export them, and (optionally) sync them to external destinations (e.g., Notion / Obsidian) **when you manually trigger a sync**.
+The Extension’s single purpose is to help you save **visible** AI conversations (and optionally web articles) from pages you view to your browser locally, manage local article comments, export them, and (optionally) sync them to external destinations (e.g., Notion / Obsidian) **when you manually trigger a sync**.
 
 ## 2. What Data the Extension Accesses
 
@@ -18,6 +18,10 @@ When you visit a supported site, the Extension may read content from the current
 
 When you manually save a web page as an article, the Extension may read the article content from the current page to extract a readable version (title/body) for local storage and export.
 
+If you use article comments or in-page comments, the Extension may also read and write the local comment thread content, quoted text, and locator metadata that you enter in the Extension UI.
+
+For supported conversations and articles, the Extension may also read embedded image URLs so it can preview, export, or cache images locally when you enable image-related features.
+
 The Extension may automatically capture updates while you stay on a supported conversation page, and it also provides an in-page “Save” button for manual capture.
 
 ## 3. Local Storage
@@ -25,14 +29,17 @@ The Extension may automatically capture updates while you stay on a supported co
 The Extension is local-first:
 
 - Saved conversations and messages are stored locally in your browser using IndexedDB.
+- Article comments, sync mappings, and other local thread metadata are stored locally as part of the Extension’s own data model.
 - Settings and small state (e.g., Notion connection status, selected parent page ID) are stored locally using `chrome.storage.local`.
 - Small UI state (e.g., in-page button position) may be stored using `localStorage`.
+- Backup/export packages are created locally; they may include conversations, messages, comments, and settings, while sensitive OAuth tokens are excluded.
 
 ## 4. Notion Sync (Optional, Manual)
 
 If you choose to connect Notion and manually trigger sync:
 
 - The Extension sends data to Notion over HTTPS using the Notion API.
+- If you sync an article that has local comments, the Extension may include the related comment thread content and comment-count metadata in the synced output.
 - The Extension may download referenced images (by URL) and upload them to Notion as file uploads if supported by Notion.
 
 Notion’s handling of data is governed by Notion’s own privacy policy.
@@ -49,10 +56,12 @@ To avoid embedding a Notion OAuth client secret in the Extension, the Extension 
 - `storage`: store settings and small state locally (e.g., Notion connection status, selected parent page ID).
 - `contextMenus`: provide right-click menu actions (e.g., capture/save/export/sync entry points).
 - `tabs`: open/focus the extension app page, open authorization/help links, and improve UX during OAuth flows.
+- `tabGroups`: keep Chat with AI result tabs organized when the browser supports tab grouping.
 - `webNavigation`: detect the OAuth redirect/callback navigation to complete the connection flow.
 - `activeTab`: access the current tab when you interact with the Extension (e.g., manual capture) without needing persistent access.
 - `scripting`: inject packaged scripts into the current page to enable capture and in-page UI.
-- Host permissions: allow the Extension to run on supported AI chat sites and (when you choose to use it) on arbitrary web pages for manual article capture, and to access Notion endpoints required for sync.
+- `declarativeNetRequestWithHostAccess`: temporarily adjust request headers for anti-hotlink image downloads on supported browsers.
+- Host permissions: allow the Extension to run on supported AI chat sites and arbitrary web pages for manual article capture, to access Notion endpoints and the OAuth worker required for sync, and to reach CDN hosts used by anti-hotlink image caching.
 
 ## 7. Remote Code
 

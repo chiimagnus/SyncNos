@@ -5,9 +5,9 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `2023855db9ccb17de797d6bd6ccdc99f51c9fb78` |
+| Commit hash | `1c39d297dee5f050d6ebdd670963c19c808b1789` |
 | Branch name | `main` (HEAD), `origin/main` |
-| Generation timestamp | `2026-04-07 19:35:49 +0800` |
+| Generation timestamp | `2026-04-09 23:54:07 +0800` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
 | Update mode | Major incremental sync update |
@@ -94,7 +94,7 @@
 - 评论级 Chat with AI 菜单（整条线程上下文）
 
 ### 7. 2026-04 配置 / 存储同步
-- `manifest.version` 对齐到 `1.5.2`
+- `manifest.version` 对齐到 `1.5.3`
 - `DB_VERSION` 对齐到 `8`，补齐列表分页 / 筛选索引回填
 - Inpage 分区承载 `markdown_reading_profile_v1` 与 `anti_hotlink_rules_v1`
 - `article` 抓取在命中 anti-hotlink 规则时会自动缓存图片，即使 web article cache toggle 关闭也不会中断主链路
@@ -106,7 +106,7 @@
 - `modules/comments.md`：**完全重写**，反映 React 迁移后的新架构
 
 ## Coverage Notes
-- 本次重点是同步 2026-04 的重大架构变化：评论模块 React 迁移、Settings 重构、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强，以及 1.5.2 / DB v8 / Inpage 规则事实。
+- 本次重点是同步 2026-04 的重大架构变化：评论模块 React 迁移、Settings 重构、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强，以及 1.5.3 / DB v8 / Inpage 规则事实。
 - `data-flow.md`、`modules/webclipper.md`、`configuration.md`、`storage.md`、`testing.md`、`workflow.md`、`security.md`、`glossary.md` 已在本轮增量中同步。
 - deepwiki 继续覆盖配置、数据流、存储、测试、发布与排障；并维持"代码/配置优先于文档摘要"的约束。
 

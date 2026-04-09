@@ -372,7 +372,7 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
   - `src/services/protocols/markdown-reading-profile-storage.ts`
 - 存储键：`markdown_reading_profile_v1`，未知值必须回退 `medium`。
 - UI 接入链路：
-  - 设置页：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx`
+  - 设置页：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx` + `src/ui/settings/SettingsTopTabsNav.tsx`
   - 运行时消费：`src/ui/conversations/ConversationDetailPane.tsx -> ChatMessageBubble.tsx`
 - 工程约束：
   - `ChatMessageBubble` 只维护结构样式；profile 差异统一放在 preset。
@@ -391,5 +391,5 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
   - `src/ui/settings/sections/AntiHotlinkDomainsEditor.tsx`
 - 存储键：`anti_hotlink_rules_v1`
 - 默认规则：`cdnfile.sspai.com -> https://sspai.com/`、`sns-webpic-qc.xhscdn.com -> https://www.xiaohongshu.com/`
-- UI 接入链路：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx`
+- UI 接入链路：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx` + `src/ui/settings/SettingsTopTabsNav.tsx`
 - 行为约束：文章命中规则时会自动补 referer 并走图片缓存；`web_article_cache_images_enabled` 只控制普通 article 图片缓存开关，不得阻断规则命中后的自动缓存。
