@@ -5,6 +5,7 @@ import {
   createArticleCommentsSidebarController,
   type ArticleCommentsSidebarController,
 } from '@services/comments/sidebar/article-comments-sidebar-controller';
+import { buildArticleCommentLocatorFromRange } from '@services/comments/locator';
 import type {
   CommentSidebarSession,
   CommentSidebarSessionSnapshot,
@@ -24,6 +25,39 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
   const onCloseRef = useRef<(() => void) | undefined>(input.onClose);
   onCloseRef.current = input.onClose;
   const closeListenersRef = useRef<Set<() => void>>(new Set());
+  const locatorRootRef = useRef<Element | null>(null);
+
+  const resolveAppSelectionPayload = () => {
+    const root = locatorRootRef.current;
+    if (!root) return { selectionText: '', locator: null };
+    try {
+      const selection = globalThis.getSelection?.();
+      if (!selection || selection.rangeCount <= 0) return { selectionText: '', locator: null };
+      const text = String(selection.toString() || '').trim();
+      if (!text) return { selectionText: '', locator: null };
+
+      const anchorNode = selection.anchorNode as Node | null;
+      const focusNode = selection.focusNode as Node | null;
+      if ((anchorNode && !root.contains(anchorNode)) || (focusNode && !root.contains(focusNode))) {
+        return { selectionText: '', locator: null };
+      }
+
+      const range = selection.getRangeAt(0)?.cloneRange?.();
+      if (!range) return { selectionText: text, locator: null };
+
+      return {
+        selectionText: text,
+        locator:
+          buildArticleCommentLocatorFromRange({
+            env: 'app',
+            root,
+            range,
+          }) ?? null,
+      };
+    } catch (_error) {
+      return { selectionText: '', locator: null };
+    }
+  };
 
   const sidebarSessionRef = useRef<CommentSidebarSession | null>(null);
   if (!sidebarSessionRef.current) {
@@ -36,6 +70,7 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
     sidebarControllerRef.current = createArticleCommentsSidebarController({
       session: sidebarSession,
       adapter: createArticleCommentsSidebarAppAdapter(),
+      resolveComposerSelection: () => resolveAppSelectionPayload(),
       onClose: () => {
         onCloseRef.current?.();
         for (const listener of closeListenersRef.current) {
@@ -56,7 +91,6 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
     () => sidebarSession.getSnapshot(),
   );
 
-  const locatorRootRef = useRef<Element | null>(null);
   const setLocatorRoot = useCallback((root: Element | null) => {
     locatorRootRef.current = root;
   }, []);
