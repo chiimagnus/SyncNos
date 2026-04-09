@@ -192,7 +192,9 @@ export function createArticleCommentsSidebarController(input: {
         const resolveComposerSelection = input.resolveComposerSelection;
         if (typeof resolveComposerSelection !== 'function') return;
         const requestSeq = ++composerSelectionRequestSeq;
-        const applyIfLatest = (payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined) => {
+        const applyIfLatest = (
+          payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined,
+        ) => {
           if (requestSeq !== composerSelectionRequestSeq) return;
           applyComposerSelection(payload ?? { selectionText: '', locator: null });
         };

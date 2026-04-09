@@ -108,9 +108,9 @@ describe('inpage comments sidebar toggle', () => {
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'pointerdown' });
 
-    const reply = shadow?.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as
-      | HTMLTextAreaElement
-      | null;
+    const reply = shadow?.querySelector(
+      '.webclipper-inpage-comments-panel__reply-textarea',
+    ) as HTMLTextAreaElement | null;
     expect(reply).toBeTruthy();
     reply?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     reply?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));

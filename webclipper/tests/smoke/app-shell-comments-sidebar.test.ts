@@ -4,15 +4,17 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import type { ReactNode } from 'react';
 
-const { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState, detailPaneMockState } = vi.hoisted(() => {
-  const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
-  const listArticleCommentsByCanonicalUrlMock = vi.fn(async (canonicalUrl: string) => {
-    return commentsByUrl.get(String(canonicalUrl || '')) || [];
-  });
-  const responsiveTierState = { value: 'wide' as 'narrow' | 'medium' | 'wide' };
-  const detailPaneMockState = { provideLocatorRoot: true };
-  return { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState, detailPaneMockState };
-});
+const { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState, detailPaneMockState } = vi.hoisted(
+  () => {
+    const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
+    const listArticleCommentsByCanonicalUrlMock = vi.fn(async (canonicalUrl: string) => {
+      return commentsByUrl.get(String(canonicalUrl || '')) || [];
+    });
+    const responsiveTierState = { value: 'wide' as 'narrow' | 'medium' | 'wide' };
+    const detailPaneMockState = { provideLocatorRoot: true };
+    return { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState, detailPaneMockState };
+  },
+);
 
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
 
@@ -359,9 +361,9 @@ describe('AppShell comments sidebar', () => {
     });
 
     const reply = (await vi.waitFor(() => {
-      const el = shadow?.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as
-        | HTMLTextAreaElement
-        | null;
+      const el = shadow?.querySelector(
+        '.webclipper-inpage-comments-panel__reply-textarea',
+      ) as HTMLTextAreaElement | null;
       expect(el).toBeTruthy();
       return el;
     })) as HTMLTextAreaElement;
@@ -389,12 +391,11 @@ describe('AppShell comments sidebar', () => {
       openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    const host = (await vi
-      .waitFor(() => {
-        const panel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
-        expect(panel).toBeTruthy();
-        return panel;
-      })) as HTMLElement;
+    const host = (await vi.waitFor(() => {
+      const panel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+      expect(panel).toBeTruthy();
+      return panel;
+    })) as HTMLElement;
     const shadow = host.shadowRoot;
     expect(shadow).toBeTruthy();
 
