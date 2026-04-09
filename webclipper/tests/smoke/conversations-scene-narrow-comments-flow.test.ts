@@ -12,7 +12,12 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 const setActiveId = vi.fn();
 const openConversationExternalById = vi.fn();
 const openConversationExternalBySourceKey = vi.fn();
-const consumePendingOpenConversation = vi.fn(() => null);
+type PendingOpenConversationMockPayload = {
+  conversationId: number;
+  source: string;
+  conversationKey: string;
+} | null;
+const consumePendingOpenConversation = vi.fn<() => PendingOpenConversationMockPayload>(() => null);
 const sidebarOpen = vi.fn(async () => {});
 const subscribeSidebarClose = vi.fn((listener: () => void) => {
   currentSidebarCloseListener = listener;
@@ -260,6 +265,13 @@ describe('ConversationsScene narrow comments flow', () => {
     });
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
+    expect(sidebarOpen).toHaveBeenLastCalledWith({
+      selectionText: '',
+      locator: null,
+      focusComposer: true,
+      source: 'popup',
+      ensureContext: false,
+    });
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
     const commentsPanel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(commentsPanel?.getAttribute('data-layout')).toBe('full-width');
@@ -344,6 +356,13 @@ describe('ConversationsScene narrow comments flow', () => {
     });
 
     expect(sidebarOpen).toHaveBeenCalledTimes(1);
+    expect(sidebarOpen).toHaveBeenLastCalledWith({
+      selectionText: '',
+      locator: null,
+      focusComposer: true,
+      source: 'popup',
+      ensureContext: false,
+    });
     expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
     const commentsPanel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(commentsPanel?.getAttribute('data-layout')).toBe('full-width');

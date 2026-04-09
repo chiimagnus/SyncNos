@@ -4,13 +4,14 @@ import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import type { ReactNode } from 'react';
 
-const { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState } = vi.hoisted(() => {
+const { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState, detailPaneMockState } = vi.hoisted(() => {
   const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
   const listArticleCommentsByCanonicalUrlMock = vi.fn(async (canonicalUrl: string) => {
     return commentsByUrl.get(String(canonicalUrl || '')) || [];
   });
   const responsiveTierState = { value: 'wide' as 'narrow' | 'medium' | 'wide' };
-  return { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState };
+  const detailPaneMockState = { provideLocatorRoot: true };
+  return { commentsByUrl, listArticleCommentsByCanonicalUrlMock, responsiveTierState, detailPaneMockState };
 });
 
 const COMMENTS_SIDEBAR_COLLAPSED_KEY = 'webclipper_app_comments_sidebar_collapsed';
@@ -123,9 +124,11 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
   ConversationDetailPane: ({
     onTriggerCommentsSidebar,
     commentsSidebarOpen,
+    onCommentsLocatorRootChange,
   }: {
     onTriggerCommentsSidebar?: (input: any) => void;
     commentsSidebarOpen?: boolean;
+    onCommentsLocatorRootChange?: (root: Element | null) => void;
   }) =>
     createElement(
       'div',
@@ -140,6 +143,20 @@ vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
           'data-can-trigger': onTriggerCommentsSidebar ? '1' : '0',
         },
         'open-comments',
+      ),
+      createElement(
+        'div',
+        {
+          ref: (el: HTMLDivElement | null) => {
+            if (!detailPaneMockState.provideLocatorRoot) {
+              onCommentsLocatorRootChange?.(null);
+              return;
+            }
+            onCommentsLocatorRootChange?.(el);
+          },
+          'data-mock-locator-root': '1',
+        },
+        'Selectable quote from mock detail pane',
       ),
       createElement('div', null, 'detail-pane'),
     ),
@@ -168,6 +185,10 @@ function setupDom() {
     configurable: true,
     value: dom.window.CustomEvent,
   });
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: dom.window.getSelection.bind(dom.window),
+  });
   Object.defineProperty(globalThis, 'getComputedStyle', {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
@@ -176,12 +197,49 @@ function setupDom() {
     configurable: true,
     value: true,
   });
+
+  (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
+  (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
 }
 
 function cleanupDom() {
   // Keep the JSDOM globals around: React may schedule async work that still
   // references `window` after the test has completed. The next `setupDom()`
   // call will overwrite them.
+}
+
+function mockSelectionInElement(el: HTMLElement, needle: string): (() => void) | null {
+  const walker = document.createTreeWalker(el, window.NodeFilter.SHOW_TEXT);
+  let textNode: Text | null = null;
+  let start = -1;
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    const text = String(node.textContent || '');
+    const index = text.indexOf(needle);
+    if (index >= 0) {
+      textNode = node;
+      start = index;
+      break;
+    }
+  }
+  if (!textNode || start < 0) return null;
+
+  const range = document.createRange();
+  range.setStart(textNode, start);
+  range.setEnd(textNode, start + needle.length);
+
+  const selectionMock = {
+    rangeCount: 1,
+    anchorNode: textNode,
+    focusNode: textNode,
+    toString: () => needle,
+    getRangeAt: () => range,
+    removeAllRanges: () => {},
+    addRange: () => {},
+  } as any;
+
+  const spy = vi.spyOn(globalThis, 'getSelection').mockImplementation(() => selectionMock as Selection);
+  return () => spy.mockRestore();
 }
 
 describe('AppShell comments sidebar', () => {
@@ -191,6 +249,7 @@ describe('AppShell comments sidebar', () => {
     commentsByUrl.clear();
     listArticleCommentsByCanonicalUrlMock.mockClear();
     responsiveTierState.value = 'wide';
+    detailPaneMockState.provideLocatorRoot = true;
     currentState.selectedConversation = {
       id: 21,
       title: 'Article',
@@ -255,6 +314,106 @@ describe('AppShell comments sidebar', () => {
 
     await vi.waitFor(() => {
       expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
+  });
+
+  it('auto-attaches selected text on root composer click and ignores reply interactions', async () => {
+    commentsByUrl.set('https://example.com/article', [{ id: 101, parentId: null, commentText: 'Root comment' }]);
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
+
+    const locatorRoot = document.querySelector('[data-mock-locator-root="1"]') as HTMLElement | null;
+    expect(locatorRoot).toBeTruthy();
+    const selectedText = 'quote from mock';
+    const restoreSelection = mockSelectionInElement(locatorRoot!, selectedText);
+    expect(restoreSelection).toBeTruthy();
+
+    const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(host).toBeTruthy();
+    const shadow = host?.shadowRoot;
+    expect(shadow).toBeTruthy();
+
+    const composer = shadow?.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement | null;
+    expect(composer).toBeTruthy();
+    act(() => {
+      composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      expect(quoteText).toBe(selectedText);
+    });
+
+    const reply = (await vi.waitFor(() => {
+      const el = shadow?.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as
+        | HTMLTextAreaElement
+        | null;
+      expect(el).toBeTruthy();
+      return el;
+    })) as HTMLTextAreaElement;
+    act(() => {
+      reply.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+      reply.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+    });
+
+    const quoteAfterReply = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    expect(quoteAfterReply).toBe(selectedText);
+
+    restoreSelection?.();
+  });
+
+  it('clears quote when locator root is unavailable in app flow', async () => {
+    detailPaneMockState.provideLocatorRoot = false;
+
+    act(() => {
+      root!.render(createElement(AppShell));
+    });
+
+    const openBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    expect(openBtn).toBeTruthy();
+    act(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    const host = (await vi
+      .waitFor(() => {
+        const panel = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+        expect(panel).toBeTruthy();
+        return panel;
+      })) as HTMLElement;
+    const shadow = host.shadowRoot;
+    expect(shadow).toBeTruthy();
+
+    await vi.waitFor(() => {
+      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      expect(quoteText).toBe('Selected quote');
+    });
+
+    const composer = shadow?.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement | null;
+    expect(composer).toBeTruthy();
+    act(() => {
+      composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      expect(quoteText).toBe('');
     });
   });
 
