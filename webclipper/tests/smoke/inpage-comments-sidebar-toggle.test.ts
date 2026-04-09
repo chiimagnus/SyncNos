@@ -100,19 +100,19 @@ describe('inpage comments sidebar toggle', () => {
     const shadow = host?.shadowRoot;
     expect(shadow).toBeTruthy();
 
+    document.dispatchEvent(new window.Event('selectionchange'));
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
+
     const composer = shadow?.querySelector(
       '.webclipper-inpage-comments-panel__composer-textarea',
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
     composer?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     composer?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
-
-    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
-
     document.dispatchEvent(new window.Event('selectionchange'));
-
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
 
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
@@ -122,6 +122,7 @@ describe('inpage comments sidebar toggle', () => {
     expect(reply).toBeTruthy();
     reply?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     reply?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
+    document.dispatchEvent(new window.Event('selectionchange'));
 
     await Promise.resolve();
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);

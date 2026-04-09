@@ -357,6 +357,32 @@ describe('AppShell comments sidebar', () => {
       expect(quoteText).toBe(selectedText);
     });
 
+    restoreSelection?.();
+
+    const composer = shadow?.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement | null;
+    expect(composer).toBeTruthy();
+    act(() => {
+      composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+      composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+      document.dispatchEvent(new window.Event('selectionchange'));
+    });
+
+    const quoteAfterComposerClick =
+      shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    expect(quoteAfterComposerClick).toBe(selectedText);
+
+    act(() => {
+      composer!.value = 'typing root';
+      composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
+      document.dispatchEvent(new window.Event('selectionchange'));
+    });
+
+    const quoteAfterComposerTyping =
+      shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    expect(quoteAfterComposerTyping).toBe(selectedText);
+
     const reply = (await vi.waitFor(() => {
       const el = shadow?.querySelector(
         '.webclipper-inpage-comments-panel__reply-textarea',
@@ -367,12 +393,21 @@ describe('AppShell comments sidebar', () => {
     act(() => {
       reply.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
       reply.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+      document.dispatchEvent(new window.Event('selectionchange'));
     });
 
     const quoteAfterReply = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
     expect(quoteAfterReply).toBe(selectedText);
 
-    restoreSelection?.();
+    act(() => {
+      reply.value = 'typing reply';
+      reply.dispatchEvent(new window.Event('input', { bubbles: true }));
+      document.dispatchEvent(new window.Event('selectionchange'));
+    });
+
+    const quoteAfterReplyTyping =
+      shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    expect(quoteAfterReplyTyping).toBe(selectedText);
   });
 
   it('clears quote when locator root is unavailable in app flow', async () => {

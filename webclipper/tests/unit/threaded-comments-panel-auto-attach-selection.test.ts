@@ -23,6 +23,10 @@ function setupDom() {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
   });
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: dom.window.getSelection.bind(dom.window),
+  });
 
   (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
   (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
@@ -36,6 +40,33 @@ function cleanupDom() {
   delete (globalThis as any).Node;
   delete (globalThis as any).MutationObserver;
   delete (globalThis as any).getComputedStyle;
+  delete (globalThis as any).getSelection;
+}
+
+function installMutableSelectionMock(initialText: string) {
+  const state = { text: String(initialText || '') };
+  const selectionMock = {
+    rangeCount: 1,
+    anchorNode: document.body,
+    focusNode: document.body,
+    anchorOffset: 0,
+    get focusOffset() {
+      return String(state.text || '').length;
+    },
+    toString: () => String(state.text || ''),
+    getRangeAt: () => {
+      const range = document.createRange();
+      range.selectNodeContents(document.body);
+      return range;
+    },
+    removeAllRanges: () => {},
+    addRange: () => {},
+  } as any;
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: () => selectionMock as Selection,
+  });
+  return state;
 }
 
 async function flushReactScheduler() {
@@ -72,6 +103,9 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
 
+    const selectionState = installMutableSelectionMock('Quoted text');
+    expect(selectionState.text).toBe('Quoted text');
+
     document.dispatchEvent(new window.Event('selectionchange'));
     document.dispatchEvent(new window.Event('selectionchange'));
 
@@ -83,7 +117,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.cleanup();
   });
 
-  it('does not request selection from root/reply interactions, only from selectionchange', async () => {
+  it('does not clear quote when composer/reply interactions cause empty selectionchange', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -94,8 +128,17 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
+    const selectionState = installMutableSelectionMock('Quoted text');
 
     mounted.api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' }]);
+
+    document.dispatchEvent(new window.Event('selectionchange'));
+    await Promise.resolve();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
+
+    selectionState.text = '';
 
     const composer = shadow.querySelector(
       '.webclipper-inpage-comments-panel__composer-textarea',
@@ -104,15 +147,10 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
-    await Promise.resolve();
-
-    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
-
     document.dispatchEvent(new window.Event('selectionchange'));
     await Promise.resolve();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
 
     const reply = shadow.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
@@ -121,6 +159,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     reply!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     reply!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+    document.dispatchEvent(new window.Event('selectionchange'));
     await Promise.resolve();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);

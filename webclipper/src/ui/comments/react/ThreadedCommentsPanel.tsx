@@ -109,6 +109,7 @@ export function ThreadedCommentsPanel({
   const lastFocusedComposerSignalRef = useRef(0);
   const lastHandledEscapeSignalRef = useRef(0);
   const lastAutoSelectionSignatureRef = useRef('');
+  const suppressEmptyAutoSelectionUntilRef = useRef(0);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
@@ -217,9 +218,35 @@ export function ThreadedCommentsPanel({
     });
   };
 
+  const isPanelTextInputFocused = () => {
+    const composer = composerTextareaRef.current;
+    let activeElement: Element | null = null;
+    const rootNode = composer?.getRootNode?.();
+    if (rootNode && typeof (rootNode as ShadowRoot).activeElement !== 'undefined') {
+      activeElement = ((rootNode as ShadowRoot).activeElement as Element | null) ?? null;
+    } else {
+      activeElement = (document.activeElement as Element | null) ?? null;
+    }
+    if (!activeElement) return false;
+    try {
+      return Boolean(
+        activeElement.closest(
+          '.webclipper-inpage-comments-panel__composer-textarea,.webclipper-inpage-comments-panel__reply-textarea',
+        ),
+      );
+    } catch (_error) {
+      return false;
+    }
+  };
+
   const requestComposerSelection = useCallback((trigger: 'button' | 'auto', autoSignature?: string | null) => {
     if (trigger === 'auto') {
       const normalizedSignature = String(autoSignature || 'empty');
+      if (normalizedSignature === 'empty') {
+        if (isPanelTextInputFocused()) return;
+        const suppressUntil = Number(suppressEmptyAutoSelectionUntilRef.current || 0);
+        if (Date.now() <= suppressUntil) return;
+      }
       if (normalizedSignature === lastAutoSelectionSignatureRef.current) return;
       lastAutoSelectionSignatureRef.current = normalizedSignature;
     }
@@ -230,6 +257,10 @@ export function ThreadedCommentsPanel({
       // ignore
     });
   }, [readHandlers, snapshot.handlers]);
+
+  const suppressNextEmptyAutoSelection = () => {
+    suppressEmptyAutoSelectionUntilRef.current = Date.now() + 320;
+  };
 
   const updateArmedDeleteId = useCallback(
     (next: number | null) => {
@@ -632,6 +663,12 @@ export function ThreadedCommentsPanel({
             placeholder="Write a comment…"
             rows={1}
             value={composerText}
+            onPointerDown={() => {
+              suppressNextEmptyAutoSelection();
+            }}
+            onFocus={() => {
+              suppressNextEmptyAutoSelection();
+            }}
             onInput={(event) => updateComposerText(event.currentTarget.value)}
             onChange={(event) => updateComposerText(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -830,6 +867,12 @@ export function ThreadedCommentsPanel({
                       placeholder="Reply…"
                       rows={1}
                       value={replyTexts[rootId] || ''}
+                      onPointerDown={() => {
+                        suppressNextEmptyAutoSelection();
+                      }}
+                      onFocus={() => {
+                        suppressNextEmptyAutoSelection();
+                      }}
                       onInput={(event) => {
                         updateReplyText(rootId, event.currentTarget.value);
                         autosizeTextarea(event.currentTarget);
