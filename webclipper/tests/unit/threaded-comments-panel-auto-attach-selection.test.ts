@@ -88,6 +88,34 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.cleanup();
   });
 
+  it('dedupes repeated root composer pointerdown requests within same interaction', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onComposerSelectionRequest = vi.fn();
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    mounted.api.setHandlers({ onComposerSelectionRequest } as any);
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    const shadow = panel!.shadowRoot!;
+
+    const composer = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement | null;
+    expect(composer).toBeTruthy();
+
+    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+
+    await Promise.resolve();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'pointerdown' });
+
+    mounted.cleanup();
+  });
+
   it('requests selection on root composer focus and ignores reply interactions', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
