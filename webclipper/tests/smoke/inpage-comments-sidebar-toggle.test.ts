@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 
 import { getInpageCommentsPanelApi } from '../../src/ui/inpage/inpage-comments-panel-shadow';
@@ -22,6 +22,9 @@ function setupDom() {
     configurable: true,
     value: true,
   });
+
+  (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
+  (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
 }
 
 function cleanupDom() {
@@ -81,5 +84,38 @@ describe('inpage comments sidebar toggle', () => {
 
     collapse?.click();
     expect(api.isOpen()).toBe(false);
+  });
+
+  it('triggers composer selection request only from root composer interactions', async () => {
+    const api = getInpageCommentsPanelApi();
+    const onComposerSelectionRequest = vi.fn();
+
+    api.setHandlers({ onComposerSelectionRequest } as any);
+    api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'Root comment' }]);
+    api.open({ focusComposer: false });
+
+    const host = document.getElementById('webclipper-inpage-comments-panel') as HTMLElement | null;
+    expect(host).toBeTruthy();
+    const shadow = host?.shadowRoot;
+    expect(shadow).toBeTruthy();
+
+    const composer = shadow?.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement | null;
+    expect(composer).toBeTruthy();
+    composer?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'pointerdown' });
+
+    const reply = shadow?.querySelector('.webclipper-inpage-comments-panel__reply-textarea') as
+      | HTMLTextAreaElement
+      | null;
+    expect(reply).toBeTruthy();
+    reply?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+    reply?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
+
+    await Promise.resolve();
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
   });
 });

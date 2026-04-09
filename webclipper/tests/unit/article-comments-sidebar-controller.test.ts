@@ -122,6 +122,56 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().quoteText).toBe('');
   });
 
+  it('updates quote and locator from composer selection requests', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+
+    const locator = {
+      env: 'inpage',
+      quote: { exact: 'Quoted from page' },
+      position: { start: 0, end: 16 },
+    };
+
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 51 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
+    };
+
+    const resolveComposerSelection = vi
+      .fn()
+      .mockResolvedValueOnce({ selectionText: 'Quoted from page', locator })
+      .mockResolvedValueOnce({ selectionText: '', locator: null });
+
+    createArticleCommentsSidebarController({
+      session,
+      adapter: adapter as any,
+      resolveComposerSelection,
+    });
+
+    const handlers = panel.getState().handlers;
+    expect(typeof handlers.onComposerSelectionRequest).toBe('function');
+
+    await handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
+    expect(resolveComposerSelection).toHaveBeenNthCalledWith(1, { trigger: 'pointerdown' });
+    expect(session.getSnapshot().quoteText).toBe('Quoted from page');
+
+    await handlers.onSave('root comment');
+    expect(adapter.addRoot).toHaveBeenLastCalledWith({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 21,
+      quoteText: 'Quoted from page',
+      commentText: 'root comment',
+      locator,
+    });
+
+    await handlers.onComposerSelectionRequest({ trigger: 'focus' });
+    expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'focus' });
+    expect(session.getSnapshot().quoteText).toBe('');
+  });
+
   it('setContext: refreshes comments when canonicalUrl switches', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
