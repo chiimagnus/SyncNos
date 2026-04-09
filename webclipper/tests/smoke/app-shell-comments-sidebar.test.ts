@@ -319,7 +319,7 @@ describe('AppShell comments sidebar', () => {
     });
   });
 
-  it('attaches selected text on root composer interaction and ignores reply interactions', async () => {
+  it('attaches selected text on selectionchange and ignores reply interactions', async () => {
     commentsByUrl.set('https://example.com/article', [{ id: 101, parentId: null, commentText: 'Root comment' }]);
 
     act(() => {
@@ -348,13 +348,8 @@ describe('AppShell comments sidebar', () => {
     expect(shadow).toBeTruthy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
-    const composer = shadow?.querySelector(
-      '.webclipper-inpage-comments-panel__composer-textarea',
-    ) as HTMLTextAreaElement | null;
-    expect(composer).toBeTruthy();
     act(() => {
-      composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-      composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+      document.dispatchEvent(new window.Event('selectionchange'));
     });
 
     await vi.waitFor(() => {
@@ -406,13 +401,8 @@ describe('AppShell comments sidebar', () => {
       expect(quoteText).toBe('Selected quote');
     });
 
-    const composer = shadow?.querySelector(
-      '.webclipper-inpage-comments-panel__composer-textarea',
-    ) as HTMLTextAreaElement | null;
-    expect(composer).toBeTruthy();
     act(() => {
-      composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-      composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+      document.dispatchEvent(new window.Event('selectionchange'));
     });
 
     await vi.waitFor(() => {

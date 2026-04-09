@@ -87,7 +87,7 @@ describe('inpage comments sidebar toggle', () => {
     expect(api.isOpen()).toBe(false);
   });
 
-  it('triggers composer selection request only from root composer interactions', async () => {
+  it('triggers composer selection request only from document selectionchange', async () => {
     const api = getInpageCommentsPanelApi();
     const onComposerSelectionRequest = vi.fn();
 
@@ -106,6 +106,10 @@ describe('inpage comments sidebar toggle', () => {
     expect(composer).toBeTruthy();
     composer?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     composer?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
+
+    document.dispatchEvent(new window.Event('selectionchange'));
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });

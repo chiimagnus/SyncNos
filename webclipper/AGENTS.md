@@ -100,9 +100,9 @@ npm --prefix webclipper run check        # 产物校验（manifest/icons 等）
 ## 评论侧栏选区附加契约
 
 - 行为边界（真源）：`webclipper/src/ui/comments/react/ThreadedCommentsPanel.tsx` + `webclipper/src/services/comments/sidebar/article-comments-sidebar-controller.ts`。
-- 右侧评论侧边栏根输入框（`Write a comment…`）在 `pointerdown/focus` 时会自动触发一次选区附加（`trigger: auto`），用于“选中文本→点击输入框”链路。
+- 右侧评论侧边栏打开后，页面 `selectionchange` 会自动触发一次选区附加（`trigger: auto`），无需点击/聚焦输入框。
 - reply 输入框不得触发附加或清空。
-- 空选区语义：允许由根输入框自动触发“清空引用（quote + locator）”；reply 交互不能污染引用区。
+- 空选区语义：允许由 `selectionchange` 自动触发“清空引用（quote + locator）”；reply 交互不能污染引用区。
 - 调整此行为时必须同时回归：
   - `tests/unit/threaded-comments-panel-auto-attach-selection.test.ts`
   - `tests/unit/article-comments-sidebar-controller.test.ts`

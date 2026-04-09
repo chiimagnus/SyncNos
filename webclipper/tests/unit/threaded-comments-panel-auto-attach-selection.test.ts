@@ -60,7 +60,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     cleanupDom();
   });
 
-  it('requests selection on root composer pointerdown and dedupes immediate focus', async () => {
+  it('requests selection on document selectionchange and dedupes identical signatures', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -72,13 +72,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
 
-    const composer = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__composer-textarea',
-    ) as HTMLTextAreaElement | null;
-    expect(composer).toBeTruthy();
-
-    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.Event('selectionchange'));
 
     await Promise.resolve();
 
@@ -88,7 +83,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.cleanup();
   });
 
-  it('requests selection on root composer focus and ignores reply interactions', async () => {
+  it('does not request selection from root/reply interactions, only from selectionchange', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -107,7 +102,13 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
 
+    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
+
+    document.dispatchEvent(new window.Event('selectionchange'));
     await Promise.resolve();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
