@@ -395,7 +395,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const turns: Element[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any;
     if (!turns.length) return false;
 
-    const maxTurns = Math.max(1, Number(options.maxTurns) || 240);
     const settleMs = Math.max(0, Number(options.settleMs) || 80);
     const perTurnTimeoutMs = Math.max(120, Number(options.perTurnTimeoutMs) || 900);
     const pollMs = Math.max(30, Number(options.pollMs) || 80);
@@ -408,7 +407,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
     const bottomTurn = turns[turns.length - 1] || null;
 
-    const total = Math.min(maxTurns, turns.length);
+    const total = turns.length;
     for (let i = 0; i < total; i += 1) {
       const turn = turns[i];
       const role = normalizeRoleFromTurn(turn);
@@ -446,7 +445,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       if (turnId) manualTurnCache.set(turnId, msg);
     }
 
-    manualCacheWarningFlags = Array.from(ctx.warningFlags);
+    const warningFlags = new Set<string>(ctx.warningFlags);
+    manualCacheWarningFlags = Array.from(warningFlags);
 
     try {
       (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });

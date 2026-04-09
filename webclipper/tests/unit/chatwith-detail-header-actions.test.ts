@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadChatWithSettingsMock = vi.fn();
 const buildChatWithPayloadMock = vi.fn();
-const truncateForChatWithMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const openChatWithPlatformMock = vi.fn();
 
@@ -12,7 +11,6 @@ vi.mock('../../src/services/integrations/chatwith/chatwith-settings', async () =
     ...(actual as Record<string, unknown>),
     loadChatWithSettings: (...args: any[]) => loadChatWithSettingsMock(...args),
     buildChatWithPayload: (...args: any[]) => buildChatWithPayloadMock(...args),
-    truncateForChatWith: (...args: any[]) => truncateForChatWithMock(...args),
   };
 });
 
@@ -33,7 +31,6 @@ describe('resolveChatWithDetailHeaderActions', () => {
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     buildChatWithPayloadMock.mockResolvedValue('payload\n');
-    truncateForChatWithMock.mockReturnValue({ text: 'payload-truncated\n', truncated: true });
     writeTextToClipboardMock.mockResolvedValue(true);
     openChatWithPlatformMock.mockResolvedValue(true);
   });
@@ -66,7 +63,7 @@ describe('resolveChatWithDetailHeaderActions', () => {
     expect(actions).toHaveLength(1);
     await actions[0].onTrigger();
 
-    expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload-truncated\n');
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload\n');
     expect(openChatWithPlatformMock).toHaveBeenCalledWith(
       expect.objectContaining({
         context: expect.objectContaining({ articleKey: 'https://example.com/a' }),

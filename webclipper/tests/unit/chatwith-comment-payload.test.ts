@@ -56,7 +56,7 @@ describe('buildChatWithCommentPayloadV1', () => {
     expect(payload).toBe('');
   });
 
-  it('supports custom template rendering and truncation suffix behavior', () => {
+  it('supports custom template rendering and keeps full payload', () => {
     const payload = buildChatWithCommentPayloadV1({
       quoteText: 'Q',
       commentText: `Reply 1:\n${'C'.repeat(200)}`,
@@ -70,7 +70,7 @@ describe('buildChatWithCommentPayloadV1', () => {
     expect(payload).toContain('Reply 1:');
 
     const truncated = truncateForChatWith(payload, 80);
-    expect(truncated.truncated).toBe(true);
-    expect(truncated.text).toContain('[Truncated: original length=');
+    expect(truncated.truncated).toBe(false);
+    expect(truncated.text).toBe(payload);
   });
 });

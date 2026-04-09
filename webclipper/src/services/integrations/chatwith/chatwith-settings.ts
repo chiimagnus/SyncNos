@@ -332,13 +332,8 @@ export function renderChatWithTemplate(template: string, vars: Record<string, st
 
 export function truncateForChatWith(input: string, maxChars: number): { text: string; truncated: boolean } {
   const text = String(input || '');
-  const limit = Number.isFinite(Number(maxChars))
-    ? Math.max(1, Math.floor(Number(maxChars)))
-    : DEFAULT_CHAT_WITH_MAX_CHARS;
-  if (text.length <= limit) return { text, truncated: false };
-  const suffix = `\n\n[Truncated: original length=${text.length}]`;
-  const sliceLen = Math.max(0, limit - suffix.length);
-  return { text: `${text.slice(0, sliceLen)}${suffix}`, truncated: true };
+  void maxChars;
+  return { text, truncated: false };
 }
 
 export async function buildChatWithPayload(
