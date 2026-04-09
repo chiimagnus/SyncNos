@@ -1,8 +1,6 @@
 import { openDb as openSchemaDb } from '@platform/idb/schema';
 
-const INLINE_HTTP_IMAGES_MAX_COUNT = 100;
-const INLINE_HTTP_IMAGE_MAX_BYTES = 10_000_000;
-const INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES = INLINE_HTTP_IMAGES_MAX_COUNT * INLINE_HTTP_IMAGE_MAX_BYTES;
+const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
 const SYNCNOS_ASSET_PREFIX = 'syncnos-asset://';
 
 type ImageCacheRow = {
@@ -292,7 +290,7 @@ async function ensureCachedAssetRecord(row: ImageCacheRow): Promise<CachedAsset 
   }
 
   if (!row.dataUrl || !isDataImageUrl(row.dataUrl)) return null;
-  const parsed = parseDataImageUrl({ dataUrl: row.dataUrl, maxBytes: INLINE_HTTP_IMAGE_MAX_BYTES });
+  const parsed = parseDataImageUrl({ dataUrl: row.dataUrl, maxBytes: NO_IMAGE_SIZE_LIMIT });
   if (!parsed.ok) return null;
 
   return upsertCachedImageAsset({
@@ -438,29 +436,16 @@ export async function inlineChatImagesInMessages(input: {
       if (!isDataUrl && !isHttpImage) continue;
       if (isHttpImage && !enableHttpImages) continue;
 
-      if (inlinedCount >= INLINE_HTTP_IMAGES_MAX_COUNT) {
-        warningFlags.add('inline_images_count_limit_reached');
-        continue;
-      }
-      if (inlinedBytes >= INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
-        warningFlags.add('inline_images_total_bytes_limit_reached');
-        continue;
-      }
-
       let parsedDataUrl:
         | { ok: true; blob: Blob; byteSize: number; contentType: string; cacheKey: string }
         | { ok: false; reason: 'non_image' | 'empty' | 'too_large' | 'fetch' }
         | null = null;
       let cacheLookupUrl = url;
       if (isDataUrl) {
-        parsedDataUrl = parseDataImageUrl({ dataUrl: url, maxBytes: INLINE_HTTP_IMAGE_MAX_BYTES });
+        parsedDataUrl = parseDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT });
         if (!parsedDataUrl.ok) {
           if (parsedDataUrl.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
           else warningFlags.add('inline_images_download_failed');
-          continue;
-        }
-        if (inlinedBytes + parsedDataUrl.byteSize > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
-          warningFlags.add('inline_images_total_bytes_limit_reached');
           continue;
         }
         cacheLookupUrl = parsedDataUrl.cacheKey;
@@ -496,15 +481,11 @@ export async function inlineChatImagesInMessages(input: {
         const downloaded = await downloadImageAsBlob({
           url,
           referrer: input.conversationUrl,
-          maxBytes: INLINE_HTTP_IMAGE_MAX_BYTES,
+          maxBytes: NO_IMAGE_SIZE_LIMIT,
         });
         if (!downloaded.ok) {
           if (downloaded.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
           else warningFlags.add('inline_images_download_failed');
-          continue;
-        }
-        if (inlinedBytes + downloaded.byteSize > INLINE_HTTP_IMAGES_MAX_TOTAL_BYTES) {
-          warningFlags.add('inline_images_total_bytes_limit_reached');
           continue;
         }
 
