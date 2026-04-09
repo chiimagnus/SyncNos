@@ -1,7 +1,7 @@
 import type { CommentSaveResult, ThreadedCommentItem, ThreadedCommentsPanelCommentChatWithConfig } from '../types';
 
 export type ThreadedCommentsPanelComposerSelectionRequest = {
-  trigger: 'pointerdown' | 'focus';
+  trigger: 'button' | 'auto';
 };
 
 export type ThreadedCommentsPanelHandlers = {

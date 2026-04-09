@@ -85,7 +85,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Chat with AI** — copy local conversations/articles with customizable templates, platform list, and max-length controls.
 - **$ Mention in AI chats** — type `$` on supported AI sites to search saved items and insert markdown snippets inline.
 - **Inpage quick actions** — single-click the inpage button to save current content; double-click to open the comments sidebar.
-- **Article comment threads** — local threaded comments for web articles (detail + inpage panel); root comment composer auto-attaches current selection as quote and clears quote when selection is empty, while reply composer does not affect quote selection state; preserved in Zip v2 backup/restore and article sync flows.
+- **Article comment threads** — local threaded comments for web articles (detail + inpage panel); use the sidebar "Quote selection" button to attach current selection as quote (empty selection clears quote), while clicking/focusing composers does not auto-attach; preserved in Zip v2 backup/restore and article sync flows.
 - **Smart current-page capture** — popup auto-detects page type and runs `Fetch AI Chat` or `Fetch Article`.
 - **Image caching** — optionally cache AI chat and web article images locally. Historical AI chat images can be backfilled from the detail page.
 - **Anti-hotlink image caching** — article images that match anti-hotlink rules are cached automatically, even if web article image caching is turned off.

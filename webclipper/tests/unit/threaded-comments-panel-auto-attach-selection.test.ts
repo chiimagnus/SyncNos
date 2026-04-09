@@ -65,7 +65,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
     mounted.api.setHandlers({ onComposerSelectionRequest } as any);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
@@ -83,35 +83,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     await Promise.resolve();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'pointerdown' });
-
-    mounted.cleanup();
-  });
-
-  it('dedupes repeated root composer pointerdown requests within same interaction', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-
-    const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
-    mounted.api.setHandlers({ onComposerSelectionRequest } as any);
-
-    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
-    expect(panel).toBeTruthy();
-    const shadow = panel!.shadowRoot!;
-
-    const composer = shadow.querySelector(
-      '.webclipper-inpage-comments-panel__composer-textarea',
-    ) as HTMLTextAreaElement | null;
-    expect(composer).toBeTruthy();
-
-    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-
-    await Promise.resolve();
-
-    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'pointerdown' });
+    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'auto' });
 
     mounted.cleanup();
   });
@@ -121,13 +93,14 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.body.appendChild(host);
 
     const onComposerSelectionRequest = vi.fn();
-    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
     mounted.api.setHandlers({ onComposerSelectionRequest } as any);
-    mounted.api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' }]);
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(panel).toBeTruthy();
     const shadow = panel!.shadowRoot!;
+
+    mounted.api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' }]);
 
     const composer = shadow.querySelector(
       '.webclipper-inpage-comments-panel__composer-textarea',
@@ -138,7 +111,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     await Promise.resolve();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'focus' });
+    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
 
     const reply = shadow.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
@@ -150,6 +123,29 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     await Promise.resolve();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    mounted.cleanup();
+  });
+
+  it('renders comments header title and no manual attach-selection button', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    const shadow = panel!.shadowRoot!;
+
+    const headerTitle = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__header-title',
+    ) as HTMLElement | null;
+    expect(headerTitle).toBeTruthy();
+    expect(headerTitle?.textContent).toBe('articleCommentsHeading');
+
+    const attachSelectionBtn = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__attach-selection',
+    ) as HTMLButtonElement | null;
+    expect(attachSelectionBtn).toBeFalsy();
 
     mounted.cleanup();
   });

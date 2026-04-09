@@ -18,7 +18,7 @@ export type CommentSidebarItem = {
 export type CommentSaveResult = void | boolean | { ok: boolean; createdRootId?: number | null };
 
 export type CommentSidebarComposerSelectionRequest = {
-  trigger: 'pointerdown' | 'focus';
+  trigger: 'button' | 'auto';
 };
 
 export type CommentSidebarHandlers = {

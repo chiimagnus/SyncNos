@@ -83,8 +83,7 @@ export function ThreadedCommentsPanel({
   const lastFocusedComposerSignalRef = useRef(0);
   const lastHandledEscapeSignalRef = useRef(0);
   const lastComposerPointerDownAtRef = useRef(0);
-  const lastComposerSelectionTriggerRef = useRef<'pointerdown' | 'focus' | null>(null);
-  const lastComposerSelectionRequestedAtRef = useRef(0);
+  const lastComposerAutoSelectionRequestAtRef = useRef(0);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
@@ -193,33 +192,12 @@ export function ThreadedCommentsPanel({
     });
   };
 
-  const isRootComposerTarget = (target: EventTarget | null): boolean => {
-    const el = target as HTMLElement | null;
-    if (!el) return false;
-    try {
-      return Boolean(el.closest('[data-webclipper-root-composer="1"]'));
-    } catch (_error) {
-      return false;
+  const requestComposerSelection = (trigger: 'button' | 'auto') => {
+    if (trigger === 'auto') {
+      const now = Date.now();
+      if (now - Number(lastComposerAutoSelectionRequestAtRef.current || 0) <= 120) return;
+      lastComposerAutoSelectionRequestAtRef.current = now;
     }
-  };
-
-  const requestComposerSelection = (trigger: 'pointerdown' | 'focus', target: EventTarget | null) => {
-    if (!isRootComposerTarget(target)) return;
-
-    const now = Date.now();
-    if (trigger === 'focus' && now - Number(lastComposerPointerDownAtRef.current || 0) <= 250) {
-      return;
-    }
-    if (
-      lastComposerSelectionTriggerRef.current === trigger &&
-      now - Number(lastComposerSelectionRequestedAtRef.current || 0) <= 120
-    ) {
-      return;
-    }
-
-    lastComposerSelectionTriggerRef.current = trigger;
-    lastComposerSelectionRequestedAtRef.current = now;
-
     const latestHandlers = readHandlers?.() || snapshot.handlers;
     const handler = latestHandlers.onComposerSelectionRequest;
     if (typeof handler !== 'function') return;
@@ -605,12 +583,14 @@ export function ThreadedCommentsPanel({
             placeholder="Write a comment…"
             rows={1}
             value={composerText}
-            onPointerDown={(event) => {
+            onPointerDown={() => {
               lastComposerPointerDownAtRef.current = Date.now();
-              requestComposerSelection('pointerdown', event.currentTarget);
+              requestComposerSelection('auto');
             }}
-            onFocus={(event) => {
-              requestComposerSelection('focus', event.currentTarget);
+            onFocus={() => {
+              const now = Date.now();
+              if (now - Number(lastComposerPointerDownAtRef.current || 0) <= 250) return;
+              requestComposerSelection('auto');
             }}
             onInput={(event) => updateComposerText(event.currentTarget.value)}
             onChange={(event) => updateComposerText(event.currentTarget.value)}

@@ -154,8 +154,8 @@ describe('article-comments-sidebar-controller', () => {
     const handlers = panel.getState().handlers;
     expect(typeof handlers.onComposerSelectionRequest).toBe('function');
 
-    await handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
-    expect(resolveComposerSelection).toHaveBeenNthCalledWith(1, { trigger: 'pointerdown' });
+    await handlers.onComposerSelectionRequest({ trigger: 'button' });
+    expect(resolveComposerSelection).toHaveBeenNthCalledWith(1, { trigger: 'button' });
     expect(session.getSnapshot().quoteText).toBe('Quoted from page');
 
     await handlers.onSave('root comment');
@@ -167,8 +167,8 @@ describe('article-comments-sidebar-controller', () => {
       locator,
     });
 
-    await handlers.onComposerSelectionRequest({ trigger: 'focus' });
-    expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'focus' });
+    await handlers.onComposerSelectionRequest({ trigger: 'button' });
+    expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'button' });
     expect(session.getSnapshot().quoteText).toBe('');
   });
 
@@ -199,8 +199,8 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const handlers = panel.getState().handlers;
-    const oldRequest = handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
-    const newRequest = handlers.onComposerSelectionRequest({ trigger: 'focus' });
+    const oldRequest = handlers.onComposerSelectionRequest({ trigger: 'button' });
+    const newRequest = handlers.onComposerSelectionRequest({ trigger: 'button' });
 
     fast.resolve({ selectionText: 'new quote', locator: null });
     await newRequest;
@@ -235,7 +235,7 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     const handlers = panel.getState().handlers;
-    await handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
+    await handlers.onComposerSelectionRequest({ trigger: 'button' });
     expect(session.getSnapshot().quoteText).toBe('Selection text only');
 
     await handlers.onSave('comment');
@@ -279,7 +279,7 @@ describe('article-comments-sidebar-controller', () => {
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
 
     const handlers = panel.getState().handlers;
-    await handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
+    await handlers.onComposerSelectionRequest({ trigger: 'button' });
     expect(session.getSnapshot().quoteText).toBe('Quote A');
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });

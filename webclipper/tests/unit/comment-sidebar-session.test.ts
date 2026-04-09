@@ -203,8 +203,8 @@ describe('comment-sidebar-session', () => {
     expect(typeof latestHandlers.onComposerSelectionRequest).toBe('function');
     expect(typeof latestHandlers.onSave).toBe('function');
 
-    await latestHandlers.onComposerSelectionRequest?.({ trigger: 'pointerdown' } as any);
-    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'pointerdown' });
+    await latestHandlers.onComposerSelectionRequest?.({ trigger: 'button' } as any);
+    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'button' });
 
     await latestHandlers.onSave?.('hello');
     expect(session.getSnapshot().quoteText).toBe('');

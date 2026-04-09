@@ -213,6 +213,7 @@ export const zh: { [K in TranslationKey]: string } = {
   openCommentsSidebarTooltip: '打开评论侧边栏',
   commentsSidebarArticleOnlyHint: '仅支持在网页文章中使用评论侧边栏',
   commentsSidebarUnavailableHint: '当前页面不支持打开评论侧边栏',
+  attachSelectedQuote: '附加选区',
   tooltipCommentSendDetailed: '发送评论',
   tooltipReplySendDetailed: '发送回复（Ctrl/Cmd + Enter）',
   tooltipDeleteCommentDetailed: '删除评论',

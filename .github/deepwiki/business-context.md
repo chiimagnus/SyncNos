@@ -34,7 +34,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 2. 扩展向页面注入 `readability.js`，尝试抽取标题、作者、发布时间、正文和 markdown 文本。
 3. 抓取结果被保存为 `sourceType = article` 的本地会话，并写入单条 `article_body` 消息。
 4. 后续 Notion / Obsidian / 备份 / 导出都把 article 当作与 chat 并列的一种会话类型处理；用户也可以在 article detail 或 inpage comments panel 里留下本地注释线程，这些评论会随 article 同步进入 Notion / Obsidian 的评论区段，并随 Zip v2 备份 / 导入保留。
-5. 当评论侧栏已打开时，根输入框会尝试自动附加当前选区（同一交互去重）；若无选区则清空引用；reply 输入框不会触发附加/清空。
+5. 当评论侧栏已打开时，用户可点击“附加选区”按钮把当前选区附加为引用；若无选区则清空引用；点击/聚焦 `Write a comment…` 与 reply 输入框都不会触发附加/清空。
 
 ### 旅程 3：用户在 Settings 里查看自己的本地积累到底有多大
 1. 用户可以直接进入 WebClipper 的 `Settings → Insight`，也可以从会话列表底部 `today/total` 统计点击跳转到该分区。

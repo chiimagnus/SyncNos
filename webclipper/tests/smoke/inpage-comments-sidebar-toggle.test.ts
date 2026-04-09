@@ -72,6 +72,7 @@ describe('inpage comments sidebar toggle', () => {
     const shadow = host?.shadowRoot;
     expect(shadow).toBeTruthy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__header-title')).toBeTruthy();
+    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
     const collapse = shadow?.querySelector('.webclipper-inpage-comments-panel__collapse') as HTMLButtonElement | null;
     expect(collapse).toBeTruthy();
 
@@ -104,9 +105,12 @@ describe('inpage comments sidebar toggle', () => {
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
     composer?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+    composer?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
-    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'pointerdown' });
+    expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
+
+    expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
     const reply = shadow?.querySelector(
       '.webclipper-inpage-comments-panel__reply-textarea',
