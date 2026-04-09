@@ -313,9 +313,6 @@ export const en = {
   chatWithPromptTemplateAria: 'Prompt template',
   chatWithPromptTemplateHint:
     'Variables: article_content, article_title, article_url, conversation_markdown. Prefer {{article_content}} style placeholders.',
-  chatWithMaxCharsLabel: 'Max chars',
-  chatWithMaxCharsAria: 'Max chars',
-  chatWithMaxCharsHint: 'Long content will be truncated before copying.',
   chatWithPlatformsLabel: 'Platforms',
   chatWithPlatformsEnabled: 'Enabled',
   chatWithPlatformNameAriaPrefix: 'Platform name',

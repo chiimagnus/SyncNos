@@ -27,7 +27,6 @@ describe('resolveChatWithDetailHeaderActions', () => {
     vi.clearAllMocks();
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 120,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     buildChatWithPayloadMock.mockResolvedValue('payload\n');

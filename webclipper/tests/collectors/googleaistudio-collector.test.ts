@@ -324,7 +324,7 @@ describe('googleaistudio-collector', () => {
     expect(snap.conversation.warningFlags).toContain('inline_images_single_too_large');
   });
 
-  it('manual capture ignores maxTurns option and keeps full turn list', async () => {
+  it('manual capture keeps full turn list', async () => {
     const html = `
       <div class="chat-session-content">
         <ms-chat-turn id="turn-u1">
@@ -360,7 +360,7 @@ describe('googleaistudio-collector', () => {
     });
 
     const def = createGoogleAiStudioCollectorDef(env) as any;
-    await Promise.resolve(def.collector.prepareManualCapture({ maxTurns: 1, settleMs: 0 }));
+    await Promise.resolve(def.collector.prepareManualCapture({ settleMs: 0 }));
     const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
 
     expect(snap).toBeTruthy();

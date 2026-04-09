@@ -30,7 +30,6 @@ describe('resolveChatWithCommentActions', () => {
     vi.clearAllMocks();
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [],
     });
     writeTextToClipboardMock.mockResolvedValue(true);
@@ -58,7 +57,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: false }],
     });
 
@@ -77,7 +75,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 120,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     resolveSingleEnabledChatWithActionLabelMock.mockResolvedValue('Chat with ChatGPT');
@@ -122,7 +119,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [
         { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true },
         { id: 'claude', name: 'Claude', url: 'https://claude.ai/', enabled: true },
@@ -146,7 +142,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     writeTextToClipboardMock.mockResolvedValue(false);
@@ -167,7 +162,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     openChatWithPlatformMock.mockResolvedValue(false);

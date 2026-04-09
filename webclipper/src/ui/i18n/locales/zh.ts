@@ -309,9 +309,6 @@ export const zh: { [K in TranslationKey]: string } = {
   chatWithPromptTemplateAria: 'Prompt 模板',
   chatWithPromptTemplateHint:
     '可用变量：article_content、article_title、article_url、conversation_markdown。推荐使用 {{article_content}} 这类占位符。',
-  chatWithMaxCharsLabel: '最大字符数',
-  chatWithMaxCharsAria: '最大字符数',
-  chatWithMaxCharsHint: '复制前会先截断过长内容。',
   chatWithPlatformsLabel: '平台',
   chatWithPlatformsEnabled: '启用',
   chatWithPlatformNameAriaPrefix: '平台名称',

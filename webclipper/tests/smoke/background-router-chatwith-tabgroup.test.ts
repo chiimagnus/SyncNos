@@ -66,7 +66,6 @@ describe('background-router chatwith grouped tab open/focus', () => {
   it('creates grouped platform tab in sender window', async () => {
     vi.mocked(loadChatWithSettings).mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     } as any);
     vi.mocked(tabGroupsSupported).mockReturnValue(true);
@@ -108,7 +107,6 @@ describe('background-router chatwith grouped tab open/focus', () => {
   it('degrades gracefully when article tab context is unavailable', async () => {
     vi.mocked(loadChatWithSettings).mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     } as any);
     vi.mocked(tabGroupsSupported).mockReturnValue(true);
@@ -136,7 +134,6 @@ describe('background-router chatwith grouped tab open/focus', () => {
   it('requires article key for grouped open/focus', async () => {
     vi.mocked(loadChatWithSettings).mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     } as any);
 
