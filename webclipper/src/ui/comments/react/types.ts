@@ -1,10 +1,17 @@
 import type { CommentSaveResult, ThreadedCommentItem, ThreadedCommentsPanelCommentChatWithConfig } from '../types';
 
+export type ThreadedCommentsPanelComposerSelectionRequest = {
+  trigger: 'pointerdown' | 'focus';
+};
+
 export type ThreadedCommentsPanelHandlers = {
   onSave?: (text: string) => CommentSaveResult | Promise<CommentSaveResult>;
   onReply?: (parentId: number, text: string) => void | Promise<void>;
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
+  onComposerSelectionRequest?: (
+    input: ThreadedCommentsPanelComposerSelectionRequest,
+  ) => void | Promise<void>;
 };
 
 export type ThreadedCommentsPanelSnapshot = {

@@ -82,6 +82,7 @@ export function ThreadedCommentsPanel({
   const composerTextRef = useRef('');
   const lastFocusedComposerSignalRef = useRef(0);
   const lastHandledEscapeSignalRef = useRef(0);
+  const lastComposerPointerDownAtRef = useRef(0);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
@@ -187,6 +188,15 @@ export function ThreadedCommentsPanel({
     replyTextsRef.current = { ...replyTextsRef.current, [rootId]: next };
     syncLocalState(() => {
       setReplyText(rootId, next);
+    });
+  };
+
+  const requestComposerSelection = (trigger: 'pointerdown' | 'focus') => {
+    const latestHandlers = readHandlers?.() || snapshot.handlers;
+    const handler = latestHandlers.onComposerSelectionRequest;
+    if (typeof handler !== 'function') return;
+    void Promise.resolve(handler({ trigger })).catch(() => {
+      // ignore
     });
   };
 
@@ -567,6 +577,15 @@ export function ThreadedCommentsPanel({
             placeholder="Write a comment…"
             rows={1}
             value={composerText}
+            onPointerDown={() => {
+              lastComposerPointerDownAtRef.current = Date.now();
+              requestComposerSelection('pointerdown');
+            }}
+            onFocus={() => {
+              const now = Date.now();
+              if (now - Number(lastComposerPointerDownAtRef.current || 0) <= 250) return;
+              requestComposerSelection('focus');
+            }}
             onInput={(event) => updateComposerText(event.currentTarget.value)}
             onChange={(event) => updateComposerText(event.currentTarget.value)}
             onKeyDown={(event) => {
