@@ -83,6 +83,7 @@ export function createArticleCommentsSidebarController(input: {
   let lastEnsureContextInput: ArticleCommentsSidebarEnsureContextInput | undefined;
   let pendingRootLocator: ArticleCommentLocator | null = null;
   let refreshRunId = 0;
+  let composerSelectionRequestSeq = 0;
 
   const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
     const quoteText = normalizeCommentSidebarQuoteText(payload?.selectionText);
@@ -190,12 +191,14 @@ export function createArticleCommentsSidebarController(input: {
       onComposerSelectionRequest: async (request) => {
         const resolveComposerSelection = input.resolveComposerSelection;
         if (typeof resolveComposerSelection !== 'function') return;
+        const requestSeq = ++composerSelectionRequestSeq;
         let payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined;
         try {
           payload = await resolveComposerSelection(request);
         } catch (_error) {
           payload = { selectionText: '', locator: null };
         }
+        if (requestSeq !== composerSelectionRequestSeq) return;
         applyComposerSelection(payload ?? { selectionText: '', locator: null });
       },
     };

@@ -172,6 +172,129 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().quoteText).toBe('');
   });
 
+  it('ignores stale composer selection responses and keeps latest result', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 1 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 1 })),
+    };
+
+    const slow = createDeferred<{ selectionText: string; locator: unknown | null }>();
+    const fast = createDeferred<{ selectionText: string; locator: unknown | null }>();
+
+    const resolveComposerSelection = vi
+      .fn()
+      .mockImplementationOnce(() => slow.promise)
+      .mockImplementationOnce(() => fast.promise);
+
+    createArticleCommentsSidebarController({
+      session,
+      adapter: adapter as any,
+      resolveComposerSelection,
+    });
+
+    const handlers = panel.getState().handlers;
+    const oldRequest = handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
+    const newRequest = handlers.onComposerSelectionRequest({ trigger: 'focus' });
+
+    fast.resolve({ selectionText: 'new quote', locator: null });
+    await newRequest;
+    expect(session.getSnapshot().quoteText).toBe('new quote');
+
+    slow.resolve({ selectionText: 'old quote', locator: null });
+    await oldRequest;
+    expect(session.getSnapshot().quoteText).toBe('new quote');
+  });
+
+  it('preserves quote text when locator is missing and saves with null locator', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 77 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      ensureContext: vi.fn(async () => ({ canonicalUrl: 'https://example.com/article', conversationId: 21 })),
+    };
+
+    const resolveComposerSelection = vi.fn().mockResolvedValue({
+      selectionText: 'Selection text only',
+      locator: null,
+    });
+
+    createArticleCommentsSidebarController({
+      session,
+      adapter: adapter as any,
+      resolveComposerSelection,
+    });
+
+    const handlers = panel.getState().handlers;
+    await handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
+    expect(session.getSnapshot().quoteText).toBe('Selection text only');
+
+    await handlers.onSave('comment');
+    expect(adapter.addRoot).toHaveBeenLastCalledWith({
+      canonicalUrl: 'https://example.com/article',
+      conversationId: 21,
+      quoteText: 'Selection text only',
+      commentText: 'comment',
+      locator: null,
+    });
+  });
+
+  it('clears pending locator when context switches before save', async () => {
+    const panel = createMockPanel();
+    const session = createCommentSidebarSession(panel.api as any);
+
+    const adapter = {
+      list: vi.fn(async () => []),
+      addRoot: vi.fn(async () => ({ id: 66 })),
+      addReply: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+    };
+
+    const locatorFromA = {
+      env: 'inpage',
+      quote: { exact: 'Quote A' },
+      position: { start: 0, end: 6 },
+    };
+
+    const resolveComposerSelection = vi.fn().mockResolvedValue({
+      selectionText: 'Quote A',
+      locator: locatorFromA,
+    });
+
+    const controller = createArticleCommentsSidebarController({
+      session,
+      adapter: adapter as any,
+      resolveComposerSelection,
+    });
+
+    controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
+
+    const handlers = panel.getState().handlers;
+    await handlers.onComposerSelectionRequest({ trigger: 'pointerdown' });
+    expect(session.getSnapshot().quoteText).toBe('Quote A');
+
+    controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
+    expect(session.getSnapshot().quoteText).toBe('');
+
+    await handlers.onSave('comment in b');
+    expect(adapter.addRoot).toHaveBeenLastCalledWith({
+      canonicalUrl: 'https://example.com/b',
+      conversationId: 2,
+      quoteText: '',
+      commentText: 'comment in b',
+      locator: null,
+    });
+  });
+
   it('setContext: refreshes comments when canonicalUrl switches', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
