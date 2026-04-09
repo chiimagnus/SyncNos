@@ -201,7 +201,7 @@ export function registerClipperContextMenu(): void {
   void createOrRefreshMenus(api);
 
   try {
-    api.onClicked?.addListener?.((info: any, tab: any) => {
+    api.onClicked?.addListener?.((info: any, _tab: any) => {
       const id = String(info?.menuItemId || '');
       if (!id) return;
 

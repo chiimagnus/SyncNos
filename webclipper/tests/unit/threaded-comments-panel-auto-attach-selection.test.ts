@@ -101,8 +101,6 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     expect(panel).toBeTruthy();
-    const shadow = panel!.shadowRoot!;
-
     const selectionState = installMutableSelectionMock('Quoted text');
     expect(selectionState.text).toBe('Quoted text');
 
