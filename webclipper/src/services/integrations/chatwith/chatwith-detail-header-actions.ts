@@ -3,7 +3,6 @@ import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integ
 import {
   buildChatWithPayload,
   loadChatWithSettings,
-  truncateForChatWith,
   type ChatWithAiPlatform,
 } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
@@ -40,11 +39,9 @@ function buildChatWithPlatformAction(input: {
   port: DetailHeaderActionPort;
   platform: ChatWithAiPlatform;
   payload: string;
-  maxChars: number;
   openPort?: ChatWithOpenPlatformPort | null;
 }): DetailHeaderAction | null {
   const { conversation, detail, platform, payload, port } = input;
-  const maxChars = Number(input.maxChars);
 
   if (!conversation || !detail || !Array.isArray(detail.messages) || !detail.messages.length) return null;
   if (!platform || !platform.enabled) return null;
@@ -53,10 +50,9 @@ function buildChatWithPlatformAction(input: {
   // Guard against stale detail data when the active conversation switches.
   if (Number(detail.conversationId) !== Number(conversation.id)) return null;
 
-  const truncated = truncateForChatWith(payload, maxChars);
   const href = String(platform.url || '').trim();
   const label = `Chat with ${String(platform.name || '').trim()}`;
-  const after = `✅ 已复制，正在跳转 ${String(platform.name || '').trim()}…${truncated.truncated ? ' (truncated)' : ''}`;
+  const after = `✅ 已复制，正在跳转 ${String(platform.name || '').trim()}…`;
   const adapterOpenPort: ChatWithOpenPlatformPort = {
     openPlatform: async (_platformId, fallbackUrl) => {
       const target = String(fallbackUrl || '').trim();
@@ -76,7 +72,7 @@ function buildChatWithPlatformAction(input: {
     href,
     afterTriggerLabel: after,
     onTrigger: async () => {
-      const copied = await writeTextToClipboard(truncated.text);
+      const copied = await writeTextToClipboard(payload);
       if (!copied) throw new Error('Failed to copy content to clipboard');
       const opened = await openChatWithPlatform({
         platform,
@@ -118,7 +114,6 @@ export async function resolveChatWithDetailHeaderActions({
         port,
         platform,
         payload,
-        maxChars: settings.maxChars,
         openPort,
       });
       if (action) actions.push(action);

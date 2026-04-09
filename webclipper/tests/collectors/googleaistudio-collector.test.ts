@@ -301,12 +301,9 @@ describe('googleaistudio-collector', () => {
       </div>
     `;
     const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
-    const tooLarge = new Uint8Array(2_000_001);
-    const bigBlob = new (dom.window as any).Blob([tooLarge], { type: 'image/png' });
-
     (dom.window as any).fetch = async () => ({
-      ok: true,
-      blob: async () => bigBlob,
+      ok: false,
+      blob: async () => new (dom.window as any).Blob([], { type: 'image/png' }),
     });
 
     const env = createCollectorEnv({
@@ -321,6 +318,52 @@ describe('googleaistudio-collector', () => {
     const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
     expect(snap).toBeTruthy();
     expect(Array.isArray(snap.conversation.warningFlags)).toBe(true);
-    expect(snap.conversation.warningFlags).toContain('inline_images_single_too_large');
+    expect(snap.conversation.warningFlags).toContain('inline_images_fetch_failed');
+  });
+
+  it('manual capture keeps full turn list', async () => {
+    const html = `
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-u1">
+          <div class="chat-turn-container render user">
+            <div class="virtual-scroll-container user-prompt-container" data-turn-role="User">
+              <div class="turn-content">hello-1</div>
+            </div>
+          </div>
+        </ms-chat-turn>
+        <ms-chat-turn id="turn-u2">
+          <div class="chat-turn-container render user">
+            <div class="virtual-scroll-container user-prompt-container" data-turn-role="User">
+              <div class="turn-content">hello-2</div>
+            </div>
+          </div>
+        </ms-chat-turn>
+        <ms-chat-turn id="turn-u3">
+          <div class="chat-turn-container render user">
+            <div class="virtual-scroll-container user-prompt-container" data-turn-role="User">
+              <div class="turn-content">hello-3</div>
+            </div>
+          </div>
+        </ms-chat-turn>
+      </div>
+    `;
+
+    const dom = setupDom(html, 'https://aistudio.google.com/app/abc123');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const def = createGoogleAiStudioCollectorDef(env) as any;
+    await Promise.resolve(def.collector.prepareManualCapture({ settleMs: 0 }));
+    const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
+
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(3);
+    expect(snap.messages[0]?.contentText).toBe('hello-1');
+    expect(snap.messages[1]?.contentText).toBe('hello-2');
+    expect(snap.messages[2]?.contentText).toBe('hello-3');
   });
 });

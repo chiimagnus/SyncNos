@@ -1,8 +1,4 @@
-import {
-  loadChatWithSettings,
-  truncateForChatWith,
-  type ChatWithAiPlatform,
-} from '@services/integrations/chatwith/chatwith-settings';
+import { loadChatWithSettings, type ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
 import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-detail-header-actions';
 import { buildChatWithCommentPayloadV1 } from '@services/integrations/chatwith/chatwith-comment-payload';
@@ -68,7 +64,6 @@ export async function resolveChatWithCommentActions(
   });
   if (!safeText(payload)) return [];
 
-  const truncated = truncateForChatWith(payload, settings.maxChars);
   const singleLabel = enabledPlatforms.length === 1 ? await resolveSingleEnabledChatWithActionLabel() : null;
 
   const actions: ChatWithCommentAction[] = [];
@@ -81,7 +76,7 @@ export async function resolveChatWithCommentActions(
       id: `chat-with-${platformId}`,
       label: buildActionLabel(platform, singleLabel),
       onTrigger: async () => {
-        const copied = await writeTextToClipboard(truncated.text);
+        const copied = await writeTextToClipboard(payload);
         if (!copied) throw new Error('Failed to copy content to clipboard');
         const opened = await openChatWithPlatform({
           platform,
@@ -93,7 +88,7 @@ export async function resolveChatWithCommentActions(
             : null,
         });
         if (!opened) throw new Error(`Failed to open ${platformName}`);
-        return `✅ 已复制，正在跳转 ${platformName}…${truncated.truncated ? ' (truncated)' : ''}`;
+        return `✅ 已复制，正在跳转 ${platformName}…`;
       },
     });
   }

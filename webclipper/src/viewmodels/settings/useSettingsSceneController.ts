@@ -24,7 +24,6 @@ import { storageGet, storageOnChanged, storageRemove, storageSet } from '@servic
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import {
-  DEFAULT_CHAT_WITH_MAX_CHARS,
   DEFAULT_CHAT_WITH_PLATFORMS,
   DEFAULT_CHAT_WITH_PROMPT_TEMPLATE,
   loadChatWithSettings,
@@ -234,7 +233,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
-  const [chatWithMaxChars, setChatWithMaxChars] = useState<string>(String(DEFAULT_CHAT_WITH_MAX_CHARS));
   const [chatWithPlatforms, setChatWithPlatforms] = useState<any[]>(DEFAULT_CHAT_WITH_PLATFORMS.slice());
   const chatWithHydratedRef = useRef(false);
 
@@ -355,7 +353,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     const chatWith = await loadChatWithSettings();
     setChatWithPromptTemplate(String(chatWith.promptTemplate || DEFAULT_CHAT_WITH_PROMPT_TEMPLATE));
-    setChatWithMaxChars(String(chatWith.maxChars || DEFAULT_CHAT_WITH_MAX_CHARS));
     setChatWithPlatforms(
       Array.isArray(chatWith.platforms) ? (chatWith.platforms as any) : DEFAULT_CHAT_WITH_PLATFORMS.slice(),
     );
@@ -882,12 +879,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (!chatWithHydratedRef.current) return;
 
     // Save on explicit UI boundaries (onBlur / Enter), instead of debounced write-through.
-    const max = Number(String(chatWithMaxChars || '').trim());
     await runTask(
       async () => {
         await saveChatWithSettings({
           promptTemplate: String(chatWithPromptTemplate || ''),
-          maxChars: Number.isFinite(max) ? Math.floor(max) : DEFAULT_CHAT_WITH_MAX_CHARS,
           platforms: Array.isArray(chatWithPlatforms) ? (chatWithPlatforms as any) : [],
         } as any);
       },
@@ -897,7 +892,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         fallbackMessage: 'save chat with settings failed',
       },
     );
-  }, [chatWithMaxChars, chatWithPlatforms, chatWithPromptTemplate, runTask]);
+  }, [chatWithPlatforms, chatWithPromptTemplate, runTask]);
 
   useEffect(() => {
     if (activeSection !== 'aboutyou') return;
@@ -1173,8 +1168,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     chatWithPromptTemplate,
     setChatWithPromptTemplate,
-    chatWithMaxChars,
-    setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
     onSaveChatWithSettings,

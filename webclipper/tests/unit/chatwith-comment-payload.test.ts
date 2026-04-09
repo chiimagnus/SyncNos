@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildChatWithCommentPayloadV1 } from '../../src/services/integrations/chatwith/chatwith-comment-payload';
-import { truncateForChatWith } from '../../src/services/integrations/chatwith/chatwith-settings';
 
 describe('buildChatWithCommentPayloadV1', () => {
   it('builds payload with quote/comment/title/url and trailing newline', () => {
@@ -56,7 +55,7 @@ describe('buildChatWithCommentPayloadV1', () => {
     expect(payload).toBe('');
   });
 
-  it('supports custom template rendering and truncation suffix behavior', () => {
+  it('supports custom template rendering', () => {
     const payload = buildChatWithCommentPayloadV1({
       quoteText: 'Q',
       commentText: `Reply 1:\n${'C'.repeat(200)}`,
@@ -68,9 +67,6 @@ describe('buildChatWithCommentPayloadV1', () => {
     expect(payload).toContain('Title=T');
     expect(payload).toContain('URL=https://example.com/x');
     expect(payload).toContain('Reply 1:');
-
-    const truncated = truncateForChatWith(payload, 80);
-    expect(truncated.truncated).toBe(true);
-    expect(truncated.text).toContain('[Truncated: original length=');
+    expect(payload.endsWith('\n')).toBe(true);
   });
 });

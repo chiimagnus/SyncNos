@@ -23,24 +23,13 @@ export function ChatWithAiSection(props: {
   busy: boolean;
   promptTemplate: string;
   onChangePromptTemplate: (v: string) => void;
-  maxChars: string;
-  onChangeMaxChars: (v: string) => void;
   platforms: ChatWithAiPlatform[];
   onChangePlatforms: (next: ChatWithAiPlatform[]) => void;
   onSave: () => void;
   onResetPlatforms: () => void;
 }) {
-  const {
-    busy,
-    promptTemplate,
-    onChangePromptTemplate,
-    maxChars,
-    onChangeMaxChars,
-    platforms,
-    onChangePlatforms,
-    onSave,
-    onResetPlatforms,
-  } = props;
+  const { busy, promptTemplate, onChangePromptTemplate, platforms, onChangePlatforms, onSave, onResetPlatforms } =
+    props;
 
   const rows = useMemo(() => (Array.isArray(platforms) ? platforms : []), [platforms]);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -100,27 +89,6 @@ export function ChatWithAiSection(props: {
             />
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
               {t('chatWithPromptTemplateHint')}
-            </div>
-          </div>
-        </SettingsFormRow>
-
-        <SettingsFormRow label={t('chatWithMaxCharsLabel')} align="start">
-          <div className="tw-flex tw-items-center tw-gap-2">
-            <input
-              id="chatWithMaxChars"
-              value={maxChars}
-              onChange={(e) => onChangeMaxChars(e.target.value)}
-              disabled={busy}
-              type="number"
-              inputMode="numeric"
-              min={500}
-              step={500}
-              placeholder="28000"
-              aria-label={t('chatWithMaxCharsAria')}
-              className={`${textInputClassName} tw-w-[140px]`}
-            />
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-              {t('chatWithMaxCharsHint')}
             </div>
           </div>
         </SettingsFormRow>

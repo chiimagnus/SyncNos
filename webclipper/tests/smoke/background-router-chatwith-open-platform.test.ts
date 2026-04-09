@@ -29,7 +29,6 @@ describe('background-router chatwith open platform', () => {
   it('opens enabled platform in sender window', async () => {
     vi.mocked(loadChatWithSettings).mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     } as any);
     vi.mocked(tabsCreate).mockResolvedValue({ id: 99, windowId: 7, url: 'https://chatgpt.com/' } as any);
@@ -57,7 +56,6 @@ describe('background-router chatwith open platform', () => {
   it('rejects disabled platform and does not open tab', async () => {
     vi.mocked(loadChatWithSettings).mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: false }],
     } as any);
 

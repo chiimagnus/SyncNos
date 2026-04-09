@@ -41,10 +41,6 @@ function pickTurnContent(turn: Element, role: 'user' | 'assistant'): Element | n
 }
 
 export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDefinition {
-  const INLINE_BLOB_IMAGES_MAX_COUNT = 12;
-  const INLINE_BLOB_IMAGE_MAX_BYTES = 2_000_000;
-  const INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES = 8_000_000;
-
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
@@ -192,15 +188,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const cached = ctx.blobUrlCache.get(blobUrl);
     if (cached && cached.dataUrl) return cached.dataUrl;
 
-    if (ctx.inlinedCount >= INLINE_BLOB_IMAGES_MAX_COUNT) {
-      ctx.warningFlags.add('inline_images_limit_reached');
-      return null;
-    }
-    if (ctx.inlinedBytes >= INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
-      ctx.warningFlags.add('inline_images_total_bytes_limit_reached');
-      return null;
-    }
-
     const fetchFn: any = (env.window as any)?.fetch || (globalThis as any).fetch;
     if (typeof fetchFn !== 'function') {
       ctx.warningFlags.add('inline_images_fetch_unavailable');
@@ -223,14 +210,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       }
       if (size <= 0) {
         ctx.warningFlags.add('inline_images_empty_blob');
-        return null;
-      }
-      if (size > INLINE_BLOB_IMAGE_MAX_BYTES) {
-        ctx.warningFlags.add('inline_images_single_too_large');
-        return null;
-      }
-      if (ctx.inlinedBytes + size > INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
-        ctx.warningFlags.add('inline_images_total_bytes_limit_reached');
         return null;
       }
 
@@ -395,7 +374,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const turns: Element[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any;
     if (!turns.length) return false;
 
-    const maxTurns = Math.max(1, Number(options.maxTurns) || 240);
     const settleMs = Math.max(0, Number(options.settleMs) || 80);
     const perTurnTimeoutMs = Math.max(120, Number(options.perTurnTimeoutMs) || 900);
     const pollMs = Math.max(30, Number(options.pollMs) || 80);
@@ -408,7 +386,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
     const bottomTurn = turns[turns.length - 1] || null;
 
-    const total = Math.min(maxTurns, turns.length);
+    const total = turns.length;
     for (let i = 0; i < total; i += 1) {
       const turn = turns[i];
       const role = normalizeRoleFromTurn(turn);
@@ -446,7 +424,8 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       if (turnId) manualTurnCache.set(turnId, msg);
     }
 
-    manualCacheWarningFlags = Array.from(ctx.warningFlags);
+    const warningFlags = new Set<string>(ctx.warningFlags);
+    manualCacheWarningFlags = Array.from(warningFlags);
 
     try {
       (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });

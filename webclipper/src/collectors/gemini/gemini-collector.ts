@@ -9,9 +9,6 @@ import {
 import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
 
 export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition {
-  const INLINE_BLOB_IMAGES_MAX_COUNT = 12;
-  const INLINE_BLOB_IMAGE_MAX_BYTES = 2_000_000;
-  const INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES = 8_000_000;
   const DEEP_RESEARCH_MIN_TEXT_LENGTH = 120;
 
   function sleep(ms: number): Promise<void> {
@@ -810,15 +807,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
     const cached = ctx.blobUrlCache.get(blobUrl);
     if (cached && cached.dataUrl) return cached.dataUrl;
 
-    if (ctx.inlinedCount >= INLINE_BLOB_IMAGES_MAX_COUNT) {
-      ctx.warningFlags.add('inline_images_limit_reached');
-      return null;
-    }
-    if (ctx.inlinedBytes >= INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
-      ctx.warningFlags.add('inline_images_total_bytes_limit_reached');
-      return null;
-    }
-
     const fetchFn: any = (env.window as any)?.fetch || (globalThis as any).fetch;
     if (typeof fetchFn !== 'function') {
       ctx.warningFlags.add('inline_images_fetch_unavailable');
@@ -841,14 +829,6 @@ export function createGeminiCollectorDef(env: CollectorEnv): CollectorDefinition
       }
       if (size <= 0) {
         ctx.warningFlags.add('inline_images_empty_blob');
-        return null;
-      }
-      if (size > INLINE_BLOB_IMAGE_MAX_BYTES) {
-        ctx.warningFlags.add('inline_images_single_too_large');
-        return null;
-      }
-      if (ctx.inlinedBytes + size > INLINE_BLOB_IMAGES_MAX_TOTAL_BYTES) {
-        ctx.warningFlags.add('inline_images_total_bytes_limit_reached');
         return null;
       }
 

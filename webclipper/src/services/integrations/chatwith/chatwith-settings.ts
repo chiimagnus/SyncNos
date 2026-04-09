@@ -14,14 +14,10 @@ export type ChatWithAiPlatform = {
 export type ChatWithSettings = {
   promptTemplate: string;
   platforms: ChatWithAiPlatform[];
-  maxChars: number;
 };
 
 export const CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY = 'chat_with_prompt_template_v1';
 export const CHAT_WITH_PLATFORMS_STORAGE_KEY = 'chat_with_ai_platforms_v1';
-export const CHAT_WITH_MAX_CHARS_STORAGE_KEY = 'chat_with_max_chars_v1';
-
-export const DEFAULT_CHAT_WITH_MAX_CHARS = 28_000;
 
 export const DEFAULT_CHAT_WITH_PROMPT_TEMPLATE = t('chatWithDefaultPromptTemplateV1');
 
@@ -85,10 +81,6 @@ function withDefaults(input: Partial<ChatWithSettings>): ChatWithSettings {
     ? String(input.promptTemplate)
     : DEFAULT_CHAT_WITH_PROMPT_TEMPLATE;
 
-  const maxCharsRaw = Number((input as any).maxChars);
-  const maxChars =
-    Number.isFinite(maxCharsRaw) && maxCharsRaw > 500 ? Math.floor(maxCharsRaw) : DEFAULT_CHAT_WITH_MAX_CHARS;
-
   const platformsInput = Array.isArray(input.platforms) ? input.platforms : [];
   const parsed = platformsInput.map(coercePlatform).filter(Boolean) as ChatWithAiPlatform[];
 
@@ -102,26 +94,17 @@ function withDefaults(input: Partial<ChatWithSettings>): ChatWithSettings {
 
   return {
     promptTemplate,
-    maxChars,
     platforms: Array.from(map.values()),
   };
 }
 
 export async function loadChatWithSettings(): Promise<ChatWithSettings> {
   try {
-    const res = await storageGet([
-      CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY,
-      CHAT_WITH_PLATFORMS_STORAGE_KEY,
-      CHAT_WITH_MAX_CHARS_STORAGE_KEY,
-    ]);
+    const res = await storageGet([CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY, CHAT_WITH_PLATFORMS_STORAGE_KEY]);
 
     const promptTemplate = isNonEmptyString(res?.[CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY])
       ? String(res[CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY])
       : DEFAULT_CHAT_WITH_PROMPT_TEMPLATE;
-
-    const maxCharsRaw = Number(res?.[CHAT_WITH_MAX_CHARS_STORAGE_KEY]);
-    const maxChars =
-      Number.isFinite(maxCharsRaw) && maxCharsRaw > 500 ? Math.floor(maxCharsRaw) : DEFAULT_CHAT_WITH_MAX_CHARS;
 
     const platformsRaw = res?.[CHAT_WITH_PLATFORMS_STORAGE_KEY];
     let platforms: ChatWithAiPlatform[] = [];
@@ -129,7 +112,7 @@ export async function loadChatWithSettings(): Promise<ChatWithSettings> {
       platforms = platformsRaw.map(coercePlatform).filter(Boolean) as ChatWithAiPlatform[];
     }
 
-    return withDefaults({ promptTemplate, platforms, maxChars });
+    return withDefaults({ promptTemplate, platforms });
   } catch (_e) {
     return withDefaults({});
   }
@@ -139,7 +122,6 @@ export async function saveChatWithSettings(settings: ChatWithSettings): Promise<
   const normalized = withDefaults(settings || ({} as any));
   await storageSet({
     [CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY]: String(normalized.promptTemplate || ''),
-    [CHAT_WITH_MAX_CHARS_STORAGE_KEY]: Math.floor(Number(normalized.maxChars) || DEFAULT_CHAT_WITH_MAX_CHARS),
     [CHAT_WITH_PLATFORMS_STORAGE_KEY]: normalized.platforms.map((p) => ({
       id: p.id,
       name: p.name,
@@ -328,17 +310,6 @@ export function renderChatWithTemplate(template: string, vars: Record<string, st
   }
 
   return out;
-}
-
-export function truncateForChatWith(input: string, maxChars: number): { text: string; truncated: boolean } {
-  const text = String(input || '');
-  const limit = Number.isFinite(Number(maxChars))
-    ? Math.max(1, Math.floor(Number(maxChars)))
-    : DEFAULT_CHAT_WITH_MAX_CHARS;
-  if (text.length <= limit) return { text, truncated: false };
-  const suffix = `\n\n[Truncated: original length=${text.length}]`;
-  const sliceLen = Math.max(0, limit - suffix.length);
-  return { text: `${text.slice(0, sliceLen)}${suffix}`, truncated: true };
 }
 
 export async function buildChatWithPayload(

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadChatWithSettingsMock = vi.fn();
-const truncateForChatWithMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const resolveSingleEnabledChatWithActionLabelMock = vi.fn();
 const openChatWithPlatformMock = vi.fn();
@@ -11,7 +10,6 @@ vi.mock('../../src/services/integrations/chatwith/chatwith-settings', async () =
   return {
     ...(actual as Record<string, unknown>),
     loadChatWithSettings: (...args: any[]) => loadChatWithSettingsMock(...args),
-    truncateForChatWith: (...args: any[]) => truncateForChatWithMock(...args),
   };
 });
 
@@ -32,13 +30,8 @@ describe('resolveChatWithCommentActions', () => {
     vi.clearAllMocks();
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [],
     });
-    truncateForChatWithMock.mockImplementation((input: string) => ({
-      text: String(input || ''),
-      truncated: false,
-    }));
     writeTextToClipboardMock.mockResolvedValue(true);
     resolveSingleEnabledChatWithActionLabelMock.mockResolvedValue(null);
     openChatWithPlatformMock.mockResolvedValue(true);
@@ -64,7 +57,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: false }],
     });
 
@@ -77,17 +69,15 @@ describe('resolveChatWithCommentActions', () => {
     expect(actions).toEqual([]);
   });
 
-  it('builds single-platform action and copies truncated payload', async () => {
+  it('builds single-platform action and copies full payload', async () => {
     const { resolveChatWithCommentActions } =
       await import('../../src/services/integrations/chatwith/chatwith-comment-actions');
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 120,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     resolveSingleEnabledChatWithActionLabelMock.mockResolvedValue('Chat with ChatGPT');
-    truncateForChatWithMock.mockReturnValue({ text: 'payload-truncated\n', truncated: true });
 
     const actions = await resolveChatWithCommentActions({
       quoteText: 'Selected quote',
@@ -103,7 +93,7 @@ describe('resolveChatWithCommentActions', () => {
     const notice = await actions[0].onTrigger();
 
     expect(writeTextToClipboardMock).toHaveBeenCalledTimes(1);
-    expect(writeTextToClipboardMock).toHaveBeenCalledWith('payload-truncated\n');
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith(expect.any(String));
     expect(openChatWithPlatformMock).toHaveBeenCalledTimes(1);
     expect(openChatWithPlatformMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -113,12 +103,8 @@ describe('resolveChatWithCommentActions', () => {
     );
     expect(String(notice || '')).toContain('已复制');
     expect(String(notice || '')).toContain('ChatGPT');
-    expect(String(notice || '')).toContain('truncated');
 
-    expect(truncateForChatWithMock).toHaveBeenCalledTimes(1);
-    expect(truncateForChatWithMock).toHaveBeenCalledWith(expect.any(String), 120);
-
-    const payloadArg = String(truncateForChatWithMock.mock.calls[0]?.[0] || '');
+    const payloadArg = String(writeTextToClipboardMock.mock.calls[0]?.[0] || '');
     expect(payloadArg).toContain('Article Title: My Article');
     expect(payloadArg).toContain('Article URL: https://example.com/article');
     expect(payloadArg).toContain('Quote:');
@@ -133,7 +119,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [
         { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true },
         { id: 'claude', name: 'Claude', url: 'https://claude.ai/', enabled: true },
@@ -157,7 +142,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     writeTextToClipboardMock.mockResolvedValue(false);
@@ -178,7 +162,6 @@ describe('resolveChatWithCommentActions', () => {
 
     loadChatWithSettingsMock.mockResolvedValue({
       promptTemplate: '',
-      maxChars: 28000,
       platforms: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
     });
     openChatWithPlatformMock.mockResolvedValue(false);

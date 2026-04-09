@@ -66,8 +66,6 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     chatWithPromptTemplate,
     setChatWithPromptTemplate,
-    chatWithMaxChars,
-    setChatWithMaxChars,
     chatWithPlatforms,
     setChatWithPlatforms,
     onSaveChatWithSettings,
@@ -204,8 +202,6 @@ export function SettingsScene(props: SettingsSceneProps) {
           busy={busy}
           promptTemplate={chatWithPromptTemplate}
           onChangePromptTemplate={setChatWithPromptTemplate}
-          maxChars={chatWithMaxChars}
-          onChangeMaxChars={setChatWithMaxChars}
           platforms={chatWithPlatforms as any}
           onChangePlatforms={setChatWithPlatforms as any}
           onSave={() => {

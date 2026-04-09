@@ -267,6 +267,34 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(syncTooltip).toContain('tooltipLoadedVisibleSelectionScope');
   });
 
+  it('shows warning badge tooltip with mapped warning details', async () => {
+    currentState = buildState({
+      items: [
+        {
+          ...baseConversation(11, 'googleaistudio'),
+          warningFlags: ['inline_images_fetch_failed', 'inline_images_encode_failed', 'custom_warning_code'],
+        },
+      ],
+      listSummary: { totalCount: 1, todayCount: 1 },
+      listFacets: {
+        sources: [{ key: 'googleaistudio', label: 'googleaistudio', count: 1 }],
+        sites: [],
+      },
+    });
+
+    await renderPane();
+
+    const badge = Array.from(document.querySelectorAll('span')).find(
+      (el) => String(el.textContent || '').trim() === 'warningBadge',
+    ) as HTMLSpanElement | undefined;
+    expect(badge).toBeTruthy();
+
+    const tooltip = String(badge?.getAttribute('data-tooltip-content') || '');
+    expect(tooltip).toContain('warningFlagInlineImagesFetchFailed');
+    expect(tooltip).toContain('warningFlagInlineImagesEncodeFailed');
+    expect(tooltip).toContain('warningFlagUnknownPrefix: custom_warning_code');
+  });
+
   it('shows select-all as indeterminate until all conversations are selected', async () => {
     currentState = buildState({
       items: [baseConversation(11), baseConversation(22)],
