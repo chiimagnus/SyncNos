@@ -188,4 +188,25 @@ describe('comment-sidebar-session', () => {
       lastOpenSource: 'app',
     });
   });
+
+  it('forwards onComposerSelectionRequest while keeping onSave clear-quote wrapper', async () => {
+    const { panel, calls } = createPanelMock();
+    const session = createCommentSidebarSession(panel);
+
+    const onComposerSelectionRequest = vi.fn(async () => {});
+    const onSave = vi.fn(async () => ({ ok: true }));
+
+    session.setQuoteText('quoted text');
+    session.setHandlers({ onSave, onComposerSelectionRequest });
+
+    const latestHandlers = calls.handlers[calls.handlers.length - 1];
+    expect(typeof latestHandlers.onComposerSelectionRequest).toBe('function');
+    expect(typeof latestHandlers.onSave).toBe('function');
+
+    await latestHandlers.onComposerSelectionRequest?.({ trigger: 'pointerdown' } as any);
+    expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'pointerdown' });
+
+    await latestHandlers.onSave?.('hello');
+    expect(session.getSnapshot().quoteText).toBe('');
+  });
 });
