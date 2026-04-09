@@ -80,11 +80,6 @@ function hasWarningFlags(conversation: Conversation) {
 function resolveWarningFlagMessage(flag: string): string {
   const code = String(flag || '').trim();
   switch (code) {
-    case 'inline_images_limit_reached':
-    case 'inline_images_count_limit_reached':
-      return t('warningFlagInlineImagesLimitReached');
-    case 'inline_images_total_bytes_limit_reached':
-      return t('warningFlagInlineImagesTotalBytesLimitReached');
     case 'inline_images_fetch_unavailable':
       return t('warningFlagInlineImagesFetchUnavailable');
     case 'inline_images_fetch_failed':
@@ -95,9 +90,6 @@ function resolveWarningFlagMessage(flag: string): string {
       return t('warningFlagInlineImagesNonImageBlob');
     case 'inline_images_empty_blob':
       return t('warningFlagInlineImagesEmptyBlob');
-    case 'inline_images_single_too_large':
-    case 'inline_images_single_bytes_limit_reached':
-      return t('warningFlagInlineImagesSingleTooLarge');
     case 'inline_images_encode_failed':
       return t('warningFlagInlineImagesEncodeFailed');
     case 'discourse_op_missing_on_page':

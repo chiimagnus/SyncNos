@@ -272,11 +272,7 @@ describe('ConversationListPane pagination behaviors', () => {
       items: [
         {
           ...baseConversation(11, 'googleaistudio'),
-          warningFlags: [
-            'inline_images_fetch_failed',
-            'inline_images_total_bytes_limit_reached',
-            'custom_warning_code',
-          ],
+          warningFlags: ['inline_images_fetch_failed', 'inline_images_encode_failed', 'custom_warning_code'],
         },
       ],
       listSummary: { totalCount: 1, todayCount: 1 },
@@ -295,7 +291,7 @@ describe('ConversationListPane pagination behaviors', () => {
 
     const tooltip = String(badge?.getAttribute('data-tooltip-content') || '');
     expect(tooltip).toContain('warningFlagInlineImagesFetchFailed');
-    expect(tooltip).toContain('warningFlagInlineImagesTotalBytesLimitReached');
+    expect(tooltip).toContain('warningFlagInlineImagesEncodeFailed');
     expect(tooltip).toContain('warningFlagUnknownPrefix: custom_warning_code');
   });
 

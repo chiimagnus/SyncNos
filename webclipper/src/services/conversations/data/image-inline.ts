@@ -444,8 +444,7 @@ export async function inlineChatImagesInMessages(input: {
       if (isDataUrl) {
         parsedDataUrl = parseDataImageUrl({ dataUrl: url, maxBytes: NO_IMAGE_SIZE_LIMIT });
         if (!parsedDataUrl.ok) {
-          if (parsedDataUrl.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
-          else warningFlags.add('inline_images_download_failed');
+          warningFlags.add('inline_images_download_failed');
           continue;
         }
         cacheLookupUrl = parsedDataUrl.cacheKey;
@@ -484,8 +483,7 @@ export async function inlineChatImagesInMessages(input: {
           maxBytes: NO_IMAGE_SIZE_LIMIT,
         });
         if (!downloaded.ok) {
-          if (downloaded.reason === 'too_large') warningFlags.add('inline_images_single_bytes_limit_reached');
-          else warningFlags.add('inline_images_download_failed');
+          warningFlags.add('inline_images_download_failed');
           continue;
         }
 
