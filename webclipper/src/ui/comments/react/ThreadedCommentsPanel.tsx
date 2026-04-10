@@ -110,6 +110,8 @@ export function ThreadedCommentsPanel({
   const lastHandledEscapeSignalRef = useRef(0);
   const lastAutoSelectionSignatureRef = useRef('');
   const suppressEmptyAutoSelectionUntilRef = useRef(0);
+  const pendingAutoSelectionRequestRef = useRef(false);
+  const pendingAutoSelectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
@@ -318,25 +320,61 @@ export function ThreadedCommentsPanel({
   useLayoutEffect(() => {
     if (!snapshot.open) {
       lastAutoSelectionSignatureRef.current = '';
+      pendingAutoSelectionRequestRef.current = false;
+      if (pendingAutoSelectionTimerRef.current) {
+        clearTimeout(pendingAutoSelectionTimerRef.current);
+        pendingAutoSelectionTimerRef.current = null;
+      }
       return;
     }
-    const latestHandlers = readHandlers?.() || snapshot.handlers;
-    if (typeof latestHandlers.onComposerSelectionRequest !== 'function') return;
 
     const onSelectionChange = () => {
-      let signature = 'empty';
-      try {
-        signature = buildSelectionSignature(globalThis.getSelection?.());
-      } catch (_error) {
-        signature = 'empty';
+      if (pendingAutoSelectionTimerRef.current) {
+        clearTimeout(pendingAutoSelectionTimerRef.current);
+        pendingAutoSelectionTimerRef.current = null;
       }
-      requestComposerSelection('auto', signature);
+      pendingAutoSelectionTimerRef.current = setTimeout(() => {
+        pendingAutoSelectionTimerRef.current = null;
+        const latestHandlers = readHandlers?.() || snapshot.handlers;
+        if (typeof latestHandlers.onComposerSelectionRequest !== 'function') {
+          pendingAutoSelectionRequestRef.current = true;
+          return;
+        }
+        pendingAutoSelectionRequestRef.current = false;
+        let signature = 'empty';
+        try {
+          signature = buildSelectionSignature(globalThis.getSelection?.());
+        } catch (_error) {
+          signature = 'empty';
+        }
+        requestComposerSelection('auto', signature);
+      }, 300);
     };
 
     document.addEventListener('selectionchange', onSelectionChange);
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange);
+      pendingAutoSelectionRequestRef.current = false;
+      if (pendingAutoSelectionTimerRef.current) {
+        clearTimeout(pendingAutoSelectionTimerRef.current);
+        pendingAutoSelectionTimerRef.current = null;
+      }
     };
+  }, [readHandlers, requestComposerSelection, snapshot.handlers, snapshot.open]);
+
+  useLayoutEffect(() => {
+    if (!snapshot.open) return;
+    if (!pendingAutoSelectionRequestRef.current) return;
+    const latestHandlers = readHandlers?.() || snapshot.handlers;
+    if (typeof latestHandlers.onComposerSelectionRequest !== 'function') return;
+    pendingAutoSelectionRequestRef.current = false;
+    let signature = 'empty';
+    try {
+      signature = buildSelectionSignature(globalThis.getSelection?.());
+    } catch (_error) {
+      signature = 'empty';
+    }
+    requestComposerSelection('auto', signature);
   }, [readHandlers, requestComposerSelection, snapshot.handlers, snapshot.open]);
 
   useLayoutEffect(() => {

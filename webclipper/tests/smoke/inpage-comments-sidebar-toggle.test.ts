@@ -39,6 +39,11 @@ function cleanupDom() {
 
 async function flushReactScheduler() {
   await Promise.resolve();
+  if (vi.isFakeTimers()) {
+    vi.runOnlyPendingTimers();
+    await Promise.resolve();
+    return;
+  }
   await new Promise<void>((resolve) => {
     if (typeof setImmediate === 'function') {
       setImmediate(resolve);
@@ -52,9 +57,15 @@ async function flushReactScheduler() {
 describe('inpage comments sidebar toggle', () => {
   beforeEach(() => {
     setupDom();
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
   });
 
   afterEach(async () => {
+    if (vi.isFakeTimers()) {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    }
     await flushReactScheduler();
     cleanupDom();
   });
@@ -101,6 +112,7 @@ describe('inpage comments sidebar toggle', () => {
     expect(shadow).toBeTruthy();
 
     document.dispatchEvent(new window.Event('selectionchange'));
+    vi.advanceTimersByTime(300);
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
@@ -112,6 +124,7 @@ describe('inpage comments sidebar toggle', () => {
     composer?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     composer?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
+    vi.advanceTimersByTime(300);
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
@@ -123,6 +136,7 @@ describe('inpage comments sidebar toggle', () => {
     reply?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     reply?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
+    vi.advanceTimersByTime(300);
 
     await Promise.resolve();
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);

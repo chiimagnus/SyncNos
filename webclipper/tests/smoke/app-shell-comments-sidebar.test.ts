@@ -348,14 +348,16 @@ describe('AppShell comments sidebar', () => {
     expect(shadow).toBeTruthy();
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
-    act(() => {
-      document.dispatchEvent(new window.Event('selectionchange'));
-    });
+    // Wait a tick so the panel can install the selectionchange listener.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-    await vi.waitFor(() => {
-      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
-      expect(quoteText).toBe(selectedText);
-    });
+    document.dispatchEvent(new window.Event('selectionchange'));
+
+    // Auto-attach is debounced in the panel runtime; wait for it to apply.
+    await new Promise<void>((resolve) => setTimeout(resolve, 350));
+
+    const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    expect(quoteText).toBe(selectedText);
 
     restoreSelection?.();
 
