@@ -71,6 +71,11 @@ function installMutableSelectionMock(initialText: string) {
 
 async function flushReactScheduler() {
   await Promise.resolve();
+  if (vi.isFakeTimers()) {
+    vi.runOnlyPendingTimers();
+    await Promise.resolve();
+    return;
+  }
   await new Promise<void>((resolve) => {
     if (typeof setImmediate === 'function') {
       setImmediate(resolve);
@@ -84,9 +89,15 @@ async function flushReactScheduler() {
 describe('Threaded comments panel auto-attach selection trigger', () => {
   beforeEach(() => {
     setupDom();
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
   });
 
   afterEach(async () => {
+    if (vi.isFakeTimers()) {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    }
     await flushReactScheduler();
     cleanupDom();
   });
@@ -107,7 +118,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     document.dispatchEvent(new window.Event('selectionchange'));
     document.dispatchEvent(new window.Event('selectionchange'));
 
-    await Promise.resolve();
+    vi.advanceTimersByTime(300);
+    await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'auto' });
@@ -131,7 +143,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' }]);
 
     document.dispatchEvent(new window.Event('selectionchange'));
-    await Promise.resolve();
+    vi.advanceTimersByTime(300);
+    await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
@@ -146,7 +159,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    await Promise.resolve();
+    vi.advanceTimersByTime(300);
+    await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
@@ -158,7 +172,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     reply!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
     reply!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    await Promise.resolve();
+    vi.advanceTimersByTime(300);
+    await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
