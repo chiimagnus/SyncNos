@@ -714,7 +714,7 @@ export function ThreadedCommentsPanel({
 	          <button
 	            type="button"
 	            className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
-	            style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
+	            style={{ position: 'absolute', top: 0, right: 0, zIndex: 2 }}
 	            aria-label="Clear quote"
 	            onClick={() => {
 	              lastAutoSelectionSignatureRef.current = '';
@@ -737,7 +737,7 @@ export function ThreadedCommentsPanel({
 	          <div
 	            aria-hidden="true"
 	            className="webclipper-inpage-comments-panel__quote-clear-spacer"
-	            style={{ float: 'right', width: 24, height: 24, marginLeft: 6, marginBottom: 4, pointerEvents: 'none' }}
+	            style={{ float: 'right', width: 24, height: 24, marginLeft: 6, marginBottom: 0, pointerEvents: 'none' }}
 	          />
 	          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
 	        </div>
