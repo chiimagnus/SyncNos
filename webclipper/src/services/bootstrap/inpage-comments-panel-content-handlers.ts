@@ -11,9 +11,23 @@ type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
 
+function isSelectionWithinLocatorRoot(selection: Selection | null, locatorRoot: Element | null): boolean {
+  if (!selection || !locatorRoot) return false;
+  const anchorNode = selection.anchorNode;
+  const focusNode = selection.focusNode;
+  if (!anchorNode || !focusNode) return false;
+  try {
+    return locatorRoot.contains(anchorNode) && locatorRoot.contains(focusNode);
+  } catch (_e) {
+    return false;
+  }
+}
+
 function pickQuoteFromSelection(): string {
   try {
     const selection = globalThis.getSelection?.();
+    const locatorRoot = document.body || document.documentElement;
+    if (!isSelectionWithinLocatorRoot(selection || null, locatorRoot)) return '';
     const text = selection ? String(selection.toString() || '') : '';
     return text.trim();
   } catch (_e) {
@@ -25,12 +39,14 @@ function pickLocatorFromSelection(): any | null {
   try {
     const selection = globalThis.getSelection?.();
     if (!selection || selection.rangeCount <= 0) return null;
+    const locatorRoot = document.body || document.documentElement;
+    if (!isSelectionWithinLocatorRoot(selection, locatorRoot)) return null;
     const range = selection.getRangeAt(0);
     const text = String(selection.toString() || '').trim();
     if (!text) return null;
     return buildArticleCommentLocatorFromRange({
       env: 'inpage',
-      root: document.body || document.documentElement,
+      root: locatorRoot,
       range,
     });
   } catch (_e) {
