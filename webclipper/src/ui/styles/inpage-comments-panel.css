@@ -223,9 +223,18 @@
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
   padding: var(--comments-panel-body-padding-y);
+  padding-right: calc(var(--comments-panel-body-padding-y) + 30px);
+  position: relative;
   border-radius: var(--radius-card);
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
+}
+
+.webclipper-inpage-comments-panel__quote-clear {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
 }
 
 .webclipper-inpage-comments-panel__notice {

@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -109,9 +110,10 @@ export function ThreadedCommentsPanel({
   const lastFocusedComposerSignalRef = useRef(0);
   const lastHandledEscapeSignalRef = useRef(0);
   const lastAutoSelectionSignatureRef = useRef('');
-  const suppressEmptyAutoSelectionUntilRef = useRef(0);
   const pendingAutoSelectionRequestRef = useRef(false);
-  const pendingAutoSelectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAutoSelectionSignatureRef = useRef('empty');
+  const pendingAutoSelectionCommitRafRef = useRef<number | null>(null);
+  const autoSelectionDirtyRef = useRef(false);
   const replyTextareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
   const replyTextsRef = useRef<Record<number, string>>({});
   const pendingReplyFocusRootIdRef = useRef<number | null>(null);
@@ -220,38 +222,24 @@ export function ThreadedCommentsPanel({
     });
   };
 
-  const isPanelTextInputFocused = () => {
-    const composer = composerTextareaRef.current;
-    let activeElement: Element | null = null;
-    const rootNode = composer?.getRootNode?.();
-    if (rootNode && typeof (rootNode as ShadowRoot).activeElement !== 'undefined') {
-      activeElement = ((rootNode as ShadowRoot).activeElement as Element | null) ?? null;
-    } else {
-      activeElement = (document.activeElement as Element | null) ?? null;
-    }
-    if (!activeElement) return false;
-    try {
-      return Boolean(
-        activeElement.closest(
-          '.webclipper-inpage-comments-panel__composer-textarea,.webclipper-inpage-comments-panel__reply-textarea',
-        ),
-      );
-    } catch (_error) {
-      return false;
-    }
-  };
-
   const requestComposerSelection = useCallback(
     (trigger: 'button' | 'auto', autoSignature?: string | null) => {
       if (trigger === 'auto') {
         const normalizedSignature = String(autoSignature || 'empty');
-        if (normalizedSignature === 'empty') {
-          if (isPanelTextInputFocused()) return;
-          const suppressUntil = Number(suppressEmptyAutoSelectionUntilRef.current || 0);
-          if (Date.now() <= suppressUntil) return;
+        if (normalizedSignature === 'empty') return;
+        const latestHandlers = readHandlers?.() || snapshot.handlers;
+        const handler = latestHandlers.onComposerSelectionRequest;
+        if (typeof handler !== 'function') {
+          pendingAutoSelectionRequestRef.current = true;
+          pendingAutoSelectionSignatureRef.current = normalizedSignature;
+          return;
         }
         if (normalizedSignature === lastAutoSelectionSignatureRef.current) return;
         lastAutoSelectionSignatureRef.current = normalizedSignature;
+        void Promise.resolve(handler({ trigger })).catch(() => {
+          // ignore
+        });
+        return;
       }
       const latestHandlers = readHandlers?.() || snapshot.handlers;
       const handler = latestHandlers.onComposerSelectionRequest;
@@ -262,10 +250,6 @@ export function ThreadedCommentsPanel({
     },
     [readHandlers, snapshot.handlers],
   );
-
-  const suppressNextEmptyAutoSelection = () => {
-    suppressEmptyAutoSelectionUntilRef.current = Date.now() + 320;
-  };
 
   const updateArmedDeleteId = useCallback(
     (next: number | null) => {
@@ -321,46 +305,82 @@ export function ThreadedCommentsPanel({
     if (!snapshot.open) {
       lastAutoSelectionSignatureRef.current = '';
       pendingAutoSelectionRequestRef.current = false;
-      if (pendingAutoSelectionTimerRef.current) {
-        clearTimeout(pendingAutoSelectionTimerRef.current);
-        pendingAutoSelectionTimerRef.current = null;
+      pendingAutoSelectionSignatureRef.current = 'empty';
+      autoSelectionDirtyRef.current = false;
+      if (pendingAutoSelectionCommitRafRef.current != null) {
+        if (typeof globalThis.cancelAnimationFrame === 'function') {
+          globalThis.cancelAnimationFrame(pendingAutoSelectionCommitRafRef.current);
+        } else {
+          clearTimeout(pendingAutoSelectionCommitRafRef.current);
+        }
+        pendingAutoSelectionCommitRafRef.current = null;
       }
       return;
     }
+  }, [snapshot.open]);
+
+  useLayoutEffect(() => {
+    if (!snapshot.open) return;
+    const scheduleNextFrame = (cb: () => void) => {
+      if (typeof globalThis.requestAnimationFrame === 'function') return globalThis.requestAnimationFrame(cb);
+      return setTimeout(cb, 0) as unknown as number;
+    };
+    const cancelNextFrame = (id: number) => {
+      if (typeof globalThis.cancelAnimationFrame === 'function') {
+        globalThis.cancelAnimationFrame(id);
+        return;
+      }
+      clearTimeout(id);
+    };
+    const scheduleCommit = (signature?: string | null) => {
+      if (pendingAutoSelectionCommitRafRef.current != null) {
+        cancelNextFrame(pendingAutoSelectionCommitRafRef.current);
+      }
+      pendingAutoSelectionCommitRafRef.current = scheduleNextFrame(() => {
+        pendingAutoSelectionCommitRafRef.current = null;
+        let nextSignature = String(signature || '');
+        if (!nextSignature) {
+          try {
+            nextSignature = buildSelectionSignature(globalThis.getSelection?.());
+          } catch (_error) {
+            nextSignature = 'empty';
+          }
+        }
+        requestComposerSelection('auto', nextSignature);
+      });
+    };
 
     const onSelectionChange = () => {
-      if (pendingAutoSelectionTimerRef.current) {
-        clearTimeout(pendingAutoSelectionTimerRef.current);
-        pendingAutoSelectionTimerRef.current = null;
-      }
-      pendingAutoSelectionTimerRef.current = setTimeout(() => {
-        pendingAutoSelectionTimerRef.current = null;
-        const latestHandlers = readHandlers?.() || snapshot.handlers;
-        if (typeof latestHandlers.onComposerSelectionRequest !== 'function') {
-          pendingAutoSelectionRequestRef.current = true;
-          return;
-        }
-        pendingAutoSelectionRequestRef.current = false;
-        let signature = 'empty';
-        try {
-          signature = buildSelectionSignature(globalThis.getSelection?.());
-        } catch (_error) {
-          signature = 'empty';
-        }
-        requestComposerSelection('auto', signature);
-      }, 300);
+      autoSelectionDirtyRef.current = true;
     };
 
-    document.addEventListener('selectionchange', onSelectionChange);
+    const onPointerUp = () => {
+      if (!autoSelectionDirtyRef.current) return;
+      autoSelectionDirtyRef.current = false;
+      scheduleCommit(null);
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!autoSelectionDirtyRef.current) return;
+      autoSelectionDirtyRef.current = false;
+      scheduleCommit(null);
+    };
+
+    document.addEventListener('selectionchange', onSelectionChange, true);
+    document.addEventListener('pointerup', onPointerUp, true);
+    document.addEventListener('keyup', onKeyUp, true);
     return () => {
-      document.removeEventListener('selectionchange', onSelectionChange);
-      pendingAutoSelectionRequestRef.current = false;
-      if (pendingAutoSelectionTimerRef.current) {
-        clearTimeout(pendingAutoSelectionTimerRef.current);
-        pendingAutoSelectionTimerRef.current = null;
+      document.removeEventListener('selectionchange', onSelectionChange, true);
+      document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('keyup', onKeyUp, true);
+      autoSelectionDirtyRef.current = false;
+      if (pendingAutoSelectionCommitRafRef.current != null) {
+        cancelNextFrame(pendingAutoSelectionCommitRafRef.current);
+        pendingAutoSelectionCommitRafRef.current = null;
       }
     };
-  }, [readHandlers, requestComposerSelection, snapshot.handlers, snapshot.open]);
+  }, [requestComposerSelection, snapshot.open]);
 
   useLayoutEffect(() => {
     if (!snapshot.open) return;
@@ -368,12 +388,8 @@ export function ThreadedCommentsPanel({
     const latestHandlers = readHandlers?.() || snapshot.handlers;
     if (typeof latestHandlers.onComposerSelectionRequest !== 'function') return;
     pendingAutoSelectionRequestRef.current = false;
-    let signature = 'empty';
-    try {
-      signature = buildSelectionSignature(globalThis.getSelection?.());
-    } catch (_error) {
-      signature = 'empty';
-    }
+    const signature = pendingAutoSelectionSignatureRef.current;
+    pendingAutoSelectionSignatureRef.current = 'empty';
     requestComposerSelection('auto', signature);
   }, [readHandlers, requestComposerSelection, snapshot.handlers, snapshot.open]);
 
@@ -691,12 +707,34 @@ export function ThreadedCommentsPanel({
         >
           {snapshot.noticeMessage}
         </div>
-        <div
-          className="webclipper-inpage-comments-panel__quote"
-          style={{ display: snapshot.quoteText ? 'block' : 'none' }}
-        >
-          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
-        </div>
+	        <div
+	          className="webclipper-inpage-comments-panel__quote"
+	          style={{ display: snapshot.quoteText ? 'block' : 'none' }}
+	        >
+	          <button
+	            type="button"
+	            className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
+	            aria-label="Clear quote"
+	            onClick={() => {
+	              lastAutoSelectionSignatureRef.current = '';
+	              pendingAutoSelectionRequestRef.current = false;
+	              pendingAutoSelectionSignatureRef.current = 'empty';
+              autoSelectionDirtyRef.current = false;
+              const latestHandlers = readHandlers?.() || snapshot.handlers;
+              const handler = latestHandlers.onComposerQuoteClearRequest;
+              if (typeof handler !== 'function') return;
+	              void Promise.resolve(handler()).catch(() => {
+	                // ignore
+	              });
+	            }}
+	          >
+	            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+	              <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+	              <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+	            </svg>
+	          </button>
+	          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
+	        </div>
         <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
           <textarea
             ref={composerTextareaRef}
@@ -704,12 +742,6 @@ export function ThreadedCommentsPanel({
             placeholder="Write a comment…"
             rows={1}
             value={composerText}
-            onPointerDown={() => {
-              suppressNextEmptyAutoSelection();
-            }}
-            onFocus={() => {
-              suppressNextEmptyAutoSelection();
-            }}
             onInput={(event) => updateComposerText(event.currentTarget.value)}
             onChange={(event) => updateComposerText(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -908,12 +940,6 @@ export function ThreadedCommentsPanel({
                       placeholder="Reply…"
                       rows={1}
                       value={replyTexts[rootId] || ''}
-                      onPointerDown={() => {
-                        suppressNextEmptyAutoSelection();
-                      }}
-                      onFocus={() => {
-                        suppressNextEmptyAutoSelection();
-                      }}
                       onInput={(event) => {
                         updateReplyText(rootId, event.currentTarget.value);
                         autosizeTextarea(event.currentTarget);

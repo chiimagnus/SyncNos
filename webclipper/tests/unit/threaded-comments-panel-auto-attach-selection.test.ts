@@ -102,7 +102,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     cleanupDom();
   });
 
-  it('requests selection on document selectionchange and dedupes identical signatures', async () => {
+  it('requests selection on pointerup commit and dedupes identical signatures', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -117,12 +117,42 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     document.dispatchEvent(new window.Event('selectionchange'));
     document.dispatchEvent(new window.Event('selectionchange'));
-
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'auto' });
+
+    mounted.cleanup();
+  });
+
+  it('commits keyboard selection only after modifier is released (shift + arrow)', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onComposerSelectionRequest = vi.fn();
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    mounted.api.setHandlers({ onComposerSelectionRequest } as any);
+
+    const selectionState = installMutableSelectionMock('Quoted text');
+
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'ArrowRight', shiftKey: true }));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
+
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    selectionState.text = '';
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     mounted.cleanup();
   });
@@ -143,7 +173,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' }]);
 
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -156,10 +186,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
 
-    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -169,13 +197,58 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLTextAreaElement | null;
     expect(reply).toBeTruthy();
 
-    reply!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    reply!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    mounted.cleanup();
+  });
+
+  it('clears quote only via explicit ❌ and allows reattaching the same selection', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onComposerSelectionRequest = vi.fn();
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+
+    mounted.api.setHandlers({
+      onComposerSelectionRequest,
+      onComposerQuoteClearRequest: () => {
+        mounted.api.setQuoteText('');
+      },
+    } as any);
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    const shadow = panel!.shadowRoot!;
+
+    const selectionState = installMutableSelectionMock('Same quote');
+
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.Event('pointerup'));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    mounted.api.setQuoteText(selectionState.text);
+    await flushReactScheduler();
+
+    const clearBtn = shadow.querySelector('.webclipper-inpage-comments-panel__quote-clear') as HTMLButtonElement | null;
+    expect(clearBtn).toBeTruthy();
+    clearBtn!.click();
+    await flushReactScheduler();
+
+    const quoteEl = shadow.querySelector('.webclipper-inpage-comments-panel__quote') as HTMLElement | null;
+    expect(quoteEl).toBeTruthy();
+    expect((quoteEl as HTMLElement).style.display).toBe('none');
+
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.Event('pointerup'));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(2);
 
     mounted.cleanup();
   });

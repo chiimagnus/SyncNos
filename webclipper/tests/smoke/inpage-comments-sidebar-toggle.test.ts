@@ -14,6 +14,10 @@ function setupDom() {
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
+  Object.defineProperty(globalThis, 'getSelection', {
+    configurable: true,
+    value: dom.window.getSelection.bind(dom.window),
+  });
   Object.defineProperty(globalThis, 'getComputedStyle', {
     configurable: true,
     value: dom.window.getComputedStyle.bind(dom.window),
@@ -33,6 +37,7 @@ function cleanupDom() {
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
   delete (globalThis as any).Node;
+  delete (globalThis as any).getSelection;
   delete (globalThis as any).getComputedStyle;
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
@@ -98,7 +103,7 @@ describe('inpage comments sidebar toggle', () => {
     expect(api.isOpen()).toBe(false);
   });
 
-  it('triggers composer selection request only from document selectionchange', async () => {
+  it('triggers composer selection request on pointerup commit (not selectionchange only)', async () => {
     const api = getInpageCommentsPanelApi();
     const onComposerSelectionRequest = vi.fn();
 
@@ -111,8 +116,26 @@ describe('inpage comments sidebar toggle', () => {
     const shadow = host?.shadowRoot;
     expect(shadow).toBeTruthy();
 
+    const selectionMock = {
+      rangeCount: 1,
+      anchorNode: document.body,
+      focusNode: document.body,
+      anchorOffset: 0,
+      focusOffset: 4,
+      toString: () => 'Quote',
+      getRangeAt: () => {
+        const range = document.createRange();
+        range.selectNodeContents(document.body);
+        return range;
+      },
+      removeAllRanges: () => {},
+      addRange: () => {},
+    } as any;
+    const selectionSpy = vi.spyOn(globalThis, 'getSelection').mockImplementation(() => selectionMock as Selection);
+
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
+    await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
     expect(onComposerSelectionRequest).toHaveBeenLastCalledWith({ trigger: 'auto' });
@@ -121,10 +144,15 @@ describe('inpage comments sidebar toggle', () => {
       '.webclipper-inpage-comments-panel__composer-textarea',
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
-    composer?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    composer?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
+    selectionSpy.mockImplementation(() => ({ ...selectionMock, toString: () => '' }) as Selection);
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
+    await flushReactScheduler();
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    await flushReactScheduler();
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
@@ -133,12 +161,11 @@ describe('inpage comments sidebar toggle', () => {
       '.webclipper-inpage-comments-panel__reply-textarea',
     ) as HTMLTextAreaElement | null;
     expect(reply).toBeTruthy();
-    reply?.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    reply?.dispatchEvent(new window.FocusEvent('focus', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
-
-    await Promise.resolve();
+    document.dispatchEvent(new window.Event('pointerup'));
+    await flushReactScheduler();
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    selectionSpy.mockRestore();
   });
 });

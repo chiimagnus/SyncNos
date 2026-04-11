@@ -189,24 +189,32 @@ describe('comment-sidebar-session', () => {
     });
   });
 
-  it('forwards onComposerSelectionRequest while keeping onSave clear-quote wrapper', async () => {
+  it('forwards composer selection + quote clear requests and does not clear quote implicitly on save', async () => {
     const { panel, calls } = createPanelMock();
     const session = createCommentSidebarSession(panel);
 
     const onComposerSelectionRequest = vi.fn(async () => {});
+    const onComposerQuoteClearRequest = vi.fn(async () => {
+      session.setQuoteText('');
+    });
     const onSave = vi.fn(async () => ({ ok: true }));
 
     session.setQuoteText('quoted text');
-    session.setHandlers({ onSave, onComposerSelectionRequest });
+    session.setHandlers({ onSave, onComposerSelectionRequest, onComposerQuoteClearRequest });
 
     const latestHandlers = calls.handlers[calls.handlers.length - 1];
     expect(typeof latestHandlers.onComposerSelectionRequest).toBe('function');
     expect(typeof latestHandlers.onSave).toBe('function');
+    expect(typeof latestHandlers.onComposerQuoteClearRequest).toBe('function');
 
     await latestHandlers.onComposerSelectionRequest?.({ trigger: 'button' } as any);
     expect(onComposerSelectionRequest).toHaveBeenCalledWith({ trigger: 'button' });
 
     await latestHandlers.onSave?.('hello');
+    expect(session.getSnapshot().quoteText).toBe('quoted text');
+
+    await latestHandlers.onComposerQuoteClearRequest?.();
+    expect(onComposerQuoteClearRequest).toHaveBeenCalledTimes(1);
     expect(session.getSnapshot().quoteText).toBe('');
   });
 });

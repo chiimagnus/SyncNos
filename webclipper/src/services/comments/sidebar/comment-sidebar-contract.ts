@@ -27,6 +27,7 @@ export type CommentSidebarHandlers = {
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
   onComposerSelectionRequest?: (input: CommentSidebarComposerSelectionRequest) => void | Promise<void>;
+  onComposerQuoteClearRequest?: () => void | Promise<void>;
 };
 
 export type CommentSidebarPanelApi = {
