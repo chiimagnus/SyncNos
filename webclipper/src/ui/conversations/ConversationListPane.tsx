@@ -59,57 +59,6 @@ function formatTime(ts?: number) {
   }
 }
 
-function normalizeWarningFlags(conversation: Conversation): string[] {
-  const raw = Array.isArray((conversation as any).warningFlags)
-    ? ((conversation as any).warningFlags as unknown[])
-    : [];
-  const out: string[] = [];
-  for (const item of raw) {
-    const code = String(item || '').trim();
-    if (!code) continue;
-    if (out.includes(code)) continue;
-    out.push(code);
-  }
-  return out;
-}
-
-function hasWarningFlags(conversation: Conversation) {
-  return normalizeWarningFlags(conversation).length > 0;
-}
-
-function resolveWarningFlagMessage(flag: string): string {
-  const code = String(flag || '').trim();
-  switch (code) {
-    case 'inline_images_fetch_unavailable':
-      return t('warningFlagInlineImagesFetchUnavailable');
-    case 'inline_images_fetch_failed':
-      return t('warningFlagInlineImagesFetchFailed');
-    case 'inline_images_download_failed':
-      return t('warningFlagInlineImagesDownloadFailed');
-    case 'inline_images_non_image_blob':
-      return t('warningFlagInlineImagesNonImageBlob');
-    case 'inline_images_empty_blob':
-      return t('warningFlagInlineImagesEmptyBlob');
-    case 'inline_images_encode_failed':
-      return t('warningFlagInlineImagesEncodeFailed');
-    case 'discourse_op_missing_on_page':
-      return t('warningFlagDiscourseOpMissingOnPage');
-    case 'container_low_confidence':
-      return t('warningFlagContainerLowConfidence');
-    default:
-      return `${t('warningFlagUnknownPrefix')}: ${code}`;
-  }
-}
-
-function buildWarningBadgeTooltip(flags: string[]): string {
-  const normalized = Array.isArray(flags) ? flags.map((x) => String(x || '').trim()).filter(Boolean) : [];
-  if (!normalized.length) return '';
-  const preview = normalized.slice(0, 3).map(resolveWarningFlagMessage);
-  const hiddenCount = normalized.length - preview.length;
-  const hiddenSuffix = hiddenCount > 0 ? ` (+${hiddenCount})` : '';
-  return `${t('warningBadge')}: ${preview.join(' · ')}${hiddenSuffix}`;
-}
-
 function sanitizeHttpUrl(url: unknown) {
   const text = String(url || '').trim();
   if (!text) return '';
@@ -715,8 +664,6 @@ export function ConversationListPane({
             const commentThreadCount = Number((conversation as any).commentThreadCount);
             const safeUrl = sanitizeHttpUrl((conversation as any).url || '');
             const isActive = Number(id) === Number(effectiveActiveRowId);
-            const warningFlags = normalizeWarningFlags(conversation as any);
-            const warningBadgeTooltip = warningFlags.length ? buildWarningBadgeTooltip(warningFlags) : '';
 
             const rowSurfaceClass = isActive
               ? 'tw-border tw-border-[color-mix(in_srgb,var(--accent)_58%,var(--border))] tw-shadow-[inset_0_1px_0_var(--surface-inset-highlight)]'
@@ -757,15 +704,6 @@ export function ConversationListPane({
                     <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-font-semibold tw-leading-5 tw-break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
                       {formatConversationTitle((conversation as any).title)}
                     </div>
-                    {hasWarningFlags(conversation as any) ? (
-                      <span
-                        className="tw-inline-flex tw-rounded-[var(--radius-chip)] tw-border tw-border-[var(--warning)] tw-bg-[color-mix(in_srgb,var(--warning)_18%,var(--bg-card))] tw-px-2 tw-py-0.5 tw-text-[10px] tw-font-extrabold tw-text-[var(--text-primary)]"
-                        aria-label={warningBadgeTooltip || t('warningBadge')}
-                        {...tooltipAttrs(warningBadgeTooltip)}
-                      >
-                        {t('warningBadge')}
-                      </span>
-                    ) : null}
                   </div>
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
