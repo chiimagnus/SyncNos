@@ -302,6 +302,9 @@ export default function AppShell() {
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
+    const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+    const settingsLastActiveElementRef = useRef<HTMLElement | null>(null);
+
     const closeSettings = () => {
       const from = String(state?.from || '').trim();
       if (from) navigate(from, { replace: true });
@@ -313,6 +316,10 @@ export default function AppShell() {
         closeSettings();
         return;
       }
+
+      const active = document.activeElement;
+      settingsLastActiveElementRef.current = active instanceof HTMLElement ? active : null;
+      settingsLastActiveElementRef.current?.blur();
 
       navigate('/settings', {
         state: {
@@ -331,6 +338,10 @@ export default function AppShell() {
         navigate('/settings?section=aboutyou', { replace: true, state: location.state });
         return;
       }
+
+      const active = document.activeElement;
+      settingsLastActiveElementRef.current = active instanceof HTMLElement ? active : null;
+      settingsLastActiveElementRef.current?.blur();
 
       navigate('/settings?section=aboutyou', {
         state: {
@@ -354,6 +365,11 @@ export default function AppShell() {
         navigate(route, { replace: true, state: location.state });
         return;
       }
+
+      const active = document.activeElement;
+      settingsLastActiveElementRef.current = active instanceof HTMLElement ? active : null;
+      settingsLastActiveElementRef.current?.blur();
+
       navigate(route, {
         state: {
           backgroundLocation: {
@@ -488,6 +504,29 @@ export default function AppShell() {
     }, [showSettingsSheet]);
 
     useEffect(() => {
+      if (showSettingsSheet) {
+        const active = document.activeElement;
+        if (!settingsLastActiveElementRef.current) {
+          settingsLastActiveElementRef.current = active instanceof HTMLElement ? active : null;
+        }
+
+        const timer = window.setTimeout(() => {
+          settingsCloseButtonRef.current?.focus({ preventScroll: true });
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+      }
+
+      const lastActive = settingsLastActiveElementRef.current;
+      settingsLastActiveElementRef.current = null;
+      if (!lastActive) return;
+      if (!document.contains(lastActive)) return;
+      try {
+        lastActive.focus({ preventScroll: true });
+      } catch {}
+    }, [showSettingsSheet]);
+
+    useEffect(() => {
       if (!locMountedRef.current) {
         locMountedRef.current = true;
         return;
@@ -602,6 +641,7 @@ export default function AppShell() {
                   'tw-h-full tw-min-w-0 tw-flex-1 tw-overflow-hidden',
                   showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
                 ].join(' ')}
+                {...(showSettingsSheet ? ({ inert: '' } as any) : {})}
                 aria-hidden={showSettingsSheet}
               >
                 <Routes location={routesLocation}>
@@ -708,6 +748,7 @@ export default function AppShell() {
                 <button
                   type="button"
                   onClick={closeSettings}
+                  ref={settingsCloseButtonRef}
                   className={['tw-absolute tw-right-1 tw-top-1 tw-z-20', buttonIconCircleGhostClassName()].join(' ')}
                   aria-label={t('closeSettings')}
                 >
