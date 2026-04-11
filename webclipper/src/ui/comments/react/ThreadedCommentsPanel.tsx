@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -706,31 +707,34 @@ export function ThreadedCommentsPanel({
         >
           {snapshot.noticeMessage}
         </div>
-        <div
-          className="webclipper-inpage-comments-panel__quote"
-          style={{ display: snapshot.quoteText ? 'block' : 'none' }}
-        >
-          <button
-            type="button"
-            className="webclipper-inpage-comments-panel__quote-clear webclipper-btn webclipper-btn--icon"
-            aria-label="Clear quote"
-            onClick={() => {
-              lastAutoSelectionSignatureRef.current = '';
-              pendingAutoSelectionRequestRef.current = false;
-              pendingAutoSelectionSignatureRef.current = 'empty';
+	        <div
+	          className="webclipper-inpage-comments-panel__quote"
+	          style={{ display: snapshot.quoteText ? 'block' : 'none' }}
+	        >
+	          <button
+	            type="button"
+	            className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
+	            aria-label="Clear quote"
+	            onClick={() => {
+	              lastAutoSelectionSignatureRef.current = '';
+	              pendingAutoSelectionRequestRef.current = false;
+	              pendingAutoSelectionSignatureRef.current = 'empty';
               autoSelectionDirtyRef.current = false;
               const latestHandlers = readHandlers?.() || snapshot.handlers;
               const handler = latestHandlers.onComposerQuoteClearRequest;
               if (typeof handler !== 'function') return;
-              void Promise.resolve(handler()).catch(() => {
-                // ignore
-              });
-            }}
-          >
-            ×
-          </button>
-          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
-        </div>
+	              void Promise.resolve(handler()).catch(() => {
+	                // ignore
+	              });
+	            }}
+	          >
+	            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+	              <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+	              <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+	            </svg>
+	          </button>
+	          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
+	        </div>
         <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
           <textarea
             ref={composerTextareaRef}

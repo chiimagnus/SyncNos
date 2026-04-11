@@ -232,19 +232,9 @@
 
 .webclipper-inpage-comments-panel__quote-clear {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--panel-text-muted);
-}
-
-.webclipper-inpage-comments-panel__quote-clear:is(:hover, :focus-visible) {
-  color: var(--panel-danger);
+  top: 4px;
+  right: 4px;
+  z-index: 2;
 }
 
 .webclipper-inpage-comments-panel__notice {
