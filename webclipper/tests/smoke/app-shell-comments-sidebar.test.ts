@@ -359,6 +359,29 @@ describe('AppShell comments sidebar', () => {
       expect(quoteText).toBe(selectedText);
     });
 
+    const clearBtn = shadow?.querySelector(
+      '.webclipper-inpage-comments-panel__quote-clear',
+    ) as HTMLButtonElement | null;
+    expect(clearBtn).toBeTruthy();
+    act(() => {
+      clearBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      expect(quoteText).toBe('');
+    });
+
+    act(() => {
+      document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
+    });
+
+    await vi.waitFor(() => {
+      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      expect(quoteText).toBe(selectedText);
+    });
+
     restoreSelection?.();
 
     const composer = shadow?.querySelector(

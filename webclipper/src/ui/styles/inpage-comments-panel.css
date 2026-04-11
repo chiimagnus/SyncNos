@@ -223,9 +223,28 @@
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
   padding: var(--comments-panel-body-padding-y);
+  padding-right: calc(var(--comments-panel-body-padding-y) + 30px);
+  position: relative;
   border-radius: var(--radius-card);
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
+}
+
+.webclipper-inpage-comments-panel__quote-clear {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--panel-text-muted);
+}
+
+.webclipper-inpage-comments-panel__quote-clear:is(:hover, :focus-visible) {
+  color: var(--panel-danger);
 }
 
 .webclipper-inpage-comments-panel__notice {
