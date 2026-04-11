@@ -707,14 +707,11 @@ export function ThreadedCommentsPanel({
         >
           {snapshot.noticeMessage}
         </div>
-	        <div
-	          className="webclipper-inpage-comments-panel__quote"
-	          style={{ display: snapshot.quoteText ? 'block' : 'none', position: 'relative' }}
-	        >
+	        <div className="webclipper-inpage-comments-panel__quote" hidden={!snapshot.quoteText}>
+	          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
 	          <button
 	            type="button"
 	            className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
-	            style={{ position: 'absolute', top: 0, right: 0, zIndex: 2 }}
 	            aria-label="Clear quote"
 	            onClick={() => {
 	              lastAutoSelectionSignatureRef.current = '';
@@ -734,12 +731,6 @@ export function ThreadedCommentsPanel({
 	              <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
 	            </svg>
 	          </button>
-	          <div
-	            aria-hidden="true"
-	            className="webclipper-inpage-comments-panel__quote-clear-spacer"
-	            style={{ float: 'right', width: 24, height: 24, marginLeft: 6, marginBottom: 0, pointerEvents: 'none' }}
-	          />
-	          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
 	        </div>
         <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
           <textarea
