@@ -267,7 +267,7 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(syncTooltip).toContain('tooltipLoadedVisibleSelectionScope');
   });
 
-  it('shows warning badge tooltip with mapped warning details', async () => {
+  it('does not render warning badge even when warningFlags exist', async () => {
     currentState = buildState({
       items: [
         {
@@ -287,12 +287,7 @@ describe('ConversationListPane pagination behaviors', () => {
     const badge = Array.from(document.querySelectorAll('span')).find(
       (el) => String(el.textContent || '').trim() === 'warningBadge',
     ) as HTMLSpanElement | undefined;
-    expect(badge).toBeTruthy();
-
-    const tooltip = String(badge?.getAttribute('data-tooltip-content') || '');
-    expect(tooltip).toContain('warningFlagInlineImagesFetchFailed');
-    expect(tooltip).toContain('warningFlagInlineImagesEncodeFailed');
-    expect(tooltip).toContain('warningFlagUnknownPrefix: custom_warning_code');
+    expect(badge).toBeFalsy();
   });
 
   it('shows select-all as indeterminate until all conversations are selected', async () => {
