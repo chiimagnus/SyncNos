@@ -223,17 +223,17 @@
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
   padding: var(--comments-panel-body-padding-y);
-  padding-right: calc(var(--comments-panel-body-padding-y) + 30px);
   position: relative;
+  display: grid;
   border-radius: var(--radius-card);
   border: 1px solid var(--quote-border);
   background: var(--quote-bg);
 }
 
 .webclipper-inpage-comments-panel__quote-clear {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  grid-area: 1 / 1;
+  justify-self: end;
+  align-self: start;
   z-index: 2;
 }
 
@@ -250,6 +250,7 @@
 }
 
 .webclipper-inpage-comments-panel__quote-text {
+  grid-area: 1 / 1;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--panel-text);
