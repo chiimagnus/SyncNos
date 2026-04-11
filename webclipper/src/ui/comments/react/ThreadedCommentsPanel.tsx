@@ -709,11 +709,12 @@ export function ThreadedCommentsPanel({
         </div>
 	        <div
 	          className="webclipper-inpage-comments-panel__quote"
-	          style={{ display: snapshot.quoteText ? 'block' : 'none' }}
+	          style={{ display: snapshot.quoteText ? 'block' : 'none', position: 'relative' }}
 	        >
 	          <button
 	            type="button"
 	            className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
+	            style={{ position: 'absolute', top: 4, right: 4, zIndex: 2 }}
 	            aria-label="Clear quote"
 	            onClick={() => {
 	              lastAutoSelectionSignatureRef.current = '';
