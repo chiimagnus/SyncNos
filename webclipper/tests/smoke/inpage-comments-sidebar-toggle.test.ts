@@ -150,6 +150,11 @@ describe('inpage comments sidebar toggle', () => {
     await flushReactScheduler();
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    await flushReactScheduler();
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
     expect(shadow?.querySelector('.webclipper-inpage-comments-panel__attach-selection')).toBeFalsy();
 
     const reply = shadow?.querySelector(

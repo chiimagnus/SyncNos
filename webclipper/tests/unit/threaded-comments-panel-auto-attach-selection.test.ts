@@ -126,6 +126,37 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.cleanup();
   });
 
+  it('commits keyboard selection only after modifier is released (shift + arrow)', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const onComposerSelectionRequest = vi.fn();
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: true });
+    mounted.api.setHandlers({ onComposerSelectionRequest } as any);
+
+    const selectionState = installMutableSelectionMock('Quoted text');
+
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'ArrowRight', shiftKey: true }));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(0);
+
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    selectionState.text = '';
+    document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false }));
+    await flushReactScheduler();
+
+    expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
+
+    mounted.cleanup();
+  });
+
   it('does not clear quote when composer/reply interactions cause empty selectionchange', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
