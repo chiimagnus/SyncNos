@@ -2,7 +2,37 @@ import { webextApis, webextError, webextLastErrorMessage } from '@platform/webex
 
 type AnyTab = { id?: number; url?: string; title?: string; windowId?: number; active?: boolean };
 
+function shouldLogTabsCreate(url: string): boolean {
+  const safeUrl = String(url || '').trim();
+  if (!/^https?:\/\//i.test(safeUrl)) return false;
+
+  const anyGlobal = globalThis as any;
+  if (anyGlobal?.__SYNCNOS_DEBUG_TABS_CREATE__ === true) return true;
+
+  // Keep default noise low: only log NotionAI / Notion site opens unless explicitly enabled.
+  return /(^|\/\/)([^/]*\.)?notion\.so(\/|$)/i.test(safeUrl);
+}
+
+function debugTabsCreate(createProperties: any) {
+  try {
+    const url = String(createProperties?.url || '').trim();
+    if (!shouldLogTabsCreate(url)) return;
+    const stack = new Error('tabs.create stack').stack || '';
+    // eslint-disable-next-line no-console
+    console.log('[SyncNos][tabs.create]', {
+      at: new Date().toISOString(),
+      url,
+      active: createProperties?.active,
+      windowId: createProperties?.windowId,
+      stack,
+    });
+  } catch (_e) {
+    // ignore
+  }
+}
+
 export async function tabsCreate(createProperties: any): Promise<AnyTab | null> {
+  debugTabsCreate(createProperties);
   const { chrome, browser } = webextApis();
 
   if (browser?.tabs?.create) {
