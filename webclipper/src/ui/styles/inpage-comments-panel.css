@@ -223,7 +223,6 @@
 .webclipper-inpage-comments-panel__quote {
   margin: 0 0 10px 0;
   padding: var(--comments-panel-body-padding-y);
-  padding-right: calc(var(--comments-panel-body-padding-y) + 30px);
   position: relative;
   border-radius: var(--radius-card);
   border: 1px solid var(--quote-border);

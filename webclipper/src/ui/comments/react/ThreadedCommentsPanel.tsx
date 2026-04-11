@@ -734,6 +734,11 @@ export function ThreadedCommentsPanel({
 	              <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
 	            </svg>
 	          </button>
+	          <div
+	            aria-hidden="true"
+	            className="webclipper-inpage-comments-panel__quote-clear-spacer"
+	            style={{ float: 'right', width: 24, height: 24, marginLeft: 6, marginBottom: 4, pointerEvents: 'none' }}
+	          />
 	          <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
 	        </div>
         <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
