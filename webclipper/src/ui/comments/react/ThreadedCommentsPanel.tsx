@@ -307,7 +307,11 @@ export function ThreadedCommentsPanel({
       pendingAutoSelectionSignatureRef.current = 'empty';
       autoSelectionDirtyRef.current = false;
       if (pendingAutoSelectionCommitRafRef.current != null) {
-        cancelAnimationFrame(pendingAutoSelectionCommitRafRef.current);
+        if (typeof globalThis.cancelAnimationFrame === 'function') {
+          globalThis.cancelAnimationFrame(pendingAutoSelectionCommitRafRef.current);
+        } else {
+          clearTimeout(pendingAutoSelectionCommitRafRef.current);
+        }
         pendingAutoSelectionCommitRafRef.current = null;
       }
       return;
@@ -316,11 +320,22 @@ export function ThreadedCommentsPanel({
 
   useLayoutEffect(() => {
     if (!snapshot.open) return;
+    const scheduleNextFrame = (cb: () => void) => {
+      if (typeof globalThis.requestAnimationFrame === 'function') return globalThis.requestAnimationFrame(cb);
+      return setTimeout(cb, 0) as unknown as number;
+    };
+    const cancelNextFrame = (id: number) => {
+      if (typeof globalThis.cancelAnimationFrame === 'function') {
+        globalThis.cancelAnimationFrame(id);
+        return;
+      }
+      clearTimeout(id);
+    };
     const scheduleCommit = (signature?: string | null) => {
       if (pendingAutoSelectionCommitRafRef.current != null) {
-        cancelAnimationFrame(pendingAutoSelectionCommitRafRef.current);
+        cancelNextFrame(pendingAutoSelectionCommitRafRef.current);
       }
-      pendingAutoSelectionCommitRafRef.current = requestAnimationFrame(() => {
+      pendingAutoSelectionCommitRafRef.current = scheduleNextFrame(() => {
         pendingAutoSelectionCommitRafRef.current = null;
         let nextSignature = String(signature || '');
         if (!nextSignature) {
@@ -360,7 +375,7 @@ export function ThreadedCommentsPanel({
       document.removeEventListener('keyup', onKeyUp, true);
       autoSelectionDirtyRef.current = false;
       if (pendingAutoSelectionCommitRafRef.current != null) {
-        cancelAnimationFrame(pendingAutoSelectionCommitRafRef.current);
+        cancelNextFrame(pendingAutoSelectionCommitRafRef.current);
         pendingAutoSelectionCommitRafRef.current = null;
       }
     };

@@ -102,7 +102,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     cleanupDom();
   });
 
-  it('requests selection on document selectionchange and dedupes identical signatures', async () => {
+  it('requests selection on pointerup commit and dedupes identical signatures', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -117,8 +117,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
 
     document.dispatchEvent(new window.Event('selectionchange'));
     document.dispatchEvent(new window.Event('selectionchange'));
-
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -143,7 +142,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     mounted.api.setComments([{ id: 1, parentId: null, createdAt: Date.now(), commentText: 'root' }]);
 
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -156,10 +155,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLTextAreaElement | null;
     expect(composer).toBeTruthy();
 
-    composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
@@ -169,10 +166,8 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     ) as HTMLTextAreaElement | null;
     expect(reply).toBeTruthy();
 
-    reply!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-    reply!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
     document.dispatchEvent(new window.Event('selectionchange'));
-    vi.advanceTimersByTime(300);
+    document.dispatchEvent(new window.Event('pointerup'));
     await flushReactScheduler();
 
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);

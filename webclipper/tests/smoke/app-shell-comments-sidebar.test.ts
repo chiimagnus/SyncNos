@@ -319,7 +319,7 @@ describe('AppShell comments sidebar', () => {
     });
   });
 
-  it('attaches selected text on selectionchange and ignores reply interactions', async () => {
+  it('attaches selected text on pointerup commit and ignores reply interactions', async () => {
     commentsByUrl.set('https://example.com/article', [{ id: 101, parentId: null, commentText: 'Root comment' }]);
 
     act(() => {
@@ -352,12 +352,12 @@ describe('AppShell comments sidebar', () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
     document.dispatchEvent(new window.Event('selectionchange'));
+    document.dispatchEvent(new window.Event('pointerup'));
 
-    // Auto-attach is debounced in the panel runtime; wait for it to apply.
-    await new Promise<void>((resolve) => setTimeout(resolve, 350));
-
-    const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
-    expect(quoteText).toBe(selectedText);
+    await vi.waitFor(() => {
+      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      expect(quoteText).toBe(selectedText);
+    });
 
     restoreSelection?.();
 
@@ -369,6 +369,7 @@ describe('AppShell comments sidebar', () => {
       composer!.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
       composer!.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
     });
 
     const quoteAfterComposerClick = shadow
@@ -380,6 +381,7 @@ describe('AppShell comments sidebar', () => {
       composer!.value = 'typing root';
       composer!.dispatchEvent(new window.Event('input', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
     });
 
     const quoteAfterComposerTyping = shadow
@@ -398,6 +400,7 @@ describe('AppShell comments sidebar', () => {
       reply.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
       reply.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
     });
 
     const quoteAfterReply = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
@@ -407,6 +410,7 @@ describe('AppShell comments sidebar', () => {
       reply.value = 'typing reply';
       reply.dispatchEvent(new window.Event('input', { bubbles: true }));
       document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
     });
 
     const quoteAfterReplyTyping = shadow
@@ -443,6 +447,7 @@ describe('AppShell comments sidebar', () => {
 
     act(() => {
       document.dispatchEvent(new window.Event('selectionchange'));
+      document.dispatchEvent(new window.Event('pointerup'));
     });
 
     await vi.waitFor(() => {
