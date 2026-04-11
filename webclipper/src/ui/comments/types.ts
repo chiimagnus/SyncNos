@@ -27,6 +27,7 @@ export type ThreadedCommentsPanelApi = {
     onDelete?: (id: number) => void | Promise<void>;
     onClose?: () => void;
     onComposerSelectionRequest?: (input: ThreadedCommentsPanelComposerSelectionRequest) => void | Promise<void>;
+    onComposerQuoteClearRequest?: () => void | Promise<void>;
   }) => void;
 };
 

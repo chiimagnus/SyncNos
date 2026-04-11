@@ -87,8 +87,9 @@ export function createArticleCommentsSidebarController(input: {
 
   const applyComposerSelection = (payload?: ArticleCommentsSidebarControllerComposerSelectionPayload | null) => {
     const quoteText = normalizeCommentSidebarQuoteText(payload?.selectionText);
+    if (!quoteText) return;
     session.setQuoteText(quoteText);
-    pendingRootLocator = quoteText ? normalizeLocator(payload?.locator) : null;
+    pendingRootLocator = normalizeLocator(payload?.locator);
   };
 
   const ensureContext = async (
@@ -196,7 +197,7 @@ export function createArticleCommentsSidebarController(input: {
           payload: ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined,
         ) => {
           if (requestSeq !== composerSelectionRequestSeq) return;
-          applyComposerSelection(payload ?? { selectionText: '', locator: null });
+          applyComposerSelection(payload);
         };
         try {
           const resolved = resolveComposerSelection(request);
@@ -206,14 +207,19 @@ export function createArticleCommentsSidebarController(input: {
                 applyIfLatest(payload as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
               })
               .catch(() => {
-                applyIfLatest({ selectionText: '', locator: null });
+                applyIfLatest(null);
               });
             return;
           }
           applyIfLatest(resolved as ArticleCommentsSidebarControllerComposerSelectionPayload | null | undefined);
         } catch (_error) {
-          applyIfLatest({ selectionText: '', locator: null });
+          applyIfLatest(null);
         }
+      },
+      onComposerQuoteClearRequest: () => {
+        composerSelectionRequestSeq += 1;
+        session.setQuoteText('');
+        pendingRootLocator = null;
       },
     };
 

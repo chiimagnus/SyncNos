@@ -10,6 +10,7 @@ export type ThreadedCommentsPanelHandlers = {
   onDelete?: (id: number) => void | Promise<void>;
   onClose?: () => void;
   onComposerSelectionRequest?: (input: ThreadedCommentsPanelComposerSelectionRequest) => void | Promise<void>;
+  onComposerQuoteClearRequest?: () => void | Promise<void>;
 };
 
 export type ThreadedCommentsPanelSnapshot = {
