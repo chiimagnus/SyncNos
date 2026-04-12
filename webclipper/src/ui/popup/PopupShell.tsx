@@ -11,7 +11,7 @@ import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticl
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
-import { usePopupOpenInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenInpageCommentsSidebar';
+import { usePopupOpenAppCommentsConversation } from '@viewmodels/popup/usePopupOpenAppCommentsConversation';
 
 const POPUP_NOTION_SYNC_NUDGE_DISMISSED_KEY = 'webclipper_popup_notion_sync_open_tab_dont_show_v1';
 
@@ -113,7 +113,7 @@ function PopupShellFrame() {
   const { refreshList, refreshActiveDetail } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
-  const commentsButton = usePopupOpenInpageCommentsSidebar();
+  const commentsButton = usePopupOpenAppCommentsConversation();
   const { buttonDisabled, buttonLabel, capture, status } = usePopupCurrentPageCapture({
     onCaptured: async () => {
       await refreshList();

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { ARTICLE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { send } from '@services/shared/runtime';
+import { openOrFocusExtensionAppTab } from '@services/shared/webext';
+import { encodeConversationLoc, buildConversationRouteFromLoc } from '@services/shared/conversation-loc';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 
 type ApiResponse<T> = {
@@ -16,6 +20,12 @@ type CaptureState = {
   label: string;
   collectorId: string | null;
   reason?: string;
+};
+
+type ResolvedArticle = {
+  conversationId: number;
+  url: string | null;
+  title: string | null;
 };
 
 function unwrap<T>(response: ApiResponse<T>): T {
@@ -34,7 +44,7 @@ function hasRuntimeSendMessage(): boolean {
   return typeof chromeSend === 'function';
 }
 
-export function usePopupOpenInpageCommentsSidebar() {
+export function usePopupOpenAppCommentsConversation() {
   const runtimeAvailable = useMemo(() => hasRuntimeSendMessage(), []);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -105,13 +115,16 @@ export function usePopupOpenInpageCommentsSidebar() {
     if (checking || opening || !eligible) return false;
     if (mountedRef.current) setOpening(true);
     try {
-      const response = await send<ApiResponse<{ opened: boolean }>>(
-        UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
-        {
-          source: 'popup',
-        },
-      );
-      return response?.ok === true;
+      const response = await send<ApiResponse<ResolvedArticle>>(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {});
+      const resolved = unwrap(response);
+
+      const canonicalUrl = canonicalizeArticleUrl(resolved?.url);
+      if (!canonicalUrl) return false;
+
+      const loc = encodeConversationLoc({ source: 'web', conversationKey: `article:${canonicalUrl}` });
+      const route = buildConversationRouteFromLoc(loc);
+      const opened = await openOrFocusExtensionAppTab({ route });
+      return Boolean(opened);
     } catch (_error) {
       return false;
     } finally {
