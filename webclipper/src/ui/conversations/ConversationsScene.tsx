@@ -89,7 +89,7 @@ export function ConversationsScene({
   });
   const selectedConversationCanonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
   const canOpenCommentsFromDetail =
-    Boolean(commentsSidebarRuntime) &&
+    (typeof onOpenCommentsExternally === 'function' || Boolean(commentsSidebarRuntime)) &&
     isArticleConversationLike(selectedConversation) &&
     Boolean(selectedConversationCanonicalUrl);
 

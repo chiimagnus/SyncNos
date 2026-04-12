@@ -8,7 +8,6 @@ import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/
 import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
-import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
@@ -110,7 +109,6 @@ export default function PopupShell() {
 }
 
 function PopupShellFrame() {
-  const commentsSidebarRuntime = useArticleCommentsSidebarRuntime();
   const { refreshList, refreshActiveDetail, selectedConversation } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
@@ -272,7 +270,6 @@ function PopupShellFrame() {
                 void onOpenProviderSettings(section).catch(() => {});
               }}
               onOpenCommentsExternally={onOpenSelectedConversationComments}
-              commentsSidebarRuntime={commentsSidebarRuntime}
               narrowCommentsOpenSource="popup"
             />
           </div>

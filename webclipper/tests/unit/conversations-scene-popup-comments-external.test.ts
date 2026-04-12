@@ -106,14 +106,6 @@ describe('ConversationsScene (popup) comments external override', () => {
         createElement(ConversationsScene, {
           inlineNarrowDetailHeader: true,
           onOpenCommentsExternally: () => openExternalMock(),
-          commentsSidebarRuntime: {
-            sidebarController: { open: (...args: any[]) => sidebarOpenMock(...args) },
-            sidebarSnapshot: {},
-            sidebarSession: {},
-            setLocatorRoot: vi.fn(),
-            getLocatorRoot: vi.fn(),
-            subscribeSidebarClose: () => () => {},
-          },
         } as any),
       );
     });
@@ -135,4 +127,3 @@ describe('ConversationsScene (popup) comments external override', () => {
     cleanupDom();
   });
 });
-
