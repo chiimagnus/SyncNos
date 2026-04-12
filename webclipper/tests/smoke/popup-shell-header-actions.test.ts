@@ -285,7 +285,8 @@ describe('PopupShell header actions', () => {
   it('opens app.html and jumps to the resolved article conversation from the comments button', async () => {
     const { UI_MESSAGE_TYPES } = await import('../../src/services/protocols/message-contracts');
     const { ARTICLE_MESSAGE_TYPES } = await import('../../src/platform/messaging/message-contracts');
-    const { encodeConversationLoc, buildConversationRouteFromLoc } = await import('../../src/services/shared/conversation-loc');
+    const { encodeConversationLoc, buildConversationRouteFromLoc } =
+      await import('../../src/services/shared/conversation-loc');
 
     sendMock.mockImplementation(async (type: string) => {
       if (type === UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE) {
@@ -338,6 +339,9 @@ describe('PopupShell header actions', () => {
       expect((window as any).close).toHaveBeenCalledTimes(1);
     });
 
-    expect(sendMock).not.toHaveBeenCalledWith(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, expect.anything());
+    expect(sendMock).not.toHaveBeenCalledWith(
+      UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
+      expect.anything(),
+    );
   });
 });

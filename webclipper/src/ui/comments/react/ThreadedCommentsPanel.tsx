@@ -668,10 +668,10 @@ export function ThreadedCommentsPanel({
         updateArmedDeleteId(null);
       }}
     >
-	      {showHeader ? (
-	        <div className="webclipper-inpage-comments-panel__header">
-	          <div className="webclipper-inpage-comments-panel__header-title">{t('articleCommentsHeading')}</div>
-	          <div className="webclipper-inpage-comments-panel__header-actions">
+      {showHeader ? (
+        <div className="webclipper-inpage-comments-panel__header">
+          <div className="webclipper-inpage-comments-panel__header-title">{t('articleCommentsHeading')}</div>
+          <div className="webclipper-inpage-comments-panel__header-actions">
             {showHeaderChatWith ? (
               <div className="webclipper-inpage-comments-panel__chatwith" ref={headerChatWithRootRef} />
             ) : null}
@@ -696,8 +696,8 @@ export function ThreadedCommentsPanel({
             ) : null}
           </div>
         </div>
-	      ) : null}
-	      <div className="webclipper-inpage-comments-panel__body">
+      ) : null}
+      <div className="webclipper-inpage-comments-panel__body">
         <div
           className="webclipper-inpage-comments-panel__notice"
           style={{ display: snapshot.noticeVisible && snapshot.noticeMessage ? 'block' : 'none' }}
@@ -707,37 +707,37 @@ export function ThreadedCommentsPanel({
         >
           {snapshot.noticeMessage}
         </div>
-	        {String(snapshot.quoteText || '').trim() ? (
-	          <div className="webclipper-inpage-comments-panel__quote">
-	            <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
-	            <button
-	              type="button"
-	              className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
-	              aria-label="Clear quote"
-	              onClick={() => {
-	                lastAutoSelectionSignatureRef.current = '';
-	                pendingAutoSelectionRequestRef.current = false;
-	                pendingAutoSelectionSignatureRef.current = 'empty';
-	                autoSelectionDirtyRef.current = false;
-	                const latestHandlers = readHandlers?.() || snapshot.handlers;
-	                const handler = latestHandlers.onComposerQuoteClearRequest;
-	                if (typeof handler !== 'function') return;
-	                void Promise.resolve(handler()).catch(() => {
-	                  // ignore
-	                });
-	              }}
-	            >
-	              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-	                <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-	                <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-	              </svg>
-	            </button>
-	          </div>
-	        ) : null}
-	        <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
-	          <textarea
-	            ref={composerTextareaRef}
-	            className="webclipper-inpage-comments-panel__composer-textarea"
+        {String(snapshot.quoteText || '').trim() ? (
+          <div className="webclipper-inpage-comments-panel__quote">
+            <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
+            <button
+              type="button"
+              className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
+              aria-label="Clear quote"
+              onClick={() => {
+                lastAutoSelectionSignatureRef.current = '';
+                pendingAutoSelectionRequestRef.current = false;
+                pendingAutoSelectionSignatureRef.current = 'empty';
+                autoSelectionDirtyRef.current = false;
+                const latestHandlers = readHandlers?.() || snapshot.handlers;
+                const handler = latestHandlers.onComposerQuoteClearRequest;
+                if (typeof handler !== 'function') return;
+                void Promise.resolve(handler()).catch(() => {
+                  // ignore
+                });
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+        <div className="webclipper-inpage-comments-panel__reply-composer is-root" data-webclipper-root-composer="1">
+          <textarea
+            ref={composerTextareaRef}
+            className="webclipper-inpage-comments-panel__composer-textarea"
             placeholder="Write a comment…"
             rows={1}
             value={composerText}

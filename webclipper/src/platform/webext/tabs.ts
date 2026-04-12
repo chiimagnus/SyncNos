@@ -18,7 +18,7 @@ function debugTabsCreate(createProperties: any) {
     const url = String(createProperties?.url || '').trim();
     if (!shouldLogTabsCreate(url)) return;
     const stack = new Error('tabs.create stack').stack || '';
-     
+
     console.log('[SyncNos][tabs.create]', {
       at: new Date().toISOString(),
       url,

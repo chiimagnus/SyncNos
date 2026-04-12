@@ -517,16 +517,16 @@ export default function AppShell() {
         return () => window.clearTimeout(timer);
       }
 
-	      const lastActive = settingsLastActiveElementRef.current;
-	      settingsLastActiveElementRef.current = null;
-	      if (!lastActive) return;
-	      if (!document.contains(lastActive)) return;
-	      try {
-	        lastActive.focus({ preventScroll: true });
-	      } catch (e) {
-	        void e;
-	      }
-	    }, [showSettingsSheet]);
+      const lastActive = settingsLastActiveElementRef.current;
+      settingsLastActiveElementRef.current = null;
+      if (!lastActive) return;
+      if (!document.contains(lastActive)) return;
+      try {
+        lastActive.focus({ preventScroll: true });
+      } catch (e) {
+        void e;
+      }
+    }, [showSettingsSheet]);
 
     useEffect(() => {
       if (!locMountedRef.current) {

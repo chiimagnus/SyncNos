@@ -114,7 +114,10 @@ export function usePopupOpenAppCommentsConversation() {
     if (checking || opening || !eligible) return false;
     if (mountedRef.current) setOpening(true);
     try {
-      const response = await send<ApiResponse<ResolvedArticle>>(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, {});
+      const response = await send<ApiResponse<ResolvedArticle>>(
+        ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB,
+        {},
+      );
       const resolved = unwrap(response);
 
       const canonicalUrl = canonicalizeArticleUrl(resolved?.url);
