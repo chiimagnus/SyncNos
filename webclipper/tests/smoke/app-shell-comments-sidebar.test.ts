@@ -369,7 +369,7 @@ describe('AppShell comments sidebar', () => {
 
     await vi.waitFor(() => {
       const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
-      expect(quoteText).toBe('');
+      expect(quoteText ?? '').toBe('');
     });
 
     act(() => {
@@ -466,7 +466,7 @@ describe('AppShell comments sidebar', () => {
     const initialQuoteText = shadow
       ?.querySelector('.webclipper-inpage-comments-panel__quote-text')
       ?.textContent?.trim();
-    expect(initialQuoteText).toBe('');
+    expect(initialQuoteText ?? '').toBe('');
 
     act(() => {
       document.dispatchEvent(new window.Event('selectionchange'));
@@ -475,7 +475,7 @@ describe('AppShell comments sidebar', () => {
 
     await vi.waitFor(() => {
       const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
-      expect(quoteText).toBe('');
+      expect(quoteText ?? '').toBe('');
     });
   });
 

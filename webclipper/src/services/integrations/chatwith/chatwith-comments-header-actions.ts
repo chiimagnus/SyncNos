@@ -88,7 +88,7 @@ function buildChatWithPlatformAction(input: {
   };
 }
 
-export async function resolveChatWithDetailHeaderActions({
+export async function resolveChatWithCommentsHeaderActions({
   conversation,
   detail,
   port,

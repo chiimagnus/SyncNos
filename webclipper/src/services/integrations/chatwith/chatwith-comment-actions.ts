@@ -1,6 +1,6 @@
 import { loadChatWithSettings, type ChatWithAiPlatform } from '@services/integrations/chatwith/chatwith-settings';
 import { writeTextToClipboard } from '@services/integrations/chatwith/chatwith-clipboard';
-import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-detail-header-actions';
+import { resolveSingleEnabledChatWithActionLabel } from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import { buildChatWithCommentPayloadV1 } from '@services/integrations/chatwith/chatwith-comment-payload';
 import {
   openChatWithPlatform,

@@ -17,7 +17,7 @@ vi.mock('../../src/services/integrations/chatwith/chatwith-clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),
 }));
 
-vi.mock('../../src/services/integrations/chatwith/chatwith-detail-header-actions', () => ({
+vi.mock('../../src/services/integrations/chatwith/chatwith-comments-header-actions', () => ({
   resolveSingleEnabledChatWithActionLabel: (...args: any[]) => resolveSingleEnabledChatWithActionLabelMock(...args),
 }));
 

@@ -57,7 +57,8 @@ npm --prefix webclipper run check            # 产物校验
    - `webclipper/src/ui/shared/SelectMenu.tsx`（source/site 筛选菜单的 `adaptiveMaxHeight` 与可视区域计算）
    - `webclipper/src/ui/popup/PopupShell.tsx` / `webclipper/src/ui/app/AppShell.tsx`（列表统计跳转 Insight 的路由入口）
    - `webclipper/src/ui/conversations/ConversationListPane.tsx` / `pending-open.ts`（来源筛选持久化与窄屏 detail bridge）
-   - `webclipper/src/viewmodels/conversations/conversations-context.tsx` / `DetailHeaderActionBar.tsx` / `DetailNavigationHeader.tsx`（详情头 `open / tools` 槽位分发与窄屏一致性；Chat with AI 动作也复用 `tools` 槽位）
+   - `webclipper/src/viewmodels/conversations/conversations-context.tsx` / `DetailHeaderActionBar.tsx` / `DetailNavigationHeader.tsx`（详情头 `open / tools` 槽位分发与窄屏一致性；`tools` 仅用于本地工具动作（例如 cache-images），不包含 Chat with）
+   - `webclipper/src/ui/comments/react/ThreadedCommentsPanel.tsx` / `webclipper/src/services/integrations/chatwith/chatwith-comments-header-actions.ts`（Chat with 仅归属评论侧栏：sidebar header + comment-level）
 4. 默认验证顺序使用：
    - `npm --prefix webclipper run compile`
    - `npm --prefix webclipper run test`
