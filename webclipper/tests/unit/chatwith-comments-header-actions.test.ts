@@ -22,7 +22,7 @@ vi.mock('../../src/services/integrations/chatwith/chatwith-open-port', () => ({
   openChatWithPlatform: (...args: any[]) => openChatWithPlatformMock(...args),
 }));
 
-describe('resolveChatWithDetailHeaderActions', () => {
+describe('resolveChatWithCommentsHeaderActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loadChatWithSettingsMock.mockResolvedValue({
@@ -35,10 +35,10 @@ describe('resolveChatWithDetailHeaderActions', () => {
   });
 
   it('passes articleKey context to openPort when conversation is an article', async () => {
-    const { resolveChatWithDetailHeaderActions } =
-      await import('../../src/services/integrations/chatwith/chatwith-detail-header-actions');
+    const { resolveChatWithCommentsHeaderActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
-    const actions = await resolveChatWithDetailHeaderActions({
+    const actions = await resolveChatWithCommentsHeaderActions({
       conversation: {
         id: 1,
         sourceType: 'article',
@@ -71,10 +71,10 @@ describe('resolveChatWithDetailHeaderActions', () => {
   });
 
   it('does not pass articleKey context for non-article conversations', async () => {
-    const { resolveChatWithDetailHeaderActions } =
-      await import('../../src/services/integrations/chatwith/chatwith-detail-header-actions');
+    const { resolveChatWithCommentsHeaderActions } =
+      await import('../../src/services/integrations/chatwith/chatwith-comments-header-actions');
 
-    const actions = await resolveChatWithDetailHeaderActions({
+    const actions = await resolveChatWithCommentsHeaderActions({
       conversation: {
         id: 1,
         sourceType: 'chat',

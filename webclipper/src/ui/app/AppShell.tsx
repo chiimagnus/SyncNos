@@ -17,9 +17,9 @@ import { createThreadedCommentChatWithConfig } from '@ui/comments';
 import type { ThreadedCommentsPanelChatWithAction } from '@ui/comments';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import {
-  resolveChatWithDetailHeaderActions,
+  resolveChatWithCommentsHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
-} from '@services/integrations/chatwith/chatwith-detail-header-actions';
+} from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import { CHATWITH_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { createRuntimeClient } from '@services/shared/runtime-client';
@@ -462,7 +462,7 @@ export default function AppShell() {
         throw new Error('Conversation detail is not ready yet');
       }
 
-      const actions: DetailHeaderAction[] = await resolveChatWithDetailHeaderActions({
+      const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
         conversation: selectedConversation,
         detail: currentDetail,
         port: defaultDetailHeaderActionPort,
@@ -517,16 +517,16 @@ export default function AppShell() {
         return () => window.clearTimeout(timer);
       }
 
-	      const lastActive = settingsLastActiveElementRef.current;
-	      settingsLastActiveElementRef.current = null;
-	      if (!lastActive) return;
-	      if (!document.contains(lastActive)) return;
-	      try {
-	        lastActive.focus({ preventScroll: true });
-	      } catch (e) {
-	        void e;
-	      }
-	    }, [showSettingsSheet]);
+      const lastActive = settingsLastActiveElementRef.current;
+      settingsLastActiveElementRef.current = null;
+      if (!lastActive) return;
+      if (!document.contains(lastActive)) return;
+      try {
+        lastActive.focus({ preventScroll: true });
+      } catch (e) {
+        void e;
+      }
+    }, [showSettingsSheet]);
 
     useEffect(() => {
       if (!locMountedRef.current) {

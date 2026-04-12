@@ -241,8 +241,7 @@ describe('Threaded comments panel auto-attach selection trigger', () => {
     await flushReactScheduler();
 
     const quoteEl = shadow.querySelector('.webclipper-inpage-comments-panel__quote') as HTMLElement | null;
-    expect(quoteEl).toBeTruthy();
-    expect((quoteEl as HTMLElement).style.display).toBe('none');
+    expect(quoteEl).toBeFalsy();
 
     document.dispatchEvent(new window.Event('selectionchange'));
     document.dispatchEvent(new window.Event('pointerup'));

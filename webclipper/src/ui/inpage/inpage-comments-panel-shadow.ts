@@ -16,9 +16,9 @@ import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import {
-  resolveChatWithDetailHeaderActions,
+  resolveChatWithCommentsHeaderActions,
   resolveSingleEnabledChatWithActionLabel,
-} from '@services/integrations/chatwith/chatwith-detail-header-actions';
+} from '@services/integrations/chatwith/chatwith-comments-header-actions';
 import { defaultDetailHeaderActionPort, type DetailHeaderAction } from '@services/integrations/detail-header-actions';
 
 export type InpageCommentItem = ThreadedCommentItem;
@@ -148,7 +148,7 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     publishedAt: resolved?.data?.publishedAt,
   });
 
-  const actions: DetailHeaderAction[] = await resolveChatWithDetailHeaderActions({
+  const actions: DetailHeaderAction[] = await resolveChatWithCommentsHeaderActions({
     conversation,
     detail,
     port: defaultDetailHeaderActionPort,
