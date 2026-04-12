@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
-import { ARTICLE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { ARTICLE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { encodeConversationLoc, buildConversationRouteFromLoc } from '@services/shared/conversation-loc';
