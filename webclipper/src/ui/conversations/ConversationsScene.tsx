@@ -30,6 +30,7 @@ export type ConversationsSceneProps = {
   onPopupNotionSyncStarted?: () => void;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
+  onOpenCommentsExternally?: () => void;
   commentsSidebarRuntime?: ArticleCommentsSidebarRuntime;
   narrowCommentsOpenSource?: 'popup' | 'app';
   resolveCommentsSidebarChatWithActions?: () => Promise<ThreadedCommentsPanelChatWithAction[]>;
@@ -60,6 +61,7 @@ export function ConversationsScene({
   onPopupNotionSyncStarted,
   onOpenInsightsSection,
   onOpenSettingsSection,
+  onOpenCommentsExternally,
   commentsSidebarRuntime,
   narrowCommentsOpenSource = 'popup',
   resolveCommentsSidebarChatWithActions,
@@ -167,6 +169,10 @@ export function ConversationsScene({
                 onTriggerCommentsSidebar={
                   canOpenCommentsFromDetail
                     ? () => {
+                        if (typeof onOpenCommentsExternally === 'function') {
+                          onOpenCommentsExternally();
+                          return;
+                        }
                         if (!commentsSidebarRuntime) return;
                         openComments();
                         void commentsSidebarRuntime.sidebarController.open({

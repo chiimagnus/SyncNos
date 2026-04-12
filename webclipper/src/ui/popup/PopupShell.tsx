@@ -3,6 +3,7 @@ import { MessageSquareText, Settings as SettingsIcon } from 'lucide-react';
 
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
+import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 
 import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
@@ -110,7 +111,7 @@ export default function PopupShell() {
 
 function PopupShellFrame() {
   const commentsSidebarRuntime = useArticleCommentsSidebarRuntime();
-  const { refreshList, refreshActiveDetail } = useConversationsApp();
+  const { refreshList, refreshActiveDetail, selectedConversation } = useConversationsApp();
   const [notionSyncNudgeOpen, setNotionSyncNudgeOpen] = useState(false);
   const [notionSyncNudgeDontShowAgain, setNotionSyncNudgeDontShowAgain] = useState(false);
   const commentsButton = usePopupOpenAppCommentsConversation();
@@ -120,6 +121,20 @@ function PopupShellFrame() {
       await refreshActiveDetail();
     },
   });
+
+  const onOpenSelectedConversationComments = useCallback(() => {
+    void (async () => {
+      const convo: any = selectedConversation;
+      const source = String(convo?.source || '').trim();
+      const conversationKey = String(convo?.conversationKey || '').trim();
+      if (!source || !conversationKey) return;
+
+      const loc = encodeConversationLoc({ source, conversationKey });
+      const route = buildConversationRouteFromLoc(loc);
+      const opened = await openOrFocusExtensionAppTab({ route });
+      if (opened) window.close();
+    })();
+  }, [selectedConversation]);
 
   const onOpenSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings' });
@@ -256,6 +271,7 @@ function PopupShellFrame() {
               onOpenSettingsSection={(section) => {
                 void onOpenProviderSettings(section).catch(() => {});
               }}
+              onOpenCommentsExternally={onOpenSelectedConversationComments}
               commentsSidebarRuntime={commentsSidebarRuntime}
               narrowCommentsOpenSource="popup"
             />
