@@ -24,7 +24,7 @@ describe('article-extract xiaohongshu', () => {
     const res = extractBySiteSpec(XIAOHONGSHU_NOTE_SITE_SPEC, 'https://www.xiaohongshu.com/explore/123');
     expect(res).toBeTruthy();
     expect(res?.author).toBe('作者');
-    expect(String(res?.contentMarkdown || '')).toBe('');
+    expect(Object.prototype.hasOwnProperty.call(res || {}, 'contentMarkdown')).toBe(false);
     expect(String(res?.textContent || '')).toContain('这里是正文');
     expect(String(res?.contentHTML || '')).toContain('sns-webpic-qc.xhscdn.com');
   });

@@ -136,7 +136,6 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
     contentHTML: htmlBody
       ? `<html><body>${htmlBody}</body></html>`
       : `<html><body><p>${escapeHtml(textContent)}</p></body></html>`,
-    contentMarkdown: '',
     textContent,
     excerpt: '',
   };
