@@ -78,7 +78,11 @@ export function htmlToMarkdown(html: unknown, text: unknown, baseHref: string) {
   try {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = normalizedHtml;
-    const root = wrapper.querySelector('article') || wrapper;
+    const directChildren = Array.from(wrapper.children || []);
+    const root =
+      directChildren.length === 1 && String(directChildren[0]?.tagName || '').toLowerCase() === 'article'
+        ? directChildren[0]
+        : wrapper;
     normalizeDetailsElementsForMarkdown(root);
     const md = renderBlock(root, baseHref);
     return normalizeText(md);
