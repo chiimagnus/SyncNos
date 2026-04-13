@@ -1,15 +1,17 @@
 import { DISCOURSE_OP_MISSING_WARNING_FLAG } from '@collectors/web/article-fetch-errors';
 import { DISCOURSE_TOPIC_PATH_RE_FLAGS, DISCOURSE_TOPIC_PATH_RE_SOURCE } from '@collectors/web/article-fetch-discourse';
-import { ARTICLE_FETCH_SITE_SPECS } from '@collectors/web/article-fetch-sites';
 import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
-import { extractDiscourseOpOnly, parseDiscourseTopicPathOnPage } from '@collectors/web/article-extract/discourse-op';
 import {
+  ARTICLE_FETCH_SITE_SPECS,
+  extractDiscourseOpOnly,
+  parseDiscourseTopicPathOnPage,
   buildWechatShareMediaGalleryHtml,
   buildWechatShareMediaGalleryMarkdown,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
-} from '@collectors/web/article-extract/wechat-share-media';
+  waitForXiaohongshuNoteHydrated,
+} from '@collectors/web/article-extract/sites';
 import type { ExtractedWebArticle } from '@collectors/web/article-extract/types';
 import { normalizeText } from '@collectors/web/article-extract/url';
 
@@ -147,25 +149,6 @@ async function waitForWechatShareMediaHydrated() {
     lastCount = count;
     if (stableTicks >= 2) return;
     await new Promise((resolve) => setTimeout(resolve, 150));
-  }
-}
-
-function isXiaohongshuNotePage() {
-  const hostname = String(location.hostname || '').toLowerCase();
-  if (!hostname || !hostname.endsWith('xiaohongshu.com')) return false;
-  return Boolean(document.querySelector('#noteContainer'));
-}
-
-async function waitForXiaohongshuNoteHydrated() {
-  if (!isXiaohongshuNotePage()) return;
-
-  const deadline = Date.now() + 4_000;
-  while (Date.now() < deadline) {
-    const root = document.querySelector('#noteContainer') as any;
-    const text = root ? normalizeText(String((root as any).innerText || '')) : '';
-    const imgCount = root ? Number(root.querySelectorAll?.('img')?.length || 0) : 0;
-    if (text.length >= 80 || imgCount >= 1) return;
-    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 }
 
