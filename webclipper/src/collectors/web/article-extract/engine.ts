@@ -1,10 +1,10 @@
 import { DISCOURSE_OP_MISSING_WARNING_FLAG } from '@collectors/web/article-fetch-errors';
 import { DISCOURSE_TOPIC_PATH_RE_FLAGS, DISCOURSE_TOPIC_PATH_RE_SOURCE } from '@collectors/web/article-fetch-discourse';
+import { ARTICLE_FETCH_SITE_SPECS } from '@collectors/web/article-fetch-sites';
 import { extractByDefuddle } from '@collectors/web/article-extract/defuddle';
 import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
 import {
-  ARTICLE_FETCH_SITE_SPECS,
   extractDiscourseOpOnly,
   parseDiscourseTopicPathOnPage,
   buildWechatShareMediaGalleryHtml,

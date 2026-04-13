@@ -1,4 +1,5 @@
 import TurndownService from 'turndown';
+import { gfm as applyTurndownGfm } from 'turndown-plugin-gfm';
 import { cleanHtmlFragment } from '@collectors/web/article-extract/html-clean';
 import { normalizeText } from '@collectors/web/article-extract/url';
 
@@ -16,6 +17,7 @@ function createTurndownService() {
     emDelimiter: '*',
     strongDelimiter: '**',
   });
+  applyTurndownGfm(turndown);
 
   turndown.addRule('syncnos-pre', {
     filter: 'pre',

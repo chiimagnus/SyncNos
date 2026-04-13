@@ -71,8 +71,22 @@ function listElementsIncludingRoot(root: Element, selector: string) {
   return out;
 }
 
+function promoteTableCellAlignment(root: Element) {
+  const cells = listElementsIncludingRoot(root, 'table th[style], table td[style]');
+  for (const cell of cells) {
+    const align = normalizeText(cell.getAttribute('align') || '').toLowerCase();
+    if (align === 'left' || align === 'center' || align === 'right') continue;
+
+    const style = String(cell.getAttribute('style') || '');
+    const match = style.match(/(?:^|;)\s*text-align\s*:\s*(left|center|right)\s*(?:;|$)/i);
+    if (!match || !match[1]) continue;
+    cell.setAttribute('align', String(match[1]).toLowerCase());
+  }
+}
+
 export function cleanHtmlFragment(root: Element, baseHref: string) {
   listElementsIncludingRoot(root, 'script,style').forEach((node) => node.remove());
+  promoteTableCellAlignment(root);
   listElementsIncludingRoot(root, '[style]').forEach((node) => node.removeAttribute('style'));
   normalizeLazyLoadedImages(root, baseHref);
   listElementsIncludingRoot(root, '[href]').forEach((node) => absolutizeAttr(node, 'href', baseHref));

@@ -69,6 +69,7 @@
     "react-router-dom": "7.13.1",
     "react-tooltip": "^5.30.0",
     "recharts": "^3.8.0",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
   }
 }

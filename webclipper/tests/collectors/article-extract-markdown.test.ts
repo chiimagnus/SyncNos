@@ -54,4 +54,33 @@ describe('article-extract markdown', () => {
     expect(md).toContain('![](https://example.com/original.png)');
     expect(md).not.toContain('data:image/gif');
   });
+
+  it('converts GitHub-style README table HTML into markdown table with alignment', () => {
+    const html = `
+      <article class="markdown-body entry-content">
+        <table>
+          <thead>
+            <tr>
+              <th>Package</th>
+              <th style="text-align: right;">Version</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SyncNos</td>
+              <td style="text-align: right;">1.0.24</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://github.com/chii/example' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://github.com/chii/example');
+    expect(md).toMatch(/\|\s*Package\s*\|\s*Version\s*\|/);
+    expect(md).toMatch(/\|\s*-{2,}\s*\|\s*-{2,}:\s*\|/);
+    expect(md).toMatch(/\|\s*SyncNos\s*\|\s*1\.0\.24\s*\|/);
+  });
 });

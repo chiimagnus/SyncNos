@@ -91,12 +91,13 @@
 1. `src/collectors/web/article-fetch.ts` 在 background 侧解析 active tab + canonical URL，向 content 发送 `EXTRACT_WEB_ARTICLE`。
 2. content 侧 `src/collectors/web/article-extract/engine.ts` 先做 `waitForDomStabilized()` + site hydration wait（微信图集 / 小红书）。
 3. 抽取顺序固定为：`site spec` → `Discourse OP(.cooked)` → `Defuddle` → `Readability` → `fallback`。
-4. 统一转换主干：`contentHTML` → `cleanHtmlFragment()`（移除 script/style/style attr + href/src/srcset 绝对化）→ `htmlToMarkdownTurndown()`。
+4. 统一转换主干：`contentHTML` → `cleanHtmlFragment()`（移除 script/style/style attr + href/src/srcset 绝对化）→ `htmlToMarkdownTurndown()`（含 GFM table 转换）。
 5. 兜底：Turndown 返回空时回退 `textContent`。
 
 ### 站点适配边界
 
 - `site spec` 只负责提取结构化 `contentHTML + textContent`，不再直接拼 markdown。
+- `article-fetch-sites/*` 只维护 declarative site specs；`article-extract/sites/*` 只维护运行时站点 helper，不承担 spec 转发。
 - Discourse 保留首贴 `.cooked` 轻量适配（避免 onebox 截断）。
 - 微信 share media 图集保留 HTML 追加能力，但 markdown 统一由 Turndown 生成（已移除 `buildWechatShareMediaGalleryMarkdown()` 旁路）。
 - 小红书/Bilibili 仍由 `article-fetch-sites/*` 提供选择器策略，并在 engine 主干中统一转换。
@@ -115,6 +116,7 @@
 | WeChat share media | 图集图片被正确提取并清洗参数；输出是图片 blocks（非表格） |
 | 小红书 note | `#noteContainer` hydrated 后走 site spec；正文与图片都保留 |
 | Bilibili opus | 图片 URL 去除 `@...` 后缀，正文段落保留 |
+| GitHub README（含 table） | 表格转换为 GFM markdown table；对齐信息可保留（例如右对齐列） |
 
 ### 与 obsidian-clipper 的对标差异
 
