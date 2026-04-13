@@ -281,9 +281,14 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   const sitePayload = extractBySiteSpecs(baseHref);
   if (sitePayload) {
+    const markdown =
+      htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) ||
+      htmlToMarkdown(sitePayload.contentHTML, sitePayload.textContent, baseHref) ||
+      normalizeText(sitePayload.textContent);
     return withDiscourseOpWarning(
       {
         ...sitePayload,
+        contentMarkdown: markdown,
       },
       false,
     );

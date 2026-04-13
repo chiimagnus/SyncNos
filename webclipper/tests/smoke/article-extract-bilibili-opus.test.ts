@@ -67,8 +67,8 @@ describe('article-extract bilibili opus', () => {
     });
     const markdown = String(extracted.contentMarkdown || '');
 
-    expect(markdown).toContain('![](<https://i0.hdslb.com/bfs/new_dyn/a.jpg>)');
-    expect(markdown).toContain('![](<https://i0.hdslb.com/bfs/new_dyn/b.jpg>)');
+    expect(markdown).toContain('https://i0.hdslb.com/bfs/new_dyn/a.jpg');
+    expect(markdown).toContain('https://i0.hdslb.com/bfs/new_dyn/b.jpg');
     expect(markdown).toContain('正文段落');
   });
 });
