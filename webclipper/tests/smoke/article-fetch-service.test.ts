@@ -127,7 +127,7 @@ describe('article-fetch-service', () => {
     expect(data.title).toBe('Readability Title');
     expect(data.wordCount).toBeGreaterThan(0);
 
-    expect(executeScript).toHaveBeenCalledTimes(1);
+    expect(executeScript).toHaveBeenCalledTimes(0);
     expect(upsertConversation).toHaveBeenCalledTimes(1);
     expect(upsertConversation.mock.calls[0][0]).toMatchObject({
       sourceType: 'article',
@@ -740,7 +740,13 @@ describe('article-fetch-service', () => {
       runtime.lastError = null;
     });
 
+    let extractCall = 0;
     const sendMessage = vi.fn((_tabId: number, _msg: any, cb: (res: any) => void) => {
+      extractCall += 1;
+      if (extractCall === 1) {
+        cb({ ok: false, error: { message: 'No article content detected' } });
+        return;
+      }
       cb({
         ok: true,
         data: {
@@ -773,6 +779,6 @@ describe('article-fetch-service', () => {
 
     expect(data.title).toBe('No Readability Title');
     expect(executeScript).toHaveBeenCalledTimes(1);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
   });
 });
