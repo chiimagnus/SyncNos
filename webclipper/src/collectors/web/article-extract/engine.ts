@@ -1,6 +1,7 @@
 import { DISCOURSE_OP_MISSING_WARNING_FLAG } from '@collectors/web/article-fetch-errors';
 import { DISCOURSE_TOPIC_PATH_RE_FLAGS, DISCOURSE_TOPIC_PATH_RE_SOURCE } from '@collectors/web/article-fetch-discourse';
 import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
+import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
 import {
   ARTICLE_FETCH_SITE_SPECS,
@@ -68,6 +69,8 @@ function fallbackExtract(baseHref: string) {
   ]);
   const text = normalizeText((root as any).innerText || '');
   if (!text) return null;
+  const fallbackHtml = buildHtml('', text);
+  const markdown = htmlToMarkdownTurndown(fallbackHtml, baseHref) || htmlToMarkdown('', text, baseHref);
   return {
     title,
     author,
@@ -77,8 +80,8 @@ function fallbackExtract(baseHref: string) {
       "meta[name='pubdate']",
     ]),
     excerpt: '',
-    contentHTML: buildHtml('', text),
-    contentMarkdown: htmlToMarkdown('', text, baseHref),
+    contentHTML: fallbackHtml,
+    contentMarkdown: markdown,
     textContent: text,
   };
 }
@@ -216,10 +219,12 @@ function extractByReadability(baseHref: string) {
   const wechatGalleryMarkdown = buildWechatShareMediaGalleryMarkdown(baseHref);
   const htmlBody = normalizeText(content) || (text ? `<p>${escapeHtml(text)}</p>` : '');
   const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
-  const markdownBase = htmlToMarkdown(content, text, baseHref);
-  const markdownWithWechatGallery = wechatGalleryMarkdown
-    ? normalizeText(`${markdownBase}\n\n${wechatGalleryMarkdown}`)
-    : markdownBase;
+  const legacyMarkdownBase = htmlToMarkdown(content, text, baseHref);
+  const legacyMarkdownWithWechatGallery = wechatGalleryMarkdown
+    ? normalizeText(`${legacyMarkdownBase}\n\n${wechatGalleryMarkdown}`)
+    : legacyMarkdownBase;
+  const markdownFromTurndown = wechatGalleryHtml ? '' : htmlToMarkdownTurndown(contentWithWechatGallery, baseHref);
+  const markdownWithWechatGallery = markdownFromTurndown || legacyMarkdownWithWechatGallery;
 
   return {
     title,
