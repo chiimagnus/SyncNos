@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { htmlToMarkdown } from '../../src/collectors/web/article-extract/markdown.ts';
+import { htmlToMarkdownTurndown } from '../../src/collectors/web/article-extract/markdown-turndown.ts';
 
 function setupDom(dom: JSDOM) {
   // @ts-expect-error test global
@@ -30,7 +30,7 @@ describe('article-extract markdown', () => {
     const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://linux.do/t/any/1' });
     setupDom(dom);
 
-    const md = htmlToMarkdown(html, '', 'https://linux.do/t/any/1');
+    const md = htmlToMarkdownTurndown(html, 'https://linux.do/t/any/1');
     expect(md).toContain('**Mac**');
     expect(md).toContain('```');
     expect(md).toContain('echo 1');

@@ -17,6 +17,19 @@ function createTurndownService() {
     strongDelimiter: '**',
   });
 
+  turndown.addRule('syncnos-pre', {
+    filter: 'pre',
+    replacement(_content, node) {
+      const pre = node as HTMLElement;
+      const code = pre?.querySelector?.('code');
+      const value = String(code?.textContent || pre?.textContent || '')
+        .replace(/\r\n/g, '\n')
+        .trim();
+      if (!value) return '\n';
+      return `\n\`\`\`\n${value}\n\`\`\`\n\n`;
+    },
+  });
+
   turndown.addRule('syncnos-summary', {
     filter: 'summary',
     replacement(content) {

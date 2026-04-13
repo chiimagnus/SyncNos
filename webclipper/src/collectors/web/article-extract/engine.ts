@@ -1,7 +1,6 @@
 import { DISCOURSE_OP_MISSING_WARNING_FLAG } from '@collectors/web/article-fetch-errors';
 import { DISCOURSE_TOPIC_PATH_RE_FLAGS, DISCOURSE_TOPIC_PATH_RE_SOURCE } from '@collectors/web/article-fetch-discourse';
 import { extractByDefuddle } from '@collectors/web/article-extract/defuddle';
-import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
 import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
 import {
@@ -61,10 +60,7 @@ function fallbackExtract(baseHref: string) {
   const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
   if (wechatOnlyUrls.length >= 2) {
     const html = buildWechatShareMediaGalleryHtml(baseHref);
-    const markdown =
-      htmlToMarkdownTurndown(html, baseHref) ||
-      htmlToMarkdown(html, wechatOnlyUrls.join('\n'), baseHref) ||
-      normalizeText(wechatOnlyUrls.join('\n'));
+    const markdown = htmlToMarkdownTurndown(html, baseHref) || normalizeText(wechatOnlyUrls.join('\n'));
     return {
       title: normalizeText(document.title || '') || 'WeChat Share Media',
       author: '',
@@ -88,7 +84,7 @@ function fallbackExtract(baseHref: string) {
   const text = normalizeText((root as any).innerText || '');
   if (!text) return null;
   const fallbackHtml = buildHtml('', text);
-  const markdown = htmlToMarkdownTurndown(fallbackHtml, baseHref) || htmlToMarkdown('', text, baseHref);
+  const markdown = htmlToMarkdownTurndown(fallbackHtml, baseHref) || normalizeText(text);
   return {
     title,
     author,
@@ -241,10 +237,7 @@ function extractByReadability(baseHref: string) {
   const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
   const htmlBody = normalizeText(content) || (text ? `<p>${escapeHtml(text)}</p>` : '');
   const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
-  const markdownWithWechatGallery =
-    htmlToMarkdownTurndown(contentWithWechatGallery, baseHref) ||
-    htmlToMarkdown(contentWithWechatGallery, text, baseHref) ||
-    normalizeText(text);
+  const markdownWithWechatGallery = htmlToMarkdownTurndown(contentWithWechatGallery, baseHref) || normalizeText(text);
 
   return {
     title,
@@ -280,10 +273,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   const sitePayload = extractBySiteSpecs(baseHref);
   if (sitePayload) {
-    const markdown =
-      htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) ||
-      htmlToMarkdown(sitePayload.contentHTML, sitePayload.textContent, baseHref) ||
-      normalizeText(sitePayload.textContent);
+    const markdown = htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) || normalizeText(sitePayload.textContent);
     return withDiscourseOpWarning(
       {
         ...sitePayload,
@@ -307,10 +297,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   const defuddle = isWechatShareMediaPage() ? null : extractByDefuddle(baseHref);
   if (defuddle) {
-    const markdown =
-      htmlToMarkdownTurndown(defuddle.contentHTML, baseHref) ||
-      htmlToMarkdown(defuddle.contentHTML, defuddle.textContent, baseHref) ||
-      normalizeText(defuddle.textContent);
+    const markdown = htmlToMarkdownTurndown(defuddle.contentHTML, baseHref) || normalizeText(defuddle.textContent);
     return withDiscourseOpWarning(
       {
         ...defuddle,

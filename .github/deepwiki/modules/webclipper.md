@@ -71,7 +71,7 @@
 | 类型 | 当前覆盖 | 关键特点 |
 | --- | --- | --- |
 | AI 对话站点 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai | 通过 collectors registry 统一注册 |
-| 普通网页文章 | 任意 `http(s)` 页面 | 手动抓取时注入 `readability.js` 提取正文 |
+| 普通网页文章 | 任意 `http(s)` 页面 | content 抽取首次失败时按需注入 `readability.js` 并重试一次 |
 | inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击打开页面内评论侧边栏（inpage comments panel）、多击彩蛋提示 |
 | Popup 当前页抓取 | `usePopupCurrentPageCapture.ts` + `current-page-capture.ts` | 先判断当前页可抓取，再用统一按钮触发 chat / article 抓取 |
 | 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除；不属于新的抓取站点 |
@@ -92,7 +92,7 @@
 2. content 侧 `src/collectors/web/article-extract/engine.ts` 先做 `waitForDomStabilized()` + site hydration wait（微信图集 / 小红书）。
 3. 抽取顺序固定为：`site spec` → `Discourse OP(.cooked)` → `Defuddle` → `Readability` → `fallback`。
 4. 统一转换主干：`contentHTML` → `cleanHtmlFragment()`（移除 script/style/style attr + href/src/srcset 绝对化）→ `htmlToMarkdownTurndown()`。
-5. 兼容兜底：Turndown 返回空时再回退旧 `htmlToMarkdown()` 或 `textContent`。
+5. 兜底：Turndown 返回空时回退 `textContent`。
 
 ### 站点适配边界
 
@@ -123,7 +123,7 @@
   - 保留 Discourse OP 专项路径与 `/1` 首层回退逻辑。
   - 保留 Readability 兜底分支，且 background 侧支持按需注入。
   - 保留站点 spec（微信图集 / 小红书 / Bilibili）并统一回到同一 Markdown 主干。
-- 当前下一步：继续减少旧 `htmlToMarkdown` 兜底命中率，逐步收敛到 Turndown 单一路径。
+- 当前状态：旧 `htmlToMarkdown` 已从 web article fetch 链路移除，转换主干收敛为 Turndown + `textContent` 兜底。
 
 ## 本地数据与同步结构
 

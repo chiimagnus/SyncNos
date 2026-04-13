@@ -1,5 +1,4 @@
 import { normalizeText } from '@collectors/web/article-extract/url';
-import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
 import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 
 export function parseDiscourseTopicPathOnPage(
@@ -74,7 +73,7 @@ export function extractDiscourseOpOnly(baseHref: string, discourseTopicPathRe: R
   const title =
     normalizeText(document.title || '') ||
     readMeta(["meta[property='og:title']", "meta[name='twitter:title']", "meta[property='title']"]);
-  const markdown = htmlToMarkdownTurndown(content, baseHref) || htmlToMarkdown(content, text, baseHref);
+  const markdown = htmlToMarkdownTurndown(content, baseHref) || normalizeText(text);
 
   return {
     title,
