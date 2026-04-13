@@ -1,4 +1,4 @@
-export { ARTICLE_FETCH_SITE_SPECS } from '@collectors/web/article-extract/sites/specs';
+export { ARTICLE_FETCH_SITE_SPECS } from '@collectors/web/article-fetch-sites';
 export {
   extractDiscourseOpOnly,
   findDiscourseOpNode,
