@@ -1,7 +1,4 @@
-export {
-  extractDiscourseOpOnly,
-  parseDiscourseTopicPathOnPage,
-} from '@collectors/web/article-extract/sites/discourse';
+export { extractDiscourseOpOnly, parseDiscourseTopicPathOnPage } from '@collectors/web/article-extract/sites/discourse';
 export {
   buildWechatShareMediaGalleryHtml,
   extractWechatShareMediaImageUrls,

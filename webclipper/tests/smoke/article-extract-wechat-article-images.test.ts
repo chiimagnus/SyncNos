@@ -77,4 +77,3 @@ describe('article-extract wechat article images', () => {
     expect(markdown).toContain('![](https://mmbiz.qpic.cn/mmbiz_jpg/def/0?wx_fmt=jpeg)');
   });
 });
-

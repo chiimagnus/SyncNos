@@ -218,7 +218,7 @@ function extractBySiteSpecs(baseHref: string) {
   return null;
 }
 
-function extractWechatRichMediaArticle(baseHref: string) {
+function extractWechatRichMediaArticle(_baseHref: string) {
   const hostname = String(location.hostname || '').toLowerCase();
   if (hostname !== 'mp.weixin.qq.com') return null;
   if (isWechatShareMediaPage()) return null;
@@ -306,7 +306,8 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   const sitePayload = extractBySiteSpecs(baseHref);
   if (sitePayload) {
-    const markdown = htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) || normalizeText(sitePayload.textContent);
+    const markdown =
+      htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) || normalizeText(sitePayload.textContent);
     return withDiscourseOpWarning(
       {
         ...sitePayload,

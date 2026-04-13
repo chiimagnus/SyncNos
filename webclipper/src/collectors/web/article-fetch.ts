@@ -177,10 +177,7 @@ async function extractArticleOnTab(tabId: number) {
   return apiResponse.data as any;
 }
 
-async function extractArticleOnTabWithReadabilityFallback(
-  tabId: number,
-  ensureReadabilityOnce: () => Promise<void>,
-) {
+async function extractArticleOnTabWithReadabilityFallback(tabId: number, ensureReadabilityOnce: () => Promise<void>) {
   try {
     return await extractArticleOnTab(tabId);
   } catch (_error) {
