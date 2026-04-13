@@ -1,5 +1,6 @@
 import { DISCOURSE_OP_MISSING_WARNING_FLAG } from '@collectors/web/article-fetch-errors';
 import { DISCOURSE_TOPIC_PATH_RE_FLAGS, DISCOURSE_TOPIC_PATH_RE_SOURCE } from '@collectors/web/article-fetch-discourse';
+import { extractByDefuddle } from '@collectors/web/article-extract/defuddle';
 import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
 import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
@@ -280,6 +281,21 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
     );
   }
   const discourseOpMissingOnCurrentPage = Boolean(discourseTopic);
+
+  const defuddle = extractByDefuddle(baseHref);
+  if (defuddle) {
+    const markdown =
+      htmlToMarkdownTurndown(defuddle.contentHTML, baseHref) ||
+      htmlToMarkdown(defuddle.contentHTML, defuddle.textContent, baseHref) ||
+      normalizeText(defuddle.textContent);
+    return withDiscourseOpWarning(
+      {
+        ...defuddle,
+        contentMarkdown: markdown,
+      },
+      discourseOpMissingOnCurrentPage,
+    );
+  }
 
   const readability = extractByReadability(baseHref);
   if (readability) {
