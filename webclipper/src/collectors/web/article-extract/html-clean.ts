@@ -11,6 +11,36 @@ function absolutizeAttr(node: Element, attr: string, baseHref: string) {
   node.setAttribute(attr, sanitized);
 }
 
+function isLikelyPlaceholderImageSrc(value: string) {
+  const src = normalizeText(value).toLowerCase();
+  if (!src) return true;
+  if (src === 'about:blank') return true;
+  if (src.startsWith('data:image/')) return true;
+  return false;
+}
+
+function normalizeLazyLoadedImages(root: Element, baseHref: string) {
+  const imgs = listElementsIncludingRoot(root, 'img');
+  for (const node of imgs) {
+    const el = node as HTMLImageElement;
+    const src = normalizeText(el.getAttribute('src') || '');
+    if (!isLikelyPlaceholderImageSrc(src)) continue;
+
+    const candidateAttrs = ['data-src', 'data-original', 'data-url', 'data-lazy-src', 'data-actualsrc'];
+    let picked = '';
+    for (const attr of candidateAttrs) {
+      const raw = normalizeText(el.getAttribute(attr) || '');
+      if (!raw) continue;
+      const sanitized = sanitizeUrl(raw, baseHref);
+      if (!sanitized) continue;
+      picked = sanitized;
+      break;
+    }
+
+    if (picked) el.setAttribute('src', picked);
+  }
+}
+
 function absolutizeSrcset(node: Element, baseHref: string) {
   const value = normalizeText(node.getAttribute('srcset') || '');
   if (!value) return;
@@ -44,6 +74,7 @@ function listElementsIncludingRoot(root: Element, selector: string) {
 export function cleanHtmlFragment(root: Element, baseHref: string) {
   listElementsIncludingRoot(root, 'script,style').forEach((node) => node.remove());
   listElementsIncludingRoot(root, '[style]').forEach((node) => node.removeAttribute('style'));
+  normalizeLazyLoadedImages(root, baseHref);
   listElementsIncludingRoot(root, '[href]').forEach((node) => absolutizeAttr(node, 'href', baseHref));
   listElementsIncludingRoot(root, '[src]').forEach((node) => absolutizeAttr(node, 'src', baseHref));
   listElementsIncludingRoot(root, '[srcset]').forEach((node) => absolutizeSrcset(node, baseHref));

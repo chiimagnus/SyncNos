@@ -218,6 +218,39 @@ function extractBySiteSpecs(baseHref: string) {
   return null;
 }
 
+function extractWechatRichMediaArticle(baseHref: string) {
+  const hostname = String(location.hostname || '').toLowerCase();
+  if (hostname !== 'mp.weixin.qq.com') return null;
+  if (isWechatShareMediaPage()) return null;
+
+  const root = document.querySelector('#js_content') as any;
+  if (!root) return null;
+
+  const title =
+    normalizeText((document.querySelector('#activity-name') as any)?.textContent || '') ||
+    normalizeText(document.title || '') ||
+    readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
+  const author =
+    normalizeText((document.querySelector('#js_name') as any)?.textContent || '') ||
+    readMeta(["meta[name='author']", "meta[property='article:author']", "meta[property='og:article:author']"]);
+  const publishedAt =
+    normalizeText((document.querySelector('#publish_time') as any)?.textContent || '') ||
+    readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
+
+  const htmlBody = normalizeText(root.innerHTML || '');
+  const textContent = normalizeText(root.innerText || root.textContent || '');
+  if (!htmlBody && !textContent) return null;
+
+  return {
+    title,
+    author,
+    publishedAt,
+    excerpt: '',
+    contentHTML: buildHtml(htmlBody, textContent),
+    textContent,
+  };
+}
+
 function extractByReadability(baseHref: string) {
   if (typeof (globalThis as any).Readability !== 'function') return null;
 
@@ -277,6 +310,19 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
     return withDiscourseOpWarning(
       {
         ...sitePayload,
+        contentMarkdown: markdown,
+      },
+      false,
+    );
+  }
+
+  const wechatRichMedia = extractWechatRichMediaArticle(baseHref);
+  if (wechatRichMedia) {
+    const markdown =
+      htmlToMarkdownTurndown(wechatRichMedia.contentHTML, baseHref) || normalizeText(wechatRichMedia.textContent);
+    return withDiscourseOpWarning(
+      {
+        ...wechatRichMedia,
         contentMarkdown: markdown,
       },
       false,

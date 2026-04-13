@@ -36,4 +36,22 @@ describe('article-extract markdown', () => {
     expect(md).toContain('echo 1');
     expect(md).not.toContain('将代码复制到剪贴板');
   });
+
+  it('promotes lazy-loaded image urls (data-src) to markdown images', () => {
+    const html = `
+      <article>
+        <p>hello</p>
+        <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-src="https://mmbiz.qpic.cn/a/b/0?wx_fmt=jpeg" />
+        <img data-original="https://example.com/original.png" />
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://mp.weixin.qq.com/s/abc123' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://mp.weixin.qq.com/s/abc123');
+    expect(md).toContain('![](https://mmbiz.qpic.cn/a/b/0?wx_fmt=jpeg)');
+    expect(md).toContain('![](https://example.com/original.png)');
+    expect(md).not.toContain('data:image/gif');
+  });
 });
