@@ -23,14 +23,6 @@ function dedupeUrls(urls: string[]) {
   return out;
 }
 
-function buildMarkdownImageBlocks(urls: string[]) {
-  const unique = dedupeUrls(urls);
-  if (!unique.length) return '';
-  const lines: string[] = [];
-  for (const url of unique) lines.push(`![](<${url}>)`, '');
-  return normalizeText(lines.join('\n'));
-}
-
 function buildHtmlImageBlocks(urls: string[]) {
   const unique = dedupeUrls(urls);
   if (!unique.length) return '';
@@ -131,13 +123,11 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
   }
 
   const title = selectTitle(spec, root, text);
-  const imageMarkdown = buildMarkdownImageBlocks(urls);
   const imageHtml = buildHtmlImageBlocks(urls);
-  const markdown = normalizeText([imageMarkdown, text].filter(Boolean).join('\n\n'));
   const textContent = text || dedupeUrls(urls).join('\n');
-
-  if (!markdown && !textContent) return null;
   const htmlBody = normalizeText([imageHtml, renderPlainTextAsHtml(text)].filter(Boolean).join(''));
+
+  if (!htmlBody && !textContent) return null;
 
   return {
     title,
@@ -146,7 +136,6 @@ export function extractBySiteSpec(spec: ArticleFetchSiteSpec, baseHref: string) 
     contentHTML: htmlBody
       ? `<html><body>${htmlBody}</body></html>`
       : `<html><body><p>${escapeHtml(textContent)}</p></body></html>`,
-    contentMarkdown: markdown,
     textContent,
     excerpt: '',
   };

@@ -1,5 +1,5 @@
 import { normalizeText } from '@collectors/web/article-extract/url';
-import { htmlToMarkdown } from '@collectors/web/article-extract/markdown';
+import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 
 export function parseDiscourseTopicPathOnPage(
   pathname: unknown,
@@ -73,6 +73,7 @@ export function extractDiscourseOpOnly(baseHref: string, discourseTopicPathRe: R
   const title =
     normalizeText(document.title || '') ||
     readMeta(["meta[property='og:title']", "meta[name='twitter:title']", "meta[property='title']"]);
+  const markdown = htmlToMarkdownTurndown(content, baseHref) || normalizeText(text);
 
   return {
     title,
@@ -80,7 +81,7 @@ export function extractDiscourseOpOnly(baseHref: string, discourseTopicPathRe: R
     publishedAt,
     excerpt: '',
     contentHTML: content ? `<html><body>${content}</body></html>` : `<html><body><p>${text}</p></body></html>`,
-    contentMarkdown: htmlToMarkdown(content, text, baseHref),
+    contentMarkdown: markdown,
     textContent: text,
   };
 }

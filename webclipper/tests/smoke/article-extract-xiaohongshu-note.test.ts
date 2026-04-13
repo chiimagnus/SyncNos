@@ -34,30 +34,24 @@ afterEach(() => {
   clearDomGlobals();
 });
 
-describe('article-extract bilibili opus', () => {
-  it('extracts images + text and strips bilibili @ image suffix', async () => {
+describe('article-extract xiaohongshu note', () => {
+  it('keeps xiaohongshu site-spec extraction with hydrated note container', async () => {
     const dom = new JSDOM(
       `<body>
-        <div class="bili-opus-view">
-          <div class="opus-module-top">
-            <div class="opus-module-top__album">
-              <div class="horizontal-scroll-album__pic__img">
-                <img src="//i0.hdslb.com/bfs/new_dyn/a.jpg@858w_1044h.webp" />
-              </div>
-              <div class="horizontal-scroll-album__pic__img">
-                <img src="//i0.hdslb.com/bfs/new_dyn/b.jpg@858w_1044h.webp" />
-              </div>
-            </div>
+        <div id="noteContainer" class="note-container">
+          <div class="author-wrapper">
+            <a class="name"><span class="username">作者A</span></a>
           </div>
-          <div class="opus-module-title"><span class="opus-module-title__text">标题</span></div>
-          <div class="opus-module-author">
-            <div class="opus-module-author__name">作者</div>
-            <div class="opus-module-author__pub__text">2026年04月01日 09:21</div>
+          <div class="media-container">
+            <img src="/media/xhs-note-1.jpg" />
+            <img data-src="//sns-webpic-qc.xhscdn.com/20260406/demo/xhs-note-2.jpg" />
           </div>
-          <div class="opus-module-content"><p>正文段落</p></div>
+          <div class="content">
+            <span class="note-text">这里是小红书首贴正文关键字。</span>
+          </div>
         </div>
       </body>`,
-      { url: 'https://www.bilibili.com/opus/123', pretendToBeVisual: true },
+      { url: 'https://www.xiaohongshu.com/explore/abcdef', pretendToBeVisual: true },
     );
 
     setDomGlobals(dom);
@@ -67,8 +61,8 @@ describe('article-extract bilibili opus', () => {
     });
     const markdown = String(extracted.contentMarkdown || '');
 
-    expect(markdown).toContain('https://i0.hdslb.com/bfs/new_dyn/a.jpg');
-    expect(markdown).toContain('https://i0.hdslb.com/bfs/new_dyn/b.jpg');
-    expect(markdown).toContain('正文段落');
+    expect(markdown).toContain('这里是小红书首贴正文关键字。');
+    expect(markdown).toContain('https://www.xiaohongshu.com/media/xhs-note-1.jpg');
+    expect(markdown).toContain('https://sns-webpic-qc.xhscdn.com/20260406/demo/xhs-note-2.jpg');
   });
 });

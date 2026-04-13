@@ -177,6 +177,15 @@ async function extractArticleOnTab(tabId: number) {
   return apiResponse.data as any;
 }
 
+async function extractArticleOnTabWithReadabilityFallback(tabId: number, ensureReadabilityOnce: () => Promise<void>) {
+  try {
+    return await extractArticleOnTab(tabId);
+  } catch (_error) {
+    await ensureReadabilityOnce();
+    return await extractArticleOnTab(tabId);
+  }
+}
+
 export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) {
   const tab = await resolveTargetTab(tabId);
   const targetTabId = Number(tab.id);
@@ -186,8 +195,13 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   const discourseTopic = parseDiscourseTopicUrl(cleanedUrl);
   const canonicalUrl = canonicalizeArticleUrl(cleanedUrl) || cleanedUrl;
 
-  await ensureReadability(targetTabId);
-  let extracted = await extractArticleOnTab(targetTabId);
+  let readabilityInjected = false;
+  const ensureReadabilityOnce = async () => {
+    if (readabilityInjected) return;
+    readabilityInjected = true;
+    await ensureReadability(targetTabId);
+  };
+  let extracted = await extractArticleOnTabWithReadabilityFallback(targetTabId, ensureReadabilityOnce);
 
   const shouldFallbackToFirstFloor =
     discourseTopic &&
@@ -199,7 +213,7 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     const firstFloorUrl = buildDiscourseTopicFloorUrl(discourseTopic, 1);
     await tabsUpdate(targetTabId, { url: firstFloorUrl });
     await waitForTabUrl(targetTabId, firstFloorUrl, DISCOURSE_NAVIGATION_WAIT_TIMEOUT_MS);
-    extracted = await extractArticleOnTab(targetTabId);
+    extracted = await extractArticleOnTabWithReadabilityFallback(targetTabId, ensureReadabilityOnce);
   }
 
   if (discourseTopic && hasWarningFlag((extracted as any)?.warningFlags, DISCOURSE_OP_MISSING_WARNING_FLAG)) {

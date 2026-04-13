@@ -1,4 +1,4 @@
-import { normalizeText, sanitizeWechatMediaUrl } from '@collectors/web/article-extract/url';
+import { sanitizeWechatMediaUrl } from '@collectors/web/article-extract/url';
 
 function escapeHtml(value: unknown) {
   return String(value || '')
@@ -75,15 +75,4 @@ export function buildWechatShareMediaGalleryHtml(baseHref: string) {
     )
     .join('');
   return `<hr /><div data-syncnos-origin="wechat-share-media-gallery">${blocks}</div>`;
-}
-
-export function buildWechatShareMediaGalleryMarkdown(baseHref: string) {
-  const imageUrls = extractWechatShareMediaImageUrls(baseHref);
-  if (!imageUrls.length) return '';
-
-  const lines = ['---', ''];
-  for (const url of imageUrls) {
-    lines.push(`![](<${url}>)`, '');
-  }
-  return normalizeText(lines.join('\n'));
 }

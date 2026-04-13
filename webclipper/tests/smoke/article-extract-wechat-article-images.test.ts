@@ -34,41 +34,46 @@ afterEach(() => {
   clearDomGlobals();
 });
 
-describe('article-extract bilibili opus', () => {
-  it('extracts images + text and strips bilibili @ image suffix', async () => {
+describe('article-extract wechat article images', () => {
+  it('extracts data-src images without requiring Readability injection', async () => {
     const dom = new JSDOM(
       `<body>
-        <div class="bili-opus-view">
-          <div class="opus-module-top">
-            <div class="opus-module-top__album">
-              <div class="horizontal-scroll-album__pic__img">
-                <img src="//i0.hdslb.com/bfs/new_dyn/a.jpg@858w_1044h.webp" />
-              </div>
-              <div class="horizontal-scroll-album__pic__img">
-                <img src="//i0.hdslb.com/bfs/new_dyn/b.jpg@858w_1044h.webp" />
-              </div>
-            </div>
-          </div>
-          <div class="opus-module-title"><span class="opus-module-title__text">标题</span></div>
-          <div class="opus-module-author">
-            <div class="opus-module-author__name">作者</div>
-            <div class="opus-module-author__pub__text">2026年04月01日 09:21</div>
-          </div>
-          <div class="opus-module-content"><p>正文段落</p></div>
+        <h1 id="activity-name">微信文章标题</h1>
+        <div id="meta_content">
+          <span id="js_name">作者A</span>
+          <em id="publish_time">2026-04-13</em>
+        </div>
+        <div id="js_content" style="visibility: hidden; opacity: 0;">
+          <p>正文段落</p>
+          <section style="text-align:center;">
+            <img data-src="https://mmbiz.qpic.cn/mmbiz_png/abc/640?wx_fmt=png&from=appmsg" />
+          </section>
+          <p>第二段</p>
+          <img data-original="https://mmbiz.qpic.cn/mmbiz_jpg/def/0?wx_fmt=jpeg" />
         </div>
       </body>`,
-      { url: 'https://www.bilibili.com/opus/123', pretendToBeVisual: true },
+      {
+        url: 'https://mp.weixin.qq.com/s/oKuSgz5CP4aPOjt_o2Vi8g',
+        pretendToBeVisual: true,
+      },
     );
 
     setDomGlobals(dom);
+
     const extracted = await extractWebArticleFromCurrentPage({
       stabilizationTimeoutMs: 1,
       stabilizationMinTextLength: 1,
     });
-    const markdown = String(extracted.contentMarkdown || '');
 
-    expect(markdown).toContain('https://i0.hdslb.com/bfs/new_dyn/a.jpg');
-    expect(markdown).toContain('https://i0.hdslb.com/bfs/new_dyn/b.jpg');
+    expect(extracted.ok).toBe(true);
+    expect(String(extracted.title || '')).toContain('微信文章标题');
+    expect(String(extracted.author || '')).toContain('作者A');
+    expect(String(extracted.publishedAt || '')).toContain('2026-04-13');
+
+    const markdown = String(extracted.contentMarkdown || '');
     expect(markdown).toContain('正文段落');
+    expect(markdown).toContain('第二段');
+    expect(markdown).toContain('![](https://mmbiz.qpic.cn/mmbiz_png/abc/640?wx_fmt=png&from=appmsg)');
+    expect(markdown).toContain('![](https://mmbiz.qpic.cn/mmbiz_jpg/def/0?wx_fmt=jpeg)');
   });
 });
