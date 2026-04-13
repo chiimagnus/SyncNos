@@ -6,7 +6,6 @@ export {
 } from '@collectors/web/article-extract/sites/discourse';
 export {
   buildWechatShareMediaGalleryHtml,
-  buildWechatShareMediaGalleryMarkdown,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
 } from '@collectors/web/article-extract/sites/wechat';

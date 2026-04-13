@@ -79,10 +79,10 @@ describe('article-extract wechat gallery markdown', () => {
     });
     const markdown = String(extracted.contentMarkdown || '');
 
-    expect(markdown).toContain('![](<https://mmbiz.qpic.cn/img/a/640?wx_fmt=jpeg>)');
-    expect(markdown).toContain('![](<https://mmbiz.qpic.cn/img/b/640>)');
-    expect(markdown).toContain('![](<https://mmbiz.qpic.cn/img/c/640>)');
-    expect(markdown).toContain('![](<https://mmbiz.qpic.cn/img/d/640>)');
+    expect(markdown).toContain('![](https://mmbiz.qpic.cn/img/a/640?wx_fmt=jpeg)');
+    expect(markdown).toContain('![](https://mmbiz.qpic.cn/img/b/640)');
+    expect(markdown).toContain('![](https://mmbiz.qpic.cn/img/c/640)');
+    expect(markdown).toContain('![](https://mmbiz.qpic.cn/img/d/640)');
     expect(markdown).not.toContain('| --- |');
     expect(markdown).not.toContain('| ![](');
   });

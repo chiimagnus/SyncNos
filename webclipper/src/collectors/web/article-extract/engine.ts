@@ -9,7 +9,6 @@ import {
   extractDiscourseOpOnly,
   parseDiscourseTopicPathOnPage,
   buildWechatShareMediaGalleryHtml,
-  buildWechatShareMediaGalleryMarkdown,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
   waitForXiaohongshuNoteHydrated,
@@ -61,8 +60,11 @@ function pickRoot() {
 function fallbackExtract(baseHref: string) {
   const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
   if (wechatOnlyUrls.length >= 2) {
-    const markdown = buildWechatShareMediaGalleryMarkdown(baseHref);
     const html = buildWechatShareMediaGalleryHtml(baseHref);
+    const markdown =
+      htmlToMarkdownTurndown(html, baseHref) ||
+      htmlToMarkdown(html, wechatOnlyUrls.join('\n'), baseHref) ||
+      normalizeText(wechatOnlyUrls.join('\n'));
     return {
       title: normalizeText(document.title || '') || 'WeChat Share Media',
       author: '',
@@ -237,15 +239,12 @@ function extractByReadability(baseHref: string) {
   if (!content && !text) return null;
 
   const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
-  const wechatGalleryMarkdown = buildWechatShareMediaGalleryMarkdown(baseHref);
   const htmlBody = normalizeText(content) || (text ? `<p>${escapeHtml(text)}</p>` : '');
   const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
-  const legacyMarkdownBase = htmlToMarkdown(content, text, baseHref);
-  const legacyMarkdownWithWechatGallery = wechatGalleryMarkdown
-    ? normalizeText(`${legacyMarkdownBase}\n\n${wechatGalleryMarkdown}`)
-    : legacyMarkdownBase;
-  const markdownFromTurndown = wechatGalleryHtml ? '' : htmlToMarkdownTurndown(contentWithWechatGallery, baseHref);
-  const markdownWithWechatGallery = markdownFromTurndown || legacyMarkdownWithWechatGallery;
+  const markdownWithWechatGallery =
+    htmlToMarkdownTurndown(contentWithWechatGallery, baseHref) ||
+    htmlToMarkdown(contentWithWechatGallery, text, baseHref) ||
+    normalizeText(text);
 
   return {
     title,
