@@ -37,6 +37,21 @@ describe('article-extract markdown', () => {
     expect(md).not.toContain('将代码复制到剪贴板');
   });
 
+  it('keeps code language fences when language class exists', () => {
+    const html = `
+      <article>
+        <pre><code class="language-ts">const n: number = 1;</code></pre>
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://example.com/code' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://example.com/code');
+    expect(md).toContain('```ts');
+    expect(md).toContain('const n: number = 1;');
+  });
+
   it('promotes lazy-loaded image urls (data-src) to markdown images', () => {
     const html = `
       <article>
@@ -82,5 +97,33 @@ describe('article-extract markdown', () => {
     expect(md).toMatch(/\|\s*Package\s*\|\s*Version\s*\|/);
     expect(md).toMatch(/\|\s*-{2,}\s*\|\s*-{2,}:\s*\|/);
     expect(md).toMatch(/\|\s*SyncNos\s*\|\s*1\.0\.24\s*\|/);
+  });
+
+  it('converts headerless tables to markdown table and keeps text-align:end as right align', () => {
+    const html = `
+      <article>
+        <table>
+          <tbody>
+            <tr>
+              <td>Name</td>
+              <td style="text-align:end">Score</td>
+            </tr>
+            <tr>
+              <td>Alice</td>
+              <td style="text-align:end">99</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://example.com/table' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://example.com/table');
+    expect(md).toMatch(/\|\s*Name\s*\|\s*Score\s*\|/);
+    expect(md).toMatch(/\|\s*-{2,}\s*\|\s*-{2,}:\s*\|/);
+    expect(md).toMatch(/\|\s*Alice\s*\|\s*99\s*\|/);
+    expect(md).not.toContain('<table');
   });
 });

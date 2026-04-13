@@ -9,6 +9,51 @@ function pickTurndownRoot(wrapper: HTMLDivElement) {
   return String(directChildren[0]?.tagName || '').toLowerCase() === 'article' ? directChildren[0] : wrapper;
 }
 
+function normalizeFenceLanguage(value: unknown) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (!normalized) return '';
+  const cleaned = normalized.replace(/[^a-z0-9+.#_-]/g, '');
+  if (!cleaned) return '';
+  if (cleaned === 'auto' || cleaned === 'text' || cleaned === 'plain' || cleaned === 'plaintext') return '';
+  return cleaned;
+}
+
+function detectCodeLanguageFromClassName(value: unknown) {
+  const className = normalizeText(value);
+  if (!className) return '';
+
+  const patterns = [
+    /(?:^|\s)language-([a-z0-9+.#_-]+)(?:\s|$)/i,
+    /(?:^|\s)lang-([a-z0-9+.#_-]+)(?:\s|$)/i,
+    /(?:^|\s)highlight-source-([a-z0-9+.#_-]+)(?:\s|$)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = className.match(pattern);
+    if (!match || !match[1]) continue;
+    const language = normalizeFenceLanguage(match[1]);
+    if (language) return language;
+  }
+  return '';
+}
+
+function detectCodeLanguage(pre: HTMLElement, code: Element | null) {
+  const candidates = [
+    normalizeFenceLanguage(code?.getAttribute?.('data-language') || ''),
+    normalizeFenceLanguage(code?.getAttribute?.('data-lang') || ''),
+    normalizeFenceLanguage(code?.getAttribute?.('lang') || ''),
+    detectCodeLanguageFromClassName(code?.getAttribute?.('class') || ''),
+    normalizeFenceLanguage(pre?.getAttribute?.('data-language') || ''),
+    normalizeFenceLanguage(pre?.getAttribute?.('data-lang') || ''),
+    normalizeFenceLanguage(pre?.getAttribute?.('lang') || ''),
+    detectCodeLanguageFromClassName(pre?.getAttribute?.('class') || ''),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate) return candidate;
+  }
+  return '';
+}
+
 function createTurndownService() {
   const turndown = new TurndownService({
     headingStyle: 'atx',
@@ -24,11 +69,13 @@ function createTurndownService() {
     replacement(_content, node) {
       const pre = node as HTMLElement;
       const code = pre?.querySelector?.('code');
+      const language = detectCodeLanguage(pre, code);
       const value = String(code?.textContent || pre?.textContent || '')
         .replace(/\r\n/g, '\n')
         .trim();
       if (!value) return '\n';
-      return `\n\`\`\`\n${value}\n\`\`\`\n\n`;
+      const fence = language ? `\`\`\`${language}` : '```';
+      return `\n${fence}\n${value}\n\`\`\`\n\n`;
     },
   });
 

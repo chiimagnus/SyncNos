@@ -91,7 +91,7 @@
 1. `src/collectors/web/article-fetch.ts` 在 background 侧解析 active tab + canonical URL，向 content 发送 `EXTRACT_WEB_ARTICLE`。
 2. content 侧 `src/collectors/web/article-extract/engine.ts` 先做 `waitForDomStabilized()` + site hydration wait（微信图集 / 小红书）。
 3. 抽取顺序固定为：`site spec` → `Discourse OP(.cooked)` → `Defuddle` → `Readability` → `fallback`。
-4. 统一转换主干：`contentHTML` → `cleanHtmlFragment()`（移除 script/style/style attr + href/src/srcset 绝对化）→ `htmlToMarkdownTurndown()`（含 GFM table 转换）。
+4. 统一转换主干：`contentHTML` → `cleanHtmlFragment()`（移除 script/style/style attr + href/src/srcset 绝对化）→ `htmlToMarkdownTurndown()`（含 GFM table 转换、headerless table 归一、代码块语言 fence 保留）。
 5. 兜底：Turndown 返回空时回退 `textContent`。
 
 ### 站点适配边界

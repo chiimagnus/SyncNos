@@ -71,21 +71,68 @@ function listElementsIncludingRoot(root: Element, selector: string) {
   return out;
 }
 
+type TableAlign = 'left' | 'center' | 'right';
+
+function normalizeTableAlign(value: unknown): TableAlign | '' {
+  const align = normalizeText(value).toLowerCase();
+  if (!align) return '';
+  if (align === 'left' || align === 'start' || align === 'justify') return 'left';
+  if (align === 'center' || align === 'middle') return 'center';
+  if (align === 'right' || align === 'end') return 'right';
+  return '';
+}
+
+function copyAttributes(from: Element, to: Element) {
+  const attrs = Array.from(from.attributes || []);
+  for (const attr of attrs) to.setAttribute(attr.name, attr.value);
+}
+
+function promoteFirstTableRowToHeader(root: Element) {
+  const tables = listElementsIncludingRoot(root, 'table');
+  for (const table of tables) {
+    const firstRow = table.querySelector('tr') as HTMLTableRowElement | null;
+    if (!firstRow) continue;
+
+    const cells = Array.from(firstRow.children || []).filter((node) => {
+      const name = String((node as Element).tagName || '').toLowerCase();
+      return name === 'th' || name === 'td';
+    }) as Element[];
+    if (!cells.length) continue;
+
+    const headingRow = cells.every((cell) => String(cell.tagName || '').toLowerCase() === 'th');
+    if (headingRow) continue;
+
+    for (const cell of cells) {
+      if (String(cell.tagName || '').toLowerCase() !== 'td') continue;
+      const th = (cell.ownerDocument || document).createElement('th');
+      copyAttributes(cell, th);
+      th.innerHTML = cell.innerHTML;
+      cell.replaceWith(th);
+    }
+  }
+}
+
 function promoteTableCellAlignment(root: Element) {
-  const cells = listElementsIncludingRoot(root, 'table th[style], table td[style]');
+  const cells = listElementsIncludingRoot(root, 'table th, table td');
   for (const cell of cells) {
-    const align = normalizeText(cell.getAttribute('align') || '').toLowerCase();
-    if (align === 'left' || align === 'center' || align === 'right') continue;
+    const alignFromAttr = normalizeTableAlign(cell.getAttribute('align') || '');
+    if (alignFromAttr) {
+      cell.setAttribute('align', alignFromAttr);
+      continue;
+    }
 
     const style = String(cell.getAttribute('style') || '');
-    const match = style.match(/(?:^|;)\s*text-align\s*:\s*(left|center|right)\s*(?:;|$)/i);
+    const match = style.match(/(?:^|;)\s*text-align\s*:\s*([a-z-]+)\b[^;]*(?:;|$)/i);
     if (!match || !match[1]) continue;
-    cell.setAttribute('align', String(match[1]).toLowerCase());
+    const alignFromStyle = normalizeTableAlign(match[1]);
+    if (!alignFromStyle) continue;
+    cell.setAttribute('align', alignFromStyle);
   }
 }
 
 export function cleanHtmlFragment(root: Element, baseHref: string) {
   listElementsIncludingRoot(root, 'script,style').forEach((node) => node.remove());
+  promoteFirstTableRowToHeader(root);
   promoteTableCellAlignment(root);
   listElementsIncludingRoot(root, '[style]').forEach((node) => node.removeAttribute('style'));
   normalizeLazyLoadedImages(root, baseHref);
