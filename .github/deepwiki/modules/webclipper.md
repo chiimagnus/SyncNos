@@ -84,6 +84,47 @@
 - popup 里的 “Current Page / Fetch Current Page” 不是盲抓：`current-page-capture.ts` 会先解析当前 collector，支持页走 chat snapshot，普通网页走 article fetch，不支持页则返回显式不可抓取原因。
 - article comments 是 local-first 的注释层：它依赖 article 的 canonical URL 作为主索引，并会在 article 同步时进入 Notion / Obsidian 的评论区段，同时进入 Zip v2 备份 / 恢复；如果你改 comments 流程，一定同时看 storage、background handler、shared session、inpage 面板和 backup 目录。
 
+## fetch articles 架构（2026 Q2）
+
+### 主干链路
+
+1. `src/collectors/web/article-fetch.ts` 在 background 侧解析 active tab + canonical URL，向 content 发送 `EXTRACT_WEB_ARTICLE`。
+2. content 侧 `src/collectors/web/article-extract/engine.ts` 先做 `waitForDomStabilized()` + site hydration wait（微信图集 / 小红书）。
+3. 抽取顺序固定为：`site spec` → `Discourse OP(.cooked)` → `Defuddle` → `Readability` → `fallback`。
+4. 统一转换主干：`contentHTML` → `cleanHtmlFragment()`（移除 script/style/style attr + href/src/srcset 绝对化）→ `htmlToMarkdownTurndown()`。
+5. 兼容兜底：Turndown 返回空时再回退旧 `htmlToMarkdown()` 或 `textContent`。
+
+### 站点适配边界
+
+- `site spec` 只负责提取结构化 `contentHTML + textContent`，不再直接拼 markdown。
+- Discourse 保留首贴 `.cooked` 轻量适配（避免 onebox 截断）。
+- 微信 share media 图集保留 HTML 追加能力，但 markdown 统一由 Turndown 生成（已移除 `buildWechatShareMediaGalleryMarkdown()` 旁路）。
+- 小红书/Bilibili 仍由 `article-fetch-sites/*` 提供选择器策略，并在 engine 主干中统一转换。
+
+### Readability 注入策略
+
+- `article-fetch.ts` 不再无条件注入 `src/vendor/readability.js`。
+- 现在只在首次 content 抽取失败时按需注入并重试一次，减少不必要注入噪音与页面策略报错。
+
+### 手动验证清单（开发者）
+
+| 场景 | 期望结果 |
+| --- | --- |
+| Discourse（`linux.do` topic） | 首贴正文完整可见，不被 onebox 截断；列表/引用/代码块/details 结构可读 |
+| 普通网页（非 site spec） | Defuddle 或 Readability 路径可产出正文；链接和图片地址可用 |
+| WeChat share media | 图集图片被正确提取并清洗参数；输出是图片 blocks（非表格） |
+| 小红书 note | `#noteContainer` hydrated 后走 site spec；正文与图片都保留 |
+| Bilibili opus | 图片 URL 去除 `@...` 后缀，正文段落保留 |
+
+### 与 obsidian-clipper 的对标差异
+
+- 一致点：都采用 `Defuddle + Turndown` 作为通用抽取/转换基础。
+- 差异点（SyncNos 特有）：
+  - 保留 Discourse OP 专项路径与 `/1` 首层回退逻辑。
+  - 保留 Readability 兜底分支，且 background 侧支持按需注入。
+  - 保留站点 spec（微信图集 / 小红书 / Bilibili）并统一回到同一 Markdown 主干。
+- 当前下一步：继续减少旧 `htmlToMarkdown` 兜底命中率，逐步收敛到 Turndown 单一路径。
+
 ## 本地数据与同步结构
 
 | 区域 | 主要实现 | 关键点 |
@@ -154,7 +195,7 @@
 - **改 detail header 动作分发**：先看 `src/services/integrations/detail-header-action-types.ts`, `src/services/integrations/detail-header-actions.ts`, `src/viewmodels/conversations/conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
 - **改图片缓存补全流程（cache-images）**：先看 `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/client/repo.ts`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts`；核对动作注入条件、回填后 detail 刷新与计数反馈。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
-- **改 article 抓取**：先看 `article-fetch.ts` 与 background handlers，确认保存后的 `sourceType` 和 message 结构没有变。
+- **改 article 抓取**：先看 `article-fetch.ts`（background 侧注入/重试策略）+ `article-extract/engine.ts`（抽取顺序）+ `article-extract/markdown-turndown.ts`（统一转换），再确认保存后的 `sourceType` 和 message 结构没有变。
 
 ## 测试与调试抓手
 
@@ -167,7 +208,7 @@
 | inpage 行为异常 | `src/services/bootstrap/content.ts`, `src/services/bootstrap/content-controller.ts`, `src/ui/inpage/inpage-button-shadow.ts` | 看 gating、点击动作和 runtime invalidation |
 | `$ mention` 候选 / 插入异常 | `src/services/integrations/item-mention/**`, `src/platform/messaging/message-contracts.ts`, `tests/smoke/background-router-item-mention.test.ts` | 看站点门控（`features.dollarMention`）、设置开关、候选扫描限制与插入 markdown 构建 |
 | source/site 筛选下拉异常（高度、滚动、裁切） | `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx` | 看 `adaptiveMaxHeight`、`findNearestClippingRect()` 与 `side` 设置是否一致 |
-| article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts` | 看 `Readability` 与 fallback extract |
+| article 抓取失败 | `article-fetch.ts`, `article-fetch-background-handlers.ts`, `article-extract/engine.ts` | 先看 Defuddle/Readability 分支命中，再看 Turndown 清洗与 fallback |
 | article comments / 锚点异常 | `src/services/comments/data/storage-idb.ts`, `src/services/comments/background/handlers.ts`, `src/ui/conversations/ArticleCommentsSection.tsx`, `src/services/comments/threaded-comments-panel.ts`, `src/ui/inpage/inpage-comments-panel-shadow.ts` | 看 canonicalUrl 归一、reply / delete 路由与 shadow DOM 面板挂载 |
 | Chat with AI / 打开目标异常 | `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.test.ts`, `app-detail-header-actions.test.ts` | 看模板变量、平台设置、槽位动作分发与 clipboard + 跳转行为 |
 | 详情工具动作异常（cache-images） | `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts` | 看动作注入、`BACKFILL_CONVERSATION_IMAGES` 路由与回填计数是否一致 |
@@ -188,6 +229,17 @@
 - `webclipper/src/collectors/googleaistudio/googleaistudio-collector.ts`
 - `webclipper/src/collectors/web/article-fetch.ts`
 - `webclipper/src/collectors/web/article-fetch-background-handlers.ts`
+- `webclipper/src/collectors/web/article-extract/engine.ts`
+- `webclipper/src/collectors/web/article-extract/defuddle.ts`
+- `webclipper/src/collectors/web/article-extract/markdown-turndown.ts`
+- `webclipper/src/collectors/web/article-extract/html-clean.ts`
+- `webclipper/src/collectors/web/article-extract/site-spec-extractor.ts`
+- `webclipper/src/collectors/web/article-extract/sites/discourse.ts`
+- `webclipper/src/collectors/web/article-extract/sites/wechat.ts`
+- `webclipper/src/collectors/web/article-extract/sites/xiaohongshu.ts`
+- `webclipper/src/collectors/web/article-fetch-sites/index.ts`
+- `webclipper/src/collectors/web/article-fetch-sites/bilibili-opus.ts`
+- `webclipper/src/collectors/web/article-fetch-sites/xiaohongshu-note.ts`
 - `webclipper/src/platform/webext/anti-hotlink-rules-store.ts`
 - `webclipper/src/platform/webext/image-download-proxy.ts`
 - `webclipper/src/platform/idb/schema.ts`
@@ -248,6 +300,13 @@
 - `webclipper/src/ui/popup/PopupShell.tsx`
 - `webclipper/src/ui/popup/usePopupCurrentPageCapture.ts`
 - `webclipper/tests/smoke/background-router-current-page-capture.test.ts`
+- `webclipper/tests/smoke/article-extract-discourse-op-onebox-regression.test.ts`
+- `webclipper/tests/smoke/article-extract-markdown-complex.test.ts`
+- `webclipper/tests/smoke/article-extract-wechat-gallery.test.ts`
+- `webclipper/tests/smoke/article-extract-xiaohongshu-note.test.ts`
+- `webclipper/tests/smoke/article-extract-bilibili-opus.test.ts`
+- `webclipper/tests/smoke/article-fetch-service.test.ts`
+- `webclipper/tests/unit/article-extract-xiaohongshu.test.ts`
 - `webclipper/tests/collectors/gemini-collector.test.ts`
 - `webclipper/tests/collectors/kimi-collector.test.ts`
 - `webclipper/tests/collectors/zai-collector.test.ts`
@@ -263,4 +322,5 @@
 - `webclipper/tests/smoke/content-controller-item-mention-setting.test.ts`
 
 ## 更新记录（Update Notes）
+- 2026-04-13：新增 fetch articles 架构章节（Defuddle + Turndown 主干、按需 Readability 注入）、手动验证清单与 obsidian-clipper 对标差异；同步 article 抓取调试入口与 source references。
 - 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并补齐 `$ mention` 开关键与调试抓手入口。
