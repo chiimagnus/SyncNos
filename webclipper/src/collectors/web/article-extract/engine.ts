@@ -59,6 +59,21 @@ function pickRoot() {
 }
 
 function fallbackExtract(baseHref: string) {
+  const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
+  if (wechatOnlyUrls.length >= 2) {
+    const markdown = buildWechatShareMediaGalleryMarkdown(baseHref);
+    const html = buildWechatShareMediaGalleryHtml(baseHref);
+    return {
+      title: normalizeText(document.title || '') || 'WeChat Share Media',
+      author: '',
+      publishedAt: '',
+      excerpt: '',
+      contentHTML: buildHtml(html, ''),
+      contentMarkdown: markdown,
+      textContent: wechatOnlyUrls.join('\n'),
+    };
+  }
+
   const root = pickRoot();
   if (!root) return null;
   const title =
@@ -156,6 +171,11 @@ async function waitForWechatShareMediaHydrated() {
   }
 }
 
+async function waitForSiteHydrated() {
+  await waitForWechatShareMediaHydrated();
+  await waitForXiaohongshuNoteHydrated();
+}
+
 function normalizeDetailsElementsForReadability(doc: any) {
   if (!doc || typeof doc.querySelectorAll !== 'function' || typeof doc.createElement !== 'function') return;
 
@@ -249,8 +269,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
   const discourseTopicPathRe = new RegExp(DISCOURSE_TOPIC_PATH_RE_SOURCE, DISCOURSE_TOPIC_PATH_RE_FLAGS);
 
   await waitForDomStabilized(timeoutMs, minTextLength);
-  await waitForWechatShareMediaHydrated();
-  await waitForXiaohongshuNoteHydrated();
+  await waitForSiteHydrated();
 
   const wechatRoot = document.querySelector('#js_content') as any;
   if (wechatRoot) {
@@ -282,7 +301,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
   }
   const discourseOpMissingOnCurrentPage = Boolean(discourseTopic);
 
-  const defuddle = extractByDefuddle(baseHref);
+  const defuddle = isWechatShareMediaPage() ? null : extractByDefuddle(baseHref);
   if (defuddle) {
     const markdown =
       htmlToMarkdownTurndown(defuddle.contentHTML, baseHref) ||
@@ -304,24 +323,6 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
         ...readability,
       },
       discourseOpMissingOnCurrentPage,
-    );
-  }
-
-  const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
-  if (wechatOnlyUrls.length >= 2) {
-    const markdown = buildWechatShareMediaGalleryMarkdown(baseHref);
-    const html = buildWechatShareMediaGalleryHtml(baseHref);
-    return withDiscourseOpWarning(
-      {
-        title: normalizeText(document.title || '') || 'WeChat Share Media',
-        author: '',
-        publishedAt: '',
-        excerpt: '',
-        contentHTML: buildHtml(html, ''),
-        contentMarkdown: markdown,
-        textContent: wechatOnlyUrls.join('\n'),
-      },
-      false,
     );
   }
 
