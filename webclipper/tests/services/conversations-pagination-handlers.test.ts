@@ -10,6 +10,7 @@ const storageMocks = vi.hoisted(() => ({
   getConversationListBootstrap: vi.fn(),
   getConversationListPage: vi.fn(),
   getConversationDetail: vi.fn(),
+  getConversationTailWindowBySourceAndKey: vi.fn(),
   hasConversation: vi.fn(),
   mergeConversationsByIds: vi.fn(),
 }));
@@ -26,6 +27,7 @@ vi.mock('@services/conversations/data/storage', () => ({
   getConversationListBootstrap: storageMocks.getConversationListBootstrap,
   getConversationListPage: storageMocks.getConversationListPage,
   getConversationDetail: storageMocks.getConversationDetail,
+  getConversationTailWindowBySourceAndKey: storageMocks.getConversationTailWindowBySourceAndKey,
   hasConversation: storageMocks.hasConversation,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
 }));
@@ -55,6 +57,7 @@ afterEach(() => {
   storageMocks.getConversationListBootstrap.mockReset();
   storageMocks.getConversationListPage.mockReset();
   storageMocks.getConversationDetail.mockReset();
+  storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
   storageMocks.hasConversation.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
   writeMocks.writeConversationMessagesSnapshot.mockReset();
@@ -137,5 +140,75 @@ describe('conversations pagination handlers', () => {
     expect(res.ok).toBe(true);
     expect(storageMocks.findConversationById).toHaveBeenCalledWith(99);
     expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99' });
+  });
+
+  it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {
+    const router = createRouter();
+
+    const noSource = await router.__handleMessageForTests({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: '',
+      conversationKey: 'abc',
+    });
+    expect(noSource.ok).toBe(false);
+    expect(noSource.error?.message).toBe('invalid source');
+    expect((noSource.error?.extra as any)?.field).toBe('source');
+
+    const noKey = await router.__handleMessageForTests({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: 'chatgpt',
+      conversationKey: '',
+    });
+    expect(noKey.ok).toBe(false);
+    expect(noKey.error?.message).toBe('invalid conversationKey');
+    expect((noKey.error?.extra as any)?.field).toBe('conversationKey');
+
+    const invalidLimit = await router.__handleMessageForTests({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: 'chatgpt',
+      conversationKey: 'abc',
+      limit: 0,
+    });
+    expect(invalidLimit.ok).toBe(false);
+    expect(invalidLimit.error?.message).toBe('invalid limit');
+    expect((invalidLimit.error?.extra as any)?.field).toBe('limit');
+    expect((invalidLimit.error?.extra as any)?.code).toBe('INVALID_ARGUMENT');
+  });
+
+  it('returns normalized tail window payload from storage', async () => {
+    storageMocks.getConversationTailWindowBySourceAndKey.mockResolvedValueOnce({
+      conversation: { id: 9 },
+      messages: [{ messageKey: 'm1' }],
+    });
+    storageMocks.getConversationTailWindowBySourceAndKey.mockResolvedValueOnce({
+      conversation: null,
+      messages: [],
+    });
+    const router = createRouter();
+
+    const withLimit = await router.__handleMessageForTests({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: 'chatgpt',
+      conversationKey: 'k1',
+      limit: 1000,
+    });
+    expect(withLimit.ok).toBe(true);
+    expect(withLimit.data).toEqual({
+      conversationId: 9,
+      messages: [{ messageKey: 'm1' }],
+    });
+    expect(storageMocks.getConversationTailWindowBySourceAndKey).toHaveBeenNthCalledWith(1, 'chatgpt', 'k1', 200);
+
+    const withoutLimit = await router.__handleMessageForTests({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: 'chatgpt',
+      conversationKey: 'k2',
+    });
+    expect(withoutLimit.ok).toBe(true);
+    expect(withoutLimit.data).toEqual({
+      conversationId: null,
+      messages: [],
+    });
+    expect(storageMocks.getConversationTailWindowBySourceAndKey).toHaveBeenNthCalledWith(2, 'chatgpt', 'k2', 200);
   });
 });

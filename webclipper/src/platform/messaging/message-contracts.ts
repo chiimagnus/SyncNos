@@ -8,6 +8,7 @@ export const CORE_MESSAGE_TYPES = {
   FIND_CONVERSATION_BY_SOURCE_AND_KEY: 'findConversationBySourceAndKey',
   FIND_CONVERSATION_BY_ID: 'findConversationById',
   GET_CONVERSATION_DETAIL: 'getConversationDetail',
+  GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY: 'getConversationTailWindowBySourceAndKey',
   DELETE_CONVERSATIONS: 'deleteConversations',
 } as const;
 
