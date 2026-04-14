@@ -124,7 +124,9 @@ describe('autosave backfill reconciler', () => {
 
     const twoHundred = reconcileAutoSaveBackfill({
       localTailMessages: [],
-      pageWindowMessages: Array.from({ length: 200 }, (_, index) => msg(`m${index + 1}`, index % 2 ? 'assistant' : 'user')),
+      pageWindowMessages: Array.from({ length: 200 }, (_, index) =>
+        msg(`m${index + 1}`, index % 2 ? 'assistant' : 'user'),
+      ),
       stateKeyHash: 'state_hash',
     });
     expect(twoHundred.ok).toBe(true);

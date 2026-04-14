@@ -33,16 +33,18 @@ function createHarness(options: {
         if (typeof overridden !== 'undefined') return overridden;
       }
       if (type === 'getConversationTailWindowBySourceAndKey') {
-        const item =
-          options.tailWindows?.[Math.min(tailWindowCount, Math.max(0, (options.tailWindows?.length || 1) - 1))] || {
-            conversationId: null,
-            messages: [],
-          };
+        const item = options.tailWindows?.[
+          Math.min(tailWindowCount, Math.max(0, (options.tailWindows?.length || 1) - 1))
+        ] || {
+          conversationId: null,
+          messages: [],
+        };
         tailWindowCount += 1;
         return { ok: true, data: cloneSnapshot(item) };
       }
       if (type === 'upsertConversation') return { ok: true, data: { id: 101, __isNew: false } };
-      if (type === 'syncConversationMessages') return { ok: true, data: { upserted: Number(payload?.messages?.length) || 0 } };
+      if (type === 'syncConversationMessages')
+        return { ok: true, data: { upserted: Number(payload?.messages?.length) || 0 } };
       return { ok: true, data: {} };
     },
     onInvalidated: () => () => {},
@@ -269,7 +271,9 @@ describe('content-controller ai chat autosave backfill', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await harness.runTick();
 
-    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(2);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      2,
+    );
     expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(0);
   });
 
@@ -300,7 +304,9 @@ describe('content-controller ai chat autosave backfill', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await harness.runTick();
 
-    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(2);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      2,
+    );
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
@@ -326,11 +332,15 @@ describe('content-controller ai chat autosave backfill', () => {
 
     await harness.runTick();
     await harness.runTick();
-    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(1);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      1,
+    );
 
     await vi.advanceTimersByTimeAsync(10_000);
     await harness.runTick();
-    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(2);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      2,
+    );
   });
 
   it('stops backfill retries after max attempt limit', async () => {
@@ -358,7 +368,9 @@ describe('content-controller ai chat autosave backfill', () => {
       await vi.advanceTimersByTimeAsync(10_000);
     }
 
-    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(6);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      6,
+    );
   });
 
   it('stops backfill retries after max retry duration', async () => {
@@ -378,7 +390,9 @@ describe('content-controller ai chat autosave backfill', () => {
     await vi.advanceTimersByTimeAsync(121_000);
     await harness.runTick();
 
-    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(1);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
+      1,
+    );
   });
 
   it('retries backfill after transient append failure on next eligible tick', async () => {

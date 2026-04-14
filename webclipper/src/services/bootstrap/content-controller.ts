@@ -397,7 +397,8 @@ export function createContentController(deps: Deps) {
       stateKey: string | null;
     }> {
       const stateKey = makeConversationStateKey(snapshot);
-      if (!stateKey) return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
+      if (!stateKey)
+        return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
       const stateKeyHash = computeStateKeyHash(stateKey);
       if (!stateKeyHash)
         return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
@@ -680,13 +681,13 @@ export function createContentController(deps: Deps) {
 
         beginSaving();
         try {
-	          const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
-	          if (saved && (incrementalChanged || backfill.changed)) {
-	            showInpageTip(
-	              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
-	              'ok',
-	            );
-	          }
+          const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
+          if (saved && (incrementalChanged || backfill.changed)) {
+            showInpageTip(
+              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
+              'ok',
+            );
+          }
           if (saved && backfill.changed && backfill.logInfo) {
             if (backfill.stateKey) {
               const state = backfillStateByConversation.get(backfill.stateKey);

@@ -71,4 +71,3 @@ export function computeSuffixPrefixOverlap(prev: string[], cur: string[], requir
   }
   return 0;
 }
-

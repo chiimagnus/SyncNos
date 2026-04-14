@@ -129,7 +129,10 @@ function assignBackfillKeys(
     occurrenceByIdentity.set(comparable.identityHash, nextOcc);
     const incomingKeyRaw = String(message?.messageKey || '').trim();
     const fallbackIncomingKey = incomingKeyRaw.startsWith('fallback_');
-    const key = incomingKeyRaw && !fallbackIncomingKey ? incomingKeyRaw : `autosave_${stateKeyHash}_${comparable.identityHash}_${kind}${nextOcc}`;
+    const key =
+      incomingKeyRaw && !fallbackIncomingKey
+        ? incomingKeyRaw
+        : `autosave_${stateKeyHash}_${comparable.identityHash}_${kind}${nextOcc}`;
     added.push({ ...message, messageKey: key });
     addedKeys.push(key);
   }
@@ -213,12 +216,7 @@ export function reconcileAutoSaveBackfill(input: {
     };
   }
 
-  const assigned = assignBackfillKeys(
-    candidates,
-    candidateComparable,
-    stateKeyHash,
-    overlapForward > 0 ? 'a' : 'h',
-  );
+  const assigned = assignBackfillKeys(candidates, candidateComparable, stateKeyHash, overlapForward > 0 ? 'a' : 'h');
 
   return {
     ok: true,
