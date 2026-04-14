@@ -678,13 +678,13 @@ export function createContentController(deps: Deps) {
 
         beginSaving();
         try {
-          const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
-          if (saved && incrementalChanged) {
-            showInpageTip(
-              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
-              'ok',
-            );
-          }
+	          const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
+	          if (saved && (incrementalChanged || backfill.changed)) {
+	            showInpageTip(
+	              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
+	              'ok',
+	            );
+	          }
           if (saved && backfill.changed && backfill.logInfo) {
             if (backfill.stateKey) {
               const state = backfillStateByConversation.get(backfill.stateKey);

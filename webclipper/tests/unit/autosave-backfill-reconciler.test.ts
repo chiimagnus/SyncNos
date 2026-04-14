@@ -69,6 +69,20 @@ describe('autosave backfill reconciler', () => {
     expect(result.diff.added).toHaveLength(2);
   });
 
+  it('keeps stable incoming messageKey values (non-fallback) when assigning keys', () => {
+    const result = reconcileAutoSaveBackfill({
+      localTailMessages: [],
+      pageWindowMessages: [
+        msg('A', 'user', { messageKey: 'user_step_1' }),
+        msg('B', 'assistant', { messageKey: 'assistant_step_2' }),
+      ],
+      stateKeyHash: 'state_hash',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.diff.added).toEqual(['user_step_1', 'assistant_step_2']);
+    expect(result.addedMessages.map((entry) => entry.messageKey)).toEqual(['user_step_1', 'assistant_step_2']);
+  });
+
   it('handles page window boundaries for 0/1/200 items', () => {
     const zero = reconcileAutoSaveBackfill({
       localTailMessages: [],

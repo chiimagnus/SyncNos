@@ -35,7 +35,9 @@ function assignBackfillKeys(
     if (!message || !comparable) continue;
     const nextOcc = (occurrenceByIdentity.get(comparable.identityHash) || 0) + 1;
     occurrenceByIdentity.set(comparable.identityHash, nextOcc);
-    const key = `autosave_${stateKeyHash}_${comparable.identityHash}_${kind}${nextOcc}`;
+    const incomingKeyRaw = String(message?.messageKey || '').trim();
+    const fallbackIncomingKey = incomingKeyRaw.startsWith('fallback_');
+    const key = incomingKeyRaw && !fallbackIncomingKey ? incomingKeyRaw : `autosave_${stateKeyHash}_${comparable.identityHash}_${kind}${nextOcc}`;
     added.push({ ...message, messageKey: key });
     addedKeys.push(key);
   }

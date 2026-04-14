@@ -20,6 +20,7 @@ function createHarness(options: {
 }) {
   let tickRef: TickFn = null;
   const sendCalls: Array<{ type: string; payload?: any }> = [];
+  const tipCalls: Array<{ text: string; options?: any }> = [];
   let captureCount = 0;
   let tailWindowCount = 0;
   let incrementalCallCount = 0;
@@ -70,7 +71,11 @@ function createHarness(options: {
     runtime,
     collectorsRegistry,
     currentPageCapture,
-    inpageTip: null,
+    inpageTip: {
+      showSaveTip: (text: string, options?: any) => {
+        tipCalls.push({ text, options });
+      },
+    },
     inpageButton: {
       ensureInpageButton: () => {},
       cleanupButtons: () => {},
@@ -98,6 +103,7 @@ function createHarness(options: {
 
   return {
     sendCalls,
+    tipCalls,
     runTick: async () => {
       if (tickRef) await tickRef();
     },
@@ -203,6 +209,7 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
     expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+    expect(harness.tipCalls.length).toBeGreaterThan(0);
   });
 
   it('merges backfill and incremental deltas into one append write in the same tick', async () => {
