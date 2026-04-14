@@ -989,6 +989,19 @@ export async function getConversationBySourceConversationKey(
   return item ? normalizeConversationListRecord(item) : null;
 }
 
+export async function getConversationTailWindowBySourceAndKey(
+  source: string,
+  conversationKey: string,
+  limit: number,
+): Promise<{ conversation: Conversation | null; messages: ConversationMessage[] }> {
+  const conversation = await getConversationBySourceConversationKey(source, conversationKey);
+  if (!conversation) return { conversation: null, messages: [] };
+  const conversationId = Number(conversation.id);
+  if (!Number.isFinite(conversationId) || conversationId <= 0) return { conversation, messages: [] };
+  const messages = await getMessagesTailByConversationId(conversationId, limit);
+  return { conversation, messages };
+}
+
 function toConversationListOpenTarget(input: any): ConversationListOpenTarget | null {
   if (!input || typeof input !== 'object') return null;
   const id = Number(input.id);
