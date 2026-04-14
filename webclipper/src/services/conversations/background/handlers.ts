@@ -7,6 +7,7 @@ import {
   getConversationListBootstrap,
   getConversationListPage,
   getConversationDetail,
+  getConversationTailWindowBySourceAndKey,
   hasConversation,
   mergeConversationsByIds,
 } from '@services/conversations/data/storage';
@@ -46,6 +47,13 @@ function normalizeListFilterKey(value: unknown, fallback: string): string {
 
 function normalizeListLimit(value: unknown): number | null {
   if (value == null || value === '') return null;
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return Math.min(Math.floor(limit), 200);
+}
+
+function normalizeTailWindowLimit(value: unknown): number | null {
+  if (value == null || value === '') return 200;
   const limit = Number(value);
   if (!Number.isFinite(limit) || limit <= 0) return null;
   return Math.min(Math.floor(limit), 200);
@@ -134,6 +142,22 @@ export function registerConversationHandlers(router: AnyRouter) {
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const detail = await getConversationDetail(conversationId);
     return router.ok(detail);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, async (msg) => {
+    const source = String(msg?.source || '').trim();
+    const conversationKey = String(msg?.conversationKey || '').trim();
+    if (!source) return invalidArgument('source', 'invalid source', msg?.source);
+    if (!conversationKey) return invalidArgument('conversationKey', 'invalid conversationKey', msg?.conversationKey);
+    const limit = normalizeTailWindowLimit(msg?.limit);
+    if (limit == null) return invalidArgument('limit', 'invalid limit', msg?.limit);
+
+    const result = await getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
+    const conversationId = Number(result.conversation?.id);
+    return router.ok({
+      conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
+      messages: Array.isArray(result.messages) ? result.messages : [],
+    });
   });
 
   router.register(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, async (msg) => {

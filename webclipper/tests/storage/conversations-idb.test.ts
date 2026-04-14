@@ -7,8 +7,10 @@ import {
   __closeDbForTests,
   deleteConversationsByIds,
   getConversationById,
+  getConversationTailWindowBySourceAndKey,
   getConversationListBootstrap,
   getMessagesByConversationId,
+  getMessagesTailByConversationId,
   mergeConversationsByIds,
   syncConversationMessages,
   syncConversationMessagesAppendOnly,
@@ -174,6 +176,73 @@ describe('conversations storage-idb', () => {
     const after = await getMessagesByConversationId(id);
     expect(after.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
     expect(after.find((m) => m.messageKey === 'm1')?.contentText).toBe('u2');
+  });
+
+  it('reads message tails by conversation id with ascending sequence order', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'tail_k1',
+      title: 'Tail',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+
+    await syncConversationMessages(
+      id,
+      Array.from({ length: 300 }, (_, index) => {
+        const sequence = index + 1;
+        return {
+          messageKey: `tail_${sequence}`,
+          role: sequence % 2 === 0 ? 'assistant' : 'user',
+          contentText: `content_${sequence}`,
+          sequence,
+          updatedAt: sequence,
+        };
+      }),
+    );
+
+    const tail = await getMessagesTailByConversationId(id, 200);
+    expect(tail).toHaveLength(200);
+    expect(tail[0]?.sequence).toBe(101);
+    expect(tail[199]?.sequence).toBe(300);
+    expect(tail[0]?.messageKey).toBe('tail_101');
+    expect(tail[199]?.messageKey).toBe('tail_300');
+  });
+
+  it('reads conversation tail window by source and key', async () => {
+    const missing = await getConversationTailWindowBySourceAndKey('debug', 'missing', 200);
+    expect(missing.conversation).toBeNull();
+    expect(missing.messages).toEqual([]);
+
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'tail_window_k1',
+      title: 'Window',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+
+    await syncConversationMessages(
+      id,
+      Array.from({ length: 300 }, (_, index) => {
+        const sequence = index + 1;
+        return {
+          messageKey: `window_${sequence}`,
+          role: sequence % 2 === 0 ? 'assistant' : 'user',
+          contentText: `content_${sequence}`,
+          sequence,
+          updatedAt: sequence,
+        };
+      }),
+    );
+
+    const windowResult = await getConversationTailWindowBySourceAndKey('debug', 'tail_window_k1', 200);
+    expect(windowResult.conversation?.id).toBe(id);
+    expect(windowResult.messages).toHaveLength(200);
+    expect(windowResult.messages[0]?.sequence).toBe(101);
+    expect(windowResult.messages[199]?.sequence).toBe(300);
   });
 
   it('deletes conversations, messages, and sync mappings', async () => {

@@ -989,6 +989,19 @@ export async function getConversationBySourceConversationKey(
   return item ? normalizeConversationListRecord(item) : null;
 }
 
+export async function getConversationTailWindowBySourceAndKey(
+  source: string,
+  conversationKey: string,
+  limit: number,
+): Promise<{ conversation: Conversation | null; messages: ConversationMessage[] }> {
+  const conversation = await getConversationBySourceConversationKey(source, conversationKey);
+  if (!conversation) return { conversation: null, messages: [] };
+  const conversationId = Number(conversation.id);
+  if (!Number.isFinite(conversationId) || conversationId <= 0) return { conversation, messages: [] };
+  const messages = await getMessagesTailByConversationId(conversationId, limit);
+  return { conversation, messages };
+}
+
 function toConversationListOpenTarget(input: any): ConversationListOpenTarget | null {
   if (!input || typeof input !== 'object') return null;
   const id = Number(input.id);
@@ -1026,6 +1039,40 @@ export async function getMessagesByConversationId(conversationId: number): Promi
   const items = (await reqToPromise(
     idx.getAll(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any)) as any,
   )) as any[];
+  await txDone(t);
+  items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  return items as any;
+}
+
+export async function getMessagesTailByConversationId(
+  conversationId: number,
+  limit: number,
+): Promise<ConversationMessage[]> {
+  const normalizedConversationId = Number(conversationId);
+  const normalizedLimit = Number(limit);
+  if (!Number.isFinite(normalizedConversationId) || normalizedConversationId <= 0) return [];
+  if (!Number.isFinite(normalizedLimit) || normalizedLimit <= 0) return [];
+
+  const tailLimit = Math.floor(normalizedLimit);
+  const db = await openDb();
+  const { t, stores } = tx(db, ['messages'], 'readonly');
+  const idx = stores.messages.index('by_conversationId_sequence');
+  const range = IDBKeyRange.bound(
+    [normalizedConversationId, -Infinity] as any,
+    [normalizedConversationId, Infinity] as any,
+  );
+  const cursorReq = idx.openCursor(range, 'prev');
+  const items: any[] = [];
+  await new Promise<void>((resolve, reject) => {
+    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result as IDBCursorWithValue | null;
+      if (!cursor) return resolve();
+      items.push(cursor.value);
+      if (items.length >= tailLimit) return resolve();
+      cursor.continue();
+    };
+  });
   await txDone(t);
   items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
   return items as any;

@@ -192,6 +192,39 @@ describe('smoke', () => {
     expect(String(r2.snapshot.messages[0].messageKey || '')).toMatch(/^autosave_/);
   });
 
+  it('computeIncremental treats fallback_ incoming keys as unstable and appends only real delta', () => {
+    incrementalUpdater.__resetForTests();
+
+    const snap1 = {
+      conversation: { source: 'debug', conversationKey: 'fallback-c1' },
+      messages: [
+        { messageKey: 'fallback_a1', role: 'user', contentText: 'A' },
+        { messageKey: 'fallback_a2', role: 'assistant', contentText: 'B' },
+        { messageKey: 'fallback_a3', role: 'user', contentText: 'C' },
+      ],
+    };
+    const r1 = incrementalUpdater.computeIncremental(snap1);
+    expect(r1.changed).toBe(true);
+    expect(r1.diff.added).toHaveLength(3);
+    expect(r1.diff.added.every((key: string) => key.startsWith('autosave_'))).toBe(true);
+
+    const snap2 = {
+      conversation: { source: 'debug', conversationKey: 'fallback-c1' },
+      messages: [
+        { messageKey: 'fallback_b1', role: 'assistant', contentText: 'B' },
+        { messageKey: 'fallback_b2', role: 'user', contentText: 'C' },
+        { messageKey: 'fallback_b3', role: 'assistant', contentText: 'D' },
+      ],
+    };
+    const r2 = incrementalUpdater.computeIncremental(snap2);
+    expect(r2.changed).toBe(true);
+    expect(r2.diff.updated).toEqual([]);
+    expect(r2.diff.removed).toEqual([]);
+    expect(r2.diff.added).toHaveLength(1);
+    expect(String(r2.snapshot.messages[0].messageKey || '')).toMatch(/^autosave_/);
+    expect(String(r2.snapshot.messages[0].contentText || '')).toBe('D');
+  });
+
   it('computeIncremental isolates state by source and conversationKey', () => {
     incrementalUpdater.__resetForTests();
 

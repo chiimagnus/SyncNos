@@ -26,7 +26,7 @@ SyncNos 仓库不是单一应用，而是一套围绕“知识沉淀”展开的
 ### 旅程 1：AI 对话先变成扩展本地事实，再决定是否同步
 1. 用户打开 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 等页面。
 2. content script 通过 collector 识别站点，把页面 DOM 统一成 `conversation + messages` 结构。
-3. background 把会话写入 IndexedDB；popup / app 读取同一份本地会话数据。
+3. background 把会话写入 IndexedDB；popup / app 读取同一份本地会话数据。开启 auto-save 时，content controller 在打开会话后还会尝试对最近窗口（`<=200`）做 backfill 补齐，让本地事实源更接近跨设备真实历史。
 4. 之后用户可以选择继续同步到 Notion、写入 Obsidian、导出 Markdown / Zip，或做备份 / 恢复。
 
 ### 旅程 2：普通网页先抓正文，再进入和 AI 对话并列的 article 流程

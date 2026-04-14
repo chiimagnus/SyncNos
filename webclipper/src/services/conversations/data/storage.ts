@@ -41,6 +41,10 @@ export async function getConversationBySourceConversationKey(source: string, con
   return await idb.getConversationBySourceConversationKey(source, conversationKey);
 }
 
+export async function getConversationTailWindowBySourceAndKey(source: string, conversationKey: string, limit: number) {
+  return await idb.getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
+}
+
 export async function getConversationDetail(conversationId: number) {
   const messages = await idb.getMessagesByConversationId(conversationId);
   return { conversationId, messages };
