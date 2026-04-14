@@ -1,4 +1,11 @@
 import normalizeApi from '@services/shared/normalize.ts';
+import {
+  IDENTITY_PREFIX_LEN,
+  computeRequiredOverlap,
+  computeSuffixPrefixOverlap,
+  getMessageIdentityBase,
+  fingerprintHash,
+} from '@services/conversations/content/autosave-identity-utils.ts';
 
 type Diff = { added: string[]; updated: string[]; removed: string[] };
 
@@ -25,35 +32,6 @@ type ConversationState = {
 
 function normalizeMeta(value: unknown): string {
   return String(value || '').trim();
-}
-
-function normalizeContent(value: unknown): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.normalizeText === 'function') {
-    return normalize.normalizeText(value);
-  }
-  return String(value || '');
-}
-
-function getMessageIdentityBase(
-  message: any,
-  identityPrefixLen: number,
-): { role: string; base: string; text: string; markdown: string } {
-  const role = String((message && message.role) || 'assistant').trim() || 'assistant';
-  const text = normalizeContent(message && message.contentText);
-  const markdownRaw =
-    message && message.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
-  const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
-  const full = text || markdown;
-  const clipped = full ? full.slice(0, identityPrefixLen) : '';
-  const base = `${role}|${clipped}`;
-  return { role, base, text, markdown };
-}
-
-function fingerprintHash(base: string): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(base));
-  return base;
 }
 
 function computeStateKeyHash(stateKey: string): string {
@@ -101,26 +79,6 @@ function isPrefixOrFillingUpdate(prev: { text: string; markdown: string }, next:
     changed: prevText !== nextText || prevMarkdown !== nextMarkdown,
     acceptable: textFilled || markdownFilled || textGrew || markdownGrew,
   };
-}
-
-function computeSuffixPrefixOverlap(prev: string[], cur: string[], requiredOverlap: number): number {
-  const prevLen = prev.length;
-  const curLen = cur.length;
-  const maxOverlap = Math.min(prevLen, curLen);
-  if (maxOverlap <= 0) return 0;
-
-  for (let overlap = maxOverlap; overlap >= requiredOverlap; overlap -= 1) {
-    const start = prevLen - overlap;
-    let ok = true;
-    for (let i = 0; i < overlap; i += 1) {
-      if (prev[start + i] !== cur[i]) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) return overlap;
-  }
-  return 0;
 }
 
 function buildTailEntries(args: {
@@ -193,8 +151,6 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
   const byConversation = new Map<string, ConversationState>();
   const TAIL_UPDATE_WINDOW_SIZE = 2;
   const MAX_WINDOW_MESSAGES = 200;
-  const IDENTITY_PREFIX_LEN = 96;
-  const MIN_OVERLAP_FOR_LONG_WINDOWS = 8;
   const SEED_MAX_MESSAGES = 6;
 
   function getOrCreateState(key: string): ConversationState {
@@ -353,11 +309,7 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
       const prevIdentityHashes = state.lastWindowIdentityHashes;
       const curLen = currentIdentityHashes.length;
       const prevLen = prevIdentityHashes.length;
-      const overlapBasis = Math.min(prevLen, curLen);
-      const requiredOverlap =
-        overlapBasis <= 2
-          ? overlapBasis
-          : Math.min(MIN_OVERLAP_FOR_LONG_WINDOWS, Math.max(2, Math.floor(overlapBasis * 0.6)));
+      const requiredOverlap = computeRequiredOverlap(prevLen, curLen);
       const overlapLen = computeSuffixPrefixOverlap(prevIdentityHashes, currentIdentityHashes, requiredOverlap);
 
       const deltaByKey = new Map<string, any>();

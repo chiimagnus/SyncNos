@@ -1,69 +1,23 @@
-import normalizeApi from '@services/shared/normalize.ts';
-
-const IDENTITY_PREFIX_LEN = 96;
-const MIN_OVERLAP_FOR_LONG_WINDOWS = 8;
+import {
+  computeRequiredOverlap,
+  computeSuffixPrefixOverlap,
+  fingerprintHash,
+  getMessageIdentityMeta,
+} from '@services/conversations/content/autosave-identity-utils.ts';
 
 type BackfillComparable = {
   role: string;
   identityHash: string;
 };
 
-function normalizeContent(value: unknown): string {
-  const normalize = normalizeApi as any;
-  if (normalize && typeof normalize.normalizeText === 'function') {
-    return normalize.normalizeText(value);
-  }
-  return String(value || '');
-}
-
-function getMessageIdentityHash(message: any): string {
-  const role = String(message?.role || 'assistant').trim() || 'assistant';
-  const text = normalizeContent(message?.contentText);
-  const markdownRaw = message?.contentMarkdown && String(message.contentMarkdown).trim() ? String(message.contentMarkdown) : '';
-  const markdown = markdownRaw ? normalizeContent(markdownRaw) : '';
-  const full = text || markdown;
-  const clipped = full ? full.slice(0, IDENTITY_PREFIX_LEN) : '';
-  const normalize = normalizeApi as any;
-  const base = `${role}|${clipped}`;
-  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(base));
-  return base;
-}
-
 function toComparable(messages: any[]): BackfillComparable[] {
-  return (Array.isArray(messages) ? messages : []).map((message) => ({
-    role: String(message?.role || 'assistant').trim() || 'assistant',
-    identityHash: getMessageIdentityHash(message),
-  }));
-}
-
-function computeRequiredOverlap(localLen: number, pageLen: number): number {
-  const overlapBasis = Math.min(localLen, pageLen);
-  if (overlapBasis <= 2) return overlapBasis;
-  return Math.min(MIN_OVERLAP_FOR_LONG_WINDOWS, Math.max(2, Math.floor(overlapBasis * 0.6)));
-}
-
-function findBestOverlap(
-  localHashes: string[],
-  pageHashes: string[],
-): { localStart: number; pageStart: number; length: number } | null {
-  let best: { localStart: number; pageStart: number; length: number } | null = null;
-  for (let localStart = 0; localStart < localHashes.length; localStart += 1) {
-    for (let pageStart = 0; pageStart < pageHashes.length; pageStart += 1) {
-      if (localHashes[localStart] !== pageHashes[pageStart]) continue;
-      let length = 0;
-      while (
-        localStart + length < localHashes.length &&
-        pageStart + length < pageHashes.length &&
-        localHashes[localStart + length] === pageHashes[pageStart + length]
-      ) {
-        length += 1;
-      }
-      if (!best || length > best.length) {
-        best = { localStart, pageStart, length };
-      }
-    }
-  }
-  return best;
+  return (Array.isArray(messages) ? messages : []).map((message) => {
+    const meta = getMessageIdentityMeta(message);
+    return {
+      role: meta.role,
+      identityHash: meta.identityHash,
+    };
+  });
 }
 
 function assignBackfillKeys(messages: any[], comparables: BackfillComparable[], stateKeyHash: string) {
@@ -84,10 +38,8 @@ function assignBackfillKeys(messages: any[], comparables: BackfillComparable[], 
 }
 
 function computePageSignature(pageComparables: BackfillComparable[]): string {
-  const normalize = normalizeApi as any;
   const serialized = pageComparables.map((entry) => `${entry.role}:${entry.identityHash}`).join('|');
-  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(serialized));
-  return serialized;
+  return fingerprintHash(serialized);
 }
 
 export function reconcileAutoSaveBackfill(input: {
@@ -135,12 +87,22 @@ export function reconcileAutoSaveBackfill(input: {
     };
   }
 
-  const overlap = findBestOverlap(
-    localComparable.map((entry) => entry.identityHash),
-    pageComparable.map((entry) => entry.identityHash),
-  );
+  const localHashes = localComparable.map((entry) => entry.identityHash);
+  const pageHashes = pageComparable.map((entry) => entry.identityHash);
   const requiredOverlap = computeRequiredOverlap(localComparable.length, pageComparable.length);
-  if (!overlap || overlap.length < requiredOverlap) {
+  const overlapForward = computeSuffixPrefixOverlap(localHashes, pageHashes, requiredOverlap);
+  const overlapBackward = overlapForward > 0 ? 0 : computeSuffixPrefixOverlap(pageHashes, localHashes, requiredOverlap);
+
+  let candidates: any[] = [];
+  let candidateComparable: BackfillComparable[] = [];
+  if (overlapForward > 0) {
+    candidates = pageMessages.slice(overlapForward);
+    candidateComparable = pageComparable.slice(overlapForward);
+  } else if (overlapBackward > 0) {
+    const prefixEnd = Math.max(0, pageMessages.length - overlapBackward);
+    candidates = pageMessages.slice(0, prefixEnd);
+    candidateComparable = pageComparable.slice(0, prefixEnd);
+  } else {
     return {
       ok: false,
       addedMessages: [],
@@ -149,13 +111,6 @@ export function reconcileAutoSaveBackfill(input: {
     };
   }
 
-  const prefixMessages = pageMessages.slice(0, overlap.pageStart);
-  const prefixComparable = pageComparable.slice(0, overlap.pageStart);
-  const suffixStart = overlap.pageStart + overlap.length;
-  const suffixMessages = pageMessages.slice(suffixStart);
-  const suffixComparable = pageComparable.slice(suffixStart);
-  const candidates = prefixMessages.concat(suffixMessages);
-  const candidateComparable = prefixComparable.concat(suffixComparable);
   const assigned = assignBackfillKeys(candidates, candidateComparable, stateKeyHash);
 
   return {
@@ -165,4 +120,3 @@ export function reconcileAutoSaveBackfill(input: {
     pageSignature,
   };
 }
-
