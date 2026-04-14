@@ -386,15 +386,20 @@ export function createContentController(deps: Deps) {
       return state;
     }
 
-    async function maybeRunBackfill(snapshot: any): Promise<{ skipIncrementalSave: boolean; writtenKeys: string[] }> {
+    async function maybeRunBackfill(snapshot: any): Promise<{
+      changed: boolean;
+      snapshot: any | null;
+      diff: { added: string[]; updated: string[]; removed: string[] } | null;
+      logInfo: { source: string; conversationKey: string; addedCount: number } | null;
+    }> {
       const stateKey = makeConversationStateKey(snapshot);
-      if (!stateKey) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (!stateKey) return { changed: false, snapshot: null, diff: null, logInfo: null };
       const stateKeyHash = computeStateKeyHash(stateKey);
-      if (!stateKeyHash) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (!stateKeyHash) return { changed: false, snapshot: null, diff: null, logInfo: null };
 
       const pageMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
       const pageWindowMessages = pageMessages.slice(Math.max(0, pageMessages.length - BACKFILL_WINDOW_LIMIT));
-      if (!pageWindowMessages.length) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (!pageWindowMessages.length) return { changed: false, snapshot: null, diff: null, logInfo: null };
 
       const pageSignature = reconcileAutoSaveBackfill({
         localTailMessages: [],
@@ -404,14 +409,14 @@ export function createContentController(deps: Deps) {
       const now = Date.now();
       const state = getBackfillState(stateKey, now);
 
-      if (state.completed) return { skipIncrementalSave: false, writtenKeys: [] };
-      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) return { skipIncrementalSave: false, writtenKeys: [] };
-      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (state.completed) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) return { changed: false, snapshot: null, diff: null, logInfo: null };
       if (state.lastAttemptAt > 0 && now - state.lastAttemptAt < BACKFILL_RETRY_THROTTLE_MS) {
-        return { skipIncrementalSave: false, writtenKeys: [] };
+        return { changed: false, snapshot: null, diff: null, logInfo: null };
       }
       if (state.lastPageSignature && state.lastPageSignature === pageSignature) {
-        return { skipIncrementalSave: false, writtenKeys: [] };
+        return { changed: false, snapshot: null, diff: null, logInfo: null };
       }
 
       state.attempts += 1;
@@ -438,7 +443,7 @@ export function createContentController(deps: Deps) {
           conversationKey,
           error: error instanceof Error ? error.message : String(error || ''),
         });
-        return { skipIncrementalSave: false, writtenKeys: [] };
+        return { changed: false, snapshot: null, diff: null, logInfo: null };
       }
 
       const reconciled = reconcileAutoSaveBackfill({
@@ -456,35 +461,21 @@ export function createContentController(deps: Deps) {
             conversationKey,
           });
         }
-        return { skipIncrementalSave: false, writtenKeys: [] };
+        return { changed: false, snapshot: null, diff: null, logInfo: null };
       }
 
       state.completed = true;
-      if (!reconciled.addedMessages.length) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (!reconciled.addedMessages.length) return { changed: false, snapshot: null, diff: null, logInfo: null };
 
-      beginSaving();
-      try {
-        await saveSnapshot({ ...snapshot, messages: reconciled.addedMessages }, { mode: 'append', diff: reconciled.diff });
-      } catch (error) {
-        state.completed = false;
-        console.warn('[WebClipper] auto-save backfill write failed, incremental continues', {
+      return {
+        changed: true,
+        snapshot: { ...snapshot, messages: reconciled.addedMessages },
+        diff: reconciled.diff,
+        logInfo: {
           source,
           conversationKey,
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
-        return { skipIncrementalSave: false, writtenKeys: [] };
-      } finally {
-        endSaving();
-      }
-
-      console.info('[WebClipper] auto-save backfill applied', {
-        source,
-        conversationKey,
-        addedCount: reconciled.addedMessages.length,
-      });
-      return {
-        skipIncrementalSave: true,
-        writtenKeys: Array.isArray(reconciled.diff?.added) ? reconciled.diff.added.map((x) => String(x || '')) : [],
+          addedCount: reconciled.addedMessages.length,
+        },
       };
     }
 
@@ -607,38 +598,74 @@ export function createContentController(deps: Deps) {
         }
 
         const backfill = await maybeRunBackfill(snapshot);
-
         const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
-        if (!incremental || !incremental.changed) return;
+        const incrementalChanged = !!(incremental && incremental.changed);
+        if (!backfill.changed && !incrementalChanged) return;
 
-        let incrementalSnapshot = incremental.snapshot;
-        let incrementalDiff = incremental.diff || { added: [], updated: [], removed: [] };
-        if (backfill.skipIncrementalSave && backfill.writtenKeys.length > 0) {
-          const writtenKeys = new Set(backfill.writtenKeys);
-          const filteredMessages = (Array.isArray(incrementalSnapshot?.messages) ? incrementalSnapshot.messages : []).filter(
-            (message: any) => !writtenKeys.has(String(message?.messageKey || '').trim()),
-          );
-          const filterKeys = (keys: unknown) =>
-            (Array.isArray(keys) ? keys : [])
-              .map((value) => String(value || '').trim())
-              .filter((key) => !!key && !writtenKeys.has(key));
-          incrementalDiff = {
-            added: filterKeys(incrementalDiff?.added),
-            updated: filterKeys(incrementalDiff?.updated),
+        let appendSnapshot = backfill.changed ? backfill.snapshot : incremental?.snapshot;
+        let appendDiff = backfill.changed ? backfill.diff : incremental?.diff;
+
+        if (backfill.changed && incrementalChanged) {
+          const mergedByKey = new Map<string, any>();
+          const mergedUnkeyed: any[] = [];
+          const pushMessage = (message: any) => {
+            if (!message) return;
+            const key = String(message?.messageKey || '').trim();
+            if (!key) {
+              mergedUnkeyed.push(message);
+              return;
+            }
+            if (mergedByKey.has(key)) {
+              mergedByKey.set(key, { ...(mergedByKey.get(key) || {}), ...message });
+              return;
+            }
+            mergedByKey.set(key, message);
+          };
+          for (const message of Array.isArray(backfill.snapshot?.messages) ? backfill.snapshot.messages : []) {
+            pushMessage(message);
+          }
+          for (const message of Array.isArray(incremental?.snapshot?.messages) ? incremental.snapshot.messages : []) {
+            pushMessage(message);
+          }
+
+          const dedupeKeys = (values: unknown): string[] => {
+            const seen = new Set<string>();
+            const out: string[] = [];
+            for (const value of Array.isArray(values) ? values : []) {
+              const key = String(value || '').trim();
+              if (!key || seen.has(key)) continue;
+              seen.add(key);
+              out.push(key);
+            }
+            return out;
+          };
+
+          appendSnapshot = {
+            ...(incremental?.snapshot || backfill.snapshot || snapshot),
+            messages: [...Array.from(mergedByKey.values()), ...mergedUnkeyed],
+          };
+          appendDiff = {
+            added: dedupeKeys([...(backfill.diff?.added || []), ...(incremental?.diff?.added || [])]),
+            updated: dedupeKeys([...(backfill.diff?.updated || []), ...(incremental?.diff?.updated || [])]),
             removed: [],
           };
-          if (!filteredMessages.length && !incrementalDiff.added.length && !incrementalDiff.updated.length) return;
-          incrementalSnapshot = { ...incrementalSnapshot, messages: filteredMessages };
         }
+
+        if (!appendSnapshot || !appendDiff) return;
+        const appendMessages = Array.isArray(appendSnapshot?.messages) ? appendSnapshot.messages : [];
+        if (!appendMessages.length && !(appendDiff.added || []).length && !(appendDiff.updated || []).length) return;
 
         beginSaving();
         try {
-          const saved = await saveSnapshot(incrementalSnapshot, { mode: 'append', diff: incrementalDiff });
-          if (saved) {
+          const saved = await saveSnapshot(appendSnapshot, { mode: 'append', diff: appendDiff });
+          if (saved && incrementalChanged) {
             showInpageTip(
-              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: incrementalSnapshot?.conversation?.title }),
+              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: appendSnapshot?.conversation?.title }),
               'ok',
             );
+          }
+          if (saved && backfill.changed && backfill.logInfo) {
+            console.info('[WebClipper] auto-save backfill applied', backfill.logInfo);
           }
         } finally {
           endSaving();

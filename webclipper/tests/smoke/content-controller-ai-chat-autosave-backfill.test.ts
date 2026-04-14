@@ -165,7 +165,7 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
   });
 
-  it('persists incremental delta even when backfill already wrote in the same tick', async () => {
+  it('merges backfill and incremental deltas into one append write in the same tick', async () => {
     const harness = createHarness({
       snapshots: [makeSnapshot('c-backfill-plus-incremental', ['A', 'B', 'C'])],
       tailWindows: [
@@ -190,10 +190,9 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.runTick();
 
     const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
-    expect(syncCalls).toHaveLength(2);
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
-    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['delta']);
-    expect(syncCalls[1].payload.diff.added).toEqual(['inc_1']);
+    expect(syncCalls).toHaveLength(1);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C', 'delta']);
+    expect(syncCalls[0].payload.diff.added).toContain('inc_1');
   });
 
   it('skips writes when no overlap and can continue later ticks', async () => {
