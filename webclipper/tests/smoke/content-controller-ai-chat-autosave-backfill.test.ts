@@ -14,6 +14,7 @@ function createHarness(options: {
   tailWindows?: Array<{ conversationId: number | null; messages: any[] }>;
   incrementalImpl?: (snapshot: any, callCount: number) => any;
   collectorId?: string;
+  sendImpl?: (type: string, payload?: any) => Promise<any> | any;
 }) {
   let tickRef: TickFn = null;
   const sendCalls: Array<{ type: string; payload?: any }> = [];
@@ -24,6 +25,10 @@ function createHarness(options: {
   const runtime = {
     send: async (type: string, payload?: any) => {
       sendCalls.push({ type, payload });
+      if (typeof options.sendImpl === 'function') {
+        const overridden = await options.sendImpl(type, payload);
+        if (typeof overridden !== 'undefined') return overridden;
+      }
       if (type === 'getConversationTailWindowBySourceAndKey') {
         const item =
           options.tailWindows?.[Math.min(tailWindowCount, Math.max(0, (options.tailWindows?.length || 1) - 1))] || {
@@ -332,5 +337,32 @@ describe('content-controller ai chat autosave backfill', () => {
     await harness.runTick();
 
     expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(1);
+  });
+
+  it('retries backfill after transient append failure on next eligible tick', async () => {
+    vi.useFakeTimers();
+    let syncAttempt = 0;
+    const harness = createHarness({
+      snapshots: [makeSnapshot('c-write-fail', ['A', 'B']), makeSnapshot('c-write-fail', ['A', 'B', 'C'])],
+      tailWindows: [{ conversationId: null, messages: [] }],
+      incrementalImpl: () => ({ changed: false }),
+      sendImpl: (type: string) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        syncAttempt += 1;
+        if (syncAttempt === 1) return { ok: false, error: { message: 'sync failed once' } };
+        return { ok: true, data: { upserted: 1 } };
+      },
+    });
+
+    await harness.runTick();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await harness.runTick();
+
+    const tailCalls = harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey');
+    expect(tailCalls).toHaveLength(2);
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B', 'C']);
   });
 });

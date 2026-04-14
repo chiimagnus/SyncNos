@@ -393,15 +393,16 @@ export function createContentController(deps: Deps) {
       snapshot: any | null;
       diff: { added: string[]; updated: string[]; removed: string[] } | null;
       logInfo: { source: string; conversationKey: string; addedCount: number } | null;
+      stateKey: string | null;
     }> {
       const stateKey = makeConversationStateKey(snapshot);
-      if (!stateKey) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (!stateKey) return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
       const stateKeyHash = computeStateKeyHash(stateKey);
-      if (!stateKeyHash) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (!stateKeyHash) return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
 
       const pageMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
       const pageWindowMessages = pageMessages.slice(Math.max(0, pageMessages.length - BACKFILL_WINDOW_LIMIT));
-      if (!pageWindowMessages.length) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (!pageWindowMessages.length) return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
 
       const pageSignature = reconcileAutoSaveBackfill({
         localTailMessages: [],
@@ -411,14 +412,18 @@ export function createContentController(deps: Deps) {
       const now = Date.now();
       const state = getBackfillState(stateKey, now);
 
-      if (state.completed) return { changed: false, snapshot: null, diff: null, logInfo: null };
-      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) return { changed: false, snapshot: null, diff: null, logInfo: null };
-      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (state.completed) return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
+      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) {
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
+      }
+      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) {
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
+      }
       if (state.lastAttemptAt > 0 && now - state.lastAttemptAt < BACKFILL_RETRY_THROTTLE_MS) {
-        return { changed: false, snapshot: null, diff: null, logInfo: null };
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
       }
       if (state.lastPageSignature && state.lastPageSignature === pageSignature) {
-        return { changed: false, snapshot: null, diff: null, logInfo: null };
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
       }
 
       state.attempts += 1;
@@ -448,7 +453,7 @@ export function createContentController(deps: Deps) {
             error: error instanceof Error ? error.message : String(error || ''),
           });
         }
-        return { changed: false, snapshot: null, diff: null, logInfo: null };
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
       }
 
       const reconciled = reconcileAutoSaveBackfill({
@@ -466,11 +471,13 @@ export function createContentController(deps: Deps) {
             conversationKey,
           });
         }
-        return { changed: false, snapshot: null, diff: null, logInfo: null };
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
       }
 
-      state.completed = true;
-      if (!reconciled.addedMessages.length) return { changed: false, snapshot: null, diff: null, logInfo: null };
+      if (!reconciled.addedMessages.length) {
+        state.completed = true;
+        return { changed: false, snapshot: null, diff: null, logInfo: null, stateKey: null };
+      }
 
       return {
         changed: true,
@@ -481,6 +488,7 @@ export function createContentController(deps: Deps) {
           conversationKey,
           addedCount: reconciled.addedMessages.length,
         },
+        stateKey,
       };
     }
 
@@ -670,6 +678,10 @@ export function createContentController(deps: Deps) {
             );
           }
           if (saved && backfill.changed && backfill.logInfo) {
+            if (backfill.stateKey) {
+              const state = backfillStateByConversation.get(backfill.stateKey);
+              if (state) state.completed = true;
+            }
             console.info('[WebClipper] auto-save backfill applied', backfill.logInfo);
           }
         } finally {
