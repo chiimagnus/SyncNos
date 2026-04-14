@@ -209,9 +209,10 @@ export function createAutoSaveIncrementalEngine(): AutoSaveIncrementalEngine {
         const incomingKeyRaw = String(m?.messageKey || '').trim();
         const { role, base, text, markdown } = getMessageIdentityBase(m, IDENTITY_PREFIX_LEN);
         const identityHash = fingerprintHash(base);
+        const fallbackIncomingKey = incomingKeyRaw.startsWith('fallback_');
 
         let stableIncomingKey = '';
-        if (incomingKeyRaw) {
+        if (incomingKeyRaw && !fallbackIncomingKey) {
           const existing = state.incomingKeyIdentities.get(incomingKeyRaw);
           if (!existing) {
             state.incomingKeyIdentities.set(incomingKeyRaw, { role, text, markdown });
