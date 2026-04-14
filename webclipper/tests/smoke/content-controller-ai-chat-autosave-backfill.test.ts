@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
+import normalizeApi from '@services/shared/normalize.ts';
+import { getMessageIdentityMeta } from '@services/conversations/content/autosave-identity-utils.ts';
 
 type TickFn = (() => void | Promise<void>) | null;
 
@@ -144,6 +146,39 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
     expect(syncCalls[0].payload.diff.added).toHaveLength(2);
     expect(harness.getIncrementalCallCount()).toBe(1);
+  });
+
+  it('dedupes incremental seed vs backfill first-write by aligning synthetic keys', async () => {
+    const snapshot = makeSnapshot('c-empty-plus-seed', ['A', 'B']);
+    const stateKey = `chatgpt::c-empty-plus-seed`;
+    const stateKeyHash = String((normalizeApi as any).fnv1a32(stateKey));
+    const expectedKeys = snapshot.messages.map((message: any) => {
+      const meta = getMessageIdentityMeta(message);
+      return `autosave_${stateKeyHash}_${meta.identityHash}_s1`;
+    });
+    const harness = createHarness({
+      snapshots: [snapshot],
+      tailWindows: [{ conversationId: null, messages: [] }],
+      incrementalImpl: () => ({
+        changed: true,
+        snapshot: {
+          conversation: { source: 'chatgpt', conversationKey: 'c-empty-plus-seed' },
+          messages: snapshot.messages.map((message: any, index: number) => ({
+            ...message,
+            messageKey: expectedKeys[index],
+          })),
+        },
+        diff: { added: expectedKeys, updated: [], removed: [] },
+      }),
+    });
+
+    await harness.runTick();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(1);
+    expect(syncCalls[0].payload.mode).toBe('append');
+    expect(syncCalls[0].payload.messages).toHaveLength(2);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
   });
 
   it('writes append-only gap when overlap exists in tail', async () => {

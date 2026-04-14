@@ -20,7 +20,12 @@ function toComparable(messages: any[]): BackfillComparable[] {
   });
 }
 
-function assignBackfillKeys(messages: any[], comparables: BackfillComparable[], stateKeyHash: string) {
+function assignBackfillKeys(
+  messages: any[],
+  comparables: BackfillComparable[],
+  stateKeyHash: string,
+  kind: 's' | 'a' | 'h',
+) {
   const occurrenceByIdentity = new Map<string, number>();
   const added: any[] = [];
   const addedKeys: string[] = [];
@@ -30,7 +35,7 @@ function assignBackfillKeys(messages: any[], comparables: BackfillComparable[], 
     if (!message || !comparable) continue;
     const nextOcc = (occurrenceByIdentity.get(comparable.identityHash) || 0) + 1;
     occurrenceByIdentity.set(comparable.identityHash, nextOcc);
-    const key = `autosave_${stateKeyHash}_${comparable.identityHash}_bf${nextOcc}`;
+    const key = `autosave_${stateKeyHash}_${comparable.identityHash}_${kind}${nextOcc}`;
     added.push({ ...message, messageKey: key });
     addedKeys.push(key);
   }
@@ -78,7 +83,8 @@ export function reconcileAutoSaveBackfill(input: {
   }
 
   if (localMessages.length === 0) {
-    const assigned = assignBackfillKeys(pageMessages, pageComparable, stateKeyHash);
+    // First-write: match incremental engine's seed key shape to avoid same-tick duplication.
+    const assigned = assignBackfillKeys(pageMessages, pageComparable, stateKeyHash, 's');
     return {
       ok: true,
       addedMessages: assigned.added,
@@ -111,7 +117,12 @@ export function reconcileAutoSaveBackfill(input: {
     };
   }
 
-  const assigned = assignBackfillKeys(candidates, candidateComparable, stateKeyHash);
+  const assigned = assignBackfillKeys(
+    candidates,
+    candidateComparable,
+    stateKeyHash,
+    overlapForward > 0 ? 'a' : 'h',
+  );
 
   return {
     ok: true,

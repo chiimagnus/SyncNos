@@ -25,8 +25,8 @@ describe('autosave backfill reconciler', () => {
     expect(result.diff.updated).toEqual([]);
     expect(result.diff.removed).toEqual([]);
     expect(result.diff.added).toEqual(result.addedMessages.map((entry) => String(entry.messageKey || '')));
-    expect(result.diff.added[0]).toMatch(/^autosave_state_hash_.+_bf1$/);
-    expect(result.diff.added[1]).toMatch(/^autosave_state_hash_.+_bf1$/);
+    expect(result.diff.added[0]).toMatch(/^autosave_state_hash_.+_a1$/);
+    expect(result.diff.added[1]).toMatch(/^autosave_state_hash_.+_a1$/);
   });
 
   it('adds missing head messages when local window is a page suffix', () => {
