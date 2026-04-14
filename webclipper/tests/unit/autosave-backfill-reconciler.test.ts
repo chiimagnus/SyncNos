@@ -69,6 +69,35 @@ describe('autosave backfill reconciler', () => {
     expect(result.diff.added).toHaveLength(2);
   });
 
+  it('handles page window boundaries for 0/1/200 items', () => {
+    const zero = reconcileAutoSaveBackfill({
+      localTailMessages: [],
+      pageWindowMessages: [],
+      stateKeyHash: 'state_hash',
+    });
+    expect(zero.ok).toBe(true);
+    expect(zero.addedMessages).toEqual([]);
+    expect(zero.diff.added).toEqual([]);
+
+    const one = reconcileAutoSaveBackfill({
+      localTailMessages: [],
+      pageWindowMessages: [msg('only-one', 'user')],
+      stateKeyHash: 'state_hash',
+    });
+    expect(one.ok).toBe(true);
+    expect(one.addedMessages).toHaveLength(1);
+    expect(one.diff.added).toHaveLength(1);
+
+    const twoHundred = reconcileAutoSaveBackfill({
+      localTailMessages: [],
+      pageWindowMessages: Array.from({ length: 200 }, (_, index) => msg(`m${index + 1}`, index % 2 ? 'assistant' : 'user')),
+      stateKeyHash: 'state_hash',
+    });
+    expect(twoHundred.ok).toBe(true);
+    expect(twoHundred.addedMessages).toHaveLength(200);
+    expect(twoHundred.diff.added).toHaveLength(200);
+  });
+
   it('computes page signature from page window only', () => {
     const pageWindow = [msg('A', 'user'), msg('B')];
     const fromPrefix = reconcileAutoSaveBackfill({
@@ -85,4 +114,3 @@ describe('autosave backfill reconciler', () => {
     expect(fromPrefix.pageSignature).toBe(fromSuffix.pageSignature);
   });
 });
-

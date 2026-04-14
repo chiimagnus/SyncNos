@@ -276,7 +276,8 @@ export function createContentController(deps: Deps) {
         lastAttemptAt: number;
         lastPageSignature: string;
         completed: boolean;
-        warnedSignatures: Set<string>;
+        warnedNoOverlap: boolean;
+        warnedTailUnavailable: boolean;
       }
     >();
 
@@ -380,7 +381,8 @@ export function createContentController(deps: Deps) {
         lastAttemptAt: 0,
         lastPageSignature: '',
         completed: false,
-        warnedSignatures: new Set<string>(),
+        warnedNoOverlap: false,
+        warnedTailUnavailable: false,
       };
       backfillStateByConversation.set(stateKey, state);
       return state;
@@ -438,11 +440,14 @@ export function createContentController(deps: Deps) {
         }
         localTailMessages = Array.isArray(localWindowRes?.data?.messages) ? localWindowRes.data.messages : [];
       } catch (error) {
-        console.warn('[WebClipper] auto-save backfill skipped: tail window unavailable', {
-          source,
-          conversationKey,
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
+        if (!state.warnedTailUnavailable) {
+          state.warnedTailUnavailable = true;
+          console.warn('[WebClipper] auto-save backfill skipped: tail window unavailable', {
+            source,
+            conversationKey,
+            error: error instanceof Error ? error.message : String(error || ''),
+          });
+        }
         return { changed: false, snapshot: null, diff: null, logInfo: null };
       }
 
@@ -454,8 +459,8 @@ export function createContentController(deps: Deps) {
       state.lastPageSignature = reconciled.pageSignature;
 
       if (!reconciled.ok) {
-        if (!state.warnedSignatures.has(reconciled.pageSignature)) {
-          state.warnedSignatures.add(reconciled.pageSignature);
+        if (!state.warnedNoOverlap) {
+          state.warnedNoOverlap = true;
           console.warn('[WebClipper] auto-save backfill skipped: no overlap, incremental continues', {
             source,
             conversationKey,

@@ -259,4 +259,78 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls[0].payload.mode).toBe('append');
     expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
   });
+
+  it('throttles backfill retries until retry interval elapses', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness({
+      snapshots: [
+        makeSnapshot('c-throttle', ['A']),
+        makeSnapshot('c-throttle', ['A', 'B']),
+        makeSnapshot('c-throttle', ['A', 'B', 'C']),
+      ],
+      tailWindows: [
+        {
+          conversationId: 91,
+          messages: [{ role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' }],
+        },
+      ],
+      incrementalImpl: () => ({ changed: false }),
+    });
+
+    await harness.runTick();
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await harness.runTick();
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(2);
+  });
+
+  it('stops backfill retries after max attempt limit', async () => {
+    vi.useFakeTimers();
+    const snapshots = Array.from({ length: 8 }, (_, index) => {
+      const size = index + 1;
+      return makeSnapshot(
+        'c-attempt-limit',
+        Array.from({ length: size }, (_unused, messageIndex) => `M${messageIndex + 1}`),
+      );
+    });
+    const harness = createHarness({
+      snapshots,
+      tailWindows: [
+        {
+          conversationId: 101,
+          messages: [{ role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' }],
+        },
+      ],
+      incrementalImpl: () => ({ changed: false }),
+    });
+
+    for (let i = 0; i < snapshots.length; i += 1) {
+      await harness.runTick();
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(6);
+  });
+
+  it('stops backfill retries after max retry duration', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness({
+      snapshots: [makeSnapshot('c-duration-limit', ['A']), makeSnapshot('c-duration-limit', ['A', 'B'])],
+      tailWindows: [
+        {
+          conversationId: 111,
+          messages: [{ role: 'user', contentText: 'X', sequence: 1, messageKey: 'x1' }],
+        },
+      ],
+      incrementalImpl: () => ({ changed: false }),
+    });
+
+    await harness.runTick();
+    await vi.advanceTimersByTimeAsync(121_000);
+    await harness.runTick();
+
+    expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(1);
+  });
 });
