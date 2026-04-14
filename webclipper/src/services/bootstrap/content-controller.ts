@@ -2,7 +2,9 @@ import type { CurrentPageCaptureService } from '@services/bootstrap/current-page
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
+import normalizeApi from '@services/shared/normalize.ts';
 import { UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
 import {
   readInpageButtonGlobalPosition,
   writeInpageButtonGlobalPosition,
@@ -68,6 +70,7 @@ type Deps = {
 const CORE_MESSAGE_TYPES = Object.freeze({
   UPSERT_CONVERSATION: 'upsertConversation',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
+  GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY: 'getConversationTailWindowBySourceAndKey',
 });
 
 const EASTER_EGG_LINES = Object.freeze({
@@ -111,6 +114,16 @@ function readAiChatDollarMentionEnabled(): Promise<boolean> {
       resolve(true);
     }
   });
+}
+
+function normalizeConversationMeta(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function computeStateKeyHash(stateKey: string): string {
+  const normalize = normalizeApi as any;
+  if (normalize && typeof normalize.fnv1a32 === 'function') return String(normalize.fnv1a32(stateKey));
+  return stateKey.replace(/[^a-zA-Z0-9]+/g, '_');
 }
 
 export function createContentController(deps: Deps) {
@@ -242,6 +255,10 @@ export function createContentController(deps: Deps) {
     const DEEP_RESEARCH_POLL_INTERVAL_MS = 5_000;
     const DEEP_RESEARCH_POLL_MAX_DURATION_MS = 3 * 60_000;
     const DEEP_RESEARCH_HYDRATE_MIN_INTERVAL_MS = 12_000;
+    const BACKFILL_WINDOW_LIMIT = 200;
+    const BACKFILL_RETRY_THROTTLE_MS = 10_000;
+    const BACKFILL_RETRY_MAX_ATTEMPTS = 6;
+    const BACKFILL_RETRY_MAX_DURATION_MS = 2 * 60_000;
     const storageApi = (globalThis as any).chrome?.storage ?? (globalThis as any).browser?.storage;
     const hasStorageGet = !!storageApi?.local?.get;
     // Default to enabled when storage API is unavailable (e.g. tests).
@@ -251,6 +268,17 @@ export function createContentController(deps: Deps) {
     let inpageButtonPosition: any = null;
     let inpageButtonPositionLoaded = false;
     let inpageButtonPositionLoadPromise: Promise<any> | null = null;
+    const backfillStateByConversation = new Map<
+      string,
+      {
+        startedAt: number;
+        attempts: number;
+        lastAttemptAt: number;
+        lastPageSignature: string;
+        completed: boolean;
+        warnedSignatures: Set<string>;
+      }
+    >();
 
     void readAiChatAutoSaveEnabled()
       .then((enabled) => {
@@ -299,6 +327,7 @@ export function createContentController(deps: Deps) {
         clearTimeout(deepResearchPollTimer);
         deepResearchPollTimer = null;
       }
+      backfillStateByConversation.clear();
       observer?.stop?.();
     }
 
@@ -333,6 +362,125 @@ export function createContentController(deps: Deps) {
         deepResearchPollTimer = null;
         void handleTick();
       }, DEEP_RESEARCH_POLL_INTERVAL_MS);
+    }
+
+    function makeConversationStateKey(snapshot: any): string {
+      const source = normalizeConversationMeta(snapshot?.conversation?.source);
+      const conversationKey = normalizeConversationMeta(snapshot?.conversation?.conversationKey);
+      if (!source || !conversationKey) return '';
+      return `${source}::${conversationKey}`;
+    }
+
+    function getBackfillState(stateKey: string, now: number) {
+      let state = backfillStateByConversation.get(stateKey);
+      if (state) return state;
+      state = {
+        startedAt: now,
+        attempts: 0,
+        lastAttemptAt: 0,
+        lastPageSignature: '',
+        completed: false,
+        warnedSignatures: new Set<string>(),
+      };
+      backfillStateByConversation.set(stateKey, state);
+      return state;
+    }
+
+    async function maybeRunBackfill(snapshot: any): Promise<{ skipIncrementalSave: boolean }> {
+      const stateKey = makeConversationStateKey(snapshot);
+      if (!stateKey) return { skipIncrementalSave: false };
+      const stateKeyHash = computeStateKeyHash(stateKey);
+      if (!stateKeyHash) return { skipIncrementalSave: false };
+
+      const pageMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
+      const pageWindowMessages = pageMessages.slice(Math.max(0, pageMessages.length - BACKFILL_WINDOW_LIMIT));
+      if (!pageWindowMessages.length) return { skipIncrementalSave: false };
+
+      const pageSignature = reconcileAutoSaveBackfill({
+        localTailMessages: [],
+        pageWindowMessages,
+        stateKeyHash,
+      }).pageSignature;
+      const now = Date.now();
+      const state = getBackfillState(stateKey, now);
+
+      if (state.completed) return { skipIncrementalSave: false };
+      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) return { skipIncrementalSave: false };
+      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) return { skipIncrementalSave: false };
+      if (state.lastAttemptAt > 0 && now - state.lastAttemptAt < BACKFILL_RETRY_THROTTLE_MS) {
+        return { skipIncrementalSave: false };
+      }
+      if (state.lastPageSignature && state.lastPageSignature === pageSignature) return { skipIncrementalSave: false };
+
+      state.attempts += 1;
+      state.lastAttemptAt = now;
+      state.lastPageSignature = pageSignature;
+
+      const source = normalizeConversationMeta(snapshot?.conversation?.source);
+      const conversationKey = normalizeConversationMeta(snapshot?.conversation?.conversationKey);
+
+      let localTailMessages: any[] = [];
+      try {
+        const localWindowRes = await send(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, {
+          source,
+          conversationKey,
+          limit: BACKFILL_WINDOW_LIMIT,
+        });
+        if (!localWindowRes?.ok) {
+          throw new Error(localWindowRes?.error?.message || 'getConversationTailWindowBySourceAndKey failed');
+        }
+        localTailMessages = Array.isArray(localWindowRes?.data?.messages) ? localWindowRes.data.messages : [];
+      } catch (error) {
+        console.warn('[WebClipper] auto-save backfill skipped: tail window unavailable', {
+          source,
+          conversationKey,
+          error: error instanceof Error ? error.message : String(error || ''),
+        });
+        return { skipIncrementalSave: false };
+      }
+
+      const reconciled = reconcileAutoSaveBackfill({
+        localTailMessages,
+        pageWindowMessages,
+        stateKeyHash,
+      });
+      state.lastPageSignature = reconciled.pageSignature;
+
+      if (!reconciled.ok) {
+        if (!state.warnedSignatures.has(reconciled.pageSignature)) {
+          state.warnedSignatures.add(reconciled.pageSignature);
+          console.warn('[WebClipper] auto-save backfill skipped: no overlap, incremental continues', {
+            source,
+            conversationKey,
+          });
+        }
+        return { skipIncrementalSave: false };
+      }
+
+      state.completed = true;
+      if (!reconciled.addedMessages.length) return { skipIncrementalSave: false };
+
+      beginSaving();
+      try {
+        await saveSnapshot({ ...snapshot, messages: reconciled.addedMessages }, { mode: 'append', diff: reconciled.diff });
+      } catch (error) {
+        state.completed = false;
+        console.warn('[WebClipper] auto-save backfill write failed, incremental continues', {
+          source,
+          conversationKey,
+          error: error instanceof Error ? error.message : String(error || ''),
+        });
+        return { skipIncrementalSave: false };
+      } finally {
+        endSaving();
+      }
+
+      console.info('[WebClipper] auto-save backfill applied', {
+        source,
+        conversationKey,
+        addedCount: reconciled.addedMessages.length,
+      });
+      return { skipIncrementalSave: true };
     }
 
     function beginSaving() {
@@ -453,8 +601,11 @@ export function createContentController(deps: Deps) {
           clearDeepResearchPoll();
         }
 
+        const backfill = await maybeRunBackfill(snapshot);
+
         const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
         if (!incremental || !incremental.changed) return;
+        if (backfill.skipIncrementalSave) return;
 
         beginSaving();
         try {
