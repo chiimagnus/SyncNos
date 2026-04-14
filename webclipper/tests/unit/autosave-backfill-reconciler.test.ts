@@ -56,6 +56,19 @@ describe('autosave backfill reconciler', () => {
     expect(result.diff).toEqual({ added: [], updated: [], removed: [] });
   });
 
+  it('accepts overlap when tail messages are prefix-grown (streaming updates)', () => {
+    const pageWindow = [msg('Earlier', 'user'), msg('Hello world (final)', 'assistant'), msg('Next', 'user')];
+    const result = reconcileAutoSaveBackfill({
+      localTailMessages: [msg('Hello', 'assistant'), msg('Next', 'user')],
+      pageWindowMessages: pageWindow,
+      stateKeyHash: 'state_hash',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.addedMessages.map((entry) => entry.contentText)).toEqual(['Earlier']);
+    expect(result.diff.added).toHaveLength(1);
+  });
+
   it('treats empty local window as first-write backfill', () => {
     const pageWindow = [msg('A', 'user'), msg('B')];
     const result = reconcileAutoSaveBackfill({

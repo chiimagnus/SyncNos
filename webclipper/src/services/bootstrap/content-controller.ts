@@ -476,6 +476,8 @@ export function createContentController(deps: Deps) {
           console.warn('[WebClipper] auto-save backfill skipped: no overlap, incremental continues', {
             source,
             conversationKey,
+            localTailCount: Array.isArray(localTailMessages) ? localTailMessages.length : 0,
+            pageWindowCount: Array.isArray(pageWindowMessages) ? pageWindowMessages.length : 0,
           });
         }
         return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
