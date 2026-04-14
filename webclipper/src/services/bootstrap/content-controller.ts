@@ -386,15 +386,15 @@ export function createContentController(deps: Deps) {
       return state;
     }
 
-    async function maybeRunBackfill(snapshot: any): Promise<{ skipIncrementalSave: boolean }> {
+    async function maybeRunBackfill(snapshot: any): Promise<{ skipIncrementalSave: boolean; writtenKeys: string[] }> {
       const stateKey = makeConversationStateKey(snapshot);
-      if (!stateKey) return { skipIncrementalSave: false };
+      if (!stateKey) return { skipIncrementalSave: false, writtenKeys: [] };
       const stateKeyHash = computeStateKeyHash(stateKey);
-      if (!stateKeyHash) return { skipIncrementalSave: false };
+      if (!stateKeyHash) return { skipIncrementalSave: false, writtenKeys: [] };
 
       const pageMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
       const pageWindowMessages = pageMessages.slice(Math.max(0, pageMessages.length - BACKFILL_WINDOW_LIMIT));
-      if (!pageWindowMessages.length) return { skipIncrementalSave: false };
+      if (!pageWindowMessages.length) return { skipIncrementalSave: false, writtenKeys: [] };
 
       const pageSignature = reconcileAutoSaveBackfill({
         localTailMessages: [],
@@ -404,13 +404,15 @@ export function createContentController(deps: Deps) {
       const now = Date.now();
       const state = getBackfillState(stateKey, now);
 
-      if (state.completed) return { skipIncrementalSave: false };
-      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) return { skipIncrementalSave: false };
-      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) return { skipIncrementalSave: false };
+      if (state.completed) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (state.attempts >= BACKFILL_RETRY_MAX_ATTEMPTS) return { skipIncrementalSave: false, writtenKeys: [] };
+      if (now - state.startedAt > BACKFILL_RETRY_MAX_DURATION_MS) return { skipIncrementalSave: false, writtenKeys: [] };
       if (state.lastAttemptAt > 0 && now - state.lastAttemptAt < BACKFILL_RETRY_THROTTLE_MS) {
-        return { skipIncrementalSave: false };
+        return { skipIncrementalSave: false, writtenKeys: [] };
       }
-      if (state.lastPageSignature && state.lastPageSignature === pageSignature) return { skipIncrementalSave: false };
+      if (state.lastPageSignature && state.lastPageSignature === pageSignature) {
+        return { skipIncrementalSave: false, writtenKeys: [] };
+      }
 
       state.attempts += 1;
       state.lastAttemptAt = now;
@@ -436,7 +438,7 @@ export function createContentController(deps: Deps) {
           conversationKey,
           error: error instanceof Error ? error.message : String(error || ''),
         });
-        return { skipIncrementalSave: false };
+        return { skipIncrementalSave: false, writtenKeys: [] };
       }
 
       const reconciled = reconcileAutoSaveBackfill({
@@ -454,11 +456,11 @@ export function createContentController(deps: Deps) {
             conversationKey,
           });
         }
-        return { skipIncrementalSave: false };
+        return { skipIncrementalSave: false, writtenKeys: [] };
       }
 
       state.completed = true;
-      if (!reconciled.addedMessages.length) return { skipIncrementalSave: false };
+      if (!reconciled.addedMessages.length) return { skipIncrementalSave: false, writtenKeys: [] };
 
       beginSaving();
       try {
@@ -470,7 +472,7 @@ export function createContentController(deps: Deps) {
           conversationKey,
           error: error instanceof Error ? error.message : String(error || ''),
         });
-        return { skipIncrementalSave: false };
+        return { skipIncrementalSave: false, writtenKeys: [] };
       } finally {
         endSaving();
       }
@@ -480,7 +482,10 @@ export function createContentController(deps: Deps) {
         conversationKey,
         addedCount: reconciled.addedMessages.length,
       });
-      return { skipIncrementalSave: true };
+      return {
+        skipIncrementalSave: true,
+        writtenKeys: Array.isArray(reconciled.diff?.added) ? reconciled.diff.added.map((x) => String(x || '')) : [],
+      };
     }
 
     function beginSaving() {
@@ -605,14 +610,33 @@ export function createContentController(deps: Deps) {
 
         const incremental = incrementalUpdater?.computeIncremental?.(snapshot);
         if (!incremental || !incremental.changed) return;
-        if (backfill.skipIncrementalSave) return;
+
+        let incrementalSnapshot = incremental.snapshot;
+        let incrementalDiff = incremental.diff || { added: [], updated: [], removed: [] };
+        if (backfill.skipIncrementalSave && backfill.writtenKeys.length > 0) {
+          const writtenKeys = new Set(backfill.writtenKeys);
+          const filteredMessages = (Array.isArray(incrementalSnapshot?.messages) ? incrementalSnapshot.messages : []).filter(
+            (message: any) => !writtenKeys.has(String(message?.messageKey || '').trim()),
+          );
+          const filterKeys = (keys: unknown) =>
+            (Array.isArray(keys) ? keys : [])
+              .map((value) => String(value || '').trim())
+              .filter((key) => !!key && !writtenKeys.has(key));
+          incrementalDiff = {
+            added: filterKeys(incrementalDiff?.added),
+            updated: filterKeys(incrementalDiff?.updated),
+            removed: [],
+          };
+          if (!filteredMessages.length && !incrementalDiff.added.length && !incrementalDiff.updated.length) return;
+          incrementalSnapshot = { ...incrementalSnapshot, messages: filteredMessages };
+        }
 
         beginSaving();
         try {
-          const saved = await saveSnapshot(incremental.snapshot, { mode: 'append', diff: incremental.diff });
+          const saved = await saveSnapshot(incrementalSnapshot, { mode: 'append', diff: incrementalDiff });
           if (saved) {
             showInpageTip(
-              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: incremental?.snapshot?.conversation?.title }),
+              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: incrementalSnapshot?.conversation?.title }),
               'ok',
             );
           }

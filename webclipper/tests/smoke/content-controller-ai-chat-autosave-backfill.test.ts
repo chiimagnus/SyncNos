@@ -120,11 +120,7 @@ describe('content-controller ai chat autosave backfill', () => {
     const harness = createHarness({
       snapshots: [snapshot],
       tailWindows: [{ conversationId: null, messages: [] }],
-      incrementalImpl: (snap) => ({
-        changed: true,
-        snapshot: snap,
-        diff: { added: ['inc_only'], updated: [], removed: [] },
-      }),
+      incrementalImpl: () => ({ changed: false }),
     });
 
     await harness.runTick();
@@ -158,11 +154,7 @@ describe('content-controller ai chat autosave backfill', () => {
           ],
         },
       ],
-      incrementalImpl: (snap) => ({
-        changed: true,
-        snapshot: snap,
-        diff: { added: ['inc_only'], updated: [], removed: [] },
-      }),
+      incrementalImpl: () => ({ changed: false }),
     });
 
     await harness.runTick();
@@ -171,6 +163,37 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].payload.mode).toBe('append');
     expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+  });
+
+  it('persists incremental delta even when backfill already wrote in the same tick', async () => {
+    const harness = createHarness({
+      snapshots: [makeSnapshot('c-backfill-plus-incremental', ['A', 'B', 'C'])],
+      tailWindows: [
+        {
+          conversationId: 81,
+          messages: [
+            { role: 'user', contentText: 'A', sequence: 1, messageKey: 'm1' },
+            { role: 'assistant', contentText: 'B', sequence: 2, messageKey: 'm2' },
+          ],
+        },
+      ],
+      incrementalImpl: () => ({
+        changed: true,
+        snapshot: {
+          conversation: { source: 'chatgpt', conversationKey: 'c-backfill-plus-incremental' },
+          messages: [{ messageKey: 'inc_1', role: 'assistant', contentText: 'delta', sequence: 999 }],
+        },
+        diff: { added: ['inc_1'], updated: [], removed: [] },
+      }),
+    });
+
+    await harness.runTick();
+
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    expect(syncCalls).toHaveLength(2);
+    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['delta']);
+    expect(syncCalls[1].payload.diff.added).toEqual(['inc_1']);
   });
 
   it('skips writes when no overlap and can continue later ticks', async () => {
@@ -238,4 +261,3 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
   });
 });
-
