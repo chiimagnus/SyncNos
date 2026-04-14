@@ -6,6 +6,7 @@ import {
 
 type BackfillComparable = {
   role: string;
+  stableKey: string;
   identityHash: string;
   weakIdentityHash: string;
   text: string;
@@ -16,8 +17,12 @@ function toComparable(messages: any[]): BackfillComparable[] {
   return (Array.isArray(messages) ? messages : []).map((message) => {
     const meta = getMessageIdentityMeta(message);
     const weakMeta = getMessageIdentityMeta(message, 32);
+    const incomingKeyRaw = String(message?.messageKey || '').trim();
+    const fallbackIncomingKey = incomingKeyRaw.startsWith('fallback_');
+    const stableKey = incomingKeyRaw && !fallbackIncomingKey ? incomingKeyRaw : '';
     return {
       role: meta.role,
+      stableKey,
       identityHash: meta.identityHash,
       weakIdentityHash: weakMeta.identityHash,
       text: meta.text,
@@ -51,6 +56,21 @@ function isPrefixOrFillingUpdate(
 
 function comparableMatches(a: BackfillComparable | undefined, b: BackfillComparable | undefined): boolean {
   if (!a || !b) return false;
+  if (a.role === b.role && a.stableKey && b.stableKey && a.stableKey === b.stableKey) {
+    if (a.weakIdentityHash && a.weakIdentityHash === b.weakIdentityHash) return true;
+    const decision = isPrefixOrFillingUpdate(
+      { text: a.text || '', markdown: a.markdown || '' },
+      { text: b.text || '', markdown: b.markdown || '' },
+    );
+    if (decision.acceptable) return true;
+    const reverseDecision = isPrefixOrFillingUpdate(
+      { text: b.text || '', markdown: b.markdown || '' },
+      { text: a.text || '', markdown: a.markdown || '' },
+    );
+    if (reverseDecision.acceptable) return true;
+    // Same key but incompatible content: treat as unstable key reuse (virtualized/recycled keys).
+    return false;
+  }
   if (a.identityHash && a.identityHash === b.identityHash) return true;
   if (a.weakIdentityHash && a.weakIdentityHash === b.weakIdentityHash) return true;
   if (a.role !== b.role) return false;
@@ -119,7 +139,7 @@ function assignBackfillKeys(
 function computePageSignature(pageComparables: BackfillComparable[]): string {
   // Use weak identity for the signature so streaming/prefix-growth updates don't thrash the retry/completion state.
   const serialized = pageComparables
-    .map((entry) => `${entry.role}:${entry.weakIdentityHash || entry.identityHash}`)
+    .map((entry) => `${entry.role}:${entry.stableKey || entry.weakIdentityHash || entry.identityHash}`)
     .join('|');
   return fingerprintHash(serialized);
 }

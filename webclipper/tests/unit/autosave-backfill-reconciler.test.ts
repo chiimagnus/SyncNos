@@ -57,9 +57,16 @@ describe('autosave backfill reconciler', () => {
   });
 
   it('accepts overlap when tail messages are prefix-grown (streaming updates)', () => {
-    const pageWindow = [msg('Earlier', 'user'), msg('Hello world (final)', 'assistant'), msg('Next', 'user')];
+    const pageWindow = [
+      msg('Earlier', 'user'),
+      msg('Hello world (final)', 'assistant', { messageKey: 'assistant_step_1' }),
+      msg('Next', 'user', { messageKey: 'user_step_2' }),
+    ];
     const result = reconcileAutoSaveBackfill({
-      localTailMessages: [msg('Hello', 'assistant'), msg('Next', 'user')],
+      localTailMessages: [
+        msg('Hello', 'assistant', { messageKey: 'assistant_step_1' }),
+        msg('Next', 'user', { messageKey: 'user_step_2' }),
+      ],
       pageWindowMessages: pageWindow,
       stateKeyHash: 'state_hash',
     });
