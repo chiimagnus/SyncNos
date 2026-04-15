@@ -22,6 +22,7 @@ permissions:
 jobs:
   publish_edge_addons:
     runs-on: ubuntu-latest
+    if: ${{ !(contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc')) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
