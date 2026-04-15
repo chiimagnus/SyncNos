@@ -150,15 +150,12 @@ export function ConversationDetailPane({
     },
     [setUserMessageEl],
   );
-  const userMessageEls = useMemo(
-    () => {
-      void userMessageRefsVersion;
-      return outlineEntries
-        .map((entry) => userMessageElByIdRef.current.get(entry.messageId))
-        .filter((el): el is HTMLDivElement => Boolean(el));
-    },
-    [outlineEntries, userMessageRefsVersion],
-  );
+  const userMessageEls = useMemo(() => {
+    void userMessageRefsVersion;
+    return outlineEntries
+      .map((entry) => userMessageElByIdRef.current.get(entry.messageId))
+      .filter((el): el is HTMLDivElement => Boolean(el));
+  }, [outlineEntries, userMessageRefsVersion]);
   const observedActiveIndex = useChatOutlineActiveIndex({
     root: outlineScrollRoot,
     userMessageEls,
