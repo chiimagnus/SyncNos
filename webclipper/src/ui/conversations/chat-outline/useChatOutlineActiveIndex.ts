@@ -8,6 +8,7 @@ import {
 } from '@ui/conversations/chat-outline/active-index';
 
 const OBSERVER_THRESHOLDS = [0, 0.1, 0.25, 0.5, 0.75, 1];
+const FALLBACK_NEAREST_WINDOW = 24;
 
 export type UseChatOutlineActiveIndexInput = {
   root: Element | null;
@@ -71,6 +72,7 @@ export function useChatOutlineActiveIndex({
     }
 
     const rootEl = root && root instanceof Element ? root : null;
+    const supportsIntersectionObserver = typeof globalThis.IntersectionObserver === 'function';
     const fallbackIndexByEl = new Map<HTMLElement, number>();
     safeUserMessageEls.forEach((el, idx) => {
       fallbackIndexByEl.set(el, idx + 1);
@@ -82,17 +84,28 @@ export function useChatOutlineActiveIndex({
       const messagesRect = messagesRootEl ? messagesRootEl.getBoundingClientRect() : null;
       const centerY = computeOutlineCenterY({ rootRect, viewportRect, messagesRect });
       const visibleCandidates: OutlineIndexCandidate[] = [];
-      for (const el of visibleSetRef.current) {
-        const fallbackIndex = fallbackIndexByEl.get(el);
-        if (!fallbackIndex) continue;
-        visibleCandidates.push(toCandidate(el, fallbackIndex));
+      if (supportsIntersectionObserver) {
+        for (const el of visibleSetRef.current) {
+          const fallbackIndex = fallbackIndexByEl.get(el);
+          if (!fallbackIndex) continue;
+          visibleCandidates.push(toCandidate(el, fallbackIndex));
+        }
+      } else {
+        const previous = Number(activeIndexRef.current);
+        const previousIndex = Number.isFinite(previous) && previous > 0 ? Math.trunc(previous) - 1 : 0;
+        const start = Math.max(0, previousIndex - FALLBACK_NEAREST_WINDOW);
+        const end = Math.min(safeUserMessageEls.length, previousIndex + FALLBACK_NEAREST_WINDOW + 1);
+        for (let idx = start; idx < end; idx += 1) {
+          visibleCandidates.push(toCandidate(safeUserMessageEls[idx], idx + 1));
+        }
       }
       const previousActiveIndex = activeIndexRef.current;
       const canReusePrevious = Number.isFinite(previousActiveIndex) && Number(previousActiveIndex) > 0;
-      const allCandidates =
-        visibleCandidates.length > 0 || canReusePrevious
-          ? undefined
-          : safeUserMessageEls.map((el, idx) => toCandidate(el, idx + 1));
+      const shouldBuildAllCandidates =
+        !canReusePrevious && (!supportsIntersectionObserver || visibleCandidates.length === 0);
+      const allCandidates = shouldBuildAllCandidates
+        ? safeUserMessageEls.map((el, idx) => toCandidate(el, idx + 1))
+        : undefined;
       const nextActiveIndex = pickActiveOutlineIndex({
         centerY,
         visibleCandidates,
@@ -117,7 +130,7 @@ export function useChatOutlineActiveIndex({
     };
 
     let observer: IntersectionObserver | null = null;
-    if (typeof globalThis.IntersectionObserver === 'function') {
+    if (supportsIntersectionObserver) {
       observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
@@ -133,8 +146,6 @@ export function useChatOutlineActiveIndex({
         },
       );
       for (const el of safeUserMessageEls) observer.observe(el);
-    } else {
-      for (const el of safeUserMessageEls) visibleSetRef.current.add(el);
     }
 
     const scrollTarget: EventTarget | null = rootEl || win || null;
