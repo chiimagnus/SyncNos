@@ -59,16 +59,22 @@ function pickRoot() {
 function fallbackExtract(baseHref: string) {
   const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
   if (wechatOnlyUrls.length >= 2) {
-    const html = buildWechatShareMediaGalleryHtml(baseHref);
-    const markdown = htmlToMarkdownTurndown(html, baseHref) || normalizeText(wechatOnlyUrls.join('\n'));
+    const root = pickRoot();
+    const rootHtml = normalizeText((root as any)?.innerHTML || '');
+    const rootText = normalizeText((root as any)?.innerText || '');
+    const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
+    const htmlBody = rootHtml ? `${rootHtml}${wechatGalleryHtml}` : wechatGalleryHtml;
+    const markdown =
+      htmlToMarkdownTurndown(htmlBody, baseHref) ||
+      normalizeText([rootText, wechatOnlyUrls.join('\n')].filter(Boolean).join('\n\n'));
     return {
       title: normalizeText(document.title || '') || 'WeChat Share Media',
       author: '',
       publishedAt: '',
       excerpt: '',
-      contentHTML: buildHtml(html, ''),
+      contentHTML: buildHtml(htmlBody, ''),
       contentMarkdown: markdown,
-      textContent: wechatOnlyUrls.join('\n'),
+      textContent: normalizeText([rootText, wechatOnlyUrls.join('\n')].filter(Boolean).join('\n\n')),
     };
   }
 
@@ -218,16 +224,16 @@ function extractBySiteSpecs(baseHref: string) {
   return null;
 }
 
-function extractWechatRichMediaArticle(_baseHref: string) {
+function extractWechatRichMediaArticle(baseHref: string) {
   const hostname = String(location.hostname || '').toLowerCase();
   if (hostname !== 'mp.weixin.qq.com') return null;
-  if (isWechatShareMediaPage()) return null;
 
   const root = document.querySelector('#js_content') as any;
   if (!root) return null;
 
   const title =
     normalizeText((document.querySelector('#activity-name') as any)?.textContent || '') ||
+    normalizeText((document.querySelector('.rich_media_title') as any)?.textContent || '') ||
     normalizeText(document.title || '') ||
     readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
   const author =
@@ -241,12 +247,15 @@ function extractWechatRichMediaArticle(_baseHref: string) {
   const textContent = normalizeText(root.innerText || root.textContent || '');
   if (!htmlBody && !textContent) return null;
 
+  const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
+  const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
+
   return {
     title,
     author,
     publishedAt,
     excerpt: '',
-    contentHTML: buildHtml(htmlBody, textContent),
+    contentHTML: buildHtml(contentWithWechatGallery, textContent),
     textContent,
   };
 }
