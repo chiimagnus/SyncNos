@@ -71,22 +71,33 @@ export function useChatOutlineActiveIndex({
     }
 
     const rootEl = root && root instanceof Element ? root : null;
+    const fallbackIndexByEl = new Map<HTMLElement, number>();
+    safeUserMessageEls.forEach((el, idx) => {
+      fallbackIndexByEl.set(el, idx + 1);
+    });
 
     const recompute = () => {
       const viewportRect = readViewportRect();
       const rootRect = rootEl ? rootEl.getBoundingClientRect() : null;
       const messagesRect = messagesRootEl ? messagesRootEl.getBoundingClientRect() : null;
       const centerY = computeOutlineCenterY({ rootRect, viewportRect, messagesRect });
-      const visibleCandidates = safeUserMessageEls
-        .filter((el) => visibleSetRef.current.has(el))
-        .map((el, idx) => toCandidate(el, idx + 1));
+      const visibleCandidates: OutlineIndexCandidate[] = [];
+      for (const el of visibleSetRef.current) {
+        const fallbackIndex = fallbackIndexByEl.get(el);
+        if (!fallbackIndex) continue;
+        visibleCandidates.push(toCandidate(el, fallbackIndex));
+      }
+      const previousActiveIndex = activeIndexRef.current;
+      const canReusePrevious = Number.isFinite(previousActiveIndex) && Number(previousActiveIndex) > 0;
       const allCandidates =
-        visibleCandidates.length > 0 ? undefined : safeUserMessageEls.map((el, idx) => toCandidate(el, idx + 1));
+        visibleCandidates.length > 0 || canReusePrevious
+          ? undefined
+          : safeUserMessageEls.map((el, idx) => toCandidate(el, idx + 1));
       const nextActiveIndex = pickActiveOutlineIndex({
         centerY,
         visibleCandidates,
         allCandidates,
-        previousActiveIndex: activeIndexRef.current,
+        previousActiveIndex,
       });
       if (nextActiveIndex === activeIndexRef.current) return;
       activeIndexRef.current = nextActiveIndex;
