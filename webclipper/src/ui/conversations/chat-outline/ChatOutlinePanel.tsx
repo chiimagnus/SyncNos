@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatOutlineEntry } from '@ui/conversations/chat-outline/outline-entries';
 
@@ -8,6 +8,8 @@ export type ChatOutlinePanelProps = {
   onPickEntry?: (entry: ChatOutlineEntry) => void;
 };
 
+const CLOSE_DELAY_MS = 160;
+
 function toLabel(entry: ChatOutlineEntry): string {
   const text = String(entry.previewText || '').trim();
   return text ? `${entry.index}. ${text}` : `${entry.index}.`;
@@ -16,6 +18,28 @@ function toLabel(entry: ChatOutlineEntry): string {
 export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: ChatOutlinePanelProps) {
   const safeEntries = useMemo(() => (Array.isArray(entries) ? entries : []), [entries]);
   const [open, setOpen] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current == null) return;
+    globalThis.window?.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
+  const openPanel = useCallback(() => {
+    cancelClose();
+    setOpen(true);
+  }, [cancelClose]);
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = globalThis.window?.setTimeout(() => {
+      closeTimerRef.current = null;
+      setOpen(false);
+    }, CLOSE_DELAY_MS);
+  }, [cancelClose]);
+
+  useEffect(() => {
+    return () => cancelClose();
+  }, [cancelClose]);
 
   return (
     <div className="tw-absolute tw-right-0 tw-top-2 tw-z-30 tw-h-11 tw-w-9" data-open={open ? 'true' : 'false'}>
@@ -26,8 +50,8 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
           'tw-absolute tw-right-0 tw-top-0 tw-grid tw-h-11 tw-w-9 tw-place-items-center tw-rounded-[12px] tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
           open ? 'tw-pointer-events-none tw-opacity-0' : 'tw-opacity-100',
         ].join(' ')}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onMouseEnter={openPanel}
+        onMouseLeave={scheduleClose}
       >
         <span className="tw-grid tw-h-4 tw-w-[14px] tw-content-center tw-gap-[6px]" aria-hidden="true">
           <span className="tw-h-[2.4px] tw-rounded-[2px] tw-bg-[var(--text-secondary)] tw-opacity-80" />
@@ -42,8 +66,8 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
           open ? 'tw-translate-x-0 tw-opacity-100 tw-pointer-events-auto' : 'tw-translate-x-3 tw-opacity-0 tw-pointer-events-none',
         ].join(' ')}
         aria-label="Outline panel"
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onMouseEnter={cancelClose}
+        onMouseLeave={scheduleClose}
       >
         <header className="tw-px-4 tw-pb-2.5 tw-pt-3.5">
           <p className="tw-m-0 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">目录</p>
