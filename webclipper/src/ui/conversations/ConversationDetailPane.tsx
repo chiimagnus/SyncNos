@@ -54,6 +54,11 @@ function isChatConversationLike(conversation: any): boolean {
   );
 }
 
+function findRouteScrollRoot(messagesRoot: Element | null): Element | null {
+  if (!messagesRoot || typeof messagesRoot.closest !== 'function') return null;
+  return messagesRoot.closest('.route-scroll');
+}
+
 export type ConversationDetailPaneProps = {
   onBack?: () => void;
   hideHeader?: boolean;
@@ -96,13 +101,20 @@ export function ConversationDetailPane({
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const userMessageElByIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [outlineScrollRoot, setOutlineScrollRoot] = useState<Element | null>(null);
   const outlineEntries = useMemo(
     () => (isChat && Array.isArray(detail?.messages) ? buildChatOutlineEntries(detail.messages) : []),
     [isChat, detail?.messages],
   );
+  const outlineIndexByMessageId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const entry of outlineEntries) map.set(entry.messageId, entry.index);
+    return map;
+  }, [outlineEntries]);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
       messagesRootRef.current = node;
+      setOutlineScrollRoot(findRouteScrollRoot(node));
       try {
         onCommentsLocatorRootChange?.(node);
       } catch (_e) {
@@ -145,6 +157,14 @@ export function ConversationDetailPane({
   useEffect(() => {
     userMessageElByIdRef.current.clear();
   }, [activeId, detail?.messages]);
+
+  useEffect(() => {
+    if (!messagesRootRef.current) {
+      setOutlineScrollRoot(null);
+      return;
+    }
+    setOutlineScrollRoot(findRouteScrollRoot(messagesRootRef.current));
+  }, [activeId, hideHeader]);
 
   useEffect(() => {
     if (!urlEditing) return;
@@ -369,7 +389,10 @@ export function ConversationDetailPane({
             </div>
 
             {isChat ? (
-              <div className="tw-absolute tw-right-0 tw-top-full tw-z-30">
+              <div
+                className="tw-absolute tw-right-0 tw-top-full tw-z-30"
+                data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
+              >
                 <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
               </div>
             ) : null}
@@ -384,7 +407,10 @@ export function ConversationDetailPane({
           ].join(' ')}
         >
           {hideHeader && isChat ? (
-            <div className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4">
+            <div
+              className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4"
+              data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
+            >
               <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
             </div>
           ) : null}
@@ -411,6 +437,7 @@ export function ConversationDetailPane({
                       .toLowerCase();
                     const rawMessageId = Number((m as any).id);
                     const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
+                    const outlineIndex = messageId == null ? null : outlineIndexByMessageId.get(messageId) || null;
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
                     const messageConversationId = Number(
                       (m as any).conversationId || (selected as any)?.id || activeId,
@@ -421,6 +448,8 @@ export function ConversationDetailPane({
                         <div
                           key={String((m as any).id)}
                           className="tw-min-w-0"
+                          data-chat-outline-index={outlineIndex ?? undefined}
+                          data-chat-outline-message-id={messageId}
                           ref={(node) => {
                             setUserMessageEl(messageId, node);
                           }}
