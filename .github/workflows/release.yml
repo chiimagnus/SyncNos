@@ -16,8 +16,49 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve previous stable tag
+        id: prev
+        run: |
+          set -euo pipefail
+          current="${GITHUB_REF_NAME:-}"
+          if [[ -z "$current" ]]; then
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          prev=""
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+            [[ "$tag" == "$current" ]] && continue
+            if [[ "$tag" == *"-alpha"* || "$tag" == *"-beta"* || "$tag" == *"-rc"* ]]; then
+              continue
+            fi
+            prev="$tag"
+            break
+          done < <(git tag --list 'v*' --sort=-v:refname)
+
+          echo "tag=${prev}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release (with previous stable tag)
+        if: ${{ steps.prev.outputs.tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            [![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888) [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) [![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Fijkpghlfmkbjcgafapjcjahaikmnjncl&query=%24.version&label=Edge&logo=microsoftedge&color=blue)](https://microsoftedge.microsoft.com/addons/detail/syncnosaiweb-clipper/ijkpghlfmkbjcgafapjcjahaikmnjncl) [![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+          generate_release_notes: true
+          previous_tag: ${{ steps.prev.outputs.tag }}
+          append_body: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
+        if: ${{ steps.prev.outputs.tag == '' }}
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
