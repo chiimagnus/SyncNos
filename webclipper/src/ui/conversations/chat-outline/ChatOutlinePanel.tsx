@@ -18,6 +18,7 @@ function toLabel(entry: ChatOutlineEntry): string {
 export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: ChatOutlinePanelProps) {
   const safeEntries = useMemo(() => (Array.isArray(entries) ? entries : []), [entries]);
   const [open, setOpen] = useState(false);
+  const handleButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
 
   const cancelClose = useCallback(() => {
@@ -36,6 +37,18 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
       setOpen(false);
     }, CLOSE_DELAY_MS);
   }, [cancelClose]);
+  const closePanelAndFocusHandle = useCallback(() => {
+    cancelClose();
+    setOpen(false);
+    const focusHandle = () => {
+      handleButtonRef.current?.focus();
+    };
+    if (typeof globalThis.window?.requestAnimationFrame === 'function') {
+      globalThis.window.requestAnimationFrame(focusHandle);
+      return;
+    }
+    focusHandle();
+  }, [cancelClose]);
 
   useEffect(() => {
     return () => cancelClose();
@@ -44,14 +57,26 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
   return (
     <div className="tw-absolute tw-right-0 tw-top-2 tw-z-30 tw-h-11 tw-w-9" data-open={open ? 'true' : 'false'}>
       <button
+        ref={handleButtonRef}
         type="button"
         aria-label="Outline"
         className={[
           'tw-absolute tw-right-0 tw-top-0 tw-grid tw-h-11 tw-w-9 tw-place-items-center tw-rounded-[12px] tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
+          'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
           open ? 'tw-pointer-events-none tw-opacity-0' : 'tw-opacity-100',
         ].join(' ')}
         onMouseEnter={openPanel}
         onMouseLeave={scheduleClose}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openPanel();
+            return;
+          }
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          closePanelAndFocusHandle();
+        }}
       >
         <span className="tw-grid tw-h-4 tw-w-[14px] tw-content-center tw-gap-[6px]" aria-hidden="true">
           <span className="tw-h-[2.4px] tw-rounded-[2px] tw-bg-[var(--text-secondary)] tw-opacity-80" />
@@ -68,6 +93,11 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
         aria-label="Outline panel"
         onMouseEnter={cancelClose}
         onMouseLeave={scheduleClose}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          closePanelAndFocusHandle();
+        }}
       >
         <header className="tw-px-4 tw-pb-2.5 tw-pt-3.5">
           <p className="tw-m-0 tw-text-sm tw-font-black tw-text-[var(--text-primary)]">目录</p>
