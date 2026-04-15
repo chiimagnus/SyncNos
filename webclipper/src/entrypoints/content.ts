@@ -1,5 +1,3 @@
-import '@ui/styles/tokens.css';
-
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { registerCurrentPageCaptureContentHandlers } from '@services/bootstrap/current-page-capture-content-handlers.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
