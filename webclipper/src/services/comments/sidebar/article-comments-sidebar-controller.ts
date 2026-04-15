@@ -160,6 +160,8 @@ export function createArticleCommentsSidebarController(input: {
           commentText: value,
           locator: quoteText && pendingRootLocator ? pendingRootLocator : null,
         });
+        composerSelectionRequestSeq += 1;
+        session.setQuoteText('');
         pendingRootLocator = null;
         await refresh();
         const createdRootId = Number(created?.id);
