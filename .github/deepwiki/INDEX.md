@@ -81,8 +81,9 @@
 - [GENERATION.md](GENERATION.md)
 
 ## 更新记录（Update Notes）
+- 2026-04-16：同步 `manifest.version` 到 `1.5.4`，并澄清 CI Node 22 / 发布 Node 20 的双环境说明；更新 `configuration.md`、`dependencies.md`、`security.md`、`GENERATION.md`。
 - 2026-04-05：同步 2026-04 重大架构变化（85 commits）——评论模块 React 迁移、Settings 顶部标签导航、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强（bilibili 新增、小红书移除）、Chat with AI prompt 模板可配置；更新 `business-context.md`、`overview.md`、`architecture.md`、`modules/comments.md`、`GENERATION.md`。
-- 2026-04-09：同步 WebClipper 配置 / 存储 / 模块文档到 `1.5.3` 与 `DB_VERSION = 8`，补齐 Notion OAuth / anti-hotlink host permissions、Settings 顶部标签导航与 Inpage 阅读风格说明，并刷新 `configuration.md`、`modules/webclipper.md`、`GENERATION.md`、`PRIVACY.md`。
+- 2026-04-09：同步 WebClipper 配置 / 存储 / 模块文档与 `DB_VERSION = 8`，补齐 Notion OAuth / anti-hotlink host permissions、Settings 顶部标签导航与 Inpage 阅读风格说明，并刷新 `configuration.md`、`modules/webclipper.md`、`GENERATION.md`、`PRIVACY.md`。
 - 2026-04-02：对齐会话详情动作槽位事实（`open / tools`）、更新图片缓存双开关（`ai_chat_cache_images_enabled` / `web_article_cache_images_enabled`）、同步 article comments 已进入 Notion/Obsidian 同步区段；并修复 deepwiki 内 `conversations-context.tsx` 路径到 `src/viewmodels/conversations/conversations-context.tsx`。
 - 2026-03-30：同步 WebClipper Settings section key（`aboutyou/aboutme`）与相关 deep-link（安装后 About Me、统计入口 About You）；补齐 Notion 设置侧链路（`LIST_PARENT_PAGES`、Parent Page 发现/resolve、OAuth pending/error 状态与断开清理）；并刷新 `configuration.md` 的版本事实源对齐规则。
 - 2026-03-29：同步 WebClipper 新行为与契约：inpage 双击从"打开 popup"调整为"打开页面内评论侧边栏"；补齐 `$ mention`（item-mention）配置键、消息契约与测试入口；更正 manifest icons 事实（`16/48/128` 仍存在，仅 `icon-128.png` 暴露为 `web_accessible_resources`）。
