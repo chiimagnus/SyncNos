@@ -1,13 +1,15 @@
-name: WebClipper Release Assets
+name: WebClipper Pre-release Assets
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-alpha*'
+      - 'v*-beta*'
+      - 'v*-rc*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name to attach assets to (e.g. v0.1.0). Required for manual runs.'
+        description: 'Pre-release tag to attach assets to (e.g. v1.5.5-beta1). Required for manual runs.'
         required: true
         type: string
 
@@ -15,9 +17,8 @@ permissions:
   contents: write
 
 jobs:
-  webclipper_assets:
+  webclipper_prerelease_assets:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || !(contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc')) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -78,11 +79,16 @@ jobs:
           cp "webclipper/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
           cp "webclipper/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi" "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
 
-      - name: Upload assets to GitHub Release
+      - name: Upload assets to GitHub Pre-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          prerelease: true
+          generate_release_notes: false
+          body: ''
           files: |
             release-artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
