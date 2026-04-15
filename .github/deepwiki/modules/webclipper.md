@@ -183,6 +183,7 @@
 - `AppShell.tsx` 的 `loc` 参数消费已改为 provider 精确打开（`openConversationExternalByLoc`），不再依赖当前 loaded list 的 `items.find()`。
 - `ConversationsScene.tsx` 在窄屏下采用 list/detail 双路由；如果某个入口（例如 Insight Top conversations）需要直接开 detail，会通过 `pending-open.ts` 把目标写入一次性 payload（`conversationId`，可带 `source + conversationKey`），scene 初始化时优先走 source/key 精确打开，缺失时再回退 id。
 - detail header 的单槽位动作由 `DetailHeaderActionBar.tsx` 统一处理：槽位内单动作直出按钮、多动作自动折叠菜单；popup/app 的窄屏头部也沿用同一规则，不再出现“列表详情页和窄屏 header 行为不一致”。
+- AI chat 目录面板只在 `String(selected?.sourceType).toLowerCase() === 'chat'` 时显示：把手锚定在详情内容区右上角（header 下方或 hideHeader 内容容器顶部），hover 打开 overlay 面板，点击条目平滑滚动到对应 user 消息，自动高亮始终跟随“最接近视口中线”的 user 消息。
 - `Open in Obsidian` 的文件打开只走 Local REST API `POST /open/{filename}`；当 API 因 App 未启动不可达时，只用 `obsidian://open` 拉起桌面 App，随后再重试 REST API。
 - 文案国际化是运行时自动行为，不依赖用户手动切换设置：`i18n/index.ts` 只看 `navigator.language`，当前显式支持英文与中文两套 locale。
 - `background.ts` 现在只在首次安装时自动打开 About Me 分区（`/settings?section=aboutme`）；扩展更新后不再自动弹出设置页。
@@ -195,6 +196,7 @@
 - **改列表筛选下拉 / 菜单裁切**：先看 `ConversationListPane.tsx`, `SelectMenu.tsx`, `MenuPopover.tsx`；不要再回退固定 `maxHeight`，否则容易在底部条或窄窗口出现无谓滚动条。
 - **改主题 tokens / Settings 分组**：先看 `types.ts`, `SettingsScene.tsx`, `src/viewmodels/settings/useSettingsSceneController.ts`, `src/ui/styles/tokens.css`；不要只改某个按钮样式而忽略 token 真源。
 - **改 detail header 动作分发**：先看 `src/services/integrations/detail-header-action-types.ts`, `src/services/integrations/detail-header-actions.ts`, `src/viewmodels/conversations/conversations-context.tsx`, `DetailHeaderActionBar.tsx`, `DetailNavigationHeader.tsx`, `ConversationDetailPane.tsx`；不要在 popup / app JSX 里各自拼动作规则。
+- **改 AI chat 目录面板（outline）**：先看 `src/ui/conversations/chat-outline/outline-entries.ts`, `src/ui/conversations/chat-outline/useChatOutlineActiveIndex.ts`, `src/ui/conversations/chat-outline/ChatOutlinePanel.tsx`, `ConversationDetailPane.tsx`；不要把滚动根、DOM 锚点和高亮逻辑散落到多个组件。
 - **改图片缓存补全流程（cache-images）**：先看 `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/client/repo.ts`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts`；核对动作注入条件、回填后 detail 刷新与计数反馈。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts`（background 侧注入/重试策略）+ `article-extract/engine.ts`（抽取顺序）+ `article-extract/markdown-turndown.ts`（统一转换），再确认保存后的 `sourceType` 和 message 结构没有变。
@@ -215,6 +217,14 @@
 | Chat with AI / 打开目标异常 | `chatwith-settings.ts`, `chatwith-detail-header-actions.ts`, `detail-header-actions.test.ts`, `app-detail-header-actions.test.ts` | 看模板变量、平台设置、槽位动作分发与 clipboard + 跳转行为 |
 | 详情工具动作异常（cache-images） | `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts` | 看动作注入、`BACKFILL_CONVERSATION_IMAGES` 路由与回填计数是否一致 |
 | Insight 统计异常 | `insight-stats.ts`, `InsightSection.tsx`, `InsightPanel.tsx`, `insight-stats.test.ts`, `settings-sections.test.ts` | 先区分是 IndexedDB 读失败、聚合规则偏差、还是 Settings 导航 / 图表布局回归 |
+
+### AI Chat 目录面板手工验收清单
+
+1. 非 `chat` 会话（article/web）不显示目录把手或面板。
+2. `chat` 会话在 app + popup 都能看到右上角把手；hover 把手稳定展开 overlay 面板，面板打开时覆盖把手。
+3. 点击目录条目后，详情区平滑滚动到对应 user 消息（`block: center`）。
+4. 滚动过程中目录高亮应跟随“最接近视口中线”的 user 消息，宽屏/窄屏（`.route-scroll`）行为一致。
+5. 键盘可达：`Tab` 聚焦把手，`Enter/Space` 打开面板，`Esc` 关闭并把焦点还给把手。
 
 ## 来源引用（Source References）
 - `webclipper/wxt.config.ts`

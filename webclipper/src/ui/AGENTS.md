@@ -392,3 +392,17 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 - 默认规则：`cdnfile.sspai.com -> https://sspai.com/`、`sns-webpic-qc.xhscdn.com -> https://www.xiaohongshu.com/`
 - UI 接入链路：`src/ui/settings/sections/InpageSection.tsx` + `src/ui/settings/SettingsScene.tsx` + `src/ui/settings/SettingsTopTabsNav.tsx`
 - 行为约束：文章命中规则时会自动补 referer 并走图片缓存；`web_article_cache_images_enabled` 只控制普通 article 图片缓存开关，不得阻断规则命中后的自动缓存。
+
+## B9 · AI Chat 目录面板（Outline）协议
+
+- 真源：
+  - `src/ui/conversations/chat-outline/outline-entries.ts`
+  - `src/ui/conversations/chat-outline/useChatOutlineActiveIndex.ts`
+  - `src/ui/conversations/chat-outline/ChatOutlinePanel.tsx`
+  - `src/ui/conversations/ConversationDetailPane.tsx`
+- 显示门控：仅 `String(selected?.sourceType).toLowerCase() === 'chat'` 时渲染把手与面板；article/detail 相关 UI 不得复用这套面板。
+- DOM 锚点约束：只给 `role === 'user'` 消息 wrapper 打 `data-chat-outline-index` / `data-chat-outline-message-id`，并保持 wrapper `tw-min-w-0` 不改变气泡布局。
+- 滚动根约束：优先用消息区向上最近 `.route-scroll` 作为 root；找不到时回退 viewport。
+- 交互约束：仅把手触发打开；关闭使用短延迟吸收鼠标轨迹抖动；面板打开时覆盖把手，不挤占详情内容宽度。
+- 高亮与跳转约束：点击条目使用 `scrollIntoView({ behavior: 'smooth', block: 'center' })`；高亮以“最接近视口中线”的 user 消息为准。
+- 可访问性底线：把手保留 `<button>` 语义与 `focus-visible` 提示，支持 `Enter/Space` 打开，`Esc` 关闭并恢复焦点到把手。

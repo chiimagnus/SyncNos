@@ -1,13 +1,16 @@
 import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
+import { ChatOutlinePanel } from '@ui/conversations/chat-outline/ChatOutlinePanel';
+import { buildChatOutlineEntries, type ChatOutlineEntry } from '@ui/conversations/chat-outline/outline-entries';
+import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useChatOutlineActiveIndex';
 
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -39,6 +42,19 @@ function isArticleConversationLike(conversation: any): boolean {
     .toLowerCase();
   if (source !== 'web') return false;
   return Boolean(normalizeHttpUrl(conversation?.url));
+}
+
+function isChatConversationLike(conversation: any): boolean {
+  return (
+    String(conversation?.sourceType || '')
+      .trim()
+      .toLowerCase() === 'chat'
+  );
+}
+
+function findRouteScrollRoot(messagesRoot: Element | null): Element | null {
+  if (!messagesRoot || typeof messagesRoot.closest !== 'function') return null;
+  return messagesRoot.closest('.route-scroll');
 }
 
 export type ConversationDetailPaneProps = {
@@ -77,13 +93,30 @@ export function ConversationDetailPane({
   const outlineButtonClass = buttonTintClassName();
   const headerIconButtonClass = headerButtonClassName();
   const isArticle = isArticleConversationLike(selected);
+  const isChat = isChatConversationLike(selected);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
+  const userMessageElByIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const userMessageRefSetterByIdRef = useRef<Map<number, (node: HTMLDivElement | null) => void>>(new Map());
+  const optimisticActiveClearTimerRef = useRef<number | null>(null);
+  const [userMessageRefsVersion, setUserMessageRefsVersion] = useState(0);
+  const [outlineScrollRoot, setOutlineScrollRoot] = useState<Element | null>(null);
+  const [optimisticActiveIndex, setOptimisticActiveIndex] = useState<number | null>(null);
+  const outlineEntries = useMemo(
+    () => (isChat && Array.isArray(detail?.messages) ? buildChatOutlineEntries(detail.messages) : []),
+    [isChat, detail?.messages],
+  );
+  const outlineIndexByMessageId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const entry of outlineEntries) map.set(entry.messageId, entry.index);
+    return map;
+  }, [outlineEntries]);
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
       messagesRootRef.current = node;
+      setOutlineScrollRoot(findRouteScrollRoot(node));
       try {
         onCommentsLocatorRootChange?.(node);
       } catch (_e) {
@@ -92,6 +125,62 @@ export function ConversationDetailPane({
     },
     [onCommentsLocatorRootChange],
   );
+  const setUserMessageEl = useCallback((messageId: number, node: HTMLDivElement | null) => {
+    const map = userMessageElByIdRef.current;
+    const current = map.get(messageId) || null;
+    if (node) {
+      if (current === node) return;
+      map.set(messageId, node);
+      setUserMessageRefsVersion((value) => value + 1);
+      return;
+    }
+    if (!current) return;
+    map.delete(messageId);
+    setUserMessageRefsVersion((value) => value + 1);
+  }, []);
+  const getUserMessageRefSetter = useCallback(
+    (messageId: number) => {
+      const existing = userMessageRefSetterByIdRef.current.get(messageId);
+      if (existing) return existing;
+      const setter = (node: HTMLDivElement | null) => {
+        setUserMessageEl(messageId, node);
+      };
+      userMessageRefSetterByIdRef.current.set(messageId, setter);
+      return setter;
+    },
+    [setUserMessageEl],
+  );
+  const userMessageEls = useMemo(() => {
+    void userMessageRefsVersion;
+    return outlineEntries
+      .map((entry) => userMessageElByIdRef.current.get(entry.messageId))
+      .filter((el): el is HTMLDivElement => Boolean(el));
+  }, [outlineEntries, userMessageRefsVersion]);
+  const observedActiveIndex = useChatOutlineActiveIndex({
+    root: outlineScrollRoot,
+    userMessageEls,
+    messagesRootEl: messagesRootRef.current,
+  });
+  const activeOutlineIndex = optimisticActiveIndex ?? observedActiveIndex;
+  const pickOutlineEntry = useCallback((entry: ChatOutlineEntry) => {
+    setOptimisticActiveIndex(entry.index);
+    if (optimisticActiveClearTimerRef.current != null) {
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    }
+    optimisticActiveClearTimerRef.current = globalThis.window?.setTimeout(() => {
+      setOptimisticActiveIndex(null);
+      optimisticActiveClearTimerRef.current = null;
+    }, 520);
+
+    const target = userMessageElByIdRef.current.get(entry.messageId);
+    if (!target) return;
+    try {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    } catch (_e) {
+      target.scrollIntoView();
+    }
+  }, []);
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
@@ -105,6 +194,43 @@ export function ConversationDetailPane({
     setUrlDraft('');
     setUrlCleaning(false);
   }, [activeId]);
+
+  useEffect(() => {
+    userMessageElByIdRef.current.clear();
+    userMessageRefSetterByIdRef.current.clear();
+    setUserMessageRefsVersion((value) => value + 1);
+    setOptimisticActiveIndex(null);
+    if (optimisticActiveClearTimerRef.current != null) {
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    }
+  }, [activeId]);
+
+  useEffect(() => {
+    if (!messagesRootRef.current) {
+      setOutlineScrollRoot(null);
+      return;
+    }
+    setOutlineScrollRoot(findRouteScrollRoot(messagesRootRef.current));
+  }, [activeId, hideHeader]);
+
+  useEffect(() => {
+    if (optimisticActiveIndex == null) return;
+    if (observedActiveIndex !== optimisticActiveIndex) return;
+    setOptimisticActiveIndex(null);
+    if (optimisticActiveClearTimerRef.current != null) {
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    }
+  }, [optimisticActiveIndex, observedActiveIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (optimisticActiveClearTimerRef.current == null) return;
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!urlEditing) return;
@@ -156,7 +282,7 @@ export function ConversationDetailPane({
         {!hideHeader ? (
           <header
             className={[
-              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-items-start tw-justify-between tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-gap-3 md:tw-pt-4',
+              'tw-sticky tw-top-0 tw-z-20 tw-relative tw-flex tw-items-start tw-justify-between tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-gap-3 md:tw-pt-4',
               containerPaddingClassName,
             ].join(' ')}
           >
@@ -327,14 +453,42 @@ export function ConversationDetailPane({
                 </button>
               ) : null}
             </div>
+
+            {isChat ? (
+              <div
+                className="tw-absolute tw-right-0 tw-top-full tw-z-30"
+                data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
+              >
+                <ChatOutlinePanel
+                  entries={outlineEntries}
+                  activeIndex={activeOutlineIndex}
+                  onPickEntry={pickOutlineEntry}
+                />
+              </div>
+            ) : null}
           </header>
         ) : null}
 
         <div
-          className={[containerPaddingClassName, 'tw-pb-3 md:tw-pb-4', hideHeader ? 'tw-pt-3 md:tw-pt-4' : ''].join(
-            ' ',
-          )}
+          className={[
+            containerPaddingClassName,
+            'tw-relative tw-pb-3 md:tw-pb-4',
+            hideHeader ? 'tw-pt-3 md:tw-pt-4' : '',
+          ].join(' ')}
         >
+          {hideHeader && isChat ? (
+            <div
+              className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4"
+              data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
+            >
+              <ChatOutlinePanel
+                entries={outlineEntries}
+                activeIndex={activeOutlineIndex}
+                onPickEntry={pickOutlineEntry}
+              />
+            </div>
+          ) : null}
+
           <div className="tw-flex tw-min-w-0 tw-gap-4">
             <div className="tw-min-w-0 tw-flex-1">
               {listError ? (
@@ -352,10 +506,40 @@ export function ConversationDetailPane({
               {detail?.messages?.length ? (
                 <div ref={setMessagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
                   {detail.messages.map((m) => {
+                    const role = String((m as any).role || '')
+                      .trim()
+                      .toLowerCase();
+                    const rawMessageId = Number((m as any).id);
+                    const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
+                    const outlineIndex = messageId == null ? null : outlineIndexByMessageId.get(messageId) || null;
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
                     const messageConversationId = Number(
                       (m as any).conversationId || (selected as any)?.id || activeId,
                     );
+
+                    if (!isArticle && role === 'user' && messageId != null) {
+                      return (
+                        <div
+                          key={String((m as any).id)}
+                          className="tw-min-w-0"
+                          data-chat-outline-index={outlineIndex ?? undefined}
+                          data-chat-outline-message-id={messageId}
+                          ref={getUserMessageRefSetter(messageId)}
+                        >
+                          <ChatMessageBubble
+                            role={(m as any).role}
+                            markdown={text}
+                            readingProfile={markdownReadingProfile}
+                            conversationId={
+                              Number.isFinite(messageConversationId) && messageConversationId > 0
+                                ? messageConversationId
+                                : undefined
+                            }
+                          />
+                        </div>
+                      );
+                    }
+
                     return (
                       <ChatMessageBubble
                         key={String((m as any).id)}
