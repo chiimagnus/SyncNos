@@ -64,6 +64,39 @@ function createTurndownService() {
   });
   applyTurndownGfm(turndown);
 
+  function isInsideTable(node: Node | null): boolean {
+    const el = node && (node as any).nodeType === 1 ? (node as Element) : null;
+    if (!el || typeof (el as any).closest !== 'function') return false;
+    return Boolean((el as any).closest('table,thead,tbody,tfoot,tr,td,th'));
+  }
+
+  function collapseTableCellText(value: string) {
+    return normalizeText(value).replace(/\s+/g, ' ');
+  }
+
+  turndown.addRule('syncnos-table-section', {
+    filter(node) {
+      const name = String((node as any)?.nodeName || '').toLowerCase();
+      if (name !== 'section') return false;
+      return isInsideTable(node);
+    },
+    replacement(content) {
+      const text = collapseTableCellText(content);
+      return text ? ` ${text} ` : ' ';
+    },
+  });
+
+  turndown.addRule('syncnos-table-br', {
+    filter(node) {
+      const name = String((node as any)?.nodeName || '').toLowerCase();
+      if (name !== 'br') return false;
+      return isInsideTable(node);
+    },
+    replacement() {
+      return ' ';
+    },
+  });
+
   turndown.addRule('syncnos-pre', {
     filter: 'pre',
     replacement(_content, node) {
