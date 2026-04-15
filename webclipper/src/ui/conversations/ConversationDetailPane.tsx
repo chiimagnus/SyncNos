@@ -6,6 +6,7 @@ import {
   buildChatOutlineEntries,
   type ChatOutlineEntry,
 } from '@ui/conversations/chat-outline/outline-entries';
+import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useChatOutlineActiveIndex';
 
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
@@ -101,7 +102,11 @@ export function ConversationDetailPane({
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const userMessageElByIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const userMessageRefSetterByIdRef = useRef<Map<number, (node: HTMLDivElement | null) => void>>(new Map());
+  const optimisticActiveClearTimerRef = useRef<number | null>(null);
+  const [userMessageRefsVersion, setUserMessageRefsVersion] = useState(0);
   const [outlineScrollRoot, setOutlineScrollRoot] = useState<Element | null>(null);
+  const [optimisticActiveIndex, setOptimisticActiveIndex] = useState<number | null>(null);
   const outlineEntries = useMemo(
     () => (isChat && Array.isArray(detail?.messages) ? buildChatOutlineEntries(detail.messages) : []),
     [isChat, detail?.messages],
@@ -125,13 +130,53 @@ export function ConversationDetailPane({
   );
   const setUserMessageEl = useCallback((messageId: number, node: HTMLDivElement | null) => {
     const map = userMessageElByIdRef.current;
+    const current = map.get(messageId) || null;
     if (node) {
+      if (current === node) return;
       map.set(messageId, node);
+      setUserMessageRefsVersion((value) => value + 1);
       return;
     }
+    if (!current) return;
     map.delete(messageId);
+    setUserMessageRefsVersion((value) => value + 1);
   }, []);
+  const getUserMessageRefSetter = useCallback(
+    (messageId: number) => {
+      const existing = userMessageRefSetterByIdRef.current.get(messageId);
+      if (existing) return existing;
+      const setter = (node: HTMLDivElement | null) => {
+        setUserMessageEl(messageId, node);
+      };
+      userMessageRefSetterByIdRef.current.set(messageId, setter);
+      return setter;
+    },
+    [setUserMessageEl],
+  );
+  const userMessageEls = useMemo(
+    () =>
+      outlineEntries
+        .map((entry) => userMessageElByIdRef.current.get(entry.messageId))
+        .filter((el): el is HTMLDivElement => Boolean(el)),
+    [outlineEntries, userMessageRefsVersion],
+  );
+  const observedActiveIndex = useChatOutlineActiveIndex({
+    root: outlineScrollRoot,
+    userMessageEls,
+    messagesRootEl: messagesRootRef.current,
+  });
+  const activeOutlineIndex = optimisticActiveIndex ?? observedActiveIndex;
   const pickOutlineEntry = useCallback((entry: ChatOutlineEntry) => {
+    setOptimisticActiveIndex(entry.index);
+    if (optimisticActiveClearTimerRef.current != null) {
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    }
+    optimisticActiveClearTimerRef.current = globalThis.window?.setTimeout(() => {
+      setOptimisticActiveIndex(null);
+      optimisticActiveClearTimerRef.current = null;
+    }, 520);
+
     const target = userMessageElByIdRef.current.get(entry.messageId);
     if (!target) return;
     try {
@@ -156,7 +201,14 @@ export function ConversationDetailPane({
 
   useEffect(() => {
     userMessageElByIdRef.current.clear();
-  }, [activeId, detail?.messages]);
+    userMessageRefSetterByIdRef.current.clear();
+    setUserMessageRefsVersion((value) => value + 1);
+    setOptimisticActiveIndex(null);
+    if (optimisticActiveClearTimerRef.current != null) {
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    }
+  }, [activeId]);
 
   useEffect(() => {
     if (!messagesRootRef.current) {
@@ -165,6 +217,24 @@ export function ConversationDetailPane({
     }
     setOutlineScrollRoot(findRouteScrollRoot(messagesRootRef.current));
   }, [activeId, hideHeader]);
+
+  useEffect(() => {
+    if (optimisticActiveIndex == null) return;
+    if (observedActiveIndex !== optimisticActiveIndex) return;
+    setOptimisticActiveIndex(null);
+    if (optimisticActiveClearTimerRef.current != null) {
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    }
+  }, [optimisticActiveIndex, observedActiveIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (optimisticActiveClearTimerRef.current == null) return;
+      globalThis.window?.clearTimeout(optimisticActiveClearTimerRef.current);
+      optimisticActiveClearTimerRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!urlEditing) return;
@@ -393,7 +463,11 @@ export function ConversationDetailPane({
                 className="tw-absolute tw-right-0 tw-top-full tw-z-30"
                 data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
               >
-                <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
+                <ChatOutlinePanel
+                  entries={outlineEntries}
+                  activeIndex={activeOutlineIndex}
+                  onPickEntry={pickOutlineEntry}
+                />
               </div>
             ) : null}
           </header>
@@ -411,7 +485,11 @@ export function ConversationDetailPane({
               className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4"
               data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
             >
-              <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
+              <ChatOutlinePanel
+                entries={outlineEntries}
+                activeIndex={activeOutlineIndex}
+                onPickEntry={pickOutlineEntry}
+              />
             </div>
           ) : null}
 
@@ -450,9 +528,7 @@ export function ConversationDetailPane({
                           className="tw-min-w-0"
                           data-chat-outline-index={outlineIndex ?? undefined}
                           data-chat-outline-message-id={messageId}
-                          ref={(node) => {
-                            setUserMessageEl(messageId, node);
-                          }}
+                          ref={getUserMessageRefSetter(messageId)}
                         >
                           <ChatMessageBubble
                             role={(m as any).role}
