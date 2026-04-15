@@ -2,10 +2,7 @@ import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 import { ChatOutlinePanel } from '@ui/conversations/chat-outline/ChatOutlinePanel';
-import {
-  buildChatOutlineEntries,
-  type ChatOutlineEntry,
-} from '@ui/conversations/chat-outline/outline-entries';
+import { buildChatOutlineEntries, type ChatOutlineEntry } from '@ui/conversations/chat-outline/outline-entries';
 import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useChatOutlineActiveIndex';
 
 import { t, formatConversationTitle } from '@i18n';

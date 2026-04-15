@@ -88,7 +88,9 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
         className={[
           'tw-absolute tw-right-0 tw-top-[-6px] tw-z-10 tw-flex tw-h-[304px] tw-w-[292px] tw-flex-col tw-overflow-hidden tw-rounded-[18px] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-shadow-[0_10px_22px_rgba(0,0,0,0.18)]',
           'tw-transition-all tw-duration-150 tw-ease-out',
-          open ? 'tw-translate-x-0 tw-opacity-100 tw-pointer-events-auto' : 'tw-translate-x-3 tw-opacity-0 tw-pointer-events-none',
+          open
+            ? 'tw-translate-x-0 tw-opacity-100 tw-pointer-events-auto'
+            : 'tw-translate-x-3 tw-opacity-0 tw-pointer-events-none',
         ].join(' ')}
         aria-label="Outline panel"
         onMouseEnter={cancelClose}
@@ -129,7 +131,9 @@ export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: C
               );
             })
           ) : (
-            <p className="tw-m-0 tw-px-2 tw-pt-1 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">暂无用户消息</p>
+            <p className="tw-m-0 tw-px-2 tw-pt-1 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+              暂无用户消息
+            </p>
           )}
         </div>
       </aside>
