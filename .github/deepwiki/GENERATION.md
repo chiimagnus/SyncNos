@@ -5,12 +5,12 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `1c39d297dee5f050d6ebdd670963c19c808b1789` |
-| Branch name | `main` (HEAD), `origin/main` |
-| Generation timestamp | `2026-04-09 23:54:07 +0800` |
+| Commit hash | `dcf21c8304fc4f059dc2d4135fa2ab5055ffc2d2` |
+| Branch name | `crh` (HEAD), `origin/crh` |
+| Generation timestamp | `2026-04-16 01:10:55 +0800` |
 | Output language | 中文 |
 | Generated directory | `.github/deepwiki/` |
-| Update mode | Major incremental sync update |
+| Update mode | Minor incremental docs sync |
 
 ## Page Inventory
 
@@ -94,10 +94,15 @@
 - 评论级 Chat with AI 菜单（整条线程上下文）
 
 ### 7. 2026-04 配置 / 存储同步
-- `manifest.version` 对齐到 `1.5.3`
+- `manifest.version` 对齐到当时发布版本
 - `DB_VERSION` 对齐到 `8`，补齐列表分页 / 筛选索引回填
 - Inpage 分区承载 `markdown_reading_profile_v1` 与 `anti_hotlink_rules_v1`
 - `article` 抓取在命中 anti-hotlink 规则时会自动缓存图片，即使 web article cache toggle 关闭也不会中断主链路
+
+### 8. 2026-04-16 版本与发布环境文档修订
+- `manifest.version` 在源码与 deepwiki 中同步为 `1.5.4`
+- `dependencies.md` / `security.md` 将 CI Node 22 与发布 Node 20 拆分说明，避免把开发验证与渠道打包环境混淆
+- `INDEX.md` 与本页的生成元数据刷新为当前仓库状态
 
 ### 更新的页面
 - `business-context.md`：更新核心产物、用户旅程、业务规则、术语、最容易误判的点、来源引用
@@ -106,7 +111,8 @@
 - `modules/comments.md`：**完全重写**，反映 React 迁移后的新架构
 
 ## Coverage Notes
-- 本次重点是同步 2026-04 的重大架构变化：评论模块 React 迁移、Settings 重构、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强，以及 1.5.3 / DB v8 / Inpage 规则事实。
+- 本次轻量修订只刷新版本事实、Node 版本策略说明与生成元数据，页面集合未变。
+- 本次重点是同步 2026-04 的重大架构变化：评论模块 React 迁移、Settings 重构、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强，以及 DB v8 / Inpage 规则事实。
 - `data-flow.md`、`modules/webclipper.md`、`configuration.md`、`storage.md`、`testing.md`、`workflow.md`、`security.md`、`glossary.md` 已在本轮增量中同步。
 - deepwiki 继续覆盖配置、数据流、存储、测试、发布与排障；并维持"代码/配置优先于文档摘要"的约束。
 
