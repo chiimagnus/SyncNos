@@ -1,0 +1,71 @@
+name: WebClipper Pre-release CI (Branch)
+
+on:
+  push:
+    branches:
+      - 'prerelease/**'
+      - 'beta/**'
+  workflow_dispatch:
+
+concurrency:
+  group: webclipper-prerelease-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  prerelease_ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: webclipper/package-lock.json
+
+      - name: Install WebClipper deps
+        run: npm ci --prefix webclipper
+
+      - name: WebClipper gate (lint/format/compile/test)
+        run: npm run --prefix webclipper gate:ci
+
+      - name: Build WebClipper Chrome zip
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=chrome \
+            --zip \
+            --zip-name="syncnos-webclipper-chrome-prerelease-${GITHUB_SHA}.zip"
+
+      - name: Build WebClipper Edge zip
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=edge \
+            --out=dist-edge \
+            --zip \
+            --zip-name="syncnos-webclipper-edge-prerelease-${GITHUB_SHA}.zip"
+
+      - name: Build WebClipper Firefox XPI
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=firefox \
+            --zip \
+            --zip-name="syncnos-webclipper-firefox-prerelease-${GITHUB_SHA}.xpi"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webclipper-prerelease-${{ github.sha }}
+          path: |
+            webclipper/syncnos-webclipper-chrome-prerelease-${{ github.sha }}.zip
+            webclipper/syncnos-webclipper-edge-prerelease-${{ github.sha }}.zip
+            webclipper/syncnos-webclipper-firefox-prerelease-${{ github.sha }}.xpi
+          retention-days: 14
+
