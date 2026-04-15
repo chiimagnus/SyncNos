@@ -10,6 +10,7 @@ import {
   buildWechatShareMediaGalleryHtml,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
+  prepareWechatRichMediaDom,
   stripWechatRichMediaNoise,
   waitForXiaohongshuNoteHydrated,
 } from '@collectors/web/article-extract/sites';
@@ -310,13 +311,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
   await waitForDomStabilized(timeoutMs, minTextLength);
   await waitForSiteHydrated();
 
-  const wechatRoot = document.querySelector('#js_content') as any;
-  if (wechatRoot) {
-    wechatRoot.style.visibility = 'visible';
-    wechatRoot.style.opacity = '1';
-  }
-  const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
-  noisyNodes.forEach((node: any) => node?.remove?.());
+  prepareWechatRichMediaDom();
 
   const sitePayload = extractBySiteSpecs(baseHref);
   if (sitePayload) {

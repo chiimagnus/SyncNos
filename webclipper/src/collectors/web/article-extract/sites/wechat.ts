@@ -69,6 +69,20 @@ export function isWechatShareMediaPage() {
   return true;
 }
 
+export function prepareWechatRichMediaDom() {
+  const hostname = String(location.hostname || '').toLowerCase();
+  if (hostname !== 'mp.weixin.qq.com') return;
+
+  const wechatRoot = document.querySelector('#js_content') as any;
+  if (wechatRoot) {
+    wechatRoot.style.visibility = 'visible';
+    wechatRoot.style.opacity = '1';
+  }
+
+  const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
+  noisyNodes.forEach((node: any) => node?.remove?.());
+}
+
 export function extractWechatShareMediaImageUrls(baseHref: string) {
   if (!isWechatShareMediaPage()) return [];
 
