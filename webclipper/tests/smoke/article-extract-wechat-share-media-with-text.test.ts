@@ -55,6 +55,19 @@ describe('article-extract wechat share media with text', () => {
               <h1 class="rich_media_title">右侧标题</h1>
               <p id="js_image_desc">右侧文字A<br/>右侧文字B</p>
             </div>
+            <div class="wx_bottom_modal_wrp" role="dialog" aria-modal="true">
+              <button>Close</button>
+              <div>更多</div>
+              <div>微信扫一扫赞赏作者</div>
+              <div>Like the Author</div>
+              <div>Other Amount</div>
+              <div>¥</div>
+              <div>最低赞赏 ¥0</div>
+              <div>OK</div>
+              <div>Back</div>
+              <div>赞赏金额</div>
+              <div>1 2 3 4 5 6 7 8 9 0 .</div>
+            </div>
           </div>
         </body>
       </html>`,
@@ -83,6 +96,10 @@ describe('article-extract wechat share media with text', () => {
     expect(markdown).toContain('![](https://mmbiz.qpic.cn/img/d/640)');
     expect(markdown).not.toContain('| --- |');
     expect(markdown).not.toContain('| ![](');
+    expect(markdown).not.toContain('微信扫一扫赞赏作者');
+    expect(markdown).not.toContain('Like the Author');
+    expect(markdown).not.toContain('最低赞赏');
+    expect(markdown).not.toContain('赞赏金额');
+    expect(markdown).not.toContain('Other Amount');
   });
 });
-

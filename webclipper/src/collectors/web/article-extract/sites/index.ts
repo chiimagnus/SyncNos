@@ -3,5 +3,6 @@ export {
   buildWechatShareMediaGalleryHtml,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
+  stripWechatRichMediaNoise,
 } from '@collectors/web/article-extract/sites/wechat';
 export { waitForXiaohongshuNoteHydrated } from '@collectors/web/article-extract/sites/xiaohongshu';

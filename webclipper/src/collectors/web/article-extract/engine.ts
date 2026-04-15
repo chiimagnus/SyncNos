@@ -10,6 +10,7 @@ import {
   buildWechatShareMediaGalleryHtml,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
+  stripWechatRichMediaNoise,
   waitForXiaohongshuNoteHydrated,
 } from '@collectors/web/article-extract/sites';
 import type { ExtractedWebArticle } from '@collectors/web/article-extract/types';
@@ -59,9 +60,12 @@ function pickRoot() {
 function fallbackExtract(baseHref: string) {
   const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
   if (wechatOnlyUrls.length >= 2) {
+    const hostname = String(location.hostname || '').toLowerCase();
     const root = pickRoot();
-    const rootHtml = normalizeText((root as any)?.innerHTML || '');
-    const rootText = normalizeText((root as any)?.innerText || '');
+    const strippedRoot =
+      hostname === 'mp.weixin.qq.com' && root ? stripWechatRichMediaNoise(root as any) : (root as any);
+    const rootHtml = normalizeText((strippedRoot as any)?.innerHTML || '');
+    const rootText = normalizeText((strippedRoot as any)?.innerText || '');
     const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
     const htmlBody = rootHtml ? `${rootHtml}${wechatGalleryHtml}` : wechatGalleryHtml;
     const markdown =
@@ -243,8 +247,9 @@ function extractWechatRichMediaArticle(baseHref: string) {
     normalizeText((document.querySelector('#publish_time') as any)?.textContent || '') ||
     readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
 
-  const htmlBody = normalizeText(root.innerHTML || '');
-  const textContent = normalizeText(root.innerText || root.textContent || '');
+  const strippedRoot = stripWechatRichMediaNoise(root);
+  const htmlBody = normalizeText((strippedRoot as any).innerHTML || '');
+  const textContent = normalizeText((strippedRoot as any).innerText || (strippedRoot as any).textContent || '');
   if (!htmlBody && !textContent) return null;
 
   const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
