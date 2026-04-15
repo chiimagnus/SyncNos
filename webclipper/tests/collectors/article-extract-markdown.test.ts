@@ -126,4 +126,53 @@ describe('article-extract markdown', () => {
     expect(md).toMatch(/\|\s*Alice\s*\|\s*99\s*\|/);
     expect(md).not.toContain('<table');
   });
+
+  it('converts wechat rich_media tables with nested <section>/<span> into markdown tables', () => {
+    const html = `
+      <article>
+        <table style="width: 100%;margin: 24px 0px;border-collapse: collapse;font-size: 15px;">
+          <thead>
+            <tr style="border: none;">
+              <th style="padding: 12px 16px;font-weight: 600;border: 1px solid rgb(240, 224, 224);">
+                <section style="text-align: left;"><span leaf="">产品</span></section>
+              </th>
+              <th style="padding: 12px 16px;font-weight: 600;border: 1px solid rgb(240, 224, 224);">
+                <section style="text-align: left;"><span leaf="">做什么</span></section>
+              </th>
+              <th style="padding: 12px 16px;font-weight: 600;border: 1px solid rgb(240, 224, 224);">
+                <section style="text-align: left;"><span leaf="">商业模式</span></section>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border: none;">
+              <td style="padding: 12px 16px;border: 1px solid rgb(240, 224, 224);">
+                <section style="text-align: left;"><span leaf="">websequencediagrams.com</span></section>
+              </td>
+              <td style="padding: 12px 16px;border: 1px solid rgb(240, 224, 224);">
+                <section style="text-align: left;"><span leaf="">在线画 UML 时序图</span></section>
+              </td>
+              <td style="padding: 12px 16px;border: 1px solid rgb(240, 224, 224);">
+                <section style="text-align: left;">
+                  <span leaf="">Freemium + 企业版，</span>
+                  <strong style="font-weight: 700;"><span leaf="">2008 年的老兵</span></strong>
+                </section>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://mp.weixin.qq.com/s/abc123' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://mp.weixin.qq.com/s/abc123');
+    expect(md).toMatch(/\|\s*产品\s*\|\s*做什么\s*\|\s*商业模式\s*\|/);
+    expect(md).toMatch(/\|\s*-{2,}\s*\|\s*-{2,}\s*\|\s*-{2,}\s*\|/);
+    expect(md).toMatch(
+      /\|\s*websequencediagrams\.com\s*\|\s*在线画 UML 时序图\s*\|\s*Freemium \+ 企业版，\s*\*{2}2008 年的老兵\*{2}\s*\|/,
+    );
+    expect(md).not.toContain('<table');
+  });
 });

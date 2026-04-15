@@ -1,5 +1,44 @@
 import { sanitizeWechatMediaUrl } from '@collectors/web/article-extract/url';
 
+const WECHAT_RICH_MEDIA_NOISE_SELECTORS = [
+  '#js_article_bottom_bar',
+  '.bottom_bar_wrp',
+  '.bottom_bar_interaction_wrp',
+  '.interaction_bar__wrap',
+  '.interaction_bar',
+  '.sns_opr_btn_con',
+  '.stream_friends_container',
+  '.wx_follow_context',
+  '.wx_bottom_modal_wrp',
+  '.weui-half-screen-dialog',
+  '.weui-mask',
+  '.wx_bottom_modal_mask',
+  '.wx_bottom_modal_mask_fixed',
+  '.teleporter',
+  '.weui-loadmore',
+  '.wx_bottom_modal_msg_wrp',
+];
+
+export function stripWechatRichMediaNoise(root: Element) {
+  const cloned = root.cloneNode(true) as Element;
+  const selector = WECHAT_RICH_MEDIA_NOISE_SELECTORS.join(',');
+  if (selector) {
+    try {
+      cloned.querySelectorAll(selector).forEach((node: any) => node?.remove?.());
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  try {
+    cloned.querySelectorAll('[role="dialog"],[aria-modal="true"]').forEach((node: any) => node?.remove?.());
+  } catch (_e) {
+    // ignore
+  }
+
+  return cloned;
+}
+
 function escapeHtml(value: unknown) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -28,6 +67,20 @@ export function isWechatShareMediaPage() {
   if (!document.querySelector('.share_content_page')) return false;
   if (!document.querySelector('#img_swiper_content')) return false;
   return true;
+}
+
+export function prepareWechatRichMediaDom() {
+  const hostname = String(location.hostname || '').toLowerCase();
+  if (hostname !== 'mp.weixin.qq.com') return;
+
+  const wechatRoot = document.querySelector('#js_content') as any;
+  if (wechatRoot) {
+    wechatRoot.style.visibility = 'visible';
+    wechatRoot.style.opacity = '1';
+  }
+
+  const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
+  noisyNodes.forEach((node: any) => node?.remove?.());
 }
 
 export function extractWechatShareMediaImageUrls(baseHref: string) {

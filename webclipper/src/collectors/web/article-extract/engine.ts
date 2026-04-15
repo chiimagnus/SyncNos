@@ -10,6 +10,8 @@ import {
   buildWechatShareMediaGalleryHtml,
   extractWechatShareMediaImageUrls,
   isWechatShareMediaPage,
+  prepareWechatRichMediaDom,
+  stripWechatRichMediaNoise,
   waitForXiaohongshuNoteHydrated,
 } from '@collectors/web/article-extract/sites';
 import type { ExtractedWebArticle } from '@collectors/web/article-extract/types';
@@ -59,16 +61,25 @@ function pickRoot() {
 function fallbackExtract(baseHref: string) {
   const wechatOnlyUrls = extractWechatShareMediaImageUrls(baseHref);
   if (wechatOnlyUrls.length >= 2) {
-    const html = buildWechatShareMediaGalleryHtml(baseHref);
-    const markdown = htmlToMarkdownTurndown(html, baseHref) || normalizeText(wechatOnlyUrls.join('\n'));
+    const hostname = String(location.hostname || '').toLowerCase();
+    const root = pickRoot();
+    const strippedRoot =
+      hostname === 'mp.weixin.qq.com' && root ? stripWechatRichMediaNoise(root as any) : (root as any);
+    const rootHtml = normalizeText((strippedRoot as any)?.innerHTML || '');
+    const rootText = normalizeText((strippedRoot as any)?.innerText || '');
+    const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
+    const htmlBody = rootHtml ? `${rootHtml}${wechatGalleryHtml}` : wechatGalleryHtml;
+    const markdown =
+      htmlToMarkdownTurndown(htmlBody, baseHref) ||
+      normalizeText([rootText, wechatOnlyUrls.join('\n')].filter(Boolean).join('\n\n'));
     return {
       title: normalizeText(document.title || '') || 'WeChat Share Media',
       author: '',
       publishedAt: '',
       excerpt: '',
-      contentHTML: buildHtml(html, ''),
+      contentHTML: buildHtml(htmlBody, ''),
       contentMarkdown: markdown,
-      textContent: wechatOnlyUrls.join('\n'),
+      textContent: normalizeText([rootText, wechatOnlyUrls.join('\n')].filter(Boolean).join('\n\n')),
     };
   }
 
@@ -218,16 +229,16 @@ function extractBySiteSpecs(baseHref: string) {
   return null;
 }
 
-function extractWechatRichMediaArticle(_baseHref: string) {
+function extractWechatRichMediaArticle(baseHref: string) {
   const hostname = String(location.hostname || '').toLowerCase();
   if (hostname !== 'mp.weixin.qq.com') return null;
-  if (isWechatShareMediaPage()) return null;
 
   const root = document.querySelector('#js_content') as any;
   if (!root) return null;
 
   const title =
     normalizeText((document.querySelector('#activity-name') as any)?.textContent || '') ||
+    normalizeText((document.querySelector('.rich_media_title') as any)?.textContent || '') ||
     normalizeText(document.title || '') ||
     readMeta(['meta[property="og:title"]', 'meta[name="twitter:title"]']);
   const author =
@@ -237,16 +248,20 @@ function extractWechatRichMediaArticle(_baseHref: string) {
     normalizeText((document.querySelector('#publish_time') as any)?.textContent || '') ||
     readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]);
 
-  const htmlBody = normalizeText(root.innerHTML || '');
-  const textContent = normalizeText(root.innerText || root.textContent || '');
+  const strippedRoot = stripWechatRichMediaNoise(root);
+  const htmlBody = normalizeText((strippedRoot as any).innerHTML || '');
+  const textContent = normalizeText((strippedRoot as any).innerText || (strippedRoot as any).textContent || '');
   if (!htmlBody && !textContent) return null;
+
+  const wechatGalleryHtml = buildWechatShareMediaGalleryHtml(baseHref);
+  const contentWithWechatGallery = wechatGalleryHtml ? `${htmlBody}${wechatGalleryHtml}` : htmlBody;
 
   return {
     title,
     author,
     publishedAt,
     excerpt: '',
-    contentHTML: buildHtml(htmlBody, textContent),
+    contentHTML: buildHtml(contentWithWechatGallery, textContent),
     textContent,
   };
 }
@@ -296,13 +311,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
   await waitForDomStabilized(timeoutMs, minTextLength);
   await waitForSiteHydrated();
 
-  const wechatRoot = document.querySelector('#js_content') as any;
-  if (wechatRoot) {
-    wechatRoot.style.visibility = 'visible';
-    wechatRoot.style.opacity = '1';
-  }
-  const noisyNodes = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
-  noisyNodes.forEach((node: any) => node?.remove?.());
+  prepareWechatRichMediaDom();
 
   const sitePayload = extractBySiteSpecs(baseHref);
   if (sitePayload) {
