@@ -125,6 +125,33 @@ describe('notionai-collector', () => {
     expect(keys[1]).toBe(`notionai_t_${threadId}`);
   });
 
+  it('uses the first user step id as fallback conversationKey seed when `t` is missing', async () => {
+    const pageUrl = 'https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef';
+    const htmlFor = (stepId: string) => `
+      <div data-agent-chat-user-step-id="${stepId}">
+        <div data-content-editable-leaf="true">你好</div>
+      </div>
+      <div class="autolayout-col autolayout-fill-width">
+        <div data-block-id="b1"><div data-content-editable-leaf="true">Hello</div></div>
+      </div>
+    `;
+
+    const keys: string[] = [];
+    for (const stepId of ['step-a', 'step-b']) {
+      const dom = new JSDOM(`<body>${htmlFor(stepId)}</body>`, { url: pageUrl });
+      setupDom(dom);
+      const { collector } = createCollectorHarness();
+
+      const snap = collector.capture();
+      expect(snap).toBeTruthy();
+      keys.push(snap.conversation.conversationKey);
+    }
+
+    expect(keys[0]).toBe('notionai_0123456789abcdef0123456789abcdef_user_step-a');
+    expect(keys[1]).toBe('notionai_0123456789abcdef0123456789abcdef_user_step-b');
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it('captures user uploaded images (thread attachments) outside text leaf', async () => {
     const threadId = '30cbe9d6386a807c83e900a970ea41b2';
     const html = `

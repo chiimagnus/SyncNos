@@ -536,9 +536,12 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
     const firstUserSig = firstUser
       ? env.normalize.fnv1a32(firstUser.contentText)
       : env.normalize.fnv1a32(String(Date.now()));
+    const firstUserStableSeed = String(firstUser?.messageKey || '').trim();
+    const conversationKeySeed =
+      firstUserStableSeed && !firstUserStableSeed.startsWith('fallback_') ? firstUserStableSeed : firstUserSig;
     const conversationKey = threadId
       ? `notionai_t_${threadId}`
-      : `notionai_${pageId || location.pathname}_${firstUserSig}`;
+      : `notionai_${pageId || location.pathname}_${conversationKeySeed}`;
     const title = getChatTitleFromRoot(root || document);
     const canonicalUrl = threadId ? notionAiCanonicalChatUrl(threadId) : '';
 
