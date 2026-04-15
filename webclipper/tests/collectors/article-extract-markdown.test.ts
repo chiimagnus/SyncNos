@@ -170,7 +170,9 @@ describe('article-extract markdown', () => {
     const md = htmlToMarkdownTurndown(html, 'https://mp.weixin.qq.com/s/abc123');
     expect(md).toMatch(/\|\s*产品\s*\|\s*做什么\s*\|\s*商业模式\s*\|/);
     expect(md).toMatch(/\|\s*-{2,}\s*\|\s*-{2,}\s*\|\s*-{2,}\s*\|/);
-    expect(md).toMatch(/\|\s*websequencediagrams\.com\s*\|\s*在线画 UML 时序图\s*\|\s*Freemium \+ 企业版，\s*\*{2}2008 年的老兵\*{2}\s*\|/);
+    expect(md).toMatch(
+      /\|\s*websequencediagrams\.com\s*\|\s*在线画 UML 时序图\s*\|\s*Freemium \+ 企业版，\s*\*{2}2008 年的老兵\*{2}\s*\|/,
+    );
     expect(md).not.toContain('<table');
   });
 });
