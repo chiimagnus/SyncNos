@@ -129,14 +129,15 @@ export function useChatOutlineActiveIndex({
       });
     };
 
+    const visibleSet = visibleSetRef.current;
     let observer: IntersectionObserver | null = null;
     if (supportsIntersectionObserver) {
       observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             const target = entry.target as HTMLElement;
-            if (entry.intersectionRatio > 0) visibleSetRef.current.add(target);
-            else visibleSetRef.current.delete(target);
+            if (entry.intersectionRatio > 0) visibleSet.add(target);
+            else visibleSet.delete(target);
           }
           scheduleRecompute();
         },
@@ -158,7 +159,7 @@ export function useChatOutlineActiveIndex({
 
     return () => {
       observer?.disconnect();
-      visibleSetRef.current.clear();
+      visibleSet.clear();
       scrollTarget?.removeEventListener?.('scroll', onScroll);
       win?.removeEventListener?.('resize', onResize);
       if (rafRef.current != null) {

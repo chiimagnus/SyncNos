@@ -151,10 +151,12 @@ export function ConversationDetailPane({
     [setUserMessageEl],
   );
   const userMessageEls = useMemo(
-    () =>
-      outlineEntries
+    () => {
+      void userMessageRefsVersion;
+      return outlineEntries
         .map((entry) => userMessageElByIdRef.current.get(entry.messageId))
-        .filter((el): el is HTMLDivElement => Boolean(el)),
+        .filter((el): el is HTMLDivElement => Boolean(el));
+    },
     [outlineEntries, userMessageRefsVersion],
   );
   const observedActiveIndex = useChatOutlineActiveIndex({
