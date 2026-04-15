@@ -115,4 +115,5 @@ SyncNos 是一个人用心做的项目。
 
 ## 致谢
 
-感谢 [linux.do](https://linux.do/t/topic/1635410) 社区的支持 💛
+- 感谢 [linux.do](https://linux.do/t/topic/1635410) 社区的支持 💛
+- 感谢 [obsidian clipper](https://github.com/obsidianmd/obsidian-clipper) 的启发

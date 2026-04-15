@@ -116,4 +116,5 @@ What connects us is emotion, not a transaction.
 
 ## Acknowledgements
 
-Special thanks to the [linux.do](https://linux.do/t/topic/1635410) community 💛
+- Special thanks to the [linux.do](https://linux.do/t/topic/1635410) community 💛
+- Thanks to [obsidian clipper](https://github.com/obsidianmd/obsidian-clipper) for the inspiration
