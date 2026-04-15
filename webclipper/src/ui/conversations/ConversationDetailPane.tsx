@@ -1,13 +1,18 @@
 import { ChevronLeft } from 'lucide-react';
 
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
+import { ChatOutlinePanel } from '@ui/conversations/chat-outline/ChatOutlinePanel';
+import {
+  buildChatOutlineEntries,
+  type ChatOutlineEntry,
+} from '@ui/conversations/chat-outline/outline-entries';
 
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import { buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import {
   MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -39,6 +44,14 @@ function isArticleConversationLike(conversation: any): boolean {
     .toLowerCase();
   if (source !== 'web') return false;
   return Boolean(normalizeHttpUrl(conversation?.url));
+}
+
+function isChatConversationLike(conversation: any): boolean {
+  return (
+    String(conversation?.sourceType || '')
+      .trim()
+      .toLowerCase() === 'chat'
+  );
 }
 
 export type ConversationDetailPaneProps = {
@@ -77,10 +90,16 @@ export function ConversationDetailPane({
   const outlineButtonClass = buttonTintClassName();
   const headerIconButtonClass = headerButtonClassName();
   const isArticle = isArticleConversationLike(selected);
+  const isChat = isChatConversationLike(selected);
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
   const commentsSidebarLabel = t('openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
+  const userMessageElByIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const outlineEntries = useMemo(
+    () => (isChat && Array.isArray(detail?.messages) ? buildChatOutlineEntries(detail.messages) : []),
+    [isChat, detail?.messages],
+  );
   const setMessagesRootRef = useCallback(
     (node: HTMLDivElement | null) => {
       messagesRootRef.current = node;
@@ -92,6 +111,23 @@ export function ConversationDetailPane({
     },
     [onCommentsLocatorRootChange],
   );
+  const setUserMessageEl = useCallback((messageId: number, node: HTMLDivElement | null) => {
+    const map = userMessageElByIdRef.current;
+    if (node) {
+      map.set(messageId, node);
+      return;
+    }
+    map.delete(messageId);
+  }, []);
+  const pickOutlineEntry = useCallback((entry: ChatOutlineEntry) => {
+    const target = userMessageElByIdRef.current.get(entry.messageId);
+    if (!target) return;
+    try {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    } catch (_e) {
+      target.scrollIntoView();
+    }
+  }, []);
 
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
@@ -105,6 +141,10 @@ export function ConversationDetailPane({
     setUrlDraft('');
     setUrlCleaning(false);
   }, [activeId]);
+
+  useEffect(() => {
+    userMessageElByIdRef.current.clear();
+  }, [activeId, detail?.messages]);
 
   useEffect(() => {
     if (!urlEditing) return;
@@ -156,7 +196,7 @@ export function ConversationDetailPane({
         {!hideHeader ? (
           <header
             className={[
-              'tw-sticky tw-top-0 tw-z-20 tw-flex tw-items-start tw-justify-between tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-gap-3 md:tw-pt-4',
+              'tw-sticky tw-top-0 tw-z-20 tw-relative tw-flex tw-items-start tw-justify-between tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pt-3 tw-pb-2 md:tw-gap-3 md:tw-pt-4',
               containerPaddingClassName,
             ].join(' ')}
           >
@@ -327,14 +367,28 @@ export function ConversationDetailPane({
                 </button>
               ) : null}
             </div>
+
+            {isChat ? (
+              <div className="tw-absolute tw-right-0 tw-top-full tw-z-30 tw-relative">
+                <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
+              </div>
+            ) : null}
           </header>
         ) : null}
 
         <div
-          className={[containerPaddingClassName, 'tw-pb-3 md:tw-pb-4', hideHeader ? 'tw-pt-3 md:tw-pt-4' : ''].join(
-            ' ',
-          )}
+          className={[
+            containerPaddingClassName,
+            'tw-relative tw-pb-3 md:tw-pb-4',
+            hideHeader ? 'tw-pt-3 md:tw-pt-4' : '',
+          ].join(' ')}
         >
+          {hideHeader && isChat ? (
+            <div className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4 tw-relative">
+              <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
+            </div>
+          ) : null}
+
           <div className="tw-flex tw-min-w-0 tw-gap-4">
             <div className="tw-min-w-0 tw-flex-1">
               {listError ? (
@@ -352,10 +406,39 @@ export function ConversationDetailPane({
               {detail?.messages?.length ? (
                 <div ref={setMessagesRootRef} className="tw-mt-3 tw-grid tw-gap-2.5">
                   {detail.messages.map((m) => {
+                    const role = String((m as any).role || '')
+                      .trim()
+                      .toLowerCase();
+                    const rawMessageId = Number((m as any).id);
+                    const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
                     const text = String((m as any).contentMarkdown || (m as any).contentText || '');
                     const messageConversationId = Number(
                       (m as any).conversationId || (selected as any)?.id || activeId,
                     );
+
+                    if (!isArticle && role === 'user' && messageId != null) {
+                      return (
+                        <div
+                          key={String((m as any).id)}
+                          className="tw-min-w-0"
+                          ref={(node) => {
+                            setUserMessageEl(messageId, node);
+                          }}
+                        >
+                          <ChatMessageBubble
+                            role={(m as any).role}
+                            markdown={text}
+                            readingProfile={markdownReadingProfile}
+                            conversationId={
+                              Number.isFinite(messageConversationId) && messageConversationId > 0
+                                ? messageConversationId
+                                : undefined
+                            }
+                          />
+                        </div>
+                      );
+                    }
+
                     return (
                       <ChatMessageBubble
                         key={String((m as any).id)}
