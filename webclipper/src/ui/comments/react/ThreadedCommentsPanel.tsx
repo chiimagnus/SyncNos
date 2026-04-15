@@ -108,6 +108,7 @@ export function ThreadedCommentsPanel({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerTextRef = useRef('');
   const lastFocusedComposerSignalRef = useRef(0);
+  const lastFocusedComposerQuoteTextRef = useRef('');
   const lastHandledEscapeSignalRef = useRef(0);
   const lastHandledShortcutSubmitSignalRef = useRef(0);
   const lastAutoSelectionSignatureRef = useRef('');
@@ -301,6 +302,22 @@ export function ThreadedCommentsPanel({
     focusComposer();
     lastFocusedComposerSignalRef.current = signal;
   }, [busy, snapshot.focusComposerSignal]);
+
+  useLayoutEffect(() => {
+    if (!snapshot.open) {
+      lastFocusedComposerQuoteTextRef.current = '';
+      return;
+    }
+    const quoteText = String(snapshot.quoteText || '').trim();
+    if (!quoteText) {
+      lastFocusedComposerQuoteTextRef.current = '';
+      return;
+    }
+    if (busy) return;
+    if (lastFocusedComposerQuoteTextRef.current === quoteText) return;
+    focusComposer();
+    lastFocusedComposerQuoteTextRef.current = quoteText;
+  }, [busy, snapshot.open, snapshot.quoteText]);
 
   useLayoutEffect(() => {
     if (!snapshot.open) {
