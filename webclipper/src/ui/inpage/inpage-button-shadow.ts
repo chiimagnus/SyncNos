@@ -1,4 +1,5 @@
 import inpageButtonCssRaw from '@ui/styles/inpage-button.css?raw';
+import tokensCssRaw from '@ui/styles/tokens.css?raw';
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
@@ -18,6 +19,10 @@ const EASTER_DURATION_MS = Object.freeze({
   7: 1100,
 });
 
+function toHostTokensCss(css: string) {
+  return css.replaceAll(':root', ':host');
+}
+
 function toButtonHostCss(css: string) {
   return css
     .replaceAll('.webclipper-inpage-btn:hover', ':host(:hover)')
@@ -31,7 +36,12 @@ function toButtonHostCss(css: string) {
     .replace(/\.webclipper-inpage-btn(?!_)/g, ':host');
 }
 
-const BUTTON_SHADOW_CSS = toButtonHostCss(String(inpageButtonCssRaw || ''));
+const BUTTON_SHADOW_CSS = [
+  toHostTokensCss(String(tokensCssRaw || '')),
+  toButtonHostCss(String(inpageButtonCssRaw || '')),
+]
+  .filter(Boolean)
+  .join('\n');
 
 let runtime: InpageRuntime = null;
 

@@ -1,11 +1,19 @@
 import inpageTipCssRaw from '@ui/styles/inpage-tip.css?raw';
+import tokensCssRaw from '@ui/styles/tokens.css?raw';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
 const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
-const BUBBLE_SHADOW_CSS = String(inpageTipCssRaw || '');
+
+function toHostTokensCss(css: string) {
+  return css.replaceAll(':root', ':host');
+}
+
+const BUBBLE_SHADOW_CSS = [toHostTokensCss(String(tokensCssRaw || '')), String(inpageTipCssRaw || '')]
+  .filter(Boolean)
+  .join('\n');
 
 type TipKind = 'default' | 'error';
 
