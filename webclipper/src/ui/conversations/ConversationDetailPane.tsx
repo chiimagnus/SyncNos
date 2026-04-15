@@ -369,7 +369,7 @@ export function ConversationDetailPane({
             </div>
 
             {isChat ? (
-              <div className="tw-absolute tw-right-0 tw-top-full tw-z-30 tw-relative">
+              <div className="tw-absolute tw-right-0 tw-top-full tw-z-30">
                 <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
               </div>
             ) : null}
@@ -384,7 +384,7 @@ export function ConversationDetailPane({
           ].join(' ')}
         >
           {hideHeader && isChat ? (
-            <div className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4 tw-relative">
+            <div className="tw-absolute tw-right-3 tw-top-3 tw-z-30 md:tw-right-4 md:tw-top-4">
               <ChatOutlinePanel entries={outlineEntries} onPickEntry={pickOutlineEntry} />
             </div>
           ) : null}
