@@ -25,6 +25,12 @@ export type ThreadedCommentsPanelSnapshot = {
   noticeVisible: boolean;
   hasFocusWithinPanel: boolean;
   pendingFocusRootId: number | null;
+  shortcutSubmit: {
+    signal: number;
+    kind: 'composer' | 'reply';
+    rootId: number | null;
+    text: string;
+  } | null;
 };
 
 export type ThreadedCommentsPanelProps = {

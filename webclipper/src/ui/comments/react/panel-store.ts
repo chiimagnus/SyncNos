@@ -14,6 +14,7 @@ export type ThreadedCommentsPanelStore = {
   setNotice: (input: { message: string; visible: boolean }) => void;
   setHasFocusWithinPanel: (value: boolean) => void;
   setPendingFocusRootId: (rootId: number | null) => void;
+  requestShortcutSubmit: (input: { kind: 'composer' | 'reply'; rootId?: number | null; text: string }) => void;
 };
 
 function cloneComments(items: ThreadedCommentItem[]): ThreadedCommentItem[] {
@@ -38,7 +39,9 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStore {
     noticeVisible: false,
     hasFocusWithinPanel: false,
     pendingFocusRootId: null,
+    shortcutSubmit: null,
   };
+  let shortcutSubmitSignal = 0;
 
   const listeners = new Set<() => void>();
 
@@ -107,6 +110,21 @@ export function createThreadedCommentsPanelStore(): ThreadedCommentsPanelStore {
       const normalized = Number(rootId);
       patch({
         pendingFocusRootId: Number.isFinite(normalized) && normalized > 0 ? Math.round(normalized) : null,
+      });
+    },
+    requestShortcutSubmit(input) {
+      const kind = input?.kind === 'reply' ? 'reply' : 'composer';
+      const text = String(input?.text || '').trim();
+      if (!text) return;
+      shortcutSubmitSignal += 1;
+      const rootId = Number(input?.rootId);
+      patch({
+        shortcutSubmit: {
+          signal: shortcutSubmitSignal,
+          kind,
+          rootId: kind === 'reply' && Number.isFinite(rootId) && rootId > 0 ? Math.round(rootId) : null,
+          text,
+        },
       });
     },
   };
