@@ -118,4 +118,29 @@ describe('Threaded comments panel focus regression', () => {
 
     mounted.cleanup();
   });
+
+  it('focuses the composer after quote text is applied', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const mounted = mountThreadedCommentsPanel(host, { overlay: false, showHeader: false });
+    mounted.api.setComments([]);
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    const shadow = panel!.shadowRoot!;
+
+    const composer = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__composer-textarea',
+    ) as HTMLTextAreaElement | null;
+    expect(composer).toBeTruthy();
+    expect(shadow.activeElement).not.toBe(composer);
+
+    mounted.api.setQuoteText('Quoted passage');
+    await flushReactScheduler();
+
+    expect(shadow.activeElement).toBe(composer);
+
+    mounted.cleanup();
+  });
 });

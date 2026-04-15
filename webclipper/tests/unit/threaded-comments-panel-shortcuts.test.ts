@@ -81,7 +81,13 @@ describe('Threaded comments panel shortcuts', () => {
     textarea!.value = 'hello';
 
     textarea!.dispatchEvent(
-      new window.KeyboardEvent('keydown', { key: 'Enter', metaKey: true, bubbles: true, cancelable: true }),
+      new window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      }),
     );
     await flushPromises();
 
@@ -111,7 +117,13 @@ describe('Threaded comments panel shortcuts', () => {
     textarea!.value = 'reply';
 
     textarea!.dispatchEvent(
-      new window.KeyboardEvent('keydown', { key: 'Enter', metaKey: true, bubbles: true, cancelable: true }),
+      new window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      }),
     );
     await flushPromises();
 

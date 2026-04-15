@@ -108,7 +108,9 @@ export function ThreadedCommentsPanel({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerTextRef = useRef('');
   const lastFocusedComposerSignalRef = useRef(0);
+  const lastFocusedComposerQuoteTextRef = useRef('');
   const lastHandledEscapeSignalRef = useRef(0);
+  const lastHandledShortcutSubmitSignalRef = useRef(0);
   const lastAutoSelectionSignatureRef = useRef('');
   const pendingAutoSelectionRequestRef = useRef(false);
   const pendingAutoSelectionSignatureRef = useRef('empty');
@@ -303,6 +305,22 @@ export function ThreadedCommentsPanel({
 
   useLayoutEffect(() => {
     if (!snapshot.open) {
+      lastFocusedComposerQuoteTextRef.current = '';
+      return;
+    }
+    const quoteText = String(snapshot.quoteText || '').trim();
+    if (!quoteText) {
+      lastFocusedComposerQuoteTextRef.current = '';
+      return;
+    }
+    if (busy) return;
+    if (lastFocusedComposerQuoteTextRef.current === quoteText) return;
+    focusComposer();
+    lastFocusedComposerQuoteTextRef.current = quoteText;
+  }, [busy, snapshot.open, snapshot.quoteText]);
+
+  useLayoutEffect(() => {
+    if (!snapshot.open) {
       lastAutoSelectionSignatureRef.current = '';
       pendingAutoSelectionRequestRef.current = false;
       pendingAutoSelectionSignatureRef.current = 'empty';
@@ -405,6 +423,23 @@ export function ThreadedCommentsPanel({
     updateArmedDeleteId(null);
   }, [openCommentChatWithRootId, snapshot.escapeSignal, updateArmedDeleteId]);
 
+  useLayoutEffect(() => {
+    if (!snapshot.open) return;
+    const request = snapshot.shortcutSubmit;
+    const signal = Number(request?.signal || 0);
+    if (!Number.isFinite(signal) || signal <= 0) return;
+    if (signal <= lastHandledShortcutSubmitSignalRef.current) return;
+    if (busy) return;
+    lastHandledShortcutSubmitSignalRef.current = signal;
+    if (request?.kind === 'reply') {
+      const rootId = Number(request.rootId);
+      if (!Number.isFinite(rootId) || rootId <= 0) return;
+      void submitReply(Math.round(rootId), request.text);
+      return;
+    }
+    void submitComposer(request?.text);
+  }, [busy, snapshot.open, snapshot.shortcutSubmit]);
+
   const normalizedItems = Array.isArray(snapshot.comments)
     ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
     : [];
@@ -444,6 +479,15 @@ export function ThreadedCommentsPanel({
       if (unmountedRef.current) return;
       replyTextsRef.current = { ...replyTextsRef.current, [rootId]: '' };
       setReplyText(rootId, '');
+      try {
+        const textarea = replyTextareaRefs.current[rootId] || null;
+        if (textarea) {
+          textarea.value = '';
+          autosizeTextarea(textarea);
+        }
+      } catch (_error) {
+        // ignore
+      }
       const targetRootId = resolveTargetRootIdForReply(rootId);
       if (targetRootId == null) return;
       pendingReplyFocusRootIdRef.current = targetRootId;
@@ -743,14 +787,6 @@ export function ThreadedCommentsPanel({
             value={composerText}
             onInput={(event) => updateComposerText(event.currentTarget.value)}
             onChange={(event) => updateComposerText(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-              if (event.key !== 'Enter') return;
-              if (!(event.metaKey || event.ctrlKey)) return;
-              if (event.shiftKey || event.altKey) return;
-              event.preventDefault();
-              void submitComposer(event.currentTarget.value);
-            }}
             disabled={false}
           />
           <button
@@ -946,14 +982,6 @@ export function ThreadedCommentsPanel({
                       onChange={(event) => {
                         updateReplyText(rootId, event.currentTarget.value);
                         autosizeTextarea(event.currentTarget);
-                      }}
-                      onKeyDown={(event) => {
-                        if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-                        if (event.key !== 'Enter') return;
-                        if (!(event.metaKey || event.ctrlKey)) return;
-                        if (event.shiftKey || event.altKey) return;
-                        event.preventDefault();
-                        void submitReply(rootId, event.currentTarget.value);
                       }}
                       disabled={false}
                     />

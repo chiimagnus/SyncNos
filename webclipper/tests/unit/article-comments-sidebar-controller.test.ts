@@ -90,7 +90,7 @@ describe('article-comments-sidebar-controller', () => {
     expect(panel.getState().comments.length).toBe(1);
   });
 
-  it('save root: returns structured result, refreshes list, and keeps quote until explicit clear', async () => {
+  it('save root: returns structured result, refreshes list, and clears composer quote', async () => {
     const panel = createMockPanel();
     const session = createCommentSidebarSession(panel.api as any);
 
@@ -119,7 +119,7 @@ describe('article-comments-sidebar-controller', () => {
       locator: null,
     });
     expect(adapter.list).toHaveBeenCalled();
-    expect(session.getSnapshot().quoteText).toBe('Quoted');
+    expect(session.getSnapshot().quoteText).toBe('');
   });
 
   it('updates quote and locator from composer selection requests', async () => {
@@ -166,10 +166,11 @@ describe('article-comments-sidebar-controller', () => {
       commentText: 'root comment',
       locator,
     });
+    expect(session.getSnapshot().quoteText).toBe('');
 
     await handlers.onComposerSelectionRequest({ trigger: 'button' });
     expect(resolveComposerSelection).toHaveBeenNthCalledWith(2, { trigger: 'button' });
-    expect(session.getSnapshot().quoteText).toBe('Quoted from page');
+    expect(session.getSnapshot().quoteText).toBe('');
   });
 
   it('ignores stale composer selection responses and keeps latest result', async () => {

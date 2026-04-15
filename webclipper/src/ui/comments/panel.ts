@@ -105,7 +105,6 @@ export function mountThreadedCommentsPanel(
   const surfaceBg = String(options.surfaceBg || '').trim();
   let focusComposerSignal = 0;
   let escapeSignal = 0;
-  let shortcutSubmitInFlight = false;
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   const handlersRef: { current: ThreadedCommentsPanelHandlers } = {
     current: {
@@ -264,6 +263,8 @@ export function mountThreadedCommentsPanel(
       'textarea.webclipper-inpage-comments-panel__composer-textarea,textarea.webclipper-inpage-comments-panel__reply-textarea',
     ) as HTMLTextAreaElement | null;
     if (!textarea) return;
+    const text = String(textarea.value || '').trim();
+    if (!text) return;
 
     try {
       keyEvent.preventDefault();
@@ -281,57 +282,19 @@ export function mountThreadedCommentsPanel(
       // ignore
     }
 
-    if (shortcutSubmitInFlight || panelStore.getSnapshot().busy) return;
-    const text = String(textarea.value || '').trim();
-    if (!text) return;
-
     if (textarea.classList.contains('webclipper-inpage-comments-panel__composer-textarea')) {
-      const onSave = handlersRef.current.onSave;
-      if (typeof onSave !== 'function') return;
-      shortcutSubmitInFlight = true;
-      void Promise.resolve(onSave(text))
-        .then((result) => {
-          const createdRootId = Number((result as any)?.createdRootId);
-          if (Number.isFinite(createdRootId) && createdRootId > 0) {
-            syncReactUpdate(() => {
-              panelStore.setPendingFocusRootId(Math.round(createdRootId));
-            });
-          }
-          try {
-            textarea.value = '';
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          } catch (_e) {
-            // ignore
-          }
-        })
-        .finally(() => {
-          shortcutSubmitInFlight = false;
-        });
+      syncReactUpdate(() => {
+        panelStore.requestShortcutSubmit({ kind: 'composer', text });
+      });
       return;
     }
 
-    const onReply = handlersRef.current.onReply;
-    if (typeof onReply !== 'function') return;
     const thread = textarea.closest('.webclipper-inpage-comments-panel__thread') as HTMLElement | null;
     const rootId = Number(thread?.getAttribute('data-thread-root-id') || 0);
     if (!Number.isFinite(rootId) || rootId <= 0) return;
-
-    shortcutSubmitInFlight = true;
-    void Promise.resolve(onReply(Math.round(rootId), text))
-      .then(() => {
-        syncReactUpdate(() => {
-          panelStore.setPendingFocusRootId(Math.round(rootId));
-        });
-        try {
-          textarea.value = '';
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        } catch (_e) {
-          // ignore
-        }
-      })
-      .finally(() => {
-        shortcutSubmitInFlight = false;
-      });
+    syncReactUpdate(() => {
+      panelStore.requestShortcutSubmit({ kind: 'reply', rootId: Math.round(rootId), text });
+    });
   };
   const onShadowFocusIn = () => {
     syncReactUpdate(() => {
