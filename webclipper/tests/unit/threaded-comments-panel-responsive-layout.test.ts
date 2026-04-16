@@ -110,10 +110,10 @@ describe('threaded comments panel responsive layout', () => {
     expect(css).toContain('@media (max-width: 767px)');
     expect(css).toContain(":host([data-overlay='1']) {");
     expect(css).toContain('top: auto;');
-    expect(css).toContain('right: 16px;');
-    expect(css).toContain('bottom: 16px;');
+    expect(css).toContain('right: 8px;');
+    expect(css).toContain('bottom: 8px;');
     expect(css).toContain('width: min(420px, calc(100vw - 32px));');
-    expect(css).toContain('height: min(72vh, calc(100vh - 32px));');
+    expect(css).toContain('height: min(40vh, calc(100vh - 32px));');
     expect(css).toContain('border-radius: var(--radius-card);');
     expect(css).toContain('.webclipper-inpage-comments-panel__resize-handle');
   });
