@@ -223,6 +223,8 @@ export const en = {
   openCommentsSidebar: 'Comment',
   closeCommentsSidebar: 'Collapse comments sidebar',
   openCommentsSidebarTooltip: 'Open comments sidebar',
+  openInpageCommentsSidebar: 'Open in-page comments sidebar',
+  openInpageCommentsSidebarTooltip: 'Open comments sidebar in the current page',
   commentsSidebarArticleOnlyHint: 'Only available for web articles',
   commentsSidebarUnavailableHint: 'Comments sidebar is unavailable on this page',
   attachSelectedQuote: 'Quote selection',
