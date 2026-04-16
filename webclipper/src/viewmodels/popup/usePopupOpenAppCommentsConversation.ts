@@ -105,9 +105,12 @@ export function usePopupOpenCurrentTabInpageCommentsSidebar() {
     if (checking || opening || !eligible) return false;
     if (mountedRef.current) setOpening(true);
     try {
-      const response = await send<ApiResponse<{ opened?: boolean }>>(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
-        source: 'popup',
-      });
+      const response = await send<ApiResponse<{ opened?: boolean }>>(
+        UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
+        {
+          source: 'popup',
+        },
+      );
       const result = unwrap(response);
       return Boolean((result as any)?.opened ?? true);
     } catch (_error) {
