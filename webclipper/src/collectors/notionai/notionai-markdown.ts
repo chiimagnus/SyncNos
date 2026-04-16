@@ -46,6 +46,58 @@ function normalizeMarkdownText(value: any): any {
   return String(value || '').replace(/\u200b/g, '');
 }
 
+function notionWorkspaceSlugFromPath(pathname: any): string {
+  const segments = String(pathname || '')
+    .split('/')
+    .map((segment) => String(segment || '').trim())
+    .filter(Boolean);
+  const first = segments[0] || '';
+  if (!first) return '';
+  if (first === 'chat' || /^[0-9a-f]{32}$/i.test(first)) return '';
+  return first;
+}
+
+function resolveNotionHref(href: any): string {
+  const raw = String(href || '').trim();
+  if (!raw) return '';
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      url.hash = '';
+      return url.toString();
+    } catch (_e) {
+      return raw;
+    }
+  }
+
+  const baseHref = String((typeof location !== 'undefined' && location && location.href) || '').trim();
+  if (!baseHref) return '';
+
+  try {
+    const url = new URL(raw, baseHref);
+    const pathname = String(url.pathname || '');
+    const pageIdMatch = pathname.match(/^\/(?:([0-9a-f]{32})|([^/?#]+)\/([0-9a-f]{32}))(?:$|[/?#])/i);
+    if (pageIdMatch && /(^|\.)notion\.so$/i.test(url.hostname)) {
+      const workspaceSlug = notionWorkspaceSlugFromPath((typeof location !== 'undefined' && location && location.pathname) || '');
+      if (workspaceSlug) {
+        const pageId = String(pageIdMatch[1] || pageIdMatch[3] || '').toLowerCase();
+        if (pageId) {
+          url.pathname = `/${workspaceSlug}/${pageId}`;
+          url.search = '';
+          url.hash = '';
+          return url.toString();
+        }
+      }
+    }
+
+    url.hash = '';
+    return url.toString();
+  } catch (_e) {
+    return raw;
+  }
+}
+
 function nodeToMarkdown(node: any): any {
   if (!node) return '';
   const TEXT_NODE = typeof Node !== 'undefined' && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
@@ -68,7 +120,7 @@ function nodeToMarkdown(node: any): any {
   }
 
   if (tag === 'a') {
-    const href = String(el.getAttribute('href') || '').trim();
+    const href = resolveNotionHref(el.getAttribute ? el.getAttribute('href') : '');
     const text = childrenToMarkdown(el);
     if (/^https?:\/\//i.test(href)) return `[${text || href}](${href})`;
     return text;
