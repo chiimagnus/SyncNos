@@ -84,6 +84,25 @@
   background: transparent;
 }
 
+@media (max-width: 767px) {
+  :host([data-overlay='1']) {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: auto;
+    width: min(420px, calc(100vw - 32px));
+    height: min(40vh, calc(100vh - 32px));
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-card);
+    box-shadow: 0 18px 40px rgb(0 0 0 / 18%);
+    overflow: hidden;
+  }
+
+  :host([data-overlay='1']) .webclipper-inpage-comments-panel__resize-handle {
+    display: none;
+  }
+}
+
 .webclipper-inpage-comments-panel__resize-handle {
   display: none;
 }

@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ARTICLE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
+import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
-import { openOrFocusExtensionAppTab } from '@services/shared/webext';
-import { encodeConversationLoc, buildConversationRouteFromLoc } from '@services/shared/conversation-loc';
-import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 
 type ApiResponse<T> = {
@@ -19,12 +16,6 @@ type CaptureState = {
   label: string;
   collectorId: string | null;
   reason?: string;
-};
-
-type ResolvedArticle = {
-  conversationId: number;
-  url: string | null;
-  title: string | null;
 };
 
 function unwrap<T>(response: ApiResponse<T>): T {
@@ -43,7 +34,7 @@ function hasRuntimeSendMessage(): boolean {
   return typeof chromeSend === 'function';
 }
 
-export function usePopupOpenAppCommentsConversation() {
+export function usePopupOpenCurrentTabInpageCommentsSidebar() {
   const runtimeAvailable = useMemo(() => hasRuntimeSendMessage(), []);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -83,7 +74,7 @@ export function usePopupOpenAppCommentsConversation() {
 
       if (!mountedRef.current) return;
       setEligible(true);
-      setDisabledReason(t('openCommentsSidebar'));
+      setDisabledReason(t('openInpageCommentsSidebar'));
     } catch (error) {
       const message = (error as any)?.message ?? String(error ?? '');
       if (!mountedRef.current) return;
@@ -114,19 +105,14 @@ export function usePopupOpenAppCommentsConversation() {
     if (checking || opening || !eligible) return false;
     if (mountedRef.current) setOpening(true);
     try {
-      const response = await send<ApiResponse<ResolvedArticle>>(
-        ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB,
-        {},
+      const response = await send<ApiResponse<{ opened?: boolean }>>(
+        UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
+        {
+          source: 'popup',
+        },
       );
-      const resolved = unwrap(response);
-
-      const canonicalUrl = canonicalizeArticleUrl(resolved?.url);
-      if (!canonicalUrl) return false;
-
-      const loc = encodeConversationLoc({ source: 'web', conversationKey: `article:${canonicalUrl}` });
-      const route = buildConversationRouteFromLoc(loc);
-      const opened = await openOrFocusExtensionAppTab({ route });
-      return Boolean(opened);
+      const result = unwrap(response);
+      return Boolean((result as any)?.opened ?? true);
     } catch (_error) {
       return false;
     } finally {
@@ -135,12 +121,15 @@ export function usePopupOpenAppCommentsConversation() {
   }, [checking, eligible, opening, runtimeAvailable]);
 
   const disabled = checking || opening || !eligible;
+  const ariaLabel = t('openInpageCommentsSidebar');
   const tooltip = useMemo(() => {
     if (opening) return t('fetchingDots');
     if (checking) return t('checkingDots');
-    if (eligible) return t('openCommentsSidebarTooltip');
+    if (eligible) return t('openInpageCommentsSidebarTooltip');
     return disabledReason || t('commentsSidebarUnavailableHint');
   }, [checking, disabledReason, eligible, opening]);
 
-  return { disabled, tooltip, open };
+  return { disabled, tooltip, open, ariaLabel };
 }
+
+export const usePopupOpenAppCommentsConversation = usePopupOpenCurrentTabInpageCommentsSidebar;

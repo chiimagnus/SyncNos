@@ -170,7 +170,7 @@ export function ThreadedCommentsPanel({
     el.setAttribute('data-webclipper-tooltip', text);
   };
 
-  const runBusyTask = async (task: () => Promise<void>) => {
+  const runBusyTask = useCallback(async (task: () => Promise<void>) => {
     if (unmountedRef.current) return false;
     if (actionInFlightRef.current) return false;
     actionInFlightRef.current = true;
@@ -184,7 +184,7 @@ export function ThreadedCommentsPanel({
         setLocalBusyCount((count) => Math.max(0, count - 1));
       }
     }
-  };
+  }, []);
 
   const setCommentChatWithLoading = (rootId: number, loading: boolean) => {
     if (!Number.isFinite(rootId) || rootId <= 0) return;
@@ -263,7 +263,7 @@ export function ThreadedCommentsPanel({
     [syncLocalState],
   );
 
-  const submitComposer = async (rawText?: string | null) => {
+  const submitComposer = useCallback(async (rawText?: string | null) => {
     const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();
     if (!text || busy || actionInFlightRef.current) return;
     const latestHandlers = readHandlers?.() || snapshot.handlers;
@@ -288,7 +288,7 @@ export function ThreadedCommentsPanel({
         // ignore
       }
     });
-  };
+  }, [busy, readHandlers, runBusyTask, setPendingFocusRootId, snapshot.handlers]);
 
   useLayoutEffect(() => {
     autosizeTextarea(composerTextareaRef.current);
@@ -423,23 +423,6 @@ export function ThreadedCommentsPanel({
     updateArmedDeleteId(null);
   }, [openCommentChatWithRootId, snapshot.escapeSignal, updateArmedDeleteId]);
 
-  useLayoutEffect(() => {
-    if (!snapshot.open) return;
-    const request = snapshot.shortcutSubmit;
-    const signal = Number(request?.signal || 0);
-    if (!Number.isFinite(signal) || signal <= 0) return;
-    if (signal <= lastHandledShortcutSubmitSignalRef.current) return;
-    if (busy) return;
-    lastHandledShortcutSubmitSignalRef.current = signal;
-    if (request?.kind === 'reply') {
-      const rootId = Number(request.rootId);
-      if (!Number.isFinite(rootId) || rootId <= 0) return;
-      void submitReply(Math.round(rootId), request.text);
-      return;
-    }
-    void submitComposer(request?.text);
-  }, [busy, snapshot.open, snapshot.shortcutSubmit]);
-
   const normalizedItems = Array.isArray(snapshot.comments)
     ? snapshot.comments.filter((item) => Number.isFinite(Number(item?.id)))
     : [];
@@ -457,16 +440,16 @@ export function ThreadedCommentsPanel({
     repliesByRoot.set(rootId, list.sort(compareCommentTimeAsc));
   }
 
-  const setReplyText = (rootId: number, value: string) => {
+  const setReplyText = useCallback((rootId: number, value: string) => {
     setReplyTexts((prev) => {
       if ((prev[rootId] || '') === value) return prev;
       const next = { ...prev, [rootId]: value };
       replyTextsRef.current = next;
       return next;
     });
-  };
+  }, []);
 
-  const submitReply = async (rootId: number, rawText?: string | null) => {
+  const submitReply = useCallback(async (rootId: number, rawText?: string | null) => {
     const latestHandlers = readHandlers?.() || snapshot.handlers;
     const onReply = latestHandlers.onReply;
     if (typeof onReply !== 'function') return;
@@ -493,7 +476,24 @@ export function ThreadedCommentsPanel({
       pendingReplyFocusRootIdRef.current = targetRootId;
       setPendingFocusRootId?.(targetRootId);
     });
-  };
+  }, [busy, readHandlers, runBusyTask, setPendingFocusRootId, setReplyText, snapshot.handlers]);
+
+  useLayoutEffect(() => {
+    if (!snapshot.open) return;
+    const request = snapshot.shortcutSubmit;
+    const signal = Number(request?.signal || 0);
+    if (!Number.isFinite(signal) || signal <= 0) return;
+    if (signal <= lastHandledShortcutSubmitSignalRef.current) return;
+    if (busy) return;
+    lastHandledShortcutSubmitSignalRef.current = signal;
+    if (request?.kind === 'reply') {
+      const rootId = Number(request.rootId);
+      if (!Number.isFinite(rootId) || rootId <= 0) return;
+      void submitReply(Math.round(rootId), request.text);
+      return;
+    }
+    void submitComposer(request?.text);
+  }, [busy, snapshot.open, snapshot.shortcutSubmit, submitComposer, submitReply]);
 
   const shouldIgnoreLocateClick = (target: EventTarget | null): boolean => {
     const el = target as HTMLElement | null;

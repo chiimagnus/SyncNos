@@ -282,11 +282,8 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
   });
 
-  it('opens app.html and jumps to the resolved article conversation from the comments button', async () => {
+  it('opens the inpage comments sidebar from the popup comments button', async () => {
     const { UI_MESSAGE_TYPES } = await import('../../src/services/protocols/message-contracts');
-    const { ARTICLE_MESSAGE_TYPES } = await import('../../src/platform/messaging/message-contracts');
-    const { encodeConversationLoc, buildConversationRouteFromLoc } =
-      await import('../../src/services/shared/conversation-loc');
 
     sendMock.mockImplementation(async (type: string) => {
       if (type === UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE) {
@@ -296,17 +293,16 @@ describe('PopupShell header actions', () => {
           error: null,
         };
       }
-      if (type === ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB) {
+      if (type === UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL) {
         return {
           ok: true,
-          data: { conversationId: 1, url: 'https://example.com/a#x', title: 'A' },
+          data: { opened: true },
           error: null,
         };
       }
       throw new Error(`unexpected message: ${type}`);
     });
 
-    openOrFocusExtensionAppTabMock.mockResolvedValue({ id: 99, url: '/app.html' });
     (window as any).close = vi.fn();
 
     act(() => {
@@ -317,7 +313,9 @@ describe('PopupShell header actions', () => {
       expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE, {});
     });
 
-    const commentsBtn = document.querySelector('[aria-label="Comment"]') as HTMLButtonElement | null;
+    const commentsBtn = document.querySelector(
+      '[aria-label="Open in-page comments sidebar"]',
+    ) as HTMLButtonElement | null;
     expect(commentsBtn).toBeTruthy();
 
     await vi.waitFor(() => {
@@ -328,20 +326,13 @@ describe('PopupShell header actions', () => {
       commentsBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
 
-    const expectedLoc = encodeConversationLoc({
-      source: 'web',
-      conversationKey: 'article:https://example.com/a',
-    });
-    const expectedRoute = buildConversationRouteFromLoc(expectedLoc);
-
     await vi.waitFor(() => {
-      expect(openOrFocusExtensionAppTabMock).toHaveBeenCalledWith({ route: expectedRoute });
+      expect(sendMock).toHaveBeenCalledWith(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL, {
+        source: 'popup',
+      });
       expect((window as any).close).toHaveBeenCalledTimes(1);
     });
 
-    expect(sendMock).not.toHaveBeenCalledWith(
-      UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL,
-      expect.anything(),
-    );
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
   });
 });
