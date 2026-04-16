@@ -263,32 +263,35 @@ export function ThreadedCommentsPanel({
     [syncLocalState],
   );
 
-  const submitComposer = useCallback(async (rawText?: string | null) => {
-    const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();
-    if (!text || busy || actionInFlightRef.current) return;
-    const latestHandlers = readHandlers?.() || snapshot.handlers;
-    const onSave = latestHandlers.onSave;
-    if (typeof onSave !== 'function') return;
-    await runBusyTask(async () => {
-      const result = await onSave(text);
-      if (unmountedRef.current) return;
-      const createdRootId = resolveTargetRootIdFromSaveResult(result);
-      if (createdRootId != null) {
-        pendingReplyFocusRootIdRef.current = createdRootId;
-        setPendingFocusRootId?.(createdRootId);
-      }
-      composerTextRef.current = '';
-      setComposerText('');
-      try {
-        if (composerTextareaRef.current) {
-          composerTextareaRef.current.value = '';
-          autosizeTextarea(composerTextareaRef.current);
+  const submitComposer = useCallback(
+    async (rawText?: string | null) => {
+      const text = String(rawText ?? composerTextareaRef.current?.value ?? composerTextRef.current ?? '').trim();
+      if (!text || busy || actionInFlightRef.current) return;
+      const latestHandlers = readHandlers?.() || snapshot.handlers;
+      const onSave = latestHandlers.onSave;
+      if (typeof onSave !== 'function') return;
+      await runBusyTask(async () => {
+        const result = await onSave(text);
+        if (unmountedRef.current) return;
+        const createdRootId = resolveTargetRootIdFromSaveResult(result);
+        if (createdRootId != null) {
+          pendingReplyFocusRootIdRef.current = createdRootId;
+          setPendingFocusRootId?.(createdRootId);
         }
-      } catch (_error) {
-        // ignore
-      }
-    });
-  }, [busy, readHandlers, runBusyTask, setPendingFocusRootId, snapshot.handlers]);
+        composerTextRef.current = '';
+        setComposerText('');
+        try {
+          if (composerTextareaRef.current) {
+            composerTextareaRef.current.value = '';
+            autosizeTextarea(composerTextareaRef.current);
+          }
+        } catch (_error) {
+          // ignore
+        }
+      });
+    },
+    [busy, readHandlers, runBusyTask, setPendingFocusRootId, snapshot.handlers],
+  );
 
   useLayoutEffect(() => {
     autosizeTextarea(composerTextareaRef.current);
@@ -449,34 +452,37 @@ export function ThreadedCommentsPanel({
     });
   }, []);
 
-  const submitReply = useCallback(async (rootId: number, rawText?: string | null) => {
-    const latestHandlers = readHandlers?.() || snapshot.handlers;
-    const onReply = latestHandlers.onReply;
-    if (typeof onReply !== 'function') return;
-    const text = String(
-      rawText ?? replyTextareaRefs.current[rootId]?.value ?? replyTextsRef.current[rootId] ?? '',
-    ).trim();
-    if (!text || busy || actionInFlightRef.current) return;
-    await runBusyTask(async () => {
-      await onReply(rootId, text);
-      if (unmountedRef.current) return;
-      replyTextsRef.current = { ...replyTextsRef.current, [rootId]: '' };
-      setReplyText(rootId, '');
-      try {
-        const textarea = replyTextareaRefs.current[rootId] || null;
-        if (textarea) {
-          textarea.value = '';
-          autosizeTextarea(textarea);
+  const submitReply = useCallback(
+    async (rootId: number, rawText?: string | null) => {
+      const latestHandlers = readHandlers?.() || snapshot.handlers;
+      const onReply = latestHandlers.onReply;
+      if (typeof onReply !== 'function') return;
+      const text = String(
+        rawText ?? replyTextareaRefs.current[rootId]?.value ?? replyTextsRef.current[rootId] ?? '',
+      ).trim();
+      if (!text || busy || actionInFlightRef.current) return;
+      await runBusyTask(async () => {
+        await onReply(rootId, text);
+        if (unmountedRef.current) return;
+        replyTextsRef.current = { ...replyTextsRef.current, [rootId]: '' };
+        setReplyText(rootId, '');
+        try {
+          const textarea = replyTextareaRefs.current[rootId] || null;
+          if (textarea) {
+            textarea.value = '';
+            autosizeTextarea(textarea);
+          }
+        } catch (_error) {
+          // ignore
         }
-      } catch (_error) {
-        // ignore
-      }
-      const targetRootId = resolveTargetRootIdForReply(rootId);
-      if (targetRootId == null) return;
-      pendingReplyFocusRootIdRef.current = targetRootId;
-      setPendingFocusRootId?.(targetRootId);
-    });
-  }, [busy, readHandlers, runBusyTask, setPendingFocusRootId, setReplyText, snapshot.handlers]);
+        const targetRootId = resolveTargetRootIdForReply(rootId);
+        if (targetRootId == null) return;
+        pendingReplyFocusRootIdRef.current = targetRootId;
+        setPendingFocusRootId?.(targetRootId);
+      });
+    },
+    [busy, readHandlers, runBusyTask, setPendingFocusRootId, setReplyText, snapshot.handlers],
+  );
 
   useLayoutEffect(() => {
     if (!snapshot.open) return;
