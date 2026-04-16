@@ -1,6 +1,7 @@
 const DOCK_STYLE_ID = 'webclipper-inpage-comments-panel__dock-style';
 const DOCK_ROOT_ATTR = 'data-webclipper-comments-dock';
 const DOCK_WIDTH_CSS_VAR = '--webclipper-comments-dock-width';
+const FLOATING_PANEL_BREAKPOINT_PX = 768;
 
 export type DockController = {
   readWidthPx: () => number;
@@ -13,6 +14,14 @@ type CreateDockControllerOptions = {
   enabled: boolean;
   panelEl: HTMLElement;
 };
+
+function readViewportWidthPx(): number {
+  return Number(globalThis.innerWidth || document.documentElement?.clientWidth || 0) || 0;
+}
+
+function shouldDockViewport(): boolean {
+  return readViewportWidthPx() >= FLOATING_PANEL_BREAKPOINT_PX;
+}
 
 export function createDockController(options: CreateDockControllerOptions): DockController {
   const enabled = options.enabled === true;
@@ -67,8 +76,16 @@ export function createDockController(options: CreateDockControllerOptions): Dock
     try {
       if (!enabled) return;
       if (panelEl.getAttribute('data-open') !== '1') return;
+      const root = document.documentElement;
+      if (!root) return;
+      if (!shouldDockViewport()) {
+        root.removeAttribute(DOCK_ROOT_ATTR);
+        root.style.removeProperty(DOCK_WIDTH_CSS_VAR);
+        return;
+      }
       const width = Math.round(readWidthPx());
-      document.documentElement.style.setProperty(DOCK_WIDTH_CSS_VAR, `${width}px`, 'important');
+      root.setAttribute(DOCK_ROOT_ATTR, '1');
+      root.style.setProperty(DOCK_WIDTH_CSS_VAR, `${width}px`, 'important');
     } catch (_e) {
       // ignore
     }
@@ -85,11 +102,6 @@ export function createDockController(options: CreateDockControllerOptions): Dock
 
     if (open) {
       ensureDockStyle();
-      try {
-        root.setAttribute(DOCK_ROOT_ATTR, '1');
-      } catch (_e) {
-        // ignore
-      }
       syncWidth();
       try {
         if (dockRaf != null) cancelAnimationFrame(dockRaf);
