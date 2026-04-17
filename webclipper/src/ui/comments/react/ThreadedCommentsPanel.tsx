@@ -66,6 +66,25 @@ function buildSelectionSignature(selection: Selection | null | undefined): strin
   return `${text}#${anchorPath}:${anchorOffset}|${focusPath}:${focusOffset}`;
 }
 
+function isCommentsSelectionDebugEnabled(): boolean {
+  const anyGlobal = globalThis as any;
+  if (anyGlobal.__SYNCNOS_DEBUG_COMMENTS_SELECTION__ === true) return true;
+  try {
+    return String(anyGlobal.localStorage?.getItem?.('__SYNCNOS_DEBUG_COMMENTS_SELECTION__') || '') === '1';
+  } catch (_e) {
+    return false;
+  }
+}
+
+function debugCommentsSelection(event: string, payload: Record<string, unknown>) {
+  if (!isCommentsSelectionDebugEnabled()) return;
+  try {
+    console.log('[CommentsSelection]', event, payload);
+  } catch (_e) {
+    // ignore
+  }
+}
+
 export function ThreadedCommentsPanel({
   variant,
   fullWidth,
@@ -228,16 +247,24 @@ export function ThreadedCommentsPanel({
     (trigger: 'button' | 'auto', autoSignature?: string | null) => {
       if (trigger === 'auto') {
         const normalizedSignature = String(autoSignature || 'empty');
-        if (normalizedSignature === 'empty') return;
+        if (normalizedSignature === 'empty') {
+          debugCommentsSelection('auto_skip_empty_signature', {});
+          return;
+        }
         const latestHandlers = readHandlers?.() || snapshot.handlers;
         const handler = latestHandlers.onComposerSelectionRequest;
         if (typeof handler !== 'function') {
           pendingAutoSelectionRequestRef.current = true;
           pendingAutoSelectionSignatureRef.current = normalizedSignature;
+          debugCommentsSelection('auto_defer_no_handler', {});
           return;
         }
-        if (normalizedSignature === lastAutoSelectionSignatureRef.current) return;
+        if (normalizedSignature === lastAutoSelectionSignatureRef.current) {
+          debugCommentsSelection('auto_dedupe_signature', {});
+          return;
+        }
         lastAutoSelectionSignatureRef.current = normalizedSignature;
+        debugCommentsSelection('auto_request', {});
         void Promise.resolve(handler({ trigger })).catch(() => {
           // ignore
         });
@@ -246,6 +273,7 @@ export function ThreadedCommentsPanel({
       const latestHandlers = readHandlers?.() || snapshot.handlers;
       const handler = latestHandlers.onComposerSelectionRequest;
       if (typeof handler !== 'function') return;
+      debugCommentsSelection('button_request', {});
       void Promise.resolve(handler({ trigger })).catch(() => {
         // ignore
       });
@@ -367,17 +395,49 @@ export function ThreadedCommentsPanel({
             nextSignature = 'empty';
           }
         }
+        if (isCommentsSelectionDebugEnabled()) {
+          let textLen = 0;
+          let rangeCount = 0;
+          try {
+            const sel = globalThis.getSelection?.();
+            rangeCount = Number((sel as any)?.rangeCount || 0) || 0;
+            textLen = String(sel?.toString?.() || '').trim().length;
+          } catch (_e) {
+            // ignore
+          }
+          debugCommentsSelection('auto_commit', {
+            signatureKind: nextSignature === 'empty' ? 'empty' : 'non-empty',
+            selectionTextLen: textLen,
+            selectionRangeCount: rangeCount,
+          });
+        }
         requestComposerSelection('auto', nextSignature);
       });
     };
 
     const onSelectionChange = () => {
       autoSelectionDirtyRef.current = true;
+      if (isCommentsSelectionDebugEnabled()) {
+        let textLen = 0;
+        let rangeCount = 0;
+        try {
+          const sel = globalThis.getSelection?.();
+          rangeCount = Number((sel as any)?.rangeCount || 0) || 0;
+          textLen = String(sel?.toString?.() || '').trim().length;
+        } catch (_e) {
+          // ignore
+        }
+        debugCommentsSelection('selectionchange', {
+          selectionTextLen: textLen,
+          selectionRangeCount: rangeCount,
+        });
+      }
     };
 
     const onPointerUp = () => {
       if (!autoSelectionDirtyRef.current) return;
       autoSelectionDirtyRef.current = false;
+      debugCommentsSelection('pointerup_commit', {});
       scheduleCommit(null);
     };
 
@@ -385,6 +445,7 @@ export function ThreadedCommentsPanel({
       if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
       if (!autoSelectionDirtyRef.current) return;
       autoSelectionDirtyRef.current = false;
+      debugCommentsSelection('keyup_commit', { key: String(event.key || '') });
       scheduleCommit(null);
     };
 

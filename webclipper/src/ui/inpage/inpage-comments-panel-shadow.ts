@@ -193,12 +193,32 @@ const inpageCommentChatWithConfig = createThreadedCommentChatWithConfig({
   resolveOpenPort: () => createInpageChatWithOpenPort(),
 });
 
+function isCommentsSelectionDebugEnabled(): boolean {
+  const anyGlobal = globalThis as any;
+  if (anyGlobal.__SYNCNOS_DEBUG_COMMENTS_SELECTION__ === true) return true;
+  try {
+    return String(anyGlobal.localStorage?.getItem?.('__SYNCNOS_DEBUG_COMMENTS_SELECTION__') || '') === '1';
+  } catch (_e) {
+    return false;
+  }
+}
+
+function debugInpagePanel(event: string, payload: Record<string, unknown>) {
+  if (!isCommentsSelectionDebugEnabled()) return;
+  try {
+    console.log('[CommentsSelection][inpage-panel]', event, payload);
+  } catch (_e) {
+    // ignore
+  }
+}
+
 function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
 
   const existing = document.getElementById(PANEL_ID) as HTMLElement | null;
   if (existing && (existing as any).__webclipperPanelApi) {
     singleton = { el: existing, api: (existing as any).__webclipperPanelApi as CommentSidebarPanelApi };
+    debugInpagePanel('ensure_existing_panel', { ok: true });
     return singleton;
   }
 
@@ -223,16 +243,22 @@ function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
 
   (el as any).__webclipperPanelApi = api;
   singleton = { el, api };
+  debugInpagePanel('ensure_new_panel', {
+    ok: true,
+    viewportWidth: Number(globalThis.innerWidth || 0) || 0,
+  });
   return singleton;
 }
 
 const apiRef: InpageCommentsPanelApi = {
   open(input) {
     const { api } = ensurePanel();
+    debugInpagePanel('open', { focusComposer: input?.focusComposer === true });
     api.open({ focusComposer: input?.focusComposer === true });
   },
   close() {
     if (!singleton) return;
+    debugInpagePanel('close', {});
     singleton.api.close();
   },
   isOpen() {

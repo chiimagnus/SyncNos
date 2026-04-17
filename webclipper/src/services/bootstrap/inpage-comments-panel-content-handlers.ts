@@ -35,6 +35,25 @@ function pickQuoteFromSelection(): string {
   }
 }
 
+function debugSelection(event: string, payload: Record<string, unknown>) {
+  const anyGlobal = globalThis as any;
+  const enabled =
+    anyGlobal.__SYNCNOS_DEBUG_COMMENTS_SELECTION__ === true ||
+    (() => {
+      try {
+        return String(anyGlobal.localStorage?.getItem?.('__SYNCNOS_DEBUG_COMMENTS_SELECTION__') || '') === '1';
+      } catch (_e) {
+        return false;
+      }
+    })();
+  if (!enabled) return;
+  try {
+    console.log('[CommentsSelection][inpage]', event, payload);
+  } catch (_e) {
+    // ignore
+  }
+}
+
 function pickLocatorFromSelection(): any | null {
   try {
     const selection = globalThis.getSelection?.();
@@ -60,11 +79,14 @@ function resolveInpageSelectionPayload(): {
 } {
   const selectionText = pickQuoteFromSelection();
   if (!selectionText) {
+    debugSelection('resolve_selection', { ok: false, reason: 'empty_text' });
     return { selectionText: '', locator: null };
   }
+  const locator = pickLocatorFromSelection();
+  debugSelection('resolve_selection', { ok: true, selectionTextLen: selectionText.length, locatorOk: Boolean(locator) });
   return {
     selectionText,
-    locator: pickLocatorFromSelection(),
+    locator,
   };
 }
 
