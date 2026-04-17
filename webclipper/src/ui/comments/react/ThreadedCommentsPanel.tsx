@@ -441,6 +441,13 @@ export function ThreadedCommentsPanel({
       scheduleCommit(null);
     };
 
+    const onMouseUp = () => {
+      if (!autoSelectionDirtyRef.current) return;
+      autoSelectionDirtyRef.current = false;
+      debugCommentsSelection('mouseup_commit', {});
+      scheduleCommit(null);
+    };
+
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
       if (!autoSelectionDirtyRef.current) return;
@@ -451,10 +458,12 @@ export function ThreadedCommentsPanel({
 
     document.addEventListener('selectionchange', onSelectionChange, true);
     document.addEventListener('pointerup', onPointerUp, true);
+    document.addEventListener('mouseup', onMouseUp, true);
     document.addEventListener('keyup', onKeyUp, true);
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange, true);
       document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('mouseup', onMouseUp, true);
       document.removeEventListener('keyup', onKeyUp, true);
       autoSelectionDirtyRef.current = false;
       if (pendingAutoSelectionCommitRafRef.current != null) {
