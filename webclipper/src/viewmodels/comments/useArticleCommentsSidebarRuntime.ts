@@ -27,25 +27,65 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
   const closeListenersRef = useRef<Set<() => void>>(new Set());
   const locatorRootRef = useRef<Element | null>(null);
 
+  const debugSelection = (event: string, payload: Record<string, unknown>) => {
+    const anyGlobal = globalThis as any;
+    const enabled =
+      anyGlobal.__SYNCNOS_DEBUG_COMMENTS_SELECTION__ === true ||
+      (() => {
+        try {
+          return String(anyGlobal.localStorage?.getItem?.('__SYNCNOS_DEBUG_COMMENTS_SELECTION__') || '') === '1';
+        } catch (_e) {
+          return false;
+        }
+      })();
+    if (!enabled) return;
+    try {
+      console.log('[CommentsSelection][app]', event, payload);
+    } catch (_e) {
+      // ignore
+    }
+  };
+
   const resolveAppSelectionPayload = () => {
     const root = locatorRootRef.current;
-    if (!root) return { selectionText: '', locator: null };
+    if (!root) {
+      debugSelection('resolve_selection', { ok: false, reason: 'missing_locator_root' });
+      return { selectionText: '', locator: null };
+    }
     try {
       const selection = globalThis.getSelection?.();
-      if (!selection || selection.rangeCount <= 0) return { selectionText: '', locator: null };
+      if (!selection || selection.rangeCount <= 0) {
+        debugSelection('resolve_selection', {
+          ok: false,
+          reason: 'no_selection_range',
+          selectionRangeCount: Number((selection as any)?.rangeCount || 0) || 0,
+        });
+        return { selectionText: '', locator: null };
+      }
       const text = String(selection.toString() || '').trim();
-      if (!text) return { selectionText: '', locator: null };
+      if (!text) {
+        debugSelection('resolve_selection', { ok: false, reason: 'empty_text' });
+        return { selectionText: '', locator: null };
+      }
 
       const anchorNode = selection.anchorNode as Node | null;
       const focusNode = selection.focusNode as Node | null;
       if ((anchorNode && !root.contains(anchorNode)) || (focusNode && !root.contains(focusNode))) {
+        debugSelection('resolve_selection', {
+          ok: false,
+          reason: 'selection_outside_locator_root',
+          selectionTextLen: text.length,
+        });
         return { selectionText: '', locator: null };
       }
 
       const range = selection.getRangeAt(0)?.cloneRange?.();
-      if (!range) return { selectionText: text, locator: null };
+      if (!range) {
+        debugSelection('resolve_selection', { ok: true, selectionTextLen: text.length, locatorOk: false });
+        return { selectionText: text, locator: null };
+      }
 
-      return {
+      const payload = {
         selectionText: text,
         locator:
           buildArticleCommentLocatorFromRange({
@@ -54,7 +94,14 @@ export function useArticleCommentsSidebarRuntime(input: { onClose?: () => void }
             range,
           }) ?? null,
       };
+      debugSelection('resolve_selection', {
+        ok: true,
+        selectionTextLen: payload.selectionText.length,
+        locatorOk: Boolean(payload.locator),
+      });
+      return payload;
     } catch (_error) {
+      debugSelection('resolve_selection', { ok: false, reason: 'exception' });
       return { selectionText: '', locator: null };
     }
   };
