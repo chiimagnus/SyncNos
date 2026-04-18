@@ -406,7 +406,9 @@ export function createContentController(deps: Deps) {
         const key = String(m?.messageKey || '').trim();
         const role = String(m?.role || '').trim();
         const seq = Number(m?.sequence);
-        const raw = String(m?.contentText || m?.contentMarkdown || '').replace(/\s+/g, ' ').trim();
+        const raw = String(m?.contentText || m?.contentMarkdown || '')
+          .replace(/\s+/g, ' ')
+          .trim();
         const preview = raw.length > 80 ? `${raw.slice(0, 79)}…` : raw;
         return {
           messageKey: key || null,

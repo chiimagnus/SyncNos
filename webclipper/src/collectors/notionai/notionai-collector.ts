@@ -516,9 +516,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
       const firstBlockId =
         role === 'assistant' ? (w.querySelector('div[data-block-id]') || {}).getAttribute?.('data-block-id') : '';
       const stableId =
-        role === 'assistant' && lastUserStepId
-          ? `replyTo_${lastUserStepId}`
-          : userStepId || firstBlockId || '';
+        role === 'assistant' && lastUserStepId ? `replyTo_${lastUserStepId}` : userStepId || firstBlockId || '';
       const messageKey = stableId
         ? `${role}_${stableId}`
         : env.normalize.makeFallbackMessageKey({ role, contentText: contentText || '', sequence: i });
