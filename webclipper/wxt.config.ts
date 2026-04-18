@@ -57,9 +57,10 @@ export default defineConfig({
     },
   }),
   manifest: {
-    name: 'SyncNos-AI+Web Clipper',
+    name: '__MSG_extName__',
     version: '1.6.0',
-    description: 'Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.',
+    description: '__MSG_extDescription__',
+    default_locale: 'en',
     permissions: [
       'storage',
       'contextMenus',

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "SyncNos - Clip to Notion/Obsidian",
+    "description": "Extension name shown in Chrome Web Store and extension manager"
+  },
+  "extDescription": {
+    "message": "SyncNos is an open-source web clipper that saves AI chats, web articles, and video transcripts into Notion or Obsidian.",
+    "description": "Short description shown in Chrome Web Store and extension manager (<=132 chars recommended)"
+  }
+}

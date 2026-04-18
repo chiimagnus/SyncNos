@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "SyncNos - 一鍵剪藏到 Notion/Obsidian",
+    "description": "Chrome 商店與擴充功能管理頁顯示的擴充功能名稱"
+  },
+  "extDescription": {
+    "message": "SyncNos 是一個開源剪藏外掛，把 AI 對話、網頁文章、影片字幕一鍵存進 Notion 或 Obsidian。",
+    "description": "Chrome 商店與擴充功能管理頁顯示的簡短描述（建議不超過 132 字元）"
+  }
+}
