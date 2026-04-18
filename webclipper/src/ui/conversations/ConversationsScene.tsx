@@ -228,7 +228,7 @@ export function ConversationsScene({
       {wideHideList ? null : (
         <aside
           className={[
-            'tw-flex tw-min-h-0 tw-w-[min(420px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
+            'tw-flex tw-min-h-0 tw-w-[min(360px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
             columnDividerRightClassName(),
           ].join(' ')}
         >
