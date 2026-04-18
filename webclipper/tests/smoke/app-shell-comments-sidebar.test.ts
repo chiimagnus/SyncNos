@@ -355,7 +355,9 @@ describe('AppShell comments sidebar', () => {
     document.dispatchEvent(new window.Event('pointerup'));
 
     await vi.waitFor(() => {
-      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      const quoteText = shadow
+        ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
+        ?.textContent?.trim();
       expect(quoteText).toBe(selectedText);
     });
 
@@ -368,7 +370,9 @@ describe('AppShell comments sidebar', () => {
     });
 
     await vi.waitFor(() => {
-      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      const quoteText = shadow
+        ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
+        ?.textContent?.trim();
       expect(quoteText ?? '').toBe('');
     });
 
@@ -378,7 +382,9 @@ describe('AppShell comments sidebar', () => {
     });
 
     await vi.waitFor(() => {
-      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      const quoteText = shadow
+        ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
+        ?.textContent?.trim();
       expect(quoteText).toBe(selectedText);
     });
 
@@ -396,7 +402,7 @@ describe('AppShell comments sidebar', () => {
     });
 
     const quoteAfterComposerClick = shadow
-      ?.querySelector('.webclipper-inpage-comments-panel__quote-text')
+      ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
       ?.textContent?.trim();
     expect(quoteAfterComposerClick).toBe(selectedText);
 
@@ -408,7 +414,7 @@ describe('AppShell comments sidebar', () => {
     });
 
     const quoteAfterComposerTyping = shadow
-      ?.querySelector('.webclipper-inpage-comments-panel__quote-text')
+      ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
       ?.textContent?.trim();
     expect(quoteAfterComposerTyping).toBe(selectedText);
 
@@ -426,7 +432,9 @@ describe('AppShell comments sidebar', () => {
       document.dispatchEvent(new window.Event('pointerup'));
     });
 
-    const quoteAfterReply = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+    const quoteAfterReply = shadow
+      ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
+      ?.textContent?.trim();
     expect(quoteAfterReply).toBe(selectedText);
 
     act(() => {
@@ -437,7 +445,7 @@ describe('AppShell comments sidebar', () => {
     });
 
     const quoteAfterReplyTyping = shadow
-      ?.querySelector('.webclipper-inpage-comments-panel__quote-text')
+      ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
       ?.textContent?.trim();
     expect(quoteAfterReplyTyping).toBe(selectedText);
   });
@@ -464,7 +472,7 @@ describe('AppShell comments sidebar', () => {
     expect(shadow).toBeTruthy();
 
     const initialQuoteText = shadow
-      ?.querySelector('.webclipper-inpage-comments-panel__quote-text')
+      ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
       ?.textContent?.trim();
     expect(initialQuoteText ?? '').toBe('');
 
@@ -474,7 +482,9 @@ describe('AppShell comments sidebar', () => {
     });
 
     await vi.waitFor(() => {
-      const quoteText = shadow?.querySelector('.webclipper-inpage-comments-panel__quote-text')?.textContent?.trim();
+      const quoteText = shadow
+        ?.querySelector('.webclipper-inpage-comments-panel__quote > .webclipper-inpage-comments-panel__text')
+        ?.textContent?.trim();
       expect(quoteText ?? '').toBe('');
     });
   });
@@ -503,7 +513,9 @@ describe('AppShell comments sidebar', () => {
 
     await vi.waitFor(() => {
       const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
-      const body = host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-body');
+      const body = host?.shadowRoot?.querySelector(
+        '.webclipper-inpage-comments-panel__comment > .webclipper-inpage-comments-panel__text',
+      );
       expect(body?.textContent).toBe('Comment A');
     });
 
@@ -522,7 +534,9 @@ describe('AppShell comments sidebar', () => {
 
     await vi.waitFor(() => {
       const host = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
-      const body = host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__comment-body');
+      const body = host?.shadowRoot?.querySelector(
+        '.webclipper-inpage-comments-panel__comment > .webclipper-inpage-comments-panel__text',
+      );
       expect(body?.textContent).toBe('Comment B');
     });
 
