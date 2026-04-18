@@ -62,7 +62,11 @@ import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/sh
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
 const OBSIDIAN_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('obsidian');
-const FALLBACK_NOTION_DB_STORAGE_KEYS = ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
+const FALLBACK_NOTION_DB_STORAGE_KEYS = [
+  'notion_db_id_syncnos_ai_chats',
+  'notion_db_id_syncnos_web_articles',
+  'notion_db_id_syncnos_videos',
+];
 const FALLBACK_CHAT_DB_SPEC = {
   title: 'SyncNos-AI Chats',
   storageKey: 'notion_db_id_syncnos_ai_chats',
