@@ -129,6 +129,41 @@ function normalizeHttpUrl(raw: unknown): string {
   }
 }
 
+function deriveConversationListSourceKey(record: AnyRecord): string {
+  const source = safeString(record?.source).toLowerCase();
+  return source || 'unknown';
+}
+
+function deriveConversationListSiteKey(record: AnyRecord): string {
+  const normalizedUrl = normalizeHttpUrl(record?.url);
+  if (!normalizedUrl) return 'unknown';
+  try {
+    const host = safeString(new URL(normalizedUrl).hostname).toLowerCase();
+    return host ? `domain:${host}` : 'unknown';
+  } catch (_e) {
+    return 'unknown';
+  }
+}
+
+function normalizeListDerivedKeys(record: AnyRecord): AnyRecord {
+  if (!record || typeof record !== 'object') return record;
+  const existingListSourceKey = safeString(record?.listSourceKey);
+  const existingListSiteKey = safeString(record?.listSiteKey);
+
+  const derivedSourceKey = deriveConversationListSourceKey(record);
+  const nextListSourceKey = derivedSourceKey !== 'unknown' ? derivedSourceKey : existingListSourceKey || 'unknown';
+
+  const derivedSiteKey = deriveConversationListSiteKey(record);
+  const nextListSiteKey = derivedSiteKey !== 'unknown' ? derivedSiteKey : existingListSiteKey || 'unknown';
+
+  if (existingListSourceKey === nextListSourceKey && existingListSiteKey === nextListSiteKey) return record;
+  return {
+    ...(record as any),
+    listSourceKey: nextListSourceKey,
+    listSiteKey: nextListSiteKey,
+  };
+}
+
 function commentBaseKey(input: {
   canonicalUrl: string;
   createdAt: number;
@@ -208,7 +243,7 @@ export async function importBackupLegacyJsonMerge(
       }
 
       const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
-      const merged = mergeConversationRecord(existing, incoming);
+      const merged = normalizeListDerivedKeys(mergeConversationRecord(existing, incoming));
 
       if (existing && existing.id) {
         merged.id = existing.id;
@@ -516,16 +551,17 @@ export async function importBackupZipV2Merge(
       const merged = mergeConversationRecord(existing, incoming);
       merged.source = source;
       merged.conversationKey = conversationKey;
+      const normalizedMerged = normalizeListDerivedKeys(merged);
 
-      const uk = uniqueConversationKey(merged);
+      const uk = uniqueConversationKey(normalizedMerged);
       if (existing && existing.id) {
-        merged.id = existing.id;
+        normalizedMerged.id = existing.id;
 
-        await reqToPromise(s.conversations.put(merged as any));
+        await reqToPromise(s.conversations.put(normalizedMerged as any));
         uniqueToLocalId.set(uk, Number(existing.id));
         stats.conversationsUpdated += 1;
       } else {
-        const id = await reqToPromise(s.conversations.add(merged as any) as any);
+        const id = await reqToPromise(s.conversations.add(normalizedMerged as any) as any);
         uniqueToLocalId.set(uk, Number(id));
         stats.conversationsAdded += 1;
       }
