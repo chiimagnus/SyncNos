@@ -181,9 +181,7 @@ async function ensureConversationListDerivedKeysBackfilled(): Promise<void> {
     if (changed) invalidateConversationListStatsCache();
     conversationListDerivedKeysBackfilled = true;
   })()
-    .catch(() => {
-      conversationListDerivedKeysBackfillPromise = null;
-    })
+    .catch(() => {})
     .finally(() => {
       conversationListDerivedKeysBackfillPromise = null;
     });
@@ -969,11 +967,7 @@ async function readConversationListPage(input: {
   cursor?: ConversationListCursor | null;
   limit?: number | null;
 }): Promise<ConversationListPage<Conversation>> {
-  try {
-    await ensureConversationListDerivedKeysBackfilled();
-  } catch (_e) {
-    // ignore repair failures; fall back to best-effort reads
-  }
+  await ensureConversationListDerivedKeysBackfilled();
 
   const query = resolveConversationListQuery(input.queryInput, input.limit);
   const cursor = toComparableCursor(input.cursor);
