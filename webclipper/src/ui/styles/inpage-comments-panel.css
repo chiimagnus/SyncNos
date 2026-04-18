@@ -377,7 +377,6 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--panel-text);
-  font-weight: 650;
   font-size: 12px;
 }
 
@@ -468,13 +467,11 @@
   word-break: break-word;
   color: var(--panel-text);
   font-size: 13px;
-  font-weight: 600;
   margin-top: 6px;
 }
 
 .webclipper-inpage-comments-panel__comment-body.is-reply {
   font-size: 12px;
-  font-weight: 600;
 }
 
 .webclipper-inpage-comments-panel__replies {
