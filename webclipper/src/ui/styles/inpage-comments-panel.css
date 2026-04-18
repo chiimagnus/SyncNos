@@ -270,9 +270,15 @@
 
 .webclipper-inpage-comments-panel__quote-text {
   grid-area: 1 / 1;
+}
+
+.webclipper-inpage-comments-panel__quote-text,
+.webclipper-inpage-comments-panel__comment-body {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--panel-text);
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .webclipper-inpage-comments-panel__avatar {
@@ -463,10 +469,6 @@
 }
 
 .webclipper-inpage-comments-panel__comment-body {
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--panel-text);
-  font-size: 13px;
   margin-top: 6px;
 }
 
