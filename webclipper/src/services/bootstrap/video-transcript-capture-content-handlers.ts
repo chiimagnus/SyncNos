@@ -58,9 +58,11 @@ export function registerVideoTranscriptCaptureContentHandlers(
       .then(() => service.captureVideoTranscript())
       .then((data) => {
         if (showTip) {
-          inpageTip?.showSaveTip?.(buildCaptureSuccessTipMessage({ isNew: data?.isNew, title: data?.title }), {
-            kind: 'default',
-          });
+          const suffix = data?.subtitleStatus === 'empty' ? t('videoTranscriptTipNoSubtitlesSuffix') : '';
+          inpageTip?.showSaveTip?.(
+            buildCaptureSuccessTipMessage({ isNew: data?.isNew, title: data?.title, suffix }),
+            { kind: 'default' },
+          );
         }
         sendResponse(ok(data));
       })

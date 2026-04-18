@@ -59,6 +59,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     title?: string;
     isNew?: boolean;
     url?: string;
+    subtitleStatus?: 'ok' | 'empty';
   }> {
     const extracted = await extractVideoTranscriptFromCurrentPage();
     const capturedAt = Date.now();
@@ -80,6 +81,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       Array.isArray(extracted?.cues) ? extracted.cues : [],
       extracted?.hasTimestamps === true,
     );
+    const subtitleStatus: 'ok' | 'empty' = transcriptMarkdown ? 'ok' : 'empty';
     const resolvedTranscriptMarkdown = transcriptMarkdown || '_(未检测到字幕。)_';
     const transcriptText = normalizeText(
       (Array.isArray(extracted?.cues) ? extracted.cues : [])
@@ -142,6 +144,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       title: title || undefined,
       url,
       isNew: typeof rawIsNew === 'boolean' ? rawIsNew : undefined,
+      subtitleStatus,
     };
   }
 

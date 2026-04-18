@@ -21,6 +21,7 @@ export function buildCaptureSuccessTipMessage(input: {
   title?: unknown;
   isNew?: unknown;
   maxTitleChars?: number;
+  suffix?: unknown;
 }): string {
   const isNew = input?.isNew !== false;
   const prefix = isNew ? t('savedPrefix') : t('updatedPrefix');
@@ -29,7 +30,9 @@ export function buildCaptureSuccessTipMessage(input: {
       ? Math.max(1, Math.floor(input.maxTitleChars))
       : CAPTURE_TIP_TITLE_MAX_CHARS;
 
+  const suffix = normalizeTitle(input?.suffix);
   const title = truncateForTip(normalizeTitle(input?.title), maxChars);
-  if (title) return `${prefix}${title}`;
-  return isNew ? t('saved') : t('updated');
+  if (title) return `${prefix}${title}${suffix}`;
+  const base = isNew ? t('saved') : t('updated');
+  return `${base}${suffix}`;
 }

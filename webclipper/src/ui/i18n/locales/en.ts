@@ -45,6 +45,7 @@ export const en = {
   contextMenuSaveCurrentPage: 'Save current page',
   contextMenuSaveCurrentAiChat: 'Save current AI chat',
   contextMenuSaveCurrentVideoTranscript: 'Save video transcript',
+  videoTranscriptTipNoSubtitlesSuffix: ' (no subtitles detected)',
   contextMenuInpageGroupTitle: 'Inpage Button',
   inpageDisplayModeLabel: 'Visibility',
   inpageDisplayModeSupported: 'Only on supported sites',
