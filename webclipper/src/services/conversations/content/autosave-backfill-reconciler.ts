@@ -88,6 +88,18 @@ function comparableMatches(a: BackfillComparable | undefined, b: BackfillCompara
   return reverseDecision.acceptable;
 }
 
+function compressAdjacentDuplicates(input: BackfillComparable[]): BackfillComparable[] {
+  const list = Array.isArray(input) ? input : [];
+  if (list.length <= 1) return list;
+  const out: BackfillComparable[] = [];
+  for (const item of list) {
+    const last = out[out.length - 1];
+    if (last && comparableMatches(last, item)) continue;
+    out.push(item);
+  }
+  return out;
+}
+
 function computeSuffixPrefixOverlapFlexible(
   prev: BackfillComparable[],
   cur: BackfillComparable[],
@@ -160,7 +172,7 @@ export function reconcileAutoSaveBackfill(input: {
   const localMessages = Array.isArray(input.localTailMessages) ? input.localTailMessages : [];
   const pageMessages = Array.isArray(input.pageWindowMessages) ? input.pageWindowMessages : [];
   const stateKeyHash = String(input.stateKeyHash || '').trim();
-  const localComparable = toComparable(localMessages);
+  const localComparable = compressAdjacentDuplicates(toComparable(localMessages));
   const pageComparable = toComparable(pageMessages);
   const pageSignature = computePageSignature(pageComparable);
 
