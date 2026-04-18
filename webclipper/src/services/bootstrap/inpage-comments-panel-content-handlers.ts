@@ -83,7 +83,11 @@ function resolveInpageSelectionPayload(): {
     return { selectionText: '', locator: null };
   }
   const locator = pickLocatorFromSelection();
-  debugSelection('resolve_selection', { ok: true, selectionTextLen: selectionText.length, locatorOk: Boolean(locator) });
+  debugSelection('resolve_selection', {
+    ok: true,
+    selectionTextLen: selectionText.length,
+    locatorOk: Boolean(locator),
+  });
   return {
     selectionText,
     locator,

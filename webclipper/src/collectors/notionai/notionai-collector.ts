@@ -432,6 +432,7 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
 
     const messages: any[] = [];
     const warningFlags: any[] = [];
+    let lastUserStepId = '';
 
     function mergeImageUrls(nodes: any): any {
       const set = new Set();
@@ -514,10 +515,12 @@ export function createNotionAiCollectorDef(env: CollectorEnv): CollectorDefiniti
       const userStepId = role === 'user' ? w.getAttribute('data-agent-chat-user-step-id') : '';
       const firstBlockId =
         role === 'assistant' ? (w.querySelector('div[data-block-id]') || {}).getAttribute?.('data-block-id') : '';
-      const stableId = userStepId || firstBlockId || '';
+      const stableId =
+        role === 'assistant' && lastUserStepId ? `replyTo_${lastUserStepId}` : userStepId || firstBlockId || '';
       const messageKey = stableId
         ? `${role}_${stableId}`
         : env.normalize.makeFallbackMessageKey({ role, contentText: contentText || '', sequence: i });
+      if (role === 'user' && userStepId) lastUserStepId = userStepId;
       messages.push({
         messageKey,
         role,
