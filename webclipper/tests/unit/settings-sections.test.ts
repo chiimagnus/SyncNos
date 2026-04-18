@@ -10,6 +10,7 @@ describe('settings section definitions', () => {
   it('keeps the flattened settings navigation order stable', () => {
     expect(SETTINGS_SECTIONS.map((section) => section.key)).toEqual([
       'general',
+      'videos',
       'chat_with',
       'backup',
       'notion',
@@ -26,7 +27,7 @@ describe('settings section definitions', () => {
         keys: group.sections.map((section) => section.key),
       })),
     ).toEqual([
-      { titleKey: 'settingsGroupFeatures', keys: ['general', 'chat_with'] },
+      { titleKey: 'settingsGroupFeatures', keys: ['general', 'videos', 'chat_with'] },
       { titleKey: 'settingsGroupData', keys: ['backup', 'notion', 'obsidian'] },
       { titleKey: 'settingsGroupAbout', keys: ['aboutyou', 'aboutme'] },
     ]);

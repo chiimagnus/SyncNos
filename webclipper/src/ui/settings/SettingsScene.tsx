@@ -16,6 +16,7 @@ import { InpageSection } from '@ui/settings/sections/InpageSection';
 import { NotionAISection } from '@ui/settings/sections/NotionAISection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
+import { VideosSection } from '@ui/settings/sections/VideosSection';
 
 export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
@@ -331,6 +332,8 @@ export function SettingsScene(props: SettingsSceneProps) {
           }}
         />
       ) : null}
+
+      {activeSection === 'videos' ? <VideosSection /> : null}
 
       {activeSection === 'aboutme' ? <AboutSection /> : null}
     </section>
