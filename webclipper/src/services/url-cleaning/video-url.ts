@@ -79,4 +79,3 @@ export function canonicalizeVideoUrl(raw: unknown): string {
   if (isBilibiliHost(url.hostname)) return canonicalizeBilibiliUrl(url).toString();
   return url.toString();
 }
-

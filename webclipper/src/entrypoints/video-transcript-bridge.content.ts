@@ -19,7 +19,12 @@ const MAX_BODY_CHARS = 2_000_000;
 function getStore(): VideoTranscriptBridgeStore {
   const anyGlobal = globalThis as any;
   const existing = anyGlobal[STORE_KEY] as VideoTranscriptBridgeStore | undefined;
-  if (existing && Array.isArray(existing.responses) && existing.metaByRequestId && typeof existing.metaByRequestId === 'object') {
+  if (
+    existing &&
+    Array.isArray(existing.responses) &&
+    existing.metaByRequestId &&
+    typeof existing.metaByRequestId === 'object'
+  ) {
     return existing;
   }
   const created: VideoTranscriptBridgeStore = { responses: [], metaByRequestId: {} };
@@ -83,4 +88,3 @@ export default defineContentScript({
     });
   },
 });
-

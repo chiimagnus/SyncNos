@@ -23,10 +23,9 @@ export function AiChatsSection() {
         </h2>
         <ul className="tw-mt-2.5 tw-list-disc tw-pl-5 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           <li>
-            {t('aiChatsSectionSupportedListPrefix')}{' '}
-            <Mono>ChatGPT</Mono> / <Mono>Claude</Mono> / <Mono>Gemini</Mono> / <Mono>AI Studio</Mono> /{' '}
-            <Mono>DeepSeek</Mono> / <Mono>Kimi</Mono> / <Mono>豆包</Mono> / <Mono>元宝</Mono> / <Mono>Poe</Mono> /{' '}
-            <Mono>Notion AI</Mono> / <Mono>Z.ai</Mono>
+            {t('aiChatsSectionSupportedListPrefix')} <Mono>ChatGPT</Mono> / <Mono>Claude</Mono> / <Mono>Gemini</Mono> /{' '}
+            <Mono>AI Studio</Mono> / <Mono>DeepSeek</Mono> / <Mono>Kimi</Mono> / <Mono>豆包</Mono> / <Mono>元宝</Mono> /{' '}
+            <Mono>Poe</Mono> / <Mono>Notion AI</Mono> / <Mono>Z.ai</Mono>
             {t('aiChatsSectionSupportedListSuffix')}
           </li>
           <li>{t('aiChatsSectionSupportedNote')}</li>
@@ -66,4 +65,3 @@ export function AiChatsSection() {
     </div>
   );
 }
-

@@ -63,7 +63,10 @@ export function parseWebVtt(text: string): TranscriptCue[] {
 
     const parts = line.split('-->');
     const startRaw = String(parts[0] || '').trim();
-    const endRaw = String(parts[1] || '').trim().split(/\s+/)[0] || '';
+    const endRaw =
+      String(parts[1] || '')
+        .trim()
+        .split(/\s+/)[0] || '';
     const start = parseTimestampSeconds(startRaw);
     const end = parseTimestampSeconds(endRaw);
     if (start == null) continue;
@@ -96,7 +99,11 @@ export function parseYoutubeTimedtextXml(text: string): TranscriptCue[] {
     const dur = m[2] != null ? Number(m[2]) : NaN;
     if (!Number.isFinite(start)) continue;
     const end = Number.isFinite(dur) ? start + dur : undefined;
-    const raw = decodeHtmlEntities(String(m[3] || '').replace(/\s+/g, ' ').trim());
+    const raw = decodeHtmlEntities(
+      String(m[3] || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    );
     const cleaned = normalizeText(raw);
     if (!cleaned) continue;
     cues.push({ start, ...(end != null ? { end } : null), text: cleaned });

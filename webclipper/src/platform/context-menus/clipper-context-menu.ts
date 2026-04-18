@@ -96,7 +96,10 @@ async function captureActiveTabVideoTranscript(): Promise<void> {
   if (!tab || !Number.isFinite(tabId) || tabId <= 0) return;
   if (!isHttpUrl(tab.url)) return;
 
-  await tabsSendMessage(tabId, { type: CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT, payload: { source: 'contextmenu' } });
+  await tabsSendMessage(tabId, {
+    type: CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT,
+    payload: { source: 'contextmenu' },
+  });
 }
 
 async function refreshSaveMenuTitle(api: any, tab: { id?: unknown; url?: unknown } | null): Promise<void> {
