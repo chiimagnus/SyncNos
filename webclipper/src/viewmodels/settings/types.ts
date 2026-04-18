@@ -5,6 +5,8 @@ export type SettingsSectionKey =
   | 'aboutyou'
   | 'obsidian'
   | 'general'
+  | 'articles'
+  | 'ai_chats'
   | 'videos'
   | 'aboutme';
 
@@ -18,7 +20,7 @@ export type SettingsSectionGroup = {
 export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   {
     titleKey: 'settingsGroupFeatures',
-    sections: [{ key: 'general' }, { key: 'videos' }, { key: 'chat_with' }],
+    sections: [{ key: 'general' }, { key: 'articles' }, { key: 'ai_chats' }, { key: 'videos' }, { key: 'chat_with' }],
   },
   {
     titleKey: 'settingsGroupData',

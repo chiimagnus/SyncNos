@@ -9,6 +9,7 @@ import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
 import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
 import { type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
+import { AiChatsSection } from '@ui/settings/sections/AiChatsSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
 import { ChatWithAiSection } from '@ui/settings/sections/ChatWithAiSection';
 import { InsightSection } from '@ui/settings/sections/InsightSection';
@@ -16,6 +17,7 @@ import { InpageSection } from '@ui/settings/sections/InpageSection';
 import { NotionAISection } from '@ui/settings/sections/NotionAISection';
 import { NotionOAuthSection } from '@ui/settings/sections/NotionOAuthSection';
 import { ObsidianSettingsSection } from '@ui/settings/sections/ObsidianSettingsSection';
+import { WebArticlesSection } from '@ui/settings/sections/WebArticlesSection';
 import { VideosSection } from '@ui/settings/sections/VideosSection';
 
 export type SettingsSceneProps = {
@@ -332,6 +334,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           }}
         />
       ) : null}
+
+      {activeSection === 'articles' ? <WebArticlesSection /> : null}
+
+      {activeSection === 'ai_chats' ? <AiChatsSection /> : null}
 
       {activeSection === 'videos' ? <VideosSection /> : null}
 
