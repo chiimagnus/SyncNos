@@ -10,6 +10,9 @@ describe('settings section definitions', () => {
   it('keeps the flattened settings navigation order stable', () => {
     expect(SETTINGS_SECTIONS.map((section) => section.key)).toEqual([
       'general',
+      'articles',
+      'ai_chats',
+      'videos',
       'chat_with',
       'backup',
       'notion',
@@ -26,7 +29,7 @@ describe('settings section definitions', () => {
         keys: group.sections.map((section) => section.key),
       })),
     ).toEqual([
-      { titleKey: 'settingsGroupFeatures', keys: ['general', 'chat_with'] },
+      { titleKey: 'settingsGroupFeatures', keys: ['general', 'articles', 'ai_chats', 'videos', 'chat_with'] },
       { titleKey: 'settingsGroupData', keys: ['backup', 'notion', 'obsidian'] },
       { titleKey: 'settingsGroupAbout', keys: ['aboutyou', 'aboutme'] },
     ]);
@@ -76,6 +79,18 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 describe('inpage anti-hotlink advanced editor', () => {
   let root: ReactDOM.Root | null = null;
 
@@ -84,11 +99,12 @@ describe('inpage anti-hotlink advanced editor', () => {
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     act(() => {
       root?.unmount();
     });
     root = null;
+    await flushReactScheduler();
     cleanupDom();
   });
 

@@ -36,7 +36,9 @@ export default defineContentScript({
     registerCurrentPageCaptureContentHandlers(currentPageCapture, { inpageTip: inpageTipApi });
     registerInpageCommentsPanelContentHandlers(runtime);
     registerWebArticleExtractContentHandlers();
-    registerVideoTranscriptCaptureContentHandlers(createVideoTranscriptCaptureService({ runtime }), { inpageTip: inpageTipApi });
+    registerVideoTranscriptCaptureContentHandlers(createVideoTranscriptCaptureService({ runtime }), {
+      inpageTip: inpageTipApi,
+    });
 
     const itemMentionController = createItemMentionController({ runtime, ui: inpageItemMentionApi });
     const controller = createContentController({

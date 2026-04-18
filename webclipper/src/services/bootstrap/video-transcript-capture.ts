@@ -81,7 +81,10 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     const transcriptMarkdown = formatTranscriptMarkdown(cues, extracted?.hasTimestamps === true);
     const subtitleStatus: 'ok' | 'empty' = transcriptMarkdown ? 'ok' : 'empty';
     const transcriptText = normalizeText(
-      cues.map((c: any) => normalizeText(c?.text || '')).filter(Boolean).join('\n'),
+      cues
+        .map((c: any) => normalizeText(c?.text || ''))
+        .filter(Boolean)
+        .join('\n'),
     );
 
     if (subtitleStatus === 'empty') {

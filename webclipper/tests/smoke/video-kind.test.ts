@@ -10,4 +10,3 @@ describe('video kind', () => {
     expect(String(video?.notion?.dbSpec?.storageKey || '')).toBe('notion_db_id_syncnos_videos');
   });
 });
-

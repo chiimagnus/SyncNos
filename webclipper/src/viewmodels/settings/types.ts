@@ -1,4 +1,14 @@
-export type SettingsSectionKey = 'backup' | 'notion' | 'chat_with' | 'aboutyou' | 'obsidian' | 'general' | 'aboutme';
+export type SettingsSectionKey =
+  | 'backup'
+  | 'notion'
+  | 'chat_with'
+  | 'aboutyou'
+  | 'obsidian'
+  | 'general'
+  | 'articles'
+  | 'ai_chats'
+  | 'videos'
+  | 'aboutme';
 
 export type SettingsSectionGroupTitleKey = 'settingsGroupFeatures' | 'settingsGroupData' | 'settingsGroupAbout';
 
@@ -10,7 +20,7 @@ export type SettingsSectionGroup = {
 export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   {
     titleKey: 'settingsGroupFeatures',
-    sections: [{ key: 'general' }, { key: 'chat_with' }],
+    sections: [{ key: 'general' }, { key: 'articles' }, { key: 'ai_chats' }, { key: 'videos' }, { key: 'chat_with' }],
   },
   {
     titleKey: 'settingsGroupData',
