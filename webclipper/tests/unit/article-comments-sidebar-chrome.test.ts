@@ -243,7 +243,7 @@ describe('ArticleCommentsSection shared chrome', () => {
     });
 
     const body = host?.shadowRoot?.querySelector(
-      '.webclipper-inpage-comments-panel__comment-body',
+      '.webclipper-inpage-comments-panel__comment > .webclipper-inpage-comments-panel__text',
     ) as HTMLElement | null;
     expect(body).toBeTruthy();
     await act(async () => {

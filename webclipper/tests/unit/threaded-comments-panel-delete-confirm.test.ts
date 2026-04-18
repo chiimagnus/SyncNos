@@ -121,7 +121,9 @@ describe('Threaded comments panel delete confirmation', () => {
     await flushPromises();
     expect(del!.textContent).toBe('deleteButton');
 
-    const commentBody = shadow.querySelector('.webclipper-inpage-comments-panel__comment-body') as HTMLElement | null;
+    const commentBody = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__comment > .webclipper-inpage-comments-panel__text',
+    ) as HTMLElement | null;
     expect(commentBody).toBeTruthy();
     commentBody!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     await flushPromises();

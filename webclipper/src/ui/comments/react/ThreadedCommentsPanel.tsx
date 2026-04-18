@@ -829,7 +829,7 @@ export function ThreadedCommentsPanel({
         </div>
         {String(snapshot.quoteText || '').trim() ? (
           <div className="webclipper-inpage-comments-panel__quote">
-            <div className="webclipper-inpage-comments-panel__quote-text">{snapshot.quoteText}</div>
+            <div className="webclipper-inpage-comments-panel__text">{snapshot.quoteText}</div>
             <button
               type="button"
               className={['webclipper-inpage-comments-panel__quote-clear', buttonIconCircleGhostClassName()].join(' ')}
@@ -896,9 +896,7 @@ export function ThreadedCommentsPanel({
                         void runLocate(rootId);
                       }}
                     >
-                      <div className="webclipper-inpage-comments-panel__thread-quote-text">
-                        {String(root.quoteText)}
-                      </div>
+                      <div className="webclipper-inpage-comments-panel__text">{String(root.quoteText)}</div>
                     </div>
                   ) : null}
 
@@ -987,9 +985,7 @@ export function ThreadedCommentsPanel({
                         </button>
                       </div>
                     </div>
-                    <div className="webclipper-inpage-comments-panel__comment-body">
-                      {String(root.commentText || '')}
-                    </div>
+                    <div className="webclipper-inpage-comments-panel__text">{String(root.commentText || '')}</div>
                   </div>
 
                   {replies.length ? (
@@ -1034,7 +1030,7 @@ export function ThreadedCommentsPanel({
                               </button>
                             </div>
                           </div>
-                          <div className="webclipper-inpage-comments-panel__comment-body is-reply">
+                          <div className="webclipper-inpage-comments-panel__text">
                             {String(reply.commentText || '')}
                           </div>
                         </div>
