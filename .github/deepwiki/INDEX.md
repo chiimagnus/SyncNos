@@ -22,18 +22,20 @@
 2. [overview.md](overview.md) — 再建立目录、入口和产物级别的整体地图。
 3. [data-flow.md](data-flow.md) — 看清各条主线如何把输入变成可见结果。
 4. [modules/webclipper.md](modules/webclipper.md) — 如果你关注 AI 对话采集、文章抓取、本地会话和多目标同步。
-5. [storage.md](storage.md) / [troubleshooting.md](troubleshooting.md) — 当你开始追问“数据存在哪”或“为什么失败”。
+5. [modules/videos.md](modules/videos.md) — 如果你关注 YouTube / Bilibili 字幕采集、`video` kind 和视频会话的同步落点。
+6. [storage.md](storage.md) / [troubleshooting.md](troubleshooting.md) — 当你开始追问“数据存在哪”或“为什么失败”。
 
 ### Engineering-first
 1. [architecture.md](architecture.md) — 先看运行时边界、依赖方向、关键契约。
 2. [dependencies.md](dependencies.md) — 确认技术栈、第三方依赖、外部系统与版本规则。
 3. [configuration.md](configuration.md) — 看 manifest、`chrome.storage.local`、发布参数。
 4. [modules/webclipper.md](modules/webclipper.md) — 进入扩展的 background/content/popup/app 分层与采集策略。
-5. [data-flow.md](data-flow.md) — 对照真实输入输出链路检查改动影响面。
-6. [api.md](api.md) — 确认消息契约、OAuth code exchange、外部 API 调用边界。
-7. [security.md](security.md) — 确认权限边界、敏感信息保护与风险控制面。
-8. [testing.md](testing.md) — 确认验证顺序与现有测试覆盖。
-9. [workflow.md](workflow.md) — 确认协作方式、文档同步与发布边界。
+5. [modules/videos.md](modules/videos.md) — 进入视频字幕采集、右键菜单和 `video` kind。
+6. [data-flow.md](data-flow.md) — 对照真实输入输出链路检查改动影响面。
+7. [api.md](api.md) — 确认消息契约、OAuth code exchange、外部 API 调用边界。
+8. [security.md](security.md) — 确认权限边界、敏感信息保护与风险控制面。
+9. [testing.md](testing.md) — 确认验证顺序与现有测试覆盖。
+10. [workflow.md](workflow.md) — 确认协作方式、文档同步与发布边界。
 
 ### Release-first
 1. [release.md](release.md) — GitHub Release、CWS、AMO、产物命名和脚本职责。
@@ -49,7 +51,7 @@
 | 业务入口层 | `business-context.md` | 用业务语义把读者送往技术页，而不是停留在 marketing 摘要。 |
 | 基础全景 | `overview.md`, `architecture.md`, `dependencies.md`, `data-flow.md` | 帮你建立仓库全貌、运行时边界和主链路。 |
 | 工程执行 | `configuration.md`, `testing.md`, `workflow.md` | 回答“如何配置、如何验证、如何协作”。 |
-| 产品模块 | `modules/webclipper.md` | 回答“改扩展去哪里”。 |
+| 产品模块 | `modules/webclipper.md`, `modules/videos.md` | 回答“改扩展去哪里”与“视频字幕采集去哪里”。 |
 | 专题页面 | [storage.md](storage.md), [release.md](release.md), [troubleshooting.md](troubleshooting.md), [api.md](api.md), [operations.md](operations.md), [security.md](security.md) | 回答“数据落点、交付链路、故障定位、API 契约、运维与安全边界”。 |
 | 参考 | [glossary.md](glossary.md), [GENERATION.md](GENERATION.md) | 统一术语与生成元数据。 |
 
@@ -59,6 +61,7 @@
 | --- | --- | --- |
 | 这个仓库到底解决什么问题？ | [business-context.md](business-context.md) | [overview.md](overview.md) |
 | WebClipper 为什么先落本地库再同步？ | [business-context.md](business-context.md) | [data-flow.md](data-flow.md), [storage.md](storage.md) |
+| WebClipper 的视频字幕采集、右键菜单和 `video` kind 改哪里？ | [modules/videos.md](modules/videos.md) | [configuration.md](configuration.md), [testing.md](testing.md), [data-flow.md](data-flow.md) |
 | WebClipper 的 Insight 仪表盘读的是什么、本地统计改哪里？ | [modules/webclipper.md](modules/webclipper.md) | [storage.md](storage.md), [configuration.md](configuration.md), [testing.md](testing.md) |
 | WebClipper 的主题（仅跟随系统）、inpage 开关、AI 自动保存、AI `$ mention`、图片缓存、Inpage 阅读风格与 anti-hotlink 配置改哪里？ | [configuration.md](configuration.md) | [modules/webclipper.md](modules/webclipper.md), [workflow.md](workflow.md) |
 | WebClipper 的文章评论 / 注释线程改哪里？ | [modules/comments.md](modules/comments.md) | [modules/webclipper.md](modules/webclipper.md), [storage.md](storage.md), [testing.md](testing.md) |
@@ -75,12 +78,14 @@
 
 ## Coverage Gaps
 - **历史专项文档**：仓库还有键盘焦点与 OCR 的历史说明，但本版 deepwiki 仍以 WebClipper 主线为准，尚未拆成独立 deepwiki 子页。
+- **视频字幕专题页**：已新增 `modules/videos.md` 作为视频字幕采集的专门路由页；如果未来新增更多视频站点，优先扩展这里而不是把信息继续堆进 `modules/webclipper.md`。
 - **集成专题页**：当前 Notion / Obsidian / collectors 仍主要分布在 `architecture.md`、`data-flow.md` 与 `modules/` 页面；如果未来这些区域继续膨胀，适合再拆专题页。
 
 ## Generation Metadata
 - [GENERATION.md](GENERATION.md)
 
 ## 更新记录（Update Notes）
+- 2026-04-18：新增 `modules/videos.md` 路由页，补齐视频字幕采集、`video` kind、右键菜单与 `SyncNos-Videos` 的阅读路径；更新 `business-context.md`、`overview.md`、`modules/webclipper.md`、`INDEX.md`。
 - 2026-04-16：同步 `manifest.version` 到 `1.5.4`，并澄清 CI Node 22 / 发布 Node 20 的双环境说明；更新 `configuration.md`、`dependencies.md`、`security.md`、`GENERATION.md`。
 - 2026-04-05：同步 2026-04 重大架构变化（85 commits）——评论模块 React 迁移、Settings 顶部标签导航、AppShell listShell 重构、Notion/Obsidian 评论数同步、文章提取增强（bilibili 新增、小红书移除）、Chat with AI prompt 模板可配置；更新 `business-context.md`、`overview.md`、`architecture.md`、`modules/comments.md`、`GENERATION.md`。
 - 2026-04-09：同步 WebClipper 配置 / 存储 / 模块文档与 `DB_VERSION = 8`，补齐 Notion OAuth / anti-hotlink host permissions、Settings 顶部标签导航与 Inpage 阅读风格说明，并刷新 `configuration.md`、`modules/webclipper.md`、`GENERATION.md`、`PRIVACY.md`。

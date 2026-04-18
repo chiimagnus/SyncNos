@@ -79,6 +79,10 @@ macOS/ 历史资料已归档；本页仅保留 WebClipper 的发布主线。
 
 ## Coverage Gaps
 - WebClipper 自动化发布链路已经有足够代码证据。
+- 视频字幕采集不新增独立发布入口；它仍跟随同一套 WebClipper release workflows 交付。
+
+## 更新记录（Update Notes）
+- 2026-04-18：补充视频字幕采集不改变发布链路的说明，避免把功能更新误读成新的交付渠道。
 
 ## 来源引用（Source References）
 - `README.md`

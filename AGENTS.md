@@ -67,6 +67,7 @@ npm --prefix webclipper run check            # 产物校验
    - `npm --prefix webclipper run build:firefox`
    - `npm --prefix webclipper run check`
 6. 发布包与 AMO Source 包由 GitHub Actions 和 `.github/scripts/webclipper/*.mjs` 负责，本地以开发验证为主。
+7. 如果改动的是视频字幕采集，再额外核对 `webclipper/src/services/bootstrap/video-transcript-capture.ts`、`webclipper/src/services/bootstrap/video-transcript-capture-content-handlers.ts`、`webclipper/src/entrypoints/video-transcript-*.content.ts`、`webclipper/src/collectors/video/**`、`webclipper/src/platform/context-menus/clipper-context-menu.ts`、`webclipper/src/services/protocols/conversation-kinds.ts` 与 `webclipper/src/ui/settings/sections/VideosSection.tsx`。
 
 ### 文档同步工作流
 

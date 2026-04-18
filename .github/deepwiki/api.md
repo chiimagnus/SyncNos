@@ -19,6 +19,7 @@
 | COMMENTS | `COMMENTS_MESSAGE_TYPES` | article comments 线程的 list/add/delete/migrate | detail/inpage panel -> background |
 | UI | `UI_MESSAGE_TYPES` + `UI_EVENT_TYPES` | 打开 popup、打开 inpage comments panel、状态广播 | background <-> UI |
 | CONTENT（非 router） | `CONTENT_MESSAGE_TYPES` | background -> content script 指令（例如打开 inpage comments panel） | background -> content |
+| CONTENT（非 router） | `CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT` | 触发字幕拦截后的 video 会话写入 | background -> content |
 
 ## CORE 关键消息
 
@@ -124,12 +125,15 @@ sequenceDiagram
 | `$ mention` 插入失败（detail 为空） | `buildMentionInsertText` | 返回 `EMPTY_DETAIL`；通常需要重新采集该会话或先确认详情能正常打开 |
 | 无法打开 popup | `OPEN_EXTENSION_POPUP` | 返回 `OPEN_POPUP_UNSUPPORTED` / `OPEN_POPUP_FAILED`；提示用户通过工具栏图标或检查浏览器能力 |
 | 无法打开 inpage comments panel | `OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL` | 返回 `OPEN_INPAGE_COMMENTS_PANEL_UNAVAILABLE/FAILED`；优先检查 sender tab、content script 是否仍在运行 |
+| 视频字幕未加载或为空 | `CAPTURE_VIDEO_TRANSCRIPT` / `video-transcript-extract.ts` | 返回空结果或提示“未检测到字幕，未保存”；先确认视频页已开启字幕并等待轨道加载 |
 
 ## 来源引用（Source References）
 - `webclipper/src/platform/messaging/message-contracts.ts`
 - `webclipper/src/platform/messaging/background-router.ts`
 - `webclipper/src/services/conversations/background/handlers.ts`
 - `webclipper/src/services/bootstrap/content-controller.ts`
+- `webclipper/src/services/bootstrap/video-transcript-capture.ts`
+- `webclipper/src/services/bootstrap/video-transcript-capture-content-handlers.ts`
 - `webclipper/src/services/sync/background-handlers.ts`
 - `webclipper/src/services/integrations/item-mention/background-handlers.ts`
 - `webclipper/src/services/integrations/item-mention/mention-contract.ts`
@@ -145,6 +149,7 @@ sequenceDiagram
 - `webclipper/src/platform/messaging/ui-background-handlers.ts`
 
 ## 更新记录（Update Notes）
+- 2026-04-18：补充 `CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT` 与字幕未加载时的失败模式，确保 API 页能解释视频字幕采集的 content 指令。
 - 2026-03-30：补齐 `NOTION_MESSAGE_TYPES` 的设置侧契约（`LIST_PARENT_PAGES/GET_AUTH_STATUS/DISCONNECT`）与返回结构，并同步 Notion OAuth 的 pending/error 状态键与 code exchange 重试边界。
 - 2026-03-29：同步内部消息契约组（补齐 `CHATGPT_MESSAGE_TYPES` / `ITEM_MENTION_MESSAGE_TYPES` / `COMMENTS_MESSAGE_TYPES` / `CONTENT_MESSAGE_TYPES`），并补充 `$ mention` 与“打开 inpage comments panel”的消息链路与失败模式。
 - 2026-03-19：新增 Notion OAuth Worker 的 code exchange 分阶段说明与关键参数矩阵，明确密钥仅在 Worker 侧持有。

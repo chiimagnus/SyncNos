@@ -36,6 +36,7 @@
 | `tests/collectors/kimi-collector.test.ts`, `tests/collectors/zai-collector.test.ts` | 用户上传附件卡片图片抓取 | 防止附件图片只出现在页面而未进入本地会话 markdown |
 | `tests/smoke/background-router-current-page-capture.test.ts` | popup 当前页抓取与 background relay | 保证当前页抓取不会只在 UI 上“看起来能点” |
 | `tests/smoke/detail-header-actions.test.ts`, `tests/smoke/app-detail-header-actions.test.ts` | Notion / Obsidian / Chat with AI / cache-images 详情头动作解析（含 clipboard + external jump） | 覆盖 `open` / `tools` 主路径，保证详情头动作协议不回退 |
+| `tests/smoke/video-kind.test.ts` | `video` kind、`SyncNos-Videos`、视频字幕会话落点 | 覆盖视频字幕采集后的会话类型与同步目标是否一致 |
 | `tests/unit/settings-sections.test.ts` | Settings 分组与 section 顺序（`Features = general + chat_with`，`Data = backup + notion + obsidian`，`About = aboutyou + aboutme`；Inpage 分区承载阅读风格 / anti-hotlink） | 防止 Settings 导航回退或新分区被错误挪位 |
 | `tests/smoke/background-router-item-mention.test.ts` | `$ mention` 消息路由冒烟（search/build） | 覆盖 `ITEM_MENTION_MESSAGE_TYPES` 在 background router 的注册与输出结构 |
 | `tests/unit/item-mention-search.test.ts` | `$ mention` 候选匹配与排序 | 防止标题/域名/来源匹配规则漂移导致“候选顺序看起来不对” |
@@ -48,7 +49,8 @@
 5. **WebClipper（详情头动作）**：在 detail 中验证 `open / tools` 两组动作都能按槽位显示；`Chat with AI` 与 `cache-images` 均走 `tools`，触发后应看到更新计数反馈并刷新 detail；在 popup 与窄屏 header 也应保持同样行为。
 6. **WebClipper（About You / Insight）**：打开 `Settings → About You`（旧称 Insight，对应 section key `aboutyou`），验证 overview cards、来源分布、Top 3 longest conversations、文章域名分布都能渲染；空库应显示空态，IndexedDB 读取失败应显示错误态；在窄屏下从排行点击对话应能进入 detail；从列表底部 `today/total` 统计点击也应能跳转到 About You 分区。
 7. **WebClipper（列表筛选下拉）**：在 popup 与 app 的会话列表底部分别打开 `source` / `site` 筛选菜单，确认菜单高度会随可视区域自适应；空间不足时出现可控滚动，空间充足时不出现无谓滚动条，也不应被底部容器裁切。
-8. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
+8. **WebClipper（视频字幕采集）**：在 YouTube / Bilibili 已加载字幕的视频页，通过 `VideosSection` 或右键菜单保存一次字幕；确认只抓已加载字幕、未加载字幕时显示空提示；保存后应生成 `video` kind 会话并进入 `SyncNos-Videos`。
+9. **发布前**：确认 `manifest.version`、workflow、打包脚本参数和 tag 规则一致。
 
 ## 发布前检查
 
@@ -92,6 +94,7 @@
 - `webclipper/tests/smoke/background-router-current-page-capture.test.ts`
 - `webclipper/tests/smoke/detail-header-actions.test.ts`
 - `webclipper/tests/smoke/app-detail-header-actions.test.ts`
+- `webclipper/tests/smoke/video-kind.test.ts`
 - `webclipper/tests/unit/settings-sections.test.ts`
 - `webclipper/src/services/integrations/chatwith/chatwith-detail-header-actions.ts`
 - `webclipper/src/services/integrations/detail-header-action-types.ts`
@@ -118,5 +121,6 @@
 - `.github/workflows/webclipper-cws-publish.yml`
 
 ## 更新记录（Update Notes）
+- 2026-04-18：补充 `video-kind.test.ts` 与视频字幕采集的手动冒烟步骤，确保 `video` kind 和 `SyncNos-Videos` 落点能一起回归验证。
 - 2026-03-30：同步 Settings section key（`aboutyou/aboutme`）与新增 Notion Parent Page 发现链路的代表性单测入口。
 - 2026-03-29：同步 inpage 双击行为为“打开页面内评论侧边栏（inpage comments panel）”，并将 `$ mention` 的测试与手动冒烟项纳入回归清单。

@@ -2,9 +2,9 @@
 
 # SyncNos
 
-Never lose an AI conversation or a great article again.
+Never lose an AI conversation, a great article, or a useful video transcript again.
 
-11+ AI platforms + any web article — auto-captured in the background, stored locally first.
+11+ AI platforms + any web article + YouTube/Bilibili subtitles — auto-captured in the background, stored locally first.
 One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
 [SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
@@ -37,7 +37,7 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 ## Get Started in 3 Steps
 
 1. **Install the extension** (Chrome / Edge / Firefox / Arc)
-2. **Open any supported AI platform or web page** — the extension captures conversations and articles in the background
+2. **Open any supported AI platform, web page, or video page** — the extension captures conversations, articles, and loaded subtitles in the background
 3. **Sync or export** — go to Settings to sync to Notion / Obsidian, or export Markdown / Zip backups
 
 ## Demo Video
@@ -68,12 +68,16 @@ One-click sync to Notion / Obsidian, or export as Markdown / Zip.
 
 Any `http(s)` page can be clipped — body text, title, author, and publish date are extracted automatically.
 
+### Video Transcripts
+
+YouTube and Bilibili video pages can capture already loaded subtitles/transcripts, including timestamps when available.
+
 ## Output Targets
 
 | Target | Details |
 | --- | --- |
-| **Notion** | One-click sync after OAuth. AI chats → `SyncNos-AI Chats` database; web articles → `SyncNos-Web Articles` database. |
-| **Obsidian** | Writes directly to your vault via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Local-to-local, no network involved. |
+| **Notion** | One-click sync after OAuth. AI chats → `SyncNos-AI Chats` database; web articles → `SyncNos-Web Articles` database; video transcripts → `SyncNos-Videos` database. |
+| **Obsidian** | Writes directly to your vault via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Local-to-local, no network involved; video transcripts land in `SyncNos-Videos`. |
 | **Markdown / Zip** | Single file or bulk export. Zip v2 backups preserve article comment threads and cached images for full local recovery. |
 
 ## Core Capabilities
@@ -83,6 +87,7 @@ Any `http(s)` page can be clipped — body text, title, author, and publish date
 - **Incremental sync** — precise cursor tracking. Only new messages and articles get synced.
 - **Insight dashboard** — total clips, source breakdown, longest conversations — see your knowledge accumulate.
 - **Chat with AI** — copy local conversations/articles with customizable templates, platform list, and max-length controls.
+- **Video transcript capture** — save loaded YouTube / Bilibili subtitles with timestamps as local conversations.
 - **$ Mention in AI chats** — type `$` on supported AI sites to search saved items and insert markdown snippets inline.
 - **Inpage quick actions** — single-click the inpage button to save current content; double-click to open the comments sidebar.
 - **Article comment threads** — local threaded comments for web articles (detail + inpage panel); use the sidebar "Quote selection" button to attach current selection as quote (empty selection clears quote), while clicking/focusing composers does not auto-attach; preserved in Zip v2 backup/restore and article sync flows.

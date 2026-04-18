@@ -406,3 +406,13 @@ WebClipper 圆角必须统一复用 `webclipper/src/ui/styles/tokens.css` 的半
 - 交互约束：仅把手触发打开；关闭使用短延迟吸收鼠标轨迹抖动；面板打开时覆盖把手，不挤占详情内容宽度。
 - 高亮与跳转约束：点击条目使用 `scrollIntoView({ behavior: 'smooth', block: 'center' })`；高亮以“最接近视口中线”的 user 消息为准。
 - 可访问性底线：把手保留 `<button>` 语义与 `focus-visible` 提示，支持 `Enter/Space` 打开，`Esc` 关闭并恢复焦点到把手。
+
+## B10 · 视频字幕采集（VideosSection / 右键菜单）
+
+- 真源入口：`src/ui/settings/sections/VideosSection.tsx`、`src/platform/context-menus/clipper-context-menu.ts`、`src/services/bootstrap/video-transcript-capture.ts`、`src/services/bootstrap/video-transcript-capture-content-handlers.ts`
+- 相关协议：`src/platform/messaging/message-contracts.ts` 的 `CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT`、`src/services/protocols/conversation-kinds.ts` 的 `video` kind、`src/services/url-cleaning/video-url.ts`
+- 右键菜单文案必须使用 `contextMenuSaveCurrentVideoTranscript`；Settings 里的分区名称使用 `section_videos` / `VideosSection`
+- 支持范围只覆盖页面已加载字幕的 YouTube / Bilibili 视频页；不要把这条链路描述成“下载视频”或“抓取未加载字幕”
+- 采集失败时，空字幕必须显示 `videoTranscriptTipNoSubtitles`；不要把空结果伪装成成功保存
+- 采集结果会写成 `sourceType='video'` 的 conversation，消息 key 固定为 `video_transcript`，并保留时间戳格式的 transcript markdown
+- 手工验收时，至少确认：右键菜单出现、字幕已加载、保存后本地列表能看到视频会话、`tests/smoke/video-kind.test.ts` 仍通过

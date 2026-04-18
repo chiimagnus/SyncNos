@@ -2,7 +2,8 @@
 
 ## 职责
 - 从支持 AI 站点采集对话、从普通网页抓正文，并把结果先写入本地浏览器数据库。
-- 提供 popup / app / inpage 三类用户入口，让用户进行保存、导出、备份、Notion 同步、Obsidian 同步与设置管理。
+- 从支持 AI 站点采集对话、从普通网页抓正文、从视频页采集字幕，并把结果先写入本地浏览器数据库。
+- 提供 popup / app / inpage / settings(videos) 四类用户入口，让用户进行保存、导出、备份、Notion 同步、Obsidian 同步与设置管理。
 - 通过 MV3 的 background + content + popup + app 分层，保持“采集、持久化、同步、展示”边界清晰。
 
 ## 关键文件
@@ -14,10 +15,15 @@
 | `src/services/bootstrap/content.ts` | inpage runtime gating | 决定 `inpage_display_mode`（兼容旧 `inpage_supported_only`）与支持站点如何影响 UI 启动 |
 | `src/services/bootstrap/current-page-capture.ts` | 当前页抓取服务 | 统一判断当前标签页可否抓取，并区分 chat / article 两条手动抓取路径 |
 | `src/services/bootstrap/content-controller.ts` | 自动 / 手动保存控制器 | 单击保存、双击打开页面内评论侧边栏（inpage comments panel）、article fetch、Google AI Studio 手动保存都在这里 |
+| `src/services/bootstrap/video-transcript-capture.ts` | 视频字幕采集服务 | 把 YouTube / Bilibili 已加载字幕格式化为 video conversation |
+| `src/services/bootstrap/video-transcript-capture-content-handlers.ts` | 视频字幕消息处理器 | 连接右键菜单、空字幕提示与 capture service |
 | `src/platform/webext/anti-hotlink-rules-store.ts` | 反防盗链规则真值与 referer 映射 | 维护 `anti_hotlink_rules_v1`，为图片下载代理和 article fetch 提供 domain → referer 规则 |
 | `src/services/integrations/anti-hotlink/anti-hotlink-settings.ts` | 反防盗链设置读写与验证 | 把 Settings 面板里的规则编辑、校验、reset/restore 接到本地存储 |
 | `src/services/protocols/markdown-reading-profiles.ts` | Markdown 阅读风格协议 | 定义 Medium / Notion / Book 三档阅读样式的规范与回退 |
 | `src/ui/shared/markdown-reading-profile-presets.ts` | Markdown 阅读风格 preset | 为 popup / app 详情页提供 profile 预设与渲染入口 |
+| `src/entrypoints/video-transcript-interceptor.content.ts` | 视频字幕拦截器 | 在 MAIN world 下拦截字幕请求并收集页面 meta |
+| `src/entrypoints/video-transcript-bridge.content.ts` | 视频字幕桥接存储 | 暂存被拦截的字幕响应与 meta |
+| `src/collectors/video/` | 视频字幕解析器 | 解析 YouTube / Bilibili 字幕格式并生成 cue 列表 |
 | `src/services/integrations/chatwith/chatwith-settings.ts` | Chat with AI 配置与模板渲染 | 管理 prompt 模板、平台列表、最大字符数和复制载荷 |
 | `src/services/integrations/chatwith/chatwith-detail-header-actions.ts` | Chat with AI 详情头动作解析 | 决定哪些平台按钮出现、复制什么 payload、何时跳转 |
 | `src/services/integrations/item-mention/` | `$` mention 插入能力 | 在支持的 AI chat 输入框内通过 `$` 过滤本地 item 并插入同源 Markdown（站点门控真源：`src/collectors/ai-chat-sites.ts` 的 `features.dollarMention`） |
@@ -50,6 +56,7 @@
 | `src/ui/settings/sections/InsightPanel.tsx` | Insight 统计视图 | 用 `recharts` 渲染来源分布、文章域名分布与 Top 3 conversation |
 | `src/ui/styles/tokens.css` | 主题 tokens | 用 `prefers-color-scheme` 统一驱动亮/暗 token，popup / app / inpage 一致 |
 | `src/ui/shared/SelectMenu.tsx` | 共享下拉菜单组件 | 统一选项菜单键盘行为，并在 `adaptiveMaxHeight` 打开时按可裁剪容器动态计算高度 |
+| `src/ui/settings/sections/VideosSection.tsx` | 视频字幕设置页 | 解释支持范围、抓取步骤和失败提示 |
 | `src/ui/conversations/ConversationListPane.tsx` | 列表筛选、批量动作与来源持久化 | 控制 `source filter`、today/total 统计、导出/同步/删除菜单 |
 | `src/ui/conversations/DetailNavigationHeader.tsx` | 窄屏详情头动作容器 | 让 popup / app 窄屏 detail header 与主详情页共用同一套动作槽位策略 |
 | `src/ui/conversations/pending-open.ts` | 窄屏待打开会话桥接 | 让 Insight / 列表 / 路由在 narrow 模式下也能准确落到 detail |
@@ -72,11 +79,13 @@
 | --- | --- | --- |
 | AI 对话站点 | ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai | 通过 collectors registry 统一注册 |
 | 普通网页文章 | 任意 `http(s)` 页面 | content 抽取首次失败时按需注入 `readability.js` 并重试一次 |
+| 视频字幕页 | YouTube / Bilibili 视频页 | 只采集页面已加载字幕，右键菜单触发保存 |
 | inpage 交互 | 支持站点默认启用；非支持站点受 `inpage_display_mode` 控制（兼容旧键） | 单击保存、双击打开页面内评论侧边栏（inpage comments panel）、多击彩蛋提示 |
 | Popup 当前页抓取 | `usePopupCurrentPageCapture.ts` + `current-page-capture.ts` | 先判断当前页可抓取，再用统一按钮触发 chat / article 抓取 |
 | 文章评论 / 注释线程 | article detail + inpage comments panel | 本地 threaded comments，支持回复、删除；不属于新的抓取站点 |
 
 - `content.ts` 在所有 `http(s)` 页面注入，但 **支持站点始终优先启动 controller**；非支持站点则在读取 `inpage_display_mode`（以及兼容旧 `inpage_supported_only`）后决定是否启动。
+- `content.ts` 还会注册视频字幕采集处理器；视频页右键菜单通过 `CAPTURE_VIDEO_TRANSCRIPT` 走独立采集链路，不会复用 article fetch。
 - `anti_hotlink_rules_v1` 由 `AntiHotlinkDomainsEditor` 维护；文章抓取命中规则时会自动走图片缓存链路，即使 `web_article_cache_images_enabled` 关闭也不会把整页抓取变成失败。
 - `inpage-button-shadow.ts` 的点击结算窗口是 `400ms`：单击触发保存，双击打开页面内评论侧边栏，多击只触发彩蛋动画与提示。
 - 评论侧边栏打开后，页面 `selectionchange` 会自动附加当前选区；reply 输入框不触发附加，也不触发“空选区清空”。
@@ -200,6 +209,7 @@
 - **改图片缓存补全流程（cache-images）**：先看 `src/viewmodels/conversations/conversations-context.tsx`, `src/services/conversations/client/repo.ts`, `src/services/conversations/background/handlers.ts`, `src/services/conversations/background/image-backfill-job.ts`；核对动作注入条件、回填后 detail 刷新与计数反馈。
 - **改 Notion / Obsidian 行为**：先看各 orchestrator，再看 `conversation-kinds.ts` 和 settings store。
 - **改 article 抓取**：先看 `article-fetch.ts`（background 侧注入/重试策略）+ `article-extract/engine.ts`（抽取顺序）+ `article-extract/markdown-turndown.ts`（统一转换），再确认保存后的 `sourceType` 和 message 结构没有变。
+- **改视频字幕采集**：先看 `modules/videos.md`、`video-transcript-interceptor.content.ts`、`video-transcript-bridge.content.ts`、`video-transcript-extract.ts`、`video-transcript-capture.ts`、`clipper-context-menu.ts`，再确认 `sourceType='video'`、`SyncNos-Videos` 以及空字幕提示都没有回退。
 
 ## 测试与调试抓手
 

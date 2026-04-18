@@ -2,9 +2,9 @@
 
 # SyncNos
 
-你问过 AI 的每一句话，看过的每一篇长文，再也不会丢。
+你问过 AI 的每一句话、看过的每一篇长文、听过的每一段字幕，再也不会丢。
 
-11+ AI 平台对话 + 任意网页文章，后台自动采集，本地优先存储。
+11+ AI 平台对话 + 任意网页文章 + YouTube/Bilibili 字幕，后台自动采集，本地优先存储。
 一键同步到 Notion / Obsidian，或导出 Markdown / Zip。
 
 [SyncNos 天使赞助者们😍](https://chiimagnus.notion.site/syncnos-angels) · [English](README.md) · **中文**
@@ -37,7 +37,7 @@
 ## 3 步上手
 
 1. **安装扩展**（Chrome / Edge / Firefox / Arc）
-2. **打开任何支持的 AI 平台或网页**，插件自动在后台采集对话或文章
+2. **打开任何支持的 AI 平台、网页或视频页面**，插件自动在后台采集对话、文章或已加载字幕
 3. **同步或导出**：进入 Settings，一键同步到 Notion / Obsidian，或导出 Markdown / Zip 备份
 
 ## 操作演示视频
@@ -68,12 +68,16 @@
 
 任意 `http(s)` 页面均可触发抓取，自动提取正文、标题、作者和发布时间。
 
+### 视频字幕
+
+YouTube 和 Bilibili 视频页可采集页面已加载的字幕 / 转录内容，若有时间戳也会保留。
+
 ## 输出目标
 
 | 目标 | 说明 |
 | --- | --- |
-| **Notion** | OAuth 授权后一键同步。AI 对话 → `SyncNos-AI Chats` 数据库；网页文章 → `SyncNos-Web Articles` 数据库。 |
-| **Obsidian** | 通过 [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) 插件直接写入 vault。本地到本地，不经网络。 |
+| **Notion** | OAuth 授权后一键同步。AI 对话 → `SyncNos-AI Chats` 数据库；网页文章 → `SyncNos-Web Articles` 数据库；视频字幕 → `SyncNos-Videos` 数据库。 |
+| **Obsidian** | 通过 [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) 插件直接写入 vault。本地到本地，不经网络；视频字幕会写入 `SyncNos-Videos`。 |
 | **Markdown / Zip** | 单文件或批量导出；Zip v2 备份可保留文章评论线程与缓存图片，便于完整本地恢复。 |
 
 ## 核心能力
@@ -83,6 +87,7 @@
 - **增量同步**：游标精确追踪，只同步新消息和新文章，不重复不遗漏。
 - **Insight 仪表盘**：总 clips、来源分布、最长对话——让你的知识积累看得见。
 - **Chat with AI**：支持自定义模板、平台启用列表和最大字符数，一键复制本地对话/文章到目标 AI 平台继续深聊。
+- **视频字幕采集**：采集 YouTube / Bilibili 已加载字幕，保留完整时间戳。
 - **AI 输入框 `$` 插入**：在支持站点输入 `$`，可搜索本地已保存条目并内联插入 Markdown 片段。
 - **Inpage 快捷动作**：单击页面内按钮可快速保存，双击可打开评论侧边栏。
 - **文章评论线程**：网页文章支持本地 threaded comments（详情页 + inpage 面板）；可通过侧栏“附加选区”按钮把当前选区附加为引用（无选区会清空引用）；点击/聚焦输入框不再自动附加；并随 Zip v2 备份恢复与文章同步链路保留。

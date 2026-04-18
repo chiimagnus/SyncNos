@@ -19,7 +19,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 | 存储层 | 名称 / 版本 | 结构 | 作用 |
 | --- | --- | --- | --- |
 | IndexedDB | `webclipper`, `DB_VERSION = 8` | `conversations`, `messages`, `sync_mappings`, `image_cache`, `article_comments` | 扩展侧事实源（`image_cache` 仅作本地图片缓存，不改变会话主事实源；`article_comments` 供 article 详情评论线程使用；v8 额外回填列表分页 / 筛选索引） |
-| `conversations` | object store | `sourceType`, `source`, `conversationKey`, `title`, `url`, `lastCapturedAt`, `notionPageId` 等 | 列表、详情、同步入口 |
+| `conversations` | object store | `sourceType`（`chat / article / video`）、`source`, `conversationKey`, `title`, `url`, `lastCapturedAt`, `notionPageId` 等 | 列表、详情、同步入口 |
 | `messages` | object store | `conversationId`, `messageKey`, `contentText`, `contentMarkdown`, `sequence`, `updatedAt` | 生成 Markdown / blocks / note 内容 |
 | `sync_mappings` | object store | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt`, `updatedAt` | 决定是否能增量同步 |
 | `image_cache` | object store | `conversationId + url` 唯一索引、`opfsPath` 等元数据 | 本地图片缓存读取与回填加速 |
@@ -29,6 +29,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
 - `article_comments` 是独立的本地注释层：它会跟随 article 详情页和 inpage comments panel 使用，并会在 article 同步时进入 Notion / Obsidian 评论区段，同时随 Zip v2 备份 / 导入一起保留。
+- `video` conversation 与 chat / article 共用同一份 IndexedDB 事实源：`sourceType='video'` 时会话会进入 `SyncNos-Videos`，但不会额外引入新的 `chrome.storage.local` 配置键。
 - `anti_hotlink_rules_v1` 由 `anti-hotlink-rules-store.ts` 维护，文章抓取与图片下载代理会据此决定是否给特定 CDN 补 Referer；规则读取失败不会阻断抓取主链路。
 - `markdown_reading_profile_v1` 只影响 popup / app 详情页的 markdown 渲染样式，不会改变会话数据本身。
 - `$` mention（在 ChatGPT/Notion AI 输入框插入本地 item）只读扫描 `conversations` 做候选过滤；插入文本复用现有 “Copy full markdown” 的同源格式化链路，且当前不做截断。
@@ -142,3 +143,9 @@ export const DB_VERSION = 8;
 - `webclipper/tests/storage/schema-migration.test.ts`
 - `webclipper/tests/storage/article-comments-idb.test.ts`
 - `webclipper/tests/storage/insight-stats.test.ts`
+- `webclipper/src/services/protocols/conversation-kinds.ts`
+- `webclipper/src/services/url-cleaning/video-url.ts`
+- `webclipper/tests/smoke/video-kind.test.ts`
+
+## 更新记录（Update Notes）
+- 2026-04-18：补充 `video` conversation 的存储语义，明确 `sourceType='video'` 会落到 `SyncNos-Videos`，但不新增独立 `chrome.storage.local` 键。
