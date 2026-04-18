@@ -20,6 +20,8 @@ let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
 let conversationListStatsCacheKey: string | null = null;
 let conversationListStatsCacheValue: { summary: ConversationListSummary; facets: ConversationListFacets } | null = null;
+let conversationListDerivedKeysBackfilled = false;
+let conversationListDerivedKeysBackfillPromise: Promise<void> | null = null;
 
 async function openDb(): Promise<IDBDatabase> {
   if (cachedDb) return cachedDb;
@@ -46,6 +48,8 @@ export async function __closeDbForTests(): Promise<void> {
     openingDb = null;
     conversationListStatsCacheKey = null;
     conversationListStatsCacheValue = null;
+    conversationListDerivedKeysBackfilled = false;
+    conversationListDerivedKeysBackfillPromise = null;
   }
 }
 
@@ -146,6 +150,43 @@ function toComparableCursor(cursor: ConversationListCursor | null | undefined): 
 function invalidateConversationListStatsCache(): void {
   conversationListStatsCacheKey = null;
   conversationListStatsCacheValue = null;
+}
+
+async function ensureConversationListDerivedKeysBackfilled(): Promise<void> {
+  if (conversationListDerivedKeysBackfilled) return;
+  if (conversationListDerivedKeysBackfillPromise) return await conversationListDerivedKeysBackfillPromise;
+
+  conversationListDerivedKeysBackfillPromise = (async () => {
+    const db = await openDb();
+    const { t, stores } = tx(db, ['conversations'], 'readwrite');
+
+    let changed = false;
+    const request = stores.conversations.openCursor();
+    await new Promise<void>((resolve, reject) => {
+      request.onerror = () => reject(request.error || new Error('cursor failed'));
+      request.onsuccess = () => {
+        const cursor = request.result as IDBCursorWithValue | null;
+        if (!cursor) return resolve();
+        const raw = (cursor.value || {}) as any;
+        const normalized = normalizeConversationListRecord(raw);
+        if (normalized !== raw) {
+          changed = true;
+          cursor.update(normalized as any);
+        }
+        cursor.continue();
+      };
+    });
+
+    await txDone(t);
+    if (changed) invalidateConversationListStatsCache();
+    conversationListDerivedKeysBackfilled = true;
+  })()
+    .catch(() => {})
+    .finally(() => {
+      conversationListDerivedKeysBackfillPromise = null;
+    });
+
+  await conversationListDerivedKeysBackfillPromise;
 }
 
 function isSameLocalDayTimestamp(ts: number, now: Date): boolean {
@@ -926,6 +967,8 @@ async function readConversationListPage(input: {
   cursor?: ConversationListCursor | null;
   limit?: number | null;
 }): Promise<ConversationListPage<Conversation>> {
+  await ensureConversationListDerivedKeysBackfilled();
+
   const query = resolveConversationListQuery(input.queryInput, input.limit);
   const cursor = toComparableCursor(input.cursor);
   const statsKey = `${normalizeListKey(query.sourceKey, LIST_SOURCE_KEY_ALL)}::${normalizeConversationListSiteFilterKey(query.siteKey)}`;
