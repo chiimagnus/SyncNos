@@ -46,6 +46,8 @@ export const zh: { [K in TranslationKey]: string } = {
   contextMenuRootTitle: 'SyncNos WebClipper',
   contextMenuSaveCurrentPage: '保存当前页面',
   contextMenuSaveCurrentAiChat: '保存当前 AI 对话',
+  contextMenuSaveCurrentVideoTranscript: '保存视频字幕',
+  videoTranscriptTipNoSubtitles: '未检测到字幕，未保存。',
   contextMenuInpageGroupTitle: '页面内按钮',
   inpageDisplayModeLabel: '显示范围',
   inpageDisplayModeSupported: '仅在支持站点显示',

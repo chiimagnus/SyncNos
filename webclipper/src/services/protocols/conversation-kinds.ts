@@ -7,6 +7,7 @@ type ConversationKindRegistry = {
   getNotionDbSpecByKindId: (kindId: string) => ConversationKindDefinition['notion']['dbSpec'] | null;
   getNotionStorageKeys: () => string[];
   CHAT_KIND_ID: string;
+  VIDEO_KIND_ID: string;
   ARTICLE_KIND_ID: string;
 };
 
@@ -72,6 +73,16 @@ function asNumber(value: unknown) {
   return { number: Number.isFinite(numeric) ? numeric : 0 };
 }
 
+function asSelect(value: unknown) {
+  const name = String(value || '').trim();
+  if (!name) return { select: null };
+  return { select: { name } };
+}
+
+function asCheckbox(value: unknown) {
+  return { checkbox: value === true };
+}
+
 function register(definition: ConversationKindDefinition): boolean {
   const checked = assertKindDef(definition);
   if (definitions.some((item) => item.id === checked.id)) return false;
@@ -112,6 +123,7 @@ function getNotionStorageKeys(): string[] {
 }
 
 export const CHAT_KIND_ID = 'chat';
+export const VIDEO_KIND_ID = 'video';
 export const ARTICLE_KIND_ID = 'article';
 
 const chatKind: ConversationKindDefinition = {
@@ -202,6 +214,67 @@ const articleKind: ConversationKindDefinition = {
   obsidian: { folder: 'SyncNos-WebArticles' },
 };
 
+const videoKind: ConversationKindDefinition = {
+  id: VIDEO_KIND_ID,
+  matches: (conversation) => conversation && String(conversation.sourceType || '') === 'video',
+  notion: {
+    dbSpec: {
+      title: 'SyncNos-Videos',
+      storageKey: 'notion_db_id_syncnos_videos',
+      properties: {
+        Name: { title: {} },
+        Date: { date: {} },
+        URL: { url: {} },
+        Platform: { select: { options: [] } },
+        Author: { rich_text: {} },
+        Duration: { number: {} },
+        Thumbnail: { url: {} },
+        'Transcript Source': { select: { options: [] } },
+        'Has Timestamps': { checkbox: {} },
+      },
+      ensureSchemaPatch: {
+        Platform: { select: { options: [] } },
+        Author: { rich_text: {} },
+        Duration: { number: {} },
+        Thumbnail: { url: {} },
+        'Transcript Source': { select: { options: [] } },
+        'Has Timestamps': { checkbox: {} },
+      },
+    },
+    pageSpec: {
+      buildCreateProperties(conversation) {
+        const data = conversation || {};
+        return {
+          Name: asTitle(data.title),
+          URL: asUrl(data.url),
+          Date: asDate(data.lastCapturedAt),
+          Platform: asSelect((data as any).platform),
+          Author: asRichText(data.author),
+          Duration: asNumber((data as any).durationSeconds),
+          Thumbnail: asUrl((data as any).thumbnailUrl),
+          'Transcript Source': asSelect((data as any).transcriptSource),
+          'Has Timestamps': asCheckbox((data as any).hasTimestamps),
+        };
+      },
+      buildUpdateProperties(conversation) {
+        const data = conversation || {};
+        return {
+          Name: asTitle(data.title),
+          URL: asUrl(data.url),
+          Platform: asSelect((data as any).platform),
+          Author: asRichText(data.author),
+          Duration: asNumber((data as any).durationSeconds),
+          Thumbnail: asUrl((data as any).thumbnailUrl),
+          'Transcript Source': asSelect((data as any).transcriptSource),
+          'Has Timestamps': asCheckbox((data as any).hasTimestamps),
+        };
+      },
+    },
+  },
+  obsidian: { folder: 'SyncNos-Videos' },
+};
+
+register(videoKind);
 register(articleKind);
 register(chatKind);
 
@@ -212,5 +285,6 @@ export const conversationKinds: ConversationKindRegistry = {
   getNotionDbSpecByKindId,
   getNotionStorageKeys,
   CHAT_KIND_ID,
+  VIDEO_KIND_ID,
   ARTICLE_KIND_ID,
 };

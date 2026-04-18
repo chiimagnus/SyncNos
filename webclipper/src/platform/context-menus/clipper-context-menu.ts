@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { CURRENT_PAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { CONTENT_MESSAGE_TYPES, CURRENT_PAGE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet, storageOnChanged, storageSet } from '@platform/storage/local';
 import { tabsQuery, tabsSendMessage } from '@platform/webext/tabs';
 
@@ -11,6 +11,7 @@ const STORAGE_KEY_AI_CHAT_AUTO_SAVE_ENABLED = 'ai_chat_auto_save_enabled';
 
 const MENU_ROOT_ID = 'syncnos_clipper_root';
 const MENU_SAVE_CURRENT_PAGE_ID = 'syncnos_clipper_save_current_page';
+const MENU_SAVE_VIDEO_TRANSCRIPT_ID = 'syncnos_clipper_save_video_transcript';
 const MENU_INPAGE_GROUP_ID = 'syncnos_clipper_inpage_group';
 const MENU_AUTOSAVE_ID = 'syncnos_clipper_autosave';
 const MENU_MODE_SUPPORTED_ID = 'syncnos_clipper_mode_supported';
@@ -87,6 +88,17 @@ async function captureActiveTabCurrentPage(): Promise<void> {
   await tabsSendMessage(tabId, { type: CURRENT_PAGE_MESSAGE_TYPES.CAPTURE, payload: { source: 'contextmenu' } });
 }
 
+async function captureActiveTabVideoTranscript(): Promise<void> {
+  const tabs = await tabsQuery({ active: true, currentWindow: true });
+  const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
+  const tabId = Number(tab?.id);
+
+  if (!tab || !Number.isFinite(tabId) || tabId <= 0) return;
+  if (!isHttpUrl(tab.url)) return;
+
+  await tabsSendMessage(tabId, { type: CONTENT_MESSAGE_TYPES.CAPTURE_VIDEO_TRANSCRIPT, payload: { source: 'contextmenu' } });
+}
+
 async function refreshSaveMenuTitle(api: any, tab: { id?: unknown; url?: unknown } | null): Promise<void> {
   if (!api?.update) return;
   const tabId = Number(tab?.id);
@@ -132,6 +144,19 @@ async function createOrRefreshMenus(api: any) {
     id: MENU_SAVE_CURRENT_PAGE_ID,
     parentId: MENU_ROOT_ID,
     title: t('contextMenuSaveCurrentPage'),
+  });
+
+  api.create({
+    contexts: ['page'],
+    documentUrlPatterns: [
+      'https://www.youtube.com/watch*',
+      'https://youtu.be/*',
+      'https://www.bilibili.com/video/*',
+      'https://bilibili.com/video/*',
+    ],
+    id: MENU_SAVE_VIDEO_TRANSCRIPT_ID,
+    parentId: MENU_ROOT_ID,
+    title: t('contextMenuSaveCurrentVideoTranscript'),
   });
 
   api.create({
@@ -207,6 +232,11 @@ export function registerClipperContextMenu(): void {
 
       if (id === MENU_SAVE_CURRENT_PAGE_ID) {
         void captureActiveTabCurrentPage().catch(() => {});
+        return;
+      }
+
+      if (id === MENU_SAVE_VIDEO_TRANSCRIPT_ID) {
+        void captureActiveTabVideoTranscript().catch(() => {});
         return;
       }
 
