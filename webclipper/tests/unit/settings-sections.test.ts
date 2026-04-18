@@ -79,6 +79,18 @@ function cleanupDom() {
   delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
 }
 
+async function flushReactScheduler() {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    if (typeof setImmediate === 'function') {
+      setImmediate(resolve);
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+  await Promise.resolve();
+}
+
 describe('inpage anti-hotlink advanced editor', () => {
   let root: ReactDOM.Root | null = null;
 
@@ -87,11 +99,12 @@ describe('inpage anti-hotlink advanced editor', () => {
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     act(() => {
       root?.unmount();
     });
     root = null;
+    await flushReactScheduler();
     cleanupDom();
   });
 
