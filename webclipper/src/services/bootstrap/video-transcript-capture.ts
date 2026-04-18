@@ -77,18 +77,21 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         : null;
     const thumbnailUrl = normalizeText(extracted?.meta?.thumbnailUrl || '');
 
-    const transcriptMarkdown = formatTranscriptMarkdown(
-      Array.isArray(extracted?.cues) ? extracted.cues : [],
-      extracted?.hasTimestamps === true,
-    );
+    const cues = Array.isArray(extracted?.cues) ? extracted.cues : [];
+    const transcriptMarkdown = formatTranscriptMarkdown(cues, extracted?.hasTimestamps === true);
     const subtitleStatus: 'ok' | 'empty' = transcriptMarkdown ? 'ok' : 'empty';
-    const resolvedTranscriptMarkdown = transcriptMarkdown || '_(未检测到字幕。)_';
     const transcriptText = normalizeText(
-      (Array.isArray(extracted?.cues) ? extracted.cues : [])
-        .map((c: any) => normalizeText(c?.text || ''))
-        .filter(Boolean)
-        .join('\n'),
+      cues.map((c: any) => normalizeText(c?.text || '')).filter(Boolean).join('\n'),
     );
+
+    if (subtitleStatus === 'empty') {
+      return {
+        conversationId: null,
+        title: title || undefined,
+        url,
+        subtitleStatus,
+      };
+    }
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: {
@@ -120,7 +123,7 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         messageKey: 'video_transcript',
         role: 'transcript',
         contentText: transcriptText,
-        contentMarkdown: resolvedTranscriptMarkdown,
+        contentMarkdown: transcriptMarkdown,
         sequence: 1,
         updatedAt: capturedAt,
       },

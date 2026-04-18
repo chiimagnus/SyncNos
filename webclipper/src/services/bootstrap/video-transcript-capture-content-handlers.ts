@@ -58,11 +58,13 @@ export function registerVideoTranscriptCaptureContentHandlers(
       .then(() => service.captureVideoTranscript())
       .then((data) => {
         if (showTip) {
-          const suffix = data?.subtitleStatus === 'empty' ? t('videoTranscriptTipNoSubtitlesSuffix') : '';
-          inpageTip?.showSaveTip?.(
-            buildCaptureSuccessTipMessage({ isNew: data?.isNew, title: data?.title, suffix }),
-            { kind: 'default' },
-          );
+          if (data?.subtitleStatus === 'empty') {
+            inpageTip?.showSaveTip?.(t('videoTranscriptTipNoSubtitles'), { kind: 'default' });
+          } else {
+            inpageTip?.showSaveTip?.(buildCaptureSuccessTipMessage({ isNew: data?.isNew, title: data?.title }), {
+              kind: 'default',
+            });
+          }
         }
         sendResponse(ok(data));
       })
