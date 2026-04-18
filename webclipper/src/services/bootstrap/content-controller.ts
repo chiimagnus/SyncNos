@@ -388,6 +388,35 @@ export function createContentController(deps: Deps) {
       return state;
     }
 
+    function formatUnknownError(err: unknown): string {
+      if (err instanceof Error) return err.message;
+      try {
+        if (err && typeof err === 'object') return JSON.stringify(err);
+      } catch (_e) {
+        // ignore
+      }
+      return String(err || '');
+    }
+
+    function summarizeBackfillMessages(messages: any[], options?: { head?: boolean; limit?: number }) {
+      const limit = Number.isFinite(Number(options?.limit)) ? Math.max(1, Math.floor(Number(options?.limit))) : 8;
+      const list = Array.isArray(messages) ? messages : [];
+      const slice = options?.head ? list.slice(0, limit) : list.slice(Math.max(0, list.length - limit));
+      return slice.map((m: any) => {
+        const key = String(m?.messageKey || '').trim();
+        const role = String(m?.role || '').trim();
+        const seq = Number(m?.sequence);
+        const raw = String(m?.contentText || m?.contentMarkdown || '').replace(/\s+/g, ' ').trim();
+        const preview = raw.length > 80 ? `${raw.slice(0, 79)}…` : raw;
+        return {
+          messageKey: key || null,
+          role: role || null,
+          sequence: Number.isFinite(seq) ? seq : null,
+          preview: preview || null,
+        };
+      });
+    }
+
     async function maybeRunBackfill(snapshot: any): Promise<{
       changed: boolean;
       snapshot: any | null;
@@ -456,7 +485,7 @@ export function createContentController(deps: Deps) {
           console.warn('[WebClipper] auto-save backfill skipped: tail window unavailable', {
             source,
             conversationKey,
-            error: error instanceof Error ? error.message : String(error || ''),
+            error: formatUnknownError(error),
           });
         }
         // Tail window availability is independent of the page signature; allow retries after throttle even if window doesn't change.
@@ -479,6 +508,8 @@ export function createContentController(deps: Deps) {
             conversationKey,
             localTailCount: Array.isArray(localTailMessages) ? localTailMessages.length : 0,
             pageWindowCount: Array.isArray(pageWindowMessages) ? pageWindowMessages.length : 0,
+            localTailTailSample: summarizeBackfillMessages(localTailMessages, { head: false, limit: 8 }),
+            pageWindowHeadSample: summarizeBackfillMessages(pageWindowMessages, { head: true, limit: 8 }),
           });
         }
         return { changed: false, snapshot: null, diff: null, logInfo: null, pageSignature: null, stateKey: null };
