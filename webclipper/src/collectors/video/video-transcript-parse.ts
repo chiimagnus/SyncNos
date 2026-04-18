@@ -138,7 +138,12 @@ export function parseBilibiliSubtitleJson(text: string): TranscriptCue[] {
   if (!src) return [];
   try {
     const json: any = JSON.parse(src);
-    const body = Array.isArray(json?.body) ? json.body : [];
+    const body =
+      (Array.isArray(json?.body) ? json.body : null) ??
+      (Array.isArray(json?.data?.body) ? json.data.body : null) ??
+      (Array.isArray(json?.result?.body) ? json.result.body : null) ??
+      (Array.isArray(json?.subtitle?.body) ? json.subtitle.body : null) ??
+      [];
     const out: TranscriptCue[] = [];
     for (const item of body) {
       const start = Number(item?.from);
@@ -152,4 +157,3 @@ export function parseBilibiliSubtitleJson(text: string): TranscriptCue[] {
     return [];
   }
 }
-

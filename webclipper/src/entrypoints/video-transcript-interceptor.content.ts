@@ -41,6 +41,7 @@ function shouldInterceptUrl(raw: string): boolean {
   if (!url) return false;
   const lower = url.toLowerCase();
   if (lower.includes('youtube.com/api/timedtext')) return true;
+  if (lower.includes('/bfs/ai_subtitle/')) return true;
   if (lower.includes('hdslb.com/bfs/subtitle/') && lower.includes('.json')) return true;
   if (lower.includes('api.bilibili.com/x/player/wbi/v2')) return true;
   return false;
@@ -174,7 +175,26 @@ function wrapXhr() {
           () => {
             try {
               const contentType = parseContentType((this as any).getResponseHeader?.('content-type') || '');
-              const bodyText = safeSliceBody(String((this as any).responseText || ''));
+              let bodyText = safeSliceBody(String((this as any).responseText || ''));
+              if (!bodyText) {
+                const responseType = String((this as any).responseType || '');
+                const response = (this as any).response;
+                if (responseType === 'json' && response != null) {
+                  try {
+                    bodyText = safeSliceBody(JSON.stringify(response));
+                  } catch (_e) {
+                    // ignore
+                  }
+                } else if (responseType === 'arraybuffer' && response && typeof response.byteLength === 'number') {
+                  try {
+                    if (typeof TextDecoder === 'function') {
+                      bodyText = safeSliceBody(new TextDecoder('utf-8').decode(response));
+                    }
+                  } catch (_e) {
+                    // ignore
+                  }
+                }
+              }
               if (!bodyText) return;
               postIntercept({ url, contentType, bodyText, at: Date.now() });
             } catch (_e) {
@@ -229,4 +249,3 @@ export default defineContentScript({
     });
   },
 });
-

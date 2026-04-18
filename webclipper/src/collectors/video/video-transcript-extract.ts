@@ -118,9 +118,21 @@ function extractYoutubeCuesFromIntercept(): TranscriptCue[] {
 }
 
 function extractBilibiliCuesFromIntercept(): TranscriptCue[] {
-  const picked = pickLatestResponse((url) => url.toLowerCase().includes('hdslb.com/bfs/subtitle/') && url.toLowerCase().includes('.json'));
-  if (!picked) return [];
-  return parseBilibiliSubtitleJson(picked.bodyText);
+  const list = listVideoInterceptedResponses();
+  const sorted = list
+    .slice()
+    .filter((r) => r && typeof r.url === 'string' && typeof r.bodyText === 'string')
+    .sort((a, b) => Number(b.at) - Number(a.at));
+
+  for (const item of sorted) {
+    const urlLower = String(item.url || '').toLowerCase();
+    if (!urlLower) continue;
+    if (!urlLower.includes('/bfs/subtitle/') && !urlLower.includes('/bfs/ai_subtitle/')) continue;
+    const cues = parseBilibiliSubtitleJson(String(item.bodyText || ''));
+    if (cues.length) return cues;
+  }
+
+  return [];
 }
 
 function parseTimeToSeconds(raw: string): number | null {
@@ -191,4 +203,3 @@ export async function extractVideoTranscriptFromCurrentPage(): Promise<VideoTran
   if (dom.length) return { meta, cues: dom, source: 'B', hasTimestamps: false };
   return { meta, cues: [], source: 'C', hasTimestamps: false };
 }
-
