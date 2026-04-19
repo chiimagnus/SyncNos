@@ -64,6 +64,7 @@ export type ConversationDetailPaneProps = {
   onTriggerCommentsSidebar?: () => void;
   onCommentsLocatorRootChange?: (root: Element | null) => void;
   commentsSidebarOpen?: boolean;
+  allowTitleEditing?: boolean;
 };
 
 export function ConversationDetailPane({
@@ -73,6 +74,7 @@ export function ConversationDetailPane({
   onTriggerCommentsSidebar,
   onCommentsLocatorRootChange,
   commentsSidebarOpen = false,
+  allowTitleEditing = false,
 }: ConversationDetailPaneProps) {
   const {
     activeId,
@@ -82,6 +84,8 @@ export function ConversationDetailPane({
     detailError,
     detail,
     detailHeaderActions,
+    updateSelectedConversationTitle,
+    resetSelectedConversationTitle,
     updateSelectedConversationUrl,
     cleanUrlDraft,
   } = useConversationsApp();
@@ -185,11 +189,18 @@ export function ConversationDetailPane({
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [urlCleaning, setUrlCleaning] = useState(false);
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
+  const displayedTitle = selected ? formatConversationTitle(selected.title) : t('detailTitle');
+  const titleManuallyEdited = (selected as any)?.titleManuallyEdited === true;
   const [markdownReadingProfile, setMarkdownReadingProfile] = useState(() => normalizeStoredMarkdownReadingProfile(''));
 
   useEffect(() => {
+    setTitleEditing(false);
+    setTitleDraft('');
     setUrlEditing(false);
     setUrlDraft('');
     setUrlCleaning(false);
@@ -231,6 +242,19 @@ export function ConversationDetailPane({
       optimisticActiveClearTimerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!titleEditing) return;
+    const timer = setTimeout(() => {
+      try {
+        titleInputRef.current?.focus?.();
+        titleInputRef.current?.select?.();
+      } catch (_e) {
+        // ignore
+      }
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [titleEditing]);
 
   useEffect(() => {
     if (!urlEditing) return;
@@ -276,6 +300,11 @@ export function ConversationDetailPane({
     setUrlEditing(false);
   };
 
+  const saveTitleDraft = async () => {
+    await updateSelectedConversationTitle(String(titleDraft || ''));
+    setTitleEditing(false);
+  };
+
   return (
     <section className="tw-min-h-full tw-bg-[var(--bg-card)]">
       <section className="tw-flex tw-flex-col tw-bg-[var(--bg-card)]" aria-label={t('conversationDetailAria')}>
@@ -316,11 +345,95 @@ export function ConversationDetailPane({
               ) : null}
 
               <div className="tw-min-w-0 tw-flex-1">
-                <h2 className="tw-m-0 tw-block tw-min-w-0 tw-truncate tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
-                  {selected ? formatConversationTitle(selected.title) : t('detailTitle')}
-                </h2>
+                {selected && allowTitleEditing && titleEditing ? (
+                  <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+                    <input
+                      ref={titleInputRef}
+                      className="tw-min-w-0 tw-flex-1 tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2 tw-text-[18px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                      value={titleDraft}
+                      onChange={(e) => setTitleDraft(e.target.value)}
+                      placeholder="输入标题"
+                      autoCapitalize="sentences"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setTitleEditing(false);
+                          setTitleDraft('');
+                          return;
+                        }
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void (async () => {
+                            try {
+                              await saveTitleDraft();
+                            } catch (error) {
+                              const message =
+                                error instanceof Error && error.message
+                                  ? error.message
+                                  : String(error || t('actionFailedFallback'));
+                              if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+                              else console.error(message);
+                            }
+                          })();
+                        }
+                      }}
+                    />
+                    <span className="tw-shrink-0 tw-whitespace-nowrap tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
+                      Enter 保存 · Esc 取消
+                    </span>
+                  </div>
+                ) : (
+                  <h2 className="tw-m-0 tw-block tw-min-w-0 tw-truncate tw-text-[20px] tw-font-extrabold tw-leading-[1.18] tw-tracking-[-0.01em] tw-text-[var(--text-primary)]">
+                    {displayedTitle}
+                  </h2>
+                )}
                 {selected ? (
-                  <div className="tw-mt-1 tw-flex tw-min-w-0 tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+                  <div className="tw-mt-1 tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)]">
+                    {allowTitleEditing && !titleEditing ? (
+                      <>
+                        {titleManuallyEdited ? (
+                          <span className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-pill)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-leading-none tw-text-[var(--text-secondary)]">
+                            手动标题
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))]"
+                          onClick={() => {
+                            setTitleDraft(String((selected as any)?.title || ''));
+                            setTitleEditing(true);
+                          }}
+                          aria-label="Edit title"
+                        >
+                          修改标题
+                        </button>
+                        {titleManuallyEdited ? (
+                          <button
+                            type="button"
+                            className="tw-inline-flex tw-items-center tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-extrabold tw-text-[var(--text-secondary)] hover:tw-bg-[color-mix(in_srgb,var(--bg-sunken)_85%,var(--bg-card))]"
+                            onClick={() => {
+                              void (async () => {
+                                try {
+                                  await resetSelectedConversationTitle();
+                                } catch (error) {
+                                  const message =
+                                    error instanceof Error && error.message
+                                      ? error.message
+                                      : String(error || t('actionFailedFallback'));
+                                  if (typeof globalThis.window?.alert === 'function') globalThis.window.alert(message);
+                                  else console.error(message);
+                                }
+                              })();
+                            }}
+                            aria-label="Reset title override"
+                          >
+                            恢复自动标题
+                          </button>
+                        ) : null}
+                      </>
+                    ) : null}
                     {urlEditing ? (
                       <>
                         <input

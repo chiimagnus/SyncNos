@@ -10,6 +10,7 @@ import {
   getConversationTailWindowBySourceAndKey,
   hasConversation,
   mergeConversationsByIds,
+  updateConversationTitle,
 } from '@services/conversations/data/storage';
 import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
@@ -179,6 +180,33 @@ export function registerConversationHandlers(router: AnyRouter) {
       });
     }
     return router.ok({ ...(convo as any), __isNew: !existed });
+  });
+
+  router.register(CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_TITLE, async (msg) => {
+    const conversationId = Number(msg?.conversationId);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) {
+      return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
+    }
+    const mode = String(msg?.mode || '')
+      .trim()
+      .toLowerCase();
+    if (mode !== 'set' && mode !== 'reset') {
+      return invalidArgument('mode', 'invalid title update mode', msg?.mode);
+    }
+    const title = msg?.title == null ? '' : String(msg?.title);
+    if (mode === 'set' && !title.trim()) {
+      return invalidArgument('title', 'invalid title', msg?.title);
+    }
+    const conversation = await updateConversationTitle({
+      conversationId,
+      mode: mode as 'set' | 'reset',
+      title,
+    });
+    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+      reason: 'updateConversationTitle',
+      conversationId,
+    });
+    return router.ok(conversation);
   });
 
   router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {

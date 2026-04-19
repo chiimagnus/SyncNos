@@ -120,10 +120,12 @@ export default function AppShell() {
       }) {
         const location = useLocation();
         const initialOpenLocRef = useRef<{ source: string; conversationKey: string } | null | undefined>(undefined);
+        const initialLocValueRef = useRef<string | null | undefined>(undefined);
         if (initialOpenLocRef.current === undefined) {
           const search = String(location.search || '');
           const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
           const loc = params.get('loc');
+          initialLocValueRef.current = loc ? String(loc).trim() : null;
           initialOpenLocRef.current = loc ? decodeConversationLoc(loc) : null;
         }
 
@@ -136,6 +138,7 @@ export default function AppShell() {
               setCollapsed={setCollapsed}
               setWideCommentsCollapsed={setWideCommentsCollapsed}
               setMediumCommentsCollapsed={setMediumCommentsCollapsed}
+              initialLocValue={initialLocValueRef.current ?? null}
             />
             <AppTooltipHost />
           </ConversationsProvider>
@@ -151,6 +154,7 @@ export default function AppShell() {
     setCollapsed,
     setWideCommentsCollapsed,
     setMediumCommentsCollapsed,
+    initialLocValue,
   }: {
     sidebarCollapsed: boolean;
     wideCommentsSidebarCollapsed: boolean;
@@ -158,6 +162,7 @@ export default function AppShell() {
     setCollapsed: (collapsed: boolean) => void;
     setWideCommentsCollapsed: (collapsed: boolean) => void;
     setMediumCommentsCollapsed: (collapsed: boolean) => void;
+    initialLocValue: string | null;
   }) {
     const tier = useResponsiveTier();
     const isNarrow = tier === 'narrow';
@@ -190,9 +195,10 @@ export default function AppShell() {
     }
     const location = useLocation();
     const navigate = useNavigate();
-    const { openConversationExternalByLoc, selectedConversation, detail } = useConversationsApp();
+    const { openConversationExternalByLoc, selectedConversation, detail, startupInitialOpenPending } =
+      useConversationsApp();
     const lastInternalLocRef = useRef<string | null>(null);
-    const processedLocRef = useRef<string | null>(null);
+    const processedLocRef = useRef<string | null>(initialLocValue || null);
     const locMountedRef = useRef(false);
     const isArticleConversation = isArticleConversationLike(selectedConversation);
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
@@ -562,6 +568,7 @@ export default function AppShell() {
 
     useEffect(() => {
       if (location.pathname !== '/') return;
+      if (startupInitialOpenPending) return;
       if (!selectedConversation) return;
 
       const nextLoc = encodeConversationLoc({
@@ -576,7 +583,7 @@ export default function AppShell() {
       params.set('loc', nextLoc);
       lastInternalLocRef.current = nextLoc;
       navigate({ pathname: '/', search: `?${params.toString()}` }, { replace: true });
-    }, [location.pathname, location.search, navigate, selectedConversation]);
+    }, [location.pathname, location.search, navigate, selectedConversation, startupInitialOpenPending]);
 
     const hideSidebarInMedium = isMedium && showCommentsSidebar;
     const wideHideList = !isNarrow && (sidebarCollapsed || hideSidebarInMedium);
@@ -651,10 +658,12 @@ export default function AppShell() {
                     path="/"
                     element={
                       <ConversationsScene
+                        allowDetailTitleEditing
                         wideChrome="none"
                         wideHideList={wideHideList}
                         wideDetail={
                           <ConversationDetailPane
+                            allowTitleEditing
                             onExpandSidebar={sidebarCollapsed ? () => setCollapsed(false) : undefined}
                             onTriggerCommentsSidebar={canToggleCommentsSidebar ? triggerCommentsSidebar : undefined}
                             onCommentsLocatorRootChange={(root) => {

@@ -14,6 +14,7 @@ import {
   mergeConversationsByIds,
   syncConversationMessages,
   syncConversationMessagesAppendOnly,
+  updateConversationTitle,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
 
@@ -245,6 +246,45 @@ describe('conversations storage-idb', () => {
     expect(windowResult.messages[199]?.sequence).toBe(300);
   });
 
+  it('preserves manual title overrides across upserts and reset', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'manual-title-k1',
+      title: 'Auto title 1',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+
+    const manual = await updateConversationTitle({
+      conversationId: id,
+      mode: 'set',
+      title: 'Manual title',
+    });
+    expect(manual.title).toBe('Manual title');
+    expect(manual.autoTitle).toBe('Auto title 1');
+    expect(manual.titleManuallyEdited).toBe(true);
+
+    const afterAutosave = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'manual-title-k1',
+      title: 'Auto title 2',
+      lastCapturedAt: 2,
+    });
+    expect(afterAutosave.title).toBe('Manual title');
+    expect(afterAutosave.autoTitle).toBe('Auto title 2');
+    expect(afterAutosave.titleManuallyEdited).toBe(true);
+
+    const reset = await updateConversationTitle({
+      conversationId: id,
+      mode: 'reset',
+    });
+    expect(reset.title).toBe('Auto title 2');
+    expect(reset.autoTitle).toBe('Auto title 2');
+    expect(reset.titleManuallyEdited).toBe(false);
+  });
+
   it('deletes conversations, messages, and sync mappings', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
@@ -459,5 +499,46 @@ describe('conversations storage-idb', () => {
     expect(merged).toBeTruthy();
     expect(merged?.listSourceKey).toBe('web');
     expect(merged?.listSiteKey).toBe('domain:example.com');
+  });
+
+  it('preserves manual title override and latest auto title when merging conversations', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'merge_keep',
+      title: 'Keep auto',
+      lastCapturedAt: 10,
+    });
+    const remove = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'merge_remove',
+      title: 'Remove auto 1',
+      lastCapturedAt: 20,
+    });
+
+    await updateConversationTitle({
+      conversationId: Number(remove.id),
+      mode: 'set',
+      title: 'Manual remove',
+    });
+    await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'merge_remove',
+      title: 'Remove auto 2',
+      lastCapturedAt: 30,
+    });
+
+    await mergeConversationsByIds({
+      keepConversationId: Number(keep.id),
+      removeConversationId: Number(remove.id),
+    });
+
+    const merged = await getConversationById(Number(keep.id));
+    expect(merged).toBeTruthy();
+    expect(merged?.title).toBe('Manual remove');
+    expect(merged?.autoTitle).toBe('Remove auto 2');
+    expect(merged?.titleManuallyEdited).toBe(true);
   });
 });

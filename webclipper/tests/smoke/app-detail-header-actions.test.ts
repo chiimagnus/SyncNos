@@ -30,6 +30,10 @@ const currentState = {
       onTrigger: vi.fn(async () => {}),
     },
   ] as any[],
+  updateSelectedConversationTitle: vi.fn(async () => {}),
+  resetSelectedConversationTitle: vi.fn(async () => {}),
+  updateSelectedConversationUrl: vi.fn(async () => {}),
+  cleanUrlDraft: vi.fn(async (url: string) => url),
 };
 
 vi.mock('../../src/ui/shared/ChatMessageBubble', () => ({
@@ -90,6 +94,9 @@ function setupDom() {
     configurable: true,
     value: true,
   });
+
+  (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
+  (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
 }
 
 function cleanupDom() {
@@ -160,6 +167,14 @@ describe('ConversationDetailPane header actions', () => {
         onTrigger: vi.fn(async () => {}),
       },
     ];
+    currentState.updateSelectedConversationTitle.mockReset();
+    currentState.updateSelectedConversationTitle.mockResolvedValue(undefined);
+    currentState.resetSelectedConversationTitle.mockReset();
+    currentState.resetSelectedConversationTitle.mockResolvedValue(undefined);
+    currentState.updateSelectedConversationUrl.mockReset();
+    currentState.updateSelectedConversationUrl.mockResolvedValue(undefined);
+    currentState.cleanUrlDraft.mockReset();
+    currentState.cleanUrlDraft.mockImplementation(async (url: string) => url);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -199,6 +214,65 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
+  });
+
+  it('keeps title editing hidden unless app explicitly enables it', () => {
+    act(() => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+
+    expect(document.querySelector('[aria-label="Edit title"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Reset title override"]')).toBeFalsy();
+  });
+
+  it('shows inline title editor when app enables it', async () => {
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Manual title',
+      source: 'chatgpt',
+      conversationKey: 'conv-11',
+      notionPageId: '01234567-89ab-cdef-0123-456789abcdef',
+    } as any;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane, { allowTitleEditing: true }));
+    });
+
+    const editButton = document.querySelector('[aria-label="Edit title"]') as HTMLButtonElement | null;
+    expect(editButton).toBeTruthy();
+
+    await act(async () => {
+      editButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const input = document.querySelector('input[placeholder="输入标题"]') as HTMLInputElement | null;
+    expect(input).toBeTruthy();
+  });
+
+  it('shows reset title action only for manual titles when app enables it', async () => {
+    currentState.selectedConversation = {
+      id: 11,
+      title: 'Manual title',
+      titleManuallyEdited: true,
+      source: 'chatgpt',
+      conversationKey: 'conv-11',
+      notionPageId: '01234567-89ab-cdef-0123-456789abcdef',
+    } as any;
+
+    act(() => {
+      root!.render(createElement(ConversationDetailPane, { allowTitleEditing: true }));
+    });
+
+    const resetButton = document.querySelector('[aria-label="Reset title override"]') as HTMLButtonElement | null;
+    expect(resetButton).toBeTruthy();
+
+    await act(async () => {
+      resetButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(currentState.resetSelectedConversationTitle).toHaveBeenCalledTimes(1);
   });
 
   it('shows a menu trigger in the app detail header when multiple destinations are available', () => {

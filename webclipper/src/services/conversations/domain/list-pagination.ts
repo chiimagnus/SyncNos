@@ -26,6 +26,7 @@ export type ConversationListOpenTarget = {
   source: string;
   conversationKey: string;
   title?: string;
+  titleManuallyEdited?: boolean;
   url?: string;
   sourceType?: string;
   lastCapturedAt: number;

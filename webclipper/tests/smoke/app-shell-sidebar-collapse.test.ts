@@ -49,6 +49,10 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
 }));
 
 const openConversationExternalByLoc = vi.fn();
+const currentState = {
+  selectedConversation: null as any,
+  startupInitialOpenPending: false,
+};
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   ConversationsProvider: ({
@@ -102,7 +106,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     syncSelectedObsidian: vi.fn(),
     clearSyncFeedback: vi.fn(),
     deleteSelected: vi.fn(),
-    selectedConversation: null,
+    selectedConversation: currentState.selectedConversation,
+    startupInitialOpenPending: currentState.startupInitialOpenPending,
   }),
 }));
 
@@ -184,6 +189,8 @@ describe('AppShell sidebar collapse', () => {
     setupDom();
     openConversationExternalByLoc.mockReset();
     responsiveTierState.value = 'wide';
+    currentState.selectedConversation = null;
+    currentState.startupInitialOpenPending = false;
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -220,10 +227,16 @@ describe('AppShell sidebar collapse', () => {
 
   it('consumes external loc via provider precise-open API', async () => {
     const loc = encodeConversationLoc({ source: 'chatgpt', conversationKey: 'conv-42' });
+    currentState.selectedConversation = {
+      id: 42,
+      source: 'chatgpt',
+      conversationKey: 'conv-42',
+    };
     window.location.hash = `/?loc=${loc}`;
 
     await act(async () => {
       root!.render(createElement(AppShell));
+      await flushMicrotasks();
       await flushMicrotasks();
     });
 

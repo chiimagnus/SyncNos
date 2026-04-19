@@ -242,6 +242,63 @@ describe('backup service', () => {
     expect(assets.some((a) => Number(a.id) === referencedId)).toBe(true);
   });
 
+  it('export/import zip round-trip preserves manual title override fields', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const t = db.transaction(['conversations'], 'readwrite');
+    await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'manual-title-roundtrip',
+        title: 'Manual title',
+        autoTitle: 'Auto title 2',
+        titleManuallyEdited: true,
+        url: 'https://example.com/chat/manual-title-roundtrip',
+        warningFlags: [],
+        lastCapturedAt: 2,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    db.close();
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    await importBackupZipV2Merge(entries);
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(['conversations'], 'readonly');
+    const convs = await reqToPromise<any[]>(t2.objectStore('conversations').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      t2.oncomplete = () => resolve();
+      t2.onerror = () => reject(t2.error);
+      t2.onabort = () => reject(t2.error);
+    });
+    db2.close();
+
+    expect(convs).toHaveLength(1);
+    expect(convs[0]).toMatchObject({
+      source: 'chatgpt',
+      conversationKey: 'manual-title-roundtrip',
+      title: 'Manual title',
+      autoTitle: 'Auto title 2',
+      titleManuallyEdited: true,
+    });
+  });
+
   it('importBackupZipV2Merge tolerates missing image index and strips syncnos-asset urls', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

@@ -27,6 +27,7 @@ export type ConversationsSceneWideChrome = 'card' | 'none';
 export type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
   inlineNarrowDetailHeader?: boolean;
+  allowDetailTitleEditing?: boolean;
   onPopupNotionSyncStarted?: () => void;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
@@ -58,6 +59,7 @@ function isArticleConversationLike(conversation: any): boolean {
 export function ConversationsScene({
   defaultNarrowRoute = 'list',
   inlineNarrowDetailHeader = false,
+  allowDetailTitleEditing = false,
   onPopupNotionSyncStarted,
   onOpenInsightsSection,
   onOpenSettingsSection,
@@ -166,6 +168,7 @@ export function ConversationsScene({
             {inlineNarrowDetailHeader ? (
               <ConversationDetailPane
                 onBack={returnToList}
+                allowTitleEditing={allowDetailTitleEditing}
                 onTriggerCommentsSidebar={
                   canOpenCommentsFromDetail
                     ? () => {
@@ -188,7 +191,7 @@ export function ConversationsScene({
                 }}
               />
             ) : (
-              <ConversationDetailPane hideHeader />
+              <ConversationDetailPane hideHeader allowTitleEditing={allowDetailTitleEditing} />
             )}
           </div>
         </div>
@@ -236,7 +239,7 @@ export function ConversationsScene({
         </aside>
       )}
       <main className="route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-card)] tw-overflow-auto tw-overflow-x-hidden">
-        {wideDetail ?? <ConversationDetailPane />}
+        {wideDetail ?? <ConversationDetailPane allowTitleEditing={allowDetailTitleEditing} />}
       </main>
     </div>
   );

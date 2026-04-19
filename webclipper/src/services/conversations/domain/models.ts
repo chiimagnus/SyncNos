@@ -6,6 +6,8 @@ export type Conversation = {
   listSourceKey?: string;
   listSiteKey?: string;
   title?: string;
+  autoTitle?: string;
+  titleManuallyEdited?: boolean;
   url?: string;
   author?: string;
   publishedAt?: string;

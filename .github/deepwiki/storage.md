@@ -19,7 +19,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 | 存储层 | 名称 / 版本 | 结构 | 作用 |
 | --- | --- | --- | --- |
 | IndexedDB | `webclipper`, `DB_VERSION = 8` | `conversations`, `messages`, `sync_mappings`, `image_cache`, `article_comments` | 扩展侧事实源（`image_cache` 仅作本地图片缓存，不改变会话主事实源；`article_comments` 供 article 详情评论线程使用；v8 额外回填列表分页 / 筛选索引） |
-| `conversations` | object store | `sourceType`（`chat / article / video`）、`source`, `conversationKey`, `title`, `url`, `lastCapturedAt`, `notionPageId` 等 | 列表、详情、同步入口 |
+| `conversations` | object store | `sourceType`（`chat / article / video`）、`source`, `conversationKey`, `title`, `autoTitle`, `titleManuallyEdited`, `url`, `lastCapturedAt`, `notionPageId` 等 | 列表、详情、同步入口 |
 | `messages` | object store | `conversationId`, `messageKey`, `contentText`, `contentMarkdown`, `sequence`, `updatedAt` | 生成 Markdown / blocks / note 内容 |
 | `sync_mappings` | object store | `notionPageId`, `lastSyncedMessageKey`, `lastSyncedSequence`, `lastSyncedAt`, `updatedAt` | 决定是否能增量同步 |
 | `image_cache` | object store | `conversationId + url` 唯一索引、`opfsPath` 等元数据 | 本地图片缓存读取与回填加速 |
@@ -28,6 +28,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 
 - `storage-idb.ts` 的 `syncConversationMessages()` 采用快照式同步：存在的消息 upsert，不再出现的消息从本地删除。
 - `deleteConversationsByIds()` 会一并删除 conversation、messages 和 `sync_mappings`，防止 UI 已删但 Notion mapping 仍残留。
+- `conversations.title` 继续作为列表 / 详情 / 导出 / Notion / Obsidian 的统一标题源；当 `titleManuallyEdited=true` 时，后续采集只刷新 `autoTitle`，不会覆盖手动标题；用户在管理页执行 reset 后再回到 `autoTitle`。
 - `article_comments` 是独立的本地注释层：它会跟随 article 详情页和 inpage comments panel 使用，并会在 article 同步时进入 Notion / Obsidian 评论区段，同时随 Zip v2 备份 / 导入一起保留。
 - `video` conversation 与 chat / article 共用同一份 IndexedDB 事实源：`sourceType='video'` 时会话会进入 `SyncNos-Videos`，但不会额外引入新的 `chrome.storage.local` 配置键。
 - `anti_hotlink_rules_v1` 由 `anti-hotlink-rules-store.ts` 维护，文章抓取与图片下载代理会据此决定是否给特定 CDN 补 Referer；规则读取失败不会阻断抓取主链路。
