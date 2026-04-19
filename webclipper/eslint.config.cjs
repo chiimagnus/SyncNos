@@ -7,7 +7,15 @@ const eslintConfigPrettier = require('eslint-config-prettier');
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   {
-    ignores: ['.output/**', '.wxt/**', 'node_modules/**', 'cloudflare-workers/**', 'public/src/vendor/**'],
+    ignores: [
+      '.output/**',
+      '.wxt/**',
+      'dist/**',
+      'dist-firefox/**',
+      'node_modules/**',
+      'cloudflare-workers/**',
+      'public/src/vendor/**',
+    ],
   },
 
   js.configs.recommended,
