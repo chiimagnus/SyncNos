@@ -35,6 +35,30 @@ describe('chatgpt-collector', () => {
     expect(snap.conversation.title).toBe('GPR signal preprocessing');
   });
 
+  it('keeps fallback conversationKey in temporary chat and derives title from first user message', async () => {
+    const html = `
+      <div data-message-author-role="user"><div class="whitespace-pre-wrap">请帮我整理今天的发布检查清单</div></div>
+      <div data-message-author-role="assistant" data-message-id="m_ai_tmp_1">
+        <div class="markdown prose"><p>好的，我们先从回归范围开始。</p></div>
+      </div>
+    `;
+
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=true');
+    dom.window.document.title = 'ChatGPT';
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    expect(String(snap.conversation.conversationKey || '')).toMatch(/^fallback_/);
+    expect(String(snap.conversation.title || '')).toBe('请帮我整理今天的发布检查清单');
+    expect(String(snap.conversation.title || '')).not.toBe('ChatGPT');
+  });
+
   it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <article data-testid="conversation-turn-1">

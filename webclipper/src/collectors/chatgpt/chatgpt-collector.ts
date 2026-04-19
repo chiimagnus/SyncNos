@@ -186,7 +186,39 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return `fallback_${hash}`;
   }
 
-  function findTitle(): any {
+  function isTemporaryChatMode(): boolean {
+    try {
+      const params = new URLSearchParams(String(env.location.search || '').replace(/^\?/, ''));
+      const value = String(params.get('temporary-chat') || '').trim().toLowerCase();
+      return value === 'true' || value === '1' || value === 'yes' || value === 'on';
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function normalizeTitleText(value: unknown): string {
+    return String(value || '').trim();
+  }
+
+  function isGenericChatgptTitle(value: unknown): boolean {
+    const normalized = normalizeTitleText(value).toLowerCase();
+    return normalized === '' || normalized === 'chatgpt';
+  }
+
+  function deriveTemporaryChatAutoTitle(messages: any): string {
+    const firstUser = Array.isArray(messages)
+      ? messages.find((m: any) => m && m.role === 'user' && m.contentText)
+      : null;
+    const raw = firstUser ? String(firstUser.contentText || '') : '';
+    const normalized = env.normalize && env.normalize.normalizeText ? env.normalize.normalizeText(raw) : raw;
+    const text = String(normalized || '').trim();
+    if (!text) return '';
+    const maxLen = 56;
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, maxLen - 1).trimEnd()}…`;
+  }
+
+  function findTitle(messages?: any): any {
     const conversationId = findConversationIdFromUrl();
 
     if (conversationId) {
@@ -207,7 +239,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
     const h = env.document.querySelector('h1');
     const t = h && h.textContent ? h.textContent.trim() : '';
-    return t || env.document.title || 'ChatGPT';
+    const fallbackTitle = t || env.document.title || 'ChatGPT';
+    if (!conversationId && isTemporaryChatMode() && isGenericChatgptTitle(fallbackTitle)) {
+      const temporaryTitle = deriveTemporaryChatAutoTitle(messages);
+      if (temporaryTitle) return temporaryTitle;
+    }
+    return fallbackTitle;
   }
 
   function getConversationRoot(): any {
@@ -400,7 +437,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         sourceType: 'chat',
         source: 'chatgpt',
         conversationKey,
-        title: findTitle(),
+        title: findTitle(messages),
         url: env.location.href,
         warningFlags: [],
         lastCapturedAt: Date.now(),
