@@ -189,7 +189,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   function isTemporaryChatMode(): boolean {
     try {
       const params = new URLSearchParams(String(env.location.search || '').replace(/^\?/, ''));
-      const value = String(params.get('temporary-chat') || '').trim().toLowerCase();
+      const value = String(params.get('temporary-chat') || '')
+        .trim()
+        .toLowerCase();
       return value === 'true' || value === '1' || value === 'yes' || value === 'on';
     } catch (_e) {
       return false;
