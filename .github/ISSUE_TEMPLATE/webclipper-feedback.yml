@@ -1,0 +1,118 @@
+name: "WebClipper 反馈 / Feedback"
+description: "用于 SyncNos WebClipper 的 bug / 功能需求 / 站点适配反馈"
+title: "[WebClipper] <一句话概述>"
+labels:
+  - webclipper
+body:
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: 类型
+      description: 请选择更贴近的类型（用于后续分流）
+      options:
+        - Bug（行为不符合预期）
+        - Feature（新增能力/开关）
+        - Adapter（站点适配/抓取规则）
+        - Docs（文档/说明）
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 影响范围
+      description: 请选择主要影响到的模块
+      options:
+        - content scripts（采集/提取）
+        - background（持久化/路由/协议）
+        - popup（浏览器弹窗）
+        - app（侧边栏/会话/设置页）
+        - build/release（构建/打包/发布）
+        - 不确定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: site
+    attributes:
+      label: 站点（如适用）
+      description: 如果是站点适配相关请选择；否则选“不适用”
+      options:
+        - ChatGPT
+        - Notion
+        - WeChat（mp.weixin.qq.com）
+        - YouTube
+        - X / Twitter
+        - GitHub
+        - 不适用
+        - 其他（请在下方补充）
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 一句话总结
+      description: 发生了什么？（尽量可复现、可验证）
+      placeholder: "例如：ChatGPT Projects 内的对话采集后标题被覆盖为 ChatGPT-<Project 名>。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 按步骤写清楚（如果是 feature request，可写使用场景与触发路径）
+      placeholder: |-
+        1.
+        2.
+        3.
+    validations:
+      required: false
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际表现
+      placeholder: "实际保存成了什么？界面怎么显示？日志/错误是什么？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      placeholder: "你希望它怎么做？如果是新增开关：默认值/开启后的行为是什么？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息（可选）
+      description: 链接、截图、屏幕录制、JSON 导出片段、Notion page 链接等（注意隐私）
+    validations:
+      required: false
+
+  - type: input
+    id: reporter
+    attributes:
+      label: 反馈来源（可选）
+      description: 谁反馈的 + 日期（便于追踪）
+      placeholder: "例如：Enze，2026-04-19"
+    validations:
+      required: false
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境信息（可选）
+      description: 浏览器/操作系统/扩展版本等（越精确越好）
+      placeholder: |-
+        - OS:
+        - Browser:
+        - WebClipper version:
+    validations:
+      required: false
+
