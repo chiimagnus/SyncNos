@@ -63,6 +63,14 @@ export async function upsertConversation(payload: any) {
   return await idb.upsertConversation(payload);
 }
 
+export async function updateConversationTitle(input: {
+  conversationId: number;
+  mode: 'set' | 'reset';
+  title?: string;
+}) {
+  return await idb.updateConversationTitle(input);
+}
+
 export async function hasConversation(payload: any) {
   return await idb.hasConversation(payload);
 }

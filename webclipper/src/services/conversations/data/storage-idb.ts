@@ -89,6 +89,56 @@ function safeString(value: unknown): string {
   return String(value || '').trim();
 }
 
+function safeBoolean(value: unknown): boolean | null {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+}
+
+function deriveStoredAutoTitle(record: any): string {
+  const autoTitle = safeString(record?.autoTitle);
+  if (autoTitle) return autoTitle;
+  if (safeBoolean(record?.titleManuallyEdited) === true) return '';
+  return safeString(record?.title);
+}
+
+function resolveConversationTitleFields(
+  existing: any,
+  payload: any,
+): {
+  title: string;
+  autoTitle: string;
+  titleManuallyEdited: boolean;
+} {
+  const existingTitle = safeString(existing?.title);
+  const existingAutoTitle = deriveStoredAutoTitle(existing);
+  const existingManual = safeBoolean(existing?.titleManuallyEdited) === true;
+
+  const incomingTitle = safeString(payload?.title);
+  const incomingAutoTitle = safeString(payload?.autoTitle);
+  const manualFlag = safeBoolean(payload?.titleManuallyEdited);
+  const nextManual = manualFlag == null ? existingManual : manualFlag;
+
+  let nextAutoTitle = incomingAutoTitle || existingAutoTitle;
+  if (!incomingAutoTitle && incomingTitle) nextAutoTitle = incomingTitle;
+  if (!nextAutoTitle && !nextManual && existingTitle) nextAutoTitle = existingTitle;
+
+  let nextTitle = existingTitle;
+  if (nextManual) {
+    if (manualFlag === true && incomingTitle) nextTitle = incomingTitle;
+    else if (!nextTitle) nextTitle = existingAutoTitle || nextAutoTitle || incomingTitle;
+  } else {
+    nextTitle = incomingTitle || existingTitle || nextAutoTitle;
+    if (!nextAutoTitle && nextTitle) nextAutoTitle = nextTitle;
+  }
+
+  return {
+    title: nextTitle,
+    autoTitle: nextAutoTitle,
+    titleManuallyEdited: nextManual,
+  };
+}
+
 function normalizeListKey(value: unknown, fallback: string): string {
   const text = safeString(value).toLowerCase();
   return text || fallback;
@@ -313,6 +363,23 @@ function mergeStringFallback(preferred: unknown, fallback: unknown): string {
   return safeString(fallback);
 }
 
+function pickStringByRecency(
+  preferred: unknown,
+  preferredCapturedAt: unknown,
+  fallback: unknown,
+  fallbackCapturedAt: unknown,
+): string {
+  const a = safeString(preferred);
+  const b = safeString(fallback);
+  if (a && !b) return a;
+  if (b && !a) return b;
+  if (!a && !b) return '';
+  const at = Number(preferredCapturedAt) || 0;
+  const bt = Number(fallbackCapturedAt) || 0;
+  if (bt > at) return b;
+  return a || b;
+}
+
 function mergeWarningFlags(preferred: unknown, fallback: unknown): string[] {
   const a = Array.isArray(preferred) ? preferred : [];
   const b = Array.isArray(fallback) ? fallback : [];
@@ -416,6 +483,33 @@ async function migrateSyncMappingKey(
   }
 }
 
+function resolveMergedConversationTitleFields(
+  keep: any,
+  remove: any,
+): {
+  title: string;
+  autoTitle: string;
+  titleManuallyEdited: boolean;
+} {
+  const keepManual = safeBoolean(keep?.titleManuallyEdited) === true;
+  const removeManual = safeBoolean(remove?.titleManuallyEdited) === true;
+  const keepTitle = safeString(keep?.title);
+  const removeTitle = safeString(remove?.title);
+  const keepAutoTitle = deriveStoredAutoTitle(keep);
+  const removeAutoTitle = deriveStoredAutoTitle(remove);
+
+  const titleManuallyEdited = keepManual || removeManual;
+  const autoTitle = pickStringByRecency(keepAutoTitle, keep?.lastCapturedAt, removeAutoTitle, remove?.lastCapturedAt);
+
+  let title = '';
+  if (keepManual) title = keepTitle;
+  else if (removeManual) title = removeTitle;
+  else title = mergeStringFallback(keepTitle, removeTitle);
+  if (!title) title = autoTitle;
+
+  return { title, autoTitle, titleManuallyEdited };
+}
+
 export async function upsertConversation(payload: any): Promise<Conversation> {
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
@@ -440,14 +534,16 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
       )
     : String(payloadConversationKey || existingConversationKey || '').trim();
 
-  const nextTitle = payload.title && String(payload.title).trim() ? String(payload.title).trim() : '';
   const nextLastCapturedAt = payload.lastCapturedAt || (existing ? existing.lastCapturedAt || now : now);
+  const titleFields = resolveConversationTitleFields(existing, payload);
 
   const baseRecord = normalizeConversationListRecord({
     sourceType: nextSourceType,
     source: nextSource,
     conversationKey: nextConversationKey,
-    title: nextTitle || (existing ? existing.title || '' : ''),
+    title: titleFields.title,
+    autoTitle: titleFields.autoTitle || undefined,
+    titleManuallyEdited: titleFields.titleManuallyEdited,
     url: nextUrl || (existing ? existing.url || '' : ''),
     author: payload.author || (existing ? existing.author || '' : ''),
     publishedAt: payload.publishedAt || (existing ? existing.publishedAt || '' : ''),
@@ -481,6 +577,52 @@ export async function upsertConversation(payload: any): Promise<Conversation> {
   await txDone(t);
   invalidateConversationListStatsCache();
   return record;
+}
+
+export async function updateConversationTitle(input: {
+  conversationId: number;
+  mode: 'set' | 'reset';
+  title?: string;
+}): Promise<Conversation> {
+  const conversationId = Number(input?.conversationId);
+  if (!Number.isFinite(conversationId) || conversationId <= 0) throw new Error('invalid conversationId');
+  const mode = String(input?.mode || '')
+    .trim()
+    .toLowerCase();
+  if (mode !== 'set' && mode !== 'reset') throw new Error('invalid title update mode');
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readwrite');
+  const existing = (await reqToPromise(stores.conversations.get(conversationId as any))) as any;
+  if (!existing) {
+    await txDone(t);
+    throw new Error('conversation not found');
+  }
+
+  const record = { ...existing } as any;
+  if (mode === 'set') {
+    const nextTitle = safeString(input?.title);
+    if (!nextTitle) {
+      await txDone(t);
+      throw new Error('title is required');
+    }
+    const existingAutoTitle = deriveStoredAutoTitle(existing) || safeString(existing?.title);
+    record.title = nextTitle;
+    record.autoTitle = existingAutoTitle || undefined;
+    record.titleManuallyEdited = true;
+  } else {
+    const fallbackTitle = deriveStoredAutoTitle(existing) || safeString(existing?.title);
+    record.title = fallbackTitle;
+    record.titleManuallyEdited = false;
+    if (fallbackTitle) record.autoTitle = fallbackTitle;
+    else delete record.autoTitle;
+  }
+
+  const normalized = normalizeConversationListRecord(record);
+  await reqToPromise(stores.conversations.put(normalized as any));
+  await txDone(t);
+  invalidateConversationListStatsCache();
+  return normalized as Conversation;
 }
 
 export async function mergeConversationsByIds(input: {
@@ -527,10 +669,14 @@ export async function mergeConversationsByIds(input: {
     };
   }
 
+  const mergedTitleFields = resolveMergedConversationTitleFields(keep, remove);
+
   const mergedConversation: any = normalizeConversationListRecord({
     ...keep,
     sourceType: mergeStringFallback(keep.sourceType, remove.sourceType) || 'chat',
-    title: mergeStringFallback(keep.title, remove.title),
+    title: mergedTitleFields.title,
+    autoTitle: mergedTitleFields.autoTitle || undefined,
+    titleManuallyEdited: mergedTitleFields.titleManuallyEdited,
     url: mergeStringFallback(keep.url, remove.url),
     author: mergeStringFallback(keep.author, remove.author),
     publishedAt: mergeStringFallback(keep.publishedAt, remove.publishedAt),
@@ -1056,6 +1202,7 @@ function toConversationListOpenTarget(input: any): ConversationListOpenTarget | 
     source,
     conversationKey,
     title: safeString(input.title) || undefined,
+    titleManuallyEdited: safeBoolean(input.titleManuallyEdited) === true,
     url: safeString(input.url) || undefined,
     sourceType: safeString(input.sourceType) || undefined,
     lastCapturedAt: Number(input.lastCapturedAt) || 0,

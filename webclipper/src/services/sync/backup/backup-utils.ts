@@ -34,6 +34,12 @@ function isFinitePositiveInt(v: unknown) {
   return Number.isFinite(v) && Number(v) > 0 && Math.floor(Number(v)) === Number(v);
 }
 
+function safeBoolean(value: unknown): boolean | null {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+}
+
 export function uniqueConversationKey(conversation: UnknownRecord): string {
   const source = conversation && conversation.source ? String(conversation.source) : '';
   const conversationKey = conversation && conversation.conversationKey ? String(conversation.conversationKey) : '';
@@ -46,6 +52,52 @@ function pickStringPreferExisting(existing: unknown, incoming: unknown) {
   if (isNonEmptyString(a)) return a.trim();
   const b = incoming == null ? '' : String(incoming);
   return isNonEmptyString(b) ? b.trim() : '';
+}
+
+function deriveStoredAutoTitle(record: UnknownRecord): string {
+  const autoTitle = record && isNonEmptyString(record.autoTitle) ? String(record.autoTitle).trim() : '';
+  if (autoTitle) return autoTitle;
+  if (safeBoolean(record?.titleManuallyEdited) === true) return '';
+  return record && isNonEmptyString(record.title) ? String(record.title).trim() : '';
+}
+
+function pickStringByRecency(
+  existing: unknown,
+  existingCapturedAt: unknown,
+  incoming: unknown,
+  incomingCapturedAt: unknown,
+) {
+  const a = existing == null ? '' : String(existing).trim();
+  const b = incoming == null ? '' : String(incoming).trim();
+  if (isNonEmptyString(a) && !isNonEmptyString(b)) return a;
+  if (isNonEmptyString(b) && !isNonEmptyString(a)) return b;
+  if (!isNonEmptyString(a) && !isNonEmptyString(b)) return '';
+  const aCaptured = Number(existingCapturedAt) || 0;
+  const bCaptured = Number(incomingCapturedAt) || 0;
+  if (bCaptured > aCaptured) return b;
+  return a || b;
+}
+
+function mergeConversationTitleFields(existing: UnknownRecord, incoming: UnknownRecord) {
+  const a = existing && typeof existing === 'object' ? existing : {};
+  const b = incoming && typeof incoming === 'object' ? incoming : {};
+  const existingManual = safeBoolean(a.titleManuallyEdited) === true;
+  const incomingManual = safeBoolean(b.titleManuallyEdited) === true;
+  const existingTitle = isNonEmptyString(a.title) ? String(a.title).trim() : '';
+  const incomingTitle = isNonEmptyString(b.title) ? String(b.title).trim() : '';
+  const existingAutoTitle = deriveStoredAutoTitle(a);
+  const incomingAutoTitle = deriveStoredAutoTitle(b);
+
+  const titleManuallyEdited = existingManual || incomingManual;
+  const autoTitle = pickStringByRecency(existingAutoTitle, a.lastCapturedAt, incomingAutoTitle, b.lastCapturedAt);
+
+  let title = '';
+  if (existingManual) title = existingTitle;
+  else if (incomingManual) title = incomingTitle;
+  else title = pickStringPreferExisting(existingTitle, incomingTitle);
+  if (!title) title = autoTitle;
+
+  return { title, autoTitle, titleManuallyEdited };
 }
 
 function safeFiniteNumber(value: unknown): number | null {
@@ -69,13 +121,17 @@ function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
 export function mergeConversationRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
   const a = existing && typeof existing === 'object' ? existing : {};
   const b = incoming && typeof incoming === 'object' ? incoming : {};
+  const titleFields = mergeConversationTitleFields(a, b);
 
   const next: UnknownRecord = { ...a };
   next.sourceType = pickStringPreferExisting(a.sourceType, b.sourceType) || 'chat';
   next.source = pickStringPreferExisting(a.source, b.source);
   next.conversationKey = pickStringPreferExisting(a.conversationKey, b.conversationKey);
 
-  next.title = pickStringPreferExisting(a.title, b.title);
+  next.title = titleFields.title;
+  if (titleFields.autoTitle) next.autoTitle = titleFields.autoTitle;
+  else delete next.autoTitle;
+  next.titleManuallyEdited = titleFields.titleManuallyEdited;
   next.url = pickStringPreferExisting(a.url, b.url);
   next.author = pickStringPreferExisting(a.author, b.author);
   next.publishedAt = pickStringPreferExisting(a.publishedAt, b.publishedAt);

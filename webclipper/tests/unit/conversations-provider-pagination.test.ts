@@ -12,6 +12,7 @@ const findConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
+const updateConversationTitle = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
 
@@ -23,6 +24,7 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
   upsertConversation: (...args: any[]) => upsertConversation(...args),
+  updateConversationTitle: (...args: any[]) => updateConversationTitle(...args),
   mergeConversations: (...args: any[]) => mergeConversations(...args),
   backfillConversationImages: (...args: any[]) => backfillConversationImages(...args),
 }));
@@ -172,6 +174,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
     upsertConversation.mockReset();
+    updateConversationTitle.mockReset();
     mergeConversations.mockReset();
     backfillConversationImages.mockReset();
 
@@ -180,6 +183,7 @@ describe('ConversationsProvider pagination state', () => {
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     upsertConversation.mockResolvedValue({});
+    updateConversationTitle.mockResolvedValue({});
     mergeConversations.mockResolvedValue({
       keptConversationId: 0,
       removedConversationId: 0,
@@ -350,17 +354,31 @@ describe('ConversationsProvider pagination state', () => {
     expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
   });
 
-  it('bootstraps initialOpenLoc before fetching the first list page', async () => {
+  it('bootstraps the first list page without waiting for initialOpenLoc resolution', async () => {
     const findReq = deferred<any>();
     findConversationBySourceAndKey.mockImplementation(() => findReq.promise);
-    getConversationListBootstrap.mockResolvedValue(
-      makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
-        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
-      }),
-    );
+    const bootstrapReq = deferred<any>();
+    getConversationListBootstrap.mockImplementation(() => bootstrapReq.promise);
 
     await renderProvider({ initialOpenLoc: { source: 'chatgpt', conversationKey: 'conv-999' } });
-    expect(getConversationListBootstrap).not.toHaveBeenCalled();
+    expect(getConversationListBootstrap).toHaveBeenCalled();
+    expect(Number(latestState.activeId)).toBe(0);
+    expect(latestState.selectedConversation).toBeNull();
+    expect(Boolean(latestState.startupInitialOpenPending)).toBe(true);
+
+    await act(async () => {
+      bootstrapReq.resolve(
+        makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+          sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+        }),
+      );
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([1]);
+    expect(latestState.selectedConversation).toBeNull();
+    expect(Number(latestState.activeId)).toBe(0);
 
     await act(async () => {
       findReq.resolve({
@@ -376,9 +394,51 @@ describe('ConversationsProvider pagination state', () => {
       await flushMicrotasks();
     });
 
-    expect(getConversationListBootstrap).toHaveBeenCalled();
     expect(Number(latestState.activeId)).toBe(999);
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
+    expect(Boolean(latestState.startupInitialOpenPending)).toBe(false);
+  });
+
+  it('resets filters to all/all before startup loc bootstrap runs', async () => {
+    localStorage.setItem('webclipper_conversations_source_filter_key', 'claude');
+    localStorage.setItem('webclipper_conversations_site_filter_key', 'domain:sspai.com');
+    getConversationListBootstrap.mockResolvedValue(
+      makePage([makeConversation(1, 'chatgpt', 'conv-1')], {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+      }),
+    );
+    findConversationBySourceAndKey.mockResolvedValue(null);
+
+    await renderProvider({ initialOpenLoc: { source: 'chatgpt', conversationKey: 'conv-999' } });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(getConversationListBootstrap).toHaveBeenCalledWith({ sourceKey: 'all', siteKey: 'all', limit: 100 }, 100);
+    expect(String(latestState.listSourceFilterKey || '')).toBe('all');
+    expect(String(latestState.listSiteFilterKey || '')).toBe('all');
+  });
+
+  it('keeps list visible without auto-selecting fallback conversation when startup loc misses', async () => {
+    getConversationListBootstrap.mockResolvedValue(
+      makePage([makeConversation(21, 'chatgpt', 'conv-21')], {
+        sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+      }),
+    );
+    findConversationBySourceAndKey.mockResolvedValue(null);
+
+    await renderProvider({ initialOpenLoc: { source: 'chatgpt', conversationKey: 'missing' } });
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([21]);
+    expect(Number(latestState.activeId)).toBe(0);
+    expect(latestState.selectedConversation).toBeNull();
+    expect(Boolean(latestState.startupInitialOpenPending)).toBe(false);
   });
 
   it('provides cache-images tools action for article conversations', async () => {
@@ -411,5 +471,76 @@ describe('ConversationsProvider pagination state', () => {
     const cacheAction = actions.find((action: any) => String(action?.id || '').trim() === 'cache-images');
     expect(cacheAction).toBeTruthy();
     expect(String(cacheAction?.slot || '')).toBe('tools');
+  });
+
+  it('updates selected conversation title locally after manual override and reset', async () => {
+    getConversationListBootstrap.mockResolvedValue(
+      makePage(
+        [
+          {
+            ...makeConversation(401, 'chatgpt', 'conv-401'),
+            title: 'Auto title',
+          },
+        ],
+        {
+          sources: [{ key: 'chatgpt', label: 'chatgpt', count: 1 }],
+        },
+      ),
+    );
+
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    updateConversationTitle.mockResolvedValueOnce({
+      id: 401,
+      source: 'chatgpt',
+      conversationKey: 'conv-401',
+      title: 'Manual title',
+      titleManuallyEdited: true,
+      url: 'https://example.com/conv-401',
+      sourceType: 'chat',
+      lastCapturedAt: Number(latestState.selectedConversation?.lastCapturedAt || 0),
+    });
+
+    await act(async () => {
+      await latestState.updateSelectedConversationTitle('Manual title');
+      await flushMicrotasks();
+    });
+
+    expect(updateConversationTitle).toHaveBeenCalledWith({
+      conversationId: 401,
+      mode: 'set',
+      title: 'Manual title',
+    });
+    expect(String(latestState.selectedConversation?.title || '')).toBe('Manual title');
+    expect(latestState.selectedConversation?.titleManuallyEdited).toBe(true);
+    expect(String((latestState.items as any[])[0]?.title || '')).toBe('Manual title');
+
+    updateConversationTitle.mockResolvedValueOnce({
+      id: 401,
+      source: 'chatgpt',
+      conversationKey: 'conv-401',
+      title: 'Auto title 2',
+      titleManuallyEdited: false,
+      url: 'https://example.com/conv-401',
+      sourceType: 'chat',
+      lastCapturedAt: Number(latestState.selectedConversation?.lastCapturedAt || 0),
+    });
+
+    await act(async () => {
+      await latestState.resetSelectedConversationTitle();
+      await flushMicrotasks();
+    });
+
+    expect(updateConversationTitle).toHaveBeenLastCalledWith({
+      conversationId: 401,
+      mode: 'reset',
+    });
+    expect(String(latestState.selectedConversation?.title || '')).toBe('Auto title 2');
+    expect(latestState.selectedConversation?.titleManuallyEdited).toBe(false);
+    expect(String((latestState.items as any[])[0]?.title || '')).toBe('Auto title 2');
   });
 });

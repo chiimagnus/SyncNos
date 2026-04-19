@@ -96,6 +96,20 @@ export async function upsertConversation(
   return unwrap(res);
 }
 
+export async function updateConversationTitle(input: {
+  conversationId: number;
+  mode: 'set' | 'reset';
+  title?: string;
+}): Promise<Conversation> {
+  const conversationId = Number(input?.conversationId);
+  const res = await send<ApiResponse<Conversation>>(CORE_MESSAGE_TYPES.UPDATE_CONVERSATION_TITLE, {
+    conversationId,
+    mode: input?.mode,
+    title: input?.title,
+  });
+  return unwrap(res);
+}
+
 export async function mergeConversations(input: { keepConversationId: number; removeConversationId: number }): Promise<{
   keptConversationId: number;
   removedConversationId: number;

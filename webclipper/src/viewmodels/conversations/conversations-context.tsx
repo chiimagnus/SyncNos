@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
 
 import type {
   Conversation,
@@ -22,6 +23,7 @@ import {
   getConversationListPage,
   getConversationDetail,
   mergeConversations,
+  updateConversationTitle as updateConversationTitleRecord,
   upsertConversation,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
@@ -300,6 +302,7 @@ function toOpenTargetFromConversation(
     source,
     conversationKey,
     title: String((conversation as any).title || '').trim() || undefined,
+    titleManuallyEdited: (conversation as any).titleManuallyEdited === true,
     url: String((conversation as any).url || '').trim() || undefined,
     sourceType,
     lastCapturedAt: Number.isFinite(lastCapturedAt) ? lastCapturedAt : 0,
@@ -319,6 +322,7 @@ function toConversationFromOpenTarget(target: ConversationListOpenTarget): Conve
     source,
     conversationKey: String(target.conversationKey || '').trim(),
     title: String(target.title || '').trim() || undefined,
+    titleManuallyEdited: target.titleManuallyEdited === true,
     url,
     sourceType,
     lastCapturedAt: Number.isFinite(Number(target.lastCapturedAt)) ? Number(target.lastCapturedAt) : undefined,
@@ -333,6 +337,7 @@ function sameOpenTarget(a: ConversationListOpenTarget | null, b: ConversationLis
     String(a.source || '') === String(b.source || '') &&
     String(a.conversationKey || '') === String(b.conversationKey || '') &&
     String(a.title || '') === String(b.title || '') &&
+    Boolean(a.titleManuallyEdited) === Boolean(b.titleManuallyEdited) &&
     String(a.url || '') === String(b.url || '') &&
     String(a.sourceType || '') === String(b.sourceType || '') &&
     Number(a.lastCapturedAt || 0) === Number(b.lastCapturedAt || 0)
@@ -399,6 +404,7 @@ type ConversationsAppState = {
   setListSiteFilterKeyPersistent: (next: string) => void;
 
   pendingListLocateId: number | null;
+  startupInitialOpenPending: boolean;
   requestListLocate: (conversationId: number) => void;
   consumeListLocate: () => number | null;
   openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
@@ -419,6 +425,8 @@ type ConversationsAppState = {
   clearSyncFeedback: () => void;
   deleteSelected: () => Promise<void>;
 
+  updateSelectedConversationTitle: (nextTitle: string) => Promise<void>;
+  resetSelectedConversationTitle: () => Promise<void>;
   updateSelectedConversationUrl: (nextUrl: string) => Promise<void>;
   cleanUrlDraft: (rawUrl: string) => Promise<string>;
 };
@@ -427,6 +435,14 @@ const ConversationsContext = createContext<ConversationsAppState | null>(null);
 
 async function loadDetailFor(id: number): Promise<ConversationDetail> {
   return getConversationDetail(id);
+}
+
+type StartupInitialOpenStatus = 'idle' | 'pending' | 'opened' | 'missed' | 'timed_out';
+
+function hasInitialOpenLoc(
+  input: { source?: string | null; conversationKey?: string | null } | null | undefined,
+): boolean {
+  return Boolean(String(input?.source || '').trim() && String(input?.conversationKey || '').trim());
 }
 
 export function ConversationsProvider({
@@ -444,6 +460,10 @@ export function ConversationsProvider({
   const [listSummary, setListSummary] = useState<ConversationListSummary>(EMPTY_LIST_SUMMARY);
   const [listFacets, setListFacets] = useState<ConversationListFacets>(EMPTY_LIST_FACETS);
   const [items, setItems] = useState<Conversation[]>([]);
+  const hasStartupInitialOpen = hasInitialOpenLoc(initialOpenLoc);
+  const [startupInitialOpenStatus, setStartupInitialOpenStatus] = useState<StartupInitialOpenStatus>(() =>
+    hasStartupInitialOpen ? 'pending' : 'idle',
+  );
 
   const [bootstrapped, setBootstrapped] = useState(false);
   const didBootstrapRef = useRef(false);
@@ -456,6 +476,7 @@ export function ConversationsProvider({
   }, []);
   const listRequestSeqRef = useRef(0);
   const openTargetRequestSeqRef = useRef(0);
+  const startupOpenTargetRequestSeqRef = useRef(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -497,6 +518,30 @@ export function ConversationsProvider({
     return toConversationFromOpenTarget(activeConversationSnapshot);
   }, [activeConversationSnapshot, items, activeId]);
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
+
+  const applyConversationUpdateLocally = useCallback(
+    (conversation: Conversation | null | undefined) => {
+      if (!conversation) return;
+      const conversationId = Number((conversation as any)?.id);
+      if (!Number.isFinite(conversationId) || conversationId <= 0) return;
+      const normalized = ensureConversationUiShape(conversation);
+
+      setItems((prev) => {
+        let changed = false;
+        const next = prev.map((item) => {
+          if (Number((item as any)?.id) !== conversationId) return item;
+          changed = true;
+          return ensureConversationUiShape({ ...(item as any), ...(normalized as any) } as Conversation);
+        });
+        return changed ? next : prev;
+      });
+
+      if (Number(activeIdRef.current) === conversationId) {
+        setActiveConversationSnapshot(toOpenTargetFromConversation(normalized));
+      }
+    },
+    [setActiveConversationSnapshot],
+  );
 
   const setListSourceFilterKeyPersistent = useCallback((next: string) => {
     const value =
@@ -558,20 +603,34 @@ export function ConversationsProvider({
     ],
   );
 
-  const openConversationExternalBySourceKey = useCallback(
-    async (source: string, conversationKey: string) => {
+  const resolveConversationExternalBySourceKey = useCallback(
+    async (
+      source: string,
+      conversationKey: string,
+      options?: { requestSeqRef?: MutableRefObject<number> },
+    ): Promise<{ status: 'opened' | 'missed' | 'stale'; target: ConversationListOpenTarget | null }> => {
       const safeSource = String(source || '').trim();
       const safeConversationKey = String(conversationKey || '').trim();
-      if (!safeSource || !safeConversationKey) return;
+      if (!safeSource || !safeConversationKey) return { status: 'missed', target: null };
 
-      const requestSeq = openTargetRequestSeqRef.current + 1;
-      openTargetRequestSeqRef.current = requestSeq;
+      const requestSeqRef = options?.requestSeqRef || openTargetRequestSeqRef;
+      const requestSeq = requestSeqRef.current + 1;
+      requestSeqRef.current = requestSeq;
 
       const target = await findConversationBySourceAndKey(safeSource, safeConversationKey).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
+      if (requestSeq !== requestSeqRef.current) return { status: 'stale', target: null };
+      if (!target) return { status: 'missed', target: null };
       applyOpenTarget(target);
+      return { status: 'opened', target };
     },
     [applyOpenTarget],
+  );
+
+  const openConversationExternalBySourceKey = useCallback(
+    async (source: string, conversationKey: string) => {
+      await resolveConversationExternalBySourceKey(source, conversationKey);
+    },
+    [resolveConversationExternalBySourceKey],
   );
 
   const openConversationExternalByLoc = useCallback(
@@ -646,12 +705,22 @@ export function ConversationsProvider({
         Number.isFinite(snapshotId) &&
         snapshotId > 0 &&
         snapshotId === currentActiveId;
+      const suppressAutoSelect =
+        startupInitialOpenStatus === 'pending' ||
+        startupInitialOpenStatus === 'missed' ||
+        startupInitialOpenStatus === 'timed_out';
       const shouldPreserveActive =
         Number.isFinite(currentActiveId) &&
         currentActiveId > 0 &&
         (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
 
-      const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
+      const nextActiveId = shouldPreserveActive
+        ? currentActiveId
+        : suppressAutoSelect
+          ? null
+          : list.length
+            ? Number((list[0] as any).id)
+            : null;
       setActiveId(nextActiveId);
       if (!shouldPreserveActive) {
         const nextActiveConversation =
@@ -672,7 +741,7 @@ export function ConversationsProvider({
         setLoadingInitialList(false);
       }
     }
-  }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId]);
+  }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId, startupInitialOpenStatus]);
 
   const loadMoreList = useCallback(async () => {
     const cursor = listCursor;
@@ -760,7 +829,8 @@ export function ConversationsProvider({
         url: nextCanonical,
         lastCapturedAt: (convo as any)?.lastCapturedAt,
       };
-      await upsertConversation(payload);
+      const updatedConversation = await upsertConversation(payload);
+      applyConversationUpdateLocally(updatedConversation);
 
       if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
         await migrateArticleCommentsCanonicalUrl({
@@ -793,8 +863,38 @@ export function ConversationsProvider({
         }
       }
     },
-    [items, selectedConversation],
+    [applyConversationUpdateLocally, items, selectedConversation],
   );
+
+  const updateSelectedConversationTitle = useCallback(
+    async (nextTitle: string) => {
+      const convo = selectedConversation;
+      if (!convo) throw new Error('No conversation selected');
+      const conversationId = Number((convo as any)?.id);
+      if (!Number.isFinite(conversationId) || conversationId <= 0) throw new Error('Invalid conversation');
+      const title = String(nextTitle || '').trim();
+      if (!title) throw new Error('Title is required');
+      const updated = await updateConversationTitleRecord({
+        conversationId,
+        mode: 'set',
+        title,
+      });
+      applyConversationUpdateLocally(updated);
+    },
+    [applyConversationUpdateLocally, selectedConversation],
+  );
+
+  const resetSelectedConversationTitle = useCallback(async () => {
+    const convo = selectedConversation;
+    if (!convo) throw new Error('No conversation selected');
+    const conversationId = Number((convo as any)?.id);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) throw new Error('Invalid conversation');
+    const updated = await updateConversationTitleRecord({
+      conversationId,
+      mode: 'reset',
+    });
+    applyConversationUpdateLocally(updated);
+  }, [applyConversationUpdateLocally, selectedConversation]);
 
   const cleanUrlDraft = useCallback(async (rawUrl: string) => {
     const canonical = canonicalizeHttpUrl(rawUrl);
@@ -813,22 +913,61 @@ export function ConversationsProvider({
     didBootstrapRef.current = true;
 
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     void (async () => {
       const safeSource = String(initialOpenLoc?.source || '').trim();
       const safeConversationKey = String(initialOpenLoc?.conversationKey || '').trim();
       if (safeSource && safeConversationKey) {
-        await openConversationExternalByLoc({ source: safeSource, conversationKey: safeConversationKey }).catch(
-          () => {},
-        );
+        setListSourceFilterKeyPersistent(LIST_SOURCE_KEY_ALL);
+        setListSiteFilterKeyPersistent(LIST_SITE_FILTER_ALL_KEY);
+        setStartupInitialOpenStatus('pending');
+      } else {
+        setStartupInitialOpenStatus('idle');
       }
       if (cancelled) return;
       setBootstrapped(true);
+
+      if (!safeSource || !safeConversationKey) return;
+
+      const timeoutMs = 4000;
+      const timeoutPromise = new Promise<{ status: 'timed_out'; target: null }>((resolve) => {
+        timeoutId = globalThis.setTimeout(() => {
+          startupOpenTargetRequestSeqRef.current += 1;
+          resolve({ status: 'timed_out', target: null });
+        }, timeoutMs);
+      });
+
+      const result = await Promise.race([
+        resolveConversationExternalBySourceKey(safeSource, safeConversationKey, {
+          requestSeqRef: startupOpenTargetRequestSeqRef,
+        }),
+        timeoutPromise,
+      ]).catch(() => ({ status: 'missed' as const, target: null }));
+
+      if (timeoutId != null) {
+        globalThis.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      if (cancelled) return;
+      if (result.status === 'opened') setStartupInitialOpenStatus('opened');
+      else if (result.status === 'timed_out') setStartupInitialOpenStatus('timed_out');
+      else if (result.status === 'stale') {
+        // Ignore stale startup results; a newer open request took ownership.
+      } else {
+        setStartupInitialOpenStatus('missed');
+      }
     })();
 
     return () => {
       cancelled = true;
+      if (timeoutId != null) globalThis.clearTimeout(timeoutId);
     };
-  }, [initialOpenLoc, openConversationExternalByLoc]);
+  }, [
+    initialOpenLoc,
+    resolveConversationExternalBySourceKey,
+    setListSiteFilterKeyPersistent,
+    setListSourceFilterKeyPersistent,
+  ]);
 
   useEffect(() => {
     if (!bootstrapped) return;
@@ -1188,6 +1327,7 @@ export function ConversationsProvider({
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
     pendingListLocateId,
+    startupInitialOpenPending: startupInitialOpenStatus === 'pending',
     requestListLocate,
     consumeListLocate,
     openConversationExternalByLoc,
@@ -1205,6 +1345,8 @@ export function ConversationsProvider({
     syncSelectedObsidian,
     clearSyncFeedback,
     deleteSelected,
+    updateSelectedConversationTitle,
+    resetSelectedConversationTitle,
     updateSelectedConversationUrl,
     cleanUrlDraft,
   };
