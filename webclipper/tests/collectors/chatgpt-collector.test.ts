@@ -10,6 +10,31 @@ function setupChatgptDom(html: string, url: string) {
 }
 
 describe('chatgpt-collector', () => {
+  it('uses active conversation title in ChatGPT Projects pages (instead of project name h1)', async () => {
+    const html = `
+      <h1>Research</h1>
+      <nav>
+        <a href="/g/p_1/c/conv_project_1" aria-current="page"><span>GPR signal preprocessing</span></a>
+      </nav>
+      <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
+      <div data-message-author-role="assistant" data-message-id="m_ai_1">
+        <div class="markdown prose"><p>A</p></div>
+      </div>
+    `;
+
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/g/p_1/c/conv_project_1');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    expect(snap).toBeTruthy();
+    expect(snap.conversation.title).toBe('GPR signal preprocessing');
+  });
+
   it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
       <article data-testid="conversation-turn-1">

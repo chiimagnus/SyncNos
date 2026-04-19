@@ -187,6 +187,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function findTitle(): any {
+    const conversationId = findConversationIdFromUrl();
+
+    if (conversationId) {
+      const activeLinks = Array.from(env.document.querySelectorAll("a[aria-current='page'][href]")) as any[];
+      const active = activeLinks.find((a: any) => String(a?.getAttribute?.('href') || '').includes(`/c/${conversationId}`));
+      const activeText = active && active.textContent ? String(active.textContent).trim() : '';
+      if (activeText) return activeText;
+
+      const hrefLinks = Array.from(env.document.querySelectorAll('a[href]')) as any[];
+      const byHref = hrefLinks.find((a: any) => String(a?.getAttribute?.('href') || '').includes(`/c/${conversationId}`));
+      const hrefText = byHref && byHref.textContent ? String(byHref.textContent).trim() : '';
+      if (hrefText) return hrefText;
+    }
+
     const h = env.document.querySelector('h1');
     const t = h && h.textContent ? h.textContent.trim() : '';
     return t || env.document.title || 'ChatGPT';
