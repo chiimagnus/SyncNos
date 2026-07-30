@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { t } from '@i18n';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 
 function chatSnapshot(options?: { completeness?: 'complete' | 'partial'; verified?: boolean; source?: string }) {
@@ -65,7 +66,7 @@ describe('current page capture integrity routing', () => {
     const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
 
     expect(result).toMatchObject({ captureCompleteness: 'partial' });
-    expect(progress.at(-1)?.message).toContain('无法确认完整历史');
+    expect(progress.at(-1)?.message).toBe(t('partialCaptureSaved'));
     expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
     expect(harness.calls[1].payload).toMatchObject({
       mode: 'append',
