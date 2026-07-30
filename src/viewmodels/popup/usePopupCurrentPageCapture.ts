@@ -80,7 +80,10 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
       await refreshState();
       setStatus({
         kind: 'default',
-        message: buildCaptureSuccessTipMessage({ isNew: (data as any)?.isNew, title: (data as any)?.title }),
+        message:
+          (data as any)?.captureCompleteness === 'partial'
+            ? t('partialCaptureSaved')
+            : buildCaptureSuccessTipMessage({ isNew: (data as any)?.isNew, title: (data as any)?.title }),
       });
       return data;
     } catch (error) {

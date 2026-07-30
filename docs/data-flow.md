@@ -40,9 +40,16 @@
 4. `video-transcript-capture.ts` 将 cue 列表格式化为 transcript markdown，随后写入 `sourceType='video'` 的 conversation 和 `video_transcript` 消息。
 5. `conversation-kinds.ts` 决定这个会话最终落到 `SyncNos-Videos`，并继续沿着 Notion / Obsidian / Markdown / Zip 的同一条下游链路输出。
 
-### 4. 为什么有些来源不自动增量保存
+### 4. 虚拟列表对话的手动完整抓取
 
-- ChatGPT 与 Google AI Studio 都使用虚拟化渲染；自动 observer 常常只能看到当前可见 turns，容易漏掉离屏轮次，因此两者都退出 auto-save 集合、保留“手动保存优先”策略，全量历史由 collector 的 `prepareManualCapture()` 滚动扫描水合 + 跨扫描收割恢复。
+ChatGPT 与 Google AI Studio 会卸载离屏轮次，因此不进入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`。完整历史只由 inpage 保存按钮或 popup 当前页抓取显式启动。
+
+1. `prepareManualCapture()` 创建一次性的纯数据 token；current-page service 把同一个对象直接传给紧随其后的 `capture({ manual: true, preparedCapture })`。collector 不使用模块级或闭包级跨调用缓存。
+2. 共享 virtualized-chat sweep 从真实滚动容器顶部开始，以重叠窗口向下遍历。每次等待后重新查询当前 DOM，按稳定 turn/message key 合并；节点替换、回收、滚动高度增长和最终 live merge 都参与完整性判定。
+3. 只有身份稳定、顶部与底部均到达、窗口顺序可锚定、确认遍历无新增且最终 live merge 无变化时，结果才是 `complete`。完整结果使用 snapshot，可以删除真正缺失的旧消息。
+4. 超时、身份变化、顺序不确定、图片内联失败或其他不确定状态均降级为 `partial`。已验证的 partial 只使用带非空 diff 的 append，保留既有顺序；身份未验证或消息键不稳定时不写入。
+5. Deep Research 占位符和图片失败回退通过瞬态 merge policy 保护已有完整正文或富 Markdown；这些控制字段由 IndexedDB 写入边界消费，不持久化。
+6. 遍历结束后只在会话身份和原滚动根仍一致时恢复原始横纵滚动位置。
 - inpage 单击触发保存，双击打开页面内评论侧边栏（inpage comments panel），多击只触发彩蛋提示，不直接改变数据链路。
 
 ### 5. 会话详情里的手动图片补全（cache-images）

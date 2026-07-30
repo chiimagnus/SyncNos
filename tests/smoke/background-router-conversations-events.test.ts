@@ -130,8 +130,26 @@ describe('background-router conversations events', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalled();
+    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalledWith(123, [], {
+      mode: 'snapshot',
+      diff: null,
+    });
     expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'upsert', conversationId: 123 });
+  });
+
+  it('rejects an unknown non-empty persistence mode before image or storage work', async () => {
+    const router = createRouter();
+
+    const res = await router.__handleMessageForTests({
+      type: 'syncConversationMessages',
+      conversationId: 123,
+      mode: 'snapshop',
+      messages: [{ messageKey: 'm1', contentText: 'unsafe' }],
+    });
+
+    expect(res).toMatchObject({ ok: false, error: { message: 'invalid mode' } });
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(writeMocks.writeConversationMessagesSnapshot).not.toHaveBeenCalled();
   });
 
   it('uses ai_chat_cache_images_enabled for chat source auto-save', async () => {
@@ -165,6 +183,53 @@ describe('background-router conversations events', () => {
         conversationId: 2001,
         enableHttpImages: false,
       }),
+    );
+  });
+
+  it('keeps transient protective policies through author normalization and image inlining', async () => {
+    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
+      makeInlineResult(
+        input.messages.map((message: any) => ({
+          ...message,
+          contentMarkdown: 'fallback\n\n![](syncnos-asset://9)',
+        })),
+      ),
+    );
+    const router = createRouter();
+
+    const res = await router.__handleMessageForTests({
+      type: 'syncConversationMessages',
+      conversationId: 2003,
+      conversationSourceType: 'chat',
+      conversationUrl: 'https://aistudio.google.com/app/1',
+      mode: 'append',
+      diff: { added: [], updated: ['m1'], removed: [] },
+      messages: [
+        {
+          messageKey: 'm1',
+          role: 'user',
+          contentText: 'fallback',
+          contentMarkdown: 'fallback\n\n![](data:image/png;base64,AQ==)',
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-markdown',
+        },
+      ],
+    });
+
+    expect(res.ok).toBe(true);
+    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalledWith(
+      2003,
+      [
+        expect.objectContaining({
+          messageKey: 'm1',
+          authorName: 'You',
+          contentMarkdown: 'fallback\n\n![](syncnos-asset://9)',
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-markdown',
+        }),
+      ],
+      { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
     );
   });
 

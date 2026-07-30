@@ -7,14 +7,18 @@ import {
   inEditMode as inEditModeUtil,
 } from '@collectors/collector-utils.ts';
 import geminiMarkdown from '@collectors/gemini/gemini-markdown.ts';
-
-let manualTurnCache: Map<string, any> | null = null;
-let manualCacheConversationKey: string = '';
-let manualCacheWarningFlags: string[] = [];
-
-function sleep(ms: any): any {
-  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
-}
+import {
+  addPreparedReason,
+  createPreparedAccumulator,
+  createScrollRootRestorer,
+  finishPreparedCapture,
+  mergePreparedRecords,
+  createPreparedCaptureConsumer,
+  runVirtualizedSweep,
+  type PreparedAccumulator,
+  type PreparedIdentityGuard,
+  type PreparedMessageRecord,
+} from '@collectors/virtualized-chat/virtualized-chat-sweep.ts';
 
 function normalizeRoleFromTurn(turn: Element): 'user' | 'assistant' | null {
   const container = turn.querySelector('.chat-turn-container');
@@ -41,6 +45,7 @@ function pickTurnContent(turn: Element, role: 'user' | 'assistant'): Element | n
 }
 
 export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDefinition {
+  const consumePreparedCapture = createPreparedCaptureConsumer<any>('googleaistudio');
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
     return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
@@ -66,6 +71,40 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     );
   }
 
+  function stableTurnAnchors(root = getConversationRoot()): string[] {
+    if (!root || typeof root.querySelectorAll !== 'function') return [];
+    return Array.from(root.querySelectorAll('ms-chat-turn[id]'))
+      .map((turn: any) => String(turn?.getAttribute?.('id') || '').trim())
+      .filter(Boolean);
+  }
+
+  function sampleIdentityGuard(): PreparedIdentityGuard {
+    const anchors = stableTurnAnchors();
+    return {
+      route: String(env.location.pathname || ''),
+      durableId: String(findConversationKey() || '').trim(),
+      anchors,
+      topAnchor: anchors[0] || '',
+    };
+  }
+
+  function identityGuardsMatch(expected: PreparedIdentityGuard, actual = sampleIdentityGuard()): boolean {
+    if (!expected || !actual || !expected.route || expected.route !== actual.route) return false;
+    if (!expected.durableId || expected.durableId !== actual.durableId) return false;
+    if (!expected.anchors.length || !actual.anchors.length) return false;
+    const current = new Set(actual.anchors);
+    return expected.anchors.some((anchor) => current.has(anchor));
+  }
+
+  function createCaptureIdentitySampler(expected: PreparedIdentityGuard): () => string | null {
+    const stableIdentity = expected.route && expected.durableId ? `${expected.route}|${expected.durableId}` : '';
+    return () => {
+      if (!stableIdentity) return null;
+      const current = sampleIdentityGuard();
+      return current.route === expected.route && current.durableId === expected.durableId ? stableIdentity : null;
+    };
+  }
+
   function inEditMode(root: any): any {
     return inEditModeUtil(root);
   }
@@ -74,6 +113,40 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
     if (id) return `${id}:${role}`;
     return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
+  }
+
+  type ManualTurnEntry = {
+    turnId: string;
+    role: 'user' | 'assistant';
+    content: Element;
+    withinTurn: number;
+    messageKey: string;
+  };
+
+  function roleFromMarker(marker: Element): 'user' | 'assistant' | null {
+    const value = String(marker.getAttribute?.('data-turn-role') || '').trim();
+    if (/^user$/i.test(value)) return 'user';
+    if (/model|assistant/i.test(value)) return 'assistant';
+    return null;
+  }
+
+  function readManualTurnEntries(turn: Element): ManualTurnEntry[] {
+    const turnId = String(turn.getAttribute?.('id') || '').trim();
+    if (!turnId) return [];
+    const entries: ManualTurnEntry[] = [];
+    for (const marker of Array.from(turn.querySelectorAll('[data-turn-role]'))) {
+      const role = roleFromMarker(marker);
+      if (!role) continue;
+      const content = marker.matches?.('.turn-content') ? marker : marker.querySelector('.turn-content');
+      if (!content) continue;
+      const withinTurn = entries.length;
+      entries.push({ turnId, role, content, withinTurn, messageKey: `${turnId}:${role}:${withinTurn}` });
+    }
+    if (entries.length) return entries;
+    const role = normalizeRoleFromTurn(turn);
+    const content = role ? pickTurnContent(turn, role) : null;
+    if (!role || !content) return [];
+    return [{ turnId, role, content, withinTurn: 0, messageKey: `${turnId}:${role}:0` }];
   }
 
   function normalizeTitle(value: any): any {
@@ -115,17 +188,30 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   }
 
   type InlineImageContext = {
-    blobUrlCache: Map<string, { dataUrl: string; bytes: number }>;
-    inlinedCount: number;
-    inlinedBytes: number;
+    blobUrlCache: Map<string, string | null>;
     warningFlags: Set<string>;
+  };
+
+  type PlainImageReferences = {
+    httpUrls: string[];
+    blobUrls: string[];
+  };
+
+  type PlainExtractionInput = {
+    messageKey: string;
+    turnKey: string;
+    withinTurn: number;
+    role: 'user' | 'assistant';
+    sequence: number;
+    contentText: string;
+    baseMarkdown: string;
+    imageReferences: PlainImageReferences;
+    updatedAt: number;
   };
 
   function createInlineImageContext(): InlineImageContext {
     return {
       blobUrlCache: new Map(),
-      inlinedCount: 0,
-      inlinedBytes: 0,
       warningFlags: new Set(),
     };
   }
@@ -145,10 +231,10 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     if (srcset) {
       const items = srcset
         .split(',')
-        .map((s: any) => String(s || '').trim())
+        .map((value: any) => String(value || '').trim())
         .filter(Boolean);
       for (const item of items) {
-        const url = item.split(/\s+/)[0] ? String(item.split(/\s+/)[0]).trim() : '';
+        const url = String(item.split(/\s+/)[0] || '').trim();
         if (isBlobUrl(url)) return url;
       }
     }
@@ -157,10 +243,9 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
 
   function extractBlobImageUrlsFromElement(element: ParentNode | null): string[] {
     if (!element || typeof (element as any).querySelectorAll !== 'function') return [];
-    const images = Array.from((element as any).querySelectorAll('img'));
     const seen = new Set<string>();
     const output: string[] = [];
-    for (const image of images) {
+    for (const image of Array.from((element as any).querySelectorAll('img'))) {
       const url = pickBlobUrlFromImg(image);
       if (!url || seen.has(url)) continue;
       seen.add(url);
@@ -185,74 +270,32 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   }
 
   async function inlineBlobImageUrl(blobUrl: string, ctx: InlineImageContext): Promise<string | null> {
-    const cached = ctx.blobUrlCache.get(blobUrl);
-    if (cached && cached.dataUrl) return cached.dataUrl;
+    if (ctx.blobUrlCache.has(blobUrl)) return ctx.blobUrlCache.get(blobUrl) || null;
+    const fail = (warning: string): null => {
+      ctx.warningFlags.add(warning);
+      ctx.blobUrlCache.set(blobUrl, null);
+      return null;
+    };
 
     const fetchFn: any = (env.window as any)?.fetch || (globalThis as any).fetch;
-    if (typeof fetchFn !== 'function') {
-      ctx.warningFlags.add('inline_images_fetch_unavailable');
-      return null;
-    }
+    if (typeof fetchFn !== 'function') return fail('inline_images_fetch_unavailable');
 
     try {
       const response = await fetchFn(blobUrl);
-      if (!response || response.ok === false) {
-        ctx.warningFlags.add('inline_images_fetch_failed');
-        return null;
-      }
-
+      if (!response || response.ok === false) return fail('inline_images_fetch_failed');
       const blob = await response.blob();
       const size = Number(blob?.size || 0);
       const type = String(blob?.type || '');
-      if (!type || !/^image\//i.test(type)) {
-        ctx.warningFlags.add('inline_images_non_image_blob');
-        return null;
-      }
-      if (size <= 0) {
-        ctx.warningFlags.add('inline_images_empty_blob');
-        return null;
-      }
+      if (!type || !/^image\//i.test(type)) return fail('inline_images_non_image_blob');
+      if (size <= 0) return fail('inline_images_empty_blob');
 
       const dataUrl = await blobToDataUrl(blob);
-      if (!dataUrl || !/^data:image\//i.test(dataUrl)) {
-        ctx.warningFlags.add('inline_images_encode_failed');
-        return null;
-      }
-
-      ctx.blobUrlCache.set(blobUrl, { dataUrl, bytes: size });
-      ctx.inlinedCount += 1;
-      ctx.inlinedBytes += size;
+      if (!dataUrl || !/^data:image\//i.test(dataUrl)) return fail('inline_images_encode_failed');
+      ctx.blobUrlCache.set(blobUrl, dataUrl);
       return dataUrl;
-    } catch (_e) {
-      ctx.warningFlags.add('inline_images_fetch_failed');
-      return null;
+    } catch (_error) {
+      return fail('inline_images_fetch_failed');
     }
-  }
-
-  async function extractImageUrlsIncludingBlobImages(
-    element: ParentNode | null,
-    ctx: InlineImageContext,
-  ): Promise<string[]> {
-    const httpUrls = extractImageUrlsFromElement(element);
-    const blobUrls = extractBlobImageUrlsFromElement(element);
-    if (!blobUrls.length) return httpUrls;
-
-    const dataUrls: string[] = [];
-    for (const blobUrl of blobUrls) {
-      const dataUrl = await inlineBlobImageUrl(blobUrl, ctx);
-      if (dataUrl) dataUrls.push(dataUrl);
-    }
-
-    const merged = httpUrls.concat(dataUrls);
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const url of merged) {
-      const t = String(url || '').trim();
-      if (!t || seen.has(t)) continue;
-      seen.add(t);
-      out.push(t);
-    }
-    return out;
   }
 
   function stripThinkingFromNode(node: Element | null): Element | null {
@@ -260,17 +303,12 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     const cloned = (node as any).cloneNode(true) as Element;
     const selectors = ['ms-thought-chunk', '.thought-panel', 'img[alt="Thinking"]', '.thinking-progress-icon'];
     for (const selector of selectors) {
-      try {
-        const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
-        for (const el of list) {
-          try {
-            (el as any).remove?.();
-          } catch (_e) {
-            // ignore
-          }
+      for (const element of Array.from((cloned as any).querySelectorAll?.(selector) || [])) {
+        try {
+          (element as any).remove?.();
+        } catch (_error) {
+          // ignore
         }
-      } catch (_e) {
-        // ignore
       }
     }
     return cloned;
@@ -279,203 +317,344 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
   function stripTurnChromeFromNode(node: Element | null): Element | null {
     if (!node || typeof (node as any).cloneNode !== 'function') return node;
     const cloned = (node as any).cloneNode(true) as Element;
-    const selectors = ['.author-label', '.timestamp'];
-    for (const selector of selectors) {
-      try {
-        const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
-        for (const el of list) {
-          try {
-            (el as any).remove?.();
-          } catch (_e) {
-            // ignore
-          }
+    for (const selector of ['.author-label', '.timestamp']) {
+      for (const element of Array.from((cloned as any).querySelectorAll?.(selector) || [])) {
+        try {
+          (element as any).remove?.();
+        } catch (_error) {
+          // ignore
         }
-      } catch (_e) {
-        // ignore
       }
     }
     return cloned;
   }
 
   function cleanTurnContentNode(node: Element | null): Element | null {
-    const noThinking = stripThinkingFromNode(node);
-    return stripTurnChromeFromNode(noThinking);
+    return stripTurnChromeFromNode(stripThinkingFromNode(node));
   }
 
-  async function extractMessageFromTurn(turn: Element, sequence: number, ctx: InlineImageContext): Promise<any | null> {
-    const role = normalizeRoleFromTurn(turn);
-    if (!role) return null;
+  function uniqueStrings(values: string[]): string[] {
+    const seen = new Set<string>();
+    return values.filter((value) => {
+      const normalized = String(value || '').trim();
+      if (!normalized || seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+  }
 
-    const contentEl = pickTurnContent(turn, role);
-    if (!contentEl) return null;
-    const cleanedContent = cleanTurnContentNode(contentEl as any) || contentEl;
-
-    const updatedAt = Date.now();
-    if (role === 'user') {
-      const text = env.normalize.normalizeText(
-        (cleanedContent as any).innerText || (cleanedContent as any).textContent || '',
-      );
-      const imageUrls = await extractImageUrlsIncludingBlobImages(cleanedContent, ctx);
-      if (!text && !imageUrls.length) return null;
-      const contentText = text || '';
-      const contentMarkdown = appendImageMarkdown(contentText, imageUrls, { allowDataImageUrls: true });
-      return {
-        messageKey: messageKeyFromTurn(turn, 'user', contentText, sequence),
-        role: 'user',
-        contentText,
-        contentMarkdown,
-        sequence,
-        updatedAt,
-      };
-    }
-
-    const text = extractAssistantText(cleanedContent);
-    const imageUrls = await extractImageUrlsIncludingBlobImages(cleanedContent, ctx);
-    if (!text && !imageUrls.length) return null;
-
-    const contentText = text || '';
-    const baseMarkdown = extractAssistantMarkdown(cleanedContent, contentText);
-    const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls, { allowDataImageUrls: true });
+  function snapshotPlainInput(
+    turn: Element,
+    role: 'user' | 'assistant',
+    content: Element,
+    sequence: number,
+    manualEntry?: ManualTurnEntry,
+  ): PlainExtractionInput | null {
+    const cleaned = cleanTurnContentNode(content) || content;
+    const contentText =
+      role === 'assistant'
+        ? extractAssistantText(cleaned)
+        : env.normalize.normalizeText((cleaned as any).innerText || (cleaned as any).textContent || '');
+    const baseMarkdown = role === 'assistant' ? extractAssistantMarkdown(cleaned, contentText) : contentText;
+    const httpUrls = uniqueStrings(extractImageUrlsFromElement(cleaned));
+    const blobUrls = uniqueStrings(extractBlobImageUrlsFromElement(cleaned));
+    if (!contentText && !httpUrls.length && !blobUrls.length) return null;
     return {
-      messageKey: messageKeyFromTurn(turn, 'assistant', contentText, sequence),
-      role: 'assistant',
-      contentText,
-      contentMarkdown,
+      messageKey: manualEntry?.messageKey || messageKeyFromTurn(turn, role, contentText, sequence),
+      turnKey: manualEntry?.turnId || String(turn.getAttribute?.('id') || '').trim(),
+      withinTurn: manualEntry?.withinTurn || 0,
+      role,
       sequence,
-      updatedAt,
+      contentText,
+      baseMarkdown: baseMarkdown || contentText,
+      imageReferences: { httpUrls, blobUrls },
+      updatedAt: Date.now(),
     };
   }
 
-  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
+  function snapshotNormalInputs(): PlainExtractionInput[] {
     const root = getConversationRoot();
-    if (!root) return [];
-    if (inEditMode(root)) return [];
-
-    const turns: any[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any[];
-    if (!turns.length) return [];
-
-    const out: any[] = [];
-    let seq = 0;
-    for (const turn of turns) {
-      const msg = await extractMessageFromTurn(turn, seq, ctx);
-      if (!msg) continue;
-      out.push(msg);
-      seq += 1;
+    if (!root || inEditMode(root)) return [];
+    const output: PlainExtractionInput[] = [];
+    for (const turn of Array.from(root.querySelectorAll('ms-chat-turn')) as Element[]) {
+      const role = normalizeRoleFromTurn(turn);
+      const content = role ? pickTurnContent(turn, role) : null;
+      if (!role || !content) continue;
+      const input = snapshotPlainInput(turn, role, content, output.length);
+      if (input) output.push(input);
     }
-    return out;
+    return output;
   }
 
-  async function prepareManualCapture(options: any = {}): Promise<void> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return;
+  type ManualEntryRef = { turn: Element; entry: ManualTurnEntry };
 
+  function readCurrentManualEntryRefs(): ManualEntryRef[] {
     const root = getConversationRoot();
-    if (!root) return;
-
-    const turns: Element[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any;
-    if (!turns.length) return;
-
-    const settleMs = Math.max(0, Number(options.settleMs) || 80);
-    const perTurnTimeoutMs = Math.max(120, Number(options.perTurnTimeoutMs) || 900);
-    const pollMs = Math.max(30, Number(options.pollMs) || 80);
-
-    const conversationKey = String(findConversationKey() || '').trim();
-    manualCacheConversationKey = conversationKey;
-    manualTurnCache = new Map<string, any>();
-    const ctx = createInlineImageContext();
-    manualCacheWarningFlags = [];
-
-    const bottomTurn = turns[turns.length - 1] || null;
-
-    const total = turns.length;
-    for (let i = 0; i < total; i += 1) {
-      const turn = turns[i];
-      const role = normalizeRoleFromTurn(turn);
-      if (!role) continue;
-
-      try {
-        (turn as any).scrollIntoView?.({ block: 'center' });
-      } catch (_e) {
-        // ignore
-      }
-
-      const start = Date.now();
-      while (Date.now() - start <= perTurnTimeoutMs) {
-        const contentEl = pickTurnContent(turn, role);
-        if (contentEl) {
-          const checkEl = cleanTurnContentNode(contentEl as any) || contentEl;
-          const text = String((checkEl as any).textContent || '')
-            .replace(/\s+/g, ' ')
-            .trim();
-          const imgs = Array.from((checkEl as any).querySelectorAll?.('img') || []);
-          const hasImage = imgs.some((img: any) => {
-            const src = String(img?.currentSrc || img?.src || img?.getAttribute?.('src') || '').trim();
-            return !!src;
-          });
-          if (text || hasImage) break;
-        }
-        await sleep(pollMs);
-      }
-
-      if (settleMs) await sleep(settleMs);
-
-      const msg = await extractMessageFromTurn(turn, 0, ctx);
-      if (!msg) continue;
-      const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-      if (turnId) manualTurnCache.set(turnId, msg);
+    if (!root) return [];
+    const output: ManualEntryRef[] = [];
+    for (const turn of Array.from(root.querySelectorAll('ms-chat-turn')) as Element[]) {
+      for (const entry of readManualTurnEntries(turn)) output.push({ turn, entry });
     }
+    return output;
+  }
 
-    const warningFlags = new Set<string>(ctx.warningFlags);
-    manualCacheWarningFlags = Array.from(warningFlags);
+  async function resolveImageReferences(
+    references: PlainImageReferences,
+    ctx: InlineImageContext,
+  ): Promise<{ urls: string[]; incomplete: boolean }> {
+    const output = references.httpUrls.slice();
+    let incomplete = false;
+    for (const blobUrl of references.blobUrls) {
+      const dataUrl = await inlineBlobImageUrl(blobUrl, ctx);
+      if (dataUrl) output.push(dataUrl);
+      else incomplete = true;
+    }
+    return { urls: uniqueStrings(output), incomplete };
+  }
+
+  async function extractMessageFromInput(input: PlainExtractionInput, ctx: InlineImageContext): Promise<any | null> {
+    const resolved = await resolveImageReferences(input.imageReferences, ctx);
+    if (!input.contentText && !resolved.urls.length) return null;
+    return {
+      messageKey: input.messageKey,
+      role: input.role,
+      contentText: input.contentText,
+      contentMarkdown: appendImageMarkdown(input.baseMarkdown || input.contentText, resolved.urls, {
+        allowDataImageUrls: true,
+      }),
+      sequence: input.sequence,
+      updatedAt: input.updatedAt,
+      ...(resolved.incomplete ? { captureMergePolicy: 'preserve-existing-markdown' } : null),
+    };
+  }
+
+  async function extractMessagesFromInputs(inputs: PlainExtractionInput[], ctx: InlineImageContext): Promise<any[]> {
+    const output: any[] = [];
+    for (const input of inputs) {
+      const message = await extractMessageFromInput({ ...input, sequence: output.length }, ctx);
+      if (message) output.push(message);
+    }
+    return output;
+  }
+
+  async function collectMessages(ctx: InlineImageContext): Promise<any[]> {
+    return extractMessagesFromInputs(snapshotNormalInputs(), ctx);
+  }
+
+  type AiStudioDescriptor = {
+    key: string;
+    turnKey: string;
+    withinTurn: number;
+    fingerprint: string;
+    rendered: boolean;
+  };
+
+  function compactFingerprint(value: string): string {
+    const normalized = String(value || '');
+    return env.normalize?.fnv1a32 ? String(env.normalize.fnv1a32(normalized)) : normalized;
+  }
+
+  function descriptorFromEntry(entry: ManualTurnEntry): AiStudioDescriptor {
+    const rawText = env.normalize.normalizeText(
+      (entry.content as any).innerText || (entry.content as any).textContent || '',
+    );
+    const rawHtml = String((entry.content as any).innerHTML || '');
+    const httpUrls = extractImageUrlsFromElement(entry.content);
+    const blobUrls = extractBlobImageUrlsFromElement(entry.content);
+    return {
+      key: entry.messageKey,
+      turnKey: entry.turnId,
+      withinTurn: entry.withinTurn,
+      fingerprint: compactFingerprint(
+        [entry.messageKey, entry.role, rawText, rawHtml, httpUrls.join('|'), blobUrls.join('|')].join('\u001f'),
+      ),
+      rendered: !!rawText || !!httpUrls.length || !!blobUrls.length,
+    };
+  }
+
+  function readCurrentDescriptors(): AiStudioDescriptor[] {
+    return readCurrentManualEntryRefs().map(({ entry }) => descriptorFromEntry(entry));
+  }
+
+  async function harvestManualInto(
+    accumulator: PreparedAccumulator<any>,
+    ctx: InlineImageContext,
+  ): Promise<{ added: number; updated: number }> {
+    const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
+    const candidates = (() => {
+      const output: Array<{
+        descriptor: AiStudioDescriptor;
+        existing?: PreparedMessageRecord<any>;
+        input?: PlainExtractionInput;
+      }> = [];
+      for (const { turn, entry } of readCurrentManualEntryRefs()) {
+        const descriptor = descriptorFromEntry(entry);
+        const existing = existingByKey.get(descriptor.key);
+        if (existing && existing.fingerprint === descriptor.fingerprint) {
+          output.push({ descriptor, existing });
+          continue;
+        }
+        const input = snapshotPlainInput(turn, entry.role, entry.content, output.length, entry);
+        if (input) output.push({ descriptor, input });
+      }
+      return output;
+    })();
+
+    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    for (const candidate of candidates) {
+      const { descriptor, existing, input } = candidate;
+      if (existing) {
+        records.push({
+          key: existing.key,
+          turnKey: existing.turnKey,
+          withinTurn: existing.withinTurn,
+          fingerprint: existing.fingerprint,
+          payload: existing.payload,
+        });
+        continue;
+      }
+      if (!input) continue;
+      const message = await extractMessageFromInput(input, ctx);
+      if (!message) continue;
+      if (message.captureMergePolicy === 'preserve-existing-markdown') {
+        accumulator.completeness = 'partial';
+        if (!accumulator.reasons.includes('inline_images_incomplete')) {
+          accumulator.reasons.push('inline_images_incomplete');
+        }
+      }
+      records.push({
+        key: descriptor.key,
+        turnKey: descriptor.turnKey,
+        withinTurn: descriptor.withinTurn,
+        fingerprint: descriptor.fingerprint,
+        payload: message,
+      });
+    }
+    if (!candidates.length && stableTurnAnchors().length) addPreparedReason(accumulator, 'unstable_identity');
+    return mergePreparedRecords(accumulator, records);
+  }
+
+  async function prepareManualCapture(options: any = {}): Promise<any | null> {
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
+    const root = getConversationRoot();
+    if (!root) return null;
+
+    const identityGuard = sampleIdentityGuard();
+    const conversationKey = identityGuard.durableId && identityGuard.anchors.length ? identityGuard.durableId : '';
+    const accumulator = createPreparedAccumulator<any>({
+      source: 'googleaistudio',
+      conversationKey,
+      identityVerified: !!conversationKey,
+      identityGuard,
+    });
+    if (!conversationKey) addPreparedReason(accumulator, 'unstable_identity');
+    const ctx = createInlineImageContext();
+    const sampleIdentity = createCaptureIdentitySampler(identityGuard);
+    const runtime = { document: env.document, window: env.window };
+    const restorer = createScrollRootRestorer({
+      ...runtime,
+      getSeed: getConversationRoot,
+      sampleIdentity,
+    });
 
     try {
-      (bottomTurn as any)?.scrollIntoView?.({ block: 'end' });
-    } catch (_e) {
-      // ignore
+      const sweep = await runVirtualizedSweep(
+        runtime,
+        {
+          getScrollSeed: getConversationRoot,
+          sampleIdentity,
+          readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
+          readUnresolvedKeys: () =>
+            readCurrentDescriptors()
+              .filter((descriptor) => !descriptor.rendered)
+              .map((descriptor) => descriptor.turnKey),
+          harvest: (target) => harvestManualInto(target, ctx),
+        },
+        accumulator,
+        {
+          maxPasses: options.maxPasses,
+          totalDeadlineMs: options.totalDeadlineMs,
+          maxSteps: options.maxSteps,
+          stableSamples: options.stableSamples,
+          pollMs: options.pollMs,
+          stepTimeoutMs: options.stepTimeoutMs,
+          overlapRatio: options.overlapRatio,
+          maxOverlapRecoveries: options.maxOverlapRecoveries,
+          sleep: options.sleep,
+          now: options.now,
+        },
+      );
+      accumulator.completeness = accumulator.reasons.includes('inline_images_incomplete')
+        ? 'partial'
+        : sweep.completeness;
+    } finally {
+      const restored = restorer.restore();
+      if (!restored.restored) {
+        accumulator.completeness = 'partial';
+        addPreparedReason(accumulator, 'restore_failed');
+      }
     }
+
+    if (!identityGuardsMatch(accumulator.identityGuard)) {
+      accumulator.identityVerified = false;
+      accumulator.conversationKey = '';
+      accumulator.records = [];
+      accumulator.completeness = 'partial';
+      addPreparedReason(accumulator, 'identity_changed');
+    }
+    return { ...finishPreparedCapture(accumulator), warningFlags: Array.from(ctx.warningFlags) };
   }
 
   async function capture(options: any = {}): Promise<any> {
-    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
-    const manual = options && options.manual === true;
-    let messages: any[] = [];
-    const ctx = createInlineImageContext();
-
-    const currentConversationKey = String(findConversationKey() || '').trim();
-    if (
-      manual &&
-      manualTurnCache &&
-      manualCacheConversationKey &&
-      manualCacheConversationKey === currentConversationKey
-    ) {
-      const root = getConversationRoot();
-      const turns: Element[] = root ? (Array.from(root.querySelectorAll('ms-chat-turn')) as any) : [];
-      for (const turn of turns) {
-        const turnId = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-        if (!turnId) continue;
-        const hit = manualTurnCache.get(turnId);
-        if (hit) messages.push(hit);
-      }
-      messages = messages.map((m, idx) => ({ ...m, sequence: idx, updatedAt: Date.now() }));
-      for (const flag of manualCacheWarningFlags || []) ctx.warningFlags.add(String(flag));
-      manualTurnCache = null;
-      manualCacheConversationKey = '';
-      manualCacheWarningFlags = [];
-    } else {
-      messages = await collectMessages(ctx);
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl() || options?.manual !== true) {
+      return null;
     }
+    const ctx = createInlineImageContext();
+    const prepared = consumePreparedCapture(options?.preparedCapture);
+    if (!prepared || !identityGuardsMatch(prepared.identityGuard)) return null;
+    for (const flag of (options.preparedCapture as any)?.warningFlags || []) ctx.warningFlags.add(String(flag));
 
-    if (!messages.length) return null;
+    const accumulator = createPreparedAccumulator<any>({
+      source: 'googleaistudio',
+      conversationKey: prepared.conversationKey,
+      identityVerified: prepared.identityVerified === true,
+      identityGuard: prepared.identityGuard,
+    });
+    accumulator.completeness = prepared.completeness;
+    accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
+    accumulator.sweepMetrics = { ...prepared.metrics };
+    mergePreparedRecords(
+      accumulator,
+      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
+    );
+    const finalLive = await harvestManualInto(accumulator, ctx);
+    if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
+      accumulator.completeness = 'partial';
+      addPreparedReason(accumulator, 'final_live_changed');
+    }
+    if (!identityGuardsMatch(accumulator.identityGuard)) return null;
+
+    const finalPrepared = finishPreparedCapture(accumulator);
+    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
+    if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
+    const captureMeta = {
+      completeness: finalPrepared.completeness,
+      identityVerified: true,
+      reasons: finalPrepared.reasons,
+      metrics: finalPrepared.metrics,
+    };
     return {
       conversation: {
         sourceType: 'chat',
         source: 'googleaistudio',
-        conversationKey: findConversationKey(),
+        conversationKey: finalPrepared.conversationKey,
         title: extractConversationTitle(),
         url: env.location.href,
         warningFlags: Array.from(ctx.warningFlags),
         lastCapturedAt: Date.now(),
       },
       messages,
+      captureMeta,
     };
   }
 

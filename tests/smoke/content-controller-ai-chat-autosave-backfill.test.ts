@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites.ts';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
 import normalizeApi from '@services/shared/normalize.ts';
@@ -104,6 +105,7 @@ function createHarness(options: {
 
   return {
     sendCalls,
+    getCaptureCount: () => captureCount,
     tipCalls,
     runTick: async () => {
       if (tickRef) await tickRef();
@@ -448,4 +450,24 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(syncCalls).toHaveLength(2);
     expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
   });
+
+  it('keeps virtualized providers out of the auto-save source set', () => {
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('chatgpt')).toBe(false);
+    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('googleaistudio')).toBe(false);
+  });
+
+  it.each(['chatgpt', 'googleaistudio'])(
+    'skips virtualized manual collector %s before capture',
+    async (collectorId) => {
+      const harness = createHarness({
+        snapshots: [makeSnapshot(`manual-${collectorId}`, ['A'])],
+        collectorId,
+      });
+
+      await harness.runTick();
+
+      expect(harness.getCaptureCount()).toBe(0);
+      expect(harness.sendCalls).toHaveLength(0);
+    },
+  );
 });

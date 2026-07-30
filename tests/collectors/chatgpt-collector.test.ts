@@ -3,20 +3,23 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
-import {
-  createChatgptCollectorDef,
-  turnKeyOf,
-  getTurnSkeleton,
-  scrollTargetForTurn,
-  turnIsHydrated,
-  createHarvestCache,
-  harvestMessagesInto,
-  assembleFromCache,
-} from '../../src/collectors/chatgpt/chatgpt-collector.ts';
+import { createChatgptCollectorDef, turnKeyOf } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
+import chatgptMarkdown from '../../src/collectors/chatgpt/chatgpt-markdown.ts';
 
 function setupChatgptDom(html: string, url: string) {
   const dom = new JSDOM(`<body><main>${html}</main></body>`, { url });
   return dom;
+}
+
+async function capturePrepared(def: any, prepareOptions: any = {}) {
+  const preparedCapture = await def.collector.prepareManualCapture({
+    stableSamples: 1,
+    pollMs: 0,
+    sleep: async () => {},
+    ...prepareOptions,
+  });
+  if (!preparedCapture) return null;
+  return def.collector.capture({ manual: true, preparedCapture });
 }
 
 describe('chatgpt-collector', () => {
@@ -40,17 +43,21 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe('GPR signal preprocessing');
   });
 
-  it('keeps fallback conversationKey in temporary chat and derives title from first user message', async () => {
+  it('derives a stable temporary conversation key from the canonical top turn anchor', async () => {
     const html = `
-      <div data-message-author-role="user"><div class="whitespace-pre-wrap">请帮我整理今天的发布检查清单</div></div>
-      <div data-message-author-role="assistant" data-message-id="m_ai_tmp_1">
-        <div class="markdown prose"><p>好的，我们先从回归范围开始。</p></div>
-      </div>
+      <article data-testid="conversation-turn-1" data-turn-id="turn_tmp_user">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">请帮我整理今天的发布检查清单</div></div>
+      </article>
+      <article data-testid="conversation-turn-2" data-turn-id="turn_tmp_assistant">
+        <div data-message-author-role="assistant" data-message-id="m_ai_tmp_1">
+          <div class="markdown prose"><p>好的，我们先从回归范围开始。</p></div>
+        </div>
+      </article>
     `;
 
     const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=true');
@@ -62,19 +69,88 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const def = createChatgptCollectorDef(env) as any;
+    const preparedCapture = await def.collector.prepareManualCapture({ stableSamples: 1, pollMs: 0 });
+    const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
     expect(snap).toBeTruthy();
-    expect(String(snap.conversation.conversationKey || '')).toMatch(/^fallback_/);
+    expect(String(snap.conversation.conversationKey || '')).toMatch(/^chatgpt_/);
+    expect(snap.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
+    expect(snap.messages.every((message: any) => !String(message.messageKey).startsWith('fallback_'))).toBe(true);
     expect(String(snap.conversation.title || '')).toBe('请帮我整理今天的发布检查清单');
     expect(String(snap.conversation.title || '')).not.toBe('ChatGPT');
   });
 
+  it('keeps the temporary conversation key stable across first-user edits and history growth', async () => {
+    async function capture(text: string, includeExtra: boolean) {
+      const html = `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_stable_top">
+          <div data-message-author-role="user"><div class="whitespace-pre-wrap">${text}</div></div>
+        </article>
+        <article data-testid="conversation-turn-2" data-turn-id="turn_stable_answer">
+          <div data-message-author-role="assistant"><div class="markdown prose"><p>answer</p></div></div>
+        </article>
+        ${
+          includeExtra
+            ? '<article data-testid="conversation-turn-3" data-turn-id="turn_extra"><div data-message-author-role="user"><div class="whitespace-pre-wrap">extra</div></div></article>'
+            : ''
+        }
+      `;
+      const dom = setupChatgptDom(html, 'https://chatgpt.com/?temporary-chat=true');
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
+      return (await capturePrepared(createChatgptCollectorDef(env))) as any;
+    }
+
+    const before = await capture('first draft', false);
+    const after = await capture('edited prompt', true);
+    expect(before.conversation.conversationKey).toBe(after.conversation.conversationKey);
+  });
+
+  it('marks an unprepared unstable live snapshot as unverified so persistence rejects it', async () => {
+    const dom = setupChatgptDom(
+      '<div data-message-author-role="user"><div class="whitespace-pre-wrap">unstable</div></div>',
+      'https://chatgpt.com/?temporary-chat=true',
+    );
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const snap = await createChatgptCollectorDef(env).collector.capture({ manual: true });
+    expect(snap).toBeNull();
+  });
+
+  it('does not verify temporary-chat identity from an empty structural turn shell', async () => {
+    const dom = setupChatgptDom(
+      '<article data-testid="conversation-turn-1"><div data-message-author-role="user"><div class="whitespace-pre-wrap">unstable shell</div></div></article>',
+      'https://chatgpt.com/?temporary-chat=true',
+    );
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+    const guard = def.collector.__test.sampleIdentityGuard(dom.window.document.querySelector('main'));
+    expect(guard.anchors).toEqual([]);
+    expect(def.collector.__test.identityConversationKey(guard)).toBe('');
+
+    const snapshot = await def.collector.capture({ manual: true });
+    expect(snapshot).toBeNull();
+  });
+
   it('extracts assistant contentMarkdown from semantic markdown DOM', async () => {
     const html = `
-      <article data-testid="conversation-turn-1">
+      <article data-testid="conversation-turn-1" data-turn-id="turn_md_user">
         <div data-message-author-role="user"><div class="whitespace-pre-wrap">你好</div></div>
       </article>
-      <article data-testid="conversation-turn-2">
+      <article data-testid="conversation-turn-2" data-turn-id="turn_md_assistant">
         <div data-message-author-role="assistant" data-message-id="m_ai_1">
           <div class="markdown prose">
             <h1>主标题</h1>
@@ -117,7 +193,7 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
 
@@ -146,7 +222,7 @@ describe('chatgpt-collector', () => {
 
   it('extracts multiple assistant messages inside an agent-turn container', async () => {
     const html = `
-      <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
+      <div data-message-author-role="user" data-message-id="m_user_1"><div class="whitespace-pre-wrap">Q</div></div>
       <div class="group/turn-messages flex flex-col agent-turn">
         <div data-message-author-role="assistant" data-message-id="m_ai_1" class="text-message">
           <div class="markdown prose"><p>first</p></div>
@@ -168,7 +244,7 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'assistant']);
     expect(snap.messages.map((m: any) => m.contentText)).toEqual(['Q', 'first', 'second']);
@@ -197,119 +273,13 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
     expect(snap.messages[0].contentMarkdown).toContain('```mermaid');
     expect(snap.messages[0].contentMarkdown).toContain('graph TD');
     expect(snap.messages[0].contentText).toContain('graph TD');
-  });
-
-  it('captures deep-research iframe content via postMessage', async () => {
-    const html = `
-      <div data-message-author-role="assistant" data-message-id="m_ai_prev">
-        <div class="markdown prose"><p>previous</p></div>
-      </div>
-      <article data-testid="conversation-turn-4" data-turn="assistant" data-turn-id="t1">
-        <div class="agent-turn">
-          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/?app=chatgpt"></iframe>
-        </div>
-      </article>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_1');
-    const iframe = dom.window.document.querySelector('iframe') as any;
-    expect(iframe).toBeTruthy();
-
-    const fakeFrameWindow = {
-      postMessage: (msg: any) => {
-        const requestId = msg?.requestId;
-        dom.window.dispatchEvent(
-          new (dom.window as any).MessageEvent('message', {
-            data: {
-              __syncnos: true,
-              type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
-              requestId,
-              title: 'Report',
-              markdown: '# Title\n\nBody',
-              text: 'Title\n\nBody',
-            },
-            origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
-            source: fakeFrameWindow as any,
-          }),
-        );
-      },
-    };
-    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: fakeFrameWindow });
-
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(2);
-    expect(snap.messages[0].contentText).toContain('previous');
-    expect(snap.messages[1].role).toBe('assistant');
-    expect(snap.messages[1].contentMarkdown).toContain('# Title');
-    expect(snap.messages[1].contentText).toContain('Body');
-  });
-
-  it('captures deep-research iframe inside section conversation-turn wrappers', async () => {
-    const html = `
-      <section data-testid="conversation-turn-1" data-turn="user">
-        <div data-message-author-role="user"><div class="whitespace-pre-wrap">Q</div></div>
-      </section>
-      <section data-testid="conversation-turn-2" data-turn="assistant" data-turn-id="t2">
-        <h4 class="sr-only select-none">ChatGPT said:</h4>
-        <div class="agent-turn">
-          <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop"></iframe>
-        </div>
-      </section>
-    `;
-
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_deep_research_section_1');
-    const iframe = dom.window.document.querySelector('iframe') as any;
-    expect(iframe).toBeTruthy();
-
-    const fakeFrameWindow = {
-      postMessage: (msg: any) => {
-        const requestId = msg?.requestId;
-        dom.window.dispatchEvent(
-          new (dom.window as any).MessageEvent('message', {
-            data: {
-              __syncnos: true,
-              type: 'SYNCNOS_DEEP_RESEARCH_RESPONSE',
-              requestId,
-              title: 'Report',
-              markdown: '# Title\n\nBody',
-              text: 'Title\n\nBody',
-            },
-            origin: 'https://connector_openai_deep_research.web-sandbox.oaiusercontent.com',
-            source: fakeFrameWindow as any,
-          }),
-        );
-      },
-    };
-    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: fakeFrameWindow });
-
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
-    expect(snap.messages[0].contentText).toBe('Q');
-    expect(snap.messages[1].contentMarkdown).toContain('# Title');
-    expect(snap.messages[1].contentText).toContain('Body');
   });
 
   it('captures multiple deep-research iframes with identical src as distinct reports', async () => {
@@ -375,7 +345,7 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     const assistant = snap.messages.filter((m: any) => m.role === 'assistant');
     expect(assistant.length).toBe(3);
@@ -428,7 +398,7 @@ describe('chatgpt-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({}))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe('assistant');
@@ -441,140 +411,50 @@ describe('chatgpt-collector', () => {
 
   it('falls back to plain text markdown when markdown helper is unavailable', async () => {
     const html = `
-      <article data-testid="conversation-turn-1">
-        <div data-message-author-role="assistant">
+      <article data-testid="conversation-turn-1" data-turn-id="turn_fallback">
+        <div data-message-author-role="assistant" data-message-id="m_fallback">
           <div class="markdown prose"><p>plain answer</p></div>
         </div>
       </article>
     `;
 
-    vi.resetModules();
-    vi.doMock('../../src/collectors/chatgpt/chatgpt-markdown.ts', () => ({ default: {} }));
+    const extractAssistantText = chatgptMarkdown.extractAssistantText;
+    const extractAssistantMarkdown = chatgptMarkdown.extractAssistantMarkdown;
+    (chatgptMarkdown as any).extractAssistantText = undefined;
+    (chatgptMarkdown as any).extractAssistantMarkdown = undefined;
+    try {
+      const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_fallback_1');
+      const env = createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      });
 
-    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_fallback_1');
-    const { createChatgptCollectorDef: createDef } = await import('../../src/collectors/chatgpt/chatgpt-collector.ts');
-
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: dom.window.document as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-
-    const snap = (await Promise.resolve(createDef(env).collector.capture({ manual: true }))) as any;
-    expect(snap).toBeTruthy();
-    expect(snap.messages.length).toBe(1);
-    expect(snap.messages[0].role).toBe('assistant');
-    expect(snap.messages[0].contentText).toBe('plain answer');
-    expect(snap.messages[0].contentMarkdown).toBe('plain answer');
+      const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
+      expect(snap).toBeTruthy();
+      expect(snap.messages.length).toBe(1);
+      expect(snap.messages[0].role).toBe('assistant');
+      expect(snap.messages[0].contentText).toBe('plain answer');
+      expect(snap.messages[0].contentMarkdown).toBe('plain answer');
+    } finally {
+      chatgptMarkdown.extractAssistantText = extractAssistantText;
+      chatgptMarkdown.extractAssistantMarkdown = extractAssistantMarkdown;
+    }
   });
 });
 
-describe('chatgpt turn primitives', () => {
-  function buildTurnsDom() {
-    const html = `<!DOCTYPE html><html><body>
-      <div data-turn-id-container style="--last-known-height:120px">
-        <section data-testid="conversation-turn-1" data-turn-id="turn_a" data-turn="user">
-          <div data-message-author-role="user"><div class="whitespace-pre-wrap">你好</div></div>
-        </section>
-      </div>
-      <div data-turn-id-container style="--last-known-height:8000px">
-        <section data-testid="conversation-turn-2" data-turn-id="turn_b" data-turn="assistant"></section>
-      </div>
-      <div data-turn-id-container style="--last-known-height:200px">
-        <section data-testid="conversation-turn-3" data-turn-id="turn_c" data-turn="assistant">
-          <div data-message-author-role="assistant" data-message-id="m_c"><div class="markdown prose"><p>答</p></div></div>
-        </section>
-      </div>
-    </body></html>`;
-    return new JSDOM(html, { url: 'https://chatgpt.com/share/share_primitives_1' });
-  }
-
-  it('getTurnSkeleton returns every turn shell including empty (virtualized) ones', () => {
-    const skeleton = getTurnSkeleton(buildTurnsDom().window.document);
-    expect(skeleton.length).toBe(3);
-  });
-
-  it('turnKeyOf resolves to the same turn UUID from a deep role node and from the shell', () => {
-    const doc = buildTurnsDom().window.document;
-    const roleNode = doc.querySelector('[data-message-author-role="user"]') as any;
-    const shell1 = doc.querySelector('[data-testid="conversation-turn-1"]') as any;
-    const emptyShell = doc.querySelector('[data-testid="conversation-turn-2"]') as any;
+describe('chatgpt turn identity primitive', () => {
+  it('resolves the same turn UUID from a role node and its shell', () => {
+    const dom = new JSDOM(`<!DOCTYPE html><html><body>
+      <section data-testid="conversation-turn-1" data-turn-id="turn_a">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">你好</div></div>
+      </section>
+    </body></html>`);
+    const roleNode = dom.window.document.querySelector('[data-message-author-role="user"]') as any;
+    const shell = dom.window.document.querySelector('[data-testid="conversation-turn-1"]') as any;
     expect(turnKeyOf(roleNode)).toBe('turn_a');
-    expect(turnKeyOf(shell1)).toBe('turn_a');
-    // An empty (virtualized) shell still yields its stable turn UUID.
-    expect(turnKeyOf(emptyShell)).toBe('turn_b');
-  });
-
-  it('turnIsHydrated distinguishes empty shells from rendered turns', () => {
-    const doc = buildTurnsDom().window.document;
-    const t1 = doc.querySelector('[data-testid="conversation-turn-1"]') as any;
-    const t2 = doc.querySelector('[data-testid="conversation-turn-2"]') as any;
-    const t3 = doc.querySelector('[data-testid="conversation-turn-3"]') as any;
-    expect(turnIsHydrated(t1)).toBe(true);
-    expect(turnIsHydrated(t2)).toBe(false);
-    expect(turnIsHydrated(t3)).toBe(true);
-  });
-
-  it('scrollTargetForTurn returns the outer container without scrolling', () => {
-    const doc = buildTurnsDom().window.document;
-    const shell = doc.querySelector('[data-testid="conversation-turn-1"]') as any;
-    const target = scrollTargetForTurn(shell) as any;
-    expect(target).toBeTruthy();
-    expect(target.hasAttribute('data-turn-id-container')).toBe(true);
-  });
-});
-
-describe('chatgpt harvest cache', () => {
-  function skeletonDoc() {
-    const html = `<!DOCTYPE html><html><body>
-      <div data-turn-id-container><section data-testid="conversation-turn-1" data-turn-id="turn_a"></section></div>
-      <div data-turn-id-container><section data-testid="conversation-turn-2" data-turn-id="turn_b"></section></div>
-      <div data-turn-id-container><section data-testid="conversation-turn-3" data-turn-id="turn_c"></section></div>
-    </body></html>`;
-    return new JSDOM(html, { url: 'https://chatgpt.com/share/x' }).window.document;
-  }
-  function msg(messageKey: string, role: string, text: string) {
-    return { messageKey, role, contentText: text, contentMarkdown: text, sequence: 0, updatedAt: 1 };
-  }
-
-  it('reassembles a middle turn hydrated on a later pass into its correct position', () => {
-    const doc = skeletonDoc();
-    const cache = createHarvestCache('conv_test');
-    // Pass 1: middle turn (turn_b) is an empty shell, only turn_a and turn_c are present.
-    expect(
-      harvestMessagesInto(cache, [
-        { turnKey: 'turn_a', withinTurn: 0, message: msg('m_a', 'user', 'Q1') },
-        { turnKey: 'turn_c', withinTurn: 0, message: msg('m_c', 'assistant', 'A2') },
-      ]),
-    ).toBe(2);
-    expect((assembleFromCache(cache, doc) || []).map((m: any) => m.messageKey)).toEqual(['m_a', 'm_c']);
-    // Pass 2: the middle turn hydrates; re-harvesting turn_a/turn_c must not duplicate.
-    expect(
-      harvestMessagesInto(cache, [
-        { turnKey: 'turn_a', withinTurn: 0, message: msg('m_a', 'user', 'Q1') },
-        { turnKey: 'turn_b', withinTurn: 0, message: msg('m_b', 'user', 'Q-mid') },
-        { turnKey: 'turn_c', withinTurn: 0, message: msg('m_c', 'assistant', 'A2') },
-      ]),
-    ).toBe(1);
-    const full = assembleFromCache(cache, doc) || [];
-    expect(full.map((m: any) => m.messageKey)).toEqual(['m_a', 'm_b', 'm_c']);
-    expect(full.map((m: any) => m.sequence)).toEqual([0, 1, 2]);
-  });
-
-  it('keeps multiple messages within one turn in insertion order (F3)', () => {
-    const doc = skeletonDoc();
-    const cache = createHarvestCache('conv_multi');
-    harvestMessagesInto(cache, [
-      { turnKey: 'turn_a', withinTurn: 0, message: msg('m_a', 'user', 'Q') },
-      { turnKey: 'turn_b', withinTurn: 0, message: msg('m_b1', 'assistant', 'part1') },
-      { turnKey: 'turn_b', withinTurn: 1, message: msg('m_b2', 'assistant', 'part2') },
-    ]);
-    expect((assembleFromCache(cache, doc) || []).map((m: any) => m.messageKey)).toEqual(['m_a', 'm_b1', 'm_b2']);
-  });
-
-  it('returns null when nothing has been harvested', () => {
-    expect(assembleFromCache(createHarvestCache('empty'), skeletonDoc())).toBeNull();
+    expect(turnKeyOf(shell)).toBe('turn_a');
   });
 });
 
@@ -585,6 +465,211 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
     return new JSDOM(html, { url: 'https://chatgpt.com/share/6a422ac4-0fac-83ee-8050-90dec7c22b89' });
   }
 
+  it('asserts captured fixture facts without treating spacer selectors as completeness proof', () => {
+    const dom = loadFixture();
+    const doc = dom.window.document;
+    expect(doc.querySelectorAll('main')).toHaveLength(0);
+    const nestedDuplicates = Array.from(doc.querySelectorAll('[data-turn-id-container]')).filter((element) =>
+      element.parentElement?.hasAttribute('data-turn-id-container'),
+    );
+    expect(nestedDuplicates.length).toBeGreaterThan(0);
+    const turns = Array.from(
+      doc.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
+    );
+    expect(turns.some((turn) => !turn.querySelector('[data-message-author-role]') && !turn.textContent?.trim())).toBe(
+      true,
+    );
+    expect(turns.some((turn) => turn.querySelectorAll('[data-message-author-role]').length > 1)).toBe(true);
+  });
+
+  it('re-queries fresh descriptors and snapshots plain extraction input in one scan', () => {
+    const dom = loadFixture();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+    const adapter = def.collector.__test.manualAdapter;
+    const beforeWindow = adapter.readWindow();
+    const before = beforeWindow.descriptors;
+    expect(before).toHaveLength(12);
+    expect(before.filter((descriptor: any) => descriptor.key).length).toBe(12);
+    const first = before[0];
+    const input = beforeWindow.inputsByKey.get(first.key);
+    expect(JSON.parse(JSON.stringify(input))).toEqual(input);
+    expect(input.outerHtml).toEqual(expect.any(String));
+    expect(Object.values(input).some((value) => value instanceof dom.window.Element)).toBe(false);
+
+    const firstRole = dom.window.document.querySelector('[data-message-author-role]') as HTMLElement;
+    firstRole.querySelector('.whitespace-pre-wrap, .markdown')!.textContent = 'replacement content';
+    const after = adapter.readDescriptors();
+    expect(after[0].key).toBe(first.key);
+    expect(after[0].fingerprint).not.toBe(first.fingerprint);
+  });
+
+  it('retries a rendered message when its first plain snapshot is transiently unavailable', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_retry">
+          <div data-message-author-role="assistant"><div class="markdown prose"><p>retry me</p></div></div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_retry',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const def = createChatgptCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const adapter = def.collector.__test.manualAdapter;
+    const originalReadWindow = adapter.readWindow;
+    let remainingMisses = 1;
+    adapter.readWindow = () => {
+      const window = originalReadWindow();
+      if (remainingMisses > 0) {
+        remainingMisses -= 1;
+        return { ...window, inputsByKey: new Map() };
+      }
+      return window;
+    };
+
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      maxSteps: 4,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+
+    expect(remainingMisses).toBe(0);
+    expect(prepared.records.map((record: any) => record.payload.contentText)).toEqual(['retry me']);
+  });
+
+  it('bounds manual extraction to new or changed descriptor fingerprints', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_cost_user">
+          <div data-message-author-role="user"><div class="whitespace-pre-wrap">question</div></div>
+        </article>
+        <article data-testid="conversation-turn-2" data-turn-id="turn_cost_answer">
+          <div data-message-author-role="assistant"><div class="markdown prose"><p>draft answer</p></div></div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_cost',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      maxSteps: 4,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+
+    expect(prepared.completeness).toBe('complete');
+    expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(2);
+    expect(JSON.parse(JSON.stringify(prepared))).toEqual(prepared);
+    const containsLiveElement = (value: any): boolean => {
+      if (value instanceof dom.window.Element) return true;
+      if (!value || typeof value !== 'object') return false;
+      return Object.values(value).some((child) => containsLiveElement(child));
+    };
+    expect(containsLiveElement(prepared)).toBe(false);
+
+    const answer = dom.window.document.querySelector('.markdown.prose p') as HTMLElement;
+    answer.textContent = 'final answer';
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(3);
+    expect(snapshot.messages.map((message: any) => message.contentText)).toEqual(['question', 'final answer']);
+    expect(snapshot.captureMeta).toMatchObject({ completeness: 'partial' });
+    expect(snapshot.captureMeta.reasons).toContain('final_live_changed');
+  });
+
+  it('keeps Deep Research manual extraction synchronous and emits only a placeholder', async () => {
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_report">
+          <div data-message-author-role="assistant">
+            <iframe title="internal://deep-research" src="https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-a"></iframe>
+          </div>
+        </article>
+      `,
+      'https://chatgpt.com/c/conv_report',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const iframe = dom.window.document.querySelector('iframe') as HTMLIFrameElement;
+    const postMessage = vi.fn();
+    Object.defineProperty(iframe, 'contentWindow', { configurable: true, value: { postMessage } });
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      maxSteps: 4,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(prepared.records).toHaveLength(1);
+    expect(prepared.records[0].payload).toMatchObject({
+      contentText:
+        'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com/report-a',
+    });
+    expect(def.collector.__test.manualAdapter.getExtractionCount()).toBe(1);
+  });
+
+  it('keeps content, URLs, stable IDs, and image references out of sweep diagnostics', async () => {
+    const sentinel = 'PRIVATE_DIAGNOSTIC_SENTINEL';
+    const dom = setupChatgptDom(
+      `
+        <article data-testid="conversation-turn-1" data-turn-id="${sentinel}_turn">
+          <div data-message-author-role="assistant" data-message-id="${sentinel}_message">
+            <div class="markdown prose"><p>${sentinel}_body</p></div>
+            <img src="https://example.com/${sentinel}_image.png" />
+          </div>
+        </article>
+      `,
+      `https://chatgpt.com/c/${sentinel}_conversation`,
+    );
+    dom.window.document.title = `${sentinel}_title`;
+    (dom.window as any).scrollTo = vi.fn();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+    const def = createChatgptCollectorDef(env) as any;
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+    const diagnostics = JSON.stringify({ reasons: prepared.reasons, metrics: prepared.metrics });
+    expect(diagnostics).not.toContain(sentinel);
+    expect(prepared.reasons.every((reason: string) => /^[a-z][a-z0-9_]*$/.test(reason))).toBe(true);
+  });
+
   it('captures the virtualized fixture as a full document without regression (9 messages, 3 rounds)', async () => {
     const dom = loadFixture();
     expect(dom.window.document.querySelectorAll('main').length).toBe(0);
@@ -594,57 +679,10 @@ describe('chatgpt virtualized share fixture (5 rounds)', () => {
       location: dom.window.location as any,
       normalize: normalizeApi,
     });
-    const snap = (await Promise.resolve(createChatgptCollectorDef(env).collector.capture({ manual: true }))) as any;
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(9);
     expect(snap.messages.filter((m: any) => m.role === 'user').length).toBe(3);
-  });
-
-  it('fills the middle gap via cross-pass harvest once the empty shells hydrate (5 rounds)', async () => {
-    const dom = loadFixture();
-    const doc = dom.window.document;
-    const env = createCollectorEnv({
-      window: dom.window as any,
-      document: doc as any,
-      location: dom.window.location as any,
-      normalize: normalizeApi,
-    });
-    const def = createChatgptCollectorDef(env) as any;
-    const t = def.collector.__test;
-    const root = t.getRoot();
-    const cache = createHarvestCache(t.resolveConversationCacheKey());
-
-    // Pass 1: t3/t4/t5 are empty virtualized shells, so only 3 rounds are visible (the bug).
-    expect(await t.harvestInto(cache, root, { allowEditing: true })).toBe(9);
-    expect((assembleFromCache(cache, root) || []).filter((m: any) => m.role === 'user').length).toBe(3);
-
-    // Simulate scroll hydration: the 3 empty shells render their content.
-    const shells = getTurnSkeleton(doc).filter((s: any) => !turnIsHydrated(s));
-    expect(shells.length).toBe(3);
-    const injRoles = ['user', 'assistant', 'user'];
-    shells.forEach((s: any, idx: number) => {
-      const role = injRoles[idx];
-      const wrap = doc.createElement('div');
-      wrap.setAttribute('data-message-author-role', role);
-      wrap.setAttribute('data-message-id', `inj_${idx}`);
-      const inner = doc.createElement('div');
-      inner.className = role === 'user' ? 'whitespace-pre-wrap' : 'markdown prose';
-      inner.textContent = `注入-${role}-${idx}`;
-      wrap.appendChild(inner);
-      s.appendChild(wrap);
-    });
-
-    // Pass 2: the previously-empty shells are harvested; already-seen messages are not duplicated.
-    expect(await t.harvestInto(cache, root, { allowEditing: true })).toBe(3);
-    const full = assembleFromCache(cache, root) || [];
-    expect(full.length).toBe(12);
-    expect(full.filter((m: any) => m.role === 'user').length).toBe(5);
-    expect(full.every((m: any, i: number) => m.sequence === i)).toBe(true);
-    // The recovered messages land in the MIDDLE (positions 3,4,5), not appended at the end.
-    const injPositions = full
-      .map((m: any, i: number) => (String(m.contentText || '').startsWith('注入-') ? i : -1))
-      .filter((i: number) => i >= 0);
-    expect(injPositions).toEqual([3, 4, 5]);
   });
 });
 
@@ -653,18 +691,34 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
     const html = fs.readFileSync(new URL('../fixtures/chatgpt-share-virtualized.html', import.meta.url), 'utf8');
     return new JSDOM(html, { url: 'https://chatgpt.com/share/6a422ac4-0fac-83ee-8050-90dec7c22b89' });
   }
-  // Wire scrollIntoView on each empty shell's container so that scrolling it into view 'hydrates'
-  // the shell, mimicking ChatGPT's virtualized rendering. Returns a counter of scroll calls.
-  function mockHydrationOnScroll(doc: Document) {
-    const shells = getTurnSkeleton(doc).filter((s: any) => !turnIsHydrated(s));
+  // JSDOM has no layout. Model a document scroller whose viewport hydrates one shell per step.
+  function mockHydrationOnDynamicScroll(dom: JSDOM) {
+    const doc = dom.window.document;
+    const shells = Array.from(
+      doc.querySelectorAll("[data-testid^='conversation-turn-'], [data-testid='conversation-turn']"),
+    ).filter(
+      (shell) => !shell.querySelector('[data-message-author-role]') && !shell.textContent?.trim(),
+    ) as HTMLElement[];
     const injRoles = ['user', 'assistant', 'user'];
-    const counter = { calls: 0 };
-    shells.forEach((s: any, idx: number) => {
-      const container = (s.closest && s.closest('[data-turn-id-container]')) || s;
-      const role = injRoles[idx] || 'assistant';
-      (container as any).scrollIntoView = () => {
-        counter.calls += 1;
-        if (s.querySelector('[data-message-author-role]')) return;
+    const root = doc.documentElement;
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 500 });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
+    let top = 0;
+    let left = 0;
+    const counter = { calls: 0, hydrated: 0 };
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
+    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => left });
+    (dom.window as any).scrollTo = (nextLeft: number, nextTop: number) => {
+      left = Number(nextLeft) || 0;
+      top = Number(nextTop) || 0;
+      counter.calls += 1;
+      const hydrateCount = Math.min(shells.length, Math.floor(top / 60));
+      for (let idx = 0; idx < hydrateCount; idx += 1) {
+        const shell = shells[idx];
+        if (shell.querySelector('[data-message-author-role]')) continue;
+        const role = injRoles[idx] || 'assistant';
         const wrap = doc.createElement('div');
         wrap.setAttribute('data-message-author-role', role);
         wrap.setAttribute('data-message-id', `inj_${idx}`);
@@ -672,10 +726,19 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
         inner.className = role === 'user' ? 'whitespace-pre-wrap' : 'markdown prose';
         inner.textContent = `注入-${role}-${idx}`;
         wrap.appendChild(inner);
-        s.appendChild(wrap);
-      };
-    });
-    return { shells, counter };
+        shell.appendChild(wrap);
+        counter.hydrated += 1;
+      }
+    };
+    return {
+      shells,
+      counter,
+      getTop: () => top,
+      setPosition: (nextLeft: number, nextTop: number) => {
+        left = nextLeft;
+        top = nextTop;
+      },
+    };
   }
   function buildEnv(dom: JSDOM) {
     return createCollectorEnv({
@@ -689,38 +752,225 @@ describe('chatgpt manual scroll-sweep capture (P2)', () => {
   it('prepareManualCapture + manual capture recovers all 5 rounds across virtualized shells', async () => {
     const dom = loadFixtureDom();
     (dom.window as any).scrollTo = vi.fn();
-    const { shells, counter } = mockHydrationOnScroll(dom.window.document);
+    const { shells, counter } = mockHydrationOnDynamicScroll(dom);
     expect(shells.length).toBe(3);
     const def = createChatgptCollectorDef(buildEnv(dom)) as any;
 
-    await def.collector.prepareManualCapture({ perTurnTimeoutMs: 300, pollMs: 10, settleMs: 5 });
-    expect(counter.calls).toBe(3);
+    const preparedCapture = await def.collector.prepareManualCapture({
+      stepTimeoutMs: 100,
+      pollMs: 0,
+      stableSamples: 1,
+    });
+    expect(counter.hydrated).toBe(3);
 
-    const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
+    const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
     expect(snap.messages.length).toBe(12);
     expect(snap.messages.filter((m: any) => m.role === 'user').length).toBe(5);
     expect(snap.messages.every((m: any, i: number) => m.sequence === i)).toBe(true);
-    const injPositions = snap.messages
-      .map((m: any, i: number) => (String(m.contentText || '').startsWith('注入-') ? i : -1))
-      .filter((i: number) => i >= 0);
-    expect(injPositions).toEqual([3, 4, 5]);
+    expect(snap.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
+    const injectedPositions = snap.messages
+      .map((message: any, index: number) => (String(message.contentText || '').startsWith('注入-') ? index : -1))
+      .filter((index: number) => index >= 0);
+    expect(injectedPositions).toEqual([3, 4, 5]);
   });
 
-  it('manual capture without prepareManualCapture falls back to a live single pass (3 rounds)', async () => {
+  it('binds temporary-chat identity only after reaching the canonical top', async () => {
+    const dom = setupChatgptDom('', 'https://chatgpt.com/?temporary-chat=true');
+    const main = dom.window.document.querySelector('main') as HTMLElement;
+    const root = dom.window.document.documentElement;
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 200 });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
+    let top = 100;
+    const render = () => {
+      const atTop = top < 50;
+      main.innerHTML = `
+        <article data-testid="conversation-turn-1" data-turn-id="${atTop ? 'turn_top' : 'turn_middle'}">
+          <div data-message-author-role="${atTop ? 'user' : 'assistant'}">
+            <div class="${atTop ? 'whitespace-pre-wrap' : 'markdown prose'}">${atTop ? 'top' : 'middle'}</div>
+          </div>
+        </article>
+      `;
+    };
+    render();
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
+    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
+    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
+      top = Number(nextTop) || 0;
+      render();
+    };
+    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
+    const topGuard = {
+      route: 'chatgpt.com/?temporary-chat=true',
+      durableId: '',
+      anchors: ['turn:turn_top', 'turn_top:user:0'],
+      topAnchor: 'turn:turn_top',
+    };
+
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      maxSteps: 4,
+      maxOverlapRecoveries: 0,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+
+    expect(prepared.conversationKey).toBe(def.collector.__test.identityConversationKey(topGuard));
+    expect(prepared.identityGuard.topAnchor).toBe('turn:turn_top');
+    expect(prepared.identityGuard.anchors).toContain('turn:turn_middle');
+    expect(top).toBe(100);
+  });
+
+  it('recycles every visible anchor without treating scrolling as navigation', async () => {
+    const dom = setupChatgptDom('', 'https://chatgpt.com/?temporary-chat=true');
+    const main = dom.window.document.querySelector('main') as HTMLElement;
+    const root = dom.window.document.documentElement;
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 200 });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
+    let top = 0;
+    const render = () => {
+      const suffix = top < 50 ? 'a' : 'b';
+      main.innerHTML = `
+        <article data-testid="conversation-turn-1" data-turn-id="turn_${suffix}">
+          <div data-message-author-role="${suffix === 'a' ? 'user' : 'assistant'}">
+            <div class="${suffix === 'a' ? 'whitespace-pre-wrap' : 'markdown prose'}">message-${suffix}</div>
+          </div>
+        </article>
+      `;
+    };
+    render();
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
+    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
+    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
+      top = Number(nextTop) || 0;
+      render();
+    };
+    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
+
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      maxSteps: 4,
+      maxOverlapRecoveries: 0,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+
+    expect(top).toBe(0);
+    expect(prepared.identityVerified).toBe(true);
+    expect(prepared.reasons).not.toContain('identity_changed');
+    expect(prepared.records.map((record: any) => record.key)).toEqual(['turn_a:user:0', 'turn_b:assistant:0']);
+  });
+
+  it('downgrades a prepared capture when scroll restoration fails', async () => {
+    const dom = setupChatgptDom(
+      '<article data-testid="conversation-turn-1" data-turn-id="turn_restore"><div data-message-author-role="user"><div class="whitespace-pre-wrap">restore me</div></div></article>',
+      'https://chatgpt.com/c/conv_restore_failure',
+    );
+    const root = dom.window.document.documentElement;
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, value: 300 });
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 100 });
+    Object.defineProperty(root, 'scrollWidth', { configurable: true, value: 100 });
+    let top = 50;
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, get: () => top });
+    Object.defineProperty(dom.window, 'scrollX', { configurable: true, get: () => 0 });
+    (dom.window as any).scrollTo = (_left: number, nextTop: number) => {
+      if (Number(nextTop) === 50) throw new Error('restore blocked');
+      top = Number(nextTop) || 0;
+    };
+    const def = createChatgptCollectorDef(buildEnv(dom)) as any;
+
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 2,
+      maxSteps: 8,
+      stableSamples: 1,
+      pollMs: 0,
+      stepTimeoutMs: 20,
+    });
+
+    expect(prepared.completeness).toBe('partial');
+    expect(prepared.reasons).toContain('restore_failed');
+    expect(prepared.records).toHaveLength(1);
+  });
+
+  it('returns a plain prepared object without sharing state across collector instances', async () => {
+    const firstDom = loadFixtureDom();
+    const secondDom = loadFixtureDom();
+    (firstDom.window as any).scrollTo = vi.fn();
+    (secondDom.window as any).scrollTo = vi.fn();
+    mockHydrationOnDynamicScroll(firstDom);
+    mockHydrationOnDynamicScroll(secondDom);
+    const first = createChatgptCollectorDef(buildEnv(firstDom)) as any;
+    const second = createChatgptCollectorDef(buildEnv(secondDom)) as any;
+
+    const [firstPrepared, secondPrepared] = await Promise.all([
+      first.collector.prepareManualCapture({ stepTimeoutMs: 100, pollMs: 0, stableSamples: 1 }),
+      second.collector.prepareManualCapture({ stepTimeoutMs: 100, pollMs: 0, stableSamples: 1 }),
+    ]);
+
+    expect(firstPrepared).not.toBe(secondPrepared);
+    expect(JSON.parse(JSON.stringify(firstPrepared))).toEqual(firstPrepared);
+    expect(JSON.parse(JSON.stringify(secondPrepared))).toEqual(secondPrepared);
+    firstPrepared.records[0].payload.contentText = 'mutated-first-only';
+    expect(secondPrepared.records[0].payload.contentText).not.toBe('mutated-first-only');
+  });
+
+  it('rejects a prepared object after same-path temporary-chat replacement', async () => {
+    const firstDom = setupChatgptDom(
+      '<article data-testid="conversation-turn-1" data-turn-id="turn_first"><div data-message-author-role="user"><div class="whitespace-pre-wrap">first</div></div></article>',
+      'https://chatgpt.com/?temporary-chat=true',
+    );
+    (firstDom.window as any).scrollTo = vi.fn();
+    const first = createChatgptCollectorDef(buildEnv(firstDom)) as any;
+    const prepared = await first.collector.prepareManualCapture({ stableSamples: 1, pollMs: 0 });
+
+    const secondDom = setupChatgptDom(
+      '<article data-testid="conversation-turn-1" data-turn-id="turn_second"><div data-message-author-role="user"><div class="whitespace-pre-wrap">second</div></div></article>',
+      'https://chatgpt.com/?temporary-chat=true',
+    );
+    const second = createChatgptCollectorDef(buildEnv(secondDom)) as any;
+    const snap = await second.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(snap).toBeNull();
+  });
+
+  it('ignores a prepared object from another conversation identity', async () => {
+    const preparedDom = loadFixtureDom();
+    (preparedDom.window as any).scrollTo = vi.fn();
+    mockHydrationOnDynamicScroll(preparedDom);
+    const preparedDef = createChatgptCollectorDef(buildEnv(preparedDom)) as any;
+    const prepared = await preparedDef.collector.prepareManualCapture({
+      stepTimeoutMs: 100,
+      pollMs: 0,
+      stableSamples: 1,
+    });
+
+    const otherDom = setupChatgptDom(
+      '<div data-message-author-role="user" data-message-id="other"><div class="whitespace-pre-wrap">other</div></div>',
+      'https://chatgpt.com/c/other-conversation',
+    );
+    const other = createChatgptCollectorDef(buildEnv(otherDom)) as any;
+    const snap = await other.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(snap).toBeNull();
+  });
+
+  it('rejects manual capture without prepareManualCapture', async () => {
     const dom = loadFixtureDom();
     const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-    const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
-    expect(snap.messages.length).toBe(9);
-    expect(snap.messages.filter((m: any) => m.role === 'user').length).toBe(3);
+    const snap = await def.collector.capture({ manual: true });
+    expect(snap).toBeNull();
   });
 
   it('restores the scroll position after the sweep', async () => {
     const dom = loadFixtureDom();
-    const scrollTo = vi.fn();
-    (dom.window as any).scrollTo = scrollTo;
-    mockHydrationOnScroll(dom.window.document);
+    const scroll = mockHydrationOnDynamicScroll(dom);
+    scroll.setPosition(0, 120);
     const def = createChatgptCollectorDef(buildEnv(dom)) as any;
-    await def.collector.prepareManualCapture({ perTurnTimeoutMs: 200, pollMs: 10, settleMs: 0 });
-    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    await def.collector.prepareManualCapture({ stepTimeoutMs: 100, pollMs: 0, stableSamples: 1 });
+    expect(scroll.getTop()).toBe(120);
   });
 });

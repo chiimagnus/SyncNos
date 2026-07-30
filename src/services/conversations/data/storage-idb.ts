@@ -1,4 +1,5 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   LIST_SITE_KEY_ALL,
@@ -87,6 +88,10 @@ function withOptionalId<T extends Record<string, any>>(existingId: unknown, payl
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function normalizeMessageTimestamp(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : Date.now();
 }
 
 function normalizeListKey(value: unknown, fallback: string): string {
@@ -608,11 +613,15 @@ export async function syncConversationMessages(
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
   },
 ): Promise<{ upserted: number; deleted: number }> {
+  const requestedMode = options?.mode;
+  if (requestedMode !== undefined && !['snapshot', 'incremental', 'append'].includes(String(requestedMode))) {
+    throw new Error(`Unknown message persistence mode: ${String(requestedMode)}`);
+  }
+  const mode = requestedMode || 'snapshot';
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readwrite');
   const idx = stores.messages.index('by_conversationId_messageKey');
 
-  const mode = options?.mode === 'incremental' ? 'incremental' : options?.mode === 'append' ? 'append' : 'snapshot';
   const diff = options?.diff || null;
 
   const normalizeKeys = (value: unknown): string[] => {
@@ -620,7 +629,7 @@ export async function syncConversationMessages(
     return value.map((x) => String(x || '').trim()).filter(Boolean);
   };
 
-  if (mode !== 'snapshot' && diff) {
+  if (mode !== 'snapshot') {
     const byKey = new Map<string, any>();
     for (const m of messages || []) {
       const key = m && m.messageKey ? String(m.messageKey).trim() : '';
@@ -628,9 +637,27 @@ export async function syncConversationMessages(
       byKey.set(key, m);
     }
 
-    const upsertKeys = Array.from(new Set([...normalizeKeys(diff.added), ...normalizeKeys(diff.updated)]));
-    const allowDeletes = mode === 'incremental';
-    const removedKeys = allowDeletes ? normalizeKeys(diff.removed) : [];
+    const requestedKeys = Array.from(new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)]));
+    const requestedKeySet = new Set(requestedKeys);
+    const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
+    const hasEffectiveDiff =
+      !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
+    if (!hasEffectiveDiff) {
+      await txDone(t);
+      return { upserted: 0, deleted: 0 };
+    }
+    const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
+
+    const hasTailPolicy =
+      mode === 'append' && upsertKeys.some((key) => byKey.get(key)?.captureSequencePolicy === 'preserve-existing-tail');
+    let nextTailSequence = 0;
+    if (hasTailPolicy) {
+      const seqIdx = stores.messages.index('by_conversationId_sequence');
+      const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+      const lastCursor = await reqToPromise(seqIdx.openCursor(range, 'prev') as any);
+      const maxSequence = Number((lastCursor as any)?.value?.sequence);
+      nextTailSequence = Number.isFinite(maxSequence) ? maxSequence + 1 : 0;
+    }
 
     let upserted = 0;
     for (const key of upsertKeys) {
@@ -638,17 +665,37 @@ export async function syncConversationMessages(
       if (!m) continue;
 
       const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
+      const preserveSequence = mode === 'append' && m.captureSequencePolicy === 'preserve-existing-tail';
+      const sequence = preserveSequence
+        ? existing && Number.isFinite(existing.sequence)
+          ? existing.sequence
+          : nextTailSequence++
+        : Number.isFinite(m.sequence)
+          ? m.sequence
+          : 0;
+      const rawMergePolicy = String(m.captureMergePolicy || 'replace') as CaptureMessageMergePolicy;
+      const mergePolicy: CaptureMessageMergePolicy =
+        rawMergePolicy === 'preserve-existing-markdown' || rawMergePolicy === 'preserve-existing-content'
+          ? rawMergePolicy
+          : 'replace';
       const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
       const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
+      const preserveExistingContent = mergePolicy === 'preserve-existing-content' && !!existing;
+      const preserveExistingMarkdown =
+        !!existing &&
+        (mergePolicy === 'preserve-existing-content' || mergePolicy === 'preserve-existing-markdown') &&
+        !!String(existing.contentMarkdown || '').trim();
       const baseRecord = {
         conversationId,
         messageKey: key,
         role: m.role || 'assistant',
         authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
-        contentText: m.contentText || '',
-        contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || '' : ''),
-        sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-        updatedAt: m.updatedAt || Date.now(),
+        contentText: preserveExistingContent ? existing.contentText || '' : m.contentText || '',
+        contentMarkdown: preserveExistingMarkdown ? existing.contentMarkdown || '' : incomingMarkdown,
+        sequence,
+        updatedAt: preserveExistingContent
+          ? normalizeMessageTimestamp(existing.updatedAt)
+          : normalizeMessageTimestamp(m.updatedAt),
       };
       const record: any = withOptionalId(existing && existing.id, baseRecord);
       if (existing) {
@@ -690,9 +737,9 @@ export async function syncConversationMessages(
       role: m.role || 'assistant',
       authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
       contentText: m.contentText || '',
-      contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || '' : ''),
+      contentMarkdown: incomingMarkdown,
       sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-      updatedAt: m.updatedAt || Date.now(),
+      updatedAt: normalizeMessageTimestamp(m.updatedAt),
     };
     const record: any = withOptionalId(existing && existing.id, baseRecord);
     if (existing) {
@@ -725,14 +772,6 @@ export async function syncConversationMessages(
 
   await txDone(t);
   return { upserted, deleted };
-}
-
-export async function syncConversationMessagesAppendOnly(
-  conversationId: number,
-  messages: any[],
-  diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null,
-): Promise<{ upserted: number; deleted: number }> {
-  return await syncConversationMessages(conversationId, messages, { mode: 'append', diff: diff || null });
 }
 
 function normalizeConversationListSiteFilterKey(value: unknown): string {

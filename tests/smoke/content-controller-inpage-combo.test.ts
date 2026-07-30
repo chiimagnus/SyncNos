@@ -24,6 +24,7 @@ function setupDom() {
 function createHarness(options?: {
   sendImpl?: (type: string, payload?: any) => Promise<any>;
   captureImpl?: (args?: any) => any;
+  prepareImpl?: (args?: any) => any;
   incrementalImpl?: (snapshot: any) => any;
   collectorId?: string;
 }) {
@@ -33,12 +34,13 @@ function createHarness(options?: {
   const tipCalls: any[] = [];
   const sendCalls: Array<{ type: string; payload?: any }> = [];
 
-  const collector = {
+  const collector: any = {
     capture: (args?: any) => {
       if (typeof options?.captureImpl === 'function') return options.captureImpl(args);
       return null;
     },
   };
+  if (typeof options?.prepareImpl === 'function') collector.prepareManualCapture = options.prepareImpl;
 
   const runtime = {
     send: async (type: string, payload?: any) => {
@@ -174,6 +176,41 @@ describe('content-controller inpage combo', () => {
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
     expect(harness.tipCalls.some((c) => c.opts?.kind === 'default')).toBe(true);
   });
+
+  it.each(['chatgpt', 'googleaistudio'])(
+    'manual button passes the exact prepared object once for %s',
+    async (collectorId) => {
+      setupDom();
+      const prepared = { source: collectorId, token: Symbol(collectorId) };
+      const prepareImpl = vi.fn(() => prepared);
+      const captureImpl = vi.fn((_args?: any) => ({
+        conversation: {
+          source: collectorId,
+          conversationKey: `${collectorId}-1`,
+          url: collectorId === 'chatgpt' ? 'https://chatgpt.com/c/1' : 'https://aistudio.google.com/app/1',
+        },
+        messages: [{ messageKey: 'm1', sequence: 0, role: 'user', contentText: 'hi' }],
+        captureMeta: { completeness: 'complete', identityVerified: true, reasons: [] },
+      }));
+      const harness = createHarness({
+        collectorId,
+        prepareImpl,
+        captureImpl,
+        sendImpl: async (type: string) => {
+          if (type === 'upsertConversation') return { ok: true, data: { id: 11 } };
+          if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+          return { ok: true, data: {} };
+        },
+      });
+
+      await harness.runTick();
+      await harness.getButtonConfig().onClick();
+
+      expect(prepareImpl).toHaveBeenCalledTimes(1);
+      expect(captureImpl).toHaveBeenCalledTimes(1);
+      expect(captureImpl.mock.calls[0][0].preparedCapture).toBe(prepared);
+    },
+  );
 
   it('shows error tip when manual capture finds no visible conversation', async () => {
     setupDom();

@@ -1,3 +1,5 @@
+import { VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS } from '@services/shared/capture-integrity';
+
 export type SupportedAiChatSite = {
   id: string;
   name: string;
@@ -31,9 +33,7 @@ export const SUPPORTED_AI_CHAT_SITES: SupportedAiChatSite[] = [
   { id: 'zai', name: 'z.ai', hosts: ['chat.z.ai'], features: { dollarMention: true } },
 ] as const;
 
-// Keep auto-save conservative: Google AI Studio and ChatGPT are manual-capture only. ChatGPT
-// virtualizes off-screen turns, so a single auto-save pass can miss the middle of a conversation;
-// its full history is recovered by the manual scroll-sweep capture instead.
+// Virtualized providers require manual prepare and explicit completeness before persistence.
 export const AI_CHAT_AUTO_SAVE_COLLECTOR_IDS = new Set(
-  SUPPORTED_AI_CHAT_SITES.map((site) => site.id).filter((id) => id !== 'googleaistudio' && id !== 'chatgpt'),
+  SUPPORTED_AI_CHAT_SITES.map((site) => site.id).filter((id) => !VIRTUALIZED_MANUAL_CAPTURE_COLLECTOR_IDS.has(id)),
 );

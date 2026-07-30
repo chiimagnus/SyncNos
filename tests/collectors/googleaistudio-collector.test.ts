@@ -9,6 +9,17 @@ function setupDom(html: string, url: string) {
   return dom;
 }
 
+async function capturePrepared(def: any, prepareOptions: any = {}) {
+  const preparedCapture = await def.collector.prepareManualCapture({
+    stableSamples: 1,
+    pollMs: 0,
+    sleep: async () => {},
+    ...prepareOptions,
+  });
+  if (!preparedCapture) return null;
+  return def.collector.capture({ manual: true, preparedCapture });
+}
+
 describe('googleaistudio-collector', () => {
   it('captures AI Studio ms-chat-turn DOM and renders assistant markdown', async () => {
     const html = `
@@ -48,7 +59,7 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    const snap = (await capturePrepared(createGoogleAiStudioCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.source).toBe('googleaistudio');
     expect(snap.messages.length).toBe(2);
@@ -109,7 +120,7 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    const snap = (await capturePrepared(createGoogleAiStudioCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     const assistant = snap.messages[0];
@@ -149,7 +160,7 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    const snap = (await capturePrepared(createGoogleAiStudioCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     const assistant = snap.messages[0];
@@ -234,7 +245,7 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    const snap = (await capturePrepared(createGoogleAiStudioCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     const assistant = snap.messages[0];
@@ -277,12 +288,103 @@ describe('googleaistudio-collector', () => {
       normalize: normalizeApi,
     });
 
-    const snap = (await Promise.resolve(createGoogleAiStudioCollectorDef(env).collector.capture())) as any;
+    const snap = (await capturePrepared(createGoogleAiStudioCollectorDef(env))) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     const user = snap.messages.find((m: { role: string }) => m.role === 'user');
     expect(user).toBeTruthy();
     expect(user.contentMarkdown).toContain('![](data:image/png;base64,');
+  });
+
+  it('finishes asynchronous image extraction from plain snapshots after the live DOM is replaced', async () => {
+    const html = `<div class="chat-session-content">
+      <ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">one<img src="blob:https://aistudio.google.com/one" /></div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-2"><div data-turn-role="User"><div class="turn-content">two<img src="blob:https://aistudio.google.com/two" /></div></div></ms-chat-turn>
+    </div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/plain-input');
+    let releaseFirst: (() => void) | null = null;
+    let calls = 0;
+    (dom.window as any).fetch = async () => {
+      calls += 1;
+      if (calls === 1) await new Promise<void>((resolve) => (releaseFirst = resolve));
+      return {
+        ok: true,
+        blob: async () => new (dom.window as any).Blob([new Uint8Array([1])], { type: 'image/png' }),
+      };
+    };
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const preparing = def.collector.prepareManualCapture({ stableSamples: 1, pollMs: 0, sleep: async () => {} });
+    while (!releaseFirst) await Promise.resolve();
+    dom.window.document.querySelector('.chat-session-content')!.innerHTML = '<p>replaced</p>';
+    releaseFirst();
+    const prepared = await preparing;
+    expect(prepared.records).toEqual([]);
+    expect(prepared.reasons).toContain('identity_changed');
+    expect(await def.collector.capture({ manual: true, preparedCapture: prepared })).toBeNull();
+    expect(calls).toBe(2);
+  });
+
+  it('extracts each unchanged blob reference once per capture, including failed references', async () => {
+    const shared = 'blob:https://aistudio.google.com/shared';
+    const html = `<div class="chat-session-content">
+      <ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">one<img src="${shared}" /></div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-2"><div data-turn-role="Model"><div class="turn-content">two<img src="${shared}" /></div></div></ms-chat-turn>
+    </div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/blob-cache');
+    let calls = 0;
+    (dom.window as any).fetch = async () => {
+      calls += 1;
+      return { ok: false };
+    };
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const snap = await capturePrepared(def);
+    expect(snap.messages).toHaveLength(2);
+    expect(calls).toBe(1);
+    expect(snap.conversation.warningFlags).toContain('inline_images_fetch_failed');
+  });
+
+  it('protects only messages whose blob images could not be inlined', async () => {
+    const html = `<div class="chat-session-content">
+      <ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">failed<img src="blob:https://aistudio.google.com/fail" /></div></div></ms-chat-turn>
+      <ms-chat-turn id="turn-2"><div data-turn-role="Model"><div class="turn-content">ok<img src="blob:https://aistudio.google.com/ok" /></div></div></ms-chat-turn>
+    </div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/image-policy');
+    (dom.window as any).fetch = async (url: string) =>
+      url.endsWith('/fail')
+        ? { ok: false }
+        : {
+            ok: true,
+            blob: async () => new (dom.window as any).Blob([new Uint8Array([1])], { type: 'image/png' }),
+          };
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const prepared = await def.collector.prepareManualCapture({ stableSamples: 1, pollMs: 0, sleep: async () => {} });
+    const snap = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(snap.captureMeta.completeness).toBe('partial');
+    expect(snap.captureMeta.reasons).toContain('inline_images_incomplete');
+    expect(snap.messages[0].captureMergePolicy).toBe('preserve-existing-markdown');
+    expect(snap.messages[1].captureMergePolicy).toBeUndefined();
+    expect(snap.messages[1].contentMarkdown).toContain('data:image/png;base64,');
   });
 
   it('preserves inline image warningFlags in manual capture flow', async () => {
@@ -314,11 +416,43 @@ describe('googleaistudio-collector', () => {
     });
 
     const def = createGoogleAiStudioCollectorDef(env) as any;
-    await Promise.resolve(def.collector.prepareManualCapture({ settleMs: 0 }));
-    const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
+    const preparedCapture = await Promise.resolve(def.collector.prepareManualCapture());
+    const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
     expect(snap).toBeTruthy();
     expect(Array.isArray(snap.conversation.warningFlags)).toBe(true);
     expect(snap.conversation.warningFlags).toContain('inline_images_fetch_failed');
+  });
+
+  it('keeps prepared results isolated across collector instances', async () => {
+    const firstDom = setupDom(
+      '<div class="chat-session-content"><ms-chat-turn id="a"><div class="chat-turn-container user"><div data-turn-role="User"><div class="turn-content">A</div></div></div></ms-chat-turn></div>',
+      'https://aistudio.google.com/app/a',
+    );
+    const secondDom = setupDom(
+      '<div class="chat-session-content"><ms-chat-turn id="b"><div class="chat-turn-container user"><div data-turn-role="User"><div class="turn-content">B</div></div></div></ms-chat-turn></div>',
+      'https://aistudio.google.com/app/b',
+    );
+    const first = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: firstDom.window as any,
+        document: firstDom.window.document as any,
+        location: firstDom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const second = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: secondDom.window as any,
+        document: secondDom.window.document as any,
+        location: secondDom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const [a, b] = await Promise.all([first.collector.prepareManualCapture(), second.collector.prepareManualCapture()]);
+    const firstSnap = await first.collector.capture({ manual: true, preparedCapture: a });
+    const secondSnap = await second.collector.capture({ manual: true, preparedCapture: b });
+    expect(firstSnap.messages.map((message: any) => message.contentText)).toEqual(['A']);
+    expect(secondSnap.messages.map((message: any) => message.contentText)).toEqual(['B']);
   });
 
   it('manual capture keeps full turn list', async () => {
@@ -357,13 +491,123 @@ describe('googleaistudio-collector', () => {
     });
 
     const def = createGoogleAiStudioCollectorDef(env) as any;
-    await Promise.resolve(def.collector.prepareManualCapture({ settleMs: 0 }));
-    const snap = (await Promise.resolve(def.collector.capture({ manual: true }))) as any;
+    const preparedCapture = await Promise.resolve(def.collector.prepareManualCapture());
+    const snap = (await Promise.resolve(def.collector.capture({ manual: true, preparedCapture }))) as any;
 
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(3);
     expect(snap.messages[0]?.contentText).toBe('hello-1');
     expect(snap.messages[1]?.contentText).toBe('hello-2');
     expect(snap.messages[2]?.contentText).toBe('hello-3');
+  });
+
+  it('sweeps remounted virtual windows and restores the nested scroll root', async () => {
+    const dom = setupDom(
+      '<div id="scroll"><div class="chat-session-content"></div></div>',
+      'https://aistudio.google.com/app/dynamic',
+    );
+    const document = dom.window.document;
+    const scroll = document.querySelector('#scroll') as HTMLElement;
+    const session = document.querySelector('.chat-session-content') as HTMLElement;
+    scroll.style.overflowY = 'auto';
+    Object.defineProperties(scroll, {
+      clientHeight: { configurable: true, value: 100 },
+      clientWidth: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 300 },
+      scrollWidth: { configurable: true, value: 140 },
+    });
+    let top = 60;
+    let left = 7;
+    const render = () => {
+      const ids = top < 75 ? [1, 2] : top < 175 ? [2, 3, 4] : [4, 5];
+      session.innerHTML = ids
+        .map(
+          (id) =>
+            `<ms-chat-turn id="turn-${id}"><div data-turn-role="User"><div class="turn-content">message-${id}</div></div></ms-chat-turn>`,
+        )
+        .join('');
+    };
+    Object.defineProperty(scroll, 'scrollTop', {
+      configurable: true,
+      get: () => top,
+      set: (value) => {
+        top = Number(value);
+        render();
+      },
+    });
+    Object.defineProperty(scroll, 'scrollLeft', {
+      configurable: true,
+      get: () => left,
+      set: (value) => {
+        left = Number(value);
+      },
+    });
+    render();
+
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const prepared = await def.collector.prepareManualCapture({
+      maxPasses: 3,
+      maxSteps: 20,
+      stableSamples: 1,
+      pollMs: 0,
+      sleep: async () => {},
+    });
+    const snap = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(snap.messages.map((message: any) => message.contentText)).toEqual([
+      'message-1',
+      'message-2',
+      'message-3',
+      'message-4',
+      'message-5',
+    ]);
+    expect(top).toBe(60);
+    expect(left).toBe(7);
+  });
+
+  it('uses stable turn-role-ordinal keys for multiple messages in one turn', async () => {
+    const html = `<div class="chat-session-content"><ms-chat-turn id="turn-1"><div data-turn-role="User"><div class="turn-content">Q</div></div><div data-turn-role="Model"><div class="turn-content">A</div></div></ms-chat-turn></div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/identity');
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const preparedCapture = await def.collector.prepareManualCapture();
+    expect(preparedCapture.records.map((record: any) => record.payload.messageKey)).toEqual([
+      'turn-1:user:0',
+      'turn-1:assistant:1',
+    ]);
+    expect(
+      preparedCapture.records.every((record: any) => !String(record.payload.messageKey).startsWith('fallback_')),
+    ).toBe(true);
+  });
+
+  it('refuses to verify manual identity when stable turn ids are missing', async () => {
+    const html = `<div class="chat-session-content"><ms-chat-turn><div data-turn-role="User"><div class="turn-content">Q</div></div></ms-chat-turn></div>`;
+    const dom = setupDom(html, 'https://aistudio.google.com/app/missing-id');
+    const def = createGoogleAiStudioCollectorDef(
+      createCollectorEnv({
+        window: dom.window as any,
+        document: dom.window.document as any,
+        location: dom.window.location as any,
+        normalize: normalizeApi,
+      }),
+    ) as any;
+    const preparedCapture = await def.collector.prepareManualCapture();
+    expect(preparedCapture.identityVerified).toBe(false);
+    expect(preparedCapture.conversationKey).toBe('');
+    expect(preparedCapture.records).toEqual([]);
+    const snap = await def.collector.capture({ manual: true, preparedCapture });
+    expect(snap).toBeNull();
   });
 });

@@ -1,9 +1,16 @@
+export type CollectorCaptureOptions = {
+  manual?: boolean;
+  preparedCapture?: unknown;
+  [key: string]: unknown;
+};
+
 export type CollectorDefinition = {
   id: string;
   matches: (location: { href?: string; hostname?: string; pathname?: string }) => boolean;
   inpageMatches?: (location: { href?: string; hostname?: string; pathname?: string }) => boolean;
   collector: {
-    capture: (options?: Record<string, unknown>) => unknown;
+    capture: (options?: CollectorCaptureOptions) => unknown;
+    prepareManualCapture?: (options?: CollectorCaptureOptions) => unknown | Promise<unknown>;
     [key: string]: unknown;
   };
 };

@@ -78,14 +78,6 @@ export async function syncConversationMessages(
   return await idb.syncConversationMessages(conversationId, messages, options);
 }
 
-export async function syncConversationMessagesAppendOnly(
-  conversationId: number,
-  messages: any[],
-  diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null,
-) {
-  return await idb.syncConversationMessagesAppendOnly(conversationId, messages, diff || null);
-}
-
 export async function deleteConversationsByIds(conversationIds: any[]) {
   return await idb.deleteConversationsByIds(conversationIds);
 }

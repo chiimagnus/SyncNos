@@ -97,6 +97,29 @@ describe('image-inline', () => {
     expect(String(messages2[1].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
   });
 
+  it('preserves transient capture policies while converting data images', async () => {
+    const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([3, 1, 4])).toString('base64')}`;
+    const messages = [
+      {
+        messageKey: 'm-policy',
+        role: 'assistant',
+        sequence: 0,
+        contentText: 'fallback',
+        contentMarkdown: `fallback\n\n![](${dataImageUrl})`,
+        captureSequencePolicy: 'preserve-existing-tail',
+        captureMergePolicy: 'preserve-existing-markdown',
+      },
+    ];
+
+    const result = await inlineChatImagesInMessages({ conversationId: 3, messages, enableHttpImages: false });
+
+    expect(result.messages[0]).toMatchObject({
+      captureSequencePolicy: 'preserve-existing-tail',
+      captureMergePolicy: 'preserve-existing-markdown',
+    });
+    expect(result.messages[0].contentMarkdown).toMatch(/syncnos-asset:\/\/\d+/);
+  });
+
   it('keeps http urls when disabled, but still assets data:image markdown', async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(Uint8Array.from([1, 2, 3]), {

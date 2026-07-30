@@ -21,7 +21,7 @@ WebClipper 把 AI 对话、网页正文和视频字幕统一保存为本地 conv
 
 ### AI 对话
 
-collector 把各站点 DOM 统一为 conversation + messages。ChatGPT 与 Google AI Studio 因虚拟列表会卸载离屏轮次，只允许手动抓取；完整历史由 collector 的 `prepareManualCapture()` 滚动水合和跨扫描收割恢复。
+collector 把各站点 DOM 统一为 conversation + messages。ChatGPT 与 Google AI Studio 只允许显式手动抓取；动态遍历、完整性判定和持久化降级的权威说明见 [数据流：虚拟列表对话的手动完整抓取](../data-flow.md#4-虚拟列表对话的手动完整抓取)。
 
 ### 网页正文
 

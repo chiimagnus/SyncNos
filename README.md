@@ -4,7 +4,7 @@
 
 Never lose an AI conversation, a great article, or a useful video transcript again.
 
-11+ AI platforms + any web article + YouTube/Bilibili subtitles — auto-captured in the background, stored locally first.
+11+ AI platforms + any web article + YouTube/Bilibili subtitles — captured automatically where supported, with explicit manual capture for virtualized chats, and stored locally first.
 One-click sync to Notion / Obsidian / Feishu(Lark), or export as Markdown / Zip.
 
 [SyncNos Angel Sponsors 😍](https://chiimagnus.notion.site/syncnos-angels) · **English** · [中文](README.zh-CN.md)
@@ -45,7 +45,7 @@ One-click sync to Notion / Obsidian / Feishu(Lark), or export as Markdown / Zip.
 
 | Platform | Capture Mode |
 | --- | --- |
-| ChatGPT | Manual save preferred¹ |
+| ChatGPT | Manual only¹ |
 | Claude | Auto |
 | Gemini | Auto |
 | DeepSeek | Auto |
@@ -55,9 +55,9 @@ One-click sync to Notion / Obsidian / Feishu(Lark), or export as Markdown / Zip.
 | Poe | Auto |
 | Notion AI | Auto |
 | z.ai | Auto |
-| Google AI Studio | Manual save preferred¹ |
+| Google AI Studio | Manual only¹ |
 
-¹ Virtual list limitation: auto-capture may only detect currently visible turns. For full history, use inpage save or popup current-page capture.
+¹ ChatGPT and Google AI Studio use virtualized lists and are intentionally excluded from auto-save. Use the inpage save button or popup current-page capture. See [WebClipper data flow](docs/data-flow.md#4-虚拟列表对话的手动完整抓取).
 
 ### Web Articles
 
@@ -78,7 +78,7 @@ YouTube and Bilibili video pages can capture already loaded subtitles/transcript
 
 ## Core Capabilities
 
-- **Background auto-capture** — open a supported site and capturing starts automatically. No manual action needed (with a few exceptions).
+- **Background auto-capture** — supported non-virtual sources are captured automatically; virtualized ChatGPT and Google AI Studio conversations require an explicit manual capture.
 - **Local-first storage** — all content lands in IndexedDB before going anywhere else.
 - **Incremental sync** — precise cursor tracking. Only new messages and articles get synced.
 - **Insight dashboard** — total clips, source breakdown, longest conversations — see your knowledge accumulate.

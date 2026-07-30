@@ -13,7 +13,6 @@ import {
   getMessagesTailByConversationId,
   mergeConversationsByIds,
   syncConversationMessages,
-  syncConversationMessagesAppendOnly,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
 
@@ -150,6 +149,25 @@ describe('conversations storage-idb', () => {
     expect(after2.map((m) => m.messageKey)).toEqual(['m1']);
   });
 
+  it('rejects an unknown persistence mode before mutating stored messages', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'unknown_mode',
+      title: 'Mode',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'old', sequence: 0 }]);
+
+    await expect(
+      syncConversationMessages(id, [{ messageKey: 'm2', role: 'assistant', contentText: 'new', sequence: 1 }], {
+        mode: 'snapshop' as any,
+      }),
+    ).rejects.toThrow('Unknown message persistence mode');
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual(['m1']);
+  });
+
   it('syncs messages in append-only mode and never deletes even when removed is provided', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
@@ -165,10 +183,10 @@ describe('conversations storage-idb', () => {
       { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
     ]);
 
-    const res = await syncConversationMessagesAppendOnly(
+    const res = await syncConversationMessages(
       id,
       [{ messageKey: 'm1', role: 'user', contentText: 'u2', sequence: 1, updatedAt: 3 }],
-      { added: [], updated: ['m1'], removed: ['m2'] },
+      { mode: 'append', diff: { added: [], updated: ['m1'], removed: ['m2'] } },
     );
     expect(res.upserted).toBe(1);
     expect(res.deleted).toBe(0);
@@ -176,6 +194,466 @@ describe('conversations storage-idb', () => {
     const after = await getMessagesByConversationId(id);
     expect(after.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
     expect(after.find((m) => m.messageKey === 'm1')?.contentText).toBe('u2');
+  });
+
+  it.each([
+    ['null diff', null],
+    ['empty diff', {}],
+    ['malformed diff', { added: 'm1', updated: 12, removed: ['m2'] }],
+  ])('keeps append non-destructive with %s', async (_label, diff) => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: `append_${_label}`,
+      title: 'Append',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'old', sequence: 1 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'keep', sequence: 2 },
+    ]);
+
+    const result = await syncConversationMessages(
+      id,
+      [{ messageKey: 'm1', role: 'user', contentText: 'new', sequence: 1 }],
+      { mode: 'append', diff: diff as any },
+    );
+
+    expect(result).toEqual({ upserted: 0, deleted: 0 });
+    const stored = await getMessagesByConversationId(id);
+    expect(stored.map((message) => message.messageKey)).toEqual(['m1', 'm2']);
+    expect(stored.find((message) => message.messageKey === 'm1')?.contentText).toBe('old');
+  });
+
+  it('treats unkeyed append input as a no-delete no-op', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_unkeyed',
+      title: 'Append',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'old', sequence: 1 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'keep', sequence: 2 },
+    ]);
+
+    const result = await syncConversationMessages(id, [{ role: 'user', contentText: 'ignored', sequence: 1 }], {
+      mode: 'append',
+      diff: null,
+    });
+
+    expect(result).toEqual({ upserted: 0, deleted: 0 });
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual(['m1', 'm2']);
+  });
+
+  it('requires an explicit diff for incremental mode', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'incremental_no_diff',
+      title: 'Incremental',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'old', sequence: 1 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'keep', sequence: 2 },
+    ]);
+
+    const result = await syncConversationMessages(
+      id,
+      [{ messageKey: 'm1', role: 'user', contentText: 'ignored', sequence: 1 }],
+      { mode: 'incremental', diff: null },
+    );
+
+    expect(result).toEqual({ upserted: 0, deleted: 0 });
+    expect((await getMessagesByConversationId(id)).map((message) => message.contentText)).toEqual(['old', 'keep']);
+  });
+
+  it('preserves existing order and tail-assigns new virtual partial rows', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_sequence_tail',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 },
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
+      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 30 },
+    ]);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm3',
+          role: 'user',
+          contentText: 'three updated',
+          sequence: 0,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+        {
+          messageKey: 'm4',
+          role: 'assistant',
+          contentText: 'four',
+          sequence: 0,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+        {
+          messageKey: 'm5',
+          role: 'user',
+          contentText: 'five',
+          sequence: 0,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+      ],
+      { mode: 'append', diff: { added: ['m4', 'm5'], updated: ['m3'], removed: [] } },
+    );
+
+    const stored = await getMessagesByConversationId(id);
+    expect(stored.map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 10],
+      ['m2', 20],
+      ['m3', 30],
+      ['m4', 31],
+      ['m5', 32],
+    ]);
+  });
+
+  it('tail-assigns virtual partial rows in incoming order across added and updated diff groups', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_sequence_incoming_order',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm2',
+          role: 'assistant',
+          contentText: 'second',
+          sequence: 99,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+        {
+          messageKey: 'm1',
+          role: 'user',
+          contentText: 'first',
+          sequence: 99,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+      ],
+      { mode: 'append', diff: { added: ['m1'], updated: ['m2'], removed: [] } },
+    );
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m2', 0],
+      ['m1', 1],
+    ]);
+  });
+
+  it('tail-assigns virtual partial rows from zero in an empty conversation', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_sequence_empty',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'user',
+          contentText: 'one',
+          sequence: 999,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+        {
+          messageKey: 'm2',
+          role: 'assistant',
+          contentText: 'two',
+          sequence: 999,
+          captureSequencePolicy: 'preserve-existing-tail',
+        },
+      ],
+      { mode: 'append', diff: { added: ['m1', 'm2'], updated: [], removed: [] } },
+    );
+
+    expect((await getMessagesByConversationId(id)).map((message) => message.sequence)).toEqual([0, 1]);
+  });
+
+  it('keeps unmarked append incoming sequence for autosave prefix reconciliation', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_sequence_unmarked',
+      title: 'Order',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm2', role: 'assistant', contentText: 'two', sequence: 20 },
+      { messageKey: 'm3', role: 'user', contentText: 'three', sequence: 30 },
+    ]);
+
+    await syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentText: 'one', sequence: 10 }], {
+      mode: 'append',
+      diff: { added: ['m1'], updated: [], removed: [] },
+    });
+
+    expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 10],
+      ['m2', 20],
+      ['m3', 30],
+    ]);
+  });
+
+  it('lets explicit replace clear stale markdown in append and snapshot modes', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'clear_markdown',
+      title: 'Clear',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'assistant', contentText: 'old', contentMarkdown: '**old**', sequence: 0 },
+    ]);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'm1', role: 'assistant', contentText: 'append plain', contentMarkdown: '', sequence: 0 }],
+      { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
+    );
+    expect((await getMessagesByConversationId(id))[0].contentMarkdown).toBe('');
+
+    await syncConversationMessages(id, [
+      { messageKey: 'm1', role: 'assistant', contentText: 'snapshot plain', contentMarkdown: '', sequence: 0 },
+    ]);
+    expect((await getMessagesByConversationId(id))[0].contentMarkdown).toBe('');
+  });
+
+  it('preserves existing markdown for protective append merge policy', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_preserve_markdown',
+      title: 'Merge',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'm1',
+        role: 'assistant',
+        contentText: 'old text',
+        contentMarkdown: '![rich](data:image/png;base64,abc)',
+        sequence: 5,
+        updatedAt: 10,
+      },
+    ]);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentText: 'new text',
+          contentMarkdown: 'plain fallback',
+          sequence: 0,
+          updatedAt: 20,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-markdown',
+        },
+      ],
+      { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
+    );
+
+    const [stored] = await getMessagesByConversationId(id);
+    expect(stored).toMatchObject({
+      contentText: 'new text',
+      contentMarkdown: '![rich](data:image/png;base64,abc)',
+      sequence: 5,
+      updatedAt: 20,
+    });
+    expect(stored).not.toHaveProperty('captureMergePolicy');
+    expect(stored).not.toHaveProperty('captureSequencePolicy');
+  });
+
+  it('allows a later complete AI image snapshot to replace an earlier protected fallback', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'googleaistudio',
+      conversationKey: 'image_fallback_recovery',
+      title: 'Images',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentText: 'fallback',
+          contentMarkdown: 'fallback',
+          sequence: 0,
+          captureMergePolicy: 'preserve-existing-markdown',
+        },
+      ],
+      { mode: 'append', diff: { added: ['m1'], updated: [], removed: [] } },
+    );
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentText: 'complete',
+          contentMarkdown: 'complete\n\n![](syncnos-asset://asset-1)',
+          sequence: 0,
+        },
+      ],
+      { mode: 'snapshot', diff: null },
+    );
+
+    const [stored] = await getMessagesByConversationId(id);
+    expect(stored).toMatchObject({
+      contentText: 'complete',
+      contentMarkdown: 'complete\n\n![](syncnos-asset://asset-1)',
+    });
+    expect(stored).not.toHaveProperty('captureMergePolicy');
+  });
+
+  it('preserves existing content and zero timestamp while allowing first-time protective insert', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'append_preserve_content',
+      title: 'Merge',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'm1',
+        role: 'assistant',
+        contentText: 'hydrated report',
+        contentMarkdown: '# Hydrated report',
+        sequence: 3,
+        updatedAt: 0,
+      },
+    ]);
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentText: 'placeholder',
+          contentMarkdown: 'placeholder',
+          sequence: 0,
+          updatedAt: 20,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-content',
+        },
+        {
+          messageKey: 'm2',
+          role: 'assistant',
+          contentText: 'first placeholder',
+          contentMarkdown: 'first placeholder',
+          sequence: 0,
+          updatedAt: 30,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-content',
+        },
+      ],
+      { mode: 'append', diff: { added: ['m2'], updated: ['m1'], removed: [] } },
+    );
+
+    const stored = await getMessagesByConversationId(id);
+    expect(stored[0]).toMatchObject({
+      messageKey: 'm1',
+      contentText: 'hydrated report',
+      contentMarkdown: '# Hydrated report',
+      sequence: 3,
+      updatedAt: 0,
+    });
+    expect(stored[1]).toMatchObject({
+      messageKey: 'm2',
+      contentText: 'first placeholder',
+      contentMarkdown: 'first placeholder',
+      sequence: 4,
+      updatedAt: 30,
+    });
+  });
+
+  it('keeps hydrated Deep Research content while inserting a first-time placeholder', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'deep_research_merge',
+      title: 'Research',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'research-1',
+        role: 'assistant',
+        contentText: 'Complete report',
+        contentMarkdown: '# Complete report',
+        sequence: 0,
+        updatedAt: 10,
+      },
+    ]);
+    const placeholder = 'Deep Research (iframe): https://example.web-sandbox.oaiusercontent.com/report';
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'research-1',
+          role: 'assistant',
+          contentText: placeholder,
+          contentMarkdown: placeholder,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-content',
+        },
+        {
+          messageKey: 'research-2',
+          role: 'assistant',
+          contentText: placeholder,
+          contentMarkdown: placeholder,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-content',
+        },
+      ],
+      { mode: 'append', diff: { added: ['research-2'], updated: ['research-1'], removed: [] } },
+    );
+
+    const stored = await getMessagesByConversationId(id);
+    expect(stored[0]).toMatchObject({ contentText: 'Complete report', contentMarkdown: '# Complete report' });
+    expect(stored[1]).toMatchObject({ contentText: placeholder, contentMarkdown: placeholder });
   });
 
   it('reads message tails by conversation id with ascending sequence order', async () => {

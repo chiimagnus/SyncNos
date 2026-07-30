@@ -233,6 +233,9 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const rawMode = String(msg?.mode || '')
       .trim()
       .toLowerCase();
+    if (rawMode && rawMode !== 'snapshot' && rawMode !== 'incremental' && rawMode !== 'append') {
+      return router.err('invalid mode');
+    }
     const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
     const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
 

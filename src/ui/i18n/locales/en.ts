@@ -382,6 +382,7 @@ export const en = {
   savingDots: 'Saving...',
   loadingFullHistory: 'Loading full history...',
   captureFailedFallback: 'Capture failed',
+  partialCaptureSaved: 'Visible messages were saved, but full history could not be confirmed.',
   fetchingDots: 'Fetching...',
   checkingDots: 'Checking...',
   savedPrefix: 'Saved: ',

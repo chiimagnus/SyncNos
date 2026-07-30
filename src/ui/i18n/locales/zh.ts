@@ -374,6 +374,7 @@ export const zh: { [K in TranslationKey]: string } = {
   savingDots: '保存中...',
   loadingFullHistory: '正在加载完整历史...',
   captureFailedFallback: '获取失败',
+  partialCaptureSaved: '已保存可见消息，但无法确认完整历史。',
   fetchingDots: '获取中...',
   checkingDots: '检测中...',
   savedPrefix: '已保存：',

@@ -75,7 +75,7 @@ describe('poe-collector', () => {
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
-    const snap = collector.capture({ manual: true });
+    const snap = collector.capture({ manual: true, preparedCapture: { opaque: true } });
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe('你好');
   });
