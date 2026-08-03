@@ -70,6 +70,25 @@ describe('article-extract markdown', () => {
     expect(md).not.toContain('data:image/gif');
   });
 
+  it('uses a Discourse image link target when it is the matching original asset', () => {
+    const html = `
+      <article>
+        <a href="https://cdn3.ldstatic.com/original/4X/5/1/2/example.png">
+          <img src="https://cdn3.ldstatic.com/optimized/4X/5/1/2/example_2_259x375.png" />
+        </a>
+        <a href="https://linux.do/t/topic/1"><img src="https://cdn3.ldstatic.com/optimized/4X/5/1/2/other_2_259x375.png" /></a>
+      </article>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: 'https://linux.do/t/topic/1' });
+    setupDom(dom);
+
+    const md = htmlToMarkdownTurndown(html, 'https://linux.do/t/topic/1');
+    expect(md).toContain('![](https://cdn3.ldstatic.com/original/4X/5/1/2/example.png)');
+    expect(md).not.toContain('example_2_259x375.png');
+    expect(md).toContain('![](https://cdn3.ldstatic.com/optimized/4X/5/1/2/other_2_259x375.png)');
+  });
+
   it('captures full wechat rich_media code-snippet blocks with multiple <code> siblings', () => {
     const html = `
       <section><section class="code-snippet__fix code-snippet__js"><ul class="code-snippet__line-index code-snippet__js"><li></li><li></li><li></li><li></li><li></li></ul><pre class="code-snippet__js" data-lang="markdown"><code><span leaf=""><span class="code-snippet__section"># 寓言写作 Prompt</span></span></code><code><span leaf=""><span class="code-snippet__section">围绕&nbsp;</span><span class="code-snippet__section"><span class="code-snippet__strong">**{concept}**</span></span><span class="code-snippet__section">&nbsp;这个概念，写一则寓言来完整地解释它。要像真正的寓言那样间接讲，不要直接点破。</span></span></code><code><span leaf="">---</span></code><code><span leaf=""><span class="code-snippet__section">## 一、寓言体感</span></span></code><code><span leaf=""><span class="code-snippet__bullet">-</span>&nbsp;<span class="code-snippet__strong">**篇幅**</span>：1000字以内。真正的寓言是精炼的，靠一个核心场景、一两次转折把意思撑起来，不需要铺陈。</span></code></pre></section></section>
