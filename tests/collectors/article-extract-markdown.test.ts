@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { htmlToMarkdownTurndown } from '../../src/collectors/web/article-extract/markdown-turndown.ts';
+import { markdownToNotionBlocks } from '../../src/services/sync/notion/notion-markdown-blocks.ts';
 
 function setupDom(dom: JSDOM) {
   // @ts-expect-error test global
@@ -70,11 +71,12 @@ describe('article-extract markdown', () => {
     expect(md).not.toContain('data:image/gif');
   });
 
-  it('uses a Discourse image link target when it is the matching original asset', () => {
+  it('unwraps a Discourse original image link instead of serializing its thumbnail metadata', () => {
     const html = `
       <article>
-        <a href="https://cdn3.ldstatic.com/original/4X/5/1/2/example.png">
-          <img src="https://cdn3.ldstatic.com/optimized/4X/5/1/2/example_2_259x375.png" />
+        <a href="https://cdn3.ldstatic.com/original/4X/5/1/2/example.png" title="CleanShot">
+          <img alt="CleanShot" src="https://cdn3.ldstatic.com/optimized/4X/5/1/2/example_2_259x375.png" />
+          CleanShot828×1194 84 KB
         </a>
         <a href="https://linux.do/t/topic/1"><img src="https://cdn3.ldstatic.com/optimized/4X/5/1/2/other_2_259x375.png" /></a>
       </article>
@@ -84,9 +86,14 @@ describe('article-extract markdown', () => {
     setupDom(dom);
 
     const md = htmlToMarkdownTurndown(html, 'https://linux.do/t/topic/1');
-    expect(md).toContain('![](https://cdn3.ldstatic.com/original/4X/5/1/2/example.png)');
+    expect(md).toContain('![CleanShot](https://cdn3.ldstatic.com/original/4X/5/1/2/example.png)');
     expect(md).not.toContain('example_2_259x375.png');
+    expect(md).not.toContain('CleanShot828×1194 84 KB');
     expect(md).toContain('![](https://cdn3.ldstatic.com/optimized/4X/5/1/2/other_2_259x375.png)');
+
+    const blocks = markdownToNotionBlocks(md);
+    expect(blocks[0]?.type).toBe('image');
+    expect(blocks[0]?.image?.external?.url).toBe('https://cdn3.ldstatic.com/original/4X/5/1/2/example.png');
   });
 
   it('captures full wechat rich_media code-snippet blocks with multiple <code> siblings', () => {

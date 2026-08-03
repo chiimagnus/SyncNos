@@ -66,7 +66,9 @@ function promoteDiscourseOriginalImages(root: Element) {
     const link = image.parentElement as HTMLAnchorElement | null;
     const src = normalizeText(image.getAttribute('src') || '');
     const href = normalizeText(link?.getAttribute('href') || '');
-    if (isDiscourseOriginalImageLink(src, href)) image.setAttribute('src', href);
+    if (!link || !isDiscourseOriginalImageLink(src, href)) continue;
+    image.setAttribute('src', href);
+    link.replaceWith(image);
   }
 }
 
