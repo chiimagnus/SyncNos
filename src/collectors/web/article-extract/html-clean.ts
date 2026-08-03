@@ -72,6 +72,26 @@ function promoteDiscourseOriginalImages(root: Element) {
   }
 }
 
+function isEmojiImage(image: HTMLImageElement) {
+  if (image.classList.contains('emoji')) return true;
+  try {
+    return /(?:^|\/)images\/emoji(?:\/|$)/i.test(new URL(image.src).pathname);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function removeEmojiImages(root: Element) {
+  for (const node of listElementsIncludingRoot(root, 'img')) {
+    const image = node as HTMLImageElement;
+    if (!isEmojiImage(image)) continue;
+
+    const link = image.closest('a[href]') as HTMLAnchorElement | null;
+    image.remove();
+    if (link && !normalizeText(link.textContent || '')) link.remove();
+  }
+}
+
 function absolutizeSrcset(node: Element, baseHref: string) {
   const value = normalizeText(node.getAttribute('srcset') || '');
   if (!value) return;
@@ -170,5 +190,6 @@ export function cleanHtmlFragment(root: Element, baseHref: string) {
   listElementsIncludingRoot(root, '[href]').forEach((node) => absolutizeAttr(node, 'href', baseHref));
   listElementsIncludingRoot(root, '[src]').forEach((node) => absolutizeAttr(node, 'src', baseHref));
   promoteDiscourseOriginalImages(root);
+  removeEmojiImages(root);
   listElementsIncludingRoot(root, '[srcset]').forEach((node) => absolutizeSrcset(node, baseHref));
 }
