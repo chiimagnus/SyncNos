@@ -92,6 +92,10 @@ function removeEmojiImages(root: Element) {
   }
 }
 
+function removeOneboxPreviewImages(root: Element) {
+  for (const image of listElementsIncludingRoot(root, 'aside.onebox img')) image.remove();
+}
+
 function absolutizeSrcset(node: Element, baseHref: string) {
   const value = normalizeText(node.getAttribute('srcset') || '');
   if (!value) return;
@@ -191,5 +195,6 @@ export function cleanHtmlFragment(root: Element, baseHref: string) {
   listElementsIncludingRoot(root, '[src]').forEach((node) => absolutizeAttr(node, 'src', baseHref));
   promoteDiscourseOriginalImages(root);
   removeEmojiImages(root);
+  removeOneboxPreviewImages(root);
   listElementsIncludingRoot(root, '[srcset]').forEach((node) => absolutizeSrcset(node, baseHref));
 }
