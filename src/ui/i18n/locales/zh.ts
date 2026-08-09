@@ -39,6 +39,7 @@ export const zh: { [K in TranslationKey]: string } = {
   languageHeading: '语言',
   languageLabel: '界面语言',
   languageHint: '应用于 popup、app 和页面内提示。',
+  localeSystem: '跟随系统',
   localeEnglish: 'English',
   localeChinese: '中文',
 

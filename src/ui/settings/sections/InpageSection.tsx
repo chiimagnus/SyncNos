@@ -1,6 +1,6 @@
-import { t } from '@i18n';
+import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, checkboxClassName, textInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import {
@@ -15,6 +15,8 @@ export function InpageSection(props: {
   busy: boolean;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
+  localePreference: LocalePreference;
+  onChangeLocalePreference: (next: LocalePreference) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
@@ -39,6 +41,8 @@ export function InpageSection(props: {
     busy,
     displayMode,
     onChangeDisplayMode,
+    localePreference,
+    onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
@@ -67,6 +71,31 @@ export function InpageSection(props: {
 
   return (
     <div className="tw-grid tw-gap-4">
+      <section className={cardClassName} aria-label={t('languageHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('languageHeading')}</h2>
+        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+            <label htmlFor="interface-locale" className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+              {t('languageLabel')}
+            </label>
+            <select
+              id="interface-locale"
+              value={localePreference}
+              disabled={busy}
+              onChange={(event) => onChangeLocalePreference(event.target.value as LocalePreference)}
+              className={[textInputClassName, 'tw-w-[180px]'].join(' ')}
+            >
+              <option value="system">{t('localeSystem')}</option>
+              <option value="en">{t('localeEnglish')}</option>
+              <option value="zh">{t('localeChinese')}</option>
+            </select>
+          </div>
+          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {t('languageHint')}
+          </div>
+        </div>
+      </section>
+
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
           {t('inpageButtonHeading')}

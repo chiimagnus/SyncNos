@@ -23,6 +23,7 @@ import { onInstalled } from '@platform/runtime/runtime';
 import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 import { registerClipperContextMenu } from '@platform/context-menus/clipper-context-menu';
 import { onAlarm } from '@platform/alarms/alarms';
+import { initializeLocale } from '@i18n';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -34,7 +35,8 @@ async function openAboutSectionAfterInstall(): Promise<void> {
   await openOrFocusExtensionAppTab({ route: '/settings?section=aboutme' });
 }
 
-export default defineBackground(() => {
+export default defineBackground(async () => {
+  await initializeLocale();
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
 
   const router = createBackgroundRouter({

@@ -37,6 +37,7 @@ export const en = {
   languageHeading: 'Language',
   languageLabel: 'Interface Language',
   languageHint: 'Applies to popup, app, and inpage tips.',
+  localeSystem: 'Follow system',
   localeEnglish: 'English',
   localeChinese: 'Chinese',
 

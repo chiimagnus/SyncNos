@@ -141,6 +141,8 @@ export function SettingsScene(props: SettingsSceneProps) {
 
     inpageDisplayMode,
     onChangeInpageDisplayMode,
+    localePreference,
+    onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
@@ -394,6 +396,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           displayMode={inpageDisplayMode}
           onChangeDisplayMode={(next) => {
             void onChangeInpageDisplayMode(next);
+          }}
+          localePreference={localePreference}
+          onChangeLocalePreference={(next) => {
+            void onChangeLocalePreference(next);
           }}
           aiChatAutoSaveEnabled={aiChatAutoSaveEnabled}
           onToggleAiChatAutoSaveEnabled={(next) => {

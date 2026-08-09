@@ -114,12 +114,16 @@ describe('inpage anti-hotlink advanced editor', () => {
       busy: false,
       displayMode: 'supported',
       onChangeDisplayMode: () => {},
+      localePreference: 'system',
+      onChangeLocalePreference: () => {},
       aiChatAutoSaveEnabled: true,
       onToggleAiChatAutoSaveEnabled: () => {},
       aiChatCacheImagesEnabled: true,
       onToggleAiChatCacheImagesEnabled: () => {},
       webArticleCacheImagesEnabled: true,
       onToggleWebArticleCacheImagesEnabled: () => {},
+      xiaohongshuCommentsCaptureEnabled: false,
+      onToggleXiaohongshuCommentsCaptureEnabled: () => {},
       antiHotlinkAdvancedOpen: false,
       onToggleAntiHotlinkAdvancedOpen: () => {},
       antiHotlinkRules: [],
@@ -152,6 +156,21 @@ describe('inpage anti-hotlink advanced editor', () => {
       button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     expect(onToggleAdvanced).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a native select for interface language', () => {
+    const onChangeLocalePreference = vi.fn();
+    renderInpage({ onChangeLocalePreference });
+
+    const select = document.querySelector('select#interface-locale') as HTMLSelectElement | null;
+    expect(select).toBeTruthy();
+    expect(select?.value).toBe('system');
+
+    act(() => {
+      select!.value = 'zh';
+      select!.dispatchEvent(new window.Event('change', { bubbles: true }));
+    });
+    expect(onChangeLocalePreference).toHaveBeenCalledWith('zh');
   });
 
   it('renders editor rows and validation errors when expanded', () => {
