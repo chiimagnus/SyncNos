@@ -3,7 +3,6 @@ import { registerConversationHandlers } from '@services/conversations/background
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerWebArticleHandlers } from '@collectors/web/article-fetch-background-handlers';
-import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
@@ -58,7 +57,6 @@ export default defineBackground(async () => {
   registerWebArticleHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
-  registerChatgptDeepResearchHandlers(router);
   registerNotionSettingsHandlers(router, {
     notionSyncJobStore: services.notionSyncJobStore,
     conversationKinds: services.conversationKinds,

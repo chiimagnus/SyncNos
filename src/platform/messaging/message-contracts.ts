@@ -43,10 +43,6 @@ export const ARTICLE_MESSAGE_TYPES = {
   RESOLVE_OR_CAPTURE_ACTIVE_TAB: 'resolveOrCaptureActiveTabArticle',
 } as const;
 
-export const CHATGPT_MESSAGE_TYPES = {
-  EXTRACT_DEEP_RESEARCH: 'chatgptExtractDeepResearch',
-} as const;
-
 export const CURRENT_PAGE_MESSAGE_TYPES = {
   GET_CAPTURE_STATE: 'getCurrentPageCaptureState',
   CAPTURE: 'captureCurrentPage',
@@ -98,7 +94,6 @@ export const messageContracts = {
   OBSIDIAN_MESSAGE_TYPES,
   FEISHU_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
-  CHATGPT_MESSAGE_TYPES,
   CURRENT_PAGE_MESSAGE_TYPES,
   ITEM_MENTION_MESSAGE_TYPES,
   CHATWITH_MESSAGE_TYPES,
@@ -113,7 +108,6 @@ export type NotionMessageType = (typeof NOTION_MESSAGE_TYPES)[keyof typeof NOTIO
 export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof OBSIDIAN_MESSAGE_TYPES];
 export type FeishuMessageType = (typeof FEISHU_MESSAGE_TYPES)[keyof typeof FEISHU_MESSAGE_TYPES];
 export type ArticleMessageType = (typeof ARTICLE_MESSAGE_TYPES)[keyof typeof ARTICLE_MESSAGE_TYPES];
-export type ChatgptMessageType = (typeof CHATGPT_MESSAGE_TYPES)[keyof typeof CHATGPT_MESSAGE_TYPES];
 export type CurrentPageMessageType = (typeof CURRENT_PAGE_MESSAGE_TYPES)[keyof typeof CURRENT_PAGE_MESSAGE_TYPES];
 export type ItemMentionMessageType = (typeof ITEM_MENTION_MESSAGE_TYPES)[keyof typeof ITEM_MENTION_MESSAGE_TYPES];
 export type ChatWithMessageType = (typeof CHATWITH_MESSAGE_TYPES)[keyof typeof CHATWITH_MESSAGE_TYPES];
@@ -128,7 +122,6 @@ export type MessageType =
   | ObsidianMessageType
   | FeishuMessageType
   | ArticleMessageType
-  | ChatgptMessageType
   | CurrentPageMessageType
   | ItemMentionMessageType
   | ChatWithMessageType

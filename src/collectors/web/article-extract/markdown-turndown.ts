@@ -148,12 +148,12 @@ function createTurndownService() {
   return turndown;
 }
 
-export function htmlToMarkdownTurndown(html: unknown, baseHref: string) {
+export function htmlToMarkdownTurndown(html: unknown, baseHref: string, ownerDocument: Document = document) {
   const normalizedHtml = normalizeText(html);
   if (!normalizedHtml) return '';
 
   try {
-    const wrapper = document.createElement('div');
+    const wrapper = ownerDocument.createElement('div');
     wrapper.innerHTML = normalizedHtml;
     const root = pickTurndownRoot(wrapper);
     cleanHtmlFragment(root, baseHref);

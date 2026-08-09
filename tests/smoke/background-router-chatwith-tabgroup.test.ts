@@ -30,6 +30,7 @@ vi.mock('../../src/platform/storage/local', () => ({
     }
     return out;
   },
+  storageGetAll: async () => ({ ...storageState }),
   storageSet: async (items: Record<string, unknown>) => {
     for (const [key, value] of Object.entries(items || {})) {
       storageState[key] = value;
