@@ -173,7 +173,7 @@ describe('Threaded comments panel optional comment actions', () => {
       commentChatWith: {
         resolveActions: vi.fn(async () => [
           { id: 'chatgpt', label: 'Chat with ChatGPT', onTrigger: vi.fn() },
-          { id: 'claude', label: 'Chat with Claude', onTrigger: vi.fn() },
+          { id: 'gemini', label: 'Chat with Gemini', onTrigger: vi.fn() },
         ]),
       },
     });
@@ -186,7 +186,7 @@ describe('Threaded comments panel optional comment actions', () => {
     await flushReactScheduler();
     const menu = visibleRootMenu(shadow);
     expect(menu.textContent).toContain('Chat with ChatGPT');
-    expect(menu.textContent).toContain('Chat with Claude');
+    expect(menu.textContent).toContain('Chat with Gemini');
 
     const escape = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     (shadow.querySelector('.webclipper-inpage-comments-panel__surface') as HTMLElement).dispatchEvent(escape);

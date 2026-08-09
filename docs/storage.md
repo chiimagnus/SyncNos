@@ -47,7 +47,7 @@ SyncNos 的“存储”不是一个数据库，而是多层事实源并存：**W
 | 键 | 介质 | 生产方 | 含义 |
 | --- | --- | --- | --- |
 | `webclipper_settings_active_section` | `localStorage` | `src/viewmodels/settings/types.ts` | 记住用户上次停留的设置 section |
-| `webclipper_conversations_source_filter_key` | `localStorage` | `ConversationListPane.tsx` | 记住会话列表来源筛选（如 `all / chatgpt / claude`） |
+| `webclipper_conversations_source_filter_key` | `localStorage` | `ConversationListPane.tsx` | 记住会话列表来源筛选（如 `all / chatgpt / gemini`） |
 | `webclipper_conversations_site_filter_key` | `localStorage` | `ConversationListPane.tsx` | `source=web` 时记住站点筛选（如 `all / domain:sspai.com`） |
 | `webclipper_app_source_filter_key` | `localStorage` | 旧版本兼容回读 | 旧的来源筛选键，当前只做 backward compatibility |
 | `webclipper_pending_open_conversation_id` | `sessionStorage` | `pending-open.ts` | 窄屏下从排行 / 列表导航到 detail 的一次性桥接 payload（`conversationId`，可附带 `source + conversationKey`） |

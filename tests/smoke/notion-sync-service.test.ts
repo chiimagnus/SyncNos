@@ -84,10 +84,10 @@ describe('notion-sync-service', () => {
       return { ok: true };
     };
 
-    await notionSyncService.updatePageProperties('t', { pageId: 'p1', title: 'Hello', url: 'https://x', ai: 'claude' });
+    await notionSyncService.updatePageProperties('t', { pageId: 'p1', title: 'Hello', url: 'https://x', ai: 'gemini' });
     expect(lastReq.method).toBe('PATCH');
     expect(lastReq.path).toBe('/v1/pages/p1');
-    expect(lastReq.body.properties.AI.multi_select[0].name).toBe('Claude');
+    expect(lastReq.body.properties.AI.multi_select[0].name).toBe('Gemini');
     expect(lastReq.body.properties.Date).toBeUndefined();
   });
 

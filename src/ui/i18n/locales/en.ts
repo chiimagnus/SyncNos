@@ -37,6 +37,7 @@ export const en = {
   languageHeading: 'Language',
   languageLabel: 'Interface Language',
   languageHint: 'Applies to popup, app, and inpage tips.',
+  localeSystem: 'Follow system',
   localeEnglish: 'English',
   localeChinese: 'Chinese',
 
@@ -537,7 +538,6 @@ export const en = {
 
   // Conversation sources / sync feedback
   sourceChatgpt: 'ChatGPT',
-  sourceClaude: 'Claude',
   sourceDeepseek: 'DeepSeek',
   sourceNotionai: 'Notion AI',
   sourceGemini: 'Gemini',

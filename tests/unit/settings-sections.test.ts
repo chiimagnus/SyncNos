@@ -114,12 +114,16 @@ describe('inpage anti-hotlink advanced editor', () => {
       busy: false,
       displayMode: 'supported',
       onChangeDisplayMode: () => {},
+      localePreference: 'system',
+      onChangeLocalePreference: () => {},
       aiChatAutoSaveEnabled: true,
       onToggleAiChatAutoSaveEnabled: () => {},
       aiChatCacheImagesEnabled: true,
       onToggleAiChatCacheImagesEnabled: () => {},
       webArticleCacheImagesEnabled: true,
       onToggleWebArticleCacheImagesEnabled: () => {},
+      xiaohongshuCommentsCaptureEnabled: false,
+      onToggleXiaohongshuCommentsCaptureEnabled: () => {},
       antiHotlinkAdvancedOpen: false,
       onToggleAntiHotlinkAdvancedOpen: () => {},
       antiHotlinkRules: [],
@@ -152,6 +156,27 @@ describe('inpage anti-hotlink advanced editor', () => {
       button!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     expect(onToggleAdvanced).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the shared select menu for interface language', () => {
+    const onChangeLocalePreference = vi.fn();
+    renderInpage({ onChangeLocalePreference });
+
+    const trigger = document.querySelector('button#interface-locale') as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+    expect(trigger?.textContent).toContain('Follow system');
+
+    act(() => {
+      trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    const chinese = Array.from(document.querySelectorAll('button[role="menuitemradio"]')).find((button) =>
+      button.textContent?.includes('Chinese'),
+    ) as HTMLButtonElement | undefined;
+    expect(chinese).toBeTruthy();
+    act(() => {
+      chinese!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(onChangeLocalePreference).toHaveBeenCalledWith('zh');
   });
 
   it('renders editor rows and validation errors when expanded', () => {

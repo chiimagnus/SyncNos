@@ -21,7 +21,6 @@ function aiLabelForSource(source: unknown): string {
 
   const sourceNameMap: Record<string, string> = {
     chatgpt: 'ChatGPT',
-    claude: 'Claude',
     gemini: 'Gemini',
     deepseek: 'DeepSeek',
     kimi: 'Kimi',

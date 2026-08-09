@@ -2,7 +2,6 @@ type AiSourceMeta = { name: string; color: string };
 
 const AI = Object.freeze({
   chatgpt: { name: 'ChatGPT', color: 'green' },
-  claude: { name: 'Claude', color: 'purple' },
   gemini: { name: 'Gemini', color: 'yellow' },
   deepseek: { name: 'DeepSeek', color: 'gray' },
   kimi: { name: 'Kimi', color: 'blue' },

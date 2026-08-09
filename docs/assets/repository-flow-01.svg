@@ -32,7 +32,6 @@
 <rect class="sg" x="10" y="264" width="320" height="252" rx="12"/>
 <text class="sg-t" x="170" y="287" text-anchor="middle">🤖 WebClipper Data Sources</text>
 <rect class="sc" x="22" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="326" text-anchor="middle">ChatGPT</text>
-<rect class="sc" x="123" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="326" text-anchor="middle">Claude</text>
 <rect class="sc" x="224" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="271" y="326" text-anchor="middle">Gemini</text>
 <rect class="sc" x="22" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="378" text-anchor="middle">DeepSeek</text>
 <rect class="sc" x="123" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="378" text-anchor="middle">Kimi</text>

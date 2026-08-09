@@ -16,6 +16,7 @@ import normalizeApi from '@services/shared/normalize.ts';
 import { inpageButtonApi } from '@ui/inpage/inpage-button-shadow.ts';
 import { inpageItemMentionApi } from '@ui/inpage/inpage-item-mention-shadow.ts';
 import { inpageTipApi } from '@ui/inpage/inpage-tip-shadow.ts';
+import { initializeLocale } from '@i18n';
 import { createInpageCommentsDomSource, getInpageCommentsPanelApi } from '@ui/inpage/inpage-comments-panel-shadow.ts';
 import { createRuntimeClient } from '@platform/runtime/client.ts';
 
@@ -23,7 +24,8 @@ export default defineContentScript({
   // Inpage visibility is controlled at runtime by `inpage_display_mode` (and legacy `inpage_supported_only`).
   // This avoids browser-specific dynamic content-script registration support gaps.
   matches: ['http://*/*', 'https://*/*'],
-  main() {
+  async main() {
+    await initializeLocale();
     const runtime = createRuntimeClient();
     const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
     const collectorsRegistry = createCollectorsRegistry();

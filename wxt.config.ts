@@ -72,7 +72,6 @@ const resolveManifest: UserManifestFn = (env) => {
           'https://chat.openai.com/*',
           'https://chatgpt.com/*',
           'https://www.chatgpt.com/*',
-          'https://claude.ai/*',
           'https://gemini.google.com/*',
           'https://chat.deepseek.com/*',
           'https://chat.z.ai/*',

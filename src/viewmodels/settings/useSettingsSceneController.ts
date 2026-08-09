@@ -79,7 +79,7 @@ import {
   type NotionPageOption,
 } from '@viewmodels/settings/utils';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
-import { t } from '@i18n';
+import { getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
 
 const NOTION_SYNC_PROVIDER_ENABLED_KEY = syncProviderEnabledStorageKey('notion');
@@ -279,6 +279,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   // Mirror latest prefs so updateReaderPrefs can merge patches without stale closures.
   const readerPrefsRef = useRef(readerPrefs);
   readerPrefsRef.current = readerPrefs;
+  const [localePreference, setLocalePreference] = useState<LocalePreference>(() => getLocalePreference());
 
   // Chat with AI
   const [chatWithPromptTemplate, setChatWithPromptTemplate] = useState<string>(DEFAULT_CHAT_WITH_PROMPT_TEMPLATE);
@@ -1043,6 +1044,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onChangeLocalePreference = useCallback(
+    async (next: LocalePreference) => {
+      await runTask(async () => {
+        const preference = await saveLocalePreference(next);
+        setLocalePreference(preference);
+        globalThis.location?.reload();
+      });
+    },
+    [runTask],
+  );
+
   const onToggleAiChatAutoSaveEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
@@ -1538,6 +1550,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     inpageDisplayMode,
     onChangeInpageDisplayMode,
+    localePreference,
+    onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,

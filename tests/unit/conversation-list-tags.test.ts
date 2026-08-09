@@ -64,8 +64,8 @@ describe('resolveConversationListTag', () => {
       conversation: { source: 'chatgpt' },
       translate: tr,
     });
-    const claude = resolveConversationListTag({
-      conversation: { source: 'claude' },
+    const gemini = resolveConversationListTag({
+      conversation: { source: 'gemini' },
       translate: tr,
     });
     const kimi = resolveConversationListTag({
@@ -74,7 +74,7 @@ describe('resolveConversationListTag', () => {
     });
 
     expect(chatgpt.toneClassName).toContain('var(--brand-chatgpt)');
-    expect(claude.toneClassName).toContain('var(--brand-claude)');
+    expect(gemini.toneClassName).toContain('var(--brand-gemini)');
     expect(kimi.toneClassName).toContain('var(--brand-kimi)');
   });
 

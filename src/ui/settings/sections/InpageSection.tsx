@@ -1,4 +1,4 @@
-import { t } from '@i18n';
+import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
 import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
@@ -15,6 +15,8 @@ export function InpageSection(props: {
   busy: boolean;
   displayMode: InpageDisplayMode;
   onChangeDisplayMode: (next: InpageDisplayMode) => void;
+  localePreference: LocalePreference;
+  onChangeLocalePreference: (next: LocalePreference) => void;
   aiChatAutoSaveEnabled: boolean;
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
@@ -39,6 +41,8 @@ export function InpageSection(props: {
     busy,
     displayMode,
     onChangeDisplayMode,
+    localePreference,
+    onChangeLocalePreference,
     aiChatAutoSaveEnabled,
     onToggleAiChatAutoSaveEnabled,
     aiChatCacheImagesEnabled,
@@ -67,6 +71,32 @@ export function InpageSection(props: {
 
   return (
     <div className="tw-grid tw-gap-4">
+      <section className={cardClassName} aria-label={t('languageHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('languageHeading')}</h2>
+        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
+            <span className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('languageLabel')}</span>
+            <SelectMenu<LocalePreference>
+              value={localePreference}
+              onChange={onChangeLocalePreference}
+              disabled={busy}
+              ariaLabel={t('languageLabel')}
+              minWidth={180}
+              buttonId="interface-locale"
+              buttonClassName={[buttonTintClassName(), 'tw-min-w-[180px]'].join(' ')}
+              options={[
+                { value: 'system', label: t('localeSystem') },
+                { value: 'en', label: t('localeEnglish') },
+                { value: 'zh', label: t('localeChinese') },
+              ]}
+            />
+          </div>
+          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {t('languageHint')}
+          </div>
+        </div>
+      </section>
+
       <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
           {t('inpageButtonHeading')}
