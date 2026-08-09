@@ -21,6 +21,8 @@ export function InpageSection(props: {
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
   onToggleWebArticleCacheImagesEnabled: (next: boolean) => void;
+  xiaohongshuCommentsCaptureEnabled: boolean;
+  onToggleXiaohongshuCommentsCaptureEnabled: (next: boolean) => void;
   antiHotlinkAdvancedOpen: boolean;
   onToggleAntiHotlinkAdvancedOpen: () => void;
   antiHotlinkRules: AntiHotlinkRuleEditorRow[];
@@ -43,6 +45,8 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    xiaohongshuCommentsCaptureEnabled,
+    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -89,6 +93,25 @@ export function InpageSection(props: {
           <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
             {t('inpageDisplayModeHint')}
           </div>
+        </div>
+      </section>
+
+      <section className={cardClassName} aria-label={t('xiaohongshuCommentsHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('xiaohongshuCommentsHeading')}
+        </h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={xiaohongshuCommentsCaptureEnabled}
+            disabled={busy}
+            onChange={(e) => onToggleXiaohongshuCommentsCaptureEnabled(!!e.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('xiaohongshuCommentsLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('xiaohongshuCommentsHint')}
         </div>
       </section>
 

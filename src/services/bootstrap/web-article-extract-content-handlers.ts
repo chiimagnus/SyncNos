@@ -16,6 +16,7 @@ export function registerWebArticleExtractContentHandlers() {
         extractWebArticleFromCurrentPage({
           stabilizationTimeoutMs: Number(msg?.payload?.stabilizationTimeoutMs) || undefined,
           stabilizationMinTextLength: Number(msg?.payload?.stabilizationMinTextLength) || undefined,
+          includeXiaohongshuComments: msg?.payload?.includeXiaohongshuComments === true,
         }),
       )
       .then((data) => sendResponse(ok(data)))

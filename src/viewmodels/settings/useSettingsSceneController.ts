@@ -268,6 +268,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
+  const [xiaohongshuCommentsCaptureEnabled, setXiaohongshuCommentsCaptureEnabled] = useState<boolean>(false);
   const [antiHotlinkAdvancedOpen, setAntiHotlinkAdvancedOpen] = useState<boolean>(false);
   const [antiHotlinkRules, setAntiHotlinkRules] = useState<AntiHotlinkRuleDraft[]>(() =>
     getDefaultAntiHotlinkRulesForSettings(),
@@ -358,6 +359,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         'ai_chat_auto_save_enabled',
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
+        'xiaohongshu_comments_capture_enabled',
         ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
         'ai_chat_dollar_mention_enabled',
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
@@ -417,6 +419,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
+    setXiaohongshuCommentsCaptureEnabled(local?.xiaohongshu_comments_capture_enabled === true);
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
     setAntiHotlinkRuleErrors([]);
     setAiChatDollarMentionEnabled(local?.ai_chat_dollar_mention_enabled !== false);
@@ -484,6 +487,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, READER_PREFS_STORAGE_KEY)) {
         const nextValue = changes[READER_PREFS_STORAGE_KEY]?.newValue;
         setReaderPrefs(normalizeReaderPrefs(nextValue));
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'xiaohongshu_comments_capture_enabled')) {
+        setXiaohongshuCommentsCaptureEnabled(changes.xiaohongshu_comments_capture_enabled?.newValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY)) {
         void refresh();
@@ -1067,6 +1073,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleXiaohongshuCommentsCaptureEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        await storageSet({ xiaohongshu_comments_capture_enabled: next === true });
+        setXiaohongshuCommentsCaptureEnabled(next === true);
+      });
+    },
+    [runTask],
+  );
+
   const onToggleAntiHotlinkAdvancedOpen = useCallback(() => {
     setAntiHotlinkAdvancedOpen((open) => !open);
   }, []);
@@ -1528,6 +1544,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    xiaohongshuCommentsCaptureEnabled,
+    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,

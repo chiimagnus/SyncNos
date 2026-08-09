@@ -147,6 +147,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    xiaohongshuCommentsCaptureEnabled,
+    onToggleXiaohongshuCommentsCaptureEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -404,6 +406,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           webArticleCacheImagesEnabled={webArticleCacheImagesEnabled}
           onToggleWebArticleCacheImagesEnabled={(next) => {
             void onToggleWebArticleCacheImagesEnabled(next);
+          }}
+          xiaohongshuCommentsCaptureEnabled={xiaohongshuCommentsCaptureEnabled}
+          onToggleXiaohongshuCommentsCaptureEnabled={(next) => {
+            void onToggleXiaohongshuCommentsCaptureEnabled(next);
           }}
           antiHotlinkAdvancedOpen={antiHotlinkAdvancedOpen}
           onToggleAntiHotlinkAdvancedOpen={onToggleAntiHotlinkAdvancedOpen}
