@@ -41,18 +41,6 @@ function resolveChromiumBinaryForMac(): string | undefined {
 
 const chromeBinary = process.platform === 'darwin' ? resolveChromiumBinaryForMac() : undefined;
 
-const defuddleEntryPath = path.resolve('node_modules/defuddle/dist/defuddle.js');
-const genericDefuddleRegistryPath = path.resolve('src/collectors/web/article-extract/defuddle-extractor-registry.ts');
-
-const defuddleGenericRegistryPlugin = {
-  name: 'defuddle-generic-registry',
-  enforce: 'pre' as const,
-  resolveId(source: string, importer?: string) {
-    if (source === './extractor-registry' && importer === defuddleEntryPath) return genericDefuddleRegistryPath;
-    return null;
-  },
-};
-
 const resolveManifest: UserManifestFn = (env) => {
   const isSafari = env.browser === 'safari';
 
@@ -115,7 +103,6 @@ export default defineConfig({
   entrypointsDir: 'src/entrypoints',
   webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
   vite: () => ({
-    plugins: [defuddleGenericRegistryPlugin],
     define: {
       __SYNCNOS_FEISHU_OAUTH_CLIENT_ID__: JSON.stringify(process.env.SYNCNOS_FEISHU_OAUTH_CLIENT_ID ?? ''),
       __SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__: JSON.stringify(
@@ -123,7 +110,7 @@ export default defineConfig({
       ),
     },
     resolve: {
-      alias: { ...viteAlias, defuddle: defuddleEntryPath },
+      alias: viteAlias,
     },
     build: {
       // KaTeX/Recharts can legitimately push some chunks beyond Vite's default 500kB warning threshold.
