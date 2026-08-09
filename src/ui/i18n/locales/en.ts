@@ -184,6 +184,9 @@ export const en = {
   webArticleCacheImagesLabel: 'Auto-save web article images locally',
   webArticleCacheImagesHint:
     'Only affects web articles. Images are downloaded during capture to avoid broken cloud links.',
+  xiaohongshuCommentsHeading: 'Xiaohongshu notes',
+  xiaohongshuCommentsLabel: 'Capture source comments',
+  xiaohongshuCommentsHint: 'When enabled, saves the comments and expanded replies currently loaded on the page.',
   antiHotlinkRulesLabel: 'Anti-hotlink domains',
   antiHotlinkRulesHint:
     'Add CDN hostname + referer URL. Matched domains are force-cached during article capture even when the auto-save toggle is off.',

@@ -1,6 +1,7 @@
 import { DISCOURSE_OP_MISSING_WARNING_FLAG } from '@collectors/web/article-fetch-errors';
 import { DISCOURSE_TOPIC_PATH_RE_FLAGS, DISCOURSE_TOPIC_PATH_RE_SOURCE } from '@collectors/web/article-fetch-discourse';
 import { ARTICLE_FETCH_SITE_SPECS } from '@collectors/web/article-fetch-sites';
+import { extractXiaohongshuComments } from '@collectors/web/article-fetch-sites/xiaohongshu-note';
 import { extractByDefuddle } from '@collectors/web/article-extract/defuddle';
 import { htmlToMarkdownTurndown } from '@collectors/web/article-extract/markdown-turndown';
 import { extractBySiteSpec } from '@collectors/web/article-extract/site-spec-extractor';
@@ -20,6 +21,7 @@ import { normalizeText } from '@collectors/web/article-extract/url';
 type ExtractOptions = {
   stabilizationTimeoutMs?: number;
   stabilizationMinTextLength?: number;
+  includeXiaohongshuComments?: boolean;
 };
 
 function escapeHtml(value: unknown) {
@@ -426,10 +428,24 @@ function normalizeDetailsElementsForReadability(doc: any) {
   }
 }
 
-function extractBySiteSpecs(baseHref: string) {
+function appendHtmlBeforeBody(contentHTML: string, addition: string) {
+  return contentHTML.replace(/<\/body>\s*<\/html>\s*$/i, `${addition}</body></html>`);
+}
+
+function extractBySiteSpecs(baseHref: string, includeXiaohongshuComments: boolean) {
   for (const spec of ARTICLE_FETCH_SITE_SPECS) {
     const payload = extractBySiteSpec(spec, baseHref);
     if (!payload) continue;
+    if (spec.id === 'xiaohongshu_note' && includeXiaohongshuComments) {
+      const comments = extractXiaohongshuComments();
+      if (comments) {
+        return {
+          ...payload,
+          contentHTML: appendHtmlBeforeBody(payload.contentHTML, comments.contentHTML),
+          textContent: normalizeText([payload.textContent, comments.textContent].filter(Boolean).join('\n\n')),
+        };
+      }
+    }
     return payload;
   }
   return null;
@@ -519,7 +535,7 @@ export async function extractWebArticleFromCurrentPage(options: ExtractOptions =
 
   prepareWechatRichMediaDom();
 
-  const sitePayload = extractBySiteSpecs(baseHref);
+  const sitePayload = extractBySiteSpecs(baseHref, options.includeXiaohongshuComments === true);
   if (sitePayload) {
     const markdown =
       htmlToMarkdownTurndown(sitePayload.contentHTML, baseHref) || normalizeText(sitePayload.textContent);
