@@ -255,17 +255,17 @@ describe('content-controller inpage combo', () => {
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(true);
   });
 
-  it('does not auto-save ChatGPT after it became manual-capture only', async () => {
+  it('skips auto-save when chatgpt deep research message is still a placeholder', async () => {
     setupDom();
-    vi.useFakeTimers();
-
     const snapshot = {
-      conversation: { source: 'chatgpt', conversationKey: 'auto-dr-hydrate-1' },
+      conversation: { source: 'chatgpt', conversationKey: 'auto-dr-placeholder-1' },
       messages: [
         {
           role: 'assistant',
-          contentText: 'Visible answer',
-          contentMarkdown: 'Visible answer',
+          contentText:
+            'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
+          contentMarkdown:
+            'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
         },
       ],
     };
@@ -274,9 +274,59 @@ describe('content-controller inpage combo', () => {
       collectorId: 'chatgpt',
       captureImpl: () => snapshot,
       incrementalImpl: () => {
+        throw new Error('incremental should not run when placeholder is present');
+      },
+    });
+
+    await harness.runTick();
+
+    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+    expect(harness.tipCalls.length).toBe(0);
+  });
+
+  it('does not auto-save chatgpt deep research after ChatGPT became manual-capture only', async () => {
+    setupDom();
+    vi.useFakeTimers();
+
+    const snapshot = {
+      conversation: { source: 'chatgpt', conversationKey: 'auto-dr-hydrate-1' },
+      messages: [
+        {
+          role: 'assistant',
+          contentText:
+            'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
+          contentMarkdown:
+            'Deep Research (iframe): https://connector_openai_deep_research.web-sandbox.oaiusercontent.com?app=chatgpt&locale=en-US&deviceType=desktop',
+        },
+      ],
+    };
+
+    let extractCalls = 0;
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      captureImpl: () => snapshot,
+      incrementalImpl: () => {
         throw new Error('incremental should not run for chatgpt autosave');
       },
-      sendImpl: async (type: string) => {
+      sendImpl: async (type: string, payload?: any) => {
+        if (type === 'chatgptExtractDeepResearch') {
+          extractCalls += 1;
+          if (extractCalls === 1) return { ok: true, data: { items: [] } };
+          return {
+            ok: true,
+            data: {
+              items: [
+                {
+                  href: payload?.urls?.[0],
+                  title: 'Deep Research',
+                  text: 'x'.repeat(400),
+                  markdown: '# Deep Research\n\n' + 'x'.repeat(400),
+                },
+              ],
+            },
+          };
+        }
         if (type === 'upsertConversation') return { ok: true, data: { id: 33 } };
         if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
@@ -288,6 +338,7 @@ describe('content-controller inpage combo', () => {
 
     await vi.advanceTimersByTimeAsync(15_000);
 
+    expect(harness.sendCalls.some((c) => c.type === 'chatgptExtractDeepResearch')).toBe(false);
     expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(false);

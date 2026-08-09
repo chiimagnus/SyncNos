@@ -89,25 +89,21 @@ describe('current page capture integrity routing', () => {
     expect(harness.calls).toEqual([]);
   });
 
-  it('routes Defuddle visible-DOM capture to protective append', async () => {
+  it('routes unresolved Deep Research placeholders to protective append', async () => {
+    const placeholder = 'Deep Research (iframe): https://example.web-sandbox.oaiusercontent.com/report';
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot: {
         ...chatSnapshot(),
         messages: [
           {
-            messageKey: 'defuddle_1',
+            messageKey: 'm1',
             role: 'assistant',
-            contentText: 'Visible answer',
-            contentMarkdown: 'Visible answer',
+            contentText: placeholder,
+            contentMarkdown: placeholder,
             sequence: 0,
           },
         ],
-        captureMeta: {
-          completeness: 'partial',
-          identityVerified: true,
-          reasons: ['defuddle_visible_dom_only'],
-        },
       },
     });
 
@@ -116,7 +112,7 @@ describe('current page capture integrity routing', () => {
     const sync = harness.calls.find((call) => call.type === 'syncConversationMessages');
     expect(sync?.payload).toMatchObject({ mode: 'append' });
     expect(sync?.payload.messages[0]).toMatchObject({
-      captureSequencePolicy: 'preserve-existing-tail',
+      captureMergePolicy: 'preserve-existing-content',
     });
   });
 

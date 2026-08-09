@@ -607,6 +607,55 @@ describe('conversations storage-idb', () => {
     });
   });
 
+  it('keeps hydrated Deep Research content while inserting a first-time placeholder', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'deep_research_merge',
+      title: 'Research',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      {
+        messageKey: 'research-1',
+        role: 'assistant',
+        contentText: 'Complete report',
+        contentMarkdown: '# Complete report',
+        sequence: 0,
+        updatedAt: 10,
+      },
+    ]);
+    const placeholder = 'Deep Research (iframe): https://example.web-sandbox.oaiusercontent.com/report';
+
+    await syncConversationMessages(
+      id,
+      [
+        {
+          messageKey: 'research-1',
+          role: 'assistant',
+          contentText: placeholder,
+          contentMarkdown: placeholder,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-content',
+        },
+        {
+          messageKey: 'research-2',
+          role: 'assistant',
+          contentText: placeholder,
+          contentMarkdown: placeholder,
+          captureSequencePolicy: 'preserve-existing-tail',
+          captureMergePolicy: 'preserve-existing-content',
+        },
+      ],
+      { mode: 'append', diff: { added: ['research-2'], updated: ['research-1'], removed: [] } },
+    );
+
+    const stored = await getMessagesByConversationId(id);
+    expect(stored[0]).toMatchObject({ contentText: 'Complete report', contentMarkdown: '# Complete report' });
+    expect(stored[1]).toMatchObject({ contentText: placeholder, contentMarkdown: placeholder });
+  });
+
   it('reads message tails by conversation id with ascending sequence order', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
