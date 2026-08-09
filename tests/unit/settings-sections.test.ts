@@ -158,17 +158,23 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(onToggleAdvanced).toHaveBeenCalledTimes(1);
   });
 
-  it('uses a native select for interface language', () => {
+  it('uses the shared select menu for interface language', () => {
     const onChangeLocalePreference = vi.fn();
     renderInpage({ onChangeLocalePreference });
 
-    const select = document.querySelector('select#interface-locale') as HTMLSelectElement | null;
-    expect(select).toBeTruthy();
-    expect(select?.value).toBe('system');
+    const trigger = document.querySelector('button#interface-locale') as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+    expect(trigger?.textContent).toContain('Follow system');
 
     act(() => {
-      select!.value = 'zh';
-      select!.dispatchEvent(new window.Event('change', { bubbles: true }));
+      trigger!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    const chinese = Array.from(document.querySelectorAll('button[role="menuitemradio"]')).find((button) =>
+      button.textContent?.includes('Chinese'),
+    ) as HTMLButtonElement | undefined;
+    expect(chinese).toBeTruthy();
+    act(() => {
+      chinese!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     expect(onChangeLocalePreference).toHaveBeenCalledWith('zh');
   });
