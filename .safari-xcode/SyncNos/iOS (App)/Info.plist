@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>SFSafariWebExtensionConverterVersion</key>
-	<string>26.4</string>
+	<string>27.0</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

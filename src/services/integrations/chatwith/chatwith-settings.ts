@@ -25,7 +25,6 @@ export const DEFAULT_CHAT_WITH_PROMPT_TEMPLATE = t('chatWithDefaultPromptTemplat
 
 export const DEFAULT_CHAT_WITH_PLATFORMS: ChatWithAiPlatform[] = [
   { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true },
-  { id: 'claude', name: 'Claude', url: 'https://claude.ai/', enabled: false },
   { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', enabled: false },
   { id: 'deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com/', enabled: false },
   { id: 'kimi', name: 'Kimi', url: 'https://kimi.moonshot.cn/', enabled: false },

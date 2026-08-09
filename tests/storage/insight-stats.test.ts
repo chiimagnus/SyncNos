@@ -104,7 +104,7 @@ describe('insight stats', () => {
     });
     await seedConversation({
       sourceType: 'chat',
-      source: 'Claude',
+      source: 'Gemini',
       conversationKey: 'chat-2',
       title: '',
       lastCapturedAt: 2,
@@ -137,16 +137,16 @@ describe('insight stats', () => {
     expect(stats.totalMessages).toBe(15);
     expect(stats.chatSourceDistribution).toEqual([
       { label: 'ChatGPT', count: 1 },
-      { label: 'Claude', count: 1 },
+      { label: 'Gemini', count: 1 },
     ]);
     expect(stats.topConversations).toEqual([
       expect.objectContaining({
         title: INSIGHT_UNTITLED_CONVERSATION,
         messageCount: 9,
-        source: 'Claude',
-        openSource: 'claude',
+        source: 'Gemini',
+        openSource: 'gemini',
         openConversationKey: 'chat-2',
-        loc: encodeConversationLoc({ source: 'claude', conversationKey: 'chat-2' }),
+        loc: encodeConversationLoc({ source: 'gemini', conversationKey: 'chat-2' }),
       }),
       expect.objectContaining({
         title: 'Architecture',

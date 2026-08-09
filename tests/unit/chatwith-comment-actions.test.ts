@@ -121,7 +121,7 @@ describe('resolveChatWithCommentActions', () => {
       promptTemplate: '',
       platforms: [
         { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true },
-        { id: 'claude', name: 'Claude', url: 'https://claude.ai/', enabled: true },
+        { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', enabled: true },
       ],
     });
 
@@ -131,8 +131,8 @@ describe('resolveChatWithCommentActions', () => {
       canonicalUrl: 'https://example.com/article',
     });
 
-    expect(actions.map((item) => item.id)).toEqual(['chat-with-chatgpt', 'chat-with-claude']);
-    expect(actions.map((item) => item.label)).toEqual(['Chat with ChatGPT', 'Chat with Claude']);
+    expect(actions.map((item) => item.id)).toEqual(['chat-with-chatgpt', 'chat-with-gemini']);
+    expect(actions.map((item) => item.label)).toEqual(['Chat with ChatGPT', 'Chat with Gemini']);
     expect(resolveSingleEnabledChatWithActionLabelMock).not.toHaveBeenCalled();
   });
 

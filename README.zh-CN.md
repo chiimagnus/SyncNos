@@ -46,7 +46,6 @@
 | 平台 | 采集方式 |
 | --- | --- |
 | ChatGPT | 仅手动¹ |
-| Claude | 自动 |
 | Gemini | 自动 |
 | DeepSeek | 自动 |
 | Kimi | 自动 |

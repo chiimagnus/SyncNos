@@ -41,7 +41,6 @@ describe('item-mention sites', () => {
 
   it('picks site id', () => {
     expect(pickMentionSupportedSiteIdByHostname('chatgpt.com')).toBe('chatgpt');
-    expect(pickMentionSupportedSiteIdByHostname('claude.ai')).toBe('claude');
     expect(pickMentionSupportedSiteIdByHostname('www.notion.so')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('app.notion.com')).toBe('notionai');
     expect(pickMentionSupportedSiteIdByHostname('gemini.google.com')).toBe('gemini');

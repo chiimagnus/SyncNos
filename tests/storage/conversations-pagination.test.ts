@@ -83,7 +83,7 @@ describe('conversations pagination storage-idb', () => {
     for (let i = 0; i < timestamps.length; i += 1) {
       const row = await upsertConversation({
         sourceType: 'chat',
-        source: i % 2 === 0 ? 'chatgpt' : 'claude',
+        source: i % 2 === 0 ? 'chatgpt' : 'gemini',
         conversationKey: `page-${i + 1}`,
         title: `Row ${i + 1}`,
         lastCapturedAt: timestamps[i],
@@ -156,10 +156,10 @@ describe('conversations pagination storage-idb', () => {
     });
     await upsertConversation({
       sourceType: 'chat',
-      source: 'claude',
-      conversationKey: 'claude-1',
-      title: 'claude',
-      url: 'https://claude.ai/chat/1',
+      source: 'gemini',
+      conversationKey: 'gemini-1',
+      title: 'gemini',
+      url: 'https://gemini.google.com/app/1',
       lastCapturedAt: old,
     });
 
@@ -170,7 +170,7 @@ describe('conversations pagination storage-idb', () => {
     const sourceCounts = new Map(all.facets.sources.map((item) => [item.key, item.count]));
     expect(sourceCounts.get('web')).toBe(3);
     expect(sourceCounts.get('chatgpt')).toBe(1);
-    expect(sourceCounts.get('claude')).toBe(1);
+    expect(sourceCounts.get('gemini')).toBe(1);
 
     const siteCounts = new Map(all.facets.sites.map((item) => [item.key, item.count]));
     expect(siteCounts.get('domain:example.com')).toBe(2);

@@ -14,7 +14,6 @@ demo/
 *.db
 Backend/.env
 .kiro/
-.claude/
 .specify/
 .github/*.md
 .cursorignore

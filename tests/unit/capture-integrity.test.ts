@@ -28,7 +28,6 @@ describe('capture integrity contract', () => {
     }
 
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('gemini')).toBe(true);
-    expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('claude')).toBe(true);
   });
 
   it('keeps capture metadata and merge policies content-free and transient', () => {

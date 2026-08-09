@@ -11,7 +11,6 @@ type SourceLabelMapItem = {
 
 const SOURCE_LABEL_MAP: Record<string, SourceLabelMapItem> = {
   chatgpt: { key: 'chatgpt', i18nKey: 'sourceChatgpt' },
-  claude: { key: 'claude', i18nKey: 'sourceClaude' },
   deepseek: { key: 'deepseek', i18nKey: 'sourceDeepseek' },
   notionai: { key: 'notionai', i18nKey: 'sourceNotionai' },
   gemini: { key: 'gemini', i18nKey: 'sourceGemini' },
@@ -27,8 +26,6 @@ const SOURCE_LABEL_MAP: Record<string, SourceLabelMapItem> = {
 const SOURCE_TONE_CLASS_MAP: Record<string, string> = {
   chatgpt:
     'tw-border-[var(--brand-chatgpt)] tw-bg-[color-mix(in_srgb,var(--brand-chatgpt)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
-  claude:
-    'tw-border-[var(--brand-claude)] tw-bg-[color-mix(in_srgb,var(--brand-claude)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
   deepseek:
     'tw-border-[var(--brand-deepseek)] tw-bg-[color-mix(in_srgb,var(--brand-deepseek)_12%,var(--bg-card))] tw-text-[var(--text-primary)]',
   notionai:
