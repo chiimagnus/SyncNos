@@ -1,5 +1,7 @@
-import Defuddle from 'defuddle';
+import DefuddleModule from 'defuddle';
 import { normalizeText } from '@collectors/web/article-extract/url';
+
+const Defuddle = (DefuddleModule as unknown as { Defuddle?: typeof DefuddleModule }).Defuddle ?? DefuddleModule;
 
 type DefuddleArticlePayload = {
   title: string;
