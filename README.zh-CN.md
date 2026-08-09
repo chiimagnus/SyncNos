@@ -56,7 +56,7 @@
 | z.ai | 自动 |
 | Google AI Studio | 仅手动¹ |
 
-¹ ChatGPT 与 Google AI Studio 使用虚拟列表，明确不进入自动保存。请使用 inpage 保存按钮或 popup 当前页抓取。详见 [WebClipper 数据流](docs/data-flow.md#4-虚拟列表对话的手动完整抓取)。
+¹ ChatGPT 与 Google AI Studio 使用虚拟列表，明确不进入自动保存。请使用 inpage 保存按钮或 popup 当前页抓取。详见 [产品规则](docs/overview.md#不可破坏的产品规则)。
 
 ### 网页文章
 
@@ -85,7 +85,7 @@ YouTube 和 Bilibili 视频页可采集页面已加载的字幕 / 转录内容�
 - **视频字幕采集**：采集 YouTube / Bilibili 已加载字幕，保留完整时间戳。
 - **AI 输入框 `$` 插入**：在支持站点输入 `$`，可搜索本地已保存条目并内联插入 Markdown 片段。
 - **Inpage 快捷动作**：单击页面内按钮可快速保存，双击可打开评论侧边栏。
-- **文章评论线程**：网页文章在 App 与 Inpage 共用本地 threaded discussion；正文选区提交后自动附加到根评论，精确引用使用 panel-scoped passive/active marker，并随 Zip v2 备份恢复与文章同步链路保留。详见[评论架构与限制](docs/modules/comments.md)。
+- **文章评论线程**：网页文章在 App 与 Inpage 共用本地 threaded discussion；正文选区提交后自动附加到根评论，精确引用使用 panel-scoped passive/active marker，并随 Zip v2 备份恢复与文章同步链路保留。详见[产品规则](docs/overview.md#不可破坏的产品规则)。
 - **智能当前页抓取**：popup 会自动判断页面类型并触发“抓取 AI 对话”或“抓取文章”。
 - **图片缓存**：可选开启 AI 对话与网页文章图片本地缓存，支持在详情页手动补全历史 AI 对话图片。
 - **详情页更多菜单**：阅读设置、缓存图片和字数统计等次级操作统一收进右上角更多菜单，正文页头保持更简洁。
