@@ -555,6 +555,7 @@ export const en = {
   feishuTokenExchangeProxyUrlLabel: 'Proxy URL (Worker)',
   feishuAdvancedHint:
     'Enter App ID, then choose one: Worker proxy is safer but requires deployment; App Secret needs no Worker but is stored locally.',
+  feishuReauthorizeHint: '; after changing Feishu OAuth scopes, disconnect and reconnect.',
   feishuWaitingHint: 'Complete Feishu authorization, then return here.',
   syncStopped: 'Sync stopped',
   syncTo: 'Sync to',

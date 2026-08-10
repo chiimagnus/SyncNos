@@ -551,6 +551,7 @@ export const zh: { [K in TranslationKey]: string } = {
   feishuTokenExchangeProxyUrlLabel: '代理 URL（Worker）',
   feishuAdvancedHint:
     '填写 App ID，二选一：Worker 代理更安全但需自行部署；App Secret 无需 Worker，但会保存在本机。',
+  feishuReauthorizeHint: '；修改飞书 OAuth 权限后，请断开并重新连接。',
   feishuWaitingHint: '完成飞书授权后返回此页。',
   syncStopped: '同步已停止',
   syncTo: '同步到',
