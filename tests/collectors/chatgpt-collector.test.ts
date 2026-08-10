@@ -220,6 +220,38 @@ describe('chatgpt-collector', () => {
     expect(assistant.contentText).not.toContain('复制');
   });
 
+  it('keeps ChatGPT source links while omitting their Google favicon images', async () => {
+    const html = `
+      <article data-testid="conversation-turn-1" data-turn-id="turn_favicon">
+        <div data-message-author-role="assistant" data-message-id="m_ai_favicon">
+          <div class="markdown prose">
+            <p>
+              <a href="https://arxiv.org/abs/2312.10997">
+                <span><img src="https://www.google.com/s2/favicons?domain=https://arxiv.org&amp;sz=128" /></span>
+                <span>arXiv</span>
+              </a>
+            </p>
+            <img src="https://example.com/chart.png" />
+          </div>
+        </div>
+      </article>
+    `;
+
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/conv_favicon');
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = (await capturePrepared(createChatgptCollectorDef(env))) as any;
+    const assistant = snap.messages.find((message: any) => message.role === 'assistant');
+    expect(assistant.contentMarkdown).toContain('[arXiv](https://arxiv.org/abs/2312.10997)');
+    expect(assistant.contentMarkdown).not.toContain('www.google.com/s2/favicons');
+    expect(assistant.contentMarkdown).toContain('![](https://example.com/chart.png)');
+  });
+
   it('extracts multiple assistant messages inside an agent-turn container', async () => {
     const html = `
       <div data-message-author-role="user" data-message-id="m_user_1"><div class="whitespace-pre-wrap">Q</div></div>

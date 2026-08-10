@@ -1,7 +1,7 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { appendImageMarkdown, extractImageUrlsFromElement } from '@collectors/collector-utils.ts';
-import chatgptMarkdown from '@collectors/chatgpt/chatgpt-markdown.ts';
+import chatgptMarkdown, { isGoogleFaviconUrl } from '@collectors/chatgpt/chatgpt-markdown.ts';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -288,6 +288,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return element.querySelector('.markdown.prose') || element.querySelector('.markdown') || element;
   }
 
+  function extractChatgptImageUrls(element: ParentNode | null): string[] {
+    return extractImageUrlsFromElement(element).filter((url) => !isGoogleFaviconUrl(url));
+  }
+
   type ChatgptDescriptor = {
     key: string;
     turnKey: string;
@@ -377,9 +381,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         ? chatgptMarkdown.extractAssistantText(el) || fallbackText
         : fallbackText;
     const imageUrls = (() => {
-      const primary = extractImageUrlsFromElement(node || el);
+      const primary = extractChatgptImageUrls(node || el);
       if (!node || node === el) return primary;
-      const secondary = extractImageUrlsFromElement(el);
+      const secondary = extractChatgptImageUrls(el);
       return Array.from(new Set(primary.concat(secondary)));
     })();
 
@@ -450,7 +454,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       if (!key) continue;
       const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
       const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
-      const imageUrls = extractImageUrlsFromElement(wrapper);
+      const imageUrls = extractChatgptImageUrls(wrapper);
       const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
       const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
       const descriptor: ChatgptDescriptor = {
