@@ -249,8 +249,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianAutoSyncEnabled, setObsidianAutoSyncEnabled] = useState(false);
 
   // Backup
-  const [exportStatus, setExportStatus] = useState<string>(t('statusIdle'));
-  const [importStatus, setImportStatus] = useState<string>(t('statusReady'));
+  const [exportStatus, setExportStatus] = useState<string>('');
+  const [importStatus, setImportStatus] = useState<string>('');
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);

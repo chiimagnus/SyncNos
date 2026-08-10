@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement } from 'react';
+import { act, createElement, createRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 import { SETTINGS_SECTION_GROUPS, SETTINGS_SECTIONS } from '../../src/viewmodels/settings/types';
+import { BackupSection } from '../../src/ui/settings/sections/BackupSection';
 import { InpageSection } from '../../src/ui/settings/sections/InpageSection';
 
 describe('settings section definitions', () => {
@@ -235,5 +236,53 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(onAddRule).toHaveBeenCalledTimes(1);
     expect(onRemoveRule).toHaveBeenCalledWith(0);
     expect(onResetRules).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('backup feedback', () => {
+  let root: ReactDOM.Root | null = null;
+
+  beforeEach(() => {
+    setupDom();
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+  });
+
+  afterEach(async () => {
+    act(() => {
+      root?.unmount();
+    });
+    root = null;
+    await flushReactScheduler();
+    cleanupDom();
+  });
+
+  function renderBackup(props: Partial<Parameters<typeof BackupSection>[0]> = {}) {
+    const baseProps: Parameters<typeof BackupSection>[0] = {
+      busy: false,
+      exportStatus: '',
+      importStatus: '',
+      importStats: null,
+      lastBackupExportAt: 0,
+      backupImportRef: createRef<HTMLDivElement>(),
+      fileInputRef: createRef<HTMLInputElement>(),
+      onExport: () => {},
+      onImportFile: () => {},
+    };
+
+    act(() => {
+      root!.render(createElement(BackupSection, { ...baseProps, ...props }));
+    });
+  }
+
+  it('hides empty feedback and shows completed backup feedback', () => {
+    renderBackup();
+    expect(document.body.textContent || '').not.toContain('Idle');
+    expect(document.body.textContent || '').not.toContain('Ready');
+    expect(document.body.textContent || '').not.toContain('last export:');
+
+    renderBackup({ exportStatus: 'Exported', importStatus: 'Imported', lastBackupExportAt: 1 });
+    expect(document.body.textContent || '').toContain('Exported');
+    expect(document.body.textContent || '').toContain('Imported');
+    expect(document.body.textContent || '').toContain('last export:');
   });
 });

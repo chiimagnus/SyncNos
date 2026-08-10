@@ -112,15 +112,6 @@ export function FeishuOAuthSection(props: {
               onChange={(e) => onToggleSyncEnabled(e.target.checked)}
             />
           </SettingsFormRow>
-          {!syncEnabled ? (
-            <div className="tw-mt-2">
-              <SettingsFormRow label="" align="start">
-                <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {t('feishuSyncEnabledHint')}
-                </div>
-              </SettingsFormRow>
-            </div>
-          ) : null}
         </div>
 
         {syncEnabled ? (

@@ -93,14 +93,6 @@ export function ObsidianSettingsSection(props: {
             />
           </SettingsFormRow>
 
-          {!syncEnabled ? (
-            <SettingsFormRow label="" align="start">
-              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                {t('obsidianSyncEnabledHint')}
-              </div>
-            </SettingsFormRow>
-          ) : null}
-
           {syncEnabled ? (
             <SettingsFormRow label={t('obsidianAutoSyncEnabledLabel')}>
               <input

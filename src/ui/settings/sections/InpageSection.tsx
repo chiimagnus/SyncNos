@@ -73,7 +73,7 @@ export function InpageSection(props: {
     <div className="tw-grid tw-gap-4">
       <section className={cardClassName} aria-label={t('languageHeading')}>
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('languageHeading')}</h2>
-        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
+        <div className="tw-mt-2.5">
           <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
             <span className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('languageLabel')}</span>
             <SelectMenu<LocalePreference>
@@ -90,9 +90,6 @@ export function InpageSection(props: {
                 { value: 'zh', label: t('localeChinese') },
               ]}
             />
-          </div>
-          <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-            {t('languageHint')}
           </div>
         </div>
       </section>
@@ -202,10 +199,6 @@ export function InpageSection(props: {
             </span>
           </span>
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatCacheImagesHint')}
-        </div>
-
         <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
           <input
             type="checkbox"
@@ -221,10 +214,6 @@ export function InpageSection(props: {
             </span>
           </span>
         </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('webArticleCacheImagesHint')}
-        </div>
-
         <div className="tw-mt-3">
           <button
             type="button"

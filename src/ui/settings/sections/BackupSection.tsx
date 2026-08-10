@@ -94,15 +94,21 @@ export function BackupSection(props: {
           }}
         />
       </div>
-      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-        {t('exportStatus')} {exportStatus}
-      </div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-        {t('lastExport')} {lastBackupExportAt ? formatTime(lastBackupExportAt) : '—'}
-      </div>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-        {t('importStatus')} {importStatus}
-      </div>
+      {exportStatus ? (
+        <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {exportStatus}
+        </div>
+      ) : null}
+      {lastBackupExportAt ? (
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('lastExport')} {formatTime(lastBackupExportAt)}
+        </div>
+      ) : null}
+      {importStatus ? (
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {importStatus}
+        </div>
+      ) : null}
       <div className="tw-mt-2.5">
         <ImportStatsList stats={importStats} />
       </div>
