@@ -3,6 +3,7 @@ import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import {
   MAX_MIGRATION_FACT_RECORD_BYTES,
+  MAX_NATIVE_IMAGE_SLICE_BYTES,
   LocalDataContractError,
   parseOrderedFrameDigest,
   type JsonObject,
@@ -18,6 +19,7 @@ export const MAX_CANONICAL_RECORD_JSON_CHUNK_BYTES = 128 * 1024;
 const MAX_CANONICAL_JSON_DEPTH = 128;
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const DATA_IMAGE_URL_PATTERN = /^data:(image\/[a-z0-9.+-]+)(?:;charset=[a-z0-9._-]+)?(;base64)?,/i;
+const BASE64_DECODE_INPUT_BYTES = 64 * 1024;
 const SOURCE_LOCAL_ID_PATTERN = /^[1-9][0-9]{0,15}$/;
 const textEncoder = new TextEncoder();
 const strictTextDecoder = new TextDecoder('utf-8', { fatal: true });
@@ -442,41 +444,135 @@ function isBlob(value: unknown): value is Blob {
   return typeof Blob !== 'undefined' && value instanceof Blob;
 }
 
-function normalizeBase64(value: string): string {
-  const compact = value.replace(/\s+/g, '');
-  if (!compact) fail();
-  const paddingAt = compact.indexOf('=');
-  const body = paddingAt < 0 ? compact : compact.slice(0, paddingAt);
-  const padding = paddingAt < 0 ? '' : compact.slice(paddingAt);
-  if (!/^[A-Za-z0-9+/]+$/.test(body) || !/^={0,2}$/.test(padding)) fail();
-  if (padding && compact.length % 4 !== 0) fail();
-  if (padding.length === 1 && body.length % 4 !== 3) fail();
-  if (padding.length === 2 && body.length % 4 !== 2) fail();
-  if (!padding && body.length % 4 === 1) fail();
-  return `${body}${'='.repeat((4 - (body.length % 4)) % 4)}`;
+type Base64PayloadInfo = Readonly<{
+  byteLength: number;
+  normalizedPadding: number;
+}>;
+
+function isBase64Whitespace(value: string): boolean {
+  return /\s/u.test(value);
 }
 
-function base64ByteLength(normalized: string): number {
-  const padding = normalized.endsWith('==') ? 2 : normalized.endsWith('=') ? 1 : 0;
-  return (normalized.length / 4) * 3 - padding;
+function isBase64Character(value: string): boolean {
+  return BASE64_ALPHABET.includes(value);
 }
 
-function decodeBase64(normalized: string): Uint8Array {
-  const byteLength = base64ByteLength(normalized);
-  const bytes = new Uint8Array(byteLength);
-  let outputIndex = 0;
-  for (let index = 0; index < normalized.length; index += 4) {
-    const a = BASE64_ALPHABET.indexOf(normalized[index]!);
-    const b = BASE64_ALPHABET.indexOf(normalized[index + 1]!);
-    const c = normalized[index + 2] === '=' ? 0 : BASE64_ALPHABET.indexOf(normalized[index + 2]!);
-    const d = normalized[index + 3] === '=' ? 0 : BASE64_ALPHABET.indexOf(normalized[index + 3]!);
-    if (a < 0 || b < 0 || c < 0 || d < 0) fail();
-    const value = (a << 18) | (b << 12) | (c << 6) | d;
-    if (outputIndex < bytes.length) bytes[outputIndex++] = (value >>> 16) & 0xff;
-    if (outputIndex < bytes.length) bytes[outputIndex++] = (value >>> 8) & 0xff;
-    if (outputIndex < bytes.length) bytes[outputIndex++] = value & 0xff;
+function analyzeBase64Payload(value: string): Base64PayloadInfo {
+  let bodyLength = 0;
+  let compactLength = 0;
+  let paddingLength = 0;
+  let sawPadding = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+    if (isBase64Whitespace(character)) continue;
+    compactLength += 1;
+    if (character === '=') {
+      sawPadding = true;
+      paddingLength += 1;
+      if (paddingLength > 2) fail();
+      continue;
+    }
+    if (sawPadding || !isBase64Character(character)) fail();
+    bodyLength += 1;
   }
-  return bytes;
+
+  if (!compactLength || !bodyLength) fail();
+
+  let normalizedPadding = paddingLength;
+  let normalizedLength = compactLength;
+  if (paddingLength) {
+    if (compactLength % 4 !== 0) fail();
+    if ((paddingLength === 1 && bodyLength % 4 !== 3) || (paddingLength === 2 && bodyLength % 4 !== 2)) fail();
+  } else {
+    if (bodyLength % 4 === 1) fail();
+    normalizedPadding = (4 - (bodyLength % 4)) % 4;
+    normalizedLength = bodyLength + normalizedPadding;
+  }
+
+  const byteLength = (normalizedLength / 4) * 3 - normalizedPadding;
+  if (!Number.isSafeInteger(byteLength) || byteLength <= 0) fail();
+  if (byteLength > MAX_MIGRATION_FACT_RECORD_BYTES) fail('PAYLOAD_TOO_LARGE');
+  return Object.freeze({ byteLength, normalizedPadding });
+}
+
+function hexByte(value: string, index: number): number {
+  if (index + 2 >= value.length) fail();
+  const parsed = Number.parseInt(value.slice(index + 1, index + 3), 16);
+  if (!Number.isSafeInteger(parsed) || !/^[0-9a-f]{2}$/i.test(value.slice(index + 1, index + 3))) fail();
+  return parsed;
+}
+
+function* decodedPercentUtf8Text(value: string): Generator<string> {
+  if (hasUnpairedSurrogate(value)) fail();
+
+  let index = 0;
+  let literalStart = 0;
+  while (index < value.length) {
+    if (value[index] !== '%') {
+      const codeUnit = value.charCodeAt(index);
+      index += codeUnit >= 0xd800 && codeUnit <= 0xdbff ? 2 : 1;
+      continue;
+    }
+
+    if (literalStart < index) yield value.slice(literalStart, index);
+
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    const input = new Uint8Array(BASE64_DECODE_INPUT_BYTES);
+    let inputLength = 0;
+    const flush = (stream: boolean): string => {
+      try {
+        const decoded = inputLength ? decoder.decode(input.subarray(0, inputLength), { stream }) : '';
+        inputLength = 0;
+        return decoded;
+      } catch (_error) {
+        fail();
+      }
+    };
+
+    while (index < value.length && value[index] === '%') {
+      input[inputLength++] = hexByte(value, index);
+      index += 3;
+      if (inputLength === input.byteLength) {
+        const decoded = flush(true);
+        if (decoded) yield decoded;
+      }
+    }
+
+    const decoded = flush(true);
+    if (decoded) yield decoded;
+    try {
+      const trailing = decoder.decode();
+      if (trailing) yield trailing;
+    } catch (_error) {
+      fail();
+    }
+    literalStart = index;
+  }
+
+  if (literalStart < value.length) yield value.slice(literalStart);
+}
+
+function utf8TextByteLength(value: string): number {
+  let byteLength = 0;
+  for (let index = 0; index < value.length; ) {
+    const part = utf8CodePointByteLength(value, index);
+    byteLength += part.byteLength;
+    if (!Number.isSafeInteger(byteLength) || byteLength > MAX_MIGRATION_FACT_RECORD_BYTES) fail('PAYLOAD_TOO_LARGE');
+    index = part.nextIndex;
+  }
+  return byteLength;
+}
+
+function percentUtf8PayloadByteLength(value: string): number {
+  let byteLength = 0;
+  for (const text of decodedPercentUtf8Text(value)) {
+    const nextLength = utf8TextByteLength(text);
+    if (byteLength > MAX_MIGRATION_FACT_RECORD_BYTES - nextLength) fail('PAYLOAD_TOO_LARGE');
+    byteLength += nextLength;
+  }
+  if (!byteLength) fail();
+  return byteLength;
 }
 
 function parseDataImageUrl(value: unknown): Extract<MigrationImageByteSource, { kind: 'data-url' }> {
@@ -488,20 +584,10 @@ function parseDataImageUrl(value: unknown): Extract<MigrationImageByteSource, { 
   const contentType = parseImageContentType(matched[1]);
   const payload = dataUrl.slice(commaAt + 1);
   if (matched[2]) {
-    const normalized = normalizeBase64(payload);
-    const byteLength = base64ByteLength(normalized);
-    if (!byteLength || byteLength > MAX_MIGRATION_FACT_RECORD_BYTES) fail(byteLength ? 'PAYLOAD_TOO_LARGE' : undefined);
-    return Object.freeze({ kind: 'data-url', contentType, byteLength, encoding: 'base64', payload: normalized });
+    const base64 = analyzeBase64Payload(payload);
+    return Object.freeze({ kind: 'data-url', contentType, byteLength: base64.byteLength, encoding: 'base64', payload });
   }
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(payload);
-  } catch (_error) {
-    fail();
-  }
-  if (hasUnpairedSurrogate(decoded)) fail();
-  const byteLength = textEncoder.encode(decoded).byteLength;
-  if (!byteLength || byteLength > MAX_MIGRATION_FACT_RECORD_BYTES) fail(byteLength ? 'PAYLOAD_TOO_LARGE' : undefined);
+  const byteLength = percentUtf8PayloadByteLength(payload);
   return Object.freeze({ kind: 'data-url', contentType, byteLength, encoding: 'percent-utf8', payload });
 }
 
@@ -884,32 +970,214 @@ export function prepareMigrationImageFact(input: { row: unknown; sourceLocalId: 
   return Object.freeze({ bytes, record: result });
 }
 
-export async function materializeMigrationImageBytes(source: MigrationImageByteSource): Promise<Uint8Array> {
-  let bytes: Uint8Array;
-  if (source.kind === 'blob') {
-    bytes = new Uint8Array(await source.blob.arrayBuffer());
-  } else if (source.kind === 'view') {
-    bytes = Uint8Array.from(source.view);
-  } else if (source.encoding === 'base64') {
-    bytes = decodeBase64(source.payload);
-  } else {
-    let text: string;
-    try {
-      text = decodeURIComponent(source.payload);
-    } catch (_error) {
-      fail();
-    }
-    bytes = textEncoder.encode(text);
+class BinarySliceWriter {
+  private buffer: Uint8Array;
+  private length = 0;
+
+  constructor(private readonly maximumChunkBytes: number) {
+    this.buffer = new Uint8Array(maximumChunkBytes);
   }
-  if (bytes.byteLength !== source.byteLength) fail();
-  return bytes;
+
+  writeByte(value: number): Uint8Array | null {
+    if (!Number.isSafeInteger(value) || value < 0 || value > 0xff) fail();
+    let completed: Uint8Array | null = null;
+    if (this.length === this.buffer.byteLength) {
+      completed = this.buffer;
+      this.buffer = new Uint8Array(this.maximumChunkBytes);
+      this.length = 0;
+    }
+    this.buffer[this.length++] = value;
+    return completed;
+  }
+
+  finish(): Uint8Array | null {
+    if (!this.length) return null;
+    return this.buffer.slice(0, this.length);
+  }
 }
 
-export async function digestMigrationImageBytes(
+class Utf8SliceWriter {
+  private buffer: Uint8Array;
+  private length = 0;
+
+  constructor(private readonly maximumChunkBytes: number) {
+    this.buffer = new Uint8Array(maximumChunkBytes);
+  }
+
+  private appendEncoded(value: string): void {
+    if (!value) return;
+    const encoded = textEncoder.encode(value);
+    if (!encoded.byteLength || encoded.byteLength > this.buffer.byteLength - this.length) fail();
+    this.buffer.set(encoded, this.length);
+    this.length += encoded.byteLength;
+  }
+
+  private takeBuffer(): Uint8Array {
+    if (!this.length) fail();
+    const completed = this.buffer.slice(0, this.length);
+    this.buffer = new Uint8Array(this.maximumChunkBytes);
+    this.length = 0;
+    return completed;
+  }
+
+  write(value: string): Uint8Array[] {
+    const completed: Uint8Array[] = [];
+    let start = 0;
+    let index = 0;
+    let pendingByteLength = 0;
+    while (index < value.length) {
+      const part = utf8CodePointByteLength(value, index);
+      if (part.byteLength > this.maximumChunkBytes) fail();
+      if (pendingByteLength + part.byteLength > this.buffer.byteLength - this.length) {
+        this.appendEncoded(value.slice(start, index));
+        if (this.length) completed.push(this.takeBuffer());
+        start = index;
+        pendingByteLength = 0;
+        continue;
+      }
+      pendingByteLength += part.byteLength;
+      index = part.nextIndex;
+    }
+    this.appendEncoded(value.slice(start, index));
+    return completed;
+  }
+
+  finish(): Uint8Array | null {
+    return this.length ? this.takeBuffer() : null;
+  }
+}
+
+function assertMigrationImageByteSource(source: MigrationImageByteSource, maximumChunkBytes: number): number {
+  if (
+    !source ||
+    typeof source !== 'object' ||
+    !Number.isSafeInteger(source.byteLength) ||
+    source.byteLength <= 0 ||
+    source.byteLength > MAX_MIGRATION_FACT_RECORD_BYTES ||
+    !Number.isSafeInteger(maximumChunkBytes) ||
+    maximumChunkBytes <= 0 ||
+    maximumChunkBytes > MAX_NATIVE_IMAGE_SLICE_BYTES ||
+    parseImageContentType(source.contentType) !== source.contentType
+  ) {
+    fail(source?.byteLength && source.byteLength > MAX_MIGRATION_FACT_RECORD_BYTES ? 'PAYLOAD_TOO_LARGE' : undefined);
+  }
+  return source.byteLength;
+}
+
+function* streamBase64DataUrlBytes(value: string, maximumChunkBytes: number): Generator<Uint8Array> {
+  const info = analyzeBase64Payload(value);
+  const writer = new BinarySliceWriter(maximumChunkBytes);
+  let group = '';
+  let outputLength = 0;
+
+  const emitByte = (byte: number): Uint8Array | null => {
+    outputLength += 1;
+    if (outputLength > info.byteLength) fail();
+    return writer.writeByte(byte);
+  };
+
+  const emitGroup = function* (base64Group: string): Generator<Uint8Array> {
+    if (base64Group.length !== 4) fail();
+    const a = BASE64_ALPHABET.indexOf(base64Group[0]!);
+    const b = BASE64_ALPHABET.indexOf(base64Group[1]!);
+    const c = base64Group[2] === '=' ? 0 : BASE64_ALPHABET.indexOf(base64Group[2]!);
+    const d = base64Group[3] === '=' ? 0 : BASE64_ALPHABET.indexOf(base64Group[3]!);
+    if (a < 0 || b < 0 || c < 0 || d < 0) fail();
+    const packed = (a << 18) | (b << 12) | (c << 6) | d;
+    const first = emitByte((packed >>> 16) & 0xff);
+    if (first) yield first;
+    if (base64Group[2] !== '=') {
+      const second = emitByte((packed >>> 8) & 0xff);
+      if (second) yield second;
+    }
+    if (base64Group[3] !== '=') {
+      const third = emitByte(packed & 0xff);
+      if (third) yield third;
+    }
+  };
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+    if (isBase64Whitespace(character)) continue;
+    group += character;
+    if (group.length === 4) {
+      yield* emitGroup(group);
+      group = '';
+    }
+  }
+  if (group) {
+    group += '='.repeat(info.normalizedPadding);
+    yield* emitGroup(group);
+  }
+  if (outputLength !== info.byteLength) fail();
+  const finalSlice = writer.finish();
+  if (finalSlice) yield finalSlice;
+}
+
+function* streamPercentUtf8DataUrlBytes(value: string, maximumChunkBytes: number): Generator<Uint8Array> {
+  const writer = new Utf8SliceWriter(maximumChunkBytes);
+  let outputLength = 0;
+  for (const text of decodedPercentUtf8Text(value)) {
+    for (const completed of writer.write(text)) {
+      outputLength += completed.byteLength;
+      if (outputLength > MAX_MIGRATION_FACT_RECORD_BYTES) fail('PAYLOAD_TOO_LARGE');
+      yield completed;
+    }
+  }
+  const finalSlice = writer.finish();
+  if (finalSlice) {
+    outputLength += finalSlice.byteLength;
+    if (outputLength > MAX_MIGRATION_FACT_RECORD_BYTES) fail('PAYLOAD_TOO_LARGE');
+    yield finalSlice;
+  }
+  if (!outputLength) fail();
+}
+
+/**
+ * Iterates one already validated image source without retaining the full raw asset.
+ * Call only after the IndexedDB transaction that supplied the source has completed.
+ */
+export async function* streamMigrationImageBytes(
   source: MigrationImageByteSource,
-  provider: DigestProvider,
-): Promise<string> {
-  return await sha256Hex(provider, await materializeMigrationImageBytes(source));
+  maximumChunkBytes = MAX_NATIVE_IMAGE_SLICE_BYTES,
+): AsyncGenerator<Uint8Array> {
+  const declaredByteLength = assertMigrationImageByteSource(source, maximumChunkBytes);
+  let outputLength = 0;
+
+  const checkedSlice = (slice: Uint8Array): Uint8Array => {
+    if (!(slice instanceof Uint8Array) || !slice.byteLength) fail();
+    if (slice.byteLength > maximumChunkBytes || outputLength > declaredByteLength - slice.byteLength) fail();
+    outputLength += slice.byteLength;
+    return slice;
+  };
+
+  if (source.kind === 'blob') {
+    if (!isBlob(source.blob) || source.blob.size !== declaredByteLength) fail();
+    for (let offset = 0; offset < declaredByteLength; offset += maximumChunkBytes) {
+      const nextOffset = Math.min(declaredByteLength, offset + maximumChunkBytes);
+      const slice = new Uint8Array(await source.blob.slice(offset, nextOffset).arrayBuffer());
+      if (slice.byteLength !== nextOffset - offset) fail();
+      yield checkedSlice(slice);
+    }
+  } else if (source.kind === 'view') {
+    if (!(source.view instanceof Uint8Array) || source.view.byteLength !== declaredByteLength) fail();
+    for (let offset = 0; offset < declaredByteLength; offset += maximumChunkBytes) {
+      yield checkedSlice(source.view.subarray(offset, Math.min(declaredByteLength, offset + maximumChunkBytes)));
+    }
+  } else if (source.kind === 'data-url') {
+    if (typeof source.payload !== 'string') fail();
+    const iterator =
+      source.encoding === 'base64'
+        ? streamBase64DataUrlBytes(source.payload, maximumChunkBytes)
+        : source.encoding === 'percent-utf8'
+          ? streamPercentUtf8DataUrlBytes(source.payload, maximumChunkBytes)
+          : fail();
+    for (const slice of iterator) yield checkedSlice(slice);
+  } else {
+    fail();
+  }
+
+  if (outputLength !== declaredByteLength) fail();
 }
 
 export function createMigrationCommentOccurrenceTracker(): MigrationCommentOccurrenceTracker {

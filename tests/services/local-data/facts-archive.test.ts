@@ -14,17 +14,18 @@ import {
   decodeCanonicalJson,
   decodeMigrationFactRecord,
   decideMigrationCommentMerge,
-  digestMigrationImageBytes,
   encodeCanonicalJson,
   encodeMigrationFactRecord,
-  materializeMigrationImageBytes,
   mergeMigrationConversationPayload,
   mergeMigrationMessagePayload,
   mergeMigrationSyncMappingPayload,
   prepareMigrationImageFact,
   splitCanonicalJsonText,
+  streamMigrationImageBytes,
+  type MigrationImageByteSource,
   verifyMigrationCommentFact,
 } from '@services/local-data/facts-archive';
+import { sha256Hex } from '@services/local-data/digest';
 import { nodeDigestProvider } from '../../../packages/syncnoscli/src/runtime/node-digest';
 
 const conversationIdentities = new Map([
@@ -68,6 +69,22 @@ function comment(overrides: Record<string, unknown> = {}) {
     updatedAt: 2,
     ...overrides,
   };
+}
+
+async function collectMigrationImageBytes(source: MigrationImageByteSource): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  for await (const slice of streamMigrationImageBytes(source)) {
+    chunks.push(slice);
+    byteLength += slice.byteLength;
+  }
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 describe('local facts archive', () => {
@@ -214,9 +231,9 @@ describe('local facts archive', () => {
       expect(item.record.payload).not.toHaveProperty('conversationId');
       expect(item.record.payload).not.toHaveProperty('blob');
       expect(item.record.payload).not.toHaveProperty('dataUrl');
-      expect(await materializeMigrationImageBytes(item.bytes)).toEqual(raw);
-      expect(await digestMigrationImageBytes(item.bytes, nodeDigestProvider)).toBe(
-        await digestMigrationImageBytes(prepared[0]!.bytes, nodeDigestProvider),
+      expect(await collectMigrationImageBytes(item.bytes)).toEqual(raw);
+      expect(await sha256Hex(nodeDigestProvider, await collectMigrationImageBytes(item.bytes))).toBe(
+        await sha256Hex(nodeDigestProvider, await collectMigrationImageBytes(prepared[0]!.bytes)),
       );
     }
     expect(prepared[0]!.record.payload).toMatchObject({ unknown: { keep: true } });
@@ -232,8 +249,44 @@ describe('local facts archive', () => {
         unknown: { nested: 'x'.repeat(513 * 1024) },
       },
     });
-    expect(await materializeMigrationImageBytes(percentEncoded.bytes)).toEqual(new TextEncoder().encode('你好'));
+    expect(await collectMigrationImageBytes(percentEncoded.bytes)).toEqual(new TextEncoder().encode('你好'));
     expect((percentEncoded.record.payload.unknown as { nested: string }).nested).toHaveLength(513 * 1024);
+  });
+
+  it('streams data URL bytes in bounded Base64 and UTF-8-safe percent slices', async () => {
+    const base64 = prepareMigrationImageFact({
+      sourceLocalId: 6,
+      row: {
+        id: 6,
+        conversationId: 10,
+        url: 'https://example.com/base64-stream.png',
+        dataUrl: 'data:image/png;base64,AQID\nBAU',
+        contentType: 'image/png',
+      },
+    });
+    const percentText = '你好😀'.repeat(8);
+    const percent = prepareMigrationImageFact({
+      sourceLocalId: 7,
+      row: {
+        id: 7,
+        conversationId: 10,
+        url: 'https://example.com/percent-stream.png',
+        dataUrl: `data:image/png,${encodeURIComponent(percentText)}`,
+        contentType: 'image/png',
+      },
+    });
+
+    const base64Slices: Uint8Array[] = [];
+    for await (const slice of streamMigrationImageBytes(base64.bytes, 4)) base64Slices.push(slice);
+    expect(base64Slices.every((slice) => slice.byteLength <= 4)).toBe(true);
+    expect(Uint8Array.from(base64Slices.flatMap((slice) => [...slice]))).toEqual(Uint8Array.from([1, 2, 3, 4, 5]));
+
+    const percentSlices: Uint8Array[] = [];
+    for await (const slice of streamMigrationImageBytes(percent.bytes, 7)) percentSlices.push(slice);
+    expect(percentSlices.every((slice) => slice.byteLength <= 7)).toBe(true);
+    expect(percentSlices.map((slice) => new TextDecoder('utf-8', { fatal: true }).decode(slice)).join('')).toBe(
+      percentText,
+    );
   });
 
   it('accepts one image exactly at the 64 MiB migration ceiling without creating an archive array', () => {

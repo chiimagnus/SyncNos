@@ -1,5 +1,14 @@
 export const DB_NAME = 'webclipper';
 export const DB_VERSION = 8;
+export const FACTS_IDB_STORE_NAMES = Object.freeze([
+  'conversations',
+  'sync_mappings',
+  'messages',
+  'image_cache',
+  'article_comments',
+] as const);
+
+export type FactsIdbStoreName = (typeof FACTS_IDB_STORE_NAMES)[number];
 
 type MigrationContext = {
   db: IDBDatabase;
