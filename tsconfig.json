@@ -15,5 +15,5 @@
     },
     "jsx": "react-jsx"
   },
-  "exclude": ["dist", "dist-edge", "dist-firefox", ".output", "node_modules"]
+  "exclude": ["packages", "dist", "dist-edge", "dist-firefox", ".output", "node_modules"]
 }

@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["tests", "dist", "dist-edge", "dist-firefox", ".output", "node_modules"]
+  "exclude": ["packages", "tests", "dist", "dist-edge", "dist-firefox", ".output", "node_modules"]
 }

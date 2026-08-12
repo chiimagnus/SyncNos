@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "baseUrl": "../..",
+    "paths": {
+      "@services/*": ["src/services/*"],
+      "@platform/*": ["src/platform/*"],
+      "@collectors/*": ["src/collectors/*"],
+      "@entrypoints/*": ["src/entrypoints/*"],
+      "@ui/*": ["src/ui/*"],
+      "@viewmodels/*": ["src/viewmodels/*"],
+      "@i18n": ["src/ui/i18n/index.ts"],
+      "@i18n/*": ["src/ui/i18n/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

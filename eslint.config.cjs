@@ -13,6 +13,7 @@ module.exports = [
       '.safari-xcode/**',
       'dist/**',
       'dist-firefox/**',
+      'packages/syncnoscli/dist/**',
       'node_modules/**',
       '_temp/**',
       'cloudflare-workers/**',
@@ -24,7 +25,7 @@ module.exports = [
   ...tseslint.configs.recommended,
 
   {
-    files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}', 'packages/syncnoscli/src/**/*.ts'],
     plugins: {
       react,
       'react-hooks': reactHooks,
@@ -97,7 +98,7 @@ module.exports = [
   },
 
   {
-    files: ['tests/**/*.{ts,tsx}'],
+    files: ['tests/**/*.{ts,tsx}', 'tests/syncnoscli/**/*.ts'],
     rules: {
       // Tests sometimes embed escape-heavy strings; keep the rule enabled for src when re-enabled.
       'no-useless-escape': 'off',

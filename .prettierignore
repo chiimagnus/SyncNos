@@ -1,5 +1,6 @@
 node_modules
 .output
+packages/syncnoscli/dist
 .wxt
 cloudflare-workers/.wrangler
 cloudflare-workers/.dev.vars
