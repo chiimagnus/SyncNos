@@ -8,10 +8,14 @@ import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
   MAX_CAPTURE_SNAPSHOT_BYTES,
+  MAX_MIGRATION_PROFILE_QUEUE_ITEMS,
+  MAX_MIGRATION_PROFILE_REFERENCE_PATCH_BYTES,
   MAX_NATIVE_IMAGE_SLICE_BYTES,
   MAX_SEARCH_QUERY_SCALARS,
   MAX_STREAM_FRAME_BYTES,
   MAX_ZIP_STREAM_BYTES,
+  MIGRATION_JOURNAL_STAGES,
+  MIGRATION_PROFILE_PROVIDERS,
   LocalDataContractError,
   assertFactsEpochMatches,
   assertStreamChunkWithinLimits,
@@ -23,11 +27,14 @@ import {
   normalizeSearchQuery,
   parseBrowserRuntimeFactsRequest,
   parseCliFactsRequest,
+  parseMigrationJournalStage,
+  parseMigrationProfileReferencePatch,
   parseLocalDataError,
   parseHostFactsRequest,
   parsePlainSnippetHighlights,
   parseStreamDescriptor,
   serializedJsonUtf8ByteLength,
+  serializeMigrationProfileReferencePatch,
 } from '@services/local-data/contracts';
 import { FACT_STREAM_KINDS, createFactsManifest, parseFactsManifest } from '@services/local-data/facts-manifest';
 
@@ -358,6 +365,122 @@ describe('local data contracts', () => {
     expect(browser).toMatchObject({ ok: true, factsEpoch: `native:${MIGRATION_A}` });
     expect(host).not.toHaveProperty('factsEpoch');
     expect(cli).not.toHaveProperty('factsEpoch');
+  });
+
+  it('keeps profile migration patches bounded, reference-free, and canonically ordered', () => {
+    expect(Object.isFrozen(MIGRATION_JOURNAL_STAGES)).toBe(true);
+    expect(MIGRATION_JOURNAL_STAGES).toEqual([
+      'not_started',
+      'staging',
+      'remote_committed',
+      'profile_refs_pending',
+      'cleanup_pending',
+      'active',
+    ]);
+    expect(MIGRATION_PROFILE_PROVIDERS).toEqual(['notion', 'obsidian', 'feishu']);
+    expect(parseMigrationJournalStage('cleanup_pending')).toBe('cleanup_pending');
+    expectErrorCode(() => parseMigrationJournalStage('rollback'), 'INVALID_ARGUMENT');
+
+    const patch = {
+      version: 1,
+      queues: {
+        notion: [
+          { source: 'chatgpt', conversationKey: 'conversation-z', dueAt: 50 },
+          { source: 'chatgpt', conversationKey: 'conversation-a', dueAt: 10 },
+        ],
+        obsidian: [],
+        feishu: [],
+      },
+      syncJobs: {
+        notion: {
+          provider: 'notion',
+          status: 'aborted',
+          startedAt: 1,
+          updatedAt: 2,
+          finishedAt: 3,
+          okCount: 4,
+          failCount: 5,
+          abortedReason: 'local_data_migration',
+        },
+        obsidian: {
+          provider: 'obsidian',
+          status: 'done',
+          startedAt: 1,
+          updatedAt: 2,
+          finishedAt: 3,
+          okCount: 4,
+          failCount: 5,
+        },
+        feishu: {
+          provider: 'feishu',
+          status: 'done',
+          startedAt: 1,
+          updatedAt: 2,
+          finishedAt: 3,
+          okCount: 4,
+          failCount: 5,
+        },
+      },
+    };
+    const parsed = parseMigrationProfileReferencePatch(patch);
+    expect(Object.isFrozen(parsed)).toBe(true);
+    expect(parsed.queues.notion.map((entry) => entry.conversationKey)).toEqual(['conversation-a', 'conversation-z']);
+    const serialized = serializeMigrationProfileReferencePatch(patch);
+    expect(serialized).toBe(serializeMigrationProfileReferencePatch(parsed));
+    expect(serialized).not.toMatch(/conversationId|backendConversationId|title|url|token|oauth|warning|result/i);
+
+    expectErrorCode(
+      () =>
+        parseMigrationProfileReferencePatch({
+          ...patch,
+          queues: {
+            ...patch.queues,
+            notion: [...patch.queues.notion, { source: 'chatgpt', conversationKey: 'conversation-a', dueAt: 99 }],
+          },
+        }),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () =>
+        parseMigrationProfileReferencePatch({
+          ...patch,
+          queues: {
+            ...patch.queues,
+            notion: [{ ...patch.queues.notion[0], conversationId: 1 }],
+          },
+        }),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () =>
+        parseMigrationProfileReferencePatch({
+          ...patch,
+          syncJobs: {
+            ...patch.syncJobs,
+            notion: { ...patch.syncJobs.notion, status: 'running' },
+          },
+        }),
+      'INVALID_ARGUMENT',
+    );
+
+    const tooMany = structuredClone(patch);
+    tooMany.queues.notion = Array.from({ length: MAX_MIGRATION_PROFILE_QUEUE_ITEMS + 1 }, (_, index) => ({
+      source: 'chatgpt',
+      conversationKey: `conversation-${index}`,
+      dueAt: index + 1,
+    }));
+    expectErrorCode(() => parseMigrationProfileReferencePatch(tooMany), 'INVALID_ARGUMENT');
+
+    const oversized = structuredClone(patch);
+    for (const provider of MIGRATION_PROFILE_PROVIDERS) {
+      oversized.queues[provider] = Array.from({ length: MAX_MIGRATION_PROFILE_QUEUE_ITEMS }, (_, index) => ({
+        source: `source-${index}`,
+        conversationKey: `${'😀'.repeat(1_020)}-${index}`,
+        dueAt: index + 1,
+      }));
+    }
+    expectErrorCode(() => parseMigrationProfileReferencePatch(oversized), 'PAYLOAD_TOO_LARGE');
+    expect(MAX_MIGRATION_PROFILE_REFERENCE_PATCH_BYTES).toBe(2 * 1024 * 1024);
   });
 
   it('keeps the migration manifest compact, ordered, and receipt-verifiable', () => {

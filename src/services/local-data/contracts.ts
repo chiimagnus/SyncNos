@@ -137,14 +137,18 @@ const RECEIVED_VERSION_DIAGNOSTIC_KEYS = new Set<LocalDataDiagnosticKey>([
   'receivedProtocolVersion',
 ]);
 
-const MIGRATION_DIAGNOSTIC_STAGES = [
+export const MIGRATION_JOURNAL_STAGES = Object.freeze([
   'not_started',
   'staging',
   'remote_committed',
   'profile_refs_pending',
   'cleanup_pending',
   'active',
-] as const;
+] as const);
+
+export type MigrationJournalStage = (typeof MIGRATION_JOURNAL_STAGES)[number];
+
+const MIGRATION_DIAGNOSTIC_STAGES = MIGRATION_JOURNAL_STAGES;
 
 export class LocalDataContractError extends Error {
   readonly code: LocalDataErrorCode;
@@ -374,6 +378,179 @@ export function assertFactsEpochMatches(expected: FactsEpoch, received: unknown)
   }
   if (actual !== expected) fail('STALE_BACKEND_EPOCH');
   return actual;
+}
+
+export const MIGRATION_PROFILE_REFERENCE_PATCH_VERSION = 1 as const;
+export const MIGRATION_PROFILE_PROVIDERS = Object.freeze(['notion', 'obsidian', 'feishu'] as const);
+export const MAX_MIGRATION_PROFILE_QUEUE_ITEMS = 200;
+export const MAX_MIGRATION_PROFILE_REFERENCE_PATCH_BYTES = 2 * MEBIBYTE;
+
+export type MigrationProfileProvider = (typeof MIGRATION_PROFILE_PROVIDERS)[number];
+
+export type MigrationProfileQueueEntry = Readonly<{
+  conversationKey: string;
+  dueAt: number;
+  source: string;
+}>;
+
+export type MigrationReferenceFreeSyncJob =
+  | Readonly<{
+      failCount: number;
+      finishedAt: number;
+      okCount: number;
+      provider: MigrationProfileProvider;
+      startedAt: number;
+      status: 'done';
+      updatedAt: number;
+    }>
+  | Readonly<{
+      abortedReason: 'local_data_migration';
+      failCount: number;
+      finishedAt: number;
+      okCount: number;
+      provider: MigrationProfileProvider;
+      startedAt: number;
+      status: 'aborted';
+      updatedAt: number;
+    }>;
+
+export type MigrationProfileReferencePatch = Readonly<{
+  queues: Readonly<Record<MigrationProfileProvider, readonly MigrationProfileQueueEntry[]>>;
+  syncJobs: Readonly<Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob>>;
+  version: typeof MIGRATION_PROFILE_REFERENCE_PATCH_VERSION;
+}>;
+
+export function parseMigrationJournalStage(value: unknown): MigrationJournalStage {
+  return parseEnum(value, MIGRATION_JOURNAL_STAGES);
+}
+
+function parseMigrationProfileProvider(value: unknown): MigrationProfileProvider {
+  return parseEnum(value, MIGRATION_PROFILE_PROVIDERS);
+}
+
+function parseMigrationProfileText(value: unknown, maximumLength: number): string {
+  const text = parseText(value, maximumLength);
+  if (hasUnpairedSurrogate(text)) fail();
+  return text;
+}
+
+function compareMigrationProfileQueueEntries(
+  left: MigrationProfileQueueEntry,
+  right: MigrationProfileQueueEntry,
+): number {
+  if (left.source !== right.source) return left.source < right.source ? -1 : 1;
+  if (left.conversationKey !== right.conversationKey) return left.conversationKey < right.conversationKey ? -1 : 1;
+  return left.dueAt - right.dueAt;
+}
+
+function parseMigrationProfileQueueEntry(value: unknown): MigrationProfileQueueEntry {
+  const input = record(value);
+  exactKeys(input, ['source', 'conversationKey', 'dueAt']);
+  return Object.freeze({
+    source: parseMigrationProfileText(input.source, 256),
+    conversationKey: parseMigrationProfileText(input.conversationKey, 2048),
+    dueAt: parsePositiveSafeInteger(input.dueAt),
+  });
+}
+
+function parseMigrationProfileQueues(
+  value: unknown,
+): Readonly<Record<MigrationProfileProvider, readonly MigrationProfileQueueEntry[]>> {
+  const input = record(value);
+  exactKeys(input, MIGRATION_PROFILE_PROVIDERS);
+  const queues = {} as Record<MigrationProfileProvider, readonly MigrationProfileQueueEntry[]>;
+  for (const provider of MIGRATION_PROFILE_PROVIDERS) {
+    const rows = input[provider];
+    if (!Array.isArray(rows) || rows.length > MAX_MIGRATION_PROFILE_QUEUE_ITEMS) fail();
+    const entries = rows.map(parseMigrationProfileQueueEntry);
+    const identities = new Set<string>();
+    for (const entry of entries) {
+      const identity = `${entry.source}\u0000${entry.conversationKey}`;
+      if (identities.has(identity)) fail();
+      identities.add(identity);
+    }
+    entries.sort(compareMigrationProfileQueueEntries);
+    queues[provider] = Object.freeze(entries);
+  }
+  return Object.freeze(queues);
+}
+
+function parseMigrationReferenceFreeSyncJob(
+  value: unknown,
+  provider: MigrationProfileProvider,
+): MigrationReferenceFreeSyncJob {
+  const input = record(value);
+  const status = input.status;
+  if (status !== 'done' && status !== 'aborted') fail();
+  exactKeys(
+    input,
+    status === 'done'
+      ? ['provider', 'status', 'startedAt', 'updatedAt', 'finishedAt', 'okCount', 'failCount']
+      : ['provider', 'status', 'startedAt', 'updatedAt', 'finishedAt', 'okCount', 'failCount', 'abortedReason'],
+  );
+  if (parseMigrationProfileProvider(input.provider) !== provider) fail();
+  const startedAt = parseNonNegativeSafeInteger(input.startedAt);
+  const updatedAt = parseNonNegativeSafeInteger(input.updatedAt);
+  const finishedAt = parseNonNegativeSafeInteger(input.finishedAt);
+  const okCount = parseNonNegativeSafeInteger(input.okCount);
+  const failCount = parseNonNegativeSafeInteger(input.failCount);
+  if (startedAt > updatedAt || updatedAt > finishedAt) fail();
+  if (status === 'done') {
+    return Object.freeze({ provider, status, startedAt, updatedAt, finishedAt, okCount, failCount });
+  }
+  if (input.abortedReason !== 'local_data_migration') fail();
+  return Object.freeze({
+    provider,
+    status,
+    startedAt,
+    updatedAt,
+    finishedAt,
+    okCount,
+    failCount,
+    abortedReason: 'local_data_migration',
+  });
+}
+
+function parseMigrationReferenceFreeSyncJobs(
+  value: unknown,
+): Readonly<Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob>> {
+  const input = record(value);
+  exactKeys(input, MIGRATION_PROFILE_PROVIDERS);
+  const jobs = {} as Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob>;
+  for (const provider of MIGRATION_PROFILE_PROVIDERS) {
+    jobs[provider] = parseMigrationReferenceFreeSyncJob(input[provider], provider);
+  }
+  return Object.freeze(jobs);
+}
+
+function parseMigrationProfileReferencePatchInternal(value: unknown): MigrationProfileReferencePatch {
+  const input = record(value);
+  exactKeys(input, ['version', 'queues', 'syncJobs']);
+  if (input.version !== MIGRATION_PROFILE_REFERENCE_PATCH_VERSION) fail();
+  return Object.freeze({
+    version: MIGRATION_PROFILE_REFERENCE_PATCH_VERSION,
+    queues: parseMigrationProfileQueues(input.queues),
+    syncJobs: parseMigrationReferenceFreeSyncJobs(input.syncJobs),
+  });
+}
+
+function serializeParsedMigrationProfileReferencePatch(value: MigrationProfileReferencePatch): string {
+  const serialized = JSON.stringify(value);
+  if (typeof serialized !== 'string') fail();
+  if (new TextEncoder().encode(serialized).byteLength > MAX_MIGRATION_PROFILE_REFERENCE_PATCH_BYTES) {
+    fail('PAYLOAD_TOO_LARGE');
+  }
+  return serialized;
+}
+
+export function parseMigrationProfileReferencePatch(value: unknown): MigrationProfileReferencePatch {
+  const patch = parseMigrationProfileReferencePatchInternal(value);
+  serializeParsedMigrationProfileReferencePatch(patch);
+  return patch;
+}
+
+export function serializeMigrationProfileReferencePatch(value: unknown): string {
+  return serializeParsedMigrationProfileReferencePatch(parseMigrationProfileReferencePatchInternal(value));
 }
 
 export type SearchMode = 'literal-fallback' | 'fts-phrase';
