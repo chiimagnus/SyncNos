@@ -36,24 +36,27 @@ export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export type JsonObject = { readonly [key: string]: JsonValue };
 
-export type LocalDataErrorCode =
-  | 'HOST_UNAVAILABLE'
-  | 'ORIGIN_DENIED'
-  | 'PROTOCOL_MISMATCH'
-  | 'SCHEMA_MISMATCH'
-  | 'BUSY'
-  | 'MIGRATION_IN_PROGRESS'
-  | 'MIGRATION_RECEIPT_MISMATCH'
-  | 'MIGRATION_VALIDATION_FAILED'
-  | 'FTS_UNAVAILABLE'
-  | 'PAYLOAD_TOO_LARGE'
-  | 'STALE_BACKEND_EPOCH'
-  | 'STALE_REFERENCE'
-  | 'STALE_SEARCH_CURSOR'
-  | 'DATABASE_NOT_INITIALIZED'
-  | 'UNSUPPORTED_PLATFORM'
-  | 'JOURNAL_CORRUPT'
-  | 'INVALID_ARGUMENT';
+export const LOCAL_DATA_ERROR_CODES = Object.freeze([
+  'HOST_UNAVAILABLE',
+  'ORIGIN_DENIED',
+  'PROTOCOL_MISMATCH',
+  'SCHEMA_MISMATCH',
+  'BUSY',
+  'MIGRATION_IN_PROGRESS',
+  'MIGRATION_RECEIPT_MISMATCH',
+  'MIGRATION_VALIDATION_FAILED',
+  'FTS_UNAVAILABLE',
+  'PAYLOAD_TOO_LARGE',
+  'STALE_BACKEND_EPOCH',
+  'STALE_REFERENCE',
+  'STALE_SEARCH_CURSOR',
+  'DATABASE_NOT_INITIALIZED',
+  'UNSUPPORTED_PLATFORM',
+  'JOURNAL_CORRUPT',
+  'INVALID_ARGUMENT',
+] as const);
+
+export type LocalDataErrorCode = (typeof LOCAL_DATA_ERROR_CODES)[number];
 
 export type LocalDataDiagnosticKey =
   | 'actualBytes'
@@ -326,6 +329,16 @@ export function createLocalDataError(code: LocalDataErrorCode, diagnostics?: unk
         message: LOCAL_DATA_ERROR_MESSAGES[code],
         retryable: RETRYABLE_ERROR_CODES.has(code),
       };
+}
+
+export function parseLocalDataError(value: unknown): LocalDataError {
+  const input = record(value);
+  const hasDiagnostics = hasOwn(input, 'diagnostics');
+  exactKeys(input, hasDiagnostics ? ['code', 'message', 'retryable', 'diagnostics'] : ['code', 'message', 'retryable']);
+  const code = parseEnum(input.code, LOCAL_DATA_ERROR_CODES);
+  const error = createLocalDataError(code, hasDiagnostics ? input.diagnostics : undefined);
+  if (input.message !== error.message || input.retryable !== error.retryable) fail();
+  return error;
 }
 
 export type MigrationId = string;

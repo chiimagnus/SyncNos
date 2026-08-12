@@ -6,6 +6,7 @@ import {
   parseOrderedFrameDigest,
   type MigrationId,
 } from './contracts';
+import { OrderedFrameDigestAccumulator, type DigestProvider } from './digest';
 
 export const FACT_STREAM_KINDS = Object.freeze([
   'conversations',
@@ -24,6 +25,13 @@ export type FactsManifest = Readonly<{
   protocolVersion: number;
   schemaVersion: number;
   streamBytes: Readonly<Record<FactStreamKind, number>>;
+}>;
+
+export type FactsManifestFrame = Readonly<{
+  byteLength: number;
+  digest: string;
+  kind: FactStreamKind;
+  manifestSequence: number;
 }>;
 
 function fail(): never {
@@ -59,6 +67,20 @@ function parseCountMap(value: unknown): Readonly<Record<FactStreamKind, number>>
   return Object.freeze(result);
 }
 
+function emptyCountMap(): Record<FactStreamKind, number> {
+  return Object.fromEntries(FACT_STREAM_KINDS.map((kind) => [kind, 0])) as Record<FactStreamKind, number>;
+}
+
+function parseFactStreamKind(value: unknown): FactStreamKind {
+  if (typeof value !== 'string' || !FACT_STREAM_KINDS.includes(value as FactStreamKind)) fail();
+  return value as FactStreamKind;
+}
+
+function parseNonNegativeSafeInteger(value: unknown): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) fail();
+  return Number(value);
+}
+
 export function parseFactsManifest(value: unknown): FactsManifest {
   try {
     const input = record(value);
@@ -87,4 +109,58 @@ export function parseFactsManifest(value: unknown): FactsManifest {
 
 export function createFactsManifest(input: FactsManifest): FactsManifest {
   return parseFactsManifest(input);
+}
+
+export class FactsManifestAccumulator {
+  #finalized = false;
+  private readonly factCounts = emptyCountMap();
+  private readonly streamBytes = emptyCountMap();
+
+  private constructor(
+    private readonly migrationId: MigrationId,
+    private readonly digest: OrderedFrameDigestAccumulator,
+  ) {}
+
+  static async create(input: {
+    migrationId: MigrationId;
+    provider: DigestProvider;
+  }): Promise<FactsManifestAccumulator> {
+    return new FactsManifestAccumulator(
+      parseMigrationId(input.migrationId),
+      await OrderedFrameDigestAccumulator.create(input.provider),
+    );
+  }
+
+  addFact(kind: FactStreamKind): void {
+    if (this.#finalized) fail();
+    const parsedKind = parseFactStreamKind(kind);
+    if (this.factCounts[parsedKind] >= Number.MAX_SAFE_INTEGER) fail();
+    this.factCounts[parsedKind] += 1;
+  }
+
+  async appendFrame(frame: FactsManifestFrame): Promise<void> {
+    if (this.#finalized) fail();
+    const kind = parseFactStreamKind(frame.kind);
+    const byteLength = parseNonNegativeSafeInteger(frame.byteLength);
+    if (this.streamBytes[kind] > Number.MAX_SAFE_INTEGER - byteLength) fail();
+    await this.digest.append({
+      sequence: parseNonNegativeSafeInteger(frame.manifestSequence),
+      byteLength,
+      digest: parseOrderedFrameDigest(frame.digest),
+    });
+    this.streamBytes[kind] += byteLength;
+  }
+
+  finalize(): FactsManifest {
+    if (this.#finalized) fail();
+    this.#finalized = true;
+    return createFactsManifest({
+      migrationId: this.migrationId,
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      factCounts: this.factCounts,
+      streamBytes: this.streamBytes,
+      orderedFrameDigest: this.digest.finalize(),
+    });
+  }
 }

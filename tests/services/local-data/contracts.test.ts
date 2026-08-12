@@ -23,6 +23,7 @@ import {
   normalizeSearchQuery,
   parseBrowserRuntimeFactsRequest,
   parseCliFactsRequest,
+  parseLocalDataError,
   parseHostFactsRequest,
   parsePlainSnippetHighlights,
   parseStreamDescriptor,
@@ -347,6 +348,8 @@ describe('local data contracts', () => {
     });
     expectErrorCode(() => createLocalDataError('HOST_UNAVAILABLE', { path: '/private/data' }), 'INVALID_ARGUMENT');
     expectErrorCode(() => createLocalDataError('HOST_UNAVAILABLE', { field: '/private/data' }), 'INVALID_ARGUMENT');
+    expect(parseLocalDataError(error)).toEqual(error);
+    expectErrorCode(() => parseLocalDataError({ ...error, message: 'raw database path' }), 'INVALID_ARGUMENT');
 
     const browser = createBrowserRuntimeFactsSuccess('request-1', { items: [] }, `native:${MIGRATION_A}`);
     const host = createHostFactsSuccess('request-1', { items: [] });
