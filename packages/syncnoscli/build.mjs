@@ -18,10 +18,14 @@ await build({
   format: 'cjs',
   target: 'node22',
   sourcemap: false,
+  minifyWhitespace: true,
   legalComments: 'none',
   banner: { js: '#!/usr/bin/env node' },
   define: {
     __SYNCNOSCLI_VERSION__: JSON.stringify(packageJson.version),
+  },
+  alias: {
+    '@services': resolve(packageRoot, '../../src/services'),
   },
   external: ['better-sqlite3', 'better-sqlite3/*'],
   tsconfig: resolve(packageRoot, 'tsconfig.json'),

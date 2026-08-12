@@ -1,0 +1,393 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  BROWSER_RUNTIME_FACTS_COMMANDS,
+  CLI_FACTS_COMMANDS,
+  HOST_FACTS_COMMANDS,
+  IDB_FACTS_EPOCH,
+  LOCAL_DATA_PROTOCOL_VERSION,
+  LOCAL_DATA_SCHEMA_VERSION,
+  MAX_CAPTURE_SNAPSHOT_BYTES,
+  MAX_NATIVE_IMAGE_SLICE_BYTES,
+  MAX_SEARCH_QUERY_SCALARS,
+  MAX_STREAM_FRAME_BYTES,
+  MAX_ZIP_STREAM_BYTES,
+  LocalDataContractError,
+  assertFactsEpochMatches,
+  assertStreamChunkWithinLimits,
+  createBrowserRuntimeFactsSuccess,
+  createCliJsonSuccess,
+  createHostFactsSuccess,
+  createLocalDataError,
+  createSearchCursorBinding,
+  normalizeSearchQuery,
+  parseBrowserRuntimeFactsRequest,
+  parseCliFactsRequest,
+  parseHostFactsRequest,
+  parsePlainSnippetHighlights,
+  parseStreamDescriptor,
+  serializedJsonUtf8ByteLength,
+} from '@services/local-data/contracts';
+import { FACT_STREAM_KINDS, createFactsManifest, parseFactsManifest } from '@services/local-data/facts-manifest';
+
+const MIGRATION_A = '3b715c7d-3471-4aa4-8e7c-0c0b0a7afe7a';
+const MIGRATION_B = '6fa05726-0691-421b-b0f6-8160b9d95aac';
+const DIGEST = 'a'.repeat(64);
+
+function envelope(command: string, payload: unknown, extras: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    requestId: 'request-1',
+    command,
+    payload,
+    ...extras,
+  };
+}
+
+function expectErrorCode(callback: () => unknown, code: LocalDataContractError['code']): void {
+  let thrown: unknown;
+  try {
+    callback();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(LocalDataContractError);
+  expect((thrown as LocalDataContractError).code).toBe(code);
+}
+
+function manifestCounts(value: number): Record<(typeof FACT_STREAM_KINDS)[number], number> {
+  return Object.fromEntries(FACT_STREAM_KINDS.map((kind) => [kind, value])) as Record<
+    (typeof FACT_STREAM_KINDS)[number],
+    number
+  >;
+}
+
+describe('local data contracts', () => {
+  it('owns an explicit command allowlist for browser, Host, and CLI surfaces', () => {
+    expect(Object.isFrozen(BROWSER_RUNTIME_FACTS_COMMANDS)).toBe(true);
+    expect(Object.isFrozen(HOST_FACTS_COMMANDS)).toBe(true);
+    expect(Object.isFrozen(CLI_FACTS_COMMANDS)).toBe(true);
+    expect(BROWSER_RUNTIME_FACTS_COMMANDS).toEqual([
+      'GET_LOCAL_DATA_STATUS',
+      'START_LOCAL_DATA_MIGRATION',
+      'RESUME_LOCAL_DATA_MIGRATION',
+      'GET_FACTS_REVISION',
+      'CONVERSATION_BOOTSTRAP',
+      'CONVERSATION_LOAD_MORE',
+      'CONVERSATION_DETAIL',
+      'CONVERSATION_TAIL',
+      'SAVE_CONVERSATION_SNAPSHOT',
+      'DELETE_CONVERSATION',
+      'MERGE_CONVERSATIONS',
+      'SYNC_CONVERSATION_MESSAGES',
+      'GET_SYNC_MAPPING',
+      'PATCH_SYNC_MAPPING',
+      'CLEAR_SYNC_MAPPING',
+      'UPDATE_ARTICLE_URL',
+      'LIST_ARTICLE_COMMENTS',
+      'ADD_ARTICLE_COMMENT',
+      'ADD_ARTICLE_COMMENT_REPLY',
+      'DELETE_ARTICLE_COMMENT',
+      'MIGRATE_ARTICLE_COMMENT_URL',
+      'ENSURE_ARTICLE_COMMENT_CONTEXT',
+      'GET_IMAGE_ASSET',
+      'PUT_IMAGE_ASSET',
+      'BACKFILL_CONVERSATION_IMAGES',
+      'FACTS_IMPORT',
+      'FACTS_EXPORT',
+      'BACKUP_IMPORT',
+      'BACKUP_EXPORT',
+      'GET_INSIGHT_STATS',
+      'SEARCH_CONVERSATIONS',
+      'GET_MIGRATION_RECEIPT',
+    ]);
+    expect(HOST_FACTS_COMMANDS).toContain('UPDATE_ARTICLE_URL');
+    expect(HOST_FACTS_COMMANDS).toContain('IMPORT_FACTS');
+    expect(HOST_FACTS_COMMANDS).toContain('SEARCH_CONVERSATIONS');
+    expect(CLI_FACTS_COMMANDS).toEqual([
+      'DOCTOR',
+      'CONVERSATIONS_LIST',
+      'CONVERSATIONS_GET',
+      'STATS',
+      'SEARCH_CONVERSATIONS',
+    ]);
+  });
+
+  it('keeps browser profile epochs outside Host and CLI envelopes', () => {
+    const stableBrowserRequest = parseBrowserRuntimeFactsRequest(
+      envelope('CONVERSATION_DETAIL', { source: 'web', conversationKey: 'conversation-a' }),
+    );
+    expect(stableBrowserRequest).not.toHaveProperty('factsEpoch');
+
+    expectErrorCode(
+      () =>
+        parseBrowserRuntimeFactsRequest(
+          envelope('CONVERSATION_DETAIL', { source: 'web', conversationKey: 'conversation-a', conversationId: 10 }),
+        ),
+      'STALE_BACKEND_EPOCH',
+    );
+
+    const profileA = parseBrowserRuntimeFactsRequest(
+      envelope(
+        'CONVERSATION_DETAIL',
+        { source: 'web', conversationKey: 'conversation-a', conversationId: 10 },
+        { factsEpoch: `native:${MIGRATION_A}` },
+      ),
+    );
+    const profileB = parseBrowserRuntimeFactsRequest(
+      envelope(
+        'CONVERSATION_DETAIL',
+        { source: 'web', conversationKey: 'conversation-a', conversationId: 10 },
+        { factsEpoch: `native:${MIGRATION_B}` },
+      ),
+    );
+    expect(profileA.factsEpoch).toBe(`native:${MIGRATION_A}`);
+    expect(profileB.factsEpoch).toBe(`native:${MIGRATION_B}`);
+    expect(IDB_FACTS_EPOCH).toBe('idb-v1');
+    expect(assertFactsEpochMatches(`native:${MIGRATION_A}`, profileA.factsEpoch)).toBe(`native:${MIGRATION_A}`);
+    expectErrorCode(() => assertFactsEpochMatches(`native:${MIGRATION_A}`, profileB.factsEpoch), 'STALE_BACKEND_EPOCH');
+
+    const hostRequest = parseHostFactsRequest(
+      envelope('CONVERSATION_DETAIL', { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 }),
+    );
+    expect(hostRequest).not.toHaveProperty('factsEpoch');
+    expect(hostRequest.payload).toEqual({
+      source: 'web',
+      conversationKey: 'conversation-a',
+      backendConversationId: 91,
+    });
+    expect(
+      parseHostFactsRequest(
+        envelope('ADD_ARTICLE_COMMENT_REPLY', {
+          context: {
+            canonicalUrl: 'https://example.test/article',
+            conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+          },
+          commentText: 'reply',
+          backendParentId: 17,
+        }),
+      ).payload,
+    ).toEqual({
+      context: {
+        canonicalUrl: 'https://example.test/article',
+        conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+      },
+      commentText: 'reply',
+      backendParentId: 17,
+    });
+
+    expectErrorCode(
+      () =>
+        parseHostFactsRequest(
+          envelope(
+            'CONVERSATION_DETAIL',
+            { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+            { factsEpoch: `native:${MIGRATION_A}` },
+          ),
+        ),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () =>
+        parseHostFactsRequest(
+          envelope('CONVERSATION_DETAIL', { source: 'web', conversationKey: 'conversation-a', conversationId: 10 }),
+        ),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () =>
+        parseCliFactsRequest(
+          envelope('SEARCH_CONVERSATIONS', { query: normalizeSearchQuery('syncnos') }, { factsEpoch: IDB_FACTS_EPOCH }),
+        ),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('rejects unknown commands and command-control fields before a request reaches a backend', () => {
+    expectErrorCode(() => parseBrowserRuntimeFactsRequest(envelope('DROP_DATABASE', {})), 'INVALID_ARGUMENT');
+    expectErrorCode(
+      () => parseHostFactsRequest(envelope('GET_STATUS', { origin: 'chrome-extension://attacker/' })),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () => parseHostFactsRequest(envelope('GET_STATUS', { sql: 'DELETE FROM facts' })),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () => parseHostFactsRequest(envelope('GET_STATUS', { path: '/tmp/syncnos.sqlite' })),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(() => parseHostFactsRequest(envelope('GET_STATUS', { shell: 'sh -c bad' })), 'INVALID_ARGUMENT');
+    expectErrorCode(
+      () => parseBrowserRuntimeFactsRequest(envelope('GET_LOCAL_DATA_STATUS', { profileJournal: {} })),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('keeps user comment text opaque while command fields remain allowlisted', () => {
+    const request = parseBrowserRuntimeFactsRequest(
+      envelope('ADD_ARTICLE_COMMENT', {
+        context: { canonicalUrl: 'https://example.test/article' },
+        quoteText: 'first line\nsecond line',
+        commentText: 'a long comment\nwith its original line breaks',
+        locator: { exact: 'first line', start: 0, end: 10 },
+      }),
+    );
+    expect(request.payload).toMatchObject({
+      quoteText: 'first line\nsecond line',
+      commentText: 'a long comment\nwith its original line breaks',
+    });
+  });
+
+  it('normalizes search once with NFC, Unicode scalar limits, and an escaped FTS phrase', () => {
+    const normalized = normalizeSearchQuery('  Cafe\u0301\u00a0你好  ');
+    expect(normalized).toEqual({
+      literal: 'Café 你好',
+      scalarCount: 7,
+      mode: 'fts-phrase',
+      ftsPhrase: '"Café 你好"',
+    });
+    expect(normalizeSearchQuery(' 你好 ')).toEqual({ literal: '你好', scalarCount: 2, mode: 'literal-fallback' });
+    expect(normalizeSearchQuery('a"bc')).toMatchObject({ mode: 'fts-phrase', ftsPhrase: '"a""bc"' });
+    expect(normalizeSearchQuery('😀'.repeat(MAX_SEARCH_QUERY_SCALARS))).toMatchObject({
+      scalarCount: MAX_SEARCH_QUERY_SCALARS,
+    });
+
+    expectErrorCode(() => normalizeSearchQuery('sync\u0000nos'), 'INVALID_ARGUMENT');
+    expectErrorCode(() => normalizeSearchQuery('sync\u0085nos'), 'INVALID_ARGUMENT');
+    expectErrorCode(() => normalizeSearchQuery('😀'.repeat(MAX_SEARCH_QUERY_SCALARS + 1)), 'INVALID_ARGUMENT');
+
+    const query = normalizeSearchQuery('SyncNos search');
+    const cursor = createSearchCursorBinding(query, 'cursor-token');
+    expect(
+      parseCliFactsRequest(envelope('SEARCH_CONVERSATIONS', { query, cursor, sort: 'best', limit: 50 })),
+    ).toMatchObject({ command: 'SEARCH_CONVERSATIONS', payload: { query, cursor } });
+    expectErrorCode(
+      () =>
+        parseCliFactsRequest(
+          envelope('SEARCH_CONVERSATIONS', {
+            query,
+            cursor: { literal: 'another query', token: 'cursor-token' },
+          }),
+        ),
+      'STALE_SEARCH_CURSOR',
+    );
+    expectErrorCode(
+      () =>
+        parseCliFactsRequest(
+          envelope('SEARCH_CONVERSATIONS', {
+            query: { ...query, scalarCount: query.scalarCount + 1 },
+          }),
+        ),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('fixes plain-snippet highlights to UTF-16 half-open ranges without splitting surrogates', () => {
+    expect(parsePlainSnippetHighlights('A😀B', [{ start: 1, end: 3 }])).toEqual([{ start: 1, end: 3 }]);
+    expectErrorCode(() => parsePlainSnippetHighlights('A😀B', [{ start: 2, end: 3 }]), 'INVALID_ARGUMENT');
+    expectErrorCode(
+      () =>
+        parsePlainSnippetHighlights('A😀B', [
+          { start: 1, end: 3 },
+          { start: 2, end: 4 },
+        ]),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('enforces frame, declared-total, and accumulated-total limits before retaining stream data', () => {
+    const capture = {
+      operation: 'capture-snapshot' as const,
+      declaredTotalBytes: MAX_CAPTURE_SNAPSHOT_BYTES,
+      accumulatedBytes: MAX_CAPTURE_SNAPSHOT_BYTES - 1,
+      incomingBytes: 1,
+      serializedFrameBytes: MAX_STREAM_FRAME_BYTES,
+    };
+    expect(() => assertStreamChunkWithinLimits(capture)).not.toThrow();
+    expectErrorCode(
+      () => assertStreamChunkWithinLimits({ ...capture, serializedFrameBytes: MAX_STREAM_FRAME_BYTES + 1 }),
+      'PAYLOAD_TOO_LARGE',
+    );
+    expectErrorCode(
+      () => assertStreamChunkWithinLimits({ ...capture, declaredTotalBytes: MAX_CAPTURE_SNAPSHOT_BYTES + 1 }),
+      'PAYLOAD_TOO_LARGE',
+    );
+    expectErrorCode(
+      () =>
+        assertStreamChunkWithinLimits({ ...capture, accumulatedBytes: MAX_CAPTURE_SNAPSHOT_BYTES, incomingBytes: 1 }),
+      'PAYLOAD_TOO_LARGE',
+    );
+    expect(parseStreamDescriptor({ operation: 'zip-backup', declaredTotalBytes: MAX_ZIP_STREAM_BYTES })).toEqual({
+      operation: 'zip-backup',
+      declaredTotalBytes: MAX_ZIP_STREAM_BYTES,
+    });
+    expectErrorCode(
+      () => parseStreamDescriptor({ operation: 'zip-backup', declaredTotalBytes: MAX_ZIP_STREAM_BYTES + 1 }),
+      'PAYLOAD_TOO_LARGE',
+    );
+    expect(MAX_NATIVE_IMAGE_SLICE_BYTES).toBe(256 * 1024);
+    expect(serializedJsonUtf8ByteLength({ text: '你好😀' })).toBe(
+      new TextEncoder().encode('{"text":"你好😀"}').byteLength,
+    );
+  });
+
+  it('emits safe stable error and response envelopes without leaking browser epochs into Host or CLI', () => {
+    const error = createLocalDataError('PAYLOAD_TOO_LARGE', {
+      operation: 'image-asset',
+      actualBytes: 65,
+      limitBytes: 64,
+    });
+    expect(error).toEqual({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'The local data payload exceeds its safe limit.',
+      retryable: false,
+      diagnostics: { operation: 'image-asset', actualBytes: 65, limitBytes: 64 },
+    });
+    expectErrorCode(() => createLocalDataError('HOST_UNAVAILABLE', { path: '/private/data' }), 'INVALID_ARGUMENT');
+    expectErrorCode(() => createLocalDataError('HOST_UNAVAILABLE', { field: '/private/data' }), 'INVALID_ARGUMENT');
+
+    const browser = createBrowserRuntimeFactsSuccess('request-1', { items: [] }, `native:${MIGRATION_A}`);
+    const host = createHostFactsSuccess('request-1', { items: [] });
+    const cli = createCliJsonSuccess('request-1', { items: [] });
+    expect(browser).toMatchObject({ ok: true, factsEpoch: `native:${MIGRATION_A}` });
+    expect(host).not.toHaveProperty('factsEpoch');
+    expect(cli).not.toHaveProperty('factsEpoch');
+  });
+
+  it('keeps the migration manifest compact, ordered, and receipt-verifiable', () => {
+    expect(Object.isFrozen(FACT_STREAM_KINDS)).toBe(true);
+    expect(FACT_STREAM_KINDS).toEqual([
+      'conversations',
+      'sync_mappings',
+      'messages',
+      'image_cache',
+      'article_comments',
+    ]);
+    const manifest = createFactsManifest({
+      migrationId: MIGRATION_A,
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      factCounts: manifestCounts(2),
+      streamBytes: manifestCounts(128),
+      orderedFrameDigest: DIGEST,
+    });
+    expect(Object.isFrozen(manifest)).toBe(true);
+    expect(Object.isFrozen(manifest.factCounts)).toBe(true);
+    expect(manifest).toEqual({
+      migrationId: MIGRATION_A,
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      factCounts: manifestCounts(2),
+      streamBytes: manifestCounts(128),
+      orderedFrameDigest: DIGEST,
+    });
+    expect(Object.keys(manifest)).not.toContain('content');
+
+    const missingKind = structuredClone(manifest) as Record<string, any>;
+    delete missingKind.factCounts.messages;
+    expectErrorCode(() => parseFactsManifest(missingKind), 'MIGRATION_VALIDATION_FAILED');
+    expectErrorCode(() => parseFactsManifest({ ...manifest, extra: true }), 'MIGRATION_VALIDATION_FAILED');
+  });
+});

@@ -1,6 +1,8 @@
+import { LOCAL_DATA_PROTOCOL_VERSION } from '@services/local-data/contracts';
+
 declare const __SYNCNOSCLI_VERSION__: string;
 
-const HELP = `SyncNos CLI\n\nUsage:\n  syncnoscli --help\n  syncnoscli --version\n`;
+const HELP = `SyncNos CLI\n\nUsage:\n  syncnoscli --help\n  syncnoscli --version\n\nProtocol envelope: v${LOCAL_DATA_PROTOCOL_VERSION}\n`;
 
 export function runCli(argv = process.argv.slice(2)): number {
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {

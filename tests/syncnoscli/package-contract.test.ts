@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { LOCAL_DATA_PROTOCOL_VERSION } from '@services/local-data/contracts';
+
 const repoRoot = resolve(__dirname, '../..');
 const packageRoot = resolve(repoRoot, 'packages/syncnoscli');
 const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as Record<string, any>;
@@ -26,7 +28,9 @@ describe('SyncNos CLI package contract', () => {
     const built = readFileSync(binary, 'utf8');
     expect(built).not.toContain('../../src');
 
-    expect(execFileSync(process.execPath, [binary, '--help'], { encoding: 'utf8' })).toContain('SyncNos CLI');
+    const help = execFileSync(process.execPath, [binary, '--help'], { encoding: 'utf8' });
+    expect(help).toContain('SyncNos CLI');
+    expect(help).toContain(`Protocol envelope: v${LOCAL_DATA_PROTOCOL_VERSION}`);
     expect(execFileSync(process.execPath, [binary, '--version'], { encoding: 'utf8' }).trim()).toBe(
       packageJson.version,
     );
