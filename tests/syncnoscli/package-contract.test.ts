@@ -27,7 +27,9 @@ describe('SyncNos CLI package contract', () => {
     expect(built).not.toContain('../../src');
 
     expect(execFileSync(process.execPath, [binary, '--help'], { encoding: 'utf8' })).toContain('SyncNos CLI');
-    expect(execFileSync(process.execPath, [binary, '--version'], { encoding: 'utf8' }).trim()).toBe(packageJson.version);
+    expect(execFileSync(process.execPath, [binary, '--version'], { encoding: 'utf8' }).trim()).toBe(
+      packageJson.version,
+    );
   });
 
   it('packs no source, tests, SQLite files, or credentials', () => {
