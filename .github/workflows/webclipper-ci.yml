@@ -8,6 +8,8 @@ on:
       - tests/**
       - public/**
       - cloudflare-workers/**
+      - packages/**
+      - src/services/local-data/**
       - package.json
       - package-lock.json
       - wxt.config.ts
@@ -15,6 +17,7 @@ on:
       - eslint.config.cjs
       - vitest.config.mts
       - .prettierignore
+      - .gitignore
       - .github/scripts/webclipper/**
       - .github/workflows/webclipper-ci.yml
 
