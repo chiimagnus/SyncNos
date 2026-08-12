@@ -27,6 +27,10 @@ import {
 } from '@services/local-data/facts-archive';
 import { sha256Hex } from '@services/local-data/digest';
 import { nodeDigestProvider } from '../../../packages/syncnoscli/src/runtime/node-digest';
+import {
+  LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD,
+  createLocalDataMigrationFixture,
+} from '../../helpers/local-data-migration-fixture';
 
 const conversationIdentities = new Map([
   [10, { source: 'web', conversationKey: 'article:https://example.com/a' }],
@@ -109,39 +113,32 @@ describe('local facts archive', () => {
   });
 
   it('keeps unknown JSON fields while moving browser IDs into stream-local references', () => {
-    const nested = 'x'.repeat(513 * 1024);
+    const fixture = createLocalDataMigrationFixture();
+    const conversationRow = fixture.rows.conversations[0]!;
+    const messageRow = fixture.rows.messages[0]!;
+    const mappingRow = fixture.rows.syncMappings[0]!;
     const conversation = createMigrationConversationFact({
-      sourceLocalId: 10,
-      row: {
-        id: 10,
-        source: 'chatgpt',
-        conversationKey: 'c1',
-        title: '你好😀',
-        unknown: { nested, flags: ['keep'] },
-      },
+      sourceLocalId: conversationRow.id,
+      row: conversationRow,
     });
     const message = createMigrationMessageFact({
-      sourceLocalId: 20,
-      row: {
-        id: 20,
-        conversationId: 10,
-        messageKey: 'm1',
-        contentMarkdown: 'body',
-        opaque: { locale: 'zh-CN' },
-      },
+      sourceLocalId: messageRow.id,
+      row: messageRow,
     });
     const mapping = createMigrationSyncMappingFact({
-      sourceLocalId: 30,
-      row: { id: 30, source: 'chatgpt', conversationKey: 'c1', opaque: { local: true } },
+      sourceLocalId: mappingRow.id,
+      row: mappingRow,
     });
 
     expect(conversation.sourceLocalId).toBe('10');
     expect(conversation.payload).not.toHaveProperty('id');
-    expect((conversation.payload.unknown as { nested: string }).nested).toBe(nested);
+    expect((conversation.payload.unknownConversationField as { large: string }).large).toBe(
+      LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD,
+    );
     expect(encodeMigrationFactRecord(conversation).bytes.byteLength).toBeGreaterThan(512 * 1024);
     expect(message.conversationSourceLocalId).toBe('10');
     expect(message.payload).not.toHaveProperty('conversationId');
-    expect(mapping.payload).toMatchObject({ opaque: { local: true } });
+    expect(mapping.payload).toMatchObject({ opaqueMappingField: ['keep'] });
     expect(decodeMigrationFactRecord(encodeMigrationFactRecord(message).bytes)).toEqual(message);
   });
 
@@ -188,69 +185,34 @@ describe('local facts archive', () => {
   });
 
   it('normalizes Blob, data URL, ArrayBuffer, and view image sources without retaining legacy transport fields', async () => {
-    const raw = new Uint8Array([0, 1, 2, 3, 255]);
-    const rows = [
-      {
-        id: 1,
-        conversationId: 10,
-        url: 'https://example.com/blob.png',
-        blob: new Blob([raw], { type: 'image/png' }),
-        contentType: 'image/png',
-        dataUrl: 'data:image/png;base64,AAECA/8=',
-        unknown: { keep: true },
-      },
-      {
-        id: 2,
-        conversationId: 10,
-        url: 'https://example.com/data.png',
-        dataUrl: 'data:image/png;base64,AAECA/8=',
-        contentType: 'image/png',
-      },
-      {
-        id: 3,
-        conversationId: 10,
-        url: 'https://example.com/buffer.png',
-        blob: raw.buffer.slice(0),
-        contentType: 'image/png',
-      },
-      {
-        id: 4,
-        conversationId: 10,
-        url: 'https://example.com/view.png',
-        blob: new Uint8Array([9, ...raw, 8]).subarray(1, raw.byteLength + 1),
-        contentType: 'image/png',
-      },
+    const fixture = createLocalDataMigrationFixture();
+    const rows = fixture.rows.imageCache;
+    const expectedBytes = [
+      fixture.assets.blobBytes,
+      fixture.assets.base64Bytes,
+      fixture.assets.viewBytes,
+      fixture.assets.percentBytes,
+      fixture.assets.base64Bytes,
     ];
 
     const prepared = rows.map((row) => prepareMigrationImageFact({ row, sourceLocalId: row.id }));
-    for (const item of prepared) {
+    for (const [index, item] of prepared.entries()) {
       expect(item.record.conversationSourceLocalId).toBe('10');
       expect(item.record.contentType).toBe('image/png');
-      expect(item.record.byteLength).toBe(raw.byteLength);
+      expect(item.record.byteLength).toBe(expectedBytes[index]!.byteLength);
       expect(item.record.payload).not.toHaveProperty('id');
       expect(item.record.payload).not.toHaveProperty('conversationId');
       expect(item.record.payload).not.toHaveProperty('blob');
       expect(item.record.payload).not.toHaveProperty('dataUrl');
-      expect(await collectMigrationImageBytes(item.bytes)).toEqual(raw);
+      expect(await collectMigrationImageBytes(item.bytes)).toEqual(expectedBytes[index]);
       expect(await sha256Hex(nodeDigestProvider, await collectMigrationImageBytes(item.bytes))).toBe(
-        await sha256Hex(nodeDigestProvider, await collectMigrationImageBytes(prepared[0]!.bytes)),
+        await sha256Hex(nodeDigestProvider, expectedBytes[index]!),
       );
     }
-    expect(prepared[0]!.record.payload).toMatchObject({ unknown: { keep: true } });
-
-    const percentEncoded = prepareMigrationImageFact({
-      sourceLocalId: 5,
-      row: {
-        id: 5,
-        conversationId: 10,
-        url: 'https://example.com/percent.png',
-        dataUrl: 'data:image/png,%E4%BD%A0%E5%A5%BD',
-        contentType: 'image/png',
-        unknown: { nested: 'x'.repeat(513 * 1024) },
-      },
-    });
-    expect(await collectMigrationImageBytes(percentEncoded.bytes)).toEqual(new TextEncoder().encode('你好'));
-    expect((percentEncoded.record.payload.unknown as { nested: string }).nested).toHaveLength(513 * 1024);
+    expect(prepared[0]!.record.payload).toMatchObject({ unknownImageField: { keep: true } });
+    expect((prepared[3]!.record.payload.unknownImageField as { nested: string }).nested).toBe(
+      LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD,
+    );
   });
 
   it('streams data URL bytes in bounded Base64 and UTF-8-safe percent slices', async () => {
@@ -306,25 +268,28 @@ describe('local facts archive', () => {
   });
 
   it('creates versioned comment identities, preserves sibling occurrence and validates the cross-profile parent graph', async () => {
+    const fixture = createLocalDataMigrationFixture();
+    const [rootRow, replyRow] = fixture.rows.articleComments;
+    const conversations = new Map([[10, { source: 'chatgpt', conversationKey: 'conversation-a' }]]);
     const occurrences = createMigrationCommentOccurrenceTracker();
     const root = await createMigrationCommentFact({
-      sourceLocalId: 1,
-      row: comment(),
-      conversations: conversationIdentities,
+      sourceLocalId: rootRow!.id,
+      row: rootRow,
+      conversations,
       digestProvider: nodeDigestProvider,
       occurrenceTracker: occurrences,
     });
     const sibling = await createMigrationCommentFact({
-      sourceLocalId: 2,
-      row: comment({ id: 2 }),
-      conversations: conversationIdentities,
+      sourceLocalId: 52,
+      row: { ...rootRow, id: 52 },
+      conversations,
       digestProvider: nodeDigestProvider,
       occurrenceTracker: occurrences,
     });
     const reply = await createMigrationCommentFact({
-      sourceLocalId: 3,
-      row: comment({ id: 3, parentId: 1, commentText: 'reply' }),
-      conversations: conversationIdentities,
+      sourceLocalId: replyRow!.id,
+      row: replyRow,
+      conversations,
       digestProvider: nodeDigestProvider,
       parentRootStructuralDigest: root.archiveIdentity.rootStructuralDigest,
       occurrenceTracker: occurrences,
@@ -332,11 +297,11 @@ describe('local facts archive', () => {
 
     expect(root.archiveIdentity.occurrence).toBe(0);
     expect(sibling.archiveIdentity.occurrence).toBe(1);
-    expect(reply.parentSourceLocalId).toBe('1');
+    expect(reply.parentSourceLocalId).toBe('50');
     expect(reply.conversationSourceLocalId).toBe('10');
     expect(root.archiveIdentity.context).toEqual({
-      canonicalUrl: 'https://example.com/a',
-      conversation: conversationIdentities.get(10),
+      canonicalUrl: 'https://example.com/article',
+      conversation: conversations.get(10),
     });
     expect(compareMigrationCommentFacts(root, sibling)).toBeLessThan(0);
     await verifyMigrationCommentFact(reply, nodeDigestProvider);

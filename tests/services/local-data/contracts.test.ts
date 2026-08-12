@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+
 import {
   BROWSER_RUNTIME_FACTS_COMMANDS,
   CLI_FACTS_COMMANDS,
@@ -41,6 +44,27 @@ import { FACT_STREAM_KINDS, createFactsManifest, parseFactsManifest } from '@ser
 const MIGRATION_A = '3b715c7d-3471-4aa4-8e7c-0c0b0a7afe7a';
 const MIGRATION_B = '6fa05726-0691-421b-b0f6-8160b9d95aac';
 const DIGEST = 'a'.repeat(64);
+const REPOSITORY_ROOT = resolve(process.cwd());
+
+function readSource(path: string): string {
+  return readFileSync(resolve(REPOSITORY_ROOT, path), 'utf8');
+}
+
+function moduleSpecifiers(path: string): string[] {
+  const source = readSource(path);
+  return Array.from(source.matchAll(/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)).map(
+    (match) => match[1] ?? match[2]!,
+  );
+}
+
+function sourceFiles(path: string): string[] {
+  const absolute = resolve(REPOSITORY_ROOT, path);
+  return readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
+    const child = join(absolute, entry.name);
+    if (entry.isDirectory()) return sourceFiles(relative(REPOSITORY_ROOT, child));
+    return /\.(?:ts|tsx)$/.test(entry.name) ? [relative(REPOSITORY_ROOT, child)] : [];
+  });
+}
 
 function envelope(command: string, payload: unknown, extras: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -481,6 +505,45 @@ describe('local data contracts', () => {
     }
     expectErrorCode(() => parseMigrationProfileReferencePatch(oversized), 'PAYLOAD_TOO_LARGE');
     expect(MAX_MIGRATION_PROFILE_REFERENCE_PATCH_BYTES).toBe(2 * 1024 * 1024);
+  });
+
+  it('keeps P1 local-data pure and leaves transfer, cleanup, and local-mode admission disconnected from production callers', () => {
+    const pureLocalDataFiles = [
+      'src/services/local-data/contracts.ts',
+      'src/services/local-data/digest.ts',
+      'src/services/local-data/facts-manifest.ts',
+      'src/services/local-data/native-wire.ts',
+      'src/services/local-data/facts-archive.ts',
+      'src/services/local-data/native-host-contract.ts',
+    ];
+    const allowedServiceImports = new Set([
+      '@services/comments/domain/comment-locator',
+      '@services/url-cleaning/http-url',
+    ]);
+    for (const path of pureLocalDataFiles) {
+      const imports = moduleSpecifiers(path);
+      expect(
+        imports.some((specifier) => /^(?:@platform\/|@ui\/|@viewmodels\/|@entrypoints\/|node:)/.test(specifier)),
+      ).toBe(false);
+      expect(imports.every((specifier) => specifier.startsWith('./') || allowedServiceImports.has(specifier))).toBe(
+        true,
+      );
+    }
+
+    const forbiddenIdbConsumers = [
+      ...sourceFiles('src/ui'),
+      ...sourceFiles('src/viewmodels'),
+      ...sourceFiles('src/services/local-data'),
+    ].filter((path) => /(?:@platform\/idb|src\/platform\/idb|\/platform\/idb)/.test(readSource(path)));
+    expect(forbiddenIdbConsumers).toEqual([]);
+
+    const productionFiles = sourceFiles('src');
+    for (const symbol of ['transferIndexedDbFacts', 'clearFacts', 'verifyFactsEmpty']) {
+      const callers = productionFiles.filter((path) => new RegExp(`\\b${symbol}\\s*\\(`).test(readSource(path)));
+      expect(callers).toEqual(['src/platform/idb/facts-transfer.ts']);
+    }
+    const journalEntrypoints = productionFiles.filter((path) => /\bbeginMigrationJournal\s*\(/.test(readSource(path)));
+    expect(journalEntrypoints).toEqual(['src/platform/local-data/migration-journal.ts']);
   });
 
   it('keeps the migration manifest compact, ordered, and receipt-verifiable', () => {

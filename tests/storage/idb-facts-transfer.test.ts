@@ -6,6 +6,10 @@ import { MAX_MIGRATION_FACT_RECORD_BYTES, MAX_STREAM_FRAME_BYTES } from '@servic
 import { decodeMigrationFactRecord, type MigrationFactRecord } from '@services/local-data/facts-archive';
 import { nodeDigestProvider } from '../../packages/syncnoscli/src/runtime/node-digest';
 import {
+  LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD,
+  createLocalDataMigrationFixture,
+} from '../helpers/local-data-migration-fixture';
+import {
   NativeWireSessionReceiver,
   serializeNativeWireFrame,
   type NativeWireFrame,
@@ -140,117 +144,29 @@ async function deleteDb(): Promise<void> {
 async function seedCompleteFacts(): Promise<Readonly<{ db: IDBDatabase; imageBytes: readonly Uint8Array[] }>> {
   const db = await openDb();
   openedDatabases.push(db);
+  const fixture = createLocalDataMigrationFixture();
   const transaction = db.transaction([...FACTS_IDB_STORE_NAMES], 'readwrite');
   const conversations = transaction.objectStore('conversations');
   const mappings = transaction.objectStore('sync_mappings');
   const messages = transaction.objectStore('messages');
   const images = transaction.objectStore('image_cache');
   const comments = transaction.objectStore('article_comments');
-
-  const conversationA = await requestToPromise<number>(
-    conversations.add({
-      source: 'chatgpt',
-      conversationKey: 'conversation-a',
-      sourceType: 'chat',
-      title: '你好😀',
-      unknownConversationField: { nested: true },
-    }),
-  );
-  await requestToPromise<number>(
-    conversations.add({
-      source: 'web',
-      conversationKey: 'article:https://example.com/a',
-      sourceType: 'article',
-      title: 'Article',
-    }),
-  );
-  await requestToPromise<number>(
-    mappings.add({
-      source: 'chatgpt',
-      conversationKey: 'conversation-a',
-      notionPageId: 'page-1',
-      opaqueMappingField: ['keep'],
-    }),
-  );
-  await requestToPromise<number>(
-    messages.add({
-      conversationId: conversationA,
-      messageKey: 'message-one',
-      contentText: '你好😀',
-      opaque: { large: 'x'.repeat(513 * 1024) },
-    }),
-  );
-  await requestToPromise<number>(
-    messages.add({ conversationId: conversationA, messageKey: 'message-two', contentText: 'second' }),
-  );
-
-  const blobBytes = Uint8Array.from({ length: 2 * 256 * 1024 + 3 }, (_, index) => index % 251);
-  const base64Bytes = Uint8Array.from([1, 2, 3, 4, 5]);
-  const viewBytes = Uint8Array.from([6, 7, 8, 9]);
-  const percentBytes = new TextEncoder().encode('你好😀');
-  await requestToPromise<number>(
-    images.add({
-      conversationId: conversationA,
-      url: 'https://example.com/blob.png',
-      blob: new Blob([blobBytes], { type: 'image/png' }),
-      contentType: 'image/png',
-      byteSize: blobBytes.byteLength,
-      unknownImageField: { keep: true },
-    }),
-  );
-  await requestToPromise<number>(
-    images.add({
-      conversationId: conversationA,
-      url: 'https://example.com/base64.png',
-      dataUrl: `data:image/png;base64,${Buffer.from(base64Bytes).toString('base64').replace(/=$/, '').slice(0, 3)}\n${Buffer.from(base64Bytes).toString('base64').replace(/=$/, '').slice(3)}`,
-      contentType: 'image/png',
-    }),
-  );
-  const viewBacking = Uint8Array.from([0, ...viewBytes, 0]);
-  await requestToPromise<number>(
-    images.add({
-      conversationId: conversationA,
-      url: 'https://example.com/view.png',
-      blob: viewBacking.subarray(1, viewBacking.byteLength - 1),
-      contentType: 'image/png',
-    }),
-  );
-  await requestToPromise<number>(
-    images.add({
-      conversationId: conversationA,
-      url: 'https://example.com/percent.png',
-      dataUrl: 'data:image/png,%E4%BD%A0%E5%A5%BD%F0%9F%98%80',
-      contentType: 'image/png',
-    }),
-  );
-
-  const rootComment = await requestToPromise<number>(
-    comments.add({
-      conversationId: conversationA,
-      canonicalUrl: 'https://example.com/article#fragment',
-      authorName: 'Chii',
-      quoteText: 'quote',
-      commentText: 'root',
-      locator: null,
-      createdAt: 1,
-      updatedAt: 2,
-      unknownCommentField: { keep: true },
-    }),
-  );
-  await requestToPromise<number>(
-    comments.add({
-      parentId: rootComment,
-      conversationId: conversationA,
-      canonicalUrl: 'https://example.com/article',
-      quoteText: '',
-      commentText: 'reply',
-      locator: null,
-      createdAt: 3,
-      updatedAt: 4,
-    }),
-  );
+  for (const row of fixture.rows.conversations) await requestToPromise<number>(conversations.add(row));
+  for (const row of fixture.rows.syncMappings) await requestToPromise<number>(mappings.add(row));
+  for (const row of fixture.rows.messages) await requestToPromise<number>(messages.add(row));
+  for (const row of fixture.rows.imageCache) await requestToPromise<number>(images.add(row));
+  for (const row of fixture.rows.articleComments) await requestToPromise<number>(comments.add(row));
   await transactionDone(transaction);
-  return { db, imageBytes: [blobBytes, base64Bytes, viewBytes, percentBytes] };
+  return {
+    db,
+    imageBytes: [
+      fixture.assets.blobBytes,
+      fixture.assets.base64Bytes,
+      fixture.assets.viewBytes,
+      fixture.assets.percentBytes,
+      fixture.assets.base64Bytes,
+    ],
+  };
 }
 
 beforeEach(async () => {
@@ -299,7 +215,7 @@ describe('IndexedDB migration facts transfer', () => {
       conversations: 2,
       sync_mappings: 1,
       messages: 2,
-      image_cache: 4,
+      image_cache: 5,
       article_comments: 2,
     });
     expect(manifest.streamBytes.image_cache).toBeGreaterThan(
@@ -310,29 +226,36 @@ describe('IndexedDB migration facts transfer', () => {
     const sessions = await decodeSessions(frames);
     const facts = sessions.flatMap((session) => (session.record ? [session.record] : []));
     expect(facts.map((fact) => `${fact.kind}:${fact.sourceLocalId}`)).toEqual([
-      'conversations:1',
-      'conversations:2',
-      'sync_mappings:1',
-      'messages:1',
-      'messages:2',
-      'image_cache:1',
-      'image_cache:2',
-      'image_cache:3',
-      'image_cache:4',
-      'article_comments:1',
-      'article_comments:2',
+      'conversations:10',
+      'conversations:11',
+      'sync_mappings:30',
+      'messages:20',
+      'messages:21',
+      'image_cache:40',
+      'image_cache:41',
+      'image_cache:42',
+      'image_cache:43',
+      'image_cache:44',
+      'article_comments:50',
+      'article_comments:51',
     ]);
     expect((facts.find((fact) => fact.kind === 'messages')?.payload.opaque as { large: string }).large).toHaveLength(
-      513 * 1024,
+      LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD.length,
     );
-    expect(facts.find((fact) => fact.kind === 'conversations')?.payload.unknownConversationField).toEqual({
+    expect(facts.find((fact) => fact.kind === 'conversations')?.payload.unknownConversationField).toMatchObject({
       nested: true,
+      large: LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD,
     });
+    const [rootComment, replyComment] = facts.filter(
+      (fact): fact is Extract<MigrationFactRecord, { kind: 'article_comments' }> => fact.kind === 'article_comments',
+    );
+    expect(rootComment?.payload.unknownCommentField).toEqual({ keep: true });
+    expect(replyComment).toMatchObject({ parentSourceLocalId: '50', conversationSourceLocalId: '10' });
 
     const imageRecordIndexes = sessions
       .map((session, index) => (session.record?.kind === 'image_cache' ? index : -1))
       .filter((index) => index >= 0);
-    expect(imageRecordIndexes).toHaveLength(4);
+    expect(imageRecordIndexes).toHaveLength(5);
     for (const [index, recordIndex] of imageRecordIndexes.entries()) {
       const record = sessions[recordIndex]!.record;
       const asset = sessions[recordIndex + 1]!;
@@ -344,6 +267,11 @@ describe('IndexedDB migration facts transfer', () => {
       expect(record?.payload).not.toHaveProperty('id');
       expect(record?.payload).not.toHaveProperty('conversationId');
     }
+    const percentImage = facts.find(
+      (fact): fact is Extract<MigrationFactRecord, { kind: 'image_cache' }> =>
+        fact.kind === 'image_cache' && fact.sourceLocalId === '43',
+    );
+    expect(percentImage?.payload.unknownImageField).toEqual({ nested: LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD });
 
     const blobAsset = sessions[imageRecordIndexes[0]! + 1]!;
     expect(blobAsset.frames.filter((wireFrame) => wireFrame.type === 'data')).toHaveLength(3);
@@ -525,7 +453,7 @@ describe('IndexedDB migration facts transfer', () => {
         conversations: 2,
         sync_mappings: 1,
         messages: 2,
-        image_cache: 4,
+        image_cache: 5,
         article_comments: 2,
       },
     });
