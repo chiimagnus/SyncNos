@@ -10,7 +10,7 @@ function writeJson(p, obj) {
   writeFileSync(p, `${JSON.stringify(obj, null, 2)}\n`, 'utf-8');
 }
 
-function applyZenManifestPatches(manifest) {
+function applyZenManifestPatches(manifest, canonicalGeckoId) {
   const next = { ...(manifest || {}) };
 
   const existingBss =
@@ -21,7 +21,7 @@ function applyZenManifestPatches(manifest) {
   const resolvedGeckoId =
     process.env.FIREFOX_EXTENSION_ID && String(process.env.FIREFOX_EXTENSION_ID).trim()
       ? String(process.env.FIREFOX_EXTENSION_ID).trim()
-      : existingGecko.id || 'syncnos-webclipper@syncnos.app';
+      : existingGecko.id || canonicalGeckoId;
 
   next.browser_specific_settings = {
     ...existingBss,
@@ -36,6 +36,9 @@ function applyZenManifestPatches(manifest) {
 
 const repoRoot = resolveRepoRoot(import.meta.url);
 const webclipperRoot = resolveWebclipperRoot(repoRoot);
+const nativeHostContract = readJson(join(webclipperRoot, 'src', 'services', 'local-data', 'native-host-contract.json'));
+const canonicalGeckoId = String(nativeHostContract?.browsers?.firefox?.geckoId || '').trim();
+if (!canonicalGeckoId) throw new Error('[build] native host contract missing Firefox Gecko ID');
 
 const outDir = join(webclipperRoot, '.output');
 const wxtOut = join(outDir, 'firefox-mv3');
@@ -69,7 +72,7 @@ cpSync(wxtOut, tmpDir, { recursive: true });
 
 const tmpManifestPath = join(tmpDir, 'manifest.json');
 const tmpManifest = readJson(tmpManifestPath);
-writeJson(tmpManifestPath, applyZenManifestPatches(tmpManifest));
+writeJson(tmpManifestPath, applyZenManifestPatches(tmpManifest, canonicalGeckoId));
 
 run('zip', ['-r', '-q', '-Z', 'deflate', '-9', xpiPath, '.'], tmpDir);
 rmSync(tmpDir, { recursive: true, force: true });

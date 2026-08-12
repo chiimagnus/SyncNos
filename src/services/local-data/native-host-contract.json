@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "host": {
+    "name": "app.syncnos.localdata",
+    "protocolVersion": 1,
+    "schemaVersion": 1,
+    "databaseRelativePath": "syncnos.sqlite",
+    "nativeManifestVersion": 1,
+    "manifestFormat": "native-messaging-v1"
+  },
+  "browsers": {
+    "chrome": {
+      "runtimeId": "hmgjflllphdffeocddjjcfllifhejpok",
+      "origin": "chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/"
+    },
+    "edge": {
+      "runtimeId": "ijkpghlfmkbjcgafapjcjahaikmnjncl",
+      "origin": "chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/"
+    },
+    "firefox": {
+      "geckoId": "syncnos-webclipper@syncnos.app",
+      "allowedExtension": "syncnos-webclipper@syncnos.app",
+      "strictMinVersion": "142.0"
+    },
+    "safari": {
+      "localDataSupported": false
+    }
+  }
+}

@@ -2,6 +2,7 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
       "@ui/*": ["src/ui/*"],

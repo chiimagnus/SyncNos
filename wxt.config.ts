@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type UserManifestFn } from 'wxt';
+import { nativeHostContract } from './src/services/local-data/native-host-contract';
 
 const viteAlias = {
   '@ui': path.resolve('src/ui'),
@@ -41,8 +42,9 @@ function resolveChromiumBinaryForMac(): string | undefined {
 
 const chromeBinary = process.platform === 'darwin' ? resolveChromiumBinaryForMac() : undefined;
 
-const resolveManifest: UserManifestFn = (env) => {
+export const resolveManifest: UserManifestFn = (env) => {
   const isSafari = env.browser === 'safari';
+  const isFirefox = env.browser === 'firefox';
 
   // Base permissions shared by all browsers.
   const permissions: string[] = ['storage', 'contextMenus', 'tabs', 'webNavigation', 'scripting', 'alarms'];
@@ -58,7 +60,7 @@ const resolveManifest: UserManifestFn = (env) => {
     permissions.push('tabGroups');
   }
 
-  return {
+  const manifest = {
     name: isSafari ? '__MSG_name__' : '__MSG_extName__',
     version: '1.9.4',
     description: isSafari ? '__MSG_description__' : '__MSG_extDescription__',
@@ -93,6 +95,21 @@ const resolveManifest: UserManifestFn = (env) => {
       16: 'icons/icon-16.png',
       48: 'icons/icon-48.png',
       128: 'icons/icon-128.png',
+    },
+  };
+
+  if (!isFirefox) return manifest;
+
+  return {
+    ...manifest,
+    browser_specific_settings: {
+      gecko: {
+        id: nativeHostContract.browsers.firefox.geckoId,
+        strict_min_version: nativeHostContract.browsers.firefox.strictMinVersion,
+        data_collection_permissions: {
+          required: ['none'],
+        },
+      },
     },
   };
 };
