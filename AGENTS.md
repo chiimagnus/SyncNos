@@ -1,7 +1,5 @@
 # 仓库指南
 
-本仓库只维护 SyncNos WebClipper。iOS、macOS 与 CLI 已拆分到独立仓库。
-
 ## 分层与依赖方向
 
 - `src/ui/**`：React 组件、样式和 DOM surface。
