@@ -35,7 +35,7 @@ import {
 } from '@services/local-data/native-wire';
 
 import { FACTS_IDB_STORE_NAMES, openDb, type FactsIdbStoreName } from './schema';
-import { transactionDone } from './transactions';
+import { requestToPromise, transactionDone } from './transactions';
 
 // ponytail: one detached row keeps structured-clone memory within the single-record 64 MiB protocol ceiling; add measured byte-bounded batching only if migration throughput needs it.
 const FACTS_TRANSFER_PAGE_ROWS = 1;
@@ -70,6 +70,13 @@ export type IndexedDbFactsTransferInput = Readonly<{
   migrationId: MigrationId;
   onFrame: (frame: NativeWireFrame) => void | Promise<void>;
   signal?: AbortSignal;
+}>;
+
+export type FactsStoreCounts = Readonly<Record<FactsIdbStoreName, number>>;
+
+export type FactsEmptyVerification = Readonly<{
+  counts: FactsStoreCounts;
+  empty: boolean;
 }>;
 
 function fail(code: 'MIGRATION_VALIDATION_FAILED' | 'PAYLOAD_TOO_LARGE' = 'MIGRATION_VALIDATION_FAILED'): never {
@@ -537,5 +544,58 @@ export async function transferIndexedDbFacts(input: IndexedDbFactsTransferInput)
     return manifest.finalize();
   } finally {
     if (ownedDb) db.close();
+  }
+}
+
+/** Clears only the five migration fact stores. The migration coordinator owns the call site and receipt gate. */
+export async function clearFacts(input: Readonly<{ db?: IDBDatabase }> = {}): Promise<void> {
+  assertFactsStoreOrder();
+  const ownsDb = input.db == null;
+  const db = input.db ?? (await openDb());
+  try {
+    const transaction = db.transaction([...FACTS_IDB_STORE_NAMES], 'readwrite');
+    const completed = transactionDone(transaction);
+    try {
+      for (const storeName of FACTS_IDB_STORE_NAMES) transaction.objectStore(storeName).clear();
+      await completed;
+    } catch (error) {
+      abortQuietly(transaction);
+      await completed.catch(() => undefined);
+      throw error;
+    }
+  } finally {
+    if (ownsDb) db.close();
+  }
+}
+
+/** Counts every migration fact store in a fresh transaction; callers must require empty before declaring cleanup complete. */
+export async function verifyFactsEmpty(input: Readonly<{ db?: IDBDatabase }> = {}): Promise<FactsEmptyVerification> {
+  assertFactsStoreOrder();
+  const ownsDb = input.db == null;
+  const db = input.db ?? (await openDb());
+  try {
+    const transaction = db.transaction([...FACTS_IDB_STORE_NAMES], 'readonly');
+    const completed = transactionDone(transaction);
+    try {
+      const counts = await Promise.all(
+        FACTS_IDB_STORE_NAMES.map(async (storeName) => {
+          const count = await requestToPromise(transaction.objectStore(storeName).count());
+          if (!Number.isSafeInteger(count) || count < 0) fail();
+          return [storeName, count] as const;
+        }),
+      );
+      await completed;
+      const countsByStore = Object.freeze(Object.fromEntries(counts) as Record<FactsIdbStoreName, number>);
+      return Object.freeze({
+        counts: countsByStore,
+        empty: FACTS_IDB_STORE_NAMES.every((storeName) => countsByStore[storeName] === 0),
+      });
+    } catch (error) {
+      abortQuietly(transaction);
+      await completed.catch(() => undefined);
+      throw error;
+    }
+  } finally {
+    if (ownsDb) db.close();
   }
 }

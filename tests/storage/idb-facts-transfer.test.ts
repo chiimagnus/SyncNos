@@ -11,7 +11,7 @@ import {
   type NativeWireFrame,
 } from '@services/local-data/native-wire';
 import { FACTS_IDB_STORE_NAMES, DB_NAME, openDb } from '../../src/platform/idb/schema';
-import { transferIndexedDbFacts } from '../../src/platform/idb/facts-transfer';
+import { clearFacts, transferIndexedDbFacts, verifyFactsEmpty } from '../../src/platform/idb/facts-transfer';
 import { requestToPromise, transactionDone } from '../../src/platform/idb/transactions';
 
 const MIGRATION_ID = '1b8c5d79-6607-4f8f-9d7b-c8c3dadf0480';
@@ -493,5 +493,94 @@ describe('IndexedDB migration facts transfer', () => {
       }),
     ).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
     expect(completedManifest).toBe(false);
+  });
+
+  it('clears exactly the five fact stores in one transaction, then independently verifies every count', async () => {
+    const { db } = await seedCompleteFacts();
+    const originalTransaction = db.transaction.bind(db);
+    const transactionCalls: Array<Readonly<{ mode: IDBTransactionMode | undefined; stores: readonly string[] }>> = [];
+    const clearCalls: string[] = [];
+    (db as any).transaction = (storeNames: string | string[], mode?: IDBTransactionMode) => {
+      const stores = typeof storeNames === 'string' ? [storeNames] : [...storeNames];
+      const transaction = originalTransaction(storeNames, mode);
+      transactionCalls.push(Object.freeze({ mode, stores: Object.freeze(stores) }));
+      if (mode === 'readwrite') {
+        const originalObjectStore = transaction.objectStore.bind(transaction);
+        (transaction as any).objectStore = (storeName: string) => {
+          const store = originalObjectStore(storeName);
+          const originalClear = store.clear.bind(store);
+          (store as any).clear = () => {
+            clearCalls.push(storeName);
+            return originalClear();
+          };
+          return store;
+        };
+      }
+      return transaction;
+    };
+
+    expect(await verifyFactsEmpty({ db })).toEqual({
+      empty: false,
+      counts: {
+        conversations: 2,
+        sync_mappings: 1,
+        messages: 2,
+        image_cache: 4,
+        article_comments: 2,
+      },
+    });
+    await clearFacts({ db });
+    expect(await verifyFactsEmpty({ db })).toEqual({
+      empty: true,
+      counts: {
+        conversations: 0,
+        sync_mappings: 0,
+        messages: 0,
+        image_cache: 0,
+        article_comments: 0,
+      },
+    });
+
+    expect(clearCalls).toEqual([...FACTS_IDB_STORE_NAMES]);
+    expect(transactionCalls).toEqual([
+      { mode: 'readonly', stores: [...FACTS_IDB_STORE_NAMES] },
+      { mode: 'readwrite', stores: [...FACTS_IDB_STORE_NAMES] },
+      { mode: 'readonly', stores: [...FACTS_IDB_STORE_NAMES] },
+    ]);
+    (db as any).transaction = originalTransaction;
+  });
+
+  it('does not claim cleanup success when the clear or verification transaction fails', async () => {
+    const { db } = await seedCompleteFacts();
+    const originalTransaction = db.transaction.bind(db);
+    let failedClear = false;
+    (db as any).transaction = (storeNames: string | string[], mode?: IDBTransactionMode) => {
+      const transaction = originalTransaction(storeNames, mode);
+      if (mode !== 'readwrite' || failedClear) return transaction;
+      const originalObjectStore = transaction.objectStore.bind(transaction);
+      (transaction as any).objectStore = (storeName: string) => {
+        const store = originalObjectStore(storeName);
+        if (storeName !== 'messages') return store;
+        const originalClear = store.clear.bind(store);
+        (store as any).clear = () => {
+          failedClear = true;
+          const request = originalClear();
+          transaction.abort();
+          return request;
+        };
+        return store;
+      };
+      return transaction;
+    };
+
+    await expect(clearFacts({ db })).rejects.toThrow();
+    (db as any).transaction = originalTransaction;
+    expect(await verifyFactsEmpty({ db })).toMatchObject({ empty: false, counts: { conversations: 2, messages: 2 } });
+
+    (db as any).transaction = () => {
+      throw new Error('verification transaction unavailable');
+    };
+    await expect(verifyFactsEmpty({ db })).rejects.toThrow('verification transaction unavailable');
+    (db as any).transaction = originalTransaction;
   });
 });
