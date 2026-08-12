@@ -2,7 +2,19 @@ import {
   ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA,
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
-type UnknownRecord = Record<string, any>;
+import { uniqueConversationKey } from '@services/local-data/facts-archive';
+
+export {
+  mergeConversationRecord,
+  mergeMessageRecord,
+  mergeSyncMappingRecord,
+  isDataImageUrl,
+  normalizeFallbackImageUrl,
+  normalizeImageContentType,
+  rewriteSyncnosAssetUrlsInMarkdown,
+  SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
+  uniqueConversationKey,
+} from '@services/local-data/facts-archive';
 
 export const BACKUP_SCHEMA_VERSION = 1;
 export const BACKUP_ZIP_SCHEMA_VERSION = 2;
@@ -39,150 +51,6 @@ function isNonEmptyString(v: unknown): v is string {
 
 function isFinitePositiveInt(v: unknown) {
   return Number.isFinite(v) && Number(v) > 0 && Math.floor(Number(v)) === Number(v);
-}
-
-export function uniqueConversationKey(conversation: UnknownRecord): string {
-  const source = conversation && conversation.source ? String(conversation.source) : '';
-  const conversationKey = conversation && conversation.conversationKey ? String(conversation.conversationKey) : '';
-  if (!source || !conversationKey) return '';
-  return `${source}||${conversationKey}`;
-}
-
-function pickStringPreferExisting(existing: unknown, incoming: unknown) {
-  const a = existing == null ? '' : String(existing);
-  if (isNonEmptyString(a)) return a.trim();
-  const b = incoming == null ? '' : String(incoming);
-  return isNonEmptyString(b) ? b.trim() : '';
-}
-
-function safeFiniteNumber(value: unknown): number | null {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
-  const a = Array.isArray(existing) ? existing : [];
-  const b = Array.isArray(incoming) ? incoming : [];
-  const set = new Set<string>();
-  for (const x of a) {
-    if (isNonEmptyString(x)) set.add(String(x).trim());
-  }
-  for (const x of b) {
-    if (isNonEmptyString(x)) set.add(String(x).trim());
-  }
-  return Array.from(set);
-}
-
-export function mergeConversationRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-
-  const next: UnknownRecord = { ...a };
-  next.sourceType = pickStringPreferExisting(a.sourceType, b.sourceType) || 'chat';
-  next.source = pickStringPreferExisting(a.source, b.source);
-  next.conversationKey = pickStringPreferExisting(a.conversationKey, b.conversationKey);
-
-  next.title = pickStringPreferExisting(a.title, b.title);
-  next.url = pickStringPreferExisting(a.url, b.url);
-  next.author = pickStringPreferExisting(a.author, b.author);
-  next.publishedAt = pickStringPreferExisting(a.publishedAt, b.publishedAt);
-  next.warningFlags = mergeWarningFlags(a.warningFlags, b.warningFlags);
-
-  // notionPageId: never overwrite a non-empty local mapping.
-  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
-
-  const aCaptured = Number(a.lastCapturedAt) || 0;
-  const bCaptured = Number(b.lastCapturedAt) || 0;
-  next.lastCapturedAt = Math.max(aCaptured, bCaptured, 0);
-
-  return next;
-}
-
-function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownRecord) {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-  const aUpdated = Number(a.updatedAt) || 0;
-  const bUpdated = Number(b.updatedAt) || 0;
-  if (bUpdated && bUpdated > aUpdated) return true;
-
-  const aMd = a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
-  const bMd = b.contentMarkdown && String(b.contentMarkdown).trim() ? String(b.contentMarkdown) : '';
-  if (!aMd && bMd) return true;
-  return false;
-}
-
-export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-
-  const preferIncoming = shouldPreferIncomingMessage(a, b);
-  const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
-
-  const next: UnknownRecord = { ...base };
-  next.role = pickStringPreferExisting(base.role, 'assistant') || 'assistant';
-  next.contentText = String(next.contentText || '');
-  next.contentMarkdown = String(next.contentMarkdown || '');
-
-  const aUpdated = Number(a.updatedAt) || 0;
-  const bUpdated = Number(b.updatedAt) || 0;
-  const maxUpdated = Math.max(aUpdated, bUpdated, 0);
-  next.updatedAt = maxUpdated || Date.now();
-
-  const aSeq = Number(a.sequence);
-  const bSeq = Number(b.sequence);
-  if (Number.isFinite(bSeq)) next.sequence = bSeq;
-  else if (Number.isFinite(aSeq)) next.sequence = aSeq;
-  else next.sequence = 0;
-
-  return next;
-}
-
-export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
-  const a = existing && typeof existing === 'object' ? existing : {};
-  const b = incoming && typeof incoming === 'object' ? incoming : {};
-
-  const next: UnknownRecord = { ...a };
-  next.source = pickStringPreferExisting(a.source, b.source);
-  next.conversationKey = pickStringPreferExisting(a.conversationKey, b.conversationKey);
-
-  // notionPageId: only fill when missing locally.
-  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
-  // feishuDocId: only fill when missing locally.
-  next.feishuDocId = pickStringPreferExisting(a.feishuDocId, b.feishuDocId);
-
-  // cursor: prefer existing local value; only fill when missing locally.
-  next.lastSyncedMessageKey = pickStringPreferExisting(a.lastSyncedMessageKey, b.lastSyncedMessageKey);
-  const aSeq = Number(a.lastSyncedSequence);
-  const bSeq = Number(b.lastSyncedSequence);
-  if (Number.isFinite(aSeq)) next.lastSyncedSequence = aSeq;
-  else if (Number.isFinite(bSeq)) next.lastSyncedSequence = bSeq;
-
-  const chosenKey = pickStringPreferExisting(next.lastSyncedMessageKey, '');
-  const chosenSeq = safeFiniteNumber(next.lastSyncedSequence);
-  const existingKey = pickStringPreferExisting(a.lastSyncedMessageKey, '');
-  const incomingKey = pickStringPreferExisting(b.lastSyncedMessageKey, '');
-  const existingMatchesChosen = chosenKey
-    ? existingKey === chosenKey
-    : chosenSeq != null && Number.isFinite(aSeq) && aSeq === chosenSeq;
-  const incomingMatchesChosen = chosenKey
-    ? incomingKey === chosenKey
-    : chosenSeq != null && Number.isFinite(bSeq) && bSeq === chosenSeq;
-
-  const aAt = Number(a.lastSyncedAt);
-  const bAt = Number(b.lastSyncedAt);
-  if (Number.isFinite(aAt)) next.lastSyncedAt = aAt;
-  else if (Number.isFinite(bAt)) next.lastSyncedAt = bAt;
-
-  const aMessageUpdatedAt = safeFiniteNumber(a.lastSyncedMessageUpdatedAt);
-  const bMessageUpdatedAt = safeFiniteNumber(b.lastSyncedMessageUpdatedAt);
-  if (existingMatchesChosen && aMessageUpdatedAt != null) next.lastSyncedMessageUpdatedAt = aMessageUpdatedAt;
-  else if (incomingMatchesChosen && bMessageUpdatedAt != null) next.lastSyncedMessageUpdatedAt = bMessageUpdatedAt;
-
-  const aUpdated = Number(a.updatedAt) || 0;
-  const bUpdated = Number(b.updatedAt) || 0;
-  next.updatedAt = Math.max(aUpdated, bUpdated, 0);
-
-  return next;
 }
 
 export function filterStorageForBackup(storageLocal: unknown): Record<string, unknown> {

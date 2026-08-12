@@ -164,6 +164,51 @@ describe('backup service', () => {
     expect(entries.has(imageIndex.assets[0].blobPath)).toBe(true);
   });
 
+  it('keeps legacy data URL image export behavior after sharing the pure image helpers', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const t = db.transaction(['conversations', 'image_cache'], 'readwrite');
+    const conversationId = await reqToPromise<number>(
+      t.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'legacy-data-url',
+        title: 'Legacy image',
+        url: 'https://example.com',
+        warningFlags: [],
+        lastCapturedAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      t.objectStore('image_cache').add({
+        conversationId,
+        url: 'https://img.example/legacy.png',
+        dataUrl: 'data:image/png;base64,AQID',
+        byteSize: 3,
+        contentType: 'image/png',
+        createdAt: 1,
+        updatedAt: 1,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    db.close();
+
+    const entries = await extractZipEntries((await exportBackupZipV2()).blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const imageIndex = JSON.parse(new TextDecoder().decode(entries.get(manifest.assets.imageCacheIndexPath)!));
+    expect(imageIndex.assets).toHaveLength(1);
+    expect([...entries.get(imageIndex.assets[0].blobPath)!]).toEqual([1, 2, 3]);
+  });
+
   it('importBackupZipV2Merge restores image cache and rewrites syncnos-asset urls', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

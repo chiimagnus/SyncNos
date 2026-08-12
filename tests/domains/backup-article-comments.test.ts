@@ -10,6 +10,8 @@ import {
   validateArticleCommentsIndexDocument,
   validateBackupManifest,
 } from '@services/sync/backup/backup-utils';
+import { createMigrationCommentFact, createMigrationCommentGraphValidator } from '@services/local-data/facts-archive';
+import { nodeDigestProvider } from '../../packages/syncnoscli/src/runtime/node-digest';
 
 const root = (overrides: Record<string, unknown> = {}) => ({
   commentId: 1,
@@ -90,6 +92,30 @@ describe('backup article comments', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.warnings).toEqual([{ code: 'orphan_parent', commentId: 1 }]);
+  });
+
+  it('keeps the ZIP orphan warning while the migration archive rejects the same unresolvable parent', async () => {
+    const migrationComment = await createMigrationCommentFact({
+      sourceLocalId: 1,
+      row: {
+        id: 1,
+        parentId: 999,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com/a',
+        authorName: null,
+        quoteText: 'q',
+        commentText: 'c',
+        locator: null,
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      conversations: new Map([[10, { source: 'web', conversationKey: 'a' }]]),
+      digestProvider: nodeDigestProvider,
+      parentRootStructuralDigest: 'a'.repeat(64),
+    });
+    const graph = createMigrationCommentGraphValidator();
+    graph.add(migrationComment);
+    expect(() => graph.finalize()).toThrow('The migration facts could not be validated.');
   });
 
   it('serializes a canonical V2 graph and preserves author/locator fields', () => {

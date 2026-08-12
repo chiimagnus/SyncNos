@@ -257,6 +257,7 @@ describe('local data contracts', () => {
 
     expectErrorCode(() => normalizeSearchQuery('sync\u0000nos'), 'INVALID_ARGUMENT');
     expectErrorCode(() => normalizeSearchQuery('sync\u0085nos'), 'INVALID_ARGUMENT');
+    expectErrorCode(() => normalizeSearchQuery('sync\ud800'), 'INVALID_ARGUMENT');
     expectErrorCode(() => normalizeSearchQuery('😀'.repeat(MAX_SEARCH_QUERY_SCALARS + 1)), 'INVALID_ARGUMENT');
 
     const query = normalizeSearchQuery('SyncNos search');

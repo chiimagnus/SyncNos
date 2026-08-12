@@ -2,7 +2,9 @@ import { storageGetAll, storageSet } from '@platform/storage/local';
 import {
   BACKUP_ZIP_SCHEMA_VERSION,
   filterStorageForBackup,
+  isDataImageUrl,
   LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
+  normalizeImageContentType,
   uniqueConversationKey,
 } from '@services/sync/backup/backup-utils';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
@@ -69,18 +71,6 @@ function compareMessages(a: AnyRecord, b: AnyRecord) {
   return aKey.localeCompare(bKey);
 }
 
-function parseContentType(value: unknown): string {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  return raw.split(';')[0]!.trim().toLowerCase();
-}
-
-function isDataImageUrl(url: unknown): boolean {
-  const text = String(url || '').trim();
-  if (!text) return false;
-  return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
-}
-
 function base64ToBytes(base64: string): Uint8Array {
   const normalized = String(base64 || '').replace(/\s+/g, '');
   if (!normalized) return new Uint8Array();
@@ -131,7 +121,7 @@ function decodeDataImageUrlToBlob(dataUrl: string): Blob | null {
     .split(';')
     .map((part) => part.trim())
     .filter(Boolean);
-  const contentType = parseContentType(metaParts[0] || '');
+  const contentType = normalizeImageContentType(metaParts[0] || '');
   if (!contentType.startsWith('image/')) return null;
 
   const isBase64 = metaParts.some((part) => part.toLowerCase() === 'base64');
@@ -374,7 +364,7 @@ export async function exportBackupZipV2(
     else if (row && typeof row.dataUrl === 'string') blob = decodeDataImageUrlToBlob(row.dataUrl);
     if (!blob) continue;
 
-    const contentType = parseContentType(row.contentType || blob.type);
+    const contentType = normalizeImageContentType(row.contentType || blob.type);
     if (!contentType.startsWith('image/')) continue;
 
     const byteSize = Number(row.byteSize) || blob.size || 0;

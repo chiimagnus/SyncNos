@@ -5,6 +5,7 @@ import {
   mergeConversationRecord,
   mergeMessageRecord,
   mergeSyncMappingRecord,
+  rewriteSyncnosAssetUrlsInMarkdown,
   uniqueConversationKey,
   validateBackupDocument,
   validateBackupManifest,
@@ -15,6 +16,15 @@ describe('backup backup-utils', () => {
   it('uniqueConversationKey returns stable source||key', () => {
     expect(uniqueConversationKey({ source: 'chatgpt', conversationKey: 'c1' })).toBe('chatgpt||c1');
     expect(uniqueConversationKey({ source: '', conversationKey: 'c1' })).toBe('');
+  });
+
+  it('keeps the existing syncnos asset rewrite through the pure backup re-export', () => {
+    expect(
+      rewriteSyncnosAssetUrlsInMarkdown('![a](syncnos-asset://7) ![b](syncnos-asset://8)', {
+        remap: new Map([[7, 70]]),
+        fallbackUrlByOldId: new Map([[8, 'https://example.com/fallback.png']]),
+      }),
+    ).toBe('![a](syncnos-asset://70) ![b](https://example.com/fallback.png)');
   });
 
   it('filterStorageForBackup keeps non-sensitive settings and removes secrets', () => {

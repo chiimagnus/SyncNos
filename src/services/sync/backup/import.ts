@@ -5,6 +5,10 @@ import {
   mergeConversationRecord,
   mergeMessageRecord,
   mergeSyncMappingRecord,
+  normalizeFallbackImageUrl,
+  normalizeImageContentType,
+  rewriteSyncnosAssetUrlsInMarkdown,
+  SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC,
   uniqueConversationKey,
   validateBackupDocument,
   validateBackupManifest,
@@ -20,57 +24,6 @@ import {
 } from '@services/comments/domain/comment-archive';
 
 type AnyRecord = Record<string, any>;
-
-function parseContentType(value: unknown): string {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  return raw.split(';')[0]!.trim().toLowerCase();
-}
-
-const SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-
-function isHttpUrl(url: unknown): boolean {
-  const text = String(url || '').trim();
-  return /^https?:\/\//i.test(text);
-}
-
-function isDataImageUrl(url: unknown): boolean {
-  const text = String(url || '').trim();
-  if (!text) return false;
-  return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
-}
-
-function normalizeFallbackImageUrl(url: unknown): string {
-  const text = String(url || '').trim();
-  if (!text) return SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC;
-  if (isHttpUrl(text) || isDataImageUrl(text)) return text;
-  return SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC;
-}
-
-function rewriteSyncnosAssetUrlsInMarkdown(
-  markdown: string,
-  input: {
-    remap: Map<number, number>;
-    fallbackUrlByOldId: Map<number, string>;
-    defaultUrl?: string;
-  },
-): string {
-  const raw = String(markdown || '');
-  if (!raw) return raw;
-  if (!raw.includes('syncnos-asset://')) return raw;
-  const remap = input.remap;
-  const fallbackUrlByOldId = input.fallbackUrlByOldId;
-  const defaultUrl = normalizeFallbackImageUrl(input.defaultUrl || SYNCNOS_ASSET_MISSING_PLACEHOLDER_SRC);
-  return raw.replace(/syncnos-asset:\/\/(\d+)/gi, (full, idRaw) => {
-    const oldId = Number(idRaw);
-    if (!Number.isFinite(oldId) || oldId <= 0) return full;
-    const nextId = remap.get(oldId);
-    if (nextId) return `syncnos-asset://${nextId}`;
-    const fallback = fallbackUrlByOldId.get(oldId);
-    if (fallback) return fallback;
-    return defaultUrl;
-  });
-}
 
 export type ImportProgress = { done: number; total: number; stage: string };
 
@@ -757,7 +710,7 @@ export async function importBackupZipV2Merge(
         continue;
       }
 
-      const contentType = parseContentType(asset && asset.contentType ? asset.contentType : '');
+      const contentType = normalizeImageContentType(asset && asset.contentType ? asset.contentType : '');
       if (!contentType.startsWith('image/')) {
         if (i % 20 === 0) report();
         bump(1, 'Assets');
