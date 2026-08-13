@@ -30,6 +30,11 @@ describe('SyncNos CLI package contract', () => {
     expect(packageJson.dependencies).toEqual({ 'better-sqlite3': '13.0.3' });
     expect(packageJson.files).toEqual(['dist/**', 'prebuilds/**', 'README.md']);
     expect(packageJson.files).not.toContain('src/**');
+    expect(packageJson.scripts).toMatchObject({
+      postinstall: expect.stringContaining('dist/lifecycle.cjs'),
+      unregister: 'node dist/lifecycle.cjs unregister',
+    });
+    expect(packageJson.scripts).not.toHaveProperty('preuninstall');
     expect(rootPackageJson.private).toBe(true);
     expect(rootPackageJson.workspaces).toEqual(['packages/*']);
   });
@@ -73,6 +78,7 @@ describe('SyncNos CLI package contract', () => {
     const files = packed[0]?.files?.map((file) => String(file.path || '')) || [];
 
     expect(files).toContain('dist/cli.cjs');
+    expect(files).toContain('dist/lifecycle.cjs');
     expect(files).toContain('README.md');
     expect(files.some((file) => file.startsWith('src/') || file.startsWith('tests/'))).toBe(false);
     expect(files.some((file) => /(^|\/)([^/]*\.(?:sqlite|db)|\.env)$/i.test(file))).toBe(false);

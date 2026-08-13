@@ -7,6 +7,7 @@ import {
   readFile as nodeReadFile,
   realpath as nodeRealpath,
   rename as nodeRename,
+  unlink as nodeUnlink,
   writeFile as nodeWriteFile,
 } from 'node:fs/promises';
 import { posix, resolve as nodeResolve, win32 } from 'node:path';
@@ -85,6 +86,7 @@ export type NativeHostLauncherDependencies = Readonly<{
   readFile?: (path: string) => Promise<Buffer>;
   realpath?: (path: string) => Promise<string>;
   rename?: (source: string, destination: string) => Promise<void>;
+  unlink?: (path: string) => Promise<void>;
   writeFile?: (path: string, contents: Uint8Array, options: Readonly<{ flag: 'wx'; mode: number }>) => Promise<void>;
 }>;
 
@@ -104,6 +106,21 @@ export type NativeHostLauncherResult = Readonly<{
   ownerMarkerPath: string;
   platform: SyncNosRuntimePaths['platform'];
 }>;
+
+/** The verified runtime binding consumed by registrar sidecars and safe uninstall. */
+export type NativeHostLauncherOwnership = Readonly<{
+  configDigest: string;
+  configPath: string;
+  launcherDigest: string;
+  launcherPath: string;
+  ownerMarkerDigest: string;
+  ownerMarkerPath: string;
+  packageDigest: string;
+  platform: SyncNosRuntimePaths['platform'];
+  prebuiltDigest: string | null;
+}>;
+
+export type RemoveNativeHostLauncherResult = Readonly<{ removed: boolean }>;
 
 type ResolvedDependencies = Required<NativeHostLauncherDependencies>;
 
@@ -284,6 +301,7 @@ function resolveDependencies(input: NativeHostLauncherDependencies | undefined):
     readFile: input?.readFile ?? nodeReadFile,
     realpath: input?.realpath ?? nodeRealpath,
     rename: input?.rename ?? nodeRename,
+    unlink: input?.unlink ?? nodeUnlink,
     writeFile:
       input?.writeFile ??
       (async (path, contents, options) => {
@@ -441,16 +459,16 @@ async function loadLauncherSource(
   });
 }
 
-async function inspectExistingLauncher(
+async function inspectOwnedLauncher(
   paths: SyncNosRuntimePaths,
   dependencies: ResolvedDependencies,
-): Promise<'absent' | 'owned'> {
+): Promise<NativeHostLauncherOwnership | null> {
   const statuses = await Promise.all([
     lstatIfPresent(dependencies, paths.runtimeOwnerMarkerPath),
     lstatIfPresent(dependencies, paths.launcherConfigPath),
     lstatIfPresent(dependencies, paths.launcherPath),
   ]);
-  if (statuses.every((status) => status === null)) return 'absent';
+  if (statuses.every((status) => status === null)) return null;
   if (statuses.some((status) => status === null)) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
   for (const status of statuses) assertRegularFile(status, 'LAUNCHER_OWNERSHIP_INVALID');
 
@@ -479,7 +497,32 @@ async function inspectExistingLauncher(
   if (paths.platform === 'win32' && sha256(launcherBytes) !== config!.prebuiltDigest) {
     launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
   }
-  return 'owned';
+  return Object.freeze({
+    configDigest: marker!.configDigest,
+    configPath: paths.launcherConfigPath,
+    launcherDigest: marker!.launcherDigest,
+    launcherPath: paths.launcherPath,
+    ownerMarkerDigest: sha256(markerBytes),
+    ownerMarkerPath: paths.runtimeOwnerMarkerPath,
+    packageDigest: marker!.packageDigest,
+    platform: paths.platform,
+    prebuiltDigest: marker!.prebuiltDigest,
+  });
+}
+
+async function inspectExistingLauncher(
+  paths: SyncNosRuntimePaths,
+  dependencies: ResolvedDependencies,
+): Promise<'absent' | 'owned'> {
+  return (await inspectOwnedLauncher(paths, dependencies)) ? 'owned' : 'absent';
+}
+
+/** Reads the fixed runtime trio without creating it; malformed or partial state fails closed. */
+export async function inspectNativeHostLauncher(
+  input: Pick<EnsureNativeHostLauncherInput, 'dependencies' | 'paths'> = {},
+): Promise<NativeHostLauncherOwnership | null> {
+  const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
+  return await inspectOwnedLauncher(paths, resolveDependencies(input.dependencies));
 }
 
 async function assertTemporaryPathAbsent(
@@ -597,4 +640,38 @@ export async function ensureNativeHostLauncher(
     configPath: paths.launcherConfigPath,
     ownerMarkerPath: paths.runtimeOwnerMarkerPath,
   });
+}
+
+async function removeVerifiedOwnedFile(
+  paths: SyncNosRuntimePaths,
+  path: string,
+  expectedDigest: string,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  assertRuntimeOwnedFilePath(paths, path);
+  const bytes = await readVerifiedFile(dependencies, path, 'LAUNCHER_OWNERSHIP_INVALID');
+  if (sha256(bytes) !== expectedDigest) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  try {
+    await dependencies.unlink(path);
+  } catch (_error) {
+    launcherFailure('LAUNCHER_WRITE_FAILED');
+  }
+}
+
+/**
+ * Removes only the verified launcher trio. SQLite files, staging, and unknown contents
+ * are deliberately left untouched; Host-owned staging is cleaned by its own marker path.
+ */
+export async function removeNativeHostLauncher(
+  input: Pick<EnsureNativeHostLauncherInput, 'dependencies' | 'paths'> = {},
+): Promise<RemoveNativeHostLauncherResult> {
+  const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
+  const dependencies = resolveDependencies(input.dependencies);
+  const ownership = await inspectOwnedLauncher(paths, dependencies);
+  if (!ownership) return Object.freeze({ removed: false });
+
+  await removeVerifiedOwnedFile(paths, paths.launcherConfigPath, ownership.configDigest, dependencies);
+  await removeVerifiedOwnedFile(paths, paths.launcherPath, ownership.launcherDigest, dependencies);
+  await removeVerifiedOwnedFile(paths, paths.runtimeOwnerMarkerPath, ownership.ownerMarkerDigest, dependencies);
+  return Object.freeze({ removed: true });
 }

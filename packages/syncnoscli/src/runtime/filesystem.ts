@@ -14,13 +14,15 @@ export type RuntimeFileStatus = Readonly<{
 
 export type SpawnFileOptions = Readonly<{
   shell: false;
-  stdio: 'ignore';
+  stdio: 'ignore' | 'pipe';
   windowsHide: true;
 }>;
 
 export type SpawnFileResult = Readonly<{
   exitCode: number | null;
   signal: NodeJS.Signals | null;
+  stderr?: Buffer;
+  stdout?: Buffer;
 }>;
 
 export type RuntimeFilesystemDependencies = Readonly<{
@@ -46,6 +48,7 @@ export class SyncNosRuntimeFilesystemError extends Error {
       | 'RUNTIME_DIRECTORY_UNAVAILABLE'
       | 'WINDOWS_ATTRIB_FAILED'
       | 'WINDOWS_ATTRIB_INVALID'
+      | 'WINDOWS_SYSTEM_EXECUTABLE_INVALID'
       | 'WINDOWS_SYSTEM_ROOT_INVALID',
   ) {
     super(
@@ -88,8 +91,20 @@ export async function spawnFile(
 ): Promise<SpawnFileResult> {
   return await new Promise<SpawnFileResult>((resolve, reject) => {
     const child = nodeSpawn(file, [...argv], options);
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    if (options.stdio === 'pipe') {
+      child.stdout?.on('data', (chunk: Uint8Array) => stdout.push(Buffer.from(chunk)));
+      child.stderr?.on('data', (chunk: Uint8Array) => stderr.push(Buffer.from(chunk)));
+    }
     child.once('error', reject);
-    child.once('close', (exitCode, signal) => resolve({ exitCode, signal }));
+    child.once('close', (exitCode, signal) =>
+      resolve({
+        exitCode,
+        signal,
+        ...(options.stdio === 'pipe' ? { stderr: Buffer.concat(stderr), stdout: Buffer.concat(stdout) } : {}),
+      }),
+    );
   });
 }
 
@@ -155,24 +170,45 @@ async function assertAndRepairUnixDirectory(
   if (unixMode(repaired) !== 0o700) runtimeFilesystemFailure('RUNTIME_DIRECTORY_INVALID');
 }
 
-function windowsAttribPath(environment: Readonly<Record<string, string | undefined>>): string {
+function windowsSystemExecutablePath(
+  executable: 'attrib.exe' | 'reg.exe',
+  environment: Readonly<Record<string, string | undefined>>,
+): string {
   const systemRoot = environment.SystemRoot?.trim();
   if (!systemRoot || !win32.isAbsolute(systemRoot)) runtimeFilesystemFailure('WINDOWS_SYSTEM_ROOT_INVALID');
   const root = win32.resolve(systemRoot);
-  const attribPath = win32.resolve(root, 'System32', 'attrib.exe');
-  if (win32.dirname(attribPath).toLowerCase() !== win32.join(root, 'System32').toLowerCase()) {
+  const executablePath = win32.resolve(root, 'System32', executable);
+  if (win32.dirname(executablePath).toLowerCase() !== win32.join(root, 'System32').toLowerCase()) {
     runtimeFilesystemFailure('WINDOWS_SYSTEM_ROOT_INVALID');
   }
-  return attribPath;
+  return executablePath;
+}
+
+/** Resolves only an actual System32 executable; callers never search PATH or a shell. */
+export async function resolveVerifiedWindowsSystemExecutable(
+  executable: 'attrib.exe' | 'reg.exe',
+  input: Pick<RuntimeFilesystemDependencies, 'environment' | 'lstat'> = {},
+): Promise<string> {
+  const dependencies = resolveDependencies(input);
+  const executablePath = windowsSystemExecutablePath(executable, dependencies.environment);
+  const status = await lstatIfPresent(dependencies, executablePath);
+  if (!status || status.isSymbolicLink() || !status.isFile()) {
+    runtimeFilesystemFailure('WINDOWS_SYSTEM_EXECUTABLE_INVALID');
+  }
+  return executablePath;
 }
 
 async function markWindowsDirectoryHidden(
   paths: SyncNosRuntimePaths,
   dependencies: ResolvedRuntimeFilesystemDependencies,
 ): Promise<void> {
-  const attribPath = windowsAttribPath(dependencies.environment);
-  const attrib = await lstatIfPresent(dependencies, attribPath);
-  if (!attrib || attrib.isSymbolicLink() || !attrib.isFile()) runtimeFilesystemFailure('WINDOWS_ATTRIB_INVALID');
+  let attribPath: string;
+  try {
+    attribPath = await resolveVerifiedWindowsSystemExecutable('attrib.exe', dependencies);
+  } catch (error) {
+    if (error instanceof SyncNosRuntimeFilesystemError && error.code === 'WINDOWS_SYSTEM_ROOT_INVALID') throw error;
+    runtimeFilesystemFailure('WINDOWS_ATTRIB_INVALID');
+  }
 
   const result = await dependencies
     .spawnFile(attribPath, Object.freeze(['+H', paths.runtimeDirectory]), WINDOWS_ATTRIB_SPAWN_OPTIONS)

@@ -9,6 +9,7 @@ import {
   type LocalDataErrorCode,
 } from '@services/local-data/contracts';
 
+import { isOwnedFirefoxNativeHostManifest } from '../install/host-registration';
 import { cleanupStaleHostImportStaging, getFactsMigrationReceipt } from '../sqlite/archive-import';
 import { openReadOnly, openReadWriteForHost, type SyncNosSqliteHandle } from '../sqlite/database';
 import { readFactsRevision } from '../sqlite/revision';
@@ -273,7 +274,7 @@ export async function runNativeHost(input: NativeHostMainInput = {}): Promise<nu
 
   try {
     await validateNativeHostLaunch(argv, input.platform ?? process.platform, {
-      isOwnedFirefoxManifest: input.isOwnedFirefoxManifest,
+      isOwnedFirefoxManifest: input.isOwnedFirefoxManifest ?? isOwnedFirefoxNativeHostManifest,
     });
   } catch (error) {
     writeDiagnostic(
