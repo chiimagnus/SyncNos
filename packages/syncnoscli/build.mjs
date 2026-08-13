@@ -30,3 +30,30 @@ await build({
   external: ['better-sqlite3', 'better-sqlite3/*'],
   tsconfig: resolve(packageRoot, 'tsconfig.json'),
 });
+
+await build({
+  absWorkingDir: packageRoot,
+  stdin: {
+    contents:
+      "process.stderr.write('SyncNos Native Host is not available in this package build.\\n'); process.exitCode = 1;",
+    loader: 'ts',
+    resolveDir: packageRoot,
+    sourcefile: 'native-host-bootstrap.ts',
+  },
+  outfile: resolve(distDir, 'native-host.cjs'),
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node22',
+  sourcemap: false,
+  minifyWhitespace: true,
+  legalComments: 'none',
+  define: {
+    __SYNCNOSCLI_VERSION__: JSON.stringify(packageJson.version),
+  },
+  alias: {
+    '@services': resolve(packageRoot, '../../src/services'),
+  },
+  external: ['better-sqlite3', 'better-sqlite3/*'],
+  tsconfig: resolve(packageRoot, 'tsconfig.json'),
+});

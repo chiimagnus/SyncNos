@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "sourceSha256": "02a6d5ee9f11b1a3bc6351b8ed93c4a2d1ccf1d426b4a3ac1bcb51fefafcffd3",
+  "artifacts": {
+    "win32-x64": {
+      "file": "win32-x64/syncnos-native-host.exe",
+      "sha256": "dd8369ae598ec2552ce3bb95ac10c7b52a04b75df01328edc235a0d30c68895c"
+    },
+    "win32-arm64": {
+      "file": "win32-arm64/syncnos-native-host.exe",
+      "sha256": "8bd4d8ef29b674cebae70ec77f8e88cae5490760ca9b0771357e7f8e0e8a84e2"
+    }
+  }
+}

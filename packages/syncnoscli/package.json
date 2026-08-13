@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build": "node build.mjs",
+    "build:windows-host-shim": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-host-shim.ps1",
     "compile": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

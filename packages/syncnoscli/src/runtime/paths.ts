@@ -17,10 +17,13 @@ export type SyncNosRuntimePaths = Readonly<{
   databaseWalPath: string;
   homeDirectory: string;
   launcherConfigPath: string;
+  launcherConfigTemporaryPath: string;
   launcherPath: string;
+  launcherTemporaryPath: string;
   platform: SyncNosRuntimePlatform;
   runtimeDirectory: string;
   runtimeOwnerMarkerPath: string;
+  runtimeOwnerMarkerTemporaryPath: string;
   stagingDirectory: string;
 }>;
 
@@ -67,10 +70,16 @@ function createSyncNosRuntimePaths(platform: SyncNosRuntimePlatform, homeDirecto
     databaseWalPath: `${databasePath}-wal`,
     databaseShmPath: `${databasePath}-shm`,
     runtimeOwnerMarkerPath: api.join(runtimeDirectory, SYNCNOSCLI_RUNTIME_OWNER_MARKER_FILE_NAME),
+    runtimeOwnerMarkerTemporaryPath: api.join(runtimeDirectory, `${SYNCNOSCLI_RUNTIME_OWNER_MARKER_FILE_NAME}.next`),
     launcherConfigPath: api.join(runtimeDirectory, SYNCNOSCLI_NATIVE_HOST_LAUNCHER_CONFIG_FILE_NAME),
+    launcherConfigTemporaryPath: api.join(runtimeDirectory, `${SYNCNOSCLI_NATIVE_HOST_LAUNCHER_CONFIG_FILE_NAME}.next`),
     launcherPath: api.join(
       runtimeDirectory,
       platform === 'win32' ? SYNCNOSCLI_WINDOWS_LAUNCHER_FILE_NAME : SYNCNOSCLI_UNIX_LAUNCHER_FILE_NAME,
+    ),
+    launcherTemporaryPath: api.join(
+      runtimeDirectory,
+      `${platform === 'win32' ? SYNCNOSCLI_WINDOWS_LAUNCHER_FILE_NAME : SYNCNOSCLI_UNIX_LAUNCHER_FILE_NAME}.next`,
     ),
     stagingDirectory: api.join(runtimeDirectory, SYNCNOSCLI_STAGING_DIRECTORY_NAME),
   });
@@ -122,8 +131,11 @@ export function classifySyncNosRuntimePath(pathsValue: unknown, candidate: unkno
   if (resolved === paths.runtimeDirectory || resolved === paths.stagingDirectory) return 'runtime-owned-directory';
   if (
     resolved === paths.launcherPath ||
+    resolved === paths.launcherTemporaryPath ||
     resolved === paths.launcherConfigPath ||
-    resolved === paths.runtimeOwnerMarkerPath
+    resolved === paths.launcherConfigTemporaryPath ||
+    resolved === paths.runtimeOwnerMarkerPath ||
+    resolved === paths.runtimeOwnerMarkerTemporaryPath
   ) {
     return 'runtime-owned-file';
   }
