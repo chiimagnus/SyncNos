@@ -272,7 +272,7 @@ function canonicalJsonValue(value: unknown, depth = 0, ancestors = new Set<objec
         if (!Object.prototype.hasOwnProperty.call(value, index)) fail();
         next.push(canonicalJsonValue(value[index], depth + 1, ancestors));
       }
-      return next;
+      return Object.freeze(next);
     } finally {
       ancestors.delete(value);
     }
@@ -294,7 +294,7 @@ function canonicalJsonValue(value: unknown, depth = 0, ancestors = new Set<objec
         writable: true,
       });
     }
-    return next;
+    return Object.freeze(next);
   } finally {
     ancestors.delete(value);
   }

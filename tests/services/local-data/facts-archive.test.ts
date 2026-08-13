@@ -95,10 +95,19 @@ describe('local facts archive', () => {
   it('canonicalizes one JSON-compatible record with sorted keys, emoji-safe chunks, and exact decoding', () => {
     const canonical = encodeCanonicalJson({ z: '你好😀', a: { slash: '\\', quote: '"', nested: ['x', 1] } });
     expect(canonical.text).toBe('{"a":{"nested":["x",1],"quote":"\\\"","slash":"\\\\"},"z":"你好😀"}');
-    expect(decodeCanonicalJson(canonical.bytes)).toEqual({
+    const decoded = decodeCanonicalJson(canonical.bytes) as {
+      a: { nested: readonly unknown[]; quote: string; slash: string };
+      z: string;
+    };
+    expect(decoded).toEqual({
       a: { nested: ['x', 1], quote: '"', slash: '\\' },
       z: '你好😀',
     });
+    expect(Object.isFrozen(decoded)).toBe(true);
+    expect(Object.isFrozen(decoded.a)).toBe(true);
+    expect(Object.isFrozen(decoded.a.nested)).toBe(true);
+    expect(Reflect.set(decoded.a, 'quote', 'changed')).toBe(false);
+    expect(decoded.a.quote).toBe('"');
 
     const chunks = [...splitCanonicalJsonText(canonical, 9)];
     expect(chunks.join('')).toBe(canonical.text);
@@ -135,6 +144,8 @@ describe('local facts archive', () => {
     expect((conversation.payload.unknownConversationField as { large: string }).large).toBe(
       LOCAL_DATA_MIGRATION_LARGE_UNKNOWN_PAYLOAD,
     );
+    expect(Object.isFrozen(conversation.payload)).toBe(true);
+    expect(Object.isFrozen(conversation.payload.unknownConversationField)).toBe(true);
     expect(encodeMigrationFactRecord(conversation).bytes.byteLength).toBeGreaterThan(512 * 1024);
     expect(message.conversationSourceLocalId).toBe('10');
     expect(message.payload).not.toHaveProperty('conversationId');
