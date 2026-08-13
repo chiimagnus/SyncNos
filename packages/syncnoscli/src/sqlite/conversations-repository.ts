@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 import { mergeMigrationConversationPayload } from '@services/local-data/facts-archive';
 import { LocalDataContractError } from '@services/local-data/contracts';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
@@ -76,6 +78,13 @@ type SqliteConversationDeleteResult = Readonly<{
   deletedImageCache: number;
   deletedMappings: number;
   deletedMessages: number;
+}>;
+
+const SQLITE_CONVERSATION_LIST_CURSOR_VERSION = 1;
+
+export type SqliteConversationListScope = Readonly<{
+  siteKey: string;
+  sourceKey: string;
 }>;
 
 export type SqliteArticleUrlUpdateResult = Readonly<{
@@ -854,6 +863,78 @@ export function normalizeSqliteConversationListQuery(
     ...(Number.isFinite(fallbackLimit) && fallbackLimit > 0 ? { limit: fallbackLimit } : null),
   });
   return Object.freeze({ ...query, siteKey: normalizeConversationListSiteFilterKey(query.siteKey) });
+}
+
+/** A cursor is bound to the normalized list filters so callers cannot reuse it across scopes. */
+export function createSqliteConversationListScope(
+  queryInput?: ConversationListQueryInput | null,
+): SqliteConversationListScope {
+  const query = normalizeSqliteConversationListQuery(queryInput);
+  return Object.freeze({ sourceKey: query.sourceKey, siteKey: query.siteKey });
+}
+
+function cursorRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) invalidArgument();
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) invalidArgument();
+  return value as Record<string, unknown>;
+}
+
+function exactCursorKeys(value: Record<string, unknown>, keys: readonly string[]): void {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) invalidArgument();
+}
+
+export function encodeSqliteConversationListCursor(
+  cursor: Readonly<{ id: number; lastCapturedAt: number }>,
+  scope: SqliteConversationListScope,
+): string {
+  if (!Number.isSafeInteger(cursor.id) || cursor.id <= 0 || !Number.isFinite(cursor.lastCapturedAt)) invalidArgument();
+  return Buffer.from(
+    JSON.stringify({
+      version: SQLITE_CONVERSATION_LIST_CURSOR_VERSION,
+      sourceKey: scope.sourceKey,
+      siteKey: scope.siteKey,
+      lastCapturedAt: cursor.lastCapturedAt,
+      id: cursor.id,
+    }),
+    'utf8',
+  ).toString('base64url');
+}
+
+export function decodeSqliteConversationListCursor(
+  value: unknown,
+  scope: SqliteConversationListScope,
+): ConversationListCursor {
+  if (typeof value !== 'string' || !value) invalidArgument();
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(value, 'base64url');
+    if (!bytes.byteLength || bytes.toString('base64url') !== value) invalidArgument();
+  } catch (_error) {
+    invalidArgument();
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch (_error) {
+    invalidArgument();
+  }
+  const token = cursorRecord(parsed);
+  exactCursorKeys(token, ['version', 'sourceKey', 'siteKey', 'lastCapturedAt', 'id']);
+  if (
+    token.version !== SQLITE_CONVERSATION_LIST_CURSOR_VERSION ||
+    token.sourceKey !== scope.sourceKey ||
+    token.siteKey !== scope.siteKey ||
+    !Number.isSafeInteger(token.id) ||
+    Number(token.id) <= 0 ||
+    !Number.isFinite(token.lastCapturedAt)
+  ) {
+    invalidArgument();
+  }
+  return Object.freeze({ lastCapturedAt: Number(token.lastCapturedAt), id: Number(token.id) });
 }
 
 function readConversationListPageInSnapshot(

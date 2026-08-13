@@ -1,5 +1,3 @@
-import { Buffer } from 'node:buffer';
-
 import {
   LocalDataContractError,
   type ConversationListRequestPayload,
@@ -16,15 +14,15 @@ import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import { createCommentsRepository } from '../sqlite/comments-repository';
 import {
+  createSqliteConversationListScope,
   createConversationsRepository,
-  normalizeSqliteConversationListQuery,
+  decodeSqliteConversationListCursor,
+  encodeSqliteConversationListCursor,
 } from '../sqlite/conversations-repository';
 import { createMappingsRepository } from '../sqlite/mappings-repository';
 import { createMessagesRepository } from '../sqlite/messages-repository';
 import { createSearchRepository } from '../sqlite/search';
 import type { SyncNosSqliteDatabase } from '../sqlite/schema';
-
-const HOST_LIST_CURSOR_VERSION = 1;
 
 const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
   'CONVERSATION_BOOTSTRAP',
@@ -38,19 +36,6 @@ const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
 
 type NativeHostConnectedReadCommand = (typeof NATIVE_HOST_CONNECTED_READ_COMMANDS)[number];
 
-type HostListCursorToken = Readonly<{
-  id: number;
-  lastCapturedAt: number;
-  siteKey: string;
-  sourceKey: string;
-  version: typeof HOST_LIST_CURSOR_VERSION;
-}>;
-
-type HostListScope = Readonly<{
-  siteKey: string;
-  sourceKey: string;
-}>;
-
 function invalidArgument(): never {
   throw new LocalDataContractError('INVALID_ARGUMENT');
 }
@@ -59,75 +44,10 @@ function staleReference(): never {
   throw new LocalDataContractError('STALE_REFERENCE');
 }
 
-function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) invalidArgument();
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) invalidArgument();
-  return value as Record<string, unknown>;
-}
-
-function exactKeys(value: Record<string, unknown>, keys: readonly string[]): void {
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) invalidArgument();
-}
-
-function listScope(payload: ConversationListRequestPayload): HostListScope {
-  const query = normalizeSqliteConversationListQuery({
+function listScope(payload: ConversationListRequestPayload) {
+  return createSqliteConversationListScope({
     ...(payload.sourceKey ? { sourceKey: payload.sourceKey } : null),
     ...(payload.siteKey ? { siteKey: payload.siteKey } : null),
-  });
-  return Object.freeze({ sourceKey: query.sourceKey, siteKey: query.siteKey });
-}
-
-function encodeHostListCursor(cursor: Readonly<{ id: number; lastCapturedAt: number }>, scope: HostListScope): string {
-  if (!Number.isSafeInteger(cursor.id) || cursor.id <= 0 || !Number.isFinite(cursor.lastCapturedAt)) invalidArgument();
-  return Buffer.from(
-    JSON.stringify({
-      version: HOST_LIST_CURSOR_VERSION,
-      sourceKey: scope.sourceKey,
-      siteKey: scope.siteKey,
-      lastCapturedAt: cursor.lastCapturedAt,
-      id: cursor.id,
-    }),
-    'utf8',
-  ).toString('base64url');
-}
-
-function decodeHostListCursor(value: unknown, scope: HostListScope): HostListCursorToken {
-  if (typeof value !== 'string' || !value) invalidArgument();
-  let bytes: Buffer;
-  try {
-    bytes = Buffer.from(value, 'base64url');
-    if (!bytes.byteLength || bytes.toString('base64url') !== value) invalidArgument();
-  } catch (_error) {
-    invalidArgument();
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  } catch (_error) {
-    invalidArgument();
-  }
-  const token = record(parsed);
-  exactKeys(token, ['version', 'sourceKey', 'siteKey', 'lastCapturedAt', 'id']);
-  if (
-    token.version !== HOST_LIST_CURSOR_VERSION ||
-    token.sourceKey !== scope.sourceKey ||
-    token.siteKey !== scope.siteKey ||
-    !Number.isSafeInteger(token.id) ||
-    Number(token.id) <= 0 ||
-    !Number.isFinite(token.lastCapturedAt)
-  ) {
-    invalidArgument();
-  }
-  return Object.freeze({
-    version: HOST_LIST_CURSOR_VERSION,
-    sourceKey: scope.sourceKey,
-    siteKey: scope.siteKey,
-    lastCapturedAt: Number(token.lastCapturedAt),
-    id: Number(token.id),
   });
 }
 
@@ -171,12 +91,12 @@ function readConversationList(database: SyncNosSqliteDatabase, request: HostFact
         })()
       : (() => {
           if (request.command !== 'CONVERSATION_LOAD_MORE' || payload.cursor === undefined) invalidArgument();
-          const cursor = decodeHostListCursor(payload.cursor, scope);
+          const cursor = decodeSqliteConversationListCursor(payload.cursor, scope);
           return repository.getConversationListPage(query, cursor, payload.limit);
         })();
   return Object.freeze({
     ...page,
-    cursor: page.cursor ? encodeHostListCursor(page.cursor, scope) : null,
+    cursor: page.cursor ? encodeSqliteConversationListCursor(page.cursor, scope) : null,
   });
 }
 
