@@ -107,23 +107,23 @@ export function parseNativeHostContract(input: unknown): NativeHostContract {
   exactKeys(safari, 'browsers.safari', ['localDataSupported']);
   if (safari.localDataSupported !== false) throw new Error('Safari local data must stay unsupported');
 
-  return {
+  return Object.freeze({
     version: 1,
-    host: {
+    host: Object.freeze({
       name: hostName,
       protocolVersion: positiveInteger(host.protocolVersion, 'host.protocolVersion'),
       schemaVersion: positiveInteger(host.schemaVersion, 'host.schemaVersion'),
       databaseRelativePath: 'syncnos.sqlite',
       nativeManifestVersion: 1,
       manifestFormat: 'native-messaging-v1',
-    },
-    browsers: {
-      chrome,
-      edge,
-      firefox: { geckoId, allowedExtension, strictMinVersion },
-      safari: { localDataSupported: false },
-    },
-  };
+    }),
+    browsers: Object.freeze({
+      chrome: Object.freeze(chrome),
+      edge: Object.freeze(edge),
+      firefox: Object.freeze({ geckoId, allowedExtension, strictMinVersion }),
+      safari: Object.freeze({ localDataSupported: false }),
+    }),
+  });
 }
 
 export const nativeHostContract = parseNativeHostContract(rawContract);

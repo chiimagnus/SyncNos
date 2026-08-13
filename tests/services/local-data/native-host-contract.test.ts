@@ -36,6 +36,20 @@ describe('native host contract', () => {
     expect(nativeHostContract.browsers.safari.localDataSupported).toBe(false);
   });
 
+  it('exposes one deeply immutable runtime identity snapshot', () => {
+    const parsed = parseNativeHostContract(structuredClone(nativeHostContract));
+
+    expect(Object.isFrozen(parsed)).toBe(true);
+    expect(Object.isFrozen(parsed.host)).toBe(true);
+    expect(Object.isFrozen(parsed.browsers)).toBe(true);
+    expect(Object.isFrozen(parsed.browsers.chrome)).toBe(true);
+    expect(Object.isFrozen(parsed.browsers.edge)).toBe(true);
+    expect(Object.isFrozen(parsed.browsers.firefox)).toBe(true);
+    expect(Object.isFrozen(parsed.browsers.safari)).toBe(true);
+    expect(Reflect.set(parsed.browsers.chrome, 'runtimeId', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).toBe(false);
+    expect(parsed.browsers.chrome.runtimeId).toBe(nativeHostContract.browsers.chrome.runtimeId);
+  });
+
   it('rejects wildcard, duplicate, and malformed identity fields', () => {
     const wildcard = structuredClone(nativeHostContract);
     wildcard.browsers.chrome.origin = 'chrome-extension://*/';
