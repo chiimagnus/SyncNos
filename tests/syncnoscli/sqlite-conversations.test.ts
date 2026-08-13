@@ -291,7 +291,12 @@ describe('SQLite conversation repository', () => {
         createdAt: 1,
       });
       const deleted = repository.deleteConversationsByIds([keep.id]);
-      expect(deleted).toEqual({ deletedConversations: 1, deletedMappings: 0, deletedMessages: 0 });
+      expect(deleted).toEqual({
+        deletedConversations: 1,
+        deletedImageCache: 0,
+        deletedMappings: 0,
+        deletedMessages: 0,
+      });
       expect(database.prepare('SELECT id FROM article_comments WHERE id = ?').get(standalone)).toMatchObject({
         id: standalone,
       });

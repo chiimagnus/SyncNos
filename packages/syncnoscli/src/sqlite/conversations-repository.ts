@@ -18,6 +18,7 @@ import type {
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import { mapSqliteError } from './database';
+import { detachCommentsForDeletedConversationIds, moveCommentsForConversationMerge } from './comments-repository';
 import {
   canonicalJsonRecord,
   canonicalJsonText,
@@ -28,6 +29,7 @@ import {
 } from './fact-payload';
 import { deleteMappingsForConversationReferences, migrateSyncMappingKeyWithinTransaction } from './mappings-repository';
 import { deleteMessagesForConversationIds, moveMessagesForConversationMerge } from './messages-repository';
+import { deleteImagesForConversationIds, moveImagesForConversationMerge } from './images-repository';
 import { runFactsTransaction } from './revision';
 import type { SyncNosSqliteDatabase } from './schema';
 
@@ -66,12 +68,26 @@ type SqliteConversationMergeResult = Readonly<{
 
 type SqliteConversationDeleteResult = Readonly<{
   deletedConversations: number;
+  deletedImageCache: number;
   deletedMappings: number;
   deletedMessages: number;
 }>;
 
+export type SqliteArticleUrlUpdateResult = Readonly<{
+  conversationId: number;
+  conversationKey: string;
+  conversationSource: string;
+  fromCanonicalUrl: string;
+  merged: boolean;
+  toCanonicalUrl: string;
+}>;
+
 function invalidArgument(): never {
   throw new LocalDataContractError('INVALID_ARGUMENT');
+}
+
+function staleReference(): never {
+  throw new LocalDataContractError('STALE_REFERENCE');
 }
 
 function schemaMismatch(): never {
@@ -327,6 +343,41 @@ function buildConversationRecord(
   });
 }
 
+function writeConversationRecord(
+  database: SyncNosSqliteDatabase,
+  id: number,
+  next: ReturnType<typeof buildConversationRecord>,
+): ConversationRow {
+  const result = database
+    .prepare(
+      `UPDATE conversations
+          SET source = ?, conversation_key = ?, source_type = ?, title = ?, url = ?, author = ?, published_at = ?,
+              list_source_key = ?, list_site_key = ?, last_captured_at = ?, notion_page_id = ?, feishu_doc_id = ?,
+              payload_json = ?
+        WHERE id = ?`,
+    )
+    .run(
+      next.source,
+      next.conversationKey,
+      next.sourceType,
+      next.title,
+      next.url,
+      next.author,
+      next.publishedAt,
+      next.listSourceKey,
+      next.listSiteKey,
+      next.lastCapturedAt,
+      next.notionPageId,
+      next.feishuDocId,
+      next.payloadJson,
+      id,
+    );
+  if (Number(result.changes) !== 1) schemaMismatch();
+  const updated = selectConversationRowById(database, id);
+  if (!updated) schemaMismatch();
+  return updated;
+}
+
 function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Conversation {
   const payload = canonicalInputPayload(value);
   return execute(
@@ -342,33 +393,7 @@ function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Co
             nextConversationKey: next.conversationKey,
             fallbackNotionPageId: next.notionPageId,
           });
-          database
-            .prepare(
-              `UPDATE conversations
-                SET source = ?, conversation_key = ?, source_type = ?, title = ?, url = ?, author = ?, published_at = ?,
-                    list_source_key = ?, list_site_key = ?, last_captured_at = ?, notion_page_id = ?, feishu_doc_id = ?,
-                    payload_json = ?
-              WHERE id = ?`,
-            )
-            .run(
-              next.source,
-              next.conversationKey,
-              next.sourceType,
-              next.title,
-              next.url,
-              next.author,
-              next.publishedAt,
-              next.listSourceKey,
-              next.listSiteKey,
-              next.lastCapturedAt,
-              next.notionPageId,
-              next.feishuDocId,
-              next.payloadJson,
-              existing.id,
-            );
-          const updated = selectConversationRowById(database, existing.id);
-          if (!updated) schemaMismatch();
-          return asConversation(updated);
+          return asConversation(writeConversationRecord(database, existing.id, next));
         }
 
         const result = database
@@ -434,6 +459,63 @@ function mergeConversationPayload(
   return buildConversationRecord(mergedPayload, keep);
 }
 
+function unmergedConversationResult(
+  keepConversationId: number,
+  removeConversationId: number,
+): SqliteConversationMergeResult {
+  return Object.freeze({
+    keptConversationId: keepConversationId,
+    removedConversationId: removeConversationId,
+    movedImageCache: 0,
+    movedMessages: 0,
+    merged: false,
+  });
+}
+
+/** Runs inside a caller-owned facts transaction so compound operations cannot interleave a merge. */
+export function mergeConversationsWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{ keepConversationId: number; removeConversationId: number }>,
+): SqliteConversationMergeResult {
+  const keepConversationId = positiveId(input.keepConversationId);
+  const removeConversationId = positiveId(input.removeConversationId);
+  if (!keepConversationId || !removeConversationId) invalidArgument();
+  if (keepConversationId === removeConversationId)
+    return unmergedConversationResult(keepConversationId, removeConversationId);
+
+  const keep = selectConversationRowById(database, keepConversationId);
+  if (!keep) invalidArgument();
+  const remove = selectConversationRowById(database, removeConversationId);
+  if (!remove) return unmergedConversationResult(keepConversationId, removeConversationId);
+
+  const merged = mergeConversationPayload(keep, remove);
+  const movedMessages = moveMessagesForConversationMerge(database, { keepConversationId, removeConversationId });
+  const movedImageCache = moveImagesForConversationMerge(database, { keepConversationId, removeConversationId });
+  moveCommentsForConversationMerge(database, {
+    keepConversationId,
+    keepConversationSource: merged.source,
+    keepConversationKey: merged.conversationKey,
+    removeConversationId,
+  });
+  migrateSyncMappingKeyWithinTransaction(database, {
+    legacySource: remove.source,
+    legacyConversationKey: remove.conversation_key,
+    nextSource: merged.source,
+    nextConversationKey: merged.conversationKey,
+    fallbackNotionPageId: merged.notionPageId,
+  });
+  writeConversationRecord(database, keepConversationId, merged);
+  if (Number(database.prepare('DELETE FROM conversations WHERE id = ?').run(removeConversationId).changes) !== 1)
+    schemaMismatch();
+  return Object.freeze({
+    keptConversationId: keepConversationId,
+    removedConversationId: removeConversationId,
+    movedImageCache,
+    movedMessages,
+    merged: true,
+  });
+}
+
 function mergeConversationsByIds(
   database: SyncNosSqliteDatabase,
   input: Readonly<{ keepConversationId: number; removeConversationId: number }>,
@@ -441,75 +523,116 @@ function mergeConversationsByIds(
   const keepConversationId = positiveId(input.keepConversationId);
   const removeConversationId = positiveId(input.removeConversationId);
   if (!keepConversationId || !removeConversationId) invalidArgument();
-  if (keepConversationId === removeConversationId) {
+  if (keepConversationId === removeConversationId)
+    return unmergedConversationResult(keepConversationId, removeConversationId);
+  return execute(() => {
+    if (!selectConversationRowById(database, keepConversationId)) invalidArgument();
+    if (!selectConversationRowById(database, removeConversationId)) {
+      return unmergedConversationResult(keepConversationId, removeConversationId);
+    }
+    return runFactsTransaction(database, () =>
+      mergeConversationsWithinTransaction(database, { keepConversationId, removeConversationId }),
+    ).result;
+  });
+}
+
+/**
+ * Resolves the stable article reference again inside the write transaction, then changes
+ * its canonical URL without exposing a partial conversation/comment/mapping state.
+ */
+export function updateArticleConversationUrlWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{
+    conversationKey: unknown;
+    fromCanonicalUrl: unknown;
+    source: unknown;
+    toCanonicalUrl: unknown;
+  }>,
+): SqliteArticleUrlUpdateResult {
+  const source = safeString(input.source);
+  const conversationKey = safeString(input.conversationKey);
+  const fromCanonicalUrl = canonicalizeArticleUrl(input.fromCanonicalUrl);
+  const toCanonicalUrl = canonicalizeArticleUrl(input.toCanonicalUrl);
+  if (!source || !conversationKey || !fromCanonicalUrl || !toCanonicalUrl) invalidArgument();
+
+  const current = selectConversationRowBySourceAndKey(database, source, conversationKey);
+  if (!current) staleReference();
+  const currentCanonicalUrl = canonicalizeArticleUrl(current.url);
+  if (
+    source.toLowerCase() !== 'web' ||
+    safeString(current.source_type).toLowerCase() !== 'article' ||
+    !currentCanonicalUrl ||
+    currentCanonicalUrl !== fromCanonicalUrl
+  ) {
+    staleReference();
+  }
+  if (fromCanonicalUrl === toCanonicalUrl) {
     return Object.freeze({
-      keptConversationId: keepConversationId,
-      removedConversationId: removeConversationId,
-      movedImageCache: 0,
-      movedMessages: 0,
+      conversationId: current.id,
+      conversationKey: current.conversation_key,
+      conversationSource: current.source,
+      fromCanonicalUrl,
       merged: false,
+      toCanonicalUrl,
     });
   }
 
-  return execute(() => {
-    const keep = selectConversationRowById(database, keepConversationId);
-    if (!keep) invalidArgument();
-    const remove = selectConversationRowById(database, removeConversationId);
-    if (!remove) {
-      return Object.freeze({
-        keptConversationId: keepConversationId,
-        removedConversationId: removeConversationId,
-        movedImageCache: 0,
-        movedMessages: 0,
-        merged: false,
-      });
-    }
-    return runFactsTransaction(database, () => {
-      const merged = mergeConversationPayload(keep, remove);
-      const movedMessages = moveMessagesForConversationMerge(database, {
-        keepConversationId,
-        removeConversationId,
-      });
-      migrateSyncMappingKeyWithinTransaction(database, {
-        legacySource: remove.source,
-        legacyConversationKey: remove.conversation_key,
-        nextSource: keep.source,
-        nextConversationKey: keep.conversation_key,
-        fallbackNotionPageId: merged.notionPageId,
-      });
-      database
-        .prepare(
-          `UPDATE conversations
-              SET source = ?, conversation_key = ?, source_type = ?, title = ?, url = ?, author = ?, published_at = ?,
-                  list_source_key = ?, list_site_key = ?, last_captured_at = ?, notion_page_id = ?, feishu_doc_id = ?,
-                  payload_json = ?
-            WHERE id = ?`,
-        )
-        .run(
-          merged.source,
-          merged.conversationKey,
-          merged.sourceType,
-          merged.title,
-          merged.url,
-          merged.author,
-          merged.publishedAt,
-          merged.listSourceKey,
-          merged.listSiteKey,
-          merged.lastCapturedAt,
-          merged.notionPageId,
-          merged.feishuDocId,
-          merged.payloadJson,
-          keepConversationId,
-        );
-      database.prepare('DELETE FROM conversations WHERE id = ?').run(removeConversationId);
-      return Object.freeze({
-        keptConversationId: keepConversationId,
-        removedConversationId: removeConversationId,
-        movedImageCache: 0,
-        movedMessages,
-        merged: true,
-      });
-    }).result;
+  const targetConversationKey = `article:${toCanonicalUrl}`;
+  const conflict = selectConversationRowBySourceAndKey(database, 'web', targetConversationKey);
+  if (conflict && conflict.id !== current.id) {
+    const merged = mergeConversationsWithinTransaction(database, {
+      keepConversationId: conflict.id,
+      removeConversationId: current.id,
+    });
+    if (!merged.merged) schemaMismatch();
+    const kept = selectConversationRowById(database, conflict.id);
+    if (!kept) schemaMismatch();
+    const next = buildConversationRecord(
+      {
+        ...storedPayload(kept.payload_json),
+        source: 'web',
+        sourceType: 'article',
+        conversationKey: targetConversationKey,
+        url: toCanonicalUrl,
+      } as JsonRecord,
+      kept,
+    );
+    const updated = writeConversationRecord(database, kept.id, next);
+    return Object.freeze({
+      conversationId: updated.id,
+      conversationKey: updated.conversation_key,
+      conversationSource: updated.source,
+      fromCanonicalUrl,
+      merged: true,
+      toCanonicalUrl,
+    });
+  }
+
+  const next = buildConversationRecord(
+    {
+      ...storedPayload(current.payload_json),
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: targetConversationKey,
+      url: toCanonicalUrl,
+    } as JsonRecord,
+    current,
+  );
+  migrateSyncMappingKeyWithinTransaction(database, {
+    legacySource: current.source,
+    legacyConversationKey: current.conversation_key,
+    nextSource: next.source,
+    nextConversationKey: next.conversationKey,
+    fallbackNotionPageId: next.notionPageId,
+  });
+  const updated = writeConversationRecord(database, current.id, next);
+  return Object.freeze({
+    conversationId: updated.id,
+    conversationKey: updated.conversation_key,
+    conversationSource: updated.source,
+    fromCanonicalUrl,
+    merged: false,
+    toCanonicalUrl,
   });
 }
 
@@ -518,10 +641,14 @@ function deleteConversationsByIds(
   values: readonly unknown[],
 ): SqliteConversationDeleteResult {
   const ids = [...new Set(values.map(positiveId).filter((id): id is number => id !== null))];
-  if (!ids.length) return Object.freeze({ deletedConversations: 0, deletedMappings: 0, deletedMessages: 0 });
+  if (!ids.length) {
+    return Object.freeze({ deletedConversations: 0, deletedImageCache: 0, deletedMappings: 0, deletedMessages: 0 });
+  }
   return execute(() => {
     const existing = ids.filter((id) => selectConversationRowById(database, id));
-    if (!existing.length) return Object.freeze({ deletedConversations: 0, deletedMappings: 0, deletedMessages: 0 });
+    if (!existing.length) {
+      return Object.freeze({ deletedConversations: 0, deletedImageCache: 0, deletedMappings: 0, deletedMessages: 0 });
+    }
     return runFactsTransaction(database, () => {
       const conversations = existing
         .map((id) => selectConversationRowById(database, id))
@@ -537,10 +664,18 @@ function deleteConversationsByIds(
           conversationKey: conversation.conversation_key,
         })),
       );
+      const deletedImageCache = deleteImagesForConversationIds(
+        database,
+        conversations.map((conversation) => conversation.id),
+      );
+      detachCommentsForDeletedConversationIds(
+        database,
+        conversations.map((conversation) => conversation.id),
+      );
       let deletedConversations = 0;
       const statement = database.prepare('DELETE FROM conversations WHERE id = ?');
       for (const id of existing) deletedConversations += Number(statement.run(id).changes) || 0;
-      return Object.freeze({ deletedConversations, deletedMappings, deletedMessages });
+      return Object.freeze({ deletedConversations, deletedImageCache, deletedMappings, deletedMessages });
     }).result;
   });
 }

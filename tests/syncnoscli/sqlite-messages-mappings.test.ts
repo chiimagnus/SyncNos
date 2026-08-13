@@ -296,6 +296,7 @@ describe('SQLite sync mappings repository', () => {
       mappings.setSyncCursor(conversation.id, { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 });
       expect(conversations.deleteConversationsByIds([conversation.id])).toEqual({
         deletedConversations: 1,
+        deletedImageCache: 0,
         deletedMappings: 1,
         deletedMessages: 1,
       });
