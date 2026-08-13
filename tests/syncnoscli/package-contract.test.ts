@@ -7,8 +7,20 @@ import { LOCAL_DATA_PROTOCOL_VERSION } from '@services/local-data/contracts';
 
 const repoRoot = resolve(__dirname, '../..');
 const packageRoot = resolve(repoRoot, 'packages/syncnoscli');
+const sqlitePackageRoot = resolve(repoRoot, 'node_modules/better-sqlite3');
 const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as Record<string, any>;
 const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8')) as Record<string, any>;
+
+const SQLITE_PREBUILD_TARGETS = [
+  'darwin-arm64',
+  'darwin-x64',
+  'linux-arm64',
+  'linux-x64',
+  'linuxmusl-arm64',
+  'linuxmusl-x64',
+  'win32-arm64',
+  'win32-x64',
+] as const;
 
 describe('SyncNos CLI package contract', () => {
   it('keeps the published package narrow and pins its SQLite runtime', () => {
@@ -34,6 +46,21 @@ describe('SyncNos CLI package contract', () => {
     expect(execFileSync(process.execPath, [binary, '--version'], { encoding: 'utf8' }).trim()).toBe(
       packageJson.version,
     );
+  });
+
+  it('uses bundled SQLite prebuilds without an install-time source build', () => {
+    const sqlitePackagePath = resolve(sqlitePackageRoot, 'package.json');
+    expect(existsSync(sqlitePackagePath)).toBe(true);
+
+    const sqlitePackage = JSON.parse(readFileSync(sqlitePackagePath, 'utf8')) as Record<string, any>;
+    expect(sqlitePackage.version).toBe('13.0.3');
+    expect(sqlitePackage.gypfile).toBe(false);
+    expect(sqlitePackage.scripts ?? {}).not.toHaveProperty('preinstall');
+    expect(sqlitePackage.scripts ?? {}).not.toHaveProperty('install');
+    expect(sqlitePackage.scripts ?? {}).not.toHaveProperty('postinstall');
+    for (const target of SQLITE_PREBUILD_TARGETS) {
+      expect(existsSync(resolve(sqlitePackageRoot, 'prebuilds', `${target}.node`))).toBe(true);
+    }
   });
 
   it('packs no source, tests, SQLite files, or credentials', () => {
