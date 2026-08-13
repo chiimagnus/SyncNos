@@ -24,11 +24,16 @@ export type SqliteFtsCapability = Readonly<{
 
 const META_DATABASE_UUID = 'database_uuid';
 const META_FACTS_REVISION = 'facts_revision';
+const META_FTS_INDEX_STATUS = 'fts_index_status';
 const META_FTS_REASON = 'fts_unavailable_reason';
 const META_FTS_STATUS = 'fts_status';
 const META_SCHEMA_VERSION = 'contract_schema_version';
-const FTS_TABLE_NAME = 'conversation_fts';
+export const SQLITE_FTS_TABLE_NAME = 'conversation_fts';
 const FTS_PROBE_TABLE_NAME = 'syncnos_fts_probe_v1';
+const SQLITE_FTS_TABLE_SIGNATURE =
+  "createvirtualtableconversation_ftsusingfts5(conversation_idunindexed,title,body,tokenize='trigram')";
+
+type SqliteFtsIndexStatus = 'needs-rebuild' | 'ready';
 
 function schemaMismatch(): never {
   throw new LocalDataContractError('SCHEMA_MISMATCH');
@@ -277,6 +282,11 @@ function initializeMeta(database: SyncNosSqliteDatabase): void {
     schemaMismatch();
   }
   setMetaValue(database, META_FACTS_REVISION, revision ?? '0');
+  const ftsStatus = metaValue(database, META_FTS_STATUS);
+  if (ftsStatus !== null && ftsStatus !== 'available' && ftsStatus !== 'unavailable') schemaMismatch();
+  const ftsIndexStatus = metaValue(database, META_FTS_INDEX_STATUS);
+  if (ftsIndexStatus !== null && ftsIndexStatus !== 'needs-rebuild' && ftsIndexStatus !== 'ready') schemaMismatch();
+  setMetaValue(database, META_FTS_INDEX_STATUS, ftsIndexStatus ?? 'needs-rebuild');
   setMetaValue(database, META_SCHEMA_VERSION, String(SQLITE_SCHEMA_VERSION));
 }
 
@@ -297,42 +307,246 @@ function rollbackSavepoint(database: SyncNosSqliteDatabase, name: string): void 
   database.exec(`ROLLBACK TO ${name}; RELEASE ${name};`);
 }
 
-function ftsTableUsesTrigram(database: SyncNosSqliteDatabase): boolean {
+/** The exact derived schema is the ownership proof before a recovery path may drop it. */
+function hasVerifiedFtsTable(database: SyncNosSqliteDatabase): boolean {
   const row = database
     .prepare<[string, string], { sql: string | null }>('SELECT sql FROM sqlite_master WHERE type = ? AND name = ?')
-    .get('table', FTS_TABLE_NAME);
-  return Boolean(row?.sql && /tokenize\s*=\s*['"]trigram['"]/i.test(row.sql));
+    .get('table', SQLITE_FTS_TABLE_NAME);
+  return Boolean(row?.sql && row.sql.replaceAll(/\s+/g, '').toLowerCase() === SQLITE_FTS_TABLE_SIGNATURE);
 }
 
 function markFtsUnavailable(database: SyncNosSqliteDatabase, error: unknown): void {
+  setMetaValue(database, META_FTS_INDEX_STATUS, 'needs-rebuild');
   setMetaValue(database, META_FTS_STATUS, 'unavailable');
   setMetaValue(database, META_FTS_REASON, ftsFailureReason(error));
 }
 
+function sqliteErrorCode(error: unknown): string {
+  return error && typeof error === 'object' && typeof (error as { code?: unknown }).code === 'string'
+    ? (error as { code: string }).code
+    : '';
+}
+
+function isFtsLocalFailure(error: unknown): boolean {
+  const code = sqliteErrorCode(error);
+  return code === 'SYNCNOS_FTS_LOCAL' || code.startsWith('SQLITE_ERROR') || code.startsWith('SQLITE_CONSTRAINT');
+}
+
+function ftsLocalFailure(message: string): Error {
+  return Object.assign(new Error(message), { code: 'SYNCNOS_FTS_LOCAL' });
+}
+
+function runFtsSavepoint(database: SyncNosSqliteDatabase, name: string, operation: () => void): boolean {
+  let started = false;
+  try {
+    database.exec(`SAVEPOINT ${name};`);
+    started = true;
+    operation();
+    database.exec(`RELEASE ${name};`);
+    return true;
+  } catch (error) {
+    if (started) rollbackSavepoint(database, name);
+    if (!isFtsLocalFailure(error)) throw error;
+    markFtsUnavailable(database, error);
+    return false;
+  }
+}
+
 /** The probe is rolled back so FTS support is capability data, never a second facts source. */
-function ensureFtsCapability(database: SyncNosSqliteDatabase): void {
+function probeFtsCapability(database: SyncNosSqliteDatabase): boolean {
+  let started = false;
   try {
     database.exec('SAVEPOINT syncnos_fts_probe;');
+    started = true;
     database.exec(`CREATE VIRTUAL TABLE ${FTS_PROBE_TABLE_NAME} USING fts5 (content, tokenize='trigram');`);
     rollbackSavepoint(database, 'syncnos_fts_probe');
+    return true;
   } catch (error) {
+    if (started) rollbackSavepoint(database, 'syncnos_fts_probe');
+    if (!isFtsLocalFailure(error)) throw error;
     markFtsUnavailable(database, error);
-    return;
+    return false;
   }
+}
 
-  try {
-    database.exec('SAVEPOINT syncnos_fts_create;');
+function createFtsTable(database: SyncNosSqliteDatabase): boolean {
+  return runFtsSavepoint(database, 'syncnos_fts_create', () => {
     database.exec(
-      `CREATE VIRTUAL TABLE IF NOT EXISTS ${FTS_TABLE_NAME} USING fts5 (conversation_id UNINDEXED, title, body, tokenize='trigram');`,
+      `CREATE VIRTUAL TABLE ${SQLITE_FTS_TABLE_NAME} USING fts5 (conversation_id UNINDEXED, title, body, tokenize='trigram');`,
     );
-    if (!ftsTableUsesTrigram(database)) schemaMismatch();
-    database.exec('RELEASE syncnos_fts_create;');
-    setMetaValue(database, META_FTS_STATUS, 'available');
-    deleteMetaValue(database, META_FTS_REASON);
-  } catch (error) {
-    rollbackSavepoint(database, 'syncnos_fts_create');
-    markFtsUnavailable(database, error);
+    if (!hasVerifiedFtsTable(database)) throw ftsLocalFailure('conversation FTS table is not a verified trigram table');
+  });
+}
+
+function recreateVerifiedFtsTable(database: SyncNosSqliteDatabase): boolean {
+  return runFtsSavepoint(database, 'syncnos_fts_recreate', () => {
+    if (!hasVerifiedFtsTable(database)) throw ftsLocalFailure('conversation FTS table ownership is not verified');
+    database.exec(`DROP TABLE ${SQLITE_FTS_TABLE_NAME};`);
+    database.exec(
+      `CREATE VIRTUAL TABLE ${SQLITE_FTS_TABLE_NAME} USING fts5 (conversation_id UNINDEXED, title, body, tokenize='trigram');`,
+    );
+    if (!hasVerifiedFtsTable(database))
+      throw ftsLocalFailure('conversation FTS table recreation did not preserve trigram');
+  });
+}
+
+function verifyFtsTable(database: SyncNosSqliteDatabase): boolean {
+  return runFtsSavepoint(database, 'syncnos_fts_verify', () => {
+    database
+      .prepare(`SELECT rowid FROM ${SQLITE_FTS_TABLE_NAME} WHERE ${SQLITE_FTS_TABLE_NAME} MATCH ? LIMIT 1`)
+      .get('"syncnos-fts-healthcheck"');
+  });
+}
+
+function markFtsAvailable(database: SyncNosSqliteDatabase): void {
+  setMetaValue(database, META_FTS_STATUS, 'available');
+  deleteMetaValue(database, META_FTS_REASON);
+}
+
+/** Recreates only a verified owned index; a foreign/mismatched table is never dropped. */
+function ensureFtsCapability(database: SyncNosSqliteDatabase): boolean {
+  const status = metaValue(database, META_FTS_STATUS);
+  const verifiedTable = hasVerifiedFtsTable(database);
+  if (status === 'available' && verifiedTable && verifyFtsTable(database)) return true;
+
+  if (!probeFtsCapability(database)) return false;
+  if (verifiedTable) {
+    if (!recreateVerifiedFtsTable(database)) return false;
+  } else if (tableExists(database, SQLITE_FTS_TABLE_NAME)) {
+    markFtsUnavailable(database, ftsLocalFailure('conversation FTS table ownership is not verified'));
+    return false;
+  } else if (!createFtsTable(database)) {
+    return false;
   }
+  setMetaValue(database, META_FTS_INDEX_STATUS, 'needs-rebuild');
+  if (!verifyFtsTable(database)) return false;
+  markFtsAvailable(database);
+  return true;
+}
+
+function ftsIndexStatus(database: SyncNosSqliteDatabase): SqliteFtsIndexStatus | null {
+  const value = metaValue(database, META_FTS_INDEX_STATUS);
+  if (value === null) return null;
+  if (value === 'needs-rebuild' || value === 'ready') return value;
+  schemaMismatch();
+}
+
+function ftsIsReady(database: SyncNosSqliteDatabase): boolean {
+  return (
+    metaValue(database, META_FTS_STATUS) === 'available' &&
+    ftsIndexStatus(database) === 'ready' &&
+    hasVerifiedFtsTable(database)
+  );
+}
+
+function assertFtsWriteTransaction(database: SyncNosSqliteDatabase): void {
+  if (!database.inTransaction) throw new LocalDataContractError('INVALID_ARGUMENT');
+}
+
+type FtsDocument = Readonly<{
+  body: string;
+  conversationId: number;
+  title: string;
+}>;
+
+function readFtsDocument(database: SyncNosSqliteDatabase, conversationId: number): FtsDocument | null {
+  const conversation = database.prepare('SELECT id, title FROM conversations WHERE id = ?').get(conversationId) as
+    | Readonly<{ id?: unknown; title?: unknown }>
+    | undefined;
+  if (!conversation) return null;
+  if (
+    !Number.isSafeInteger(conversation.id) ||
+    Number(conversation.id) <= 0 ||
+    typeof conversation.title !== 'string'
+  ) {
+    schemaMismatch();
+  }
+  const messages = database
+    .prepare(
+      `SELECT content_text, content_markdown
+         FROM messages
+        WHERE conversation_id = ?
+        ORDER BY sequence ASC, id ASC`,
+    )
+    .all(conversation.id) as Array<Readonly<{ content_markdown?: unknown; content_text?: unknown }>>;
+  const body = messages
+    .map((message) => {
+      if (typeof message.content_text !== 'string' || typeof message.content_markdown !== 'string') schemaMismatch();
+      return message.content_text || message.content_markdown;
+    })
+    .join('\n');
+  return Object.freeze({ body, conversationId: Number(conversation.id), title: conversation.title });
+}
+
+function rebuildVerifiedFtsIndex(database: SyncNosSqliteDatabase): boolean {
+  const rebuilt = runFtsSavepoint(database, 'syncnos_fts_rebuild', () => {
+    database.prepare(`DELETE FROM ${SQLITE_FTS_TABLE_NAME}`).run();
+    const nextConversation = database.prepare('SELECT id FROM conversations WHERE id > ? ORDER BY id ASC LIMIT 1');
+    const insertDocument = database.prepare(
+      `INSERT INTO ${SQLITE_FTS_TABLE_NAME} (conversation_id, title, body) VALUES (?, ?, ?)`,
+    );
+    let afterConversationId = 0;
+    for (;;) {
+      const row = nextConversation.get(afterConversationId) as Readonly<{ id?: unknown }> | undefined;
+      if (!row) break;
+      if (!Number.isSafeInteger(row.id) || Number(row.id) <= afterConversationId) schemaMismatch();
+      afterConversationId = Number(row.id);
+      const document = readFtsDocument(database, afterConversationId);
+      if (!document) schemaMismatch();
+      insertDocument.run(document.conversationId, document.title, document.body);
+    }
+  });
+  if (rebuilt) setMetaValue(database, META_FTS_INDEX_STATUS, 'ready');
+  return rebuilt;
+}
+
+/** Reprobes/rebuilds only in an already authorized schema or facts transaction. */
+export function ensureSqliteFtsIndexWithinFactsTransaction(database: SyncNosSqliteDatabase): boolean {
+  assertFtsWriteTransaction(database);
+  if (!ensureFtsCapability(database)) return false;
+  if (ftsIndexStatus(database) === 'ready') return true;
+  return rebuildVerifiedFtsIndex(database);
+}
+
+/** Rebuilds the verified derived index without retrying a failure from this transaction. */
+export function rebuildSqliteFtsIndexWithinFactsTransaction(database: SyncNosSqliteDatabase): boolean {
+  assertFtsWriteTransaction(database);
+  if (metaValue(database, META_FTS_STATUS) !== 'available' || !hasVerifiedFtsTable(database)) return false;
+  return rebuildVerifiedFtsIndex(database);
+}
+
+/**
+ * ponytail: one refresh rebuilds one conversation body in O(the conversation's message count).
+ * Upgrade to a per-message index plus grouping only if profiling proves this write path hot.
+ */
+export function refreshConversationFtsDocumentWithinFactsTransaction(
+  database: SyncNosSqliteDatabase,
+  conversationId: number,
+): void {
+  assertFtsWriteTransaction(database);
+  if (!ftsIsReady(database)) return;
+  const document = readFtsDocument(database, conversationId);
+  const refreshed = runFtsSavepoint(database, 'syncnos_fts_refresh', () => {
+    database.prepare(`DELETE FROM ${SQLITE_FTS_TABLE_NAME} WHERE conversation_id = ?`).run(conversationId);
+    if (document) {
+      database
+        .prepare(`INSERT INTO ${SQLITE_FTS_TABLE_NAME} (conversation_id, title, body) VALUES (?, ?, ?)`)
+        .run(document.conversationId, document.title, document.body);
+    }
+  });
+  if (refreshed) setMetaValue(database, META_FTS_INDEX_STATUS, 'ready');
+}
+
+export function deleteConversationFtsDocumentWithinFactsTransaction(
+  database: SyncNosSqliteDatabase,
+  conversationId: number,
+): void {
+  assertFtsWriteTransaction(database);
+  if (!ftsIsReady(database)) return;
+  const deleted = runFtsSavepoint(database, 'syncnos_fts_delete', () => {
+    database.prepare(`DELETE FROM ${SQLITE_FTS_TABLE_NAME} WHERE conversation_id = ?`).run(conversationId);
+  });
+  if (deleted) setMetaValue(database, META_FTS_INDEX_STATUS, 'ready');
 }
 
 function assertSchemaIdentity(database: SyncNosSqliteDatabase, allowFreshDatabase: boolean): number {
@@ -367,7 +581,7 @@ export function migrateSqliteSchema(database: SyncNosSqliteDatabase): void {
     database.exec(`PRAGMA application_id = ${SQLITE_APPLICATION_ID};`);
     database.exec(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION};`);
     initializeMeta(database);
-    ensureFtsCapability(database);
+    ensureSqliteFtsIndexWithinFactsTransaction(database);
     database.exec('COMMIT;');
   } catch (error) {
     try {
@@ -386,6 +600,7 @@ export function assertReadableSqliteSchema(database: SyncNosSqliteDatabase): voi
   if (metaValue(database, META_SCHEMA_VERSION) !== String(SQLITE_SCHEMA_VERSION)) schemaMismatch();
   const databaseUuid = metaValue(database, META_DATABASE_UUID);
   const factsRevision = metaValue(database, META_FACTS_REVISION);
+  const indexStatus = ftsIndexStatus(database);
   const ftsStatus = metaValue(database, META_FTS_STATUS);
   if (
     !databaseUuid ||
@@ -393,6 +608,7 @@ export function assertReadableSqliteSchema(database: SyncNosSqliteDatabase): voi
     !factsRevision ||
     !/^(0|[1-9][0-9]*)$/.test(factsRevision) ||
     !Number.isSafeInteger(Number(factsRevision)) ||
+    (indexStatus !== null && indexStatus !== 'needs-rebuild' && indexStatus !== 'ready') ||
     (ftsStatus !== 'available' && ftsStatus !== 'unavailable')
   ) {
     schemaMismatch();
@@ -405,10 +621,15 @@ export function readSqliteMeta(database: SyncNosSqliteDatabase, key: string): st
 
 export function getSqliteFtsCapability(database: SyncNosSqliteDatabase): SqliteFtsCapability {
   const status = metaValue(database, META_FTS_STATUS);
-  if (status === 'available' && ftsTableUsesTrigram(database)) return Object.freeze({ available: true, reason: null });
+  if (status === 'available' && ftsIndexStatus(database) === 'ready' && hasVerifiedFtsTable(database)) {
+    return Object.freeze({ available: true, reason: null });
+  }
   return Object.freeze({
     available: false,
-    reason: metaValue(database, META_FTS_REASON) ?? 'FTS5 or trigram is unavailable',
+    reason:
+      status === 'available'
+        ? 'FTS index needs rebuilding'
+        : (metaValue(database, META_FTS_REASON) ?? 'FTS5 or trigram is unavailable'),
   });
 }
 

@@ -3,12 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
   LocalDataContractError,
+  normalizeSearchQuery,
 } from '@services/local-data/contracts';
 import {
   createMigrationCommentFact,
@@ -31,6 +32,7 @@ import { openReadWriteForHost } from '../../packages/syncnoscli/src/sqlite/datab
 import { createImagesRepository } from '../../packages/syncnoscli/src/sqlite/images-repository';
 import { createMessagesRepository } from '../../packages/syncnoscli/src/sqlite/messages-repository';
 import { readFactsRevision } from '../../packages/syncnoscli/src/sqlite/revision';
+import { createSearchRepository } from '../../packages/syncnoscli/src/sqlite/search';
 import { nodeDigestProvider } from '../../packages/syncnoscli/src/runtime/node-digest';
 import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
 
@@ -333,6 +335,11 @@ describe('SQLite staged facts import', () => {
       };
       expect(messageRow.content_markdown).toBe(`![asset](syncnos-asset://${imageRow.id})`);
       expect(messageRow.payload_json).toContain('futureMessageField');
+      expect(
+        createSearchRepository(handle.database)
+          .searchConversations({ query: normalizeSearchQuery('asset') })
+          .items.map((item) => item.conversationKey),
+      ).toEqual([`article:${articleUrl}`]);
       expect(handle.database.prepare('SELECT payload_json FROM conversations').get()).toMatchObject({
         payload_json: expect.stringContaining('futureConversationField'),
       });
@@ -381,6 +388,67 @@ describe('SQLite staged facts import', () => {
       );
       await expectRejected(() => mismatch.complete(mismatchEmission.finalize()), 'MIGRATION_RECEIPT_MISMATCH');
       mismatch.cleanup();
+    } finally {
+      handle.close();
+    }
+  });
+
+  it('commits facts, mappings, receipt, and revision when only the derived FTS rebuild fails', async () => {
+    const handle = await openDatabase();
+    try {
+      const migrationId = randomUUID();
+      const importer = await importerFor(handle.database, migrationId);
+      const emission = await createEmission(migrationId);
+      const conversation = createMigrationConversationFact({
+        row: {
+          conversationKey: 'fts-import-failure',
+          id: 1,
+          lastCapturedAt: 1,
+          source: 'chatgpt',
+          sourceType: 'chat',
+          title: 'Imported while FTS is unavailable',
+        },
+        sourceLocalId: 1,
+      });
+      const mapping = createMigrationSyncMappingFact({
+        row: {
+          conversationKey: 'fts-import-failure',
+          id: 2,
+          notionPageId: 'mapping-survives',
+          source: 'chatgpt',
+          updatedAt: 1,
+        },
+        sourceLocalId: 2,
+      });
+      await emitRecord(importer, emission, conversation);
+      await emitRecord(importer, emission, mapping);
+
+      const originalPrepare = handle.database.prepare.bind(handle.database);
+      const ftsFailure = vi.spyOn(handle.database, 'prepare').mockImplementation(((sql: string) => {
+        if (sql.includes('INSERT INTO conversation_fts')) {
+          throw Object.assign(new Error('fts rebuild failed'), { code: 'SQLITE_ERROR' });
+        }
+        return originalPrepare(sql);
+      }) as typeof handle.database.prepare);
+      let result: Awaited<ReturnType<StagedFactsImporter['complete']>>;
+      try {
+        result = await importer.complete(emission.finalize());
+      } finally {
+        ftsFailure.mockRestore();
+      }
+
+      expect(result!).toMatchObject({ alreadyCommitted: false, factsRevision: 1 });
+      expect(handle.database.prepare('SELECT COUNT(*) AS count FROM conversations').get()).toEqual({ count: 1 });
+      expect(handle.database.prepare('SELECT COUNT(*) AS count FROM sync_mappings').get()).toEqual({ count: 1 });
+      expect(handle.database.prepare('SELECT COUNT(*) AS count FROM migration_receipts').get()).toEqual({ count: 1 });
+      expect(readFactsRevision(handle.database)).toBe(1);
+      expect(handle.database.prepare("SELECT value FROM meta WHERE key = 'fts_status'").get()).toEqual({
+        value: 'unavailable',
+      });
+      expect(handle.database.prepare("SELECT value FROM meta WHERE key = 'fts_index_status'").get()).toEqual({
+        value: 'needs-rebuild',
+      });
+      importer.cleanup();
     } finally {
       handle.close();
     }

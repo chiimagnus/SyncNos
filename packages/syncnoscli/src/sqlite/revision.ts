@@ -1,6 +1,6 @@
 import { LocalDataContractError } from '@services/local-data/contracts';
 
-import { readSqliteMeta, type SyncNosSqliteDatabase } from './schema';
+import { ensureSqliteFtsIndexWithinFactsTransaction, readSqliteMeta, type SyncNosSqliteDatabase } from './schema';
 
 const FACTS_REVISION_META_KEY = 'facts_revision';
 
@@ -39,6 +39,9 @@ export function runFactsTransaction<T>(
   if (database.inTransaction) throw new LocalDataContractError('BUSY');
   database.exec('BEGIN IMMEDIATE;');
   try {
+    // A facts write is the next authorized chance to recover a derived FTS index.
+    // A local FTS fault is contained by its savepoint; a base database fault still aborts this transaction.
+    ensureSqliteFtsIndexWithinFactsTransaction(database);
     const result = operation();
     if (result && typeof result === 'object' && typeof (result as { then?: unknown }).then === 'function') {
       throw new LocalDataContractError('INVALID_ARGUMENT');

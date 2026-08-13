@@ -13,7 +13,7 @@ import {
   type JsonRecord,
 } from './fact-payload';
 import { runFactsTransaction } from './revision';
-import type { SyncNosSqliteDatabase } from './schema';
+import { refreshConversationFtsDocumentWithinFactsTransaction, type SyncNosSqliteDatabase } from './schema';
 
 type MessageRow = Readonly<{
   id: number;
@@ -512,7 +512,11 @@ function syncConversationMessages(
     () =>
       runFactsTransaction(database, () => {
         if (!conversationExists(database, conversationId)) invalidArgument();
-        return syncMessagesWithinTransaction(database, conversationId, messages, options);
+        const result = syncMessagesWithinTransaction(database, conversationId, messages, options);
+        if (result.upserted || result.deleted) {
+          refreshConversationFtsDocumentWithinFactsTransaction(database, conversationId);
+        }
+        return result;
       }).result,
   );
 }

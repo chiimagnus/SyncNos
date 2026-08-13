@@ -42,7 +42,11 @@ import {
   upsertMigrationMessageWithinTransaction,
 } from './messages-repository';
 import { bumpFactsRevision } from './revision';
-import type { SyncNosSqliteDatabase } from './schema';
+import {
+  ensureSqliteFtsIndexWithinFactsTransaction,
+  rebuildSqliteFtsIndexWithinFactsTransaction,
+  type SyncNosSqliteDatabase,
+} from './schema';
 
 const MAX_RECEIPT_COMMENT_DIAGNOSTICS = 32;
 const ASSET_URL_PATTERN = /syncnos-asset:\/\/(\d+)/gi;
@@ -724,6 +728,7 @@ function importStagedFacts(
       }
       const result = receiptResult(receipt.result_json);
       if (result.migrationId !== input.migrationId || result.manifestDigest !== input.manifestDigest) schemaMismatch();
+      ensureSqliteFtsIndexWithinFactsTransaction(database);
       database.exec('COMMIT;');
       return Object.freeze({ alreadyCommitted: true, result });
     }
@@ -733,6 +738,8 @@ function importStagedFacts(
     importMessages(database, input.migrationId);
     importImages(database, input.migrationId);
     rewriteMessages(database, input.migrationId);
+    ensureSqliteFtsIndexWithinFactsTransaction(database);
+    rebuildSqliteFtsIndexWithinFactsTransaction(database);
     const commentAmbiguity = importComments(database, input.migrationId);
     const factsRevision = bumpFactsRevision(database);
     const result: StoredImportResult = Object.freeze({

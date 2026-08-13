@@ -32,7 +32,11 @@ import { deleteMappingsForConversationReferences, migrateSyncMappingKeyWithinTra
 import { deleteMessagesForConversationIds, moveMessagesForConversationMerge } from './messages-repository';
 import { deleteImagesForConversationIds, moveImagesForConversationMerge } from './images-repository';
 import { runFactsTransaction } from './revision';
-import type { SyncNosSqliteDatabase } from './schema';
+import {
+  deleteConversationFtsDocumentWithinFactsTransaction,
+  refreshConversationFtsDocumentWithinFactsTransaction,
+  type SyncNosSqliteDatabase,
+} from './schema';
 
 type ConversationRow = Readonly<{
   id: number;
@@ -441,6 +445,7 @@ function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Co
       runFactsTransaction(database, () => {
         const existing = findExistingConversationForPayload(database, payload);
         const next = buildConversationRecord(payload, existing);
+        let stored: ConversationRow;
         if (existing) {
           migrateSyncMappingKeyWithinTransaction(database, {
             legacySource: existing.source,
@@ -449,10 +454,12 @@ function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Co
             nextConversationKey: next.conversationKey,
             fallbackNotionPageId: next.notionPageId,
           });
-          return asConversation(writeConversationRecord(database, existing.id, next));
+          stored = writeConversationRecord(database, existing.id, next);
+        } else {
+          stored = insertConversationRecord(database, next);
         }
-
-        return asConversation(insertConversationRecord(database, next));
+        refreshConversationFtsDocumentWithinFactsTransaction(database, stored.id);
+        return asConversation(stored);
       }).result,
   );
 }
@@ -537,6 +544,8 @@ export function mergeConversationsWithinTransaction(
   writeConversationRecord(database, keepConversationId, merged);
   if (Number(database.prepare('DELETE FROM conversations WHERE id = ?').run(removeConversationId).changes) !== 1)
     schemaMismatch();
+  deleteConversationFtsDocumentWithinFactsTransaction(database, removeConversationId);
+  refreshConversationFtsDocumentWithinFactsTransaction(database, keepConversationId);
   return Object.freeze({
     keptConversationId: keepConversationId,
     removedConversationId: removeConversationId,
@@ -628,6 +637,7 @@ export function updateArticleConversationUrlWithinTransaction(
       kept,
     );
     const updated = writeConversationRecord(database, kept.id, next);
+    refreshConversationFtsDocumentWithinFactsTransaction(database, updated.id);
     return Object.freeze({
       conversationId: updated.id,
       conversationKey: updated.conversation_key,
@@ -656,6 +666,7 @@ export function updateArticleConversationUrlWithinTransaction(
     fallbackNotionPageId: next.notionPageId,
   });
   const updated = writeConversationRecord(database, current.id, next);
+  refreshConversationFtsDocumentWithinFactsTransaction(database, updated.id);
   return Object.freeze({
     conversationId: updated.id,
     conversationKey: updated.conversation_key,
@@ -705,6 +716,7 @@ function deleteConversationsByIds(
       let deletedConversations = 0;
       const statement = database.prepare('DELETE FROM conversations WHERE id = ?');
       for (const id of existing) deletedConversations += Number(statement.run(id).changes) || 0;
+      for (const id of existing) deleteConversationFtsDocumentWithinFactsTransaction(database, id);
       return Object.freeze({ deletedConversations, deletedImageCache, deletedMappings, deletedMessages });
     }).result;
   });

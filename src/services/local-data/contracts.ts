@@ -648,6 +648,40 @@ export function parsePlainSnippetHighlights(snippet: unknown, value: unknown): P
   return highlights;
 }
 
+export type LocalDataSearchFacet = Readonly<{
+  count: number;
+  key: string;
+  label: string;
+}>;
+
+export type LocalDataSearchFacets = Readonly<{
+  sites: readonly LocalDataSearchFacet[];
+  sources: readonly LocalDataSearchFacet[];
+}>;
+
+export type LocalDataSearchResult = Readonly<{
+  backendConversationId: number;
+  conversationKey: string;
+  highlights: readonly PlainSnippetHighlight[];
+  lastCapturedAt: number;
+  score: number | null;
+  siteKey: string;
+  snippet: string;
+  source: string;
+  sourceType: string;
+  title: string;
+  url: string;
+}>;
+
+export type LocalDataSearchPage = Readonly<{
+  cursor: SearchCursorBinding | null;
+  factsRevision: number;
+  facets: LocalDataSearchFacets;
+  hasMore: boolean;
+  items: readonly LocalDataSearchResult[];
+  truncatedByScanLimit: boolean;
+}>;
+
 export const STREAM_OPERATION_LIMITS: Readonly<Record<LocalDataStreamOperation, number>> = Object.freeze({
   'capture-snapshot': MAX_CAPTURE_SNAPSHOT_BYTES,
   'conversation-detail': MAX_DETAIL_PREVIEW_BYTES,
