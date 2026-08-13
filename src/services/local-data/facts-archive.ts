@@ -707,8 +707,7 @@ function pickStringPreferExisting(existing: unknown, incoming: unknown): string 
 }
 
 function safeFiniteNumber(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
@@ -780,10 +779,10 @@ export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: Unknow
   next.notionPageId = pickStringPreferExisting(local.notionPageId, remote.notionPageId);
   next.feishuDocId = pickStringPreferExisting(local.feishuDocId, remote.feishuDocId);
   next.lastSyncedMessageKey = pickStringPreferExisting(local.lastSyncedMessageKey, remote.lastSyncedMessageKey);
-  const localSequence = Number(local.lastSyncedSequence);
-  const remoteSequence = Number(remote.lastSyncedSequence);
-  if (Number.isFinite(localSequence)) next.lastSyncedSequence = localSequence;
-  else if (Number.isFinite(remoteSequence)) next.lastSyncedSequence = remoteSequence;
+  const localSequence = safeFiniteNumber(local.lastSyncedSequence);
+  const remoteSequence = safeFiniteNumber(remote.lastSyncedSequence);
+  if (localSequence != null) next.lastSyncedSequence = localSequence;
+  else if (remoteSequence != null) next.lastSyncedSequence = remoteSequence;
 
   const chosenKey = pickStringPreferExisting(next.lastSyncedMessageKey, '');
   const chosenSequence = safeFiniteNumber(next.lastSyncedSequence);
@@ -791,15 +790,15 @@ export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: Unknow
   const remoteKey = pickStringPreferExisting(remote.lastSyncedMessageKey, '');
   const localMatches = chosenKey
     ? localKey === chosenKey
-    : chosenSequence != null && Number.isFinite(localSequence) && localSequence === chosenSequence;
+    : chosenSequence != null && localSequence != null && localSequence === chosenSequence;
   const remoteMatches = chosenKey
     ? remoteKey === chosenKey
-    : chosenSequence != null && Number.isFinite(remoteSequence) && remoteSequence === chosenSequence;
+    : chosenSequence != null && remoteSequence != null && remoteSequence === chosenSequence;
 
-  const localSyncedAt = Number(local.lastSyncedAt);
-  const remoteSyncedAt = Number(remote.lastSyncedAt);
-  if (Number.isFinite(localSyncedAt)) next.lastSyncedAt = localSyncedAt;
-  else if (Number.isFinite(remoteSyncedAt)) next.lastSyncedAt = remoteSyncedAt;
+  const localSyncedAt = safeFiniteNumber(local.lastSyncedAt);
+  const remoteSyncedAt = safeFiniteNumber(remote.lastSyncedAt);
+  if (localSyncedAt != null) next.lastSyncedAt = localSyncedAt;
+  else if (remoteSyncedAt != null) next.lastSyncedAt = remoteSyncedAt;
 
   const localMessageUpdatedAt = safeFiniteNumber(local.lastSyncedMessageUpdatedAt);
   const remoteMessageUpdatedAt = safeFiniteNumber(remote.lastSyncedMessageUpdatedAt);

@@ -1,5 +1,4 @@
-import { decodeCanonicalJson, encodeCanonicalJson } from '@services/local-data/facts-archive';
-import { LocalDataContractError, type JsonObject, type JsonValue } from '@services/local-data/contracts';
+import { LocalDataContractError } from '@services/local-data/contracts';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
 import {
@@ -19,10 +18,18 @@ import type {
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import { mapSqliteError } from './database';
+import {
+  canonicalJsonRecord,
+  canonicalJsonText,
+  positiveId,
+  readCanonicalJsonRecord,
+  safeString,
+  type JsonRecord,
+} from './fact-payload';
+import { deleteMappingsForConversationReferences, migrateSyncMappingKeyWithinTransaction } from './mappings-repository';
+import { deleteMessagesForConversationIds, moveMessagesForConversationMerge } from './messages-repository';
 import { runFactsTransaction } from './revision';
 import type { SyncNosSqliteDatabase } from './schema';
-
-type JsonRecord = Record<string, JsonValue>;
 
 type ConversationRow = Readonly<{
   id: number;
@@ -71,14 +78,6 @@ function schemaMismatch(): never {
   throw new LocalDataContractError('SCHEMA_MISMATCH');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function safeString(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
 function normalizeListKey(value: unknown, fallback: string): string {
   const key = safeString(value).toLowerCase();
   return key || fallback;
@@ -121,11 +120,6 @@ function normalizeTimestamp(value: unknown): number | null {
   return Math.trunc(timestamp);
 }
 
-function positiveId(value: unknown): number | null {
-  const id = Number(value);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
-}
-
 function toComparableCursor(value: ConversationListCursor | null | undefined): ConversationListCursor | null {
   if (!value) return null;
   const lastCapturedAt = Number(value.lastCapturedAt);
@@ -135,28 +129,11 @@ function toComparableCursor(value: ConversationListCursor | null | undefined): C
 }
 
 function canonicalInputPayload(value: unknown): JsonRecord {
-  const canonical = encodeCanonicalJson(value);
-  const parsed = decodeCanonicalJson(canonical.bytes);
-  if (!isRecord(parsed)) invalidArgument();
-  const payload = { ...(parsed as JsonObject) } as JsonRecord;
-  delete (payload as Record<string, JsonValue | undefined>).id;
-  delete (payload as Record<string, JsonValue | undefined>).commentThreadCount;
-  return payload;
+  return canonicalJsonRecord(value, ['id', 'commentThreadCount']);
 }
 
 function storedPayload(value: unknown): JsonRecord {
-  if (typeof value !== 'string') schemaMismatch();
-  try {
-    const parsed = decodeCanonicalJson(new TextEncoder().encode(value));
-    if (!isRecord(parsed)) schemaMismatch();
-    return { ...(parsed as JsonObject) } as JsonRecord;
-  } catch (_error) {
-    schemaMismatch();
-  }
-}
-
-function canonicalPayloadText(value: Record<string, unknown>): string {
-  return encodeCanonicalJson(value).text;
+  return readCanonicalJsonRecord(value);
 }
 
 function asConversation(row: ConversationRow): Conversation {
@@ -341,7 +318,7 @@ function buildConversationRecord(
     listSiteKey,
     listSourceKey,
     notionPageId: safeString(nextPayload.notionPageId),
-    payloadJson: canonicalPayloadText(nextPayload),
+    payloadJson: canonicalJsonText(nextPayload),
     publishedAt: safeString(nextPayload.publishedAt),
     source,
     sourceType,
@@ -358,6 +335,13 @@ function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Co
         const existing = findExistingConversationForPayload(database, payload);
         const next = buildConversationRecord(payload, existing);
         if (existing) {
+          migrateSyncMappingKeyWithinTransaction(database, {
+            legacySource: existing.source,
+            legacyConversationKey: existing.conversation_key,
+            nextSource: next.source,
+            nextConversationKey: next.conversationKey,
+            fallbackNotionPageId: next.notionPageId,
+          });
           database
             .prepare(
               `UPDATE conversations
@@ -482,6 +466,17 @@ function mergeConversationsByIds(
     }
     return runFactsTransaction(database, () => {
       const merged = mergeConversationPayload(keep, remove);
+      const movedMessages = moveMessagesForConversationMerge(database, {
+        keepConversationId,
+        removeConversationId,
+      });
+      migrateSyncMappingKeyWithinTransaction(database, {
+        legacySource: remove.source,
+        legacyConversationKey: remove.conversation_key,
+        nextSource: keep.source,
+        nextConversationKey: keep.conversation_key,
+        fallbackNotionPageId: merged.notionPageId,
+      });
       database
         .prepare(
           `UPDATE conversations
@@ -511,7 +506,7 @@ function mergeConversationsByIds(
         keptConversationId: keepConversationId,
         removedConversationId: removeConversationId,
         movedImageCache: 0,
-        movedMessages: 0,
+        movedMessages,
         merged: true,
       });
     }).result;
@@ -528,10 +523,24 @@ function deleteConversationsByIds(
     const existing = ids.filter((id) => selectConversationRowById(database, id));
     if (!existing.length) return Object.freeze({ deletedConversations: 0, deletedMappings: 0, deletedMessages: 0 });
     return runFactsTransaction(database, () => {
+      const conversations = existing
+        .map((id) => selectConversationRowById(database, id))
+        .filter(Boolean) as ConversationRow[];
+      const deletedMessages = deleteMessagesForConversationIds(
+        database,
+        conversations.map((conversation) => conversation.id),
+      );
+      const deletedMappings = deleteMappingsForConversationReferences(
+        database,
+        conversations.map((conversation) => ({
+          source: conversation.source,
+          conversationKey: conversation.conversation_key,
+        })),
+      );
       let deletedConversations = 0;
       const statement = database.prepare('DELETE FROM conversations WHERE id = ?');
       for (const id of existing) deletedConversations += Number(statement.run(id).changes) || 0;
-      return Object.freeze({ deletedConversations, deletedMappings: 0, deletedMessages: 0 });
+      return Object.freeze({ deletedConversations, deletedMappings, deletedMessages });
     }).result;
   });
 }

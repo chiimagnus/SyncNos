@@ -240,4 +240,28 @@ describe('backup backup-utils', () => {
     expect(merged.lastSyncedSequence).toBe(2);
     expect(merged.lastSyncedMessageUpdatedAt).toBe(456);
   });
+
+  it('mergeSyncMappingRecord never turns a cleared null cursor field into a synthetic zero timestamp', () => {
+    const merged = mergeSyncMappingRecord(
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        lastSyncedMessageKey: 'm1',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 100,
+        lastSyncedMessageUpdatedAt: null,
+      },
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        lastSyncedMessageKey: 'm2',
+        lastSyncedSequence: 2,
+        lastSyncedAt: 200,
+        lastSyncedMessageUpdatedAt: 456,
+      },
+    );
+
+    expect(merged.lastSyncedMessageKey).toBe('m1');
+    expect(merged.lastSyncedMessageUpdatedAt).toBeNull();
+  });
 });
