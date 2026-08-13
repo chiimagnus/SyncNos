@@ -27,6 +27,7 @@ describe('SyncNos CLI workspace gate', () => {
     expect(gate).toContain('npm run test:syncnoscli');
     expect(gate).toContain('npm run build:syncnoscli');
     expect(gate).toContain('npm run pack:syncnoscli');
+    expect(gate.indexOf('npm run build:syncnoscli')).toBeLessThan(gate.indexOf('npm run test:syncnoscli'));
   });
 
   it('uses Node 22 for every workflow that installs the workspace', () => {
@@ -44,6 +45,10 @@ describe('SyncNos CLI workspace gate', () => {
     expect(ci).toContain('- src/services/local-data/**');
     expect(ci).toContain('- package-lock.json');
     expect(ci).toContain('run: npm run gate:ci');
+    expect(ci).toContain('windows-native-host:');
+    expect(ci).toContain('runs-on: windows-latest');
+    expect(ci).toContain('run: npm run build:syncnoscli');
+    expect(ci).toContain('tests/syncnoscli/windows-native-host-runtime.test.ts');
 
     for (const workflow of workspaceWorkflows) {
       expect(readWorkflow(workflow)).not.toContain('npm publish');

@@ -1,38 +1,16 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
-import { openReadWriteForHost } from '../../packages/syncnoscli/src/sqlite/database';
-import { createMappingsRepository } from '../../packages/syncnoscli/src/sqlite/mappings-repository';
-import { createMessagesRepository } from '../../packages/syncnoscli/src/sqlite/messages-repository';
 import { readFactsRevision } from '../../packages/syncnoscli/src/sqlite/revision';
-import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
 
-const temporaryRoots: string[] = [];
+import { createSqliteTestFixture } from './sqlite-test-fixture';
 
-async function openRepositories() {
-  const root = await mkdtemp(join(tmpdir(), 'syncnoscli-messages-'));
-  temporaryRoots.push(root);
-  const handle = await openReadWriteForHost({ paths: resolveSyncNosRuntimePaths({ homeDirectory: root }) });
-  return {
-    database: handle.database,
-    conversations: createConversationsRepository(handle.database),
-    handle,
-    mappings: createMappingsRepository(handle.database),
-    messages: createMessagesRepository(handle.database),
-  };
-}
+const fixture = createSqliteTestFixture('syncnoscli-messages-');
 
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })));
-});
+afterEach(fixture.cleanup);
 
 describe('SQLite messages repository', () => {
   it('matches snapshot, incremental, and append persistence semantics while preserving opaque payload fields', async () => {
-    const { conversations, handle, messages } = await openRepositories();
+    const { conversations, handle, messages } = await fixture.open();
     try {
       const conversation = conversations.upsertConversation({
         sourceType: 'chat',
@@ -135,7 +113,7 @@ describe('SQLite messages repository', () => {
   });
 
   it('rolls back a failed facts write without publishing a revision', async () => {
-    const { conversations, database, handle, messages } = await openRepositories();
+    const { conversations, database, handle, messages } = await fixture.open();
     try {
       const conversation = conversations.upsertConversation({
         sourceType: 'chat',
@@ -168,7 +146,7 @@ describe('SQLite messages repository', () => {
 
 describe('SQLite sync mappings repository', () => {
   it('keeps cursor anchors conservative across a conversation merge and moves messages in the same facts transaction', async () => {
-    const { conversations, handle, mappings, messages } = await openRepositories();
+    const { conversations, handle, mappings, messages } = await fixture.open();
     try {
       const keep = conversations.upsertConversation({
         sourceType: 'chat',
@@ -227,7 +205,7 @@ describe('SQLite sync mappings repository', () => {
   });
 
   it('patches provider metadata and nested sections without erasing opaque fields, then clears only cursor data', async () => {
-    const { conversations, handle, mappings } = await openRepositories();
+    const { conversations, handle, mappings } = await fixture.open();
     try {
       const conversation = conversations.upsertConversation({
         sourceType: 'chat',
@@ -281,7 +259,7 @@ describe('SQLite sync mappings repository', () => {
   });
 
   it('deletes mapping and messages with the conversation but leaves standalone facts to their own repositories', async () => {
-    const { conversations, handle, mappings, messages } = await openRepositories();
+    const { conversations, handle, mappings, messages } = await fixture.open();
     try {
       const conversation = conversations.upsertConversation({
         sourceType: 'chat',

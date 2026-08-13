@@ -1,31 +1,12 @@
 import { Blob } from 'node:buffer';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createCommentsRepository } from '../../packages/syncnoscli/src/sqlite/comments-repository';
-import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
-import { openReadWriteForHost } from '../../packages/syncnoscli/src/sqlite/database';
-import { createImagesRepository } from '../../packages/syncnoscli/src/sqlite/images-repository';
 import { readFactsRevision } from '../../packages/syncnoscli/src/sqlite/revision';
-import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
 
-const temporaryRoots: string[] = [];
+import { createSqliteTestFixture } from './sqlite-test-fixture';
 
-async function openRepositories() {
-  const root = await mkdtemp(join(tmpdir(), 'syncnoscli-images-comments-'));
-  temporaryRoots.push(root);
-  const handle = await openReadWriteForHost({ paths: resolveSyncNosRuntimePaths({ homeDirectory: root }) });
-  return {
-    comments: createCommentsRepository(handle.database),
-    conversations: createConversationsRepository(handle.database),
-    database: handle.database,
-    handle,
-    images: createImagesRepository(handle.database),
-  };
-}
+const fixture = createSqliteTestFixture('syncnoscli-images-comments-');
 
 function articlePayload(url: string, title = 'Article') {
   return {
@@ -38,13 +19,11 @@ function articlePayload(url: string, title = 'Article') {
   };
 }
 
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })));
-});
+afterEach(fixture.cleanup);
 
 describe('SQLite image repository', () => {
   it('normalizes all legacy byte forms once, enforces ownership, and never reuses deleted asset ids', async () => {
-    const { conversations, database, handle, images } = await openRepositories();
+    const { conversations, database, handle, images } = await fixture.open();
     try {
       const conversation = conversations.upsertConversation(articlePayload('https://example.com/images'));
       const bytes = Uint8Array.from([1, 2, 3, 4]);
@@ -112,11 +91,73 @@ describe('SQLite image repository', () => {
       handle.close();
     }
   });
+
+  it('keeps conflicting image facts, moves unique assets, and rewrites attached comment context in one merge', async () => {
+    const { comments, conversations, database, handle, images } = await fixture.open();
+    try {
+      const keep = conversations.upsertConversation(articlePayload('https://example.com/keep', 'Keep'));
+      const remove = conversations.upsertConversation(articlePayload('https://example.com/remove', 'Remove'));
+      const keptShared = await images.putImageAsset({
+        bytes: Uint8Array.from([1]),
+        contentType: 'image/png',
+        conversationId: keep.id,
+        url: 'https://cdn.example/shared.png',
+      });
+      const removedShared = await images.putImageAsset({
+        bytes: Uint8Array.from([2]),
+        contentType: 'image/png',
+        conversationId: remove.id,
+        url: 'https://cdn.example/shared.png',
+      });
+      const moved = await images.putImageAsset({
+        bytes: Uint8Array.from([3]),
+        contentType: 'image/png',
+        conversationId: remove.id,
+        url: 'https://cdn.example/moved.png',
+      });
+      const attached = comments.addArticleComment({
+        canonicalUrl: 'https://example.com/remove',
+        commentText: 'attached to the merged article',
+        conversationId: remove.id,
+        createdAt: 1,
+      });
+
+      expect(
+        conversations.mergeConversationsByIds({
+          keepConversationId: keep.id,
+          removeConversationId: remove.id,
+        }),
+      ).toMatchObject({ merged: true, movedImageCache: 1, movedMessages: 0 });
+      expect(images.getImageAssetById({ conversationId: keep.id, id: keptShared.id })).toMatchObject({
+        bytes: Uint8Array.from([1]),
+        id: keptShared.id,
+      });
+      expect(images.getImageAssetById({ conversationId: keep.id, id: removedShared.id })).toBeNull();
+      expect(images.getImageAssetById({ conversationId: keep.id, id: moved.id })).toMatchObject({
+        bytes: Uint8Array.from([3]),
+        id: moved.id,
+      });
+      expect(comments.listArticleCommentsByCanonicalUrl('https://example.com/remove')).toMatchObject([
+        { conversationId: keep.id, id: attached.id },
+      ]);
+      expect(
+        database
+          .prepare('SELECT conversation_id, conversation_source, conversation_key FROM article_comments WHERE id = ?')
+          .get(attached.id),
+      ).toEqual({
+        conversation_id: keep.id,
+        conversation_key: keep.conversationKey,
+        conversation_source: keep.source,
+      });
+    } finally {
+      handle.close();
+    }
+  });
 });
 
 describe('SQLite article comments repository', () => {
   it('keeps root/reply/orphan behavior, derives stable context, and detaches rather than cascades on conversation deletion', async () => {
-    const { comments, conversations, database, handle } = await openRepositories();
+    const { comments, conversations, database, handle } = await fixture.open();
     try {
       const url = 'https://example.com/comments#fragment';
       const canonicalUrl = 'https://example.com/comments';
@@ -177,7 +218,7 @@ describe('SQLite article comments repository', () => {
   });
 
   it('rejects invalid comments and cross-context replies before any facts mutation', async () => {
-    const { comments, conversations, database, handle } = await openRepositories();
+    const { comments, conversations, database, handle } = await fixture.open();
     try {
       const article = conversations.upsertConversation(articlePayload('https://example.com/valid'));
       const other = conversations.upsertConversation(articlePayload('https://example.com/other'));

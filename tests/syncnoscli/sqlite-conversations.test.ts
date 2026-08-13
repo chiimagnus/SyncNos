@@ -1,70 +1,19 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 
 import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
-import { openReadOnly, openReadWriteForHost } from '../../packages/syncnoscli/src/sqlite/database';
-import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
-import type { SyncNosSqliteDatabase } from '../../packages/syncnoscli/src/sqlite/schema';
+import { openReadOnly } from '../../packages/syncnoscli/src/sqlite/database';
 
-const temporaryRoots: string[] = [];
+import { createSqliteTestFixture } from './sqlite-test-fixture';
 
-async function openRepository() {
-  const root = await mkdtemp(join(tmpdir(), 'syncnoscli-conversations-'));
-  temporaryRoots.push(root);
-  const paths = resolveSyncNosRuntimePaths({ homeDirectory: root });
-  const handle = await openReadWriteForHost({ paths });
-  return { database: handle.database, handle, paths, repository: createConversationsRepository(handle.database) };
-}
+const fixture = createSqliteTestFixture('syncnoscli-conversations-');
 
-function insertComment(
-  database: SyncNosSqliteDatabase,
-  input: {
-    canonicalUrl: string;
-    commentText: string;
-    conversationId?: number | null;
-    createdAt: number;
-    parentId?: number | null;
-  },
-): number {
-  const payload = encodeCanonicalJson({
-    authorName: null,
-    canonicalUrl: input.canonicalUrl,
-    commentText: input.commentText,
-    createdAt: input.createdAt,
-    locator: null,
-    quoteText: '',
-    updatedAt: input.createdAt,
-  }).text;
-  const result = database
-    .prepare(
-      `INSERT INTO article_comments (
-         conversation_id, parent_comment_id, canonical_url, conversation_source, conversation_key, created_at, updated_at,
-         root_structural_digest, structural_digest, payload_json
-       ) VALUES (?, ?, ?, NULL, NULL, ?, ?, NULL, NULL, ?)`,
-    )
-    .run(
-      input.conversationId ?? null,
-      input.parentId ?? null,
-      input.canonicalUrl,
-      input.createdAt,
-      input.createdAt,
-      payload,
-    );
-  return Number(result.lastInsertRowid);
-}
-
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })));
-});
+afterEach(fixture.cleanup);
 
 describe('SQLite conversation repository', () => {
   it('rewrites a legacy article row to the canonical web identity instead of duplicating it', async () => {
-    const { database, handle, repository } = await openRepository();
+    const { conversations: repository, database, handle } = await fixture.open();
     try {
       const payload = encodeCanonicalJson({
         conversationKey: 'article_https://example.com/post',
@@ -109,7 +58,7 @@ describe('SQLite conversation repository', () => {
   });
 
   it('preserves unknown payload fields while keeping article identity and derived list keys canonical', async () => {
-    const { handle, paths, repository } = await openRepository();
+    const { conversations: repository, handle, paths } = await fixture.open();
     try {
       const first = repository.upsertConversation({
         sourceType: 'article',
@@ -161,7 +110,7 @@ describe('SQLite conversation repository', () => {
   });
 
   it('uses the IDB cursor order and calculates summary/facets without materializing the full list', async () => {
-    const { handle, repository } = await openRepository();
+    const { conversations: repository, handle } = await fixture.open();
     try {
       const now = Date.now();
       const a = repository.upsertConversation({
@@ -208,7 +157,7 @@ describe('SQLite conversation repository', () => {
   });
 
   it('counts attached and orphan article comment threads, without adding counts to chats', async () => {
-    const { database, handle, repository } = await openRepository();
+    const { comments, conversations: repository, handle } = await fixture.open();
     try {
       const article = repository.upsertConversation({
         sourceType: 'article',
@@ -225,23 +174,22 @@ describe('SQLite conversation repository', () => {
         title: 'Chat',
         lastCapturedAt: 1,
       });
-      const rootId = insertComment(database, {
+      const root = comments.addArticleComment({
         canonicalUrl: 'https://example.com/thread',
         commentText: 'root',
         conversationId: article.id,
         createdAt: 1,
       });
-      insertComment(database, {
+      comments.addArticleComment({
         canonicalUrl: 'https://example.com/thread',
         commentText: 'reply',
         conversationId: article.id,
         createdAt: 2,
-        parentId: rootId,
+        parentId: root.id,
       });
-      insertComment(database, {
+      comments.addArticleComment({
         canonicalUrl: 'https://example.com/thread',
         commentText: 'orphan root',
-        conversationId: null,
         createdAt: 3,
       });
 
@@ -254,7 +202,7 @@ describe('SQLite conversation repository', () => {
   });
 
   it('merges payloads, preserves standalone comments, and never reuses deleted numeric conversation ids', async () => {
-    const { database, handle, repository } = await openRepository();
+    const { comments, conversations: repository, handle } = await fixture.open();
     try {
       const keep = repository.upsertConversation({
         sourceType: 'chat',
@@ -284,10 +232,9 @@ describe('SQLite conversation repository', () => {
       });
       expect(repository.getConversationById(remove.id)).toBeNull();
 
-      const standalone = insertComment(database, {
+      const standalone = comments.addArticleComment({
         canonicalUrl: 'https://example.com/standalone',
         commentText: 'standalone',
-        conversationId: null,
         createdAt: 1,
       });
       const deleted = repository.deleteConversationsByIds([keep.id]);
@@ -297,9 +244,9 @@ describe('SQLite conversation repository', () => {
         deletedMappings: 0,
         deletedMessages: 0,
       });
-      expect(database.prepare('SELECT id FROM article_comments WHERE id = ?').get(standalone)).toMatchObject({
-        id: standalone,
-      });
+      expect(comments.listArticleCommentsByCanonicalUrl('https://example.com/standalone')).toMatchObject([
+        { id: standalone.id, conversationId: null },
+      ]);
 
       const insertedAfterDelete = repository.upsertConversation({
         sourceType: 'chat',

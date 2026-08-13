@@ -37,6 +37,12 @@ describe('Windows Native Host shim prebuilds', () => {
     expect(manifest.sourceSha256).toBe(sha256(source));
     expect(manifest.artifacts['win32-x64'].sha256).toBe(sha256(x64));
     expect(manifest.artifacts['win32-arm64'].sha256).toBe(sha256(arm64));
+    expect(
+      Object.values(manifest.artifacts)
+        .map((artifact) => artifact.file)
+        .sort(),
+    ).toEqual(['win32-arm64/syncnos-native-host.exe', 'win32-x64/syncnos-native-host.exe']);
+    expect(JSON.stringify(manifest)).not.toMatch(/\.(?:cmd|bat)\b/i);
     expect(peMachine(x64)).toBe(0x8664);
     expect(peMachine(arm64)).toBe(0xaa64);
     expect(peSubsystem(x64)).toBe(2);

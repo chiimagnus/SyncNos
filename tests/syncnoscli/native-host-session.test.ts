@@ -1,6 +1,7 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,6 +38,15 @@ const MIGRATION_ID = '7b3e6b4e-4c4d-4fa2-92cd-43c6b5b1e9f1';
 const SESSION_ID = '42b0f5d3-3b42-4c90-a05b-2c729248fb4e';
 const DIGEST = '0'.repeat(64);
 const STALE_OWNER_TOKEN = 'ac183244-7f09-4c31-8e77-d405167490e1';
+const repoRoot = resolve(__dirname, '../..');
+
+function sourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path);
+    return /\.[cm]?[jt]sx?$/.test(entry.name) ? [path] : [];
+  });
+}
 
 function manifest() {
   return {
@@ -140,6 +150,35 @@ afterEach(async () => {
 });
 
 describe('Native Host session', () => {
+  it('keeps browser roots Node-free and rejects SQL, path, and origin request fields before opening a connection', () => {
+    const browserSources = [
+      ...sourceFiles(resolve(repoRoot, 'src/ui')),
+      ...sourceFiles(resolve(repoRoot, 'src/viewmodels')),
+      ...sourceFiles(resolve(repoRoot, 'src/services')),
+      ...sourceFiles(resolve(repoRoot, 'src/collectors')),
+      ...sourceFiles(resolve(repoRoot, 'src/entrypoints')),
+    ];
+    for (const file of browserSources) {
+      const source = readFileSync(file, 'utf8');
+      expect(source).not.toMatch(/(?:from\s+|require\()['"](?:node:[^'"]+|better-sqlite3(?:\/[^'"]*)?)['"]/);
+    }
+
+    for (const field of ['sql', 'path', 'origin']) {
+      expect(() =>
+        parseHostFactsRequest({
+          command: 'GET_STATUS',
+          payload: { [field]: 'untrusted' },
+          protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+          requestId: `forbidden-${field}`,
+          schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+        }),
+      ).toThrow(LocalDataContractError);
+    }
+
+    const registrar = readFileSync(resolve(repoRoot, 'packages/syncnoscli/src/install/host-registration.ts'), 'utf8');
+    expect(registrar).not.toMatch(/\bdatabase(?:Path|WalPath|ShmPath)\b/);
+  });
+
   it('accepts only exact Chromium argv and a registrar-approved Firefox manifest path', async () => {
     await expect(validateNativeHostLaunch([nativeHostContract.browsers.chrome.origin], 'darwin')).resolves.toEqual({
       browser: 'chrome',

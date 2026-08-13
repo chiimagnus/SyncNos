@@ -51,3 +51,29 @@ jobs:
 
       - name: gate:ci
         run: npm run gate:ci
+
+  windows-native-host:
+    name: windows-native-host
+    runs-on: windows-latest
+    timeout-minutes: 20
+    if: ${{ !github.event.pull_request.draft }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build Native Host
+        run: npm run build:syncnoscli
+
+      - name: Run Native Host shim
+        run: npm run test -- tests/syncnoscli/windows-native-host-runtime.test.ts

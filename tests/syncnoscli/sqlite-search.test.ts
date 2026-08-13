@@ -1,7 +1,3 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -13,8 +9,6 @@ import {
 
 import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
 import { openReadWriteForHost } from '../../packages/syncnoscli/src/sqlite/database';
-import { createMappingsRepository } from '../../packages/syncnoscli/src/sqlite/mappings-repository';
-import { createMessagesRepository } from '../../packages/syncnoscli/src/sqlite/messages-repository';
 import { readFactsRevision, runFactsTransaction } from '../../packages/syncnoscli/src/sqlite/revision';
 import { createSearchRepository } from '../../packages/syncnoscli/src/sqlite/search';
 import {
@@ -23,25 +17,7 @@ import {
   rebuildSqliteFtsIndexWithinFactsTransaction,
   SQLITE_FTS_TABLE_NAME,
 } from '../../packages/syncnoscli/src/sqlite/schema';
-import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
-
-const temporaryRoots: string[] = [];
-
-async function openRepositories() {
-  const root = await mkdtemp(join(tmpdir(), 'syncnoscli-search-'));
-  temporaryRoots.push(root);
-  const paths = resolveSyncNosRuntimePaths({ homeDirectory: root });
-  const handle = await openReadWriteForHost({ paths });
-  return {
-    conversations: createConversationsRepository(handle.database),
-    database: handle.database,
-    handle,
-    mappings: createMappingsRepository(handle.database),
-    messages: createMessagesRepository(handle.database),
-    paths,
-    search: createSearchRepository(handle.database),
-  };
-}
+import { createSqliteTestFixture } from './sqlite-test-fixture';
 
 function expectLocalError(callback: () => unknown, code: LocalDataContractError['code']): void {
   let thrown: unknown;
@@ -68,13 +44,13 @@ function search(
   return repository.searchConversations({ ...input, query: normalizeSearchQuery(query) });
 }
 
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })));
-});
+const fixture = createSqliteTestFixture('syncnoscli-search-');
+
+afterEach(fixture.cleanup);
 
 describe('SQLite search repository', () => {
   it('keeps FTS best/recent semantics, literal fallback, facets, and UTF-16 highlights deterministic', async () => {
-    const { conversations, handle, messages, search: repository } = await openRepositories();
+    const { conversations, handle, messages, search: repository } = await fixture.open();
     try {
       const recentBody = conversations.upsertConversation({
         conversationKey: 'recent-body',
@@ -167,8 +143,41 @@ describe('SQLite search repository', () => {
     }
   });
 
+  it('rebuilds FTS from facts to the same incremental search result', async () => {
+    const { conversations, database, handle, messages, search: repository } = await fixture.open();
+    try {
+      const titleMatch = conversations.upsertConversation({
+        conversationKey: 'rebuild-title',
+        lastCapturedAt: 200,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        title: 'needle in title',
+      });
+      const bodyMatch = conversations.upsertConversation({
+        conversationKey: 'rebuild-body',
+        lastCapturedAt: 100,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        title: 'plain title',
+      });
+      messages.syncConversationMessages(bodyMatch.id, [
+        { contentText: 'needle in body', messageKey: 'needle-message', role: 'assistant', sequence: 1 },
+      ]);
+
+      const before = search(repository, 'needle', { sort: 'recent' });
+      expect(before.items.map((item) => item.conversationKey)).toEqual([
+        titleMatch.conversationKey,
+        bodyMatch.conversationKey,
+      ]);
+      expect(database.transaction(() => rebuildSqliteFtsIndexWithinFactsTransaction(database))()).toBe(true);
+      expect(search(repository, 'needle', { sort: 'recent' })).toEqual(before);
+    } finally {
+      handle.close();
+    }
+  });
+
   it('binds cursors to stable sorting and rejects pages after another browser commits facts', async () => {
-    const { conversations, handle, paths, search: repository } = await openRepositories();
+    const { conversations, handle, paths, search: repository } = await fixture.open();
     try {
       for (const [conversationKey, lastCapturedAt] of [
         ['page-one', 300],
@@ -242,7 +251,7 @@ describe('SQLite search repository', () => {
   });
 
   it('uses distinct fallback ranking, cursor tuples, and per-conversation derived updates', async () => {
-    const { conversations, handle, messages, search: repository } = await openRepositories();
+    const { conversations, handle, messages, search: repository } = await fixture.open();
     try {
       const recentBody = conversations.upsertConversation({
         conversationKey: 'fallback-recent-body',
@@ -294,7 +303,7 @@ describe('SQLite search repository', () => {
   });
 
   it('keeps one- and two-scalar fallback searches inside the fixed recent candidate cap', async () => {
-    const { database, handle, search: repository } = await openRepositories();
+    const { database, handle, search: repository } = await fixture.open();
     try {
       runFactsTransaction(database, () => {
         const insert = database.prepare(
@@ -318,7 +327,7 @@ describe('SQLite search repository', () => {
   });
 
   it('keeps literal-fallback facets scoped and drops a non-web site filter', async () => {
-    const { conversations, handle, search: repository } = await openRepositories();
+    const { conversations, handle, search: repository } = await fixture.open();
     try {
       conversations.upsertConversation({
         conversationKey: 'fallback-chat',
@@ -361,7 +370,7 @@ describe('SQLite search repository', () => {
   });
 
   it('rebuilds derived docs on an authorized migration and contains FTS-local failures without losing facts', async () => {
-    const { conversations, database, handle, mappings, messages, search: repository } = await openRepositories();
+    const { conversations, database, handle, mappings, messages, search: repository } = await fixture.open();
     try {
       const first = conversations.upsertConversation({
         conversationKey: 'needs-rebuild',
@@ -491,7 +500,7 @@ describe('SQLite search repository', () => {
   });
 
   it('does not drop an FTS table unless its full derived schema is verified', async () => {
-    const { database, handle } = await openRepositories();
+    const { database, handle } = await fixture.open();
     try {
       database.exec(`DROP TABLE ${SQLITE_FTS_TABLE_NAME};`);
       database.exec(`CREATE VIRTUAL TABLE ${SQLITE_FTS_TABLE_NAME} USING fts5 (unrelated, tokenize='trigram');`);
