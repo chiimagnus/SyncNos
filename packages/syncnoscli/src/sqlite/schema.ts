@@ -110,6 +110,8 @@ function migrationOne(database: SyncNosSqliteDatabase): void {
       ON conversations (list_source_key, list_site_key, last_captured_at DESC, id DESC);
     CREATE INDEX conversations_by_list_site_last_captured_at_id
       ON conversations (list_site_key, last_captured_at DESC, id DESC);
+    CREATE INDEX conversations_by_article_source_url
+      ON conversations (source_type, url);
 
     CREATE TABLE sync_mappings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,6 +187,14 @@ function migrationOne(database: SyncNosSqliteDatabase): void {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+  `);
+}
+
+/** Adds read-path indexes without changing the facts contract or rewriting facts. */
+function ensureConversationIndexes(database: SyncNosSqliteDatabase): void {
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS conversations_by_article_source_url
+      ON conversations (source_type, url);
   `);
 }
 
@@ -287,6 +297,7 @@ export function migrateSqliteSchema(database: SyncNosSqliteDatabase): void {
   database.exec('BEGIN IMMEDIATE;');
   try {
     if (currentVersion < 1) migrationOne(database);
+    ensureConversationIndexes(database);
     database.exec(`PRAGMA application_id = ${SQLITE_APPLICATION_ID};`);
     database.exec(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION};`);
     initializeMeta(database);
