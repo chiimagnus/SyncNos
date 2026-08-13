@@ -1,4 +1,4 @@
-import { access, chmod, lstat, mkdtemp, rm } from 'node:fs/promises';
+import { access, chmod, lstat, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -85,12 +85,37 @@ describe('SyncNos SQLite native addon policy', () => {
 describe('SyncNos SQLite open policy', () => {
   it('keeps read-only missing-database commands side-effect free', async () => {
     const paths = await temporaryPaths();
+    const loadNativeAddon = vi.fn(() => {
+      throw new NativeAddonError();
+    });
     await expect(openReadOnly({ paths })).rejects.toSatisfy((error: unknown) => {
       expectLocalError(error, 'DATABASE_NOT_INITIALIZED');
       return true;
     });
+    await expect(openReadOnly({ paths, dependencies: { loadNativeAddon } })).rejects.toSatisfy((error: unknown) => {
+      expectLocalError(error, 'DATABASE_NOT_INITIALIZED');
+      return true;
+    });
+    expect(loadNativeAddon).not.toHaveBeenCalled();
     await expect(access(paths.runtimeDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(access(paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('rejects a runtime-directory symlink before loading an addon or resolving its database child', async () => {
+    const paths = await temporaryPaths();
+    const foreignDirectory = join(paths.homeDirectory, 'foreign-runtime');
+    await mkdir(foreignDirectory);
+    await writeFile(join(foreignDirectory, 'syncnos.sqlite'), 'not SyncNos data');
+    await symlink(foreignDirectory, paths.runtimeDirectory);
+    const loadNativeAddon = vi.fn(() => {
+      throw new NativeAddonError();
+    });
+
+    await expect(openReadOnly({ paths, dependencies: { loadNativeAddon } })).rejects.toSatisfy((error: unknown) => {
+      expectLocalError(error, 'JOURNAL_CORRUPT');
+      return true;
+    });
+    expect(loadNativeAddon).not.toHaveBeenCalled();
   });
 
   it('opens the one write path with WAL/schema then serves the same database read-only', async () => {

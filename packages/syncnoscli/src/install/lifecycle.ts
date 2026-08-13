@@ -53,6 +53,12 @@ export type InspectGlobalLifecycleInput = Readonly<{
   dependencies?: Pick<LifecycleDependencies, 'lstat' | 'readFile' | 'realpath'>;
 }>;
 
+export type InspectGlobalCliInstallInput = Readonly<{
+  packageRoot?: string;
+  paths?: SyncNosRuntimePaths;
+  dependencies?: Pick<LifecycleDependencies, 'lstat' | 'readFile' | 'realpath'>;
+}>;
+
 export type RunLifecycleInput = Readonly<{
   environment?: Readonly<Record<string, string | undefined>>;
   packageRoot?: string;
@@ -74,12 +80,12 @@ function samePath(platform: LifecyclePlatform, left: string, right: string): boo
   return platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
-function isSupportedPlatform(value: NodeJS.Platform): value is LifecyclePlatform {
-  return value === 'darwin' || value === 'linux' || value === 'win32';
+function sameSegment(platform: LifecyclePlatform, left: string, right: string): boolean {
+  return platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
-function isErrno(error: unknown, code: string): boolean {
-  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === code);
+function isSupportedPlatform(value: NodeJS.Platform): value is LifecyclePlatform {
+  return value === 'darwin' || value === 'linux' || value === 'win32';
 }
 
 function runtimePaths(input: SyncNosRuntimePaths | undefined): SyncNosRuntimePaths | null {
@@ -97,6 +103,26 @@ function globalPackagePath(paths: SyncNosRuntimePaths, prefix: string): string |
   return paths.platform === 'win32'
     ? api.join(root, 'node_modules', '@chiimagnus', 'syncnoscli')
     : api.join(root, 'lib', 'node_modules', '@chiimagnus', 'syncnoscli');
+}
+
+function globalPrefixFromPackagePath(paths: SyncNosRuntimePaths, packageRoot: string): string | null {
+  const api = pathApi(paths.platform);
+  if (!packageRoot || !api.isAbsolute(packageRoot)) return null;
+  const candidate = api.resolve(packageRoot);
+  if (!sameSegment(paths.platform, api.basename(candidate), 'syncnoscli')) return null;
+  const scopeDirectory = api.dirname(candidate);
+  if (!sameSegment(paths.platform, api.basename(scopeDirectory), '@chiimagnus')) return null;
+  const modulesDirectory = api.dirname(scopeDirectory);
+  if (!sameSegment(paths.platform, api.basename(modulesDirectory), 'node_modules')) return null;
+  const prefix =
+    paths.platform === 'win32'
+      ? api.dirname(modulesDirectory)
+      : (() => {
+          const libDirectory = api.dirname(modulesDirectory);
+          return sameSegment(paths.platform, api.basename(libDirectory), 'lib') ? api.dirname(libDirectory) : '';
+        })();
+  const expected = globalPackagePath(paths, prefix);
+  return expected && samePath(paths.platform, expected, candidate) ? prefix : null;
 }
 
 function resolveDependencies(
@@ -136,6 +162,36 @@ async function packageVersionIfIdentityMatches(
       : null;
   } catch (_error) {
     return null;
+  }
+}
+
+async function inspectGlobalCliPackage(
+  paths: SyncNosRuntimePaths,
+  expected: string,
+  candidate: string,
+  dependencies: ReturnType<typeof resolveDependencies>,
+): Promise<GlobalLifecycleInspection> {
+  const api = pathApi(paths.platform);
+  if (
+    !api.isAbsolute(candidate) ||
+    !(await regularDirectory(dependencies, expected)) ||
+    !(await regularDirectory(dependencies, candidate))
+  ) {
+    return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
+  }
+  try {
+    const [expectedRealPath, candidateRealPath] = await Promise.all([
+      dependencies.realpath(expected),
+      dependencies.realpath(candidate),
+    ]);
+    if (!samePath(paths.platform, expectedRealPath, candidateRealPath)) {
+      return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
+    }
+    const packageVersion = await packageVersionIfIdentityMatches(dependencies, paths, candidateRealPath);
+    if (!packageVersion) return Object.freeze({ packageRoot: null, reason: 'package-identity-invalid' });
+    return Object.freeze({ packageRoot: candidateRealPath, reason: 'global-layout' });
+  } catch (_error) {
+    return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
   }
 }
 
@@ -183,29 +239,31 @@ export async function inspectGlobalCliLifecycle(
   if (!expected) return Object.freeze({ packageRoot: null, reason: 'prefix-invalid' });
   const dependencies = resolveDependencies(input.dependencies);
   const candidate = input.packageRoot ?? resolveSyncNosCliPackageRoot();
-  if (!(await regularDirectory(dependencies, expected)) || !(await regularDirectory(dependencies, candidate))) {
+  const inspection = await inspectGlobalCliPackage(paths, expected, candidate, dependencies);
+  if (!inspection.packageRoot || input.requireRegistrySource !== true) return inspection;
+  const packageVersion = await packageVersionIfIdentityMatches(dependencies, paths, inspection.packageRoot);
+  return packageVersion && registryPackageResolutionMatches(environment, packageVersion)
+    ? inspection
+    : Object.freeze({ packageRoot: null, reason: 'package-source-invalid' });
+}
+
+/**
+ * Verifies a directly invoked CLI from its own non-symlink global layout. Unlike an
+ * npm lifecycle hook, this intentionally does not depend on transient npm env vars.
+ */
+export async function inspectGlobalCliInstall(
+  input: InspectGlobalCliInstallInput = {},
+): Promise<GlobalLifecycleInspection> {
+  const paths = runtimePaths(input.paths);
+  if (!paths || !isSupportedPlatform(paths.platform)) {
     return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
   }
-  try {
-    const [expectedRealPath, candidateRealPath] = await Promise.all([
-      dependencies.realpath(expected),
-      dependencies.realpath(candidate),
-    ]);
-    if (!samePath(paths.platform, expectedRealPath, candidateRealPath)) {
-      return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
-    }
-    const packageVersion = await packageVersionIfIdentityMatches(dependencies, paths, candidateRealPath);
-    if (!packageVersion) {
-      return Object.freeze({ packageRoot: null, reason: 'package-identity-invalid' });
-    }
-    if (input.requireRegistrySource === true && !registryPackageResolutionMatches(environment, packageVersion)) {
-      return Object.freeze({ packageRoot: null, reason: 'package-source-invalid' });
-    }
-    return Object.freeze({ packageRoot: candidateRealPath, reason: 'global-layout' });
-  } catch (error) {
-    if (isErrno(error, 'ENOENT')) return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
-    return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
-  }
+  const candidate = input.packageRoot ?? resolveSyncNosCliPackageRoot();
+  const prefix = globalPrefixFromPackagePath(paths, candidate);
+  if (!prefix) return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
+  const expected = globalPackagePath(paths, prefix);
+  if (!expected) return Object.freeze({ packageRoot: null, reason: 'package-path-invalid' });
+  return await inspectGlobalCliPackage(paths, expected, candidate, resolveDependencies(input.dependencies));
 }
 
 function diagnostic(input: RunLifecycleInput, message: string): void {

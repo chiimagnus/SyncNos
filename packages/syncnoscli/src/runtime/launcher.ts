@@ -111,8 +111,10 @@ export type NativeHostLauncherResult = Readonly<{
 export type NativeHostLauncherOwnership = Readonly<{
   configDigest: string;
   configPath: string;
+  entrypointPath: string;
   launcherDigest: string;
   launcherPath: string;
+  nodePath: string;
   ownerMarkerDigest: string;
   ownerMarkerPath: string;
   packageDigest: string;
@@ -190,6 +192,16 @@ function base64Path(value: unknown): string {
     launcherFailure('LAUNCHER_CONFIG_INVALID');
   }
   return value;
+}
+
+function decodeBase64Path(value: string): string {
+  try {
+    const decoded = UTF8_DECODER.decode(Buffer.from(base64Path(value), 'base64'));
+    if (!decoded || decoded.includes('\0')) launcherFailure('LAUNCHER_CONFIG_INVALID');
+    return decoded;
+  } catch (_error) {
+    launcherFailure('LAUNCHER_CONFIG_INVALID');
+  }
 }
 
 function parseLauncherConfig(bytes: Uint8Array): LauncherConfig {
@@ -497,11 +509,19 @@ async function inspectOwnedLauncher(
   if (paths.platform === 'win32' && sha256(launcherBytes) !== config!.prebuiltDigest) {
     launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
   }
+  const api = pathApi(paths.platform);
+  const nodePath = decodeBase64Path(config!.nodePathBase64);
+  const entrypointPath = decodeBase64Path(config!.entrypointPathBase64);
+  if (!api.isAbsolute(nodePath) || !api.isAbsolute(entrypointPath)) {
+    launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  }
   return Object.freeze({
     configDigest: marker!.configDigest,
     configPath: paths.launcherConfigPath,
+    entrypointPath,
     launcherDigest: marker!.launcherDigest,
     launcherPath: paths.launcherPath,
+    nodePath,
     ownerMarkerDigest: sha256(markerBytes),
     ownerMarkerPath: paths.runtimeOwnerMarkerPath,
     packageDigest: marker!.packageDigest,

@@ -16,6 +16,7 @@ import {
 export const SQLITE_BUSY_TIMEOUT_MS = 3000;
 
 type DatabaseFileStatus = Readonly<{
+  isDirectory: () => boolean;
   isFile: () => boolean;
   isSymbolicLink: () => boolean;
   mode?: number;
@@ -137,6 +138,18 @@ async function assertReadableDatabaseFile(
   if (paths.platform !== 'win32' && (Number(status.mode) & 0o777) !== 0o600) sqliteFailure('JOURNAL_CORRUPT');
 }
 
+/** The read path must reject a swapped runtime parent before it ever resolves the DB child. */
+async function assertReadableRuntimeDirectory(
+  paths: SyncNosRuntimePaths,
+  dependencies: ResolvedDatabaseDependencies,
+): Promise<void> {
+  const status = await lstatIfPresent(dependencies, paths.runtimeDirectory);
+  if (!status) sqliteFailure('DATABASE_NOT_INITIALIZED');
+  if (status.isSymbolicLink() || !status.isDirectory()) sqliteFailure('JOURNAL_CORRUPT');
+  assertOwnedUnixFile(paths, status, dependencies);
+  if (paths.platform !== 'win32' && (Number(status.mode) & 0o777) !== 0o700) sqliteFailure('JOURNAL_CORRUPT');
+}
+
 /** Rechecks the database sidecars after a write path creates or updates WAL state. */
 export async function ensureOwnerOnlyDatabaseFiles(
   pathsValue: unknown,
@@ -214,8 +227,9 @@ export async function openReadOnly(input: DatabaseOpenInput = {}): Promise<SyncN
   const dependencies = resolveDependencies(input.dependencies);
   let database: SyncNosSqliteDatabase | null = null;
   try {
-    const addon = dependencies.loadNativeAddon();
+    await assertReadableRuntimeDirectory(paths, dependencies);
     await assertReadableDatabaseFile(paths, dependencies);
+    const addon = dependencies.loadNativeAddon();
     database = createDatabase(addon, paths, { readonly: true, fileMustExist: true });
     configureReadOnlyConnection(database);
     assertReadableSqliteSchema(database);

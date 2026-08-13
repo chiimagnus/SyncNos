@@ -9,6 +9,7 @@ import {
   createWindowsRegistryAdapter,
   ensureNativeHostRegistrations,
   getNativeHostRegistrationLocations,
+  inspectNativeHostRegistrations,
   isOwnedFirefoxNativeHostManifest,
   removeOwnedNativeHostRegistrations,
   SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
@@ -210,6 +211,17 @@ describe('SyncNos Native Host registration', () => {
     ).resolves.toBe(false);
     await writeFile(join(fixture.packageRoot, 'dist', 'native-host.cjs'), 'tampered host');
     await expect(
+      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({
+      package: 'verified',
+      packageEntrypoint: 'stale',
+      browsers: [
+        { browser: 'chrome', manifest: 'owned', registry: 'not_applicable' },
+        { browser: 'edge', manifest: 'owned', registry: 'not_applicable' },
+        { browser: 'firefox', manifest: 'owned', registry: 'not_applicable' },
+      ],
+    });
+    await expect(
       isOwnedFirefoxNativeHostManifest(locations[2]!.manifestPath, {
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
@@ -238,6 +250,37 @@ describe('SyncNos Native Host registration', () => {
       removeOwnedNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
     ).resolves.toMatchObject({ conflicts: ['firefox-manifest'], removed: false });
     await expect(readFile(firefox.manifestPath, 'utf8')).resolves.toBe(before);
+  });
+
+  it('does not treat a rehashed owned launcher config as current when its entrypoint leaves the package', async () => {
+    const fixture = await createUnixFixture();
+    await ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+    const alternateEntrypoint = join(fixture.root, 'alternate-native-host.cjs');
+    await writeFile(alternateEntrypoint, 'process.exitCode = 0;');
+
+    const config = JSON.parse(await readFile(fixture.paths.launcherConfigPath, 'utf8')) as Record<string, unknown>;
+    config.entrypointPathBase64 = Buffer.from(alternateEntrypoint, 'utf8').toString('base64');
+    const configBytes = Buffer.from(JSON.stringify(config), 'utf8');
+    await writeFile(fixture.paths.launcherConfigPath, configBytes);
+
+    const marker = JSON.parse(await readFile(fixture.paths.runtimeOwnerMarkerPath, 'utf8')) as Record<string, unknown>;
+    marker.configDigest = sha256(configBytes);
+    await writeFile(fixture.paths.runtimeOwnerMarkerPath, JSON.stringify(marker));
+    for (const location of getNativeHostRegistrationLocations(fixture.paths)) {
+      const owner = JSON.parse(await readFile(location.ownerPath, 'utf8')) as Record<string, unknown>;
+      owner.configDigest = sha256(configBytes);
+      await writeFile(location.ownerPath, JSON.stringify(owner));
+    }
+
+    await expect(
+      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({ package: 'verified', packageEntrypoint: 'stale' });
+    await expect(
+      isOwnedFirefoxNativeHostManifest(getNativeHostRegistrationLocations(fixture.paths)[2]!.manifestPath, {
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+      }),
+    ).resolves.toBe(false);
   });
 
   it('keeps macOS registration strictly within the three stable user manifest folders', () => {

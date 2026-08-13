@@ -1115,6 +1115,89 @@ export type CliFactsPayloadByCommand = {
   SEARCH_CONVERSATIONS: SearchRequestPayload;
 };
 
+/** Stable, path-redacted diagnostics for the on-demand local-data installation. */
+export type CliDoctorFilePermission =
+  | 'insecure'
+  | 'invalid'
+  | 'not_present'
+  | 'platform_managed'
+  | 'private'
+  | 'unavailable';
+
+export type CliDoctorRuntimeState = 'absent' | 'invalid' | 'ready' | 'unavailable';
+
+export type CliDoctorLauncherState = 'absent' | 'invalid' | 'ready' | 'stale';
+
+export type CliDoctorRecordedNodeState = 'available' | 'invalid' | 'missing' | 'not_recorded' | 'unavailable';
+
+export type CliDoctorEntrypointState = 'current' | 'not_checked' | 'stale';
+
+export type CliDoctorRegistrationState = 'absent' | 'conflict' | 'owned' | 'unavailable';
+
+export type CliDoctorRegistryState = CliDoctorRegistrationState | 'not_applicable';
+
+export type CliDoctorDatabaseState = 'busy' | 'invalid' | 'not_initialized' | 'ready' | 'unavailable' | 'unsupported';
+
+export type CliDoctorActionName = 'database_permissions' | 'native_host';
+
+export type CliDoctorActionStatus = 'failed' | 'not_needed' | 'not_requested' | 'repaired' | 'refused';
+
+export type CliDoctorActionReason =
+  | 'database_busy'
+  | 'database_not_initialized'
+  | 'database_permissions_invalid'
+  | 'database_permissions_unavailable'
+  | 'global_install_not_verified'
+  | 'native_host_conflict'
+  | 'native_host_invalid'
+  | 'native_host_unavailable'
+  | null;
+
+export type CliDoctorReport = Readonly<{
+  actions: readonly Readonly<{
+    name: CliDoctorActionName;
+    reason: CliDoctorActionReason;
+    status: CliDoctorActionStatus;
+  }>[];
+  contract: Readonly<{
+    protocolVersion: number;
+    schemaVersion: number;
+  }>;
+  database: Readonly<{
+    factsRevision: number | null;
+    filePermissions: CliDoctorFilePermission;
+    fts: Readonly<{
+      available: boolean;
+      reason: string | null;
+    }> | null;
+    reason: LocalDataErrorCode | null;
+    schemaVersion: number | null;
+    state: CliDoctorDatabaseState;
+  }>;
+  launcher: Readonly<{
+    configDigest: string | null;
+    entrypoint: CliDoctorEntrypointState;
+    prebuiltDigest: string | null;
+    recordedNode: Readonly<{
+      matchesCurrentProcess: boolean | null;
+      path: string | null;
+      state: CliDoctorRecordedNodeState;
+    }>;
+    state: CliDoctorLauncherState;
+  }>;
+  registrations: readonly Readonly<{
+    browser: 'chrome' | 'edge' | 'firefox';
+    browserConnection: 'not_verified';
+    manifest: CliDoctorRegistrationState;
+    registry: CliDoctorRegistryState;
+  }>[];
+  runtime: Readonly<{
+    permissions: CliDoctorFilePermission;
+    staging: 'absent' | 'invalid' | 'present' | 'unavailable';
+    state: CliDoctorRuntimeState;
+  }>;
+}>;
+
 export type EmptyPayload = Readonly<Record<string, never>>;
 
 type RequestFromPayloadMap<TPayloads extends Record<string, unknown>> = {

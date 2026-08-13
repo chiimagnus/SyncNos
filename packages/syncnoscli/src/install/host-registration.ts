@@ -37,7 +37,7 @@ const NATIVE_HOST_DESCRIPTION = 'SyncNos local data Native Host';
 const WINDOWS_REGISTRY_VIEWS: readonly NativeHostRegistryView[] = Object.freeze(['32', '64']);
 const NO_REGISTRY_VIEWS: readonly NativeHostRegistryView[] = Object.freeze([]);
 
-type NativeHostBrowser = 'chrome' | 'edge' | 'firefox';
+export type NativeHostBrowser = 'chrome' | 'edge' | 'firefox';
 type NativeHostRegistryView = '32' | '64';
 type PathApi = typeof posix;
 
@@ -108,6 +108,25 @@ export type NativeHostRegistrationDependencies = Readonly<{
   unlink?: (path: string) => Promise<void>;
   windowsRegistry?: WindowsRegistryAdapter;
   writeFile?: (path: string, contents: Uint8Array, options: Readonly<{ flag: 'wx'; mode: number }>) => Promise<void>;
+}>;
+
+export type NativeHostRegistrationInspectionState = 'absent' | 'conflict' | 'owned' | 'unavailable';
+
+export type NativeHostRegistrationInspection = Readonly<{
+  browsers: readonly Readonly<{
+    browser: NativeHostBrowser;
+    manifest: NativeHostRegistrationInspectionState;
+    registry: NativeHostRegistrationInspectionState | 'not_applicable';
+  }>[];
+  package: 'invalid' | 'unavailable' | 'verified';
+  packageEntrypoint: 'current' | 'not_checked' | 'stale';
+}>;
+
+export type InspectNativeHostRegistrationsInput = Readonly<{
+  launcherDependencies?: NativeHostLauncherDependencies;
+  packageRoot?: string;
+  paths?: SyncNosRuntimePaths;
+  registrationDependencies?: NativeHostRegistrationDependencies;
 }>;
 
 export type EnsureNativeHostRegistrationsInput = Readonly<{
@@ -363,10 +382,10 @@ async function packageEntrypointMatchesLauncher(
   dependencies: ResolvedDependencies,
 ): Promise<boolean> {
   try {
-    const entrypoint = await readVerifiedFile(
-      dependencies,
-      pathApi(paths.platform).join(packageIdentity.root, 'dist', 'native-host.cjs'),
-    );
+    const api = pathApi(paths.platform);
+    const expectedEntrypoint = api.join(packageIdentity.root, 'dist', 'native-host.cjs');
+    if (!samePath(paths.platform, launcher.entrypointPath, expectedEntrypoint)) return false;
+    const entrypoint = await readVerifiedFile(dependencies, expectedEntrypoint);
     return sha256(entrypoint) === launcher.packageDigest;
   } catch (_error) {
     return false;
@@ -818,6 +837,109 @@ async function inspectRegistryRegistration(
     }
   }
   return Object.freeze({ state: registration.state === 'owned' ? ('owned' as const) : ('absent' as const) });
+}
+
+function inspectionState(state: ExistingRegistrationState): NativeHostRegistrationInspectionState {
+  return state.state;
+}
+
+function unavailableRegistrationInspection(
+  paths: SyncNosRuntimePaths,
+  packageState: NativeHostRegistrationInspection['package'],
+): NativeHostRegistrationInspection {
+  return Object.freeze({
+    package: packageState,
+    packageEntrypoint: 'not_checked' as const,
+    browsers: Object.freeze(
+      nativeHostManifestLocations(paths).map((location) =>
+        Object.freeze({
+          browser: location.browser,
+          manifest: 'unavailable' as const,
+          registry: paths.platform === 'win32' ? ('unavailable' as const) : ('not_applicable' as const),
+        }),
+      ),
+    ),
+  });
+}
+
+/**
+ * Reads the fixed registration targets without creating directories, files, registry
+ * values, a launcher, or a database. Browser reachability remains intentionally unknown.
+ */
+export async function inspectNativeHostRegistrations(
+  input: InspectNativeHostRegistrationsInput = {},
+): Promise<NativeHostRegistrationInspection> {
+  const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
+  const dependencies = resolveDependencies(input.registrationDependencies);
+  let packageIdentity: PackageIdentity;
+  try {
+    packageIdentity = await readPackageIdentity(paths, input.packageRoot, dependencies);
+  } catch (error) {
+    return unavailableRegistrationInspection(
+      paths,
+      error instanceof NativeHostRegistrationError && error.code === 'PACKAGE_IDENTITY_INVALID'
+        ? 'invalid'
+        : 'unavailable',
+    );
+  }
+
+  let launcher: NativeHostLauncherOwnership | null = null;
+  try {
+    launcher = await inspectNativeHostLauncher({ paths, dependencies: input.launcherDependencies });
+  } catch (_error) {
+    // The launcher has its own diagnostic; manifest ownership can still be observed without it.
+  }
+  const locations = nativeHostManifestLocations(paths);
+  const manifests = await Promise.all(
+    locations.map(async (location) => {
+      try {
+        return await inspectRegistration(paths, location, packageIdentity, launcher, dependencies);
+      } catch (_error) {
+        return null;
+      }
+    }),
+  );
+  const packageEntrypoint = launcher
+    ? (await packageEntrypointMatchesLauncher(paths, packageIdentity, launcher, dependencies))
+      ? ('current' as const)
+      : ('stale' as const)
+    : ('not_checked' as const);
+
+  let registry: WindowsRegistryAdapter | null = null;
+  if (paths.platform === 'win32') {
+    try {
+      registry = dependencies.windowsRegistry ?? createWindowsRegistryAdapter();
+    } catch (_error) {
+      registry = null;
+    }
+  }
+  const browsers = await Promise.all(
+    locations.map(async (location, index) => {
+      const manifest = manifests[index];
+      let registryState: NativeHostRegistrationInspectionState | 'not_applicable' = 'not_applicable';
+      if (paths.platform === 'win32') {
+        if (!registry || !manifest) {
+          registryState = 'unavailable';
+        } else {
+          try {
+            registryState = (await inspectRegistryRegistration(location, manifest, registry)).state;
+          } catch (_error) {
+            registryState = 'unavailable';
+          }
+        }
+      }
+      return Object.freeze({
+        browser: location.browser,
+        manifest: manifest ? inspectionState(manifest) : ('unavailable' as const),
+        registry: registryState,
+      });
+    }),
+  );
+  return Object.freeze({
+    package: 'verified',
+    packageEntrypoint,
+    browsers: Object.freeze(browsers),
+  });
 }
 
 async function writeRegistryRegistration(

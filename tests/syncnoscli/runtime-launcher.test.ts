@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   ensureNativeHostLauncher,
+  inspectNativeHostLauncher,
   NativeHostLauncherError,
   type NativeHostLauncherDependencies,
 } from '../../packages/syncnoscli/src/runtime/launcher';
@@ -108,6 +109,11 @@ describe('SyncNos Native Host launcher', () => {
       prebuiltDigest: null,
     });
     expect(marker).toMatchObject({ ownerMarker: 'syncnoscli-runtime-v1', platform: 'linux' });
+    await expect(inspectNativeHostLauncher({ paths: fixture.paths })).resolves.toMatchObject({
+      nodePath,
+      entrypointPath,
+      configDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
     await expect(access(fixture.paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(
       ensureNativeHostLauncher({ packageRoot: fixture.packageRoot, paths: fixture.paths }),

@@ -69,13 +69,19 @@ describe('SyncNos SQLite schema migration', () => {
     const originalExec = database.exec.bind(database);
     const exec = vi.spyOn(database, 'exec').mockImplementation((sql: string) => {
       if (sql.includes("CREATE VIRTUAL TABLE syncnos_fts_probe_v1 USING fts5 (content, tokenize='trigram')")) {
-        throw Object.assign(new Error('no such tokenizer: trigram'), { code: 'SQLITE_ERROR' });
+        throw Object.assign(new Error('SELECT private_key FROM /Users/chii/.syncnoscli/syncnos.sqlite'), {
+          code: 'SQLITE_ERROR',
+        });
       }
       return originalExec(sql);
     });
     try {
       migrateSqliteSchema(database);
-      expect(getSqliteFtsCapability(database)).toMatchObject({ available: false });
+      expect(getSqliteFtsCapability(database)).toEqual({ available: false, reason: 'FTS5 or trigram is unavailable' });
+      database
+        .prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
+        .run('fts_unavailable_reason', 'SELECT private_key FROM /Users/chii/.syncnoscli/syncnos.sqlite');
+      expect(getSqliteFtsCapability(database)).toEqual({ available: false, reason: 'FTS5 or trigram is unavailable' });
       expect(database.prepare("SELECT name FROM sqlite_master WHERE name = 'conversation_fts'").get()).toBeUndefined();
       expect(
         database.prepare("SELECT name FROM sqlite_master WHERE name = 'syncnos_fts_probe_v1'").get(),

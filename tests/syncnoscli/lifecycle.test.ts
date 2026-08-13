@@ -4,7 +4,11 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { inspectGlobalCliLifecycle, runLifecycle } from '../../packages/syncnoscli/src/install/lifecycle';
+import {
+  inspectGlobalCliInstall,
+  inspectGlobalCliLifecycle,
+  runLifecycle,
+} from '../../packages/syncnoscli/src/install/lifecycle';
 import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
 
 const temporaryRoots: string[] = [];
@@ -47,6 +51,9 @@ describe('SyncNos CLI npm lifecycle', () => {
       }),
     ).resolves.toMatchObject({ packageRoot: canonicalPackageRoot, reason: 'global-layout' });
     await expect(
+      inspectGlobalCliInstall({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({ packageRoot: canonicalPackageRoot, reason: 'global-layout' });
+    await expect(
       inspectGlobalCliLifecycle({
         environment: {
           npm_config_global: 'true',
@@ -75,6 +82,10 @@ describe('SyncNos CLI npm lifecycle', () => {
         paths: fixture.paths,
       }),
     ).resolves.toEqual({ packageRoot: null, reason: 'package-path-invalid' });
+    await expect(inspectGlobalCliInstall({ packageRoot: localAlias, paths: fixture.paths })).resolves.toEqual({
+      packageRoot: null,
+      reason: 'package-path-invalid',
+    });
 
     const linkedRoot = join(fixture.root, 'linked-package');
     await mkdir(linkedRoot);
@@ -88,6 +99,10 @@ describe('SyncNos CLI npm lifecycle', () => {
         paths: fixture.paths,
       }),
     ).resolves.toEqual({ packageRoot: null, reason: 'package-path-invalid' });
+    await expect(inspectGlobalCliInstall({ packageRoot: linkedRoot, paths: fixture.paths })).resolves.toEqual({
+      packageRoot: null,
+      reason: 'package-path-invalid',
+    });
   });
 
   it('does not mutate local/workspace-like installs even with a spoofed npm global environment', async () => {

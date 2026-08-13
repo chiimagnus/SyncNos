@@ -25,7 +25,6 @@ export type SqliteFtsCapability = Readonly<{
 const META_DATABASE_UUID = 'database_uuid';
 const META_FACTS_REVISION = 'facts_revision';
 const META_FTS_INDEX_STATUS = 'fts_index_status';
-const META_FTS_REASON = 'fts_unavailable_reason';
 const META_FTS_STATUS = 'fts_status';
 const META_SCHEMA_VERSION = 'contract_schema_version';
 export const SQLITE_FTS_TABLE_NAME = 'conversation_fts';
@@ -68,10 +67,6 @@ function setMetaValue(database: SyncNosSqliteDatabase, key: string, value: strin
   database
     .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run(key, value);
-}
-
-function deleteMetaValue(database: SyncNosSqliteDatabase, key: string): void {
-  database.prepare('DELETE FROM meta WHERE key = ?').run(key);
 }
 
 function requiredTablesPresent(database: SyncNosSqliteDatabase): boolean {
@@ -298,19 +293,6 @@ function initializeMeta(database: SyncNosSqliteDatabase): void {
   setMetaValue(database, META_SCHEMA_VERSION, String(SQLITE_SCHEMA_VERSION));
 }
 
-function ftsFailureReason(error: unknown): string {
-  const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
-  const message = error instanceof Error ? error.message : '';
-  const raw = typeof code === 'string' && code ? code : message || 'FTS5 or trigram is unavailable';
-  let sanitized = '';
-  for (const character of raw) {
-    const codePoint = character.codePointAt(0) ?? 0;
-    sanitized += codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? ' ' : character;
-    if (sanitized.length >= 240) break;
-  }
-  return sanitized || 'FTS5 or trigram is unavailable';
-}
-
 function rollbackSavepoint(database: SyncNosSqliteDatabase, name: string): void {
   database.exec(`ROLLBACK TO ${name}; RELEASE ${name};`);
 }
@@ -323,10 +305,9 @@ function hasVerifiedFtsTable(database: SyncNosSqliteDatabase): boolean {
   return Boolean(row?.sql && row.sql.replaceAll(/\s+/g, '').toLowerCase() === SQLITE_FTS_TABLE_SIGNATURE);
 }
 
-function markFtsUnavailable(database: SyncNosSqliteDatabase, error: unknown): void {
+function markFtsUnavailable(database: SyncNosSqliteDatabase): void {
   setMetaValue(database, META_FTS_INDEX_STATUS, 'needs-rebuild');
   setMetaValue(database, META_FTS_STATUS, 'unavailable');
-  setMetaValue(database, META_FTS_REASON, ftsFailureReason(error));
 }
 
 function sqliteErrorCode(error: unknown): string {
@@ -355,7 +336,7 @@ function runFtsSavepoint(database: SyncNosSqliteDatabase, name: string, operatio
   } catch (error) {
     if (started) rollbackSavepoint(database, name);
     if (!isFtsLocalFailure(error)) throw error;
-    markFtsUnavailable(database, error);
+    markFtsUnavailable(database);
     return false;
   }
 }
@@ -372,7 +353,7 @@ function probeFtsCapability(database: SyncNosSqliteDatabase): boolean {
   } catch (error) {
     if (started) rollbackSavepoint(database, 'syncnos_fts_probe');
     if (!isFtsLocalFailure(error)) throw error;
-    markFtsUnavailable(database, error);
+    markFtsUnavailable(database);
     return false;
   }
 }
@@ -408,7 +389,6 @@ function verifyFtsTable(database: SyncNosSqliteDatabase): boolean {
 
 function markFtsAvailable(database: SyncNosSqliteDatabase): void {
   setMetaValue(database, META_FTS_STATUS, 'available');
-  deleteMetaValue(database, META_FTS_REASON);
 }
 
 /** Recreates only a verified owned index; a foreign/mismatched table is never dropped. */
@@ -421,7 +401,7 @@ function ensureFtsCapability(database: SyncNosSqliteDatabase): boolean {
   if (verifiedTable) {
     if (!recreateVerifiedFtsTable(database)) return false;
   } else if (tableExists(database, SQLITE_FTS_TABLE_NAME)) {
-    markFtsUnavailable(database, ftsLocalFailure('conversation FTS table ownership is not verified'));
+    markFtsUnavailable(database);
     return false;
   } else if (!createFtsTable(database)) {
     return false;
@@ -634,10 +614,7 @@ export function getSqliteFtsCapability(database: SyncNosSqliteDatabase): SqliteF
   }
   return Object.freeze({
     available: false,
-    reason:
-      status === 'available'
-        ? 'FTS index needs rebuilding'
-        : (metaValue(database, META_FTS_REASON) ?? 'FTS5 or trigram is unavailable'),
+    reason: status === 'available' ? 'FTS index needs rebuilding' : 'FTS5 or trigram is unavailable',
   });
 }
 
