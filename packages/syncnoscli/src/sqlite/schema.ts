@@ -189,6 +189,8 @@ function migrationOne(database: SyncNosSqliteDatabase): void {
       migration_id TEXT PRIMARY KEY,
       protocol_version INTEGER NOT NULL,
       schema_version INTEGER NOT NULL,
+      host_owner_token TEXT NULL,
+      host_owner_pid INTEGER NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -266,6 +268,12 @@ function ensureImportStagingTables(database: SyncNosSqliteDatabase): void {
       PRIMARY KEY (migration_id, context_key, structural_digest)
     );
   `);
+  const columns = database.prepare('PRAGMA table_info(staging_metadata)').all() as Array<{ name?: unknown }>;
+  const names = new Set(columns.map((column) => column.name));
+  if (!names.has('host_owner_token'))
+    database.exec('ALTER TABLE staging_metadata ADD COLUMN host_owner_token TEXT NULL;');
+  if (!names.has('host_owner_pid'))
+    database.exec('ALTER TABLE staging_metadata ADD COLUMN host_owner_pid INTEGER NULL;');
 }
 
 function initializeMeta(database: SyncNosSqliteDatabase): void {

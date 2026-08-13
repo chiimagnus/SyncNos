@@ -460,6 +460,39 @@ function getMessagesTailByConversationId(
   });
 }
 
+/** Returns the next stable sequence window after a known message, or the tail when no anchor is supplied. */
+function getMessagesTailAfterKeyByConversationId(
+  database: SyncNosSqliteDatabase,
+  value: unknown,
+  afterMessageKey: unknown,
+  limit: unknown,
+): ConversationMessage[] {
+  const conversationId = positiveId(value);
+  const key = safeString(afterMessageKey);
+  const tailLimit = Number(limit);
+  if (!conversationId || !Number.isFinite(tailLimit) || tailLimit <= 0) return [];
+  if (!key) return getMessagesTailByConversationId(database, conversationId, tailLimit);
+  return execute(() => {
+    const anchor = database
+      .prepare('SELECT sequence, id FROM messages WHERE conversation_id = ? AND message_key = ?')
+      .get(conversationId, key) as Readonly<{ id?: unknown; sequence?: unknown }> | undefined;
+    const anchorId = positiveId(anchor?.id);
+    const anchorSequence = Number(anchor?.sequence);
+    if (!anchorId || !Number.isFinite(anchorSequence)) return [];
+    return (
+      database
+        .prepare(
+          `SELECT * FROM messages
+            WHERE conversation_id = ?
+              AND (sequence > ? OR (sequence = ? AND id > ?))
+            ORDER BY sequence ASC, id ASC
+            LIMIT ?`,
+        )
+        .all(conversationId, anchorSequence, anchorSequence, anchorId, Math.floor(tailLimit)) as MessageRow[]
+    ).map(asMessage);
+  });
+}
+
 function getConversationTailWindowBySourceAndKey(
   database: SyncNosSqliteDatabase,
   source: unknown,
@@ -534,6 +567,8 @@ export function createMessagesRepository(database: SyncNosSqliteDatabase) {
     getMessagesByConversationId: (conversationId: unknown) => getMessagesByConversationId(database, conversationId),
     getMessagesTailByConversationId: (conversationId: unknown, limit: unknown) =>
       getMessagesTailByConversationId(database, conversationId, limit),
+    getMessagesTailAfterKeyByConversationId: (conversationId: unknown, afterMessageKey: unknown, limit: unknown) =>
+      getMessagesTailAfterKeyByConversationId(database, conversationId, afterMessageKey, limit),
     syncConversationMessages: (conversationId: unknown, messages: unknown, options?: MessagePersistenceOptions) =>
       syncConversationMessages(database, conversationId, messages, options),
   });

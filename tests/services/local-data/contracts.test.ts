@@ -19,6 +19,7 @@ import {
   MAX_ZIP_STREAM_BYTES,
   MIGRATION_JOURNAL_STAGES,
   MIGRATION_PROFILE_PROVIDERS,
+  NATIVE_HOST_SINGLE_MESSAGE_COMMANDS,
   LocalDataContractError,
   assertFactsEpochMatches,
   assertStreamChunkWithinLimits,
@@ -27,6 +28,7 @@ import {
   createHostFactsSuccess,
   createLocalDataError,
   createSearchCursorBinding,
+  hostFactsCommandRequiresConnectedSession,
   normalizeSearchQuery,
   parseBrowserRuntimeFactsRequest,
   parseCliFactsRequest,
@@ -34,11 +36,14 @@ import {
   parseMigrationProfileReferencePatch,
   parseMigrationStreamRequestPayload,
   parseLocalDataError,
+  parseNativeHostSessionCompleteControl,
+  parseNativeHostStreamResponseData,
   parseHostFactsRequest,
   parsePlainSnippetHighlights,
   parseStreamDescriptor,
   serializedJsonUtf8ByteLength,
   serializeMigrationProfileReferencePatch,
+  isNativeHostSessionCompleteControl,
 } from '@services/local-data/contracts';
 import { FACT_STREAM_KINDS, createFactsManifest, parseFactsManifest } from '@services/local-data/facts-manifest';
 
@@ -279,6 +284,41 @@ describe('local data contracts', () => {
           schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
           transfer: { declaredTotalBytes: 1, operation: 'migration-fact-record' },
         }),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('defaults every potentially large Host command to a connected session and validates its final control', () => {
+    expect(NATIVE_HOST_SINGLE_MESSAGE_COMMANDS).toEqual(['GET_STATUS', 'GET_FACTS_REVISION', 'GET_MIGRATION_RECEIPT']);
+    expect(hostFactsCommandRequiresConnectedSession('GET_STATUS')).toBe(false);
+    expect(hostFactsCommandRequiresConnectedSession('SEARCH_CONVERSATIONS')).toBe(true);
+    expect(hostFactsCommandRequiresConnectedSession('CONVERSATION_DETAIL')).toBe(true);
+
+    const complete = {
+      type: 'complete',
+      manifest: {
+        migrationId: MIGRATION_A,
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+        factCounts: manifestCounts(0),
+        streamBytes: manifestCounts(0),
+        orderedFrameDigest: DIGEST,
+      },
+    };
+    expect(isNativeHostSessionCompleteControl(complete)).toBe(true);
+    expect(parseNativeHostSessionCompleteControl(complete)).toEqual(complete);
+    expect(isNativeHostSessionCompleteControl({ type: 'record-begin' })).toBe(false);
+    expectErrorCode(
+      () => parseNativeHostSessionCompleteControl({ type: 'complete', manifest: {}, origin: 'forged' }),
+      'INVALID_ARGUMENT',
+    );
+    expect(
+      parseNativeHostStreamResponseData({
+        stream: { operation: 'host-json', declaredTotalBytes: 128 },
+      }),
+    ).toEqual({ stream: { operation: 'host-json', declaredTotalBytes: 128 } });
+    expectErrorCode(
+      () => parseNativeHostStreamResponseData({ stream: { operation: 'image-asset', declaredTotalBytes: 128 } }),
       'INVALID_ARGUMENT',
     );
   });

@@ -839,6 +839,23 @@ function readConversationListPage(
   return database.transaction(() => readConversationListPageInSnapshot(database, input))();
 }
 
+/**
+ * Keeps Host cursor binding and repository filtering on the exact same normalized
+ * source/site scope. A cursor must not be reused for an equivalent-looking but
+ * differently normalized filter.
+ */
+export function normalizeSqliteConversationListQuery(
+  queryInput?: ConversationListQueryInput | null,
+  limit?: number | null,
+): ReturnType<typeof normalizeConversationListQuery> {
+  const fallbackLimit = Number(limit);
+  const query = normalizeConversationListQuery({
+    ...(queryInput || {}),
+    ...(Number.isFinite(fallbackLimit) && fallbackLimit > 0 ? { limit: fallbackLimit } : null),
+  });
+  return Object.freeze({ ...query, siteKey: normalizeConversationListSiteFilterKey(query.siteKey) });
+}
+
 function readConversationListPageInSnapshot(
   database: SyncNosSqliteDatabase,
   input: Readonly<{
@@ -847,12 +864,7 @@ function readConversationListPageInSnapshot(
     queryInput?: ConversationListQueryInput | null;
   }>,
 ): ConversationListPage<Conversation> {
-  const fallbackLimit = Number(input.limit);
-  const query = normalizeConversationListQuery({
-    ...(input.queryInput || {}),
-    ...(Number.isFinite(fallbackLimit) && fallbackLimit > 0 ? { limit: fallbackLimit } : null),
-  });
-  const normalizedQuery = { ...query, siteKey: normalizeConversationListSiteFilterKey(query.siteKey) };
+  const normalizedQuery = normalizeSqliteConversationListQuery(input.queryInput, input.limit);
   const cursor = toComparableCursor(input.cursor);
   const filters = queryFilters(normalizedQuery);
   const where = [...filters.where];

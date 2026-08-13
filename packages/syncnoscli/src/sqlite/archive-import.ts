@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer';
 
 import {
+  LOCAL_DATA_PROTOCOL_VERSION,
+  LOCAL_DATA_SCHEMA_VERSION,
   LocalDataContractError,
   parseMigrationId,
   parseMigrationStreamRequestPayload,
@@ -135,7 +137,14 @@ export type StagedFactsImporter = Readonly<{
 export type CreateStagedFactsImporterInput = Readonly<{
   database: SyncNosSqliteDatabase;
   digestProvider?: DigestProvider;
+  owner?: HostImportStagingOwner;
   request: unknown;
+}>;
+
+/** A Host-only marker lets a later process reclaim staging only after its owner is gone. */
+export type HostImportStagingOwner = Readonly<{
+  processId: number;
+  token: string;
 }>;
 
 function migrationValidationFailure(): never {
@@ -191,6 +200,12 @@ function safeCount(value: unknown): number {
   return Number(value);
 }
 
+function parseHostImportStagingOwner(value: HostImportStagingOwner | undefined): HostImportStagingOwner | null {
+  if (value === undefined) return null;
+  if (!Number.isSafeInteger(value.processId) || value.processId <= 0) migrationValidationFailure();
+  return Object.freeze({ processId: value.processId, token: parseMigrationId(value.token) });
+}
+
 function safePositiveId(value: unknown): number {
   const id = positiveId(value);
   if (!id) migrationValidationFailure();
@@ -227,7 +242,11 @@ function runStagingTransaction<T>(database: SyncNosSqliteDatabase, operation: ()
   }
 }
 
-function beginStaging(database: SyncNosSqliteDatabase, request: MigrationStreamRequestPayload): void {
+function beginStaging(
+  database: SyncNosSqliteDatabase,
+  request: MigrationStreamRequestPayload,
+  owner: HostImportStagingOwner | null,
+): void {
   runStagingTransaction(database, () => {
     const existing = database
       .prepare('SELECT migration_id FROM staging_metadata WHERE migration_id = ?')
@@ -236,10 +255,19 @@ function beginStaging(database: SyncNosSqliteDatabase, request: MigrationStreamR
     const now = Date.now();
     database
       .prepare(
-        `INSERT INTO staging_metadata (migration_id, protocol_version, schema_version, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO staging_metadata (
+           migration_id, protocol_version, schema_version, host_owner_token, host_owner_pid, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(request.migrationId, request.protocolVersion, request.schemaVersion, now, now);
+      .run(
+        request.migrationId,
+        request.protocolVersion,
+        request.schemaVersion,
+        owner?.token ?? null,
+        owner?.processId ?? null,
+        now,
+        now,
+      );
   });
 }
 
@@ -342,6 +370,86 @@ function receiptResult(value: unknown): StoredImportResult {
     });
   } catch (_error) {
     schemaMismatch();
+  }
+}
+
+/** Reads the compact receipt only; it never probes, recreates, or mutates staging. */
+export function getFactsMigrationReceipt(
+  database: SyncNosSqliteDatabase,
+  migrationId: unknown,
+): FactsArchiveImportResult | null {
+  try {
+    const parsedMigrationId = parseMigrationId(migrationId);
+    const receipt = database
+      .prepare(
+        `SELECT manifest_digest, protocol_version, schema_version, result_json
+           FROM migration_receipts
+          WHERE migration_id = ?`,
+      )
+      .get(parsedMigrationId) as
+      | Readonly<{
+          manifest_digest: unknown;
+          protocol_version: unknown;
+          result_json: unknown;
+          schema_version: unknown;
+        }>
+      | undefined;
+    if (!receipt) return null;
+    if (
+      receipt.protocol_version !== LOCAL_DATA_PROTOCOL_VERSION ||
+      receipt.schema_version !== LOCAL_DATA_SCHEMA_VERSION
+    ) {
+      schemaMismatch();
+    }
+    const result = receiptResult(receipt.result_json);
+    if (result.migrationId !== parsedMigrationId || result.manifestDigest !== receipt.manifest_digest) schemaMismatch();
+    return Object.freeze({ ...result, alreadyCommitted: true });
+  } catch (error) {
+    if (error instanceof LocalDataContractError) throw error;
+    throw mapSqliteError(error, { readOnly: true });
+  }
+}
+
+/**
+ * Removes only staging rows carrying a valid Host marker whose process is provably gone.
+ * Unknown/legacy rows are deliberately left alone rather than guessed away.
+ */
+export function cleanupStaleHostImportStaging(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{ isProcessAlive: (processId: number) => boolean }>,
+): number {
+  try {
+    const rows = database
+      .prepare('SELECT migration_id, host_owner_token, host_owner_pid FROM staging_metadata ORDER BY migration_id ASC')
+      .all() as Array<Readonly<{ host_owner_pid: unknown; host_owner_token: unknown; migration_id: unknown }>>;
+    const staleMigrationIds: MigrationId[] = [];
+    for (const row of rows) {
+      let migrationId: MigrationId;
+      let owner: HostImportStagingOwner;
+      try {
+        migrationId = parseMigrationId(row.migration_id);
+        if (typeof row.host_owner_pid !== 'number' || typeof row.host_owner_token !== 'string') continue;
+        owner = parseHostImportStagingOwner({
+          processId: row.host_owner_pid,
+          token: row.host_owner_token,
+        })!;
+      } catch (_error) {
+        continue;
+      }
+      let alive = true;
+      try {
+        alive = input.isProcessAlive(owner.processId);
+      } catch (_error) {
+        // An indeterminate liveness check must preserve data rather than risk an active session.
+        alive = true;
+      }
+      if (!alive) staleMigrationIds.push(migrationId);
+    }
+    for (const migrationId of staleMigrationIds) clearStaging(database, migrationId);
+    return staleMigrationIds.length;
+  } catch (error) {
+    if (error instanceof LocalDataContractError) throw error;
+    throw mapSqliteError(error);
   }
 }
 
@@ -800,7 +908,7 @@ class FactsImporter {
     const request = parseMigrationStreamRequestPayload(input.request);
     const provider = input.digestProvider ?? nodeDigestProvider;
     const digest = await OrderedFrameDigestAccumulator.create(provider);
-    beginStaging(input.database, request);
+    beginStaging(input.database, request, parseHostImportStagingOwner(input.owner));
     return new FactsImporter(input.database, request, provider, digest);
   }
 

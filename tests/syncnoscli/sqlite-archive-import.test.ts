@@ -25,6 +25,7 @@ import { OrderedFrameDigestAccumulator, sha256Hex } from '@services/local-data/d
 import { createNativeWireDataFrame, createNativeWireRecordJsonFrame } from '@services/local-data/native-wire';
 import {
   createStagedFactsImporter,
+  getFactsMigrationReceipt,
   type StagedFactsImporter,
 } from '../../packages/syncnoscli/src/sqlite/archive-import';
 import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
@@ -328,6 +329,12 @@ describe('SQLite staged facts import', () => {
         },
         factsRevision: 1,
       });
+      expect(getFactsMigrationReceipt(handle.database, migrationId)).toMatchObject({
+        alreadyCommitted: true,
+        factsRevision: 1,
+        migrationId,
+      });
+      expect(getFactsMigrationReceipt(handle.database, randomUUID())).toBeNull();
       const imageRow = handle.database.prepare('SELECT id FROM image_cache').get() as { id: number };
       const messageRow = handle.database.prepare('SELECT content_markdown, payload_json FROM messages').get() as {
         content_markdown: string;

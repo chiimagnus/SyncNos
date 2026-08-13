@@ -33,13 +33,7 @@ await build({
 
 await build({
   absWorkingDir: packageRoot,
-  stdin: {
-    contents:
-      "process.stderr.write('SyncNos Native Host is not available in this package build.\\n'); process.exitCode = 1;",
-    loader: 'ts',
-    resolveDir: packageRoot,
-    sourcefile: 'native-host-bootstrap.ts',
-  },
+  entryPoints: [resolve(packageRoot, 'src/native-host/main.ts')],
   outfile: resolve(distDir, 'native-host.cjs'),
   bundle: true,
   platform: 'node',

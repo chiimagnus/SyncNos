@@ -26,6 +26,7 @@ export const MAX_SEARCH_QUERY_SCALARS = 512;
 export const LOCAL_DATA_STREAM_OPERATIONS = Object.freeze([
   'capture-snapshot',
   'conversation-detail',
+  'host-json',
   'image-asset',
   'zip-backup',
   'migration-fact-record',
@@ -685,6 +686,8 @@ export type LocalDataSearchPage = Readonly<{
 export const STREAM_OPERATION_LIMITS: Readonly<Record<LocalDataStreamOperation, number>> = Object.freeze({
   'capture-snapshot': MAX_CAPTURE_SNAPSHOT_BYTES,
   'conversation-detail': MAX_DETAIL_PREVIEW_BYTES,
+  // Connected Host JSON replies are typed by their initiating Host command and stay bounded like detail previews.
+  'host-json': MAX_DETAIL_PREVIEW_BYTES,
   'image-asset': MAX_IMAGE_ASSET_BYTES,
   'zip-backup': MAX_ZIP_STREAM_BYTES,
   'migration-fact-record': MAX_MIGRATION_FACT_RECORD_BYTES,
@@ -910,6 +913,17 @@ export type MigrationStreamRequestPayload = Readonly<{
   schemaVersion: typeof LOCAL_DATA_SCHEMA_VERSION;
 }>;
 
+/** The final small control message for an inbound Native Host facts import. */
+export type NativeHostSessionCompleteControl = Readonly<{
+  manifest: JsonObject;
+  type: 'complete';
+}>;
+
+/** The small header that precedes a bounded, canonical JSON response on a Host port. */
+export type NativeHostStreamResponseData = Readonly<{
+  stream: StreamDescriptor;
+}>;
+
 export type BackupStreamRequestPayload = Readonly<{
   transfer: StreamDescriptor;
 }>;
@@ -1031,6 +1045,24 @@ export const HOST_FACTS_COMMANDS = Object.freeze([
 ] as const);
 
 export type HostFactsCommand = (typeof HOST_FACTS_COMMANDS)[number];
+
+/**
+ * Only these responses are intrinsically bounded enough for sendNativeMessage().
+ * Every future Host command defaults to a request-scoped Native Messaging port.
+ */
+export const NATIVE_HOST_SINGLE_MESSAGE_COMMANDS = Object.freeze([
+  'GET_STATUS',
+  'GET_FACTS_REVISION',
+  'GET_MIGRATION_RECEIPT',
+] as const);
+
+export type NativeHostSingleMessageCommand = (typeof NATIVE_HOST_SINGLE_MESSAGE_COMMANDS)[number];
+
+const NATIVE_HOST_SINGLE_MESSAGE_COMMAND_SET = new Set<string>(NATIVE_HOST_SINGLE_MESSAGE_COMMANDS);
+
+export function hostFactsCommandRequiresConnectedSession(command: HostFactsCommand): boolean {
+  return !NATIVE_HOST_SINGLE_MESSAGE_COMMAND_SET.has(command);
+}
 
 export type HostFactsPayloadByCommand = {
   GET_STATUS: EmptyPayload;
@@ -1425,6 +1457,25 @@ export function parseMigrationStreamRequestPayload(value: unknown): MigrationStr
     protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
     schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
   };
+}
+
+/** Lets the Host distinguish the final import control from a strict NativeWire frame. */
+export function isNativeHostSessionCompleteControl(value: unknown): boolean {
+  return isRecord(value) && value.type === 'complete';
+}
+
+export function parseNativeHostSessionCompleteControl(value: unknown): NativeHostSessionCompleteControl {
+  const input = record(value);
+  exactKeys(input, ['type', 'manifest']);
+  if (input.type !== 'complete') fail();
+  return Object.freeze({ type: 'complete', manifest: parseJsonObject(input.manifest) });
+}
+
+/** Native Host port replies carry one explicit descriptor before their P1 wire frames. */
+export function parseNativeHostStreamResponseData(value: unknown): NativeHostStreamResponseData {
+  const input = record(value);
+  exactKeys(input, ['stream']);
+  return Object.freeze({ stream: parseStreamDescriptor(input.stream, ['host-json']) });
 }
 
 function parseBackupStreamPayload(value: unknown): BackupStreamRequestPayload {
