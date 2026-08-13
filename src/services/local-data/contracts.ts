@@ -2,6 +2,8 @@ import { nativeHostContract } from './native-host-contract';
 
 export const LOCAL_DATA_PROTOCOL_VERSION = nativeHostContract.host.protocolVersion;
 export const LOCAL_DATA_SCHEMA_VERSION = nativeHostContract.host.schemaVersion;
+// The Host schema is tied to the single versioned Native Host contract until a new contract revision is introduced.
+export const LOCAL_DATA_SQLITE_SCHEMA_VERSION = LOCAL_DATA_SCHEMA_VERSION;
 
 const KIBIBYTE = 1024;
 const MEBIBYTE = KIBIBYTE * KIBIBYTE;
