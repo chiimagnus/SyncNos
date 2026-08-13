@@ -202,6 +202,27 @@ function writeMapping(
   return inserted;
 }
 
+/** Uses P1's cursor-aware mapping merge inside the archive import transaction. */
+export function upsertMigrationSyncMappingWithinTransaction(database: SyncNosSqliteDatabase, value: unknown): number {
+  const incoming = canonicalJsonRecord(value, ['id']) as Record<string, unknown>;
+  const source = safeString(incoming.source);
+  const conversationKey = safeString(incoming.conversationKey);
+  if (!source || !conversationKey) invalidArgument();
+  const reference = Object.freeze({ source, conversationKey });
+  const existing = selectMappingByReference(database, source, conversationKey);
+  const merged = mergeMigrationSyncMappingPayload(
+    existing ? readCanonicalJsonRecord(existing.payload_json) : {},
+    incoming,
+  );
+  const row = writeMapping(
+    database,
+    existing,
+    reference,
+    mappingPayload(existing, merged, reference, safeString(merged.notionPageId)),
+  );
+  return row.id;
+}
+
 function updateConversationPayload(
   database: SyncNosSqliteDatabase,
   conversation: ConversationRow,

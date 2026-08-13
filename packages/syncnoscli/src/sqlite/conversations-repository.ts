@@ -1,3 +1,4 @@
+import { mergeMigrationConversationPayload } from '@services/local-data/facts-archive';
 import { LocalDataContractError } from '@services/local-data/contracts';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
@@ -378,6 +379,61 @@ function writeConversationRecord(
   return updated;
 }
 
+function insertConversationRecord(
+  database: SyncNosSqliteDatabase,
+  next: ReturnType<typeof buildConversationRecord>,
+): ConversationRow {
+  const result = database
+    .prepare(
+      `INSERT INTO conversations (
+         source, conversation_key, source_type, title, url, author, published_at, list_source_key, list_site_key,
+         last_captured_at, notion_page_id, feishu_doc_id, payload_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      next.source,
+      next.conversationKey,
+      next.sourceType,
+      next.title,
+      next.url,
+      next.author,
+      next.publishedAt,
+      next.listSourceKey,
+      next.listSiteKey,
+      next.lastCapturedAt,
+      next.notionPageId,
+      next.feishuDocId,
+      next.payloadJson,
+    );
+  const id = positiveId(result.lastInsertRowid);
+  if (!id) schemaMismatch();
+  const inserted = selectConversationRowById(database, id);
+  if (!inserted) schemaMismatch();
+  return inserted;
+}
+
+/** Uses P1's existing-wins merge policy inside the caller's single import transaction. */
+export function upsertMigrationConversationWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  value: unknown,
+): Conversation {
+  const incoming = canonicalInputPayload(value);
+  const existing = findExistingConversationForPayload(database, incoming);
+  const merged = canonicalInputPayload(
+    mergeMigrationConversationPayload(existing ? storedPayload(existing.payload_json) : {}, incoming),
+  );
+  const next = buildConversationRecord(merged, existing);
+  if (!existing) return asConversation(insertConversationRecord(database, next));
+  migrateSyncMappingKeyWithinTransaction(database, {
+    legacySource: existing.source,
+    legacyConversationKey: existing.conversation_key,
+    nextSource: next.source,
+    nextConversationKey: next.conversationKey,
+    fallbackNotionPageId: next.notionPageId,
+  });
+  return asConversation(writeConversationRecord(database, existing.id, next));
+}
+
 function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Conversation {
   const payload = canonicalInputPayload(value);
   return execute(
@@ -396,33 +452,7 @@ function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Co
           return asConversation(writeConversationRecord(database, existing.id, next));
         }
 
-        const result = database
-          .prepare(
-            `INSERT INTO conversations (
-             source, conversation_key, source_type, title, url, author, published_at, list_source_key, list_site_key,
-             last_captured_at, notion_page_id, feishu_doc_id, payload_json
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
-            next.source,
-            next.conversationKey,
-            next.sourceType,
-            next.title,
-            next.url,
-            next.author,
-            next.publishedAt,
-            next.listSourceKey,
-            next.listSiteKey,
-            next.lastCapturedAt,
-            next.notionPageId,
-            next.feishuDocId,
-            next.payloadJson,
-          );
-        const id = positiveId(result.lastInsertRowid);
-        if (!id) schemaMismatch();
-        const inserted = selectConversationRowById(database, id);
-        if (!inserted) schemaMismatch();
-        return asConversation(inserted);
+        return asConversation(insertConversationRecord(database, next));
       }).result,
   );
 }

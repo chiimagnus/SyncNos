@@ -32,6 +32,7 @@ import {
   parseCliFactsRequest,
   parseMigrationJournalStage,
   parseMigrationProfileReferencePatch,
+  parseMigrationStreamRequestPayload,
   parseLocalDataError,
   parseHostFactsRequest,
   parsePlainSnippetHighlights,
@@ -253,6 +254,31 @@ describe('local data contracts', () => {
     expectErrorCode(() => parseHostFactsRequest(envelope('GET_STATUS', { shell: 'sh -c bad' })), 'INVALID_ARGUMENT');
     expectErrorCode(
       () => parseBrowserRuntimeFactsRequest(envelope('GET_LOCAL_DATA_STATUS', { profileJournal: {} })),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('starts a facts stream with only the migration identity and version pair', () => {
+    expect(
+      parseMigrationStreamRequestPayload({
+        migrationId: MIGRATION_A,
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      }),
+    ).toEqual({
+      migrationId: MIGRATION_A,
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    });
+    expectErrorCode(
+      () =>
+        parseMigrationStreamRequestPayload({
+          manifestDigest: DIGEST,
+          migrationId: MIGRATION_A,
+          protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+          schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+          transfer: { declaredTotalBytes: 1, operation: 'migration-fact-record' },
+        }),
       'INVALID_ARGUMENT',
     );
   });

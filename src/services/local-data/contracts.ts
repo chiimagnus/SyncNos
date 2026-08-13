@@ -871,9 +871,9 @@ export type HostPutImageAssetRequestPayload = Readonly<{
 }>;
 
 export type MigrationStreamRequestPayload = Readonly<{
-  manifestDigest: string;
   migrationId: MigrationId;
-  transfer: StreamDescriptor;
+  protocolVersion: typeof LOCAL_DATA_PROTOCOL_VERSION;
+  schemaVersion: typeof LOCAL_DATA_SCHEMA_VERSION;
 }>;
 
 export type BackupStreamRequestPayload = Readonly<{
@@ -1380,13 +1380,16 @@ function parseHostPutImageAssetPayload(value: unknown): HostPutImageAssetRequest
   };
 }
 
-function parseMigrationStreamPayload(value: unknown): MigrationStreamRequestPayload {
+/** Starts a streamed migration; the final manifest arrives only after all bounded sessions. */
+export function parseMigrationStreamRequestPayload(value: unknown): MigrationStreamRequestPayload {
   const input = record(value);
-  exactKeys(input, ['migrationId', 'manifestDigest', 'transfer']);
+  exactKeys(input, ['migrationId', 'protocolVersion', 'schemaVersion']);
+  if (input.protocolVersion !== LOCAL_DATA_PROTOCOL_VERSION) fail('PROTOCOL_MISMATCH');
+  if (input.schemaVersion !== LOCAL_DATA_SCHEMA_VERSION) fail('SCHEMA_MISMATCH');
   return {
     migrationId: parseMigrationId(input.migrationId),
-    manifestDigest: parseOrderedFrameDigest(input.manifestDigest),
-    transfer: parseStreamDescriptor(input.transfer, ['migration-fact-record', 'migration-image-asset']),
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
   };
 }
 
@@ -1503,7 +1506,7 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
       return parseBrowserPutImageAssetPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'FACTS_IMPORT':
     case 'FACTS_EXPORT':
-      return parseMigrationStreamPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+      return parseMigrationStreamRequestPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'BACKUP_IMPORT':
     case 'BACKUP_EXPORT':
       return parseBackupStreamPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
@@ -1565,7 +1568,7 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
       return parseHostPutImageAssetPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'IMPORT_FACTS':
     case 'EXPORT_FACTS':
-      return parseMigrationStreamPayload(value) as HostFactsPayloadByCommand[TCommand];
+      return parseMigrationStreamRequestPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'IMPORT_BACKUP':
     case 'EXPORT_BACKUP':
       return parseBackupStreamPayload(value) as HostFactsPayloadByCommand[TCommand];

@@ -198,6 +198,71 @@ function ensureConversationIndexes(database: SyncNosSqliteDatabase): void {
   `);
 }
 
+/**
+ * Import staging is Host-owned bookkeeping, not a second facts source. Keeping it
+ * outside the public facts table list lets an already-created v1 database gain the
+ * bounded importer without changing its facts contract.
+ */
+function ensureImportStagingTables(database: SyncNosSqliteDatabase): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS staging_records (
+      migration_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('conversations', 'sync_mappings', 'messages', 'image_cache', 'article_comments')),
+      source_local_id TEXT NOT NULL,
+      ordinal INTEGER NOT NULL,
+      record_blob BLOB NOT NULL,
+      conversation_source_local_id TEXT NULL,
+      parent_source_local_id TEXT NULL,
+      comment_context_key TEXT NULL,
+      comment_canonical_url TEXT NULL,
+      comment_conversation_source TEXT NULL,
+      comment_conversation_key TEXT NULL,
+      root_structural_digest TEXT NULL,
+      structural_digest TEXT NULL,
+      image_url TEXT NULL,
+      PRIMARY KEY (migration_id, kind, source_local_id),
+      UNIQUE (migration_id, ordinal)
+    );
+    CREATE INDEX IF NOT EXISTS staging_records_by_migration_kind_ordinal
+      ON staging_records (migration_id, kind, ordinal);
+    CREATE INDEX IF NOT EXISTS staging_records_by_migration_comment_group
+      ON staging_records (migration_id, comment_context_key, structural_digest);
+
+    CREATE TABLE IF NOT EXISTS staging_image_assets (
+      migration_id TEXT NOT NULL,
+      source_local_id TEXT NOT NULL,
+      byte_length INTEGER NOT NULL,
+      bytes BLOB NOT NULL,
+      PRIMARY KEY (migration_id, source_local_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS staging_remaps (
+      migration_id TEXT NOT NULL,
+      fact_kind TEXT NOT NULL CHECK (fact_kind IN ('conversations', 'messages', 'image_cache', 'article_comments')),
+      source_local_id TEXT NOT NULL,
+      target_id INTEGER NOT NULL,
+      PRIMARY KEY (migration_id, fact_kind, source_local_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS staging_conversation_identities (
+      migration_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      conversation_key TEXT NOT NULL,
+      target_id INTEGER NOT NULL,
+      PRIMARY KEY (migration_id, source, conversation_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS staging_comment_groups (
+      migration_id TEXT NOT NULL,
+      context_key TEXT NOT NULL,
+      structural_digest TEXT NOT NULL,
+      incoming_count INTEGER NOT NULL,
+      target_count INTEGER NOT NULL,
+      PRIMARY KEY (migration_id, context_key, structural_digest)
+    );
+  `);
+}
+
 function initializeMeta(database: SyncNosSqliteDatabase): void {
   const existingDatabaseUuid = metaValue(database, META_DATABASE_UUID);
   if (
@@ -298,6 +363,7 @@ export function migrateSqliteSchema(database: SyncNosSqliteDatabase): void {
   try {
     if (currentVersion < 1) migrationOne(database);
     ensureConversationIndexes(database);
+    ensureImportStagingTables(database);
     database.exec(`PRAGMA application_id = ${SQLITE_APPLICATION_ID};`);
     database.exec(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION};`);
     initializeMeta(database);

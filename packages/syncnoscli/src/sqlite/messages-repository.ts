@@ -1,3 +1,4 @@
+import { mergeMigrationMessagePayload, rewriteSyncnosAssetUrlsInMarkdown } from '@services/local-data/facts-archive';
 import { LocalDataContractError } from '@services/local-data/contracts';
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
@@ -54,6 +55,11 @@ export type MessagePersistenceOptions = Readonly<{
 export type MessagePersistenceResult = Readonly<{
   deleted: number;
   upserted: number;
+}>;
+
+export type MigrationMessageUpsertResult = Readonly<{
+  id: number;
+  rewritesImportedMarkdown: boolean;
 }>;
 
 function invalidArgument(): never {
@@ -163,7 +169,7 @@ function upsertMessageWithinTransaction(
     raw: Record<string, unknown>;
     sequence: number;
   }>,
-): void {
+): MessageRow {
   const payload = messagePayload(input.raw);
   const existingPayload = input.existing ? readCanonicalJsonRecord(input.existing.payload_json) : {};
   const policy = mergePolicy(input.raw.captureMergePolicy);
@@ -213,9 +219,13 @@ function upsertMessageWithinTransaction(
         canonicalJsonText(nextPayload),
         input.existing.id,
       );
-    return;
+    const updated = database.prepare('SELECT * FROM messages WHERE id = ?').get(input.existing.id) as
+      | MessageRow
+      | undefined;
+    if (!updated) invalidArgument();
+    return updated;
   }
-  database
+  const result = database
     .prepare(
       `INSERT INTO messages (
          conversation_id, message_key, role, author_name, content_text, content_markdown, sequence, updated_at, payload_json
@@ -232,6 +242,60 @@ function upsertMessageWithinTransaction(
       updatedAt,
       canonicalJsonText(nextPayload),
     );
+  const id = positiveId(result.lastInsertRowid);
+  if (!id) invalidArgument();
+  const inserted = database.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MessageRow | undefined;
+  if (!inserted) invalidArgument();
+  return inserted;
+}
+
+/** Uses P1's conservative message merge after the importer has remapped its conversation. */
+export function upsertMigrationMessageWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{ conversationId: number; payload: Record<string, unknown> }>,
+): MigrationMessageUpsertResult {
+  const conversationId = positiveId(input.conversationId);
+  if (!conversationId || !conversationExists(database, conversationId)) invalidArgument();
+  const incoming = messagePayload(input.payload) as Record<string, unknown>;
+  const messageKey = safeString(incoming.messageKey);
+  if (!messageKey) invalidArgument();
+  const existing = selectMessageByConversationAndKey(database, conversationId, messageKey);
+  const merged = mergeMigrationMessagePayload(existing ? readCanonicalJsonRecord(existing.payload_json) : {}, incoming);
+  const row = upsertMessageWithinTransaction(database, {
+    conversationId,
+    existing,
+    raw: merged,
+    sequence: normalizedSequence(merged.sequence),
+  });
+  return Object.freeze({
+    id: row.id,
+    // Existing markdown already points at current SQLite asset IDs. Only a newly
+    // accepted imported body may contain source-local syncnos-asset references.
+    rewritesImportedMarkdown: !existing || row.content_markdown !== existing.content_markdown,
+  });
+}
+
+/** Rewrites only an imported message after image IDs have been remapped in the same facts transaction. */
+export function rewriteMigrationMessageAssetUrlsWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{
+    defaultUrl?: string;
+    fallbackUrlByOldId: ReadonlyMap<number, string>;
+    messageId: number;
+    remap: ReadonlyMap<number, number>;
+  }>,
+): boolean {
+  const messageId = positiveId(input.messageId);
+  if (!messageId) invalidArgument();
+  const row = database.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as MessageRow | undefined;
+  if (!row) invalidArgument();
+  const contentMarkdown = rewriteSyncnosAssetUrlsInMarkdown(row.content_markdown, input);
+  if (contentMarkdown === row.content_markdown) return false;
+  const payload = { ...readCanonicalJsonRecord(row.payload_json), contentMarkdown } as Record<string, unknown>;
+  database
+    .prepare('UPDATE messages SET content_markdown = ?, payload_json = ? WHERE id = ?')
+    .run(contentMarkdown, canonicalJsonText(payload), row.id);
+  return true;
 }
 
 function assertRawMessage(value: unknown): Record<string, unknown> | null {

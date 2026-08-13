@@ -1,3 +1,4 @@
+import type { MigrationCommentFact } from '@services/local-data/facts-archive';
 import { LocalDataContractError } from '@services/local-data/contracts';
 import { parseArticleCommentDto, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { parseArticleCommentLocator } from '@services/comments/domain/comment-locator';
@@ -49,6 +50,13 @@ export type AddSqliteArticleCommentInput = Readonly<{
   parentId?: unknown;
   quoteText?: unknown;
   updatedAt?: unknown;
+}>;
+
+export type MigrationCommentWriteInput = Readonly<{
+  conversationId: number | null;
+  existingCommentId: number | null;
+  parentId: number | null;
+  record: MigrationCommentFact;
 }>;
 
 function invalidArgument(): never {
@@ -183,6 +191,105 @@ function commentPayload(input: AddSqliteArticleCommentInput): Readonly<{
     updatedAt,
     payloadJson: canonicalJsonText(payload),
   });
+}
+
+function migrationCommentPayload(
+  database: SyncNosSqliteDatabase,
+  input: Omit<MigrationCommentWriteInput, 'existingCommentId'>,
+): Readonly<{
+  canonicalUrl: string;
+  conversationId: number | null;
+  conversationKey: string | null;
+  conversationSource: string | null;
+  createdAt: number;
+  parentId: number | null;
+  payloadJson: string;
+  updatedAt: number;
+}> {
+  const record = input.record;
+  const canonicalUrl = canonicalizeArticleUrl(record.payload.canonicalUrl);
+  if (!canonicalUrl || canonicalUrl !== record.archiveIdentity.context.canonicalUrl) invalidArgument();
+  const conversationId = input.conversationId == null ? null : positiveId(input.conversationId);
+  const parentId = input.parentId == null ? null : positiveId(input.parentId);
+  if (input.conversationId !== null && !conversationId) invalidArgument();
+  if (input.parentId !== null && !parentId) invalidArgument();
+  const archivedConversation = record.archiveIdentity.context.conversation;
+  const context = conversationId ? articleConversationContext(database, conversationId) : null;
+  if (
+    Boolean(context) !== Boolean(archivedConversation) ||
+    (context &&
+      (!archivedConversation ||
+        context.conversationSource !== archivedConversation.source ||
+        context.conversationKey !== archivedConversation.conversationKey ||
+        canonicalizeArticleUrl(selectConversationById(database, conversationId!)?.url) !== canonicalUrl))
+  ) {
+    invalidArgument();
+  }
+  if (parentId) {
+    const parent = selectCommentById(database, parentId);
+    if (!parent || parent.parent_comment_id !== null || !contextMatches(parent, { canonicalUrl, conversationId }))
+      invalidArgument();
+  }
+  const createdAt = Number(record.payload.createdAt);
+  const updatedAt = Number(record.payload.updatedAt);
+  if (!Number.isFinite(createdAt) || createdAt < 0 || !Number.isFinite(updatedAt) || updatedAt < 0) invalidArgument();
+  return Object.freeze({
+    canonicalUrl,
+    conversationId,
+    conversationKey: context?.conversationKey ?? null,
+    conversationSource: context?.conversationSource ?? null,
+    createdAt,
+    parentId,
+    payloadJson: canonicalJsonText({ ...record.payload }),
+    updatedAt,
+  });
+}
+
+/**
+ * Inserts a validated P1 comment graph node, or maps it to the one prior node that
+ * the caller has already proven is an unambiguous structural match.
+ */
+export function writeMigrationCommentWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  input: MigrationCommentWriteInput,
+): number {
+  const payload = migrationCommentPayload(database, input);
+  if (input.existingCommentId !== null) {
+    const existingId = positiveId(input.existingCommentId);
+    const existing = existingId ? selectCommentById(database, existingId) : null;
+    if (
+      !existing ||
+      !contextMatches(existing, payload) ||
+      existing.parent_comment_id !== payload.parentId ||
+      existing.root_structural_digest !== input.record.archiveIdentity.rootStructuralDigest ||
+      existing.structural_digest !== input.record.archiveIdentity.structuralDigest
+    ) {
+      invalidArgument();
+    }
+    return existing.id;
+  }
+  const result = database
+    .prepare(
+      `INSERT INTO article_comments (
+         conversation_id, parent_comment_id, canonical_url, conversation_source, conversation_key, created_at, updated_at,
+         root_structural_digest, structural_digest, payload_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      payload.conversationId,
+      payload.parentId,
+      payload.canonicalUrl,
+      payload.conversationSource,
+      payload.conversationKey,
+      payload.createdAt,
+      payload.updatedAt,
+      input.record.archiveIdentity.rootStructuralDigest,
+      input.record.archiveIdentity.structuralDigest,
+      payload.payloadJson,
+    );
+  const id = positiveId(result.lastInsertRowid);
+  if (!id) invalidArgument();
+  return id;
 }
 
 function addArticleComment(database: SyncNosSqliteDatabase, input: AddSqliteArticleCommentInput): ArticleComment {

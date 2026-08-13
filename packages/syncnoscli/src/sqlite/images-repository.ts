@@ -4,7 +4,7 @@ import { prepareMigrationImageFact, streamMigrationImageBytes } from '@services/
 import { LocalDataContractError } from '@services/local-data/contracts';
 
 import { mapSqliteError } from './database';
-import { canonicalJsonText, positiveId, safeString } from './fact-payload';
+import { canonicalJsonText, positiveId, readCanonicalJsonRecord, safeString } from './fact-payload';
 import { runFactsTransaction } from './revision';
 import type { SyncNosSqliteDatabase } from './schema';
 
@@ -35,6 +35,12 @@ export type PutImageAssetInput = Readonly<{
   dataUrl?: unknown;
   metadata?: unknown;
   url?: unknown;
+}>;
+
+export type MigrationImageUpsertResult = Readonly<{
+  id: number;
+  reusedExistingBytes: boolean;
+  url: string;
 }>;
 
 function invalidArgument(): never {
@@ -76,6 +82,92 @@ function selectImageByConversationAndUrl(
       | ImageRow
       | undefined) ?? null
   );
+}
+
+function validStoredBytes(row: ImageRow): boolean {
+  return row.bytes instanceof Uint8Array && row.byte_size > 0 && row.bytes.byteLength === row.byte_size;
+}
+
+/**
+ * Imports one already validated P1 image record. Existing valid cache bytes win,
+ * matching the backup merge policy; metadata still receives non-conflicting opaque
+ * fields from the incoming record.
+ */
+export function upsertMigrationImageWithinTransaction(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{
+    bytes: Uint8Array;
+    contentType: string;
+    conversationId: number;
+    metadata: Record<string, unknown>;
+  }>,
+): MigrationImageUpsertResult {
+  const conversationId = positiveId(input.conversationId);
+  const url = safeString(input.metadata.url);
+  if (
+    !conversationId ||
+    !url ||
+    !(input.bytes instanceof Uint8Array) ||
+    input.bytes.byteLength <= 0 ||
+    !safeString(input.contentType) ||
+    !database.prepare('SELECT 1 AS present FROM conversations WHERE id = ?').get(conversationId)
+  ) {
+    invalidArgument();
+  }
+  const existing = selectImageByConversationAndUrl(database, conversationId, url);
+  const existingMetadata = existing ? readCanonicalJsonRecord(existing.payload_json) : {};
+  const keepExistingBytes = Boolean(existing && validStoredBytes(existing));
+  const contentType = keepExistingBytes ? existing!.content_type : input.contentType;
+  const bytes = keepExistingBytes ? existing!.bytes : input.bytes;
+  const metadata = {
+    ...input.metadata,
+    ...existingMetadata,
+    url,
+    contentType,
+    byteSize: bytes.byteLength,
+  } as Record<string, unknown>;
+  delete metadata.id;
+  delete metadata.conversationId;
+  delete metadata.blob;
+  delete metadata.bytes;
+  delete metadata.dataUrl;
+  const payloadJson = canonicalJsonText(metadata);
+  if (existing) {
+    if (!keepExistingBytes) {
+      database
+        .prepare(
+          `UPDATE image_cache
+              SET content_type = ?, byte_size = ?, bytes = ?, payload_json = ?
+            WHERE id = ?`,
+        )
+        .run(
+          contentType,
+          bytes.byteLength,
+          Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+          payloadJson,
+          existing.id,
+        );
+    } else if (existing.payload_json !== payloadJson) {
+      database.prepare('UPDATE image_cache SET payload_json = ? WHERE id = ?').run(payloadJson, existing.id);
+    }
+    return Object.freeze({ id: existing.id, url, reusedExistingBytes: keepExistingBytes });
+  }
+  const result = database
+    .prepare(
+      `INSERT INTO image_cache (conversation_id, url, content_type, byte_size, bytes, payload_json)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      conversationId,
+      url,
+      contentType,
+      bytes.byteLength,
+      Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+      payloadJson,
+    );
+  const id = positiveId(result.lastInsertRowid);
+  if (!id) invalidArgument();
+  return Object.freeze({ id, url, reusedExistingBytes: false });
 }
 
 async function normalizedImageInput(input: PutImageAssetInput): Promise<
