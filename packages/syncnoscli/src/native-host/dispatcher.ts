@@ -1,5 +1,6 @@
 import {
   LocalDataContractError,
+  serializedJsonUtf8ByteLength,
   type ConversationListRequestPayload,
   type HostCommentContext,
   type HostConversationReference,
@@ -35,7 +36,20 @@ const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
   'SEARCH_CONVERSATIONS',
 ] as const);
 
+const NATIVE_HOST_CONNECTED_MUTATION_COMMANDS = Object.freeze([
+  'SAVE_CONVERSATION_SNAPSHOT',
+  'DELETE_CONVERSATION',
+  'DELETE_CONVERSATIONS',
+  'MERGE_CONVERSATIONS',
+  'SYNC_CONVERSATION_MESSAGES',
+  'PATCH_SYNC_MAPPING',
+  'SET_SYNC_CURSOR',
+  'SET_CONVERSATION_NOTION_PAGE_ID',
+  'CLEAR_SYNC_MAPPING',
+] as const);
+
 type NativeHostConnectedReadCommand = (typeof NATIVE_HOST_CONNECTED_READ_COMMANDS)[number];
+type NativeHostConnectedMutationCommand = (typeof NATIVE_HOST_CONNECTED_MUTATION_COMMANDS)[number];
 
 function invalidArgument(): never {
   throw new LocalDataContractError('INVALID_ARGUMENT');
@@ -43,6 +57,10 @@ function invalidArgument(): never {
 
 function staleReference(): never {
   throw new LocalDataContractError('STALE_REFERENCE');
+}
+
+function protocolMismatch(): never {
+  throw new LocalDataContractError('PROTOCOL_MISMATCH');
 }
 
 function listScope(payload: ConversationListRequestPayload) {
@@ -115,9 +133,8 @@ function readComments(database: SyncNosSqliteDatabase, request: HostFactsRequest
 }
 
 /**
- * Dispatches only read operations whose request and response semantics are already
- * complete. Byte upload/export and mutations gain their typed stream handlers with
- * the matching P3 facts facades; they must never be guessed as one-shot JSON here.
+ * Dispatches only lease-bound facts reads. Capture streaming and the remaining facts
+ * domains gain their matching P3 facades instead of falling through to an IDB path.
  */
 export function readNativeHostConnectedCommand(database: SyncNosSqliteDatabase, request: HostFactsRequest): unknown {
   switch (request.command) {
@@ -156,6 +173,62 @@ export function readNativeHostConnectedCommand(database: SyncNosSqliteDatabase, 
   }
 }
 
+/**
+ * Executes only the typed conversation/mapping writes that P3-T4 exposes through
+ * the lease-bound facade. References are re-resolved by each repository inside its
+ * SQLite transaction; browser epochs and browser-local IDs never enter this Host.
+ */
+export function writeNativeHostConnectedCommand(database: SyncNosSqliteDatabase, request: HostFactsRequest): unknown {
+  const conversations = createConversationsRepository(database);
+  const mappings = createMappingsRepository(database);
+  switch (request.command) {
+    case 'SAVE_CONVERSATION_SNAPSHOT': {
+      const snapshot = request.payload.snapshot;
+      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) invalidArgument();
+      if (serializedJsonUtf8ByteLength(snapshot) !== request.payload.transfer.declaredTotalBytes) protocolMismatch();
+      // ponytail: P3-T5 replaces this legacy conversation-only snapshot with the atomic conversation+messages capture.
+      return conversations.upsertConversation(snapshot);
+    }
+    case 'DELETE_CONVERSATION':
+      return conversations.deleteConversationsByReferences([request.payload]);
+    case 'DELETE_CONVERSATIONS':
+      return conversations.deleteConversationsByReferences(request.payload.conversations);
+    case 'MERGE_CONVERSATIONS':
+      return conversations.mergeConversationsByReferences({
+        keep: request.payload.target,
+        remove: request.payload.source,
+      });
+    case 'SYNC_CONVERSATION_MESSAGES':
+      if (serializedJsonUtf8ByteLength(request.payload.messages) !== request.payload.transfer.declaredTotalBytes) {
+        protocolMismatch();
+      }
+      return conversations.syncConversationMessagesByReference(request.payload.conversation, request.payload.messages, {
+        ...(request.payload.mode ? { mode: request.payload.mode } : {}),
+        ...(request.payload.diff !== undefined ? { diff: request.payload.diff } : {}),
+      });
+    case 'PATCH_SYNC_MAPPING':
+      return mappings.patchSyncMappingByReference(request.payload.conversation, request.payload.patch);
+    case 'SET_SYNC_CURSOR':
+      return mappings.setSyncCursorByReference(request.payload.conversation, request.payload.cursor);
+    case 'SET_CONVERSATION_NOTION_PAGE_ID':
+      return mappings.setConversationNotionPageIdByReference(
+        request.payload.conversation,
+        request.payload.notionPageId,
+        request.payload.meta,
+      );
+    case 'CLEAR_SYNC_MAPPING':
+      return mappings.clearSyncCursorByReference(request.payload.conversation);
+    default:
+      invalidArgument();
+  }
+}
+
 export function isNativeHostConnectedReadCommand(command: HostFactsCommand): command is NativeHostConnectedReadCommand {
   return (NATIVE_HOST_CONNECTED_READ_COMMANDS as readonly string[]).includes(command);
+}
+
+export function isNativeHostConnectedMutationCommand(
+  command: HostFactsCommand,
+): command is NativeHostConnectedMutationCommand {
+  return (NATIVE_HOST_CONNECTED_MUTATION_COMMANDS as readonly string[]).includes(command);
 }

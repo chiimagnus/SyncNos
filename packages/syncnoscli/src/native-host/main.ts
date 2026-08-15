@@ -14,7 +14,12 @@ import { cleanupStaleHostImportStaging, getFactsMigrationReceipt } from '../sqli
 import { openReadOnly, openReadWriteForHost, type SyncNosSqliteHandle } from '../sqlite/database';
 import { readFactsRevision } from '../sqlite/revision';
 import { getSqliteDatabaseUuid } from '../sqlite/schema';
-import { isNativeHostConnectedReadCommand, readNativeHostConnectedCommand } from './dispatcher';
+import {
+  isNativeHostConnectedMutationCommand,
+  isNativeHostConnectedReadCommand,
+  readNativeHostConnectedCommand,
+  writeNativeHostConnectedCommand,
+} from './dispatcher';
 import {
   NativeHostLaunchError,
   createNativeHostImportSession,
@@ -230,6 +235,38 @@ async function runConnectedReadCommand(
   }
 }
 
+async function runConnectedMutationCommand(
+  request: HostFactsRequest,
+  input: Readonly<{
+    openReadWriteForHost: DatabaseOpener;
+    stderr: NativeHostErrorOutput;
+    stdout: NativeMessagingOutput;
+  }>,
+): Promise<number> {
+  let handle: SyncNosSqliteHandle | null = null;
+  let responseStarted = false;
+  try {
+    handle = await input.openReadWriteForHost();
+    const bytes = encodeNativeHostJson(writeNativeHostConnectedCommand(handle.database, request));
+    const stream = parseNativeHostStreamResponseData({
+      stream: { operation: 'host-json', declaredTotalBytes: bytes.byteLength },
+    });
+    await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, stream));
+    responseStarted = true;
+    await writeNativeHostByteStream({ bytes, operation: stream.stream.operation, output: input.stdout });
+    return 0;
+  } catch (error) {
+    if (responseStarted) {
+      writeDiagnostic(input.stderr, 'SyncNos Native Host could not finish its streamed response.');
+    } else {
+      await writeHostFailure(input.stdout, input.stderr, request, error, true);
+    }
+    return 1;
+  } finally {
+    closeHandle(handle);
+  }
+}
+
 async function runConnectedCommand(
   request: HostFactsRequest,
   messages: AsyncIterator<unknown>,
@@ -245,6 +282,13 @@ async function runConnectedCommand(
   if (isNativeHostConnectedReadCommand(request.command)) {
     return await runConnectedReadCommand(request, {
       openReadOnly: input.openReadOnly,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    });
+  }
+  if (isNativeHostConnectedMutationCommand(request.command)) {
+    return await runConnectedMutationCommand(request, {
+      openReadWriteForHost: input.openReadWriteForHost,
       stderr: input.stderr,
       stdout: input.stdout,
     });

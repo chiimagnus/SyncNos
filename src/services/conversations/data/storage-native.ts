@@ -1,8 +1,12 @@
 import { connectNative, type NativeHostRequest } from '@platform/local-data/native-client';
 import {
   LocalDataContractError,
+  serializedJsonUtf8ByteLength,
+  type ConversationMessageSyncMode,
   type HostConversationReference,
   type HostFactsCommand,
+  type JsonObject,
+  type JsonValue,
   type StableConversationReference,
 } from '@services/local-data/contracts';
 import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
@@ -24,6 +28,15 @@ type NativeConnectedCommand = Extract<
   | 'CONVERSATION_LOOKUP'
   | 'CONVERSATION_DETAIL'
   | 'CONVERSATION_TAIL'
+  | 'SAVE_CONVERSATION_SNAPSHOT'
+  | 'DELETE_CONVERSATIONS'
+  | 'MERGE_CONVERSATIONS'
+  | 'SYNC_CONVERSATION_MESSAGES'
+  | 'GET_SYNC_MAPPING'
+  | 'PATCH_SYNC_MAPPING'
+  | 'SET_SYNC_CURSOR'
+  | 'SET_CONVERSATION_NOTION_PAGE_ID'
+  | 'CLEAR_SYNC_MAPPING'
 >;
 
 type NativeConnect = <TData>(input: NativeHostRequest<NativeConnectedCommand>) => Promise<TData>;
@@ -58,6 +71,62 @@ export type ConversationReadRepository = Readonly<{
   }>;
 }>;
 
+export type ResolvedConversationReference = StableConversationReference &
+  Readonly<{
+    conversationId: number;
+  }>;
+
+export type ConversationMessageSyncOptions = Readonly<{
+  diff?: { added?: string[]; removed?: string[]; updated?: string[] } | null;
+  mode?: ConversationMessageSyncMode;
+}>;
+
+export type ConversationMappingRead = Readonly<{
+  conversation: Conversation;
+  mapping: Record<string, unknown> | null;
+}>;
+
+export type ConversationMutationRepository = Readonly<{
+  clearSyncMapping: (reference: ResolvedConversationReference, provider: string) => Promise<true>;
+  deleteConversations: (references: readonly ResolvedConversationReference[]) => Promise<{
+    deletedConversations: number;
+    deletedImageCache: number;
+    deletedMappings: number;
+    deletedMessages: number;
+  }>;
+  getSyncMapping: (
+    reference: ResolvedConversationReference,
+    provider: string,
+  ) => Promise<ConversationMappingRead | null>;
+  mergeConversations: (
+    input: Readonly<{
+      keep: ResolvedConversationReference;
+      remove: ResolvedConversationReference;
+    }>,
+  ) => Promise<{
+    keptConversationId: number;
+    merged: boolean;
+    movedImageCache: number;
+    movedMessages: number;
+    removedConversationId: number;
+  }>;
+  patchSyncMapping: (reference: ResolvedConversationReference, provider: string, patch: JsonObject) => Promise<true>;
+  setConversationNotionPageId: (
+    reference: ResolvedConversationReference,
+    notionPageId: string,
+    meta?: Readonly<{ notionPageUrl?: string; notionWorkspaceSlug?: string }>,
+  ) => Promise<true>;
+  setSyncCursor: (reference: ResolvedConversationReference, cursor: JsonObject) => Promise<true>;
+  syncConversationMessages: (
+    reference: ResolvedConversationReference,
+    messages: JsonValue,
+    options?: ConversationMessageSyncOptions,
+  ) => Promise<{ deleted: number; upserted: number }>;
+  upsertConversation: (payload: JsonObject) => Promise<Conversation>;
+}>;
+
+export type ConversationFactsRepository = ConversationReadRepository & ConversationMutationRepository;
+
 export type NativeConversationReadDependencies = Readonly<{
   connectNative?: NativeConnect;
 }>;
@@ -88,15 +157,27 @@ function positiveId(value: unknown): number {
   return Number(value);
 }
 
+function nonNegativeInteger(value: unknown): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) protocolFailure();
+  return Number(value);
+}
+
 function finiteTimestamp(value: unknown): number {
   if (!Number.isFinite(value)) return 0;
   return Number(value);
 }
 
-function hostReference(reference: StableConversationReference): HostConversationReference {
+function hostReference(
+  reference: StableConversationReference & Readonly<{ conversationId?: unknown }>,
+): HostConversationReference {
   const source = text(reference?.source, true);
   const conversationKey = text(reference?.conversationKey, true);
-  return { source, conversationKey };
+  const conversationId = reference?.conversationId;
+  return {
+    source,
+    conversationKey,
+    ...(conversationId === undefined ? {} : { backendConversationId: positiveId(conversationId) }),
+  };
 }
 
 function asConversation(value: unknown): Conversation {
@@ -193,6 +274,54 @@ function asTail(value: unknown): ConversationTailWindow {
   };
 }
 
+function asDeleteResult(value: unknown): Awaited<ReturnType<ConversationMutationRepository['deleteConversations']>> {
+  const input = record(value);
+  return {
+    deletedConversations: nonNegativeInteger(input.deletedConversations),
+    deletedImageCache: nonNegativeInteger(input.deletedImageCache),
+    deletedMappings: nonNegativeInteger(input.deletedMappings),
+    deletedMessages: nonNegativeInteger(input.deletedMessages),
+  };
+}
+
+function asMergeResult(value: unknown): Awaited<ReturnType<ConversationMutationRepository['mergeConversations']>> {
+  const input = record(value);
+  if (typeof input.merged !== 'boolean') protocolFailure();
+  return {
+    keptConversationId: positiveId(input.keptConversationId),
+    merged: input.merged,
+    movedImageCache: nonNegativeInteger(input.movedImageCache),
+    movedMessages: nonNegativeInteger(input.movedMessages),
+    removedConversationId: positiveId(input.removedConversationId),
+  };
+}
+
+function asMessageSyncResult(
+  value: unknown,
+): Awaited<ReturnType<ConversationMutationRepository['syncConversationMessages']>> {
+  const input = record(value);
+  return {
+    deleted: nonNegativeInteger(input.deleted),
+    upserted: nonNegativeInteger(input.upserted),
+  };
+}
+
+function asMappingRead(value: unknown): ConversationMappingRead | null {
+  if (value == null) return null;
+  const input = record(value);
+  const mapping = input.mapping;
+  if (mapping !== null && (typeof mapping !== 'object' || Array.isArray(mapping))) protocolFailure();
+  return {
+    conversation: asConversation(input.conversation),
+    mapping: mapping === null ? null : record(mapping),
+  };
+}
+
+function asTrue(value: unknown): true {
+  if (value !== true) protocolFailure();
+  return true;
+}
+
 function domainFromUrl(value: unknown): string {
   try {
     const url = new URL(text(value));
@@ -225,11 +354,11 @@ function listPayload(queryInput?: ConversationListQueryInput | null, limit?: num
   };
 }
 
-/** Maps only P1 typed reads to the Host; selection, sorting, and pagination remain in their existing repositories. */
+/** Maps the P3-T4 conversation facade to typed Host commands; selection and pagination stay in SQLite. */
 export function createNativeConversationReadRepository(
   lease: FactsOperationLease,
   dependencies: NativeConversationReadDependencies = {},
-): ConversationReadRepository {
+): ConversationFactsRepository {
   const nativeConnect = (dependencies.connectNative ?? connectNative) as NativeConnect;
   const request = async <TData>(command: NativeConnectedCommand, payload: unknown): Promise<TData> => {
     assertFactsOperationLease(lease);
@@ -238,7 +367,7 @@ export function createNativeConversationReadRepository(
     return result;
   };
 
-  const repository: ConversationReadRepository = {
+  const repository: ConversationFactsRepository = {
     async getConversationListBootstrap(queryInput, limit) {
       return asPage(await request('CONVERSATION_BOOTSTRAP', listPayload(queryInput, limit)));
     },
@@ -287,6 +416,97 @@ export function createNativeConversationReadRepository(
         if (!page.hasMore || !page.cursor) return { candidates, scannedCount, truncatedByScanLimit: false };
         page = await repository.getConversationListPage({}, page.cursor, Math.min(pageLimit, maxScan - scannedCount));
       }
+    },
+    async upsertConversation(payload) {
+      const snapshot = record(payload) as JsonObject;
+      return asConversation(
+        await request('SAVE_CONVERSATION_SNAPSHOT', {
+          snapshot,
+          transfer: {
+            operation: 'capture-snapshot',
+            declaredTotalBytes: serializedJsonUtf8ByteLength(snapshot),
+          },
+        }),
+      );
+    },
+    async deleteConversations(references) {
+      if (!Array.isArray(references) || !references.length) throw new LocalDataContractError('INVALID_ARGUMENT');
+      return asDeleteResult(
+        await request('DELETE_CONVERSATIONS', {
+          conversations: references.map(hostReference),
+        }),
+      );
+    },
+    async mergeConversations(input) {
+      return asMergeResult(
+        await request('MERGE_CONVERSATIONS', {
+          source: hostReference(input.remove),
+          target: hostReference(input.keep),
+        }),
+      );
+    },
+    async syncConversationMessages(reference, messages, options) {
+      return asMessageSyncResult(
+        await request('SYNC_CONVERSATION_MESSAGES', {
+          conversation: hostReference(reference),
+          messages,
+          transfer: {
+            operation: 'capture-snapshot',
+            declaredTotalBytes: serializedJsonUtf8ByteLength(messages),
+          },
+          ...(options?.mode ? { mode: options.mode } : {}),
+          ...(options?.diff !== undefined ? { diff: options.diff } : {}),
+        }),
+      );
+    },
+    async getSyncMapping(reference, provider) {
+      return asMappingRead(
+        await request('GET_SYNC_MAPPING', {
+          conversation: hostReference(reference),
+          provider: text(provider, true),
+        }),
+      );
+    },
+    async patchSyncMapping(reference, provider, patch) {
+      return asTrue(
+        await request('PATCH_SYNC_MAPPING', {
+          conversation: hostReference(reference),
+          provider: text(provider, true),
+          patch: record(patch) as JsonObject,
+        }),
+      );
+    },
+    async setSyncCursor(reference, cursor) {
+      return asTrue(
+        await request('SET_SYNC_CURSOR', {
+          conversation: hostReference(reference),
+          cursor: record(cursor) as JsonObject,
+        }),
+      );
+    },
+    async setConversationNotionPageId(reference, notionPageId, meta) {
+      return asTrue(
+        await request('SET_CONVERSATION_NOTION_PAGE_ID', {
+          conversation: hostReference(reference),
+          notionPageId: text(notionPageId),
+          ...(meta
+            ? {
+                meta: {
+                  ...(text(meta.notionPageUrl) ? { notionPageUrl: text(meta.notionPageUrl) } : {}),
+                  ...(text(meta.notionWorkspaceSlug) ? { notionWorkspaceSlug: text(meta.notionWorkspaceSlug) } : {}),
+                },
+              }
+            : {}),
+        }),
+      );
+    },
+    async clearSyncMapping(reference, provider) {
+      return asTrue(
+        await request('CLEAR_SYNC_MAPPING', {
+          conversation: hostReference(reference),
+          provider: text(provider, true),
+        }),
+      );
     },
   };
   return Object.freeze(repository);

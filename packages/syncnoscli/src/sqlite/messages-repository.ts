@@ -48,7 +48,7 @@ type ConversationTailRow = Readonly<{
 export type MessagePersistenceMode = 'snapshot' | 'incremental' | 'append';
 
 export type MessagePersistenceOptions = Readonly<{
-  diff?: Readonly<{ added?: string[]; removed?: string[]; updated?: string[] }> | null;
+  diff?: Readonly<{ added?: readonly string[]; removed?: readonly string[]; updated?: readonly string[] }> | null;
   mode?: MessagePersistenceMode;
 }>;
 
@@ -302,7 +302,7 @@ function assertRawMessage(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
-function syncMessagesWithinTransaction(
+export function syncMessagesWithinTransaction(
   database: SyncNosSqliteDatabase,
   conversationId: number,
   rawMessages: unknown,

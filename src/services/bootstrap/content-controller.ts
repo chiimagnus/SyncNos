@@ -168,7 +168,8 @@ export function createContentController(deps: Deps) {
     const rawIsNew = (conversation as any)?.__isNew;
     const isNew = typeof rawIsNew === 'boolean' ? rawIsNew : undefined;
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      conversationId: conversation.id,
+      source: snapshot.conversation.source,
+      conversationKey: snapshot.conversation.conversationKey,
       messages: snapshot.messages || [],
       mode: options?.mode || 'snapshot',
       diff: options?.diff || null,

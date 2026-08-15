@@ -866,7 +866,9 @@ export function ConversationsProvider({
         url: nextCanonical,
         lastCapturedAt: (convo as any)?.lastCapturedAt,
       };
-      await upsertConversation(payload);
+      const reference = toConversationFactsReference(convo);
+      if (!reference) throw new Error('stale conversation reference');
+      await upsertConversation({ payload, reference });
 
       if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
         await migrateArticleCommentsCanonicalUrl({
@@ -892,9 +894,11 @@ export function ConversationsProvider({
         });
 
         if (conflict) {
+          const conflictReference = toConversationFactsReference(conflict);
+          if (!conflictReference) throw new Error('stale conversation reference');
           await mergeConversations({
-            keepConversationId: Number((convo as any).id),
-            removeConversationId: Number((conflict as any).id),
+            keep: reference,
+            remove: conflictReference,
           });
         }
       }
@@ -1132,27 +1136,26 @@ export function ConversationsProvider({
 
         const safeActions = Array.isArray(actions) ? actions : [];
 
-        const conversationId = Number((selectedConversation as any)?.id);
         const conversationUrl = String((selectedConversation as any)?.url || '');
+        const reference = toConversationFactsReference(selectedConversation);
 
-        const cacheImagesAction: DetailHeaderAction | null =
-          Number.isFinite(conversationId) && conversationId > 0
-            ? {
-                id: 'cache-images',
-                label: t('detailHeaderCacheImagesLabel'),
-                busyLabel: t('detailHeaderCacheImagesInProgressLabel'),
-                showBusyProgress: true,
-                kind: 'open-target',
-                provider: 'local',
-                slot: 'tools',
-                afterTriggerLabel: t('detailHeaderCacheImagesDoneLabel'),
-                afterTriggerLabelDurationMs: 0,
-                onTrigger: async () => {
-                  await backfillConversationImages(conversationId, conversationUrl);
-                  await refreshActiveDetail();
-                },
-              }
-            : null;
+        const cacheImagesAction: DetailHeaderAction | null = reference
+          ? {
+              id: 'cache-images',
+              label: t('detailHeaderCacheImagesLabel'),
+              busyLabel: t('detailHeaderCacheImagesInProgressLabel'),
+              showBusyProgress: true,
+              kind: 'open-target',
+              provider: 'local',
+              slot: 'tools',
+              afterTriggerLabel: t('detailHeaderCacheImagesDoneLabel'),
+              afterTriggerLabelDurationMs: 0,
+              onTrigger: async () => {
+                await backfillConversationImages({ reference, conversationUrl });
+                await refreshActiveDetail();
+              },
+            }
+          : null;
 
         setDetailHeaderActions(cacheImagesAction ? [cacheImagesAction, ...safeActions] : safeActions);
       })
@@ -1277,10 +1280,17 @@ export function ConversationsProvider({
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
     if (!ids.length) return;
+    const references = ids.map((id) =>
+      toConversationFactsReference(items.find((conversation) => Number(conversation.id) === Number(id))),
+    );
+    if (references.some((reference) => !reference)) {
+      alert(t('actionFailedFallback'));
+      return;
+    }
 
     setDeleting(true);
     try {
-      await deleteConversations(ids);
+      await deleteConversations(references as ConversationFactsReference[]);
       setSelectedIds([]);
       await refreshList();
       await refreshActiveDetail();
@@ -1289,7 +1299,7 @@ export function ConversationsProvider({
     } finally {
       setDeleting(false);
     }
-  }, [refreshActiveDetail, refreshList, selectedIds]);
+  }, [items, refreshActiveDetail, refreshList, selectedIds]);
 
   const value: ConversationsAppState = {
     loadingList: loadingInitialList,

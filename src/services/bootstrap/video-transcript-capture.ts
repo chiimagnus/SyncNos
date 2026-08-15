@@ -117,7 +117,11 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     }
     const conversation = conversationRes.data;
     const conversationId = Number((conversation as any)?.id);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) throw toError('invalid conversation id');
+    const conversationSource = normalizeText((conversation as any)?.source);
+    const conversationKey = normalizeText((conversation as any)?.conversationKey);
+    if (!Number.isFinite(conversationId) || conversationId <= 0 || !conversationSource || !conversationKey) {
+      throw toError('invalid conversation identity');
+    }
 
     const messages = [
       {
@@ -131,7 +135,8 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
     ];
 
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      conversationId: conversation.id,
+      source: conversationSource,
+      conversationKey,
       messages,
       mode: 'snapshot',
       diff: null,

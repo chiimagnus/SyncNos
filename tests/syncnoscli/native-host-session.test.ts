@@ -377,6 +377,116 @@ describe('Native Host session', () => {
     });
   });
 
+  it('routes typed conversation mutations through one read-write Host session', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'syncnoscli-native-host-write-'));
+    temporaryRoots.push(root);
+    const paths = resolveSyncNosRuntimePaths({ homeDirectory: root, platform: 'darwin' });
+    const seed = await openReadWriteForHost({ paths });
+    let conversationId = 0;
+    let retainedConversationId = 0;
+    try {
+      const conversations = createConversationsRepository(seed.database);
+      conversationId = conversations.upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'delete-me',
+        title: 'Delete me',
+        lastCapturedAt: 1,
+      }).id;
+      retainedConversationId = conversations.upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'retain-me',
+        title: 'Retain me',
+        lastCapturedAt: 2,
+      }).id;
+    } finally {
+      seed.close();
+    }
+
+    const openReadOnlyConnection = vi.fn(async () => await openReadOnly({ paths }));
+    const openReadWriteConnection = vi.fn(async () => await openReadWriteForHost({ paths }));
+    const staleOutput = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: openReadOnlyConnection,
+        openReadWriteForHost: openReadWriteConnection,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([
+          {
+            protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+            schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+            requestId: 'delete-stale',
+            command: 'DELETE_CONVERSATIONS',
+            payload: {
+              conversations: [
+                { source: 'chatgpt', conversationKey: 'delete-me', backendConversationId: conversationId },
+                {
+                  source: 'chatgpt',
+                  conversationKey: 'retain-me',
+                  backendConversationId: retainedConversationId + 1,
+                },
+              ],
+            },
+          },
+        ]),
+        stdout: staleOutput.output,
+      }),
+    ).resolves.toBe(1);
+    await expect(decodedMessages(staleOutput.frames)).resolves.toMatchObject([
+      { ok: false, error: { code: 'STALE_REFERENCE' } },
+    ]);
+
+    const verifyStale = await openReadOnly({ paths });
+    try {
+      const conversations = createConversationsRepository(verifyStale.database);
+      expect(conversations.getConversationById(conversationId)).not.toBeNull();
+      expect(conversations.getConversationById(retainedConversationId)).not.toBeNull();
+    } finally {
+      verifyStale.close();
+    }
+
+    const output = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: openReadOnlyConnection,
+        openReadWriteForHost: openReadWriteConnection,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([
+          {
+            protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+            schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+            requestId: 'delete-1',
+            command: 'DELETE_CONVERSATIONS',
+            payload: {
+              conversations: [
+                { source: 'chatgpt', conversationKey: 'delete-me', backendConversationId: conversationId },
+              ],
+            },
+          },
+        ]),
+        stdout: output.output,
+      }),
+    ).resolves.toBe(0);
+
+    expect(openReadOnlyConnection).not.toHaveBeenCalled();
+    expect(openReadWriteConnection).toHaveBeenCalledTimes(2);
+    await expect(decodeHostJsonStream(await decodedMessages(output.frames))).resolves.toMatchObject({
+      deletedConversations: 1,
+    });
+
+    const verify = await openReadOnly({ paths });
+    try {
+      expect(createConversationsRepository(verify.database).getConversationById(conversationId)).toBeNull();
+    } finally {
+      verify.close();
+    }
+  });
+
   it('reclaims only provably dead Host-owned staging and preserves legacy or live sessions', async () => {
     const root = await mkdtemp(join(tmpdir(), 'syncnoscli-native-host-stale-'));
     temporaryRoots.push(root);

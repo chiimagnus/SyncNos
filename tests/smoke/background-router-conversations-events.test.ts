@@ -1,75 +1,56 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
+
+import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { LocalDataContractError } from '@services/local-data/contracts';
 
-const writeMocks = vi.hoisted(() => ({
-  writeConversationMessagesSnapshot: vi.fn(),
-  writeConversationSnapshot: vi.fn(),
-}));
+const localStorageMocks = vi.hoisted(() => ({ storageGet: vi.fn() }));
+const imageInlineMocks = vi.hoisted(() => ({ inlineChatImagesInMessages: vi.fn() }));
+const backfillJobMocks = vi.hoisted(() => ({ backfillConversationImages: vi.fn() }));
 
-const storageMocks = vi.hoisted(() => ({
-  deleteConversationsByIds: vi.fn(),
-  getConversationListBootstrap: vi.fn(),
-  getConversationListPage: vi.fn(),
-  findConversationBySourceAndKey: vi.fn(),
-  findConversationById: vi.fn(),
-  getConversationDetail: vi.fn(),
-  hasConversation: vi.fn(),
-  mergeConversationsByIds: vi.fn(),
-}));
-
-const localStorageMocks = vi.hoisted(() => ({
-  storageGet: vi.fn(),
-}));
-
-const imageInlineMocks = vi.hoisted(() => ({
-  inlineChatImagesInMessages: vi.fn(),
-}));
-
-const backfillJobMocks = vi.hoisted(() => ({
-  backfillConversationImages: vi.fn(),
-}));
-
-vi.mock('@services/conversations/data/write', () => ({
-  writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
-  writeConversationSnapshot: writeMocks.writeConversationSnapshot,
-}));
-
-vi.mock('@services/conversations/data/storage', () => ({
-  deleteConversationsByIds: storageMocks.deleteConversationsByIds,
-  getConversationListBootstrap: storageMocks.getConversationListBootstrap,
-  getConversationListPage: storageMocks.getConversationListPage,
-  findConversationBySourceAndKey: storageMocks.findConversationBySourceAndKey,
-  findConversationById: storageMocks.findConversationById,
-  getConversationDetail: storageMocks.getConversationDetail,
-  hasConversation: storageMocks.hasConversation,
-  mergeConversationsByIds: storageMocks.mergeConversationsByIds,
-}));
-
-vi.mock('@platform/storage/local', () => ({
-  storageGet: localStorageMocks.storageGet,
-}));
-
+vi.mock('@platform/storage/local', () => ({ storageGet: localStorageMocks.storageGet }));
 vi.mock('@services/conversations/data/image-inline', () => ({
   inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
 }));
-
 vi.mock('@services/conversations/background/image-backfill-job', () => ({
   backfillConversationImages: backfillJobMocks.backfillConversationImages,
 }));
 
-function makeInlineResult(messages: any[]) {
+const conversation = {
+  id: 123,
+  source: 'chatgpt',
+  conversationKey: 'thread-123',
+  sourceType: 'chat',
+  title: 'Thread',
+};
+
+function createRepository() {
   return {
-    messages,
-    inlinedCount: 0,
-    fromCacheCount: 0,
-    downloadedCount: 0,
-    inlinedBytes: 0,
-    warningFlags: [],
+    getConversationByReference: vi.fn(async ({ source, conversationKey }: any) => {
+      if (source !== conversation.source) return null;
+      if (conversationKey === conversation.conversationKey) return conversation;
+      if (conversationKey === 'thread-124') return { ...conversation, id: 124, conversationKey };
+      return null;
+    }),
+    syncConversationMessages: vi.fn(async () => ({ upserted: 1, deleted: 0 })),
+    deleteConversations: vi.fn(async () => ({
+      deletedConversations: 1,
+      deletedMessages: 0,
+      deletedMappings: 0,
+      deletedImageCache: 0,
+    })),
+    mergeConversations: vi.fn(async () => ({
+      keptConversationId: 123,
+      removedConversationId: 124,
+      movedMessages: 0,
+      movedImageCache: 0,
+      merged: true,
+    })),
+    upsertConversation: vi.fn(async () => conversation),
   };
 }
 
-function createRouter() {
+function createRouter(repository = createRepository(), onConversationChanged = vi.fn(async () => {})) {
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
       ok: false,
@@ -79,9 +60,14 @@ function createRouter() {
   });
   registerConversationHandlers(router as any, {
     conversationReadRunner: {
-      run: async ({ read }: any) => await read({ factsEpoch: 'idb-v1', mode: 'idb', repository: {} }),
+      run: async ({ expectedFactsEpoch, read }: any) => {
+        if (expectedFactsEpoch !== undefined && expectedFactsEpoch !== 'idb-v1') {
+          throw new LocalDataContractError('STALE_BACKEND_EPOCH');
+        }
+        return await read({ factsEpoch: 'idb-v1', mode: 'idb', repository });
+      },
     },
-    onConversationChanged: async () => {},
+    onConversationChanged,
     streamRouter: { register: () => {} },
   });
   return router;
@@ -89,10 +75,14 @@ function createRouter() {
 
 beforeEach(() => {
   localStorageMocks.storageGet.mockResolvedValue({});
-  imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => {
-    const messages = Array.isArray(input?.messages) ? input.messages : [];
-    return makeInlineResult(messages);
-  });
+  imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => ({
+    messages: Array.isArray(input?.messages) ? input.messages : [],
+    inlinedCount: 0,
+    fromCacheCount: 0,
+    downloadedCount: 0,
+    inlinedBytes: 0,
+    warningFlags: [],
+  }));
   backfillJobMocks.backfillConversationImages.mockResolvedValue({
     scannedMessages: 0,
     updatedMessages: 0,
@@ -106,238 +96,139 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  writeMocks.writeConversationMessagesSnapshot.mockReset();
-  writeMocks.writeConversationSnapshot.mockReset();
-  storageMocks.deleteConversationsByIds.mockReset();
-  storageMocks.getConversationListBootstrap.mockReset();
-  storageMocks.getConversationListPage.mockReset();
-  storageMocks.findConversationBySourceAndKey.mockReset();
-  storageMocks.findConversationById.mockReset();
-  storageMocks.getConversationDetail.mockReset();
-  storageMocks.hasConversation.mockReset();
-  storageMocks.mergeConversationsByIds.mockReset();
   localStorageMocks.storageGet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
   backfillJobMocks.backfillConversationImages.mockReset();
 });
 
 describe('background-router conversations events', () => {
-  it('broadcasts conversationsChanged after syncConversationMessages', async () => {
-    const broadcast = vi.fn();
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
-
-    const router = createRouter();
-    router.eventsHub.broadcast = broadcast;
+  it('resolves the stable capture identity before sync and broadcasts only after auto-sync is durable', async () => {
+    const repository = createRepository();
+    const events: string[] = [];
+    const router = createRouter(repository, async () => {
+      events.push('queue');
+    });
+    router.eventsHub.broadcast = () => events.push('broadcast');
 
     const res = await router.__handleMessageForTests({
       type: 'syncConversationMessages',
-      conversationId: 123,
+      source: conversation.source,
+      conversationKey: conversation.conversationKey,
+      messages: [{ messageKey: 'm-1', role: 'user', contentText: 'hello' }],
+    });
+
+    expect(res.ok).toBe(true);
+    expect(repository.getConversationByReference).toHaveBeenCalledWith({
+      source: conversation.source,
+      conversationKey: conversation.conversationKey,
+    });
+    expect(repository.syncConversationMessages).toHaveBeenCalledWith(
+      { source: conversation.source, conversationKey: conversation.conversationKey, conversationId: 123 },
+      [expect.objectContaining({ messageKey: 'm-1', authorName: 'You' })],
+      { mode: 'snapshot', diff: null },
+    );
+    expect(events).toEqual(['queue', 'broadcast']);
+  });
+
+  it('rejects an invalid sync mode before touching image or facts storage', async () => {
+    const repository = createRepository();
+    const router = createRouter(repository);
+
+    const res = await router.__handleMessageForTests({
+      type: 'syncConversationMessages',
+      source: conversation.source,
+      conversationKey: conversation.conversationKey,
+      mode: 'snapshop',
       messages: [],
     });
 
-    expect(res.ok).toBe(true);
-    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalledWith(123, [], {
-      mode: 'snapshot',
-      diff: null,
-    });
-    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'upsert', conversationId: 123 });
-  });
-
-  it('rejects an unknown non-empty persistence mode before image or storage work', async () => {
-    const router = createRouter();
-
-    const res = await router.__handleMessageForTests({
-      type: 'syncConversationMessages',
-      conversationId: 123,
-      mode: 'snapshop',
-      messages: [{ messageKey: 'm1', contentText: 'unsafe' }],
-    });
-
-    expect(res).toMatchObject({ ok: false, error: { message: 'invalid mode' } });
+    expect(res).toMatchObject({ ok: false, error: { extra: { code: 'INVALID_ARGUMENT' } } });
+    expect(repository.getConversationByReference).not.toHaveBeenCalled();
     expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
-    expect(writeMocks.writeConversationMessagesSnapshot).not.toHaveBeenCalled();
+    expect(repository.syncConversationMessages).not.toHaveBeenCalled();
   });
 
-  it('uses ai_chat_cache_images_enabled for chat source auto-save', async () => {
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
-      if (Array.isArray(keys) && keys.includes('ai_chat_cache_images_enabled')) {
-        return {
-          ai_chat_cache_images_enabled: false,
-          web_article_cache_images_enabled: true,
-        };
-      }
-      return {};
-    });
-
-    const router = createRouter();
-
-    const res = await router.__handleMessageForTests({
-      type: 'syncConversationMessages',
-      conversationId: 2001,
-      conversationSourceType: 'chat',
-      messages: [{ messageKey: 'm-1', contentMarkdown: '![img](https://example.com/a.png)' }],
-    });
-
-    expect(res.ok).toBe(true);
-    expect(localStorageMocks.storageGet).toHaveBeenCalledWith([
-      'ai_chat_cache_images_enabled',
-      'web_article_cache_images_enabled',
-    ]);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2001,
-        enableHttpImages: false,
-      }),
-    );
-  });
-
-  it('keeps transient protective policies through author normalization and image inlining', async () => {
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
-    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
-      makeInlineResult(
-        input.messages.map((message: any) => ({
-          ...message,
-          contentMarkdown: 'fallback\n\n![](syncnos-asset://9)',
-        })),
-      ),
-    );
-    const router = createRouter();
-
-    const res = await router.__handleMessageForTests({
-      type: 'syncConversationMessages',
-      conversationId: 2003,
-      conversationSourceType: 'chat',
-      conversationUrl: 'https://aistudio.google.com/app/1',
-      mode: 'append',
-      diff: { added: [], updated: ['m1'], removed: [] },
-      messages: [
-        {
-          messageKey: 'm1',
-          role: 'user',
-          contentText: 'fallback',
-          contentMarkdown: 'fallback\n\n![](data:image/png;base64,AQ==)',
-          captureSequencePolicy: 'preserve-existing-tail',
-          captureMergePolicy: 'preserve-existing-markdown',
-        },
-      ],
-    });
-
-    expect(res.ok).toBe(true);
-    expect(writeMocks.writeConversationMessagesSnapshot).toHaveBeenCalledWith(
-      2003,
-      [
-        expect.objectContaining({
-          messageKey: 'm1',
-          authorName: 'You',
-          contentMarkdown: 'fallback\n\n![](syncnos-asset://9)',
-          captureSequencePolicy: 'preserve-existing-tail',
-          captureMergePolicy: 'preserve-existing-markdown',
-        }),
-      ],
-      { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
-    );
-  });
-
-  it('uses web_article_cache_images_enabled for article source auto-save', async () => {
-    writeMocks.writeConversationMessagesSnapshot.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockImplementation(async (keys: string[]) => {
-      if (Array.isArray(keys) && keys.includes('ai_chat_cache_images_enabled')) {
-        return {
-          ai_chat_cache_images_enabled: false,
-          web_article_cache_images_enabled: true,
-        };
-      }
-      return {};
-    });
-
-    const router = createRouter();
-
-    const res = await router.__handleMessageForTests({
-      type: 'syncConversationMessages',
-      conversationId: 2002,
-      conversationSourceType: 'article',
-      messages: [{ messageKey: 'm-1', contentMarkdown: '![img](https://example.com/b.png)' }],
-    });
-
-    expect(res.ok).toBe(true);
-    expect(localStorageMocks.storageGet).toHaveBeenCalledWith([
-      'ai_chat_cache_images_enabled',
-      'web_article_cache_images_enabled',
-    ]);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2002,
-        enableHttpImages: true,
-      }),
-    );
-  });
-
-  it('broadcasts incremental updates while backfillConversationImages is running', async () => {
+  it('uses stable references for delete and broadcasts the re-resolved local hint', async () => {
+    const repository = createRepository();
     const broadcast = vi.fn();
-    backfillJobMocks.backfillConversationImages.mockImplementation(async (input: any) => {
-      await input?.onProgress?.({ updatedMessages: 1 });
-      await input?.onProgress?.({ updatedMessages: 2 });
-      return {
-        scannedMessages: 2,
-        updatedMessages: 2,
-        inlinedCount: 2,
-        fromCacheCount: 1,
-        downloadedCount: 1,
-        inlinedBytes: 2048,
-        warningFlags: [],
-      };
-    });
-
-    const router = createRouter();
-    router.eventsHub.broadcast = broadcast;
-
-    const res = await router.__handleMessageForTests({
-      type: 'backfillConversationImages',
-      conversationId: 888,
-      conversationUrl: 'https://example.com/a',
-    });
-
-    expect(res.ok).toBe(true);
-    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 888,
-        conversationUrl: 'https://example.com/a',
-      }),
-    );
-    expect(broadcast).toHaveBeenCalledTimes(3);
-    expect(broadcast).toHaveBeenNthCalledWith(1, 'conversationsChanged', {
-      reason: 'upsert',
-      conversationId: 888,
-    });
-    expect(broadcast).toHaveBeenNthCalledWith(2, 'conversationsChanged', {
-      reason: 'upsert',
-      conversationId: 888,
-    });
-    expect(broadcast).toHaveBeenNthCalledWith(3, 'conversationsChanged', {
-      reason: 'upsert',
-      conversationId: 888,
-    });
-  });
-
-  it('broadcasts conversationsChanged after deleteConversations', async () => {
-    const broadcast = vi.fn();
-    storageMocks.deleteConversationsByIds.mockResolvedValue({
-      deletedConversations: 2,
-      deletedMessages: 0,
-      deletedMappings: 0,
-    });
-
-    const router = createRouter();
+    const router = createRouter(repository);
     router.eventsHub.broadcast = broadcast;
 
     const res = await router.__handleMessageForTests({
       type: 'deleteConversations',
-      conversationIds: [1, '2', 'bad', -1],
+      factsEpoch: 'idb-v1',
+      conversations: [{ source: conversation.source, conversationKey: conversation.conversationKey }],
     });
 
     expect(res.ok).toBe(true);
-    expect(storageMocks.deleteConversationsByIds).toHaveBeenCalled();
-    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'delete', conversationIds: [1, 2] });
+    expect(repository.deleteConversations).toHaveBeenCalledWith([
+      { source: conversation.source, conversationKey: conversation.conversationKey, conversationId: 123 },
+    ]);
+    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'delete', conversationIds: [123] });
+  });
+
+  it('queues the retained conversation before broadcasting a completed merge', async () => {
+    const repository = createRepository();
+    const events: string[] = [];
+    const router = createRouter(repository, async (conversationId, reason) => {
+      events.push(`queue:${conversationId}:${reason}`);
+    });
+    router.eventsHub.broadcast = () => events.push('broadcast');
+
+    const res = await router.__handleMessageForTests({
+      type: 'mergeConversations',
+      factsEpoch: 'idb-v1',
+      keep: { source: conversation.source, conversationKey: conversation.conversationKey },
+      remove: { source: conversation.source, conversationKey: 'thread-124' },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(events).toEqual(['queue:123:upsertConversation', 'broadcast']);
+  });
+
+  it('does not enqueue or broadcast a no-op merge', async () => {
+    const repository = createRepository();
+    repository.mergeConversations.mockResolvedValue({
+      keptConversationId: 123,
+      removedConversationId: 123,
+      movedMessages: 0,
+      movedImageCache: 0,
+      merged: false,
+    });
+    const events: string[] = [];
+    const router = createRouter(repository, async () => events.push('queue'));
+    router.eventsHub.broadcast = () => events.push('broadcast');
+
+    const res = await router.__handleMessageForTests({
+      type: 'mergeConversations',
+      factsEpoch: 'idb-v1',
+      keep: { source: conversation.source, conversationKey: conversation.conversationKey },
+      remove: { source: conversation.source, conversationKey: conversation.conversationKey },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(events).toEqual([]);
+  });
+
+  it('does not emit backfill progress before the lease-bound job and queue complete', async () => {
+    const repository = createRepository();
+    const events: string[] = [];
+    const router = createRouter(repository, async () => events.push('queue'));
+    router.eventsHub.broadcast = () => events.push('broadcast');
+
+    const res = await router.__handleMessageForTests({
+      type: 'backfillConversationImages',
+      factsEpoch: 'idb-v1',
+      source: conversation.source,
+      conversationKey: conversation.conversationKey,
+      conversationUrl: 'https://chatgpt.com/c/thread-123',
+    });
+
+    expect(res.ok).toBe(true);
+    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({
+      conversationId: 123,
+      conversationUrl: 'https://chatgpt.com/c/thread-123',
+    });
+    expect(events).toEqual(['queue', 'broadcast']);
   });
 });

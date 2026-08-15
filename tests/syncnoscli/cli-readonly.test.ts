@@ -16,7 +16,11 @@ import {
 
 import { runConversations } from '../../packages/syncnoscli/src/commands/conversations';
 import { runCli } from '../../packages/syncnoscli/src/cli';
-import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
+import {
+  createConversationsRepository,
+  createSqliteConversationListScope,
+  encodeSqliteConversationListCursor,
+} from '../../packages/syncnoscli/src/sqlite/conversations-repository';
 import { openReadWriteForHost } from '../../packages/syncnoscli/src/sqlite/database';
 import { createMessagesRepository } from '../../packages/syncnoscli/src/sqlite/messages-repository';
 import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
@@ -93,6 +97,15 @@ afterEach(async () => {
 });
 
 describe('SyncNos read-only CLI', () => {
+  it('never serializes a browser Native cursor as a SQLite CLI cursor', () => {
+    expect(() =>
+      encodeSqliteConversationListCursor(
+        { nativeCursor: 'host:opaque' },
+        createSqliteConversationListScope({ sourceKey: 'chatgpt' }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+  });
+
   it('uses one existing database for paged list, detail, stats, and search without changing its bytes', async () => {
     const { paths, recentId } = await initializedPaths();
     const before = await readFile(paths.databasePath);

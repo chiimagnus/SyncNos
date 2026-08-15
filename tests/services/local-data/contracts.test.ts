@@ -118,10 +118,13 @@ describe('local data contracts', () => {
       'CONVERSATION_TAIL',
       'SAVE_CONVERSATION_SNAPSHOT',
       'DELETE_CONVERSATION',
+      'DELETE_CONVERSATIONS',
       'MERGE_CONVERSATIONS',
       'SYNC_CONVERSATION_MESSAGES',
       'GET_SYNC_MAPPING',
       'PATCH_SYNC_MAPPING',
+      'SET_SYNC_CURSOR',
+      'SET_CONVERSATION_NOTION_PAGE_ID',
       'CLEAR_SYNC_MAPPING',
       'UPDATE_ARTICLE_URL',
       'LIST_ARTICLE_COMMENTS',
@@ -238,6 +241,58 @@ describe('local data contracts', () => {
       () =>
         parseCliFactsRequest(
           envelope('SEARCH_CONVERSATIONS', { query: normalizeSearchQuery('syncnos') }, { factsEpoch: IDB_FACTS_EPOCH }),
+        ),
+      'INVALID_ARGUMENT',
+    );
+  });
+
+  it('parses only stable references for conversation batches and mapping mutations', () => {
+    const browserDelete = parseBrowserRuntimeFactsRequest(
+      envelope(
+        'DELETE_CONVERSATIONS',
+        { conversations: [{ source: 'web', conversationKey: 'conversation-a', conversationId: 10 }] },
+        { factsEpoch: `native:${MIGRATION_A}` },
+      ),
+    );
+    expect(browserDelete.payload).toEqual({
+      conversations: [{ source: 'web', conversationKey: 'conversation-a', conversationId: 10 }],
+    });
+
+    const hostSync = parseHostFactsRequest(
+      envelope('SYNC_CONVERSATION_MESSAGES', {
+        conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+        messages: [{ messageKey: 'm-1', role: 'user' }],
+        mode: 'append',
+        diff: { added: ['m-1'], updated: [], removed: [] },
+        transfer: { operation: 'capture-snapshot', declaredTotalBytes: 35 },
+      }),
+    );
+    expect(hostSync.payload).toMatchObject({
+      conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+      mode: 'append',
+      diff: { added: ['m-1'], updated: [], removed: [] },
+    });
+
+    expect(
+      parseHostFactsRequest(
+        envelope('SET_CONVERSATION_NOTION_PAGE_ID', {
+          conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+          notionPageId: 'page-1',
+          meta: { notionPageUrl: 'https://www.notion.so/page-1' },
+        }),
+      ).payload,
+    ).toEqual({
+      conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
+      notionPageId: 'page-1',
+      meta: { notionPageUrl: 'https://www.notion.so/page-1' },
+    });
+
+    expectErrorCode(
+      () =>
+        parseHostFactsRequest(
+          envelope('DELETE_CONVERSATIONS', {
+            conversations: [{ source: 'web', conversationKey: 'conversation-a', conversationId: 10 }],
+          }),
         ),
       'INVALID_ARGUMENT',
     );

@@ -44,8 +44,18 @@ type StableConversationReference = Readonly<{
   source: string;
 }>;
 
+type SqliteConversationReference = Readonly<{
+  backendConversationId?: unknown;
+  conversationKey?: unknown;
+  source?: unknown;
+}>;
+
 function invalidArgument(): never {
   throw new LocalDataContractError('INVALID_ARGUMENT');
+}
+
+function staleReference(): never {
+  throw new LocalDataContractError('STALE_REFERENCE');
 }
 
 function execute<T>(operation: () => T): T {
@@ -67,6 +77,27 @@ function object(value: unknown): Record<string, unknown> | null {
 
 function selectConversationById(database: SyncNosSqliteDatabase, id: number): ConversationRow | null {
   return (database.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as ConversationRow | undefined) ?? null;
+}
+
+function selectConversationByReference(
+  database: SyncNosSqliteDatabase,
+  reference: SqliteConversationReference,
+): ConversationRow {
+  const source = safeString(reference?.source);
+  const conversationKey = safeString(reference?.conversationKey);
+  if (!source || !conversationKey) invalidArgument();
+  const conversation =
+    (database
+      .prepare('SELECT * FROM conversations WHERE source = ? AND conversation_key = ?')
+      .get(source, conversationKey) as ConversationRow | undefined) ?? null;
+  if (!conversation) staleReference();
+  if (
+    reference.backendConversationId !== undefined &&
+    positiveId(reference.backendConversationId) !== conversation.id
+  ) {
+    staleReference();
+  }
+  return conversation;
 }
 
 function selectMappingByReference(
@@ -332,20 +363,44 @@ function patchSyncMapping(database: SyncNosSqliteDatabase, value: unknown, rawPa
       runFactsTransaction(database, () => {
         let conversation = selectConversationById(database, id);
         if (!conversation) invalidArgument();
-        const reference = referenceFromConversation(conversation);
-        const existing = selectMappingByReference(database, reference.source, reference.conversationKey);
-        const existingPayload = existing ? readCanonicalJsonRecord(existing.payload_json) : {};
-        const notionSections = mergedNestedRecord(existingPayload.notionSections, patch.notionSections);
-        if (notionSections) patch.notionSections = notionSections;
-        else delete patch.notionSections;
-        const payload = mappingPayload(existing, patch, reference, safeString(conversation.notion_page_id));
-        const mapping = writeMapping(database, existing, reference, payload);
-        const nextFeishuDocId = safeString((asMapping(mapping) as Record<string, unknown>).feishuDocId);
-        if (nextFeishuDocId && nextFeishuDocId !== safeString(conversation.feishu_doc_id)) {
-          conversation = updateConversationPayload(database, conversation, { feishuDocId: nextFeishuDocId });
-        }
-        return true as const;
+        return patchSyncMappingForConversation(database, conversation, patch);
       }).result,
+  );
+}
+
+function patchSyncMappingForConversation(
+  database: SyncNosSqliteDatabase,
+  initialConversation: ConversationRow,
+  patch: Record<string, unknown>,
+): true {
+  let conversation = initialConversation;
+  const reference = referenceFromConversation(conversation);
+  const existing = selectMappingByReference(database, reference.source, reference.conversationKey);
+  const existingPayload = existing ? readCanonicalJsonRecord(existing.payload_json) : {};
+  const notionSections = mergedNestedRecord(existingPayload.notionSections, patch.notionSections);
+  if (notionSections) patch.notionSections = notionSections;
+  else delete patch.notionSections;
+  const payload = mappingPayload(existing, patch, reference, safeString(conversation.notion_page_id));
+  const mapping = writeMapping(database, existing, reference, payload);
+  const nextFeishuDocId = safeString((asMapping(mapping) as Record<string, unknown>).feishuDocId);
+  if (nextFeishuDocId && nextFeishuDocId !== safeString(conversation.feishu_doc_id)) {
+    conversation = updateConversationPayload(database, conversation, { feishuDocId: nextFeishuDocId });
+  }
+  return true;
+}
+
+function patchSyncMappingByReference(
+  database: SyncNosSqliteDatabase,
+  reference: SqliteConversationReference,
+  rawPatch: unknown,
+): true {
+  if (!object(rawPatch)) invalidArgument();
+  const patch = canonicalJsonRecord(rawPatch, ['id', 'source', 'conversationKey']) as Record<string, unknown>;
+  return execute(
+    () =>
+      runFactsTransaction(database, () =>
+        patchSyncMappingForConversation(database, selectConversationByReference(database, reference), patch),
+      ).result,
   );
 }
 
@@ -357,39 +412,72 @@ function setConversationNotionPageId(
 ): true {
   const id = positiveId(value);
   if (!id) invalidArgument();
+  const pageId = safeString(notionPageId);
+  const pageUrl = safeString(meta?.notionPageUrl);
+  const workspaceSlug = safeString(meta?.notionWorkspaceSlug);
   return execute(
     () =>
       runFactsTransaction(database, () => {
-        let conversation = selectConversationById(database, id);
+        const conversation = selectConversationById(database, id);
         if (!conversation) invalidArgument();
-        const pageId = safeString(notionPageId);
-        const pageUrl = safeString(meta?.notionPageUrl);
-        const workspaceSlug = safeString(meta?.notionWorkspaceSlug);
-        conversation = updateConversationPayload(database, conversation, {
-          notionPageId: pageId,
-          ...(pageUrl ? { notionPageUrl: pageUrl } : null),
-          ...(workspaceSlug ? { notionWorkspaceSlug: workspaceSlug } : null),
-        });
-        const reference = referenceFromConversation(conversation);
-        const existing = selectMappingByReference(database, reference.source, reference.conversationKey);
-        writeMapping(
-          database,
-          existing,
-          reference,
-          mappingPayload(
-            existing,
-            {
-              notionPageId: pageId,
-              ...(pageUrl ? { notionPageUrl: pageUrl } : null),
-              ...(workspaceSlug ? { notionWorkspaceSlug: workspaceSlug } : null),
-              updatedAt: Date.now(),
-            },
-            reference,
-            pageId,
-          ),
-        );
-        return true as const;
+        return setConversationNotionPageIdForConversation(database, conversation, pageId, pageUrl, workspaceSlug);
       }).result,
+  );
+}
+
+function setConversationNotionPageIdForConversation(
+  database: SyncNosSqliteDatabase,
+  initialConversation: ConversationRow,
+  pageId: string,
+  pageUrl: string,
+  workspaceSlug: string,
+): true {
+  const conversation = updateConversationPayload(database, initialConversation, {
+    notionPageId: pageId,
+    ...(pageUrl ? { notionPageUrl: pageUrl } : null),
+    ...(workspaceSlug ? { notionWorkspaceSlug: workspaceSlug } : null),
+  });
+  const reference = referenceFromConversation(conversation);
+  const existing = selectMappingByReference(database, reference.source, reference.conversationKey);
+  writeMapping(
+    database,
+    existing,
+    reference,
+    mappingPayload(
+      existing,
+      {
+        notionPageId: pageId,
+        ...(pageUrl ? { notionPageUrl: pageUrl } : null),
+        ...(workspaceSlug ? { notionWorkspaceSlug: workspaceSlug } : null),
+        updatedAt: Date.now(),
+      },
+      reference,
+      pageId,
+    ),
+  );
+  return true;
+}
+
+function setConversationNotionPageIdByReference(
+  database: SyncNosSqliteDatabase,
+  reference: SqliteConversationReference,
+  notionPageId: unknown,
+  meta?: Readonly<{ notionPageUrl?: unknown; notionWorkspaceSlug?: unknown }>,
+): true {
+  const pageId = safeString(notionPageId);
+  const pageUrl = safeString(meta?.notionPageUrl);
+  const workspaceSlug = safeString(meta?.notionWorkspaceSlug);
+  return execute(
+    () =>
+      runFactsTransaction(database, () =>
+        setConversationNotionPageIdForConversation(
+          database,
+          selectConversationByReference(database, reference),
+          pageId,
+          pageUrl,
+          workspaceSlug,
+        ),
+      ).result,
   );
 }
 
@@ -413,36 +501,54 @@ function setSyncCursor(
       runFactsTransaction(database, () => {
         const conversation = selectConversationById(database, id);
         if (!conversation) invalidArgument();
-        const reference = referenceFromConversation(conversation);
-        const existing = selectMappingByReference(database, reference.source, reference.conversationKey);
-        const existingPayload = existing ? readCanonicalJsonRecord(existing.payload_json) : {};
-        const notionSections = mergedNestedRecord(existingPayload.notionSections, input.notionSections);
-        const notionSectionCursors = mergedNestedRecord(
-          existingPayload.notionSectionCursors,
-          input.notionSectionCursors,
-        );
-        const notionSectionDigests = mergedNestedRecord(
-          existingPayload.notionSectionDigests,
-          input.notionSectionDigests,
-        );
-        const payload = mappingPayload(
-          existing,
-          {
-            lastSyncedMessageKey: safeString(input.lastSyncedMessageKey),
-            lastSyncedSequence: finiteNumber(input.lastSyncedSequence),
-            lastSyncedAt: finiteNumber(input.lastSyncedAt) ?? Date.now(),
-            lastSyncedMessageUpdatedAt: finiteNumber(input.lastSyncedMessageUpdatedAt),
-            ...(notionSections ? { notionSections } : null),
-            ...(notionSectionCursors ? { notionSectionCursors } : null),
-            ...(notionSectionDigests ? { notionSectionDigests } : null),
-            updatedAt: Date.now(),
-          },
-          reference,
-          safeString(conversation.notion_page_id),
-        );
-        writeMapping(database, existing, reference, payload);
-        return true as const;
+        return setSyncCursorForConversation(database, conversation, input);
       }).result,
+  );
+}
+
+type SyncCursorInput = Parameters<typeof setSyncCursor>[2];
+
+function setSyncCursorForConversation(
+  database: SyncNosSqliteDatabase,
+  conversation: ConversationRow,
+  input: SyncCursorInput,
+): true {
+  const reference = referenceFromConversation(conversation);
+  const existing = selectMappingByReference(database, reference.source, reference.conversationKey);
+  const existingPayload = existing ? readCanonicalJsonRecord(existing.payload_json) : {};
+  const notionSections = mergedNestedRecord(existingPayload.notionSections, input.notionSections);
+  const notionSectionCursors = mergedNestedRecord(existingPayload.notionSectionCursors, input.notionSectionCursors);
+  const notionSectionDigests = mergedNestedRecord(existingPayload.notionSectionDigests, input.notionSectionDigests);
+  const payload = mappingPayload(
+    existing,
+    {
+      lastSyncedMessageKey: safeString(input.lastSyncedMessageKey),
+      lastSyncedSequence: finiteNumber(input.lastSyncedSequence),
+      lastSyncedAt: finiteNumber(input.lastSyncedAt) ?? Date.now(),
+      lastSyncedMessageUpdatedAt: finiteNumber(input.lastSyncedMessageUpdatedAt),
+      ...(notionSections ? { notionSections } : null),
+      ...(notionSectionCursors ? { notionSectionCursors } : null),
+      ...(notionSectionDigests ? { notionSectionDigests } : null),
+      updatedAt: Date.now(),
+    },
+    reference,
+    safeString(conversation.notion_page_id),
+  );
+  writeMapping(database, existing, reference, payload);
+  return true;
+}
+
+function setSyncCursorByReference(
+  database: SyncNosSqliteDatabase,
+  reference: SqliteConversationReference,
+  input: SyncCursorInput,
+): true {
+  if (!object(input)) invalidArgument();
+  return execute(
+    () =>
+      runFactsTransaction(database, () =>
+        setSyncCursorForConversation(database, selectConversationByReference(database, reference), input),
+      ).result,
   );
 }
 
@@ -478,19 +584,62 @@ function clearSyncCursor(database: SyncNosSqliteDatabase, value: unknown): true 
   });
 }
 
+function clearSyncCursorByReference(database: SyncNosSqliteDatabase, reference: SqliteConversationReference): true {
+  return execute(() => {
+    const initialConversation = selectConversationByReference(database, reference);
+    const initialReference = referenceFromConversation(initialConversation);
+    if (!selectMappingByReference(database, initialReference.source, initialReference.conversationKey)) return true;
+    return runFactsTransaction(database, () => {
+      const conversation = selectConversationByReference(database, reference);
+      const stableReference = referenceFromConversation(conversation);
+      const existing = selectMappingByReference(database, stableReference.source, stableReference.conversationKey);
+      if (!existing) return true as const;
+      writeMapping(
+        database,
+        existing,
+        stableReference,
+        mappingPayload(
+          existing,
+          {
+            lastSyncedMessageKey: '',
+            lastSyncedSequence: null,
+            lastSyncedAt: null,
+            lastSyncedMessageUpdatedAt: null,
+            updatedAt: Date.now(),
+          },
+          stableReference,
+          safeString(conversation.notion_page_id),
+        ),
+      );
+      return true as const;
+    }).result;
+  });
+}
+
 /** One SQLite handle hosts all provider mapping operations for the short-lived Host invocation. */
 export function createMappingsRepository(database: SyncNosSqliteDatabase) {
   return Object.freeze({
     clearSyncCursor: (conversationId: unknown) => clearSyncCursor(database, conversationId),
+    clearSyncCursorByReference: (reference: SqliteConversationReference) =>
+      clearSyncCursorByReference(database, reference),
     getSyncMappingByConversation: (conversationId: unknown) => getSyncMappingByConversation(database, conversationId),
     patchSyncMapping: (conversationId: unknown, patch: unknown) => patchSyncMapping(database, conversationId, patch),
+    patchSyncMappingByReference: (reference: SqliteConversationReference, patch: unknown) =>
+      patchSyncMappingByReference(database, reference, patch),
     setConversationNotionPageId: (
       conversationId: unknown,
       notionPageId: unknown,
       meta?: Readonly<{ notionPageUrl?: unknown; notionWorkspaceSlug?: unknown }>,
     ) => setConversationNotionPageId(database, conversationId, notionPageId, meta),
+    setConversationNotionPageIdByReference: (
+      reference: SqliteConversationReference,
+      notionPageId: unknown,
+      meta?: Readonly<{ notionPageUrl?: unknown; notionWorkspaceSlug?: unknown }>,
+    ) => setConversationNotionPageIdByReference(database, reference, notionPageId, meta),
     setSyncCursor: (conversationId: unknown, input: Parameters<typeof setSyncCursor>[2]) =>
       setSyncCursor(database, conversationId, input),
+    setSyncCursorByReference: (reference: SqliteConversationReference, input: SyncCursorInput) =>
+      setSyncCursorByReference(database, reference, input),
   });
 }
 

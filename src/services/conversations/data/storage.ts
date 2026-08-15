@@ -1,6 +1,11 @@
 import * as idb from '@services/conversations/data/storage-idb';
 import { FactsBackend, type BoundFactsRepository } from '@services/local-data/facts-backend';
-import { LocalDataContractError, type StableConversationReference } from '@services/local-data/contracts';
+import {
+  LocalDataContractError,
+  type JsonObject,
+  type JsonValue,
+  type StableConversationReference,
+} from '@services/local-data/contracts';
 import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import type {
   ConversationDetail,
@@ -10,10 +15,20 @@ import type {
 } from '@services/conversations/domain/models';
 import {
   createNativeConversationReadRepository,
-  type ConversationReadRepository,
+  type ConversationFactsRepository,
+  type ConversationMappingRead,
+  type ConversationMessageSyncOptions,
+  type ResolvedConversationReference,
 } from '@services/conversations/data/storage-native';
 
-export type { ConversationReadRepository } from '@services/conversations/data/storage-native';
+export type {
+  ConversationFactsRepository,
+  ConversationMappingRead,
+  ConversationMessageSyncOptions,
+  ConversationMutationRepository,
+  ConversationReadRepository,
+  ResolvedConversationReference,
+} from '@services/conversations/data/storage-native';
 
 function assertReference(reference: StableConversationReference): StableConversationReference {
   const source = String(reference?.source || '').trim();
@@ -22,7 +37,16 @@ function assertReference(reference: StableConversationReference): StableConversa
   return { source, conversationKey };
 }
 
-function createIdbConversationReadRepository(lease: FactsOperationLease): ConversationReadRepository {
+function assertResolvedReference(reference: ResolvedConversationReference): ResolvedConversationReference {
+  const normalized = assertReference(reference);
+  const conversationId = Number(reference?.conversationId);
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+    throw new LocalDataContractError('STALE_REFERENCE');
+  }
+  return { ...normalized, conversationId };
+}
+
+function createIdbConversationReadRepository(lease: FactsOperationLease): ConversationFactsRepository {
   const assertLease = () => assertFactsOperationLease(lease);
   return Object.freeze({
     async getConversationListBootstrap(queryInput?: ConversationListQueryInput | null, limit?: number | null) {
@@ -90,10 +114,60 @@ function createIdbConversationReadRepository(lease: FactsOperationLease): Conver
       assertLease();
       return await idb.searchConversationMentionCandidates(input);
     },
+    async upsertConversation(payload: JsonObject) {
+      assertLease();
+      return await idb.upsertConversation(payload);
+    },
+    async deleteConversations(references) {
+      assertLease();
+      const resolved = references.map(assertResolvedReference);
+      if (!resolved.length) throw new LocalDataContractError('INVALID_ARGUMENT');
+      return await idb.deleteConversationsByIds(resolved.map((reference) => reference.conversationId));
+    },
+    async mergeConversations(input) {
+      assertLease();
+      const keep = assertResolvedReference(input.keep);
+      const remove = assertResolvedReference(input.remove);
+      return await idb.mergeConversationsByIds({
+        keepConversationId: keep.conversationId,
+        removeConversationId: remove.conversationId,
+      });
+    },
+    async syncConversationMessages(reference, messages: JsonValue, options?: ConversationMessageSyncOptions) {
+      assertLease();
+      const resolved = assertResolvedReference(reference);
+      if (!Array.isArray(messages)) throw new LocalDataContractError('INVALID_ARGUMENT');
+      return await idb.syncConversationMessages(resolved.conversationId, messages, options);
+    },
+    async getSyncMapping(reference, _provider): Promise<ConversationMappingRead | null> {
+      assertLease();
+      const resolved = assertResolvedReference(reference);
+      return (await idb.getSyncMappingByConversation(resolved.conversationId)) as ConversationMappingRead | null;
+    },
+    async patchSyncMapping(reference, _provider, patch) {
+      assertLease();
+      const resolved = assertResolvedReference(reference);
+      return await idb.patchSyncMapping(resolved.conversationId, patch);
+    },
+    async setSyncCursor(reference, cursor) {
+      assertLease();
+      const resolved = assertResolvedReference(reference);
+      return await idb.setSyncCursor(resolved.conversationId, cursor);
+    },
+    async setConversationNotionPageId(reference, notionPageId, meta) {
+      assertLease();
+      const resolved = assertResolvedReference(reference);
+      return await idb.setConversationNotionPageId(resolved.conversationId, notionPageId, meta);
+    },
+    async clearSyncMapping(reference, _provider) {
+      assertLease();
+      const resolved = assertResolvedReference(reference);
+      return await idb.clearSyncCursor(resolved.conversationId);
+    },
   });
 }
 
-const conversationFactsBackend = new FactsBackend<ConversationReadRepository>({
+const conversationFactsBackend = new FactsBackend<ConversationFactsRepository>({
   createIdbRepository: createIdbConversationReadRepository,
   createNativeRepository: createNativeConversationReadRepository,
 });
@@ -107,7 +181,7 @@ export type ConversationReadRunner = Readonly<{
     input: Readonly<{
       expectedFactsEpoch?: unknown;
       kind: string;
-      read: (backend: BoundFactsRepository<ConversationReadRepository>) => Promise<T> | T;
+      read: (backend: BoundFactsRepository<ConversationFactsRepository>) => Promise<T> | T;
     }>,
   ) => Promise<T>;
 }>;
@@ -146,12 +220,4 @@ export async function syncConversationMessages(
   },
 ) {
   return await idb.syncConversationMessages(conversationId, messages, options);
-}
-
-export async function deleteConversationsByIds(conversationIds: any[]) {
-  return await idb.deleteConversationsByIds(conversationIds);
-}
-
-export async function mergeConversationsByIds(input: { keepConversationId: number; removeConversationId: number }) {
-  return await idb.mergeConversationsByIds(input);
 }

@@ -258,6 +258,68 @@ describe('SQLite sync mappings repository', () => {
     }
   });
 
+  it('uses stable references for message and mapping writes, rejecting a mismatched backend hint without a revision', async () => {
+    const { conversations, database, handle, mappings, messages } = await fixture.open();
+    try {
+      const conversation = conversations.upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'stable-mapping',
+        title: 'Stable mapping',
+        lastCapturedAt: 1,
+      });
+      const reference = {
+        source: 'chatgpt',
+        conversationKey: 'stable-mapping',
+        backendConversationId: conversation.id,
+      };
+
+      expect(
+        conversations.syncConversationMessagesByReference(reference, [
+          { messageKey: 'm1', role: 'assistant', contentText: 'one', sequence: 1 },
+        ]),
+      ).toEqual({ upserted: 1, deleted: 0 });
+      expect(mappings.patchSyncMappingByReference(reference, { feishuDocId: 'feishu-stable' })).toBe(true);
+      expect(mappings.setSyncCursorByReference(reference, { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 })).toBe(
+        true,
+      );
+      expect(
+        mappings.setConversationNotionPageIdByReference(reference, 'notion-stable', {
+          notionPageUrl: 'https://notion.so/notion-stable',
+        }),
+      ).toBe(true);
+
+      const beforeClear = mappings.getSyncMappingByConversation(conversation.id)?.mapping as Record<string, unknown>;
+      expect(beforeClear).toMatchObject({
+        feishuDocId: 'feishu-stable',
+        notionPageId: 'notion-stable',
+        lastSyncedMessageKey: 'm1',
+      });
+      expect(mappings.clearSyncCursorByReference(reference)).toBe(true);
+      expect(mappings.getSyncMappingByConversation(conversation.id)?.mapping).toMatchObject({
+        lastSyncedMessageKey: '',
+        lastSyncedSequence: null,
+      });
+      expect(messages.getMessagesByConversationId(conversation.id).map((message) => message.messageKey)).toEqual([
+        'm1',
+      ]);
+
+      const revisionBeforeStaleWrite = readFactsRevision(database);
+      try {
+        mappings.patchSyncMappingByReference(
+          { ...reference, backendConversationId: conversation.id + 1 },
+          { ignored: true },
+        );
+        throw new Error('expected stale reference');
+      } catch (error) {
+        expect(error).toMatchObject({ code: 'STALE_REFERENCE' });
+      }
+      expect(readFactsRevision(database)).toBe(revisionBeforeStaleWrite);
+    } finally {
+      handle.close();
+    }
+  });
+
   it('deletes mapping and messages with the conversation but leaves standalone facts to their own repositories', async () => {
     const { conversations, handle, mappings, messages } = await fixture.open();
     try {

@@ -814,8 +814,22 @@ export type CaptureSnapshotRequestPayload = Readonly<{
 
 export type SyncMessagesRequestPayload<TReference extends StableConversationReference> = Readonly<{
   conversation: TReference;
+  diff?: ConversationMessageSyncDiff | null;
   messages: JsonValue;
+  mode?: ConversationMessageSyncMode;
   transfer: StreamDescriptor;
+}>;
+
+export type ConversationMessageSyncMode = 'snapshot' | 'incremental' | 'append';
+
+export type ConversationMessageSyncDiff = Readonly<{
+  added?: readonly string[];
+  removed?: readonly string[];
+  updated?: readonly string[];
+}>;
+
+export type DeleteConversationsRequestPayload<TReference extends StableConversationReference> = Readonly<{
+  conversations: readonly TReference[];
 }>;
 
 export type MergeConversationsRequestPayload<TReference extends StableConversationReference> = Readonly<{
@@ -833,6 +847,20 @@ export type PatchMappingRequestPayload<TReference extends StableConversationRefe
     Readonly<{
       patch: JsonObject;
     }>;
+
+export type SetSyncCursorRequestPayload<TReference extends StableConversationReference> = Readonly<{
+  conversation: TReference;
+  cursor: JsonObject;
+}>;
+
+export type SetConversationNotionPageIdRequestPayload<TReference extends StableConversationReference> = Readonly<{
+  conversation: TReference;
+  meta?: Readonly<{
+    notionPageUrl?: string;
+    notionWorkspaceSlug?: string;
+  }>;
+  notionPageId: string;
+}>;
 
 export type UpdateArticleUrlRequestPayload<TReference extends StableConversationReference> = Readonly<{
   conversation?: TReference;
@@ -954,10 +982,13 @@ export const BROWSER_RUNTIME_FACTS_COMMANDS = Object.freeze([
   'CONVERSATION_TAIL',
   'SAVE_CONVERSATION_SNAPSHOT',
   'DELETE_CONVERSATION',
+  'DELETE_CONVERSATIONS',
   'MERGE_CONVERSATIONS',
   'SYNC_CONVERSATION_MESSAGES',
   'GET_SYNC_MAPPING',
   'PATCH_SYNC_MAPPING',
+  'SET_SYNC_CURSOR',
+  'SET_CONVERSATION_NOTION_PAGE_ID',
   'CLEAR_SYNC_MAPPING',
   'UPDATE_ARTICLE_URL',
   'LIST_ARTICLE_COMMENTS',
@@ -992,10 +1023,13 @@ export type BrowserRuntimeFactsPayloadByCommand = {
   CONVERSATION_TAIL: ConversationTailRequestPayload<BrowserConversationReference>;
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
   DELETE_CONVERSATION: BrowserConversationReference;
+  DELETE_CONVERSATIONS: DeleteConversationsRequestPayload<BrowserConversationReference>;
   MERGE_CONVERSATIONS: MergeConversationsRequestPayload<BrowserConversationReference>;
   SYNC_CONVERSATION_MESSAGES: SyncMessagesRequestPayload<BrowserConversationReference>;
   GET_SYNC_MAPPING: MappingRequestPayload<BrowserConversationReference>;
   PATCH_SYNC_MAPPING: PatchMappingRequestPayload<BrowserConversationReference>;
+  SET_SYNC_CURSOR: SetSyncCursorRequestPayload<BrowserConversationReference>;
+  SET_CONVERSATION_NOTION_PAGE_ID: SetConversationNotionPageIdRequestPayload<BrowserConversationReference>;
   CLEAR_SYNC_MAPPING: MappingRequestPayload<BrowserConversationReference>;
   UPDATE_ARTICLE_URL: UpdateArticleUrlRequestPayload<BrowserConversationReference>;
   LIST_ARTICLE_COMMENTS: ListArticleCommentsRequestPayload<BrowserCommentContext>;
@@ -1026,10 +1060,13 @@ export const HOST_FACTS_COMMANDS = Object.freeze([
   'CONVERSATION_TAIL',
   'SAVE_CONVERSATION_SNAPSHOT',
   'DELETE_CONVERSATION',
+  'DELETE_CONVERSATIONS',
   'MERGE_CONVERSATIONS',
   'SYNC_CONVERSATION_MESSAGES',
   'GET_SYNC_MAPPING',
   'PATCH_SYNC_MAPPING',
+  'SET_SYNC_CURSOR',
+  'SET_CONVERSATION_NOTION_PAGE_ID',
   'CLEAR_SYNC_MAPPING',
   'UPDATE_ARTICLE_URL',
   'LIST_ARTICLE_COMMENTS',
@@ -1080,10 +1117,13 @@ export type HostFactsPayloadByCommand = {
   CONVERSATION_TAIL: ConversationTailRequestPayload<HostConversationReference>;
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
   DELETE_CONVERSATION: HostConversationReference;
+  DELETE_CONVERSATIONS: DeleteConversationsRequestPayload<HostConversationReference>;
   MERGE_CONVERSATIONS: MergeConversationsRequestPayload<HostConversationReference>;
   SYNC_CONVERSATION_MESSAGES: SyncMessagesRequestPayload<HostConversationReference>;
   GET_SYNC_MAPPING: MappingRequestPayload<HostConversationReference>;
   PATCH_SYNC_MAPPING: PatchMappingRequestPayload<HostConversationReference>;
+  SET_SYNC_CURSOR: SetSyncCursorRequestPayload<HostConversationReference>;
+  SET_CONVERSATION_NOTION_PAGE_ID: SetConversationNotionPageIdRequestPayload<HostConversationReference>;
   CLEAR_SYNC_MAPPING: MappingRequestPayload<HostConversationReference>;
   UPDATE_ARTICLE_URL: UpdateArticleUrlRequestPayload<HostConversationReference>;
   LIST_ARTICLE_COMMENTS: ListArticleCommentsRequestPayload<HostCommentContext>;
@@ -1350,12 +1390,49 @@ function parseSyncMessagesPayload<TReference extends StableConversationReference
   parseReference: (input: unknown) => TReference,
 ): SyncMessagesRequestPayload<TReference> {
   const input = record(value);
-  exactKeys(input, ['conversation', 'messages', 'transfer']);
+  allowedKeys(input, ['conversation', 'messages', 'transfer', 'mode', 'diff']);
+  const mode = hasOwn(input, 'mode')
+    ? parseEnum(input.mode, ['snapshot', 'incremental', 'append'] as const)
+    : undefined;
+  const diff = hasOwn(input, 'diff') ? parseConversationMessageSyncDiff(input.diff) : undefined;
   return {
     conversation: parseReference(input.conversation),
     messages: parseJsonValue(input.messages),
     transfer: parseStreamDescriptor(input.transfer, ['capture-snapshot']),
+    ...(mode ? { mode } : {}),
+    ...(diff !== undefined ? { diff } : {}),
   };
+}
+
+function parseConversationMessageSyncDiff(value: unknown): ConversationMessageSyncDiff | null {
+  if (value === null) return null;
+  const input = record(value);
+  allowedKeys(input, ['added', 'removed', 'updated']);
+  const parseKeys = (raw: unknown): string[] => {
+    if (!Array.isArray(raw)) fail();
+    return raw.map((item) => parseText(item));
+  };
+  return {
+    ...(hasOwn(input, 'added') ? { added: parseKeys(input.added) } : {}),
+    ...(hasOwn(input, 'removed') ? { removed: parseKeys(input.removed) } : {}),
+    ...(hasOwn(input, 'updated') ? { updated: parseKeys(input.updated) } : {}),
+  };
+}
+
+function parseConversationReferencesPayload<TReference extends StableConversationReference>(
+  value: unknown,
+  parseReference: (input: unknown) => TReference,
+): DeleteConversationsRequestPayload<TReference> {
+  const input = record(value);
+  exactKeys(input, ['conversations']);
+  if (
+    !Array.isArray(input.conversations) ||
+    !input.conversations.length ||
+    input.conversations.length > MAX_PAGE_LIMIT
+  ) {
+    fail();
+  }
+  return { conversations: input.conversations.map(parseReference) };
 }
 
 function parseMergeConversationsPayload<TReference extends StableConversationReference>(
@@ -1376,6 +1453,42 @@ function parseMappingPayload<TReference extends StableConversationReference>(
   exactKeys(input, requiresPatch ? ['conversation', 'provider', 'patch'] : ['conversation', 'provider']);
   const base = { conversation: parseReference(input.conversation), provider: parseText(input.provider) };
   return requiresPatch ? { ...base, patch: parseJsonObject(input.patch) } : base;
+}
+
+function parseSetSyncCursorPayload<TReference extends StableConversationReference>(
+  value: unknown,
+  parseReference: (input: unknown) => TReference,
+): SetSyncCursorRequestPayload<TReference> {
+  const input = record(value);
+  exactKeys(input, ['conversation', 'cursor']);
+  return { conversation: parseReference(input.conversation), cursor: parseJsonObject(input.cursor) };
+}
+
+function parseSetConversationNotionPageIdPayload<TReference extends StableConversationReference>(
+  value: unknown,
+  parseReference: (input: unknown) => TReference,
+): SetConversationNotionPageIdRequestPayload<TReference> {
+  const input = record(value);
+  allowedKeys(input, ['conversation', 'notionPageId', 'meta']);
+  if (typeof input.notionPageId !== 'string' || input.notionPageId.length > MAX_PROTOCOL_TEXT_LENGTH) fail();
+  const notionPageId = input.notionPageId.trim();
+  if (hasC0OrC1Control(notionPageId)) fail();
+  let meta: SetConversationNotionPageIdRequestPayload<TReference>['meta'];
+  if (hasOwn(input, 'meta')) {
+    const rawMeta = record(input.meta);
+    allowedKeys(rawMeta, ['notionPageUrl', 'notionWorkspaceSlug']);
+    const notionPageUrl = parseOptionalText(rawMeta, 'notionPageUrl');
+    const notionWorkspaceSlug = parseOptionalText(rawMeta, 'notionWorkspaceSlug');
+    meta = {
+      ...(notionPageUrl ? { notionPageUrl } : {}),
+      ...(notionWorkspaceSlug ? { notionWorkspaceSlug } : {}),
+    };
+  }
+  return {
+    conversation: parseReference(input.conversation),
+    notionPageId,
+    ...(meta ? { meta } : {}),
+  };
 }
 
 function parseBrowserCommentContext(value: unknown): BrowserCommentContext {
@@ -1618,6 +1731,11 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
     case 'DELETE_CONVERSATION':
     case 'BACKFILL_CONVERSATION_IMAGES':
       return parseBrowserConversationReference(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+    case 'DELETE_CONVERSATIONS':
+      return parseConversationReferencesPayload(
+        value,
+        parseBrowserConversationReference,
+      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'CONVERSATION_TAIL':
       return parseConversationTailPayload(
         value,
@@ -1647,6 +1765,16 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
         value,
         parseBrowserConversationReference,
         true,
+      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+    case 'SET_SYNC_CURSOR':
+      return parseSetSyncCursorPayload(
+        value,
+        parseBrowserConversationReference,
+      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+    case 'SET_CONVERSATION_NOTION_PAGE_ID':
+      return parseSetConversationNotionPageIdPayload(
+        value,
+        parseBrowserConversationReference,
       ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'UPDATE_ARTICLE_URL':
     case 'MIGRATE_ARTICLE_COMMENT_URL':
@@ -1710,6 +1838,11 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
     case 'DELETE_CONVERSATION':
     case 'BACKFILL_CONVERSATION_IMAGES':
       return parseHostConversationReference(value) as HostFactsPayloadByCommand[TCommand];
+    case 'DELETE_CONVERSATIONS':
+      return parseConversationReferencesPayload(
+        value,
+        parseHostConversationReference,
+      ) as HostFactsPayloadByCommand[TCommand];
     case 'CONVERSATION_TAIL':
       return parseConversationTailPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];
     case 'SAVE_CONVERSATION_SNAPSHOT':
@@ -1726,6 +1859,13 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
       return parseMappingPayload(value, parseHostConversationReference, false) as HostFactsPayloadByCommand[TCommand];
     case 'PATCH_SYNC_MAPPING':
       return parseMappingPayload(value, parseHostConversationReference, true) as HostFactsPayloadByCommand[TCommand];
+    case 'SET_SYNC_CURSOR':
+      return parseSetSyncCursorPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];
+    case 'SET_CONVERSATION_NOTION_PAGE_ID':
+      return parseSetConversationNotionPageIdPayload(
+        value,
+        parseHostConversationReference,
+      ) as HostFactsPayloadByCommand[TCommand];
     case 'UPDATE_ARTICLE_URL':
     case 'MIGRATE_ARTICLE_COMMENT_URL':
       return parseUpdateArticleUrlPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];

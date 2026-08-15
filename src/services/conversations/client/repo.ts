@@ -84,6 +84,28 @@ function positiveId(value: unknown): number {
   return Number(value);
 }
 
+type ConversationMutationReference = Readonly<{
+  conversationKey: string;
+  factsEpoch: FactsEpoch;
+  source: string;
+}>;
+
+function mutationReference(value: ConversationFactsReference): ConversationMutationReference {
+  return {
+    source: text(value?.source, true),
+    conversationKey: text(value?.conversationKey, true),
+    factsEpoch: parseFactsEpoch(value?.factsEpoch),
+  };
+}
+
+function mutationReferences(values: readonly ConversationFactsReference[]): readonly ConversationMutationReference[] {
+  if (!Array.isArray(values) || !values.length) return [];
+  const references = values.map(mutationReference);
+  const [first] = references;
+  if (!first || references.some((reference) => reference.factsEpoch !== first.factsEpoch)) protocolFailure();
+  return references;
+}
+
 function exactKeys(value: Record<string, unknown>, keys: readonly string[]): void {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
@@ -341,33 +363,47 @@ export async function getConversationTailWindowBySourceAndKey(input: {
   return await resolveConversationTailWindowResponse(unwrap(res));
 }
 
-export async function deleteConversations(conversationIds: number[]): Promise<unknown> {
-  const ids = Array.isArray(conversationIds)
-    ? conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
-    : [];
-  if (!ids.length) return null;
-  const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, { conversationIds: ids });
-  return unwrap(res);
-}
-
-export async function upsertConversation(
-  payload: Partial<Conversation>,
-): Promise<Conversation & { __isNew?: boolean }> {
-  const res = await send<ApiResponse<Conversation & { __isNew?: boolean }>>(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-    payload: payload as any,
+export async function deleteConversations(references: readonly ConversationFactsReference[]): Promise<unknown> {
+  const normalized = mutationReferences(references);
+  if (!normalized.length) return null;
+  const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, {
+    factsEpoch: normalized[0].factsEpoch,
+    conversations: normalized.map(({ source, conversationKey }) => ({ source, conversationKey })),
   });
   return unwrap(res);
 }
 
-export async function mergeConversations(input: { keepConversationId: number; removeConversationId: number }): Promise<{
+export async function upsertConversation(
+  input: Readonly<{ payload: Partial<Conversation>; reference: ConversationFactsReference }>,
+): Promise<Conversation & { __isNew?: boolean }> {
+  const reference = mutationReference(input.reference);
+  const payloadReference = {
+    source: text(input.payload?.source, true),
+    conversationKey: text(input.payload?.conversationKey, true),
+  };
+  if (payloadReference.source !== reference.source || payloadReference.conversationKey !== reference.conversationKey) {
+    protocolFailure();
+  }
+  const res = await send<ApiResponse<Conversation & { __isNew?: boolean }>>(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
+    factsEpoch: reference.factsEpoch,
+    reference: { source: reference.source, conversationKey: reference.conversationKey },
+    payload: input.payload as any,
+  });
+  return unwrap(res);
+}
+
+export async function mergeConversations(input: {
+  keep: ConversationFactsReference;
+  remove: ConversationFactsReference;
+}): Promise<{
   keptConversationId: number;
   removedConversationId: number;
   movedMessages: number;
   movedImageCache: number;
   merged: boolean;
 }> {
-  const keepConversationId = Number(input.keepConversationId);
-  const removeConversationId = Number(input.removeConversationId);
+  const [keep, remove] = mutationReferences([input.keep, input.remove]);
+  if (!keep || !remove) protocolFailure();
   const res = await send<
     ApiResponse<{
       keptConversationId: number;
@@ -376,7 +412,11 @@ export async function mergeConversations(input: { keepConversationId: number; re
       movedImageCache: number;
       merged: boolean;
     }>
-  >(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, { keepConversationId, removeConversationId });
+  >(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, {
+    factsEpoch: keep.factsEpoch,
+    keep: { source: keep.source, conversationKey: keep.conversationKey },
+    remove: { source: remove.source, conversationKey: remove.conversationKey },
+  });
   return unwrap(res);
 }
 
@@ -391,16 +431,16 @@ export type BackfillConversationImagesResult = {
 };
 
 export async function backfillConversationImages(
-  conversationId: number,
-  conversationUrl?: string,
+  input: Readonly<{ conversationUrl?: string; reference: ConversationFactsReference }>,
 ): Promise<BackfillConversationImagesResult> {
-  const id = Number(conversationId);
-  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+  const reference = mutationReference(input.reference);
   const res = await send<ApiResponse<BackfillConversationImagesResult>>(
     CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES,
     {
-      conversationId: id,
-      conversationUrl: String(conversationUrl || ''),
+      factsEpoch: reference.factsEpoch,
+      source: reference.source,
+      conversationKey: reference.conversationKey,
+      conversationUrl: String(input.conversationUrl || ''),
     },
   );
   return unwrap(res);

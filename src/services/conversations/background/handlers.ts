@@ -1,12 +1,10 @@
 import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet } from '@platform/storage/local';
 import {
-  deleteConversationsByIds,
-  hasConversation,
-  mergeConversationsByIds,
   type ConversationReadRunner,
+  type ConversationMessageSyncOptions,
+  type ResolvedConversationReference,
 } from '@services/conversations/data/storage';
-import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 import {
@@ -23,7 +21,10 @@ import {
   MAX_DETAIL_PREVIEW_BYTES,
   MAX_ORDINARY_FACTS_RESPONSE_BYTES,
   parseStreamDescriptor,
+  type JsonObject,
+  type JsonValue,
   type FactsEpoch,
+  type StableConversationReference,
 } from '@services/local-data/contracts';
 import type {
   Conversation,
@@ -128,10 +129,6 @@ class PendingConversationReadStreams {
   }
 }
 
-function fireAndForget(task: void | Promise<void>) {
-  Promise.resolve(task).catch(() => {});
-}
-
 type ListQueryPayload = {
   sourceKey: string;
   siteKey: string;
@@ -193,14 +190,62 @@ function parseListCursorPayload(value: unknown) {
   return { lastCapturedAt, id };
 }
 
-function stableReference(msg: any): { source: string; conversationKey: string } | null {
-  const source = String(msg?.source || '').trim();
-  const conversationKey = String(msg?.conversationKey || '').trim();
+function stableReference(value: unknown): StableConversationReference | null {
+  const source = String((value as any)?.source || '').trim();
+  const conversationKey = String((value as any)?.conversationKey || '').trim();
   return source && conversationKey ? { source, conversationKey } : null;
 }
 
 function requireFactsEpoch(msg: any): FactsEpoch | null {
   return typeof msg?.factsEpoch === 'string' && msg.factsEpoch ? (msg.factsEpoch as FactsEpoch) : null;
+}
+
+function sameReference(a: StableConversationReference, b: StableConversationReference): boolean {
+  return a.source === b.source && a.conversationKey === b.conversationKey;
+}
+
+async function resolveConversationReference(
+  repository: Readonly<{
+    getConversationByReference: (reference: StableConversationReference) => Promise<Conversation | null>;
+  }>,
+  reference: StableConversationReference,
+): Promise<ResolvedConversationReference> {
+  const conversation = await repository.getConversationByReference(reference);
+  if (!conversation) throw new LocalDataContractError('STALE_REFERENCE');
+  const conversationId = Number(conversation.id);
+  const source = String(conversation.source || '').trim();
+  const conversationKey = String(conversation.conversationKey || '').trim();
+  if (
+    !Number.isSafeInteger(conversationId) ||
+    conversationId <= 0 ||
+    !source ||
+    !conversationKey ||
+    !sameReference(reference, { source, conversationKey })
+  ) {
+    throw new LocalDataContractError('STALE_REFERENCE');
+  }
+  return { source, conversationKey, conversationId };
+}
+
+function normalizeMessageSyncOptions(msg: any): ConversationMessageSyncOptions | null {
+  const rawMode = String(msg?.mode || '')
+    .trim()
+    .toLowerCase();
+  if (rawMode && rawMode !== 'snapshot' && rawMode !== 'incremental' && rawMode !== 'append') return null;
+  const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
+  if (msg?.diff == null) return { mode, diff: null };
+  if (typeof msg.diff !== 'object' || Array.isArray(msg.diff)) return null;
+  const normalizeKeys = (value: unknown): string[] | null => {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) return null;
+    const keys = value.map((item) => String(item || '').trim());
+    return keys.every(Boolean) ? [...new Set(keys)] : null;
+  };
+  const added = normalizeKeys(msg.diff.added);
+  const updated = normalizeKeys(msg.diff.updated);
+  const removed = normalizeKeys(msg.diff.removed);
+  if (!added || !updated || !removed) return null;
+  return { mode, diff: { added, updated, removed } };
 }
 
 function factsError(router: AnyRouter, error: unknown) {
@@ -380,192 +425,261 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
   });
 
   router.register(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, async (msg) => {
-    const payload = msg.payload || {};
-    if (!payload.source) return router.err('missing conversation source');
-    if (!payload.conversationKey) return router.err('missing conversationKey');
-    let existed = false;
+    const payload = msg?.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return invalidArgument('payload', 'invalid conversation payload', payload);
+    }
+    const payloadReference = stableReference(payload);
+    if (!payloadReference) return invalidArgument('payload', 'missing conversation reference', payload);
+    const expectedFactsEpoch = msg?.factsEpoch === undefined ? undefined : requireFactsEpoch(msg);
+    if (msg?.factsEpoch !== undefined && !expectedFactsEpoch) {
+      return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    }
+    const observedReference = msg?.reference === undefined ? null : stableReference(msg.reference);
+    if (expectedFactsEpoch && (!observedReference || !sameReference(observedReference, payloadReference))) {
+      return router.err('stale conversation reference', { code: 'STALE_REFERENCE' });
+    }
     try {
-      existed = await hasConversation(payload);
-    } catch (_e) {
-      existed = false;
-    }
-    const convo = await writeConversationSnapshot(payload);
-    const conversationId = Number((convo as any)?.id);
-    if (Number.isFinite(conversationId) && conversationId > 0) {
-      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-        reason: existed ? 'upsertConversation' : 'createConversation',
-        conversationId,
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-upsert',
+        ...(expectedFactsEpoch ? { expectedFactsEpoch } : {}),
+        read: async ({ repository }) => {
+          const existing = await repository.getConversationByReference(payloadReference);
+          if (expectedFactsEpoch && !existing) throw new LocalDataContractError('STALE_REFERENCE');
+          const conversation = await repository.upsertConversation(payload as JsonObject);
+          const conversationId = Number(conversation.id);
+          if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+            throw new LocalDataContractError('PROTOCOL_MISMATCH');
+          }
+          const isNew = !existing;
+          await deps.onConversationChanged(
+            conversationId,
+            isNew
+              ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
+              : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+          );
+          return { conversation, conversationId, isNew };
+        },
       });
-      fireAndForget(
-        deps.onConversationChanged(
-          conversationId,
-          existed
-            ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation
-            : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation,
-        ),
-      );
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: result.isNew ? 'createConversation' : 'upsertConversation',
+        conversationId: result.conversationId,
+      });
+      return router.ok({ ...result.conversation, __isNew: result.isNew });
+    } catch (error) {
+      return factsError(router, error);
     }
-    return router.ok({ ...(convo as any), __isNew: !existed });
   });
 
   router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {
-    const keepConversationId = Number(msg?.keepConversationId);
-    const removeConversationId = Number(msg?.removeConversationId);
-    if (!Number.isFinite(keepConversationId) || keepConversationId <= 0)
-      return router.err('invalid keepConversationId');
-    if (!Number.isFinite(removeConversationId) || removeConversationId <= 0)
-      return router.err('invalid removeConversationId');
-    if (keepConversationId === removeConversationId) {
-      return router.ok({
-        keptConversationId: keepConversationId,
-        removedConversationId: removeConversationId,
-        movedMessages: 0,
-        movedImageCache: 0,
-        merged: false,
+    const keep = stableReference(msg?.keep);
+    const remove = stableReference(msg?.remove);
+    if (!keep) return invalidArgument('keep', 'invalid keep conversation reference', msg?.keep);
+    if (!remove) return invalidArgument('remove', 'invalid remove conversation reference', msg?.remove);
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    try {
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-merge',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ repository }) => {
+          const resolvedKeep = await resolveConversationReference(repository, keep);
+          const resolvedRemove = await resolveConversationReference(repository, remove);
+          const response = await repository.mergeConversations({ keep: resolvedKeep, remove: resolvedRemove });
+          if (response.merged) {
+            await deps.onConversationChanged(
+              response.keptConversationId,
+              AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+            );
+          }
+          return { response };
+        },
       });
+      if (result.response.merged) {
+        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+          reason: 'mergeConversations',
+          conversationId: result.response.keptConversationId,
+          removedConversationId: result.response.removedConversationId,
+        });
+      }
+      return router.ok(result.response);
+    } catch (error) {
+      return factsError(router, error);
     }
-
-    const res = await mergeConversationsByIds({ keepConversationId, removeConversationId });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'mergeConversations',
-      conversationId: keepConversationId,
-      removedConversationId: removeConversationId,
-    });
-    return router.ok(res);
   });
 
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
-    const conversationId = Number(msg.conversationId);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const rawMode = String(msg?.mode || '')
-      .trim()
-      .toLowerCase();
-    if (rawMode && rawMode !== 'snapshot' && rawMode !== 'incremental' && rawMode !== 'append') {
-      return router.err('invalid mode');
+    const reference = stableReference(msg);
+    if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
+    const expectedFactsEpoch = msg?.factsEpoch === undefined ? undefined : requireFactsEpoch(msg);
+    if (msg?.factsEpoch !== undefined && !expectedFactsEpoch) {
+      return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
     }
-    const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
-    const diff = msg?.diff && typeof msg.diff === 'object' ? msg.diff : null;
-
-    let messages = Array.isArray(msg.messages) ? msg.messages : [];
+    if (!Array.isArray(msg?.messages))
+      return invalidArgument('messages', 'invalid conversation messages', msg?.messages);
+    const options = normalizeMessageSyncOptions(msg);
+    if (!options) return invalidArgument('mode', 'invalid message sync options', { mode: msg?.mode, diff: msg?.diff });
     try {
-      const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
-      const aboutYouUserName =
-        normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-sync-messages',
+        ...(expectedFactsEpoch ? { expectedFactsEpoch } : {}),
+        read: async ({ mode: backendMode, repository }) => {
+          const resolved = await resolveConversationReference(repository, reference);
+          let messages = msg.messages.slice();
+          try {
+            const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+            const aboutYouUserName =
+              normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+            messages = messages.map((message: any) => {
+              if (!message || typeof message !== 'object') return message;
+              const role = String(message.role || '')
+                .trim()
+                .toLowerCase();
+              if (role !== 'user' || String(message.authorName || '').trim()) return message;
+              return { ...message, authorName: aboutYouUserName };
+            });
+          } catch {
+            // Author names are optional and retain the renderer fallback.
+          }
 
-      messages = messages.map((m: any) => {
-        if (!m || typeof m !== 'object') return m;
-        const role = String((m as any).role || '')
-          .trim()
-          .toLowerCase();
-        if (role !== 'user') return m;
-        const currentAuthor = String((m as any).authorName || '').trim();
-        if (currentAuthor) return m;
-        return { ...(m as any), authorName: aboutYouUserName };
+          if (backendMode === 'idb') {
+            try {
+              const sourceType =
+                String(msg?.conversationSourceType || '')
+                  .trim()
+                  .toLowerCase() || 'chat';
+              const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+              const enableHttpImages =
+                sourceType === 'article'
+                  ? local?.web_article_cache_images_enabled === true
+                  : local?.ai_chat_cache_images_enabled === true;
+              const keys =
+                (options.mode === 'incremental' || options.mode === 'append') && options.diff
+                  ? new Set([...(options.diff.added || []), ...(options.diff.updated || [])])
+                  : null;
+              const inlined = await inlineChatImagesInMessages({
+                conversationId: resolved.conversationId,
+                conversationUrl: String(msg?.conversationUrl || ''),
+                messages,
+                onlyMessageKeys: keys,
+                enableHttpImages,
+              });
+              messages = inlined.messages;
+              if (
+                inlined.inlinedCount > 0 ||
+                inlined.downloadedCount > 0 ||
+                inlined.fromCacheCount > 0 ||
+                inlined.warningFlags.length > 0
+              ) {
+                console.info('[ImageInline]', {
+                  conversationId: resolved.conversationId,
+                  mode: options.mode,
+                  inlinedCount: inlined.inlinedCount,
+                  downloadedCount: inlined.downloadedCount,
+                  fromCacheCount: inlined.fromCacheCount,
+                  inlinedBytes: inlined.inlinedBytes,
+                  warningFlags: inlined.warningFlags,
+                });
+              }
+            } catch (error) {
+              console.warn('[ImageInline] failed but capture continues', {
+                conversationId: resolved.conversationId,
+                mode: options.mode,
+                error: error instanceof Error ? error.message : String(error || ''),
+              });
+            }
+          }
+          // ponytail: P3-T7 supplies the Native image capability; active message writes must not touch image IDB here.
+          const response = await repository.syncConversationMessages(resolved, messages as JsonValue, options);
+          await deps.onConversationChanged(
+            resolved.conversationId,
+            AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+          );
+          return { response, conversationId: resolved.conversationId };
+        },
       });
-    } catch (_e) {
-      // ignore: authorName is optional and will fallback during rendering
-    }
-    try {
-      const sourceType =
-        String(msg?.conversationSourceType || '')
-          .trim()
-          .toLowerCase() || 'chat';
-      const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
-      const enabled =
-        sourceType === 'article'
-          ? local?.web_article_cache_images_enabled === true
-          : local?.ai_chat_cache_images_enabled === true;
-      const keys =
-        (mode === 'incremental' || mode === 'append') && diff
-          ? new Set(
-              [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
-                .map((x) => String(x || '').trim())
-                .filter(Boolean),
-            )
-          : null;
-      const inlined = await inlineChatImagesInMessages({
-        conversationId,
-        conversationUrl: String(msg?.conversationUrl || ''),
-        messages,
-        onlyMessageKeys: keys,
-        enableHttpImages: enabled,
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'upsert',
+        conversationId: result.conversationId,
       });
-      messages = inlined.messages;
-      if (
-        inlined.inlinedCount > 0 ||
-        inlined.downloadedCount > 0 ||
-        inlined.fromCacheCount > 0 ||
-        (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
-      ) {
-        console.info('[ImageInline]', {
-          conversationId,
-          mode,
-          inlinedCount: inlined.inlinedCount,
-          downloadedCount: inlined.downloadedCount,
-          fromCacheCount: inlined.fromCacheCount,
-          inlinedBytes: inlined.inlinedBytes,
-          warningFlags: inlined.warningFlags,
-        });
-      }
+      return router.ok(result.response);
     } catch (error) {
-      console.warn('[ImageInline] failed but capture continues', {
-        conversationId,
-        mode,
-        error: error instanceof Error ? error.message : String(error || ''),
-      });
+      return factsError(router, error);
     }
-
-    const res = await writeConversationMessagesSnapshot(conversationId, messages, { mode, diff });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'upsert',
-      conversationId,
-    });
-    fireAndForget(
-      deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
-    );
-    return router.ok(res);
   });
 
   router.register(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, async (msg) => {
-    const conversationId = Number(msg.conversationId);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
+    const reference = stableReference(msg);
+    if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
     const conversationUrl = String(msg?.conversationUrl || '').trim();
-    let progressEnqueued = false;
-    const res = await backfillConversationImages({
-      conversationId,
-      conversationUrl,
-      onProgress: async (progress) => {
-        const updatedMessages = Number(progress?.updatedMessages) || 0;
-        if (updatedMessages <= 0) return;
-        router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'upsert',
-          conversationId,
-        });
-        if (progressEnqueued) return;
-        progressEnqueued = true;
-        fireAndForget(
-          deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages),
-        );
-      },
-    });
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'upsert',
-      conversationId,
-    });
-    fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages));
-    return router.ok(res);
+    try {
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-backfill-images',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ mode, repository }) => {
+          const resolved = await resolveConversationReference(repository, reference);
+          if (mode !== 'idb') {
+            // ponytail: P3-T7 replaces this IDB-only image job with the typed Native image facade.
+            throw new LocalDataContractError('PROTOCOL_MISMATCH');
+          }
+          const response = await backfillConversationImages({
+            conversationId: resolved.conversationId,
+            conversationUrl,
+          });
+          await deps.onConversationChanged(
+            resolved.conversationId,
+            AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages,
+          );
+          return { response, conversationId: resolved.conversationId };
+        },
+      });
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'upsert',
+        conversationId: result.conversationId,
+      });
+      return router.ok(result.response);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, async (msg) => {
-    const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
-    const res = await deleteConversationsByIds(ids);
-    const normalizedIds = Array.isArray(ids)
-      ? ids.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
-      : [];
-    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-      reason: 'delete',
-      conversationIds: normalizedIds,
-    });
-    return router.ok(res);
+    if (!Array.isArray(msg?.conversations) || !msg.conversations.length) {
+      return invalidArgument('conversations', 'invalid conversation references', msg?.conversations);
+    }
+    const references: Array<StableConversationReference | null> = (msg.conversations as unknown[]).map((value) =>
+      stableReference(value),
+    );
+    if (references.some((reference) => !reference)) {
+      return invalidArgument('conversations', 'invalid conversation references', msg.conversations);
+    }
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    try {
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-delete',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ repository }) => {
+          const resolved = await Promise.all(
+            (references as StableConversationReference[]).map((reference) =>
+              resolveConversationReference(repository, reference),
+            ),
+          );
+          return {
+            response: await repository.deleteConversations(resolved),
+            conversationIds: resolved.map((reference) => reference.conversationId),
+          };
+        },
+      });
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'delete',
+        conversationIds: result.conversationIds,
+      });
+      return router.ok(result.response);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 }

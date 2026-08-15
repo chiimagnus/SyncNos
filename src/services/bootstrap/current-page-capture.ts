@@ -163,7 +163,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
     const conversation = conversationRes.data;
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      conversationId: conversation.id,
+      source: normalizedSnapshot.conversation.source,
+      conversationKey: normalizedSnapshot.conversation.conversationKey,
       messages: normalizedSnapshot.messages || [],
       mode: integrity.persistence.mode,
       diff: integrity.persistence.diff,
