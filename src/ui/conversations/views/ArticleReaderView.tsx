@@ -77,9 +77,9 @@ const READER_RAIL_CLASS = 'tw-flex-none tw-shrink-0 tw-self-start';
  * text-align). Theme (P3) and narration (P4) build on the same view.
  */
 export function ArticleReaderView({
-  selected,
   activeId,
   detail,
+  imageAssetResolver,
   listError,
   loadingDetail,
   detailError,
@@ -504,18 +504,13 @@ export function ArticleReaderView({
             >
               {detail.messages.map((m: any) => {
                 const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-                const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
 
                 return (
                   <ChatMessageBubble
                     key={String((m as any).id)}
                     role="assistant"
                     markdown={text}
-                    conversationId={
-                      Number.isFinite(messageConversationId) && messageConversationId > 0
-                        ? messageConversationId
-                        : undefined
-                    }
+                    imageAssetResolver={imageAssetResolver}
                     className={READER_PROSE_CLASS}
                   />
                 );

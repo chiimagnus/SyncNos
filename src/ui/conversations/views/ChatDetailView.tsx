@@ -14,9 +14,9 @@ export type ChatDetailViewProps = DetailViewSharedProps & {
  * happens in the next task after the chat/article split is isolated.
  */
 export function ChatDetailView({
-  selected,
   activeId,
   detail,
+  imageAssetResolver,
   listError,
   loadingDetail,
   detailError,
@@ -45,7 +45,6 @@ export function ChatDetailView({
               const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
               const outlineIndex = messageId == null ? null : outlineIndexByMessageId.get(messageId) || null;
               const text = String((m as any).contentMarkdown || (m as any).contentText || '');
-              const messageConversationId = Number((m as any).conversationId || (selected as any)?.id || activeId);
 
               if (role === 'user' && messageId != null) {
                 return (
@@ -56,15 +55,7 @@ export function ChatDetailView({
                     data-chat-outline-message-id={messageId}
                     ref={getUserMessageRefSetter(messageId)}
                   >
-                    <ChatMessageBubble
-                      role={(m as any).role}
-                      markdown={text}
-                      conversationId={
-                        Number.isFinite(messageConversationId) && messageConversationId > 0
-                          ? messageConversationId
-                          : undefined
-                      }
-                    />
+                    <ChatMessageBubble role={(m as any).role} markdown={text} imageAssetResolver={imageAssetResolver} />
                   </div>
                 );
               }
@@ -74,11 +65,7 @@ export function ChatDetailView({
                   key={String((m as any).id)}
                   role={(m as any).role}
                   markdown={text}
-                  conversationId={
-                    Number.isFinite(messageConversationId) && messageConversationId > 0
-                      ? messageConversationId
-                      : undefined
-                  }
+                  imageAssetResolver={imageAssetResolver}
                 />
               );
             })}

@@ -29,6 +29,7 @@ import type {
 } from '@services/conversations/domain/models';
 import {
   LocalDataContractError,
+  LOCAL_DATA_STREAM_OPERATIONS,
   MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
   parseConversationCaptureSnapshot,
   parseFactsEpoch,
@@ -42,7 +43,7 @@ type ApiError = { message: string; extra: unknown } | null;
 type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
 
 type RuntimePortListener = (message?: unknown) => void;
-type ConversationReadStreamPort = RuntimeStreamPort &
+type LocalDataStreamPort = RuntimeStreamPort &
   Readonly<{
     onDisconnect?: Readonly<{
       addListener?: (listener: RuntimePortListener) => void;
@@ -198,9 +199,9 @@ function asConversationTailWindow(value: unknown): ConversationTailWindowRespons
   };
 }
 
-function asConversationReadStreamPort(value: unknown): ConversationReadStreamPort {
+function asLocalDataStreamPort(value: unknown): LocalDataStreamPort {
   if (!value || typeof value !== 'object') protocolFailure();
-  const port = value as ConversationReadStreamPort;
+  const port = value as LocalDataStreamPort;
   if (
     typeof port.postMessage !== 'function' ||
     typeof port.onMessage?.addListener !== 'function' ||
@@ -215,11 +216,22 @@ function sameDescriptor(actual: StreamDescriptor, expected: StreamDescriptor): b
   return actual.operation === expected.operation && actual.declaredTotalBytes === expected.declaredTotalBytes;
 }
 
-async function receiveConversationReadStream(preflight: ConversationReadStreamPreflight): Promise<unknown> {
-  const port = asConversationReadStreamPort(connectPort(UI_PORT_NAMES.LOCAL_DATA_STREAM));
-  const receiver = new RuntimeStreamReceiver(preflight.requestId, preflight.stream);
+/** Receives one authenticated P3-T2 download without interpreting its bytes. */
+export async function receiveLocalDataDownloadStream(
+  input: Readonly<{ requestId: string; stream: StreamDescriptor }>,
+): Promise<Uint8Array> {
+  const opened = parseRuntimeStreamMessage({
+    type: LOCAL_DATA_STREAM_MESSAGE_TYPES.OPEN,
+    requestId: input.requestId,
+    direction: 'download',
+    operation: input.stream?.operation,
+  });
+  if (opened.type !== 'open' || opened.direction !== 'download') protocolFailure();
+  const stream = parseStreamDescriptor(input.stream, LOCAL_DATA_STREAM_OPERATIONS);
+  const port = asLocalDataStreamPort(connectPort(UI_PORT_NAMES.LOCAL_DATA_STREAM));
+  const receiver = new RuntimeStreamReceiver(opened.requestId, stream);
 
-  return await new Promise<unknown>((resolve, reject) => {
+  return await new Promise<Uint8Array>((resolve, reject) => {
     let closed = false;
     let headerReceived = false;
     let queue = Promise.resolve();
@@ -239,7 +251,7 @@ async function receiveConversationReadStream(preflight: ConversationReadStreamPr
         // A disconnected Port cannot be reused.
       }
     };
-    const complete = (value: unknown) => {
+    const complete = (value: Uint8Array) => {
       if (closed) return;
       closed = true;
       cleanup();
@@ -253,10 +265,10 @@ async function receiveConversationReadStream(preflight: ConversationReadStreamPr
     };
     const accept = async (raw: unknown) => {
       const message = parseRuntimeStreamMessage(raw);
-      if (message.requestId !== preflight.requestId) protocolFailure();
+      if (message.requestId !== opened.requestId) protocolFailure();
       if (message.type === 'error') throw new LocalDataContractError(message.error.code, message.error.diagnostics);
       if (message.type === 'header') {
-        if (headerReceived || !sameDescriptor(message.stream, preflight.stream)) protocolFailure();
+        if (headerReceived || !sameDescriptor(message.stream, stream)) protocolFailure();
         headerReceived = true;
         return;
       }
@@ -265,19 +277,13 @@ async function receiveConversationReadStream(preflight: ConversationReadStreamPr
       if (event?.kind === 'ack') {
         port.postMessage({
           type: LOCAL_DATA_STREAM_MESSAGE_TYPES.ACK,
-          requestId: preflight.requestId,
+          requestId: opened.requestId,
           acknowledgedSequence: event.acknowledgedSequence,
         });
         return;
       }
       if (event?.kind === 'complete') {
-        let payload: unknown;
-        try {
-          payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(event.bytes));
-        } catch {
-          protocolFailure();
-        }
-        complete(payload);
+        complete(event.bytes);
         return;
       }
       if (event?.kind === 'cancelled' || event?.kind === 'failed') {
@@ -294,9 +300,9 @@ async function receiveConversationReadStream(preflight: ConversationReadStreamPr
       port.onDisconnect?.addListener?.(onDisconnect);
       port.postMessage({
         type: LOCAL_DATA_STREAM_MESSAGE_TYPES.OPEN,
-        requestId: preflight.requestId,
+        requestId: opened.requestId,
         direction: 'download',
-        operation: 'conversation-detail',
+        operation: stream.operation,
       });
     } catch (error) {
       fail(error);
@@ -304,11 +310,20 @@ async function receiveConversationReadStream(preflight: ConversationReadStreamPr
   });
 }
 
+async function receiveConversationReadStream(preflight: ConversationReadStreamPreflight): Promise<unknown> {
+  const bytes = await receiveLocalDataDownloadStream(preflight);
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch {
+    return protocolFailure();
+  }
+}
+
 async function uploadConversationCaptureSnapshot(
   preflight: ConversationCaptureSnapshotStreamPreflight,
   bytes: Uint8Array,
 ): Promise<ConversationCaptureSnapshotResult> {
-  const port = asConversationReadStreamPort(connectPort(UI_PORT_NAMES.LOCAL_DATA_STREAM));
+  const port = asLocalDataStreamPort(connectPort(UI_PORT_NAMES.LOCAL_DATA_STREAM));
   const sender = new RuntimeStreamSender({ announceHeader: false, port, requestId: preflight.requestId });
 
   return await new Promise<ConversationCaptureSnapshotResult>((resolve, reject) => {

@@ -1,6 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { buildFeishuDocUrl } from '@services/integrations/openin/feishu-openin';
 import { buildNotionPageUrl } from '@services/integrations/openin/notion-openin';
@@ -17,6 +16,11 @@ export type ChatWithSettings = {
   promptTemplate: string;
   platforms: ChatWithAiPlatform[];
 };
+
+/** The caller owns the facts lease or runtime stream used to inspect one internal image. */
+export type ExternalOutputImageAssetResolver = (
+  assetId: number,
+) => Promise<Readonly<{ contentType?: string; url?: string }> | null>;
 
 export const CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY = 'chat_with_prompt_template_v1';
 export const CHAT_WITH_PLATFORMS_STORAGE_KEY = 'chat_with_ai_platforms_v1';
@@ -201,13 +205,16 @@ function inferImageExtFromSource(input: { contentType?: string; url?: string }):
   return 'png';
 }
 
-async function inferMaterializedImageExt(url: string): Promise<string> {
+async function inferMaterializedImageExt(
+  url: string,
+  resolveImageAsset: ExternalOutputImageAssetResolver,
+): Promise<string> {
   const text = String(url || '').trim();
   const assetId = parseSyncnosAssetId(text);
   if (!assetId) {
     return inferImageExtFromSource({ url: text });
   }
-  const asset = await getImageCacheAssetById({ id: assetId });
+  const asset = await resolveImageAsset(assetId);
   if (!asset) return 'png';
   return inferImageExtFromSource({ contentType: asset.contentType, url: asset.url });
 }
@@ -232,9 +239,11 @@ export function materializeMarkdownAssetPlaceholders(input: { markdown: string }
 export async function materializeMarkdownAssetPaths(input: {
   markdown: string;
   markdownBasename: string;
+  resolveImageAsset: ExternalOutputImageAssetResolver;
 }): Promise<string> {
   const markdown = String(input.markdown || '');
   if (!markdown) return '';
+  if (typeof input.resolveImageAsset !== 'function') throw new Error('image asset resolver unavailable');
 
   const basename = String(input.markdownBasename || '').trim() || 'conversation';
   const orderedUrls: string[] = [];
@@ -257,7 +266,7 @@ export async function materializeMarkdownAssetPaths(input: {
   for (let i = 0; i < orderedUrls.length; i += 1) {
     const url = orderedUrls[i]!;
 
-    const ext = await inferMaterializedImageExt(url);
+    const ext = await inferMaterializedImageExt(url, input.resolveImageAsset);
     replacements.set(url, `${basename}-${i + 1}.${ext}`);
   }
 

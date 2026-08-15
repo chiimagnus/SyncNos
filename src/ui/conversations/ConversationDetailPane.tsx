@@ -54,6 +54,7 @@ export function ConversationDetailPane({
     loadingDetail,
     detailError,
     detail,
+    resolveDetailImageAsset,
     detailHeaderActions,
     updateSelectedConversationUrl,
     cleanUrlDraft,
@@ -526,6 +527,7 @@ export function ConversationDetailPane({
               selected={selected}
               activeId={activeId}
               detail={detail}
+              imageAssetResolver={resolveDetailImageAsset}
               listError={listError}
               loadingDetail={loadingDetail}
               detailError={detailError}
@@ -540,6 +542,7 @@ export function ConversationDetailPane({
               selected={selected}
               activeId={activeId}
               detail={detail}
+              imageAssetResolver={resolveDetailImageAsset}
               listError={listError}
               loadingDetail={loadingDetail}
               detailError={detailError}

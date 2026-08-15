@@ -13,7 +13,7 @@ import type { FactsEpoch } from '@services/local-data/contracts';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import { getConversationImageAsset, type ConversationImageAssetResolver } from '@services/conversations/client/images';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
@@ -142,14 +142,20 @@ function ensureConversationUiShape(conversation: Conversation): Conversation {
 
 function toConversationFactsReference(
   conversation:
-    | Readonly<{ conversationKey?: string; factsEpoch?: FactsEpoch; id?: number; source?: string }>
+    | Readonly<{
+        conversationId?: number;
+        conversationKey?: string;
+        factsEpoch?: FactsEpoch;
+        id?: number;
+        source?: string;
+      }>
     | null
     | undefined,
 ): ConversationFactsReference | null {
   const source = String(conversation?.source || '').trim();
   const conversationKey = String(conversation?.conversationKey || '').trim();
   const factsEpoch = String(conversation?.factsEpoch || '').trim();
-  const conversationId = Number(conversation?.id);
+  const conversationId = Number(conversation?.id ?? conversation?.conversationId);
   if (!source || !conversationKey || !factsEpoch) return null;
   return {
     source,
@@ -175,16 +181,15 @@ function sameConversationFactsReference(
 const URL_EDIT_CANCELLED_ERROR = 'SYNCNOS_URL_EDIT_CANCELLED';
 
 async function materializeSyncnosAssetsForExport(input: {
+  attachmentStartIndex?: number;
   markdown: string;
   markdownBasename: string;
-  conversationId?: number | null;
+  resolveImageAsset: ConversationImageAssetResolver;
 }): Promise<{ markdown: string; attachments: Array<{ name: string; data: Blob }> }> {
   const markdown = String(input.markdown || '');
   if (!markdown) return { markdown: '', attachments: [] };
 
   const basename = String(input.markdownBasename || '').trim() || 'conversation';
-  const conversationId = Number(input.conversationId);
-
   const orderedAssetIds: number[] = [];
   const seenAssetIds = new Set<number>();
   MARKDOWN_IMAGE_RE.lastIndex = 0;
@@ -201,13 +206,10 @@ async function materializeSyncnosAssetsForExport(input: {
 
   const assetNameById = new Map<number, string>();
   const attachments: Array<{ name: string; data: Blob }> = [];
-  let index = 0;
+  let index = Math.max(0, Math.floor(Number(input.attachmentStartIndex) || 0));
 
   for (const assetId of orderedAssetIds) {
-    const asset = await getImageCacheAssetById({
-      id: assetId,
-      conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
-    });
+    const asset = await input.resolveImageAsset(assetId);
     if (!asset) continue;
     index += 1;
     const ext = inferImageExtFromAsset(asset);
@@ -418,6 +420,7 @@ type ConversationsAppState = {
   loadingDetail: boolean;
   detailError: string | null;
   detail: ConversationDetail | null;
+  resolveDetailImageAsset: ConversationImageAssetResolver;
 
   selectedConversation: Conversation | null;
   detailHeaderActions: DetailHeaderAction[];
@@ -539,6 +542,19 @@ export function ConversationsProvider({
     if (!activeConversationSnapshot || Number(activeConversationSnapshot.id) !== selectedId) return null;
     return toConversationFromOpenTarget(activeConversationSnapshot);
   }, [activeConversationSnapshot, items, activeId]);
+  const resolveConversationImageAsset = useCallback(
+    async (reference: ConversationFactsReference, assetId: number) =>
+      await getConversationImageAsset({ reference, assetId }),
+    [],
+  );
+  const resolveDetailImageAsset = useCallback<ConversationImageAssetResolver>(
+    async (assetId) => {
+      const reference = toConversationFactsReference(detail);
+      if (!reference) throw new Error('stale conversation image reference');
+      return await resolveConversationImageAsset(reference, assetId);
+    },
+    [detail, resolveConversationImageAsset],
+  );
   const [detailHeaderActions, setDetailHeaderActions] = useState<DetailHeaderAction[]>([]);
 
   const setListSourceFilterKeyPersistent = useCallback((next: string) => {
@@ -1213,31 +1229,39 @@ export function ConversationsProvider({
 
         if (mergeSingle) {
           const docs: string[] = [];
+          const attachments: Array<{ name: string; data: Blob }> = [];
+          const mergedBaseName = `SyncNos-md-${stamp}`;
           for (const c of selectedConversations) {
             const reference = toConversationFactsReference(c);
             if (!reference) throw new Error('stale conversation reference');
             const d = await getConversationDetail(reference);
-            docs.push(formatConversationMarkdown(c, d.messages || []));
+            const detailReference = toConversationFactsReference(d);
+            if (!detailReference) throw new Error('stale conversation detail reference');
+            const materialized = await materializeSyncnosAssetsForExport({
+              markdown: formatConversationMarkdown(c, d.messages || []),
+              markdownBasename: mergedBaseName,
+              attachmentStartIndex: attachments.length,
+              resolveImageAsset: async (assetId) => await resolveConversationImageAsset(detailReference, assetId),
+            });
+            docs.push(materialized.markdown);
+            attachments.push(...materialized.attachments);
           }
-          const mergedBaseName = `SyncNos-md-${stamp}`;
           const mergedDoc = docs.join('\n---\n\n');
-          const mergedMaterialized = await materializeSyncnosAssetsForExport({
-            markdown: mergedDoc,
-            markdownBasename: mergedBaseName,
-          });
-          files.push({ name: `${mergedBaseName}.md`, data: mergedMaterialized.markdown });
-          for (const attachment of mergedMaterialized.attachments) files.push(attachment);
+          files.push({ name: `${mergedBaseName}.md`, data: mergedDoc });
+          for (const attachment of attachments) files.push(attachment);
         } else {
           for (const c of selectedConversations) {
             const reference = toConversationFactsReference(c);
             if (!reference) throw new Error('stale conversation reference');
             const d = await getConversationDetail(reference);
+            const detailReference = toConversationFactsReference(d);
+            if (!detailReference) throw new Error('stale conversation detail reference');
             const basename = buildConversationBasename(c);
 
             const materialized = await materializeSyncnosAssetsForExport({
               markdown: formatConversationMarkdown(c, d.messages || []),
               markdownBasename: basename,
-              conversationId: Number(c.id),
+              resolveImageAsset: async (assetId) => await resolveConversationImageAsset(detailReference, assetId),
             });
             files.push({
               name: `${basename}.md`,
@@ -1260,7 +1284,7 @@ export function ConversationsProvider({
         setExporting(false);
       }
     },
-    [items, selectedIds],
+    [items, resolveConversationImageAsset, selectedIds],
   );
 
   const syncSelectedNotion = useCallback(async () => {
@@ -1320,6 +1344,7 @@ export function ConversationsProvider({
     loadingDetail,
     detailError,
     detail,
+    resolveDetailImageAsset,
     selectedConversation,
     detailHeaderActions,
     exporting,

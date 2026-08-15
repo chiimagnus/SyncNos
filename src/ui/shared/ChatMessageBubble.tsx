@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createMarkdownRenderer } from '@ui/shared/markdown-core';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
 
 type BubbleRole = 'user' | 'assistant';
@@ -71,7 +70,7 @@ export type ChatMessageBubbleProps = {
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
   markdown: string;
-  conversationId?: number;
+  imageAssetResolver?: (assetId: number) => Promise<Readonly<{ blob: Blob }> | null>;
   readingProfile?: unknown;
   className?: string;
 };
@@ -108,7 +107,7 @@ export function ChatMessageBubble({
   headerLeft,
   headerRight,
   markdown,
-  conversationId,
+  imageAssetResolver,
   readingProfile,
   className,
 }: ChatMessageBubbleProps) {
@@ -142,10 +141,11 @@ export function ChatMessageBubble({
 
   useEffect(() => {
     const ids = collectOrderedSyncnosAssetIds(String(markdown || ''));
-    if (!ids.length) {
+    if (!ids.length || !imageAssetResolver) {
       setAssetSrcById(new Map());
       return;
     }
+    const resolveImageAsset = imageAssetResolver;
 
     let disposed = false;
     const objectUrls: string[] = [];
@@ -154,7 +154,7 @@ export function ChatMessageBubble({
       const next = new Map<number, string>();
       try {
         for (const id of ids) {
-          const asset = await getImageCacheAssetById({ id, conversationId });
+          const asset = await resolveImageAsset(id);
           if (!asset || disposed) continue;
           let url: string | null = null;
           try {
@@ -183,7 +183,7 @@ export function ChatMessageBubble({
       disposed = true;
       for (const objectUrl of objectUrls) URL.revokeObjectURL(objectUrl);
     };
-  }, [markdown, conversationId]);
+  }, [markdown, imageAssetResolver]);
 
   const html = useMemo(() => {
     const activeMathRenderer = mathRenderer || sharedMathMd;

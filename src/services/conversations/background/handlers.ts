@@ -24,6 +24,7 @@ import {
   LocalDataContractError,
   parseConversationCaptureSnapshot,
   MAX_DETAIL_PREVIEW_BYTES,
+  MAX_IMAGE_ASSET_BYTES,
   MAX_ORDINARY_FACTS_RESPONSE_BYTES,
   parseRuntimeCaptureSnapshotPayload,
   parseStreamDescriptor,
@@ -70,7 +71,13 @@ type PendingReadStream = {
   bytes: Uint8Array;
   expiresAt: number;
   expirationTimer: ReturnType<typeof globalThis.setTimeout>;
+  operation: 'conversation-detail' | 'image-asset';
 };
+
+type ImageAssetReadStreamPreflight = ConversationReadStreamPreflight &
+  Readonly<{
+    contentType: string;
+  }>;
 
 function createReadStreamRequestId(): string {
   const requestId = globalThis.crypto?.randomUUID?.();
@@ -78,8 +85,8 @@ function createReadStreamRequestId(): string {
   return requestId;
 }
 
-/** Holds one already-authorized response until its matching authenticated Port consumes it. */
-class PendingConversationReadStreams {
+/** Holds bounded, already-authorized read bytes until their matching authenticated Port consumes them. */
+class PendingFactsReadStreams {
   #bytes = 0;
   #pending = new Map<string, PendingReadStream>();
 
@@ -96,29 +103,55 @@ class PendingConversationReadStreams {
     }
     if (bytes.byteLength <= MAX_ORDINARY_FACTS_RESPONSE_BYTES) return value;
 
+    return this.publishBytes(bytes, 'conversation-detail');
+  }
+
+  publishImage(input: Readonly<{ bytes: Uint8Array; contentType: string }>): ImageAssetReadStreamPreflight {
+    const contentType = String(input.contentType || '')
+      .trim()
+      .toLowerCase();
+    if (
+      !(input.bytes instanceof Uint8Array) ||
+      input.bytes.byteLength <= 0 ||
+      !/^image\/[a-z0-9.+-]+$/.test(contentType)
+    ) {
+      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    }
+    if (input.bytes.byteLength > MAX_IMAGE_ASSET_BYTES) {
+      throw new LocalDataContractError('PAYLOAD_TOO_LARGE', {
+        operation: 'image-asset',
+        actualBytes: input.bytes.byteLength,
+        limitBytes: MAX_IMAGE_ASSET_BYTES,
+      });
+    }
+    return { ...this.publishBytes(input.bytes, 'image-asset'), contentType };
+  }
+
+  take(requestId: string, operation: PendingReadStream['operation']): Uint8Array {
     this.expire();
-    // ponytail: one detail ceiling of pending data; add a bounded queue only if concurrent detail UX needs it.
+    const pending = this.#pending.get(requestId);
+    if (!pending) throw new LocalDataContractError('STALE_REFERENCE');
+    this.drop(requestId, pending);
+    if (pending.operation !== operation) throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    return pending.bytes;
+  }
+
+  private publishBytes(bytes: Uint8Array, operation: PendingReadStream['operation']): ConversationReadStreamPreflight {
+    this.expire();
+    // ponytail: one shared 64 MiB pending-read ceiling; add a bounded queue only if concurrent detail/image UX needs it.
     if (this.#bytes + bytes.byteLength > MAX_DETAIL_PREVIEW_BYTES) throw new LocalDataContractError('BUSY');
 
     const requestId = createReadStreamRequestId();
     if (this.#pending.has(requestId)) throw new LocalDataContractError('BUSY');
     const expiresAt = Date.now() + PENDING_READ_STREAM_TTL_MS;
     const expirationTimer = globalThis.setTimeout(() => this.drop(requestId), PENDING_READ_STREAM_TTL_MS);
-    this.#pending.set(requestId, { bytes, expiresAt, expirationTimer });
+    this.#pending.set(requestId, { bytes, expiresAt, expirationTimer, operation });
     this.#bytes += bytes.byteLength;
     return {
       kind: 'stream',
       requestId,
-      stream: parseStreamDescriptor({ operation: 'conversation-detail', declaredTotalBytes: bytes.byteLength }),
+      stream: parseStreamDescriptor({ operation, declaredTotalBytes: bytes.byteLength }),
     };
-  }
-
-  take(requestId: string): Uint8Array {
-    this.expire();
-    const pending = this.#pending.get(requestId);
-    if (!pending) throw new LocalDataContractError('STALE_REFERENCE');
-    this.drop(requestId, pending);
-    return pending.bytes;
   }
 
   private expire(now = Date.now()): void {
@@ -517,11 +550,16 @@ function withFactsEpochTarget(target: ConversationListOpenTarget | null, factsEp
 }
 
 export function registerConversationHandlers(router: AnyRouter, deps: ConversationHandlersDeps) {
-  const readStreams = new PendingConversationReadStreams();
+  const readStreams = new PendingFactsReadStreams();
   const captureStreams = new PendingCaptureSnapshotStreams();
   deps.streamRouter.register('conversation-detail', {
     download: async ({ requestId, send }) => {
-      await send(readStreams.take(requestId));
+      await send(readStreams.take(requestId, 'conversation-detail'));
+    },
+  });
+  deps.streamRouter.register('image-asset', {
+    download: async ({ requestId, send }) => {
+      await send(readStreams.take(requestId, 'image-asset'));
     },
   });
   deps.streamRouter.register('capture-snapshot', {
@@ -678,6 +716,40 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           }),
       });
       return router.ok(detail as ConversationDetailReadResponse);
+    } catch (error) {
+      return factsError(router, error);
+    }
+  });
+
+  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_IMAGE_ASSET, async (msg) => {
+    const reference = stableReference(msg);
+    if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    const assetId = Number(msg?.assetId);
+    if (!Number.isSafeInteger(assetId) || assetId <= 0) {
+      return invalidArgument('assetId', 'invalid image asset id', msg?.assetId);
+    }
+    try {
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-image-asset',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ lease, mode, repository }) => {
+          const owner = await resolveConversationReference(repository, reference);
+          const asset = await createImageStorage({ lease, mode }).getAsset(owner, assetId);
+          if (!asset) return null;
+          const bytes = new Uint8Array(await asset.blob.arrayBuffer());
+          if (
+            asset.id !== assetId ||
+            asset.conversationId !== owner.conversationId ||
+            bytes.byteLength !== asset.byteSize
+          ) {
+            throw new LocalDataContractError('PROTOCOL_MISMATCH');
+          }
+          return readStreams.publishImage({ bytes, contentType: asset.contentType });
+        },
+      });
+      return router.ok(result);
     } catch (error) {
       return factsError(router, error);
     }

@@ -14,6 +14,7 @@ const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
+const getConversationImageAsset = vi.fn();
 const TEST_FACTS_EPOCH = 'idb-v1';
 
 vi.mock('@services/conversations/client/repo', () => ({
@@ -26,6 +27,10 @@ vi.mock('@services/conversations/client/repo', () => ({
   upsertConversation: (...args: any[]) => upsertConversation(...args),
   mergeConversations: (...args: any[]) => mergeConversations(...args),
   backfillConversationImages: (...args: any[]) => backfillConversationImages(...args),
+}));
+
+vi.mock('@services/conversations/client/images', () => ({
+  getConversationImageAsset: (...args: any[]) => getConversationImageAsset(...args),
 }));
 
 const clearFeedback = vi.fn();
@@ -177,6 +182,7 @@ describe('ConversationsProvider pagination state', () => {
     upsertConversation.mockReset();
     mergeConversations.mockReset();
     backfillConversationImages.mockReset();
+    getConversationImageAsset.mockReset();
 
     getConversationListPage.mockResolvedValue(makePage([]));
     findConversationById.mockResolvedValue(null);
@@ -199,6 +205,7 @@ describe('ConversationsProvider pagination state', () => {
       inlinedBytes: 0,
       warningFlags: [],
     });
+    getConversationImageAsset.mockResolvedValue(null);
   });
 
   afterEach(async () => {
@@ -464,6 +471,19 @@ describe('ConversationsProvider pagination state', () => {
 
     expect(Number(latestState.detail?.conversationId)).toBe(3);
     expect(String(latestState.detail?.messages?.[0]?.contentMarkdown || '')).toBe('article three');
+
+    await act(async () => {
+      await latestState.resolveDetailImageAsset(7);
+    });
+    expect(getConversationImageAsset).toHaveBeenCalledWith({
+      assetId: 7,
+      reference: {
+        conversationId: 3,
+        source: 'web',
+        conversationKey: 'article-3',
+        factsEpoch: TEST_FACTS_EPOCH,
+      },
+    });
   });
 
   it('provides cache-images tools action for article conversations', async () => {
