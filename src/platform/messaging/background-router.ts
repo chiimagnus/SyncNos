@@ -7,7 +7,26 @@ type Handler = (msg: Message, sender: any) => Promise<any> | any;
 
 type RouterOptions = {
   fallback: Handler;
+  localDataStreamRouter?: Readonly<{
+    registerPort: (port: unknown) => boolean;
+  }>;
 };
+
+function disconnectPort(port: any): void {
+  try {
+    port?.disconnect?.();
+  } catch {
+    // Unknown Runtime Ports are never retained.
+  }
+}
+
+function isOwnExtensionPort(port: any, runtime: any): boolean {
+  return !!runtime?.id && port?.sender?.id === runtime.id;
+}
+
+function isPopupEventsPort(port: any): boolean {
+  return typeof port?.postMessage === 'function' && typeof port?.onDisconnect?.addListener === 'function';
+}
 
 function ok(data: unknown) {
   return { ok: true, data, error: null };
@@ -17,7 +36,7 @@ function err(message: string, extra?: unknown) {
   return { ok: false, data: null, error: { message, extra: extra ?? null } };
 }
 
-export function createBackgroundRouter({ fallback }: RouterOptions) {
+export function createBackgroundRouter({ fallback, localDataStreamRouter }: RouterOptions) {
   const handlers = new Map<string, Handler>();
   const eventsHub = createEventsHub({ portName: UI_PORT_NAMES.POPUP_EVENTS });
 
@@ -46,7 +65,16 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     try {
       const rt = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
       rt?.onConnect?.addListener?.((port: any) => {
-        eventsHub.registerPort(port);
+        if (!isOwnExtensionPort(port, rt)) {
+          disconnectPort(port);
+          return;
+        }
+        if (port?.name === UI_PORT_NAMES.POPUP_EVENTS) {
+          if (!isPopupEventsPort(port) || !eventsHub.registerPort(port)) disconnectPort(port);
+          return;
+        }
+        if (port?.name === UI_PORT_NAMES.LOCAL_DATA_STREAM && localDataStreamRouter?.registerPort(port)) return;
+        disconnectPort(port);
       });
     } catch (_e) {
       // ignore

@@ -24,6 +24,8 @@ import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 import { registerClipperContextMenu } from '@platform/context-menus/clipper-context-menu';
 import { onAlarm } from '@platform/alarms/alarms';
 import { initializeLocale } from '@i18n';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
+import { BackgroundStreamRouter } from '@services/local-data/background-stream-router';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -37,7 +39,10 @@ async function openAboutSectionAfterInstall(): Promise<void> {
 
 export default defineBackground(async () => {
   await initializeLocale();
+  const factsGate = new FactsOperationGate();
+  await factsGate.initializeFromJournal();
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
+  const streamRouter = new BackgroundStreamRouter(factsGate);
 
   const router = createBackgroundRouter({
     fallback: (msg) => ({
@@ -45,6 +50,7 @@ export default defineBackground(async () => {
       data: null,
       error: { message: `unknown message type: ${msg?.type}`, extra: null },
     }),
+    localDataStreamRouter: streamRouter,
   });
 
   registerConversationHandlers(router, {
@@ -107,6 +113,9 @@ export default defineBackground(async () => {
 
   try {
     onAlarm((alarm) => {
+      // ponytail: P3-T9 will hold outer leases across the complete scheduler run; this keeps recovery
+      // from starting a legacy flush while the durable journal already blocks facts admissions.
+      if (!factsGate.allowsFactsOperations) return;
       void services.autoSync.handleAlarm(String(alarm?.name || ''));
     });
   } catch (_e) {
@@ -116,9 +125,11 @@ export default defineBackground(async () => {
   // Best-effort flush for any overdue auto-sync queue items. This complements
   // alarms-based wakeups and helps after extension reload / background restart.
   try {
-    void services.autoSync.notionScheduler.flush();
-    void services.autoSync.obsidianScheduler.flush();
-    void services.autoSync.feishuScheduler.flush();
+    if (factsGate.allowsFactsOperations) {
+      void services.autoSync.notionScheduler.flush();
+      void services.autoSync.obsidianScheduler.flush();
+      void services.autoSync.feishuScheduler.flush();
+    }
   } catch (_e) {
     // ignore
   }

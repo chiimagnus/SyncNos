@@ -12,6 +12,7 @@ export {
   UI_MESSAGE_TYPES,
   UI_EVENT_TYPES,
   UI_PORT_NAMES,
+  LOCAL_DATA_STREAM_MESSAGE_TYPES,
   messageContracts,
 } from '@platform/messaging/message-contracts';
 
@@ -28,5 +29,6 @@ export type {
   UiMessageType,
   UiEventType,
   UiPortName,
+  LocalDataStreamMessageType,
   MessageType,
 } from '@platform/messaging/message-contracts';

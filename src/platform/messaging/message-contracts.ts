@@ -93,6 +93,15 @@ export const UI_PORT_NAMES = {
   POPUP_EVENTS: 'popup:events',
 } as const;
 
+export const LOCAL_DATA_STREAM_MESSAGE_TYPES = {
+  ACK: 'ack',
+  COMPLETE: 'complete',
+  ERROR: 'error',
+  FRAME: 'frame',
+  HEADER: 'header',
+  OPEN: 'open',
+} as const;
+
 export const messageContracts = {
   CORE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
@@ -107,6 +116,7 @@ export const messageContracts = {
   UI_MESSAGE_TYPES,
   UI_EVENT_TYPES,
   UI_PORT_NAMES,
+  LOCAL_DATA_STREAM_MESSAGE_TYPES,
 } as const;
 
 export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[keyof typeof CORE_MESSAGE_TYPES];
@@ -122,6 +132,8 @@ export type CommentsMessageType = (typeof COMMENTS_MESSAGE_TYPES)[keyof typeof C
 export type UiMessageType = (typeof UI_MESSAGE_TYPES)[keyof typeof UI_MESSAGE_TYPES];
 export type UiEventType = (typeof UI_EVENT_TYPES)[keyof typeof UI_EVENT_TYPES];
 export type UiPortName = (typeof UI_PORT_NAMES)[keyof typeof UI_PORT_NAMES];
+export type LocalDataStreamMessageType =
+  (typeof LOCAL_DATA_STREAM_MESSAGE_TYPES)[keyof typeof LOCAL_DATA_STREAM_MESSAGE_TYPES];
 
 export type MessageType =
   | CoreMessageType
