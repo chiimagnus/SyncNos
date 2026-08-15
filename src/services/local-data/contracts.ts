@@ -14,6 +14,9 @@ const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 export const MAX_STREAM_FRAME_BYTES = 512 * KIBIBYTE;
+// Keep ordinary runtime replies comfortably below browser message implementation limits.
+// Larger facts are always negotiated onto the authenticated Port protocol below.
+export const MAX_ORDINARY_FACTS_RESPONSE_BYTES = 256 * KIBIBYTE;
 export const MAX_CAPTURE_SNAPSHOT_BYTES = 64 * MEBIBYTE;
 export const MAX_DETAIL_PREVIEW_BYTES = 64 * MEBIBYTE;
 export const MAX_IMAGE_ASSET_BYTES = 64 * MEBIBYTE;
@@ -946,6 +949,7 @@ export const BROWSER_RUNTIME_FACTS_COMMANDS = Object.freeze([
   'GET_FACTS_REVISION',
   'CONVERSATION_BOOTSTRAP',
   'CONVERSATION_LOAD_MORE',
+  'CONVERSATION_LOOKUP',
   'CONVERSATION_DETAIL',
   'CONVERSATION_TAIL',
   'SAVE_CONVERSATION_SNAPSHOT',
@@ -983,6 +987,7 @@ export type BrowserRuntimeFactsPayloadByCommand = {
   GET_FACTS_REVISION: EmptyPayload;
   CONVERSATION_BOOTSTRAP: ConversationListRequestPayload;
   CONVERSATION_LOAD_MORE: ConversationListRequestPayload;
+  CONVERSATION_LOOKUP: BrowserConversationReference;
   CONVERSATION_DETAIL: BrowserConversationReference;
   CONVERSATION_TAIL: ConversationTailRequestPayload<BrowserConversationReference>;
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
@@ -1016,6 +1021,7 @@ export const HOST_FACTS_COMMANDS = Object.freeze([
   'GET_FACTS_REVISION',
   'CONVERSATION_BOOTSTRAP',
   'CONVERSATION_LOAD_MORE',
+  'CONVERSATION_LOOKUP',
   'CONVERSATION_DETAIL',
   'CONVERSATION_TAIL',
   'SAVE_CONVERSATION_SNAPSHOT',
@@ -1069,6 +1075,7 @@ export type HostFactsPayloadByCommand = {
   GET_FACTS_REVISION: EmptyPayload;
   CONVERSATION_BOOTSTRAP: ConversationListRequestPayload;
   CONVERSATION_LOAD_MORE: ConversationListRequestPayload;
+  CONVERSATION_LOOKUP: HostConversationReference;
   CONVERSATION_DETAIL: HostConversationReference;
   CONVERSATION_TAIL: ConversationTailRequestPayload<HostConversationReference>;
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
@@ -1606,6 +1613,7 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
     case 'CONVERSATION_BOOTSTRAP':
     case 'CONVERSATION_LOAD_MORE':
       return parseConversationListPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+    case 'CONVERSATION_LOOKUP':
     case 'CONVERSATION_DETAIL':
     case 'DELETE_CONVERSATION':
     case 'BACKFILL_CONVERSATION_IMAGES':
@@ -1697,6 +1705,7 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
     case 'CONVERSATION_BOOTSTRAP':
     case 'CONVERSATION_LOAD_MORE':
       return parseConversationListPayload(value) as HostFactsPayloadByCommand[TCommand];
+    case 'CONVERSATION_LOOKUP':
     case 'CONVERSATION_DETAIL':
     case 'DELETE_CONVERSATION':
     case 'BACKFILL_CONVERSATION_IMAGES':
@@ -1778,6 +1787,7 @@ function browserPayloadCarriesNumericFactId(command: BrowserRuntimeFactsCommand,
   const contextHasId = (value: unknown) => isRecord(value) && referenceHasId(value.conversation);
 
   switch (command) {
+    case 'CONVERSATION_LOOKUP':
     case 'CONVERSATION_DETAIL':
     case 'DELETE_CONVERSATION':
     case 'BACKFILL_CONVERSATION_IMAGES':

@@ -9,6 +9,7 @@ import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import normalizeApi from '@services/shared/normalize.ts';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
+import { resolveConversationTailWindowResponse } from '@services/conversations/client/repo';
 import {
   readInpageButtonGlobalPosition,
   writeInpageButtonGlobalPosition,
@@ -429,7 +430,8 @@ export function createContentController(deps: Deps) {
         if (!localWindowRes?.ok) {
           throw new Error(localWindowRes?.error?.message || 'getConversationTailWindowBySourceAndKey failed');
         }
-        localTailMessages = Array.isArray(localWindowRes?.data?.messages) ? localWindowRes.data.messages : [];
+        const localTail = await resolveConversationTailWindowResponse(localWindowRes.data);
+        localTailMessages = Array.isArray(localTail.messages) ? localTail.messages : [];
       } catch (error) {
         if (!state.warnedTailUnavailable) {
           state.warnedTailUnavailable = true;

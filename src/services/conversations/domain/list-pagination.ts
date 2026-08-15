@@ -1,9 +1,14 @@
 import type { Conversation } from '@services/conversations/domain/models';
+import type { FactsEpoch } from '@services/local-data/contracts';
 
-export type ConversationListCursor = {
-  lastCapturedAt: number;
-  id: number;
-};
+export type ConversationListCursor =
+  | {
+      lastCapturedAt: number;
+      id: number;
+    }
+  | {
+      nativeCursor: string;
+    };
 
 export type ConversationListSummary = {
   totalCount: number;
@@ -25,6 +30,7 @@ export type ConversationListOpenTarget = {
   id: number;
   source: string;
   conversationKey: string;
+  factsEpoch?: FactsEpoch;
   title?: string;
   url?: string;
   sourceType?: string;
@@ -32,6 +38,7 @@ export type ConversationListOpenTarget = {
 };
 
 export type ConversationListPage<TItem = Conversation> = {
+  factsEpoch?: FactsEpoch;
   items: TItem[];
   cursor: ConversationListCursor | null;
   hasMore: boolean;

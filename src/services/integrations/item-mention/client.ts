@@ -1,5 +1,5 @@
 import { ITEM_MENTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import type { MentionSearchResult } from '@services/integrations/item-mention/mention-contract';
+import type { MentionInsertPayload, MentionSearchResult } from '@services/integrations/item-mention/mention-contract';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -27,11 +27,18 @@ export async function searchMentionCandidates(
 
 export async function buildMentionInsertText(
   runtime: RuntimeClient | null,
-  input: { conversationId: number },
-): Promise<{ conversationId: number; markdown: string }> {
+  input: MentionInsertPayload,
+): Promise<{ conversationKey: string; factsEpoch: string; markdown: string; source: string }> {
   if (!runtime || typeof runtime.send !== 'function') throw new Error('runtime client unavailable');
   const res = await runtime.send(ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT, {
-    conversationId: input.conversationId,
+    conversationKey: input.conversationKey,
+    factsEpoch: input.factsEpoch,
+    source: input.source,
   });
-  return ensureOk(res, 'buildMentionInsertText failed') as { conversationId: number; markdown: string };
+  return ensureOk(res, 'buildMentionInsertText failed') as {
+    conversationKey: string;
+    factsEpoch: string;
+    markdown: string;
+    source: string;
+  };
 }

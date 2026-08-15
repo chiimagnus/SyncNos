@@ -31,7 +31,43 @@ export function createTestBackgroundRouter() {
     }),
   });
 
-  registerConversationHandlers(router, { onConversationChanged: async () => {} });
+  registerConversationHandlers(router, {
+    conversationReadRunner: {
+      run: async ({ read }: any) =>
+        await read({
+          factsEpoch: 'idb-v1',
+          mode: 'idb',
+          repository: {
+            findConversationById: async () => null,
+            findConversationBySourceAndKey: async () => null,
+            getConversationByReference: async () => null,
+            getConversationDetail: async () => ({ conversationId: 1, messages: [] }),
+            getConversationListBootstrap: async () => ({
+              items: [],
+              cursor: null,
+              hasMore: false,
+              summary: { totalCount: 0, todayCount: 0 },
+              facets: { sources: [], sites: [] },
+            }),
+            getConversationListPage: async () => ({
+              items: [],
+              cursor: null,
+              hasMore: false,
+              summary: { totalCount: 0, todayCount: 0 },
+              facets: { sources: [], sites: [] },
+            }),
+            getConversationTailWindow: async () => ({ conversationId: 1, messages: [] }),
+            searchConversationMentionCandidates: async () => ({
+              candidates: [],
+              scannedCount: 0,
+              truncatedByScanLimit: false,
+            }),
+          },
+        }),
+    },
+    onConversationChanged: async () => {},
+    streamRouter: { register: () => {} },
+  });
   registerWebArticleHandlers(router);
   registerChatWithBackgroundHandlers(router);
   registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });

@@ -38,6 +38,8 @@ export function normalizeMentionCandidate(
     conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : 0,
     title: safeText((input as any).title),
     source: safeText((input as any).source),
+    conversationKey: safeText((input as any).conversationKey),
+    factsEpoch: safeText((input as any).factsEpoch) as MentionCandidate['factsEpoch'],
     url: safeText((input as any).url),
     domain: safeText((input as any).domain) || parseDomainFromUrl((input as any).url),
     sourceType: safeText((input as any).sourceType) || 'chat',
@@ -88,12 +90,12 @@ export function searchMentionCandidates(input: {
 
   if (query.empty) {
     const sorted = normalized
-      .filter((c) => c.conversationId > 0)
+      .filter((c) => c.source && c.conversationKey && c.factsEpoch)
       .sort((a, b) => {
         const at = a.lastCapturedAt || 0;
         const bt = b.lastCapturedAt || 0;
         if (bt !== at) return bt - at;
-        return (b.conversationId || 0) - (a.conversationId || 0);
+        return `${a.source}\u0000${a.conversationKey}`.localeCompare(`${b.source}\u0000${b.conversationKey}`);
       })
       .slice(0, limit);
     return { query, candidates: sorted, limit };
@@ -101,7 +103,7 @@ export function searchMentionCandidates(input: {
 
   const matched: Array<{ c: MentionCandidate; score: number }> = [];
   for (const c of normalized) {
-    if (!c || c.conversationId <= 0) continue;
+    if (!c || !c.source || !c.conversationKey || !c.factsEpoch) continue;
     const info = scoreCandidate(c, query);
     if (!info.matched) continue;
     matched.push({ c, score: info.score });
@@ -112,7 +114,7 @@ export function searchMentionCandidates(input: {
     const at = a.c.lastCapturedAt || 0;
     const bt = b.c.lastCapturedAt || 0;
     if (bt !== at) return bt - at;
-    return (b.c.conversationId || 0) - (a.c.conversationId || 0);
+    return `${a.c.source}\u0000${a.c.conversationKey}`.localeCompare(`${b.c.source}\u0000${b.c.conversationKey}`);
   });
 
   return {

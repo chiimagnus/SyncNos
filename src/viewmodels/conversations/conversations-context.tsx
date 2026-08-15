@@ -3,11 +3,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type {
   Conversation,
   ConversationDetail,
+  ConversationFactsReference,
   ConversationListCursor,
   ConversationListFacets,
   ConversationListOpenTarget,
   ConversationListSummary,
 } from '@services/conversations/domain/models';
+import type { FactsEpoch } from '@services/local-data/contracts';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
@@ -136,6 +138,38 @@ function ensureConversationUiShape(conversation: Conversation): Conversation {
   if (currentSourceType === nextSourceType) return conversation;
 
   return { ...(conversation as any), sourceType: nextSourceType };
+}
+
+function toConversationFactsReference(
+  conversation:
+    | Readonly<{ conversationKey?: string; factsEpoch?: FactsEpoch; id?: number; source?: string }>
+    | null
+    | undefined,
+): ConversationFactsReference | null {
+  const source = String(conversation?.source || '').trim();
+  const conversationKey = String(conversation?.conversationKey || '').trim();
+  const factsEpoch = String(conversation?.factsEpoch || '').trim();
+  const conversationId = Number(conversation?.id);
+  if (!source || !conversationKey || !factsEpoch) return null;
+  return {
+    source,
+    conversationKey,
+    factsEpoch: factsEpoch as FactsEpoch,
+    ...(Number.isFinite(conversationId) && conversationId > 0 ? { conversationId } : {}),
+  };
+}
+
+function sameConversationFactsReference(
+  a: ConversationFactsReference | null | undefined,
+  b: ConversationFactsReference | null | undefined,
+): boolean {
+  return (
+    Boolean(a) &&
+    Boolean(b) &&
+    a!.source === b!.source &&
+    a!.conversationKey === b!.conversationKey &&
+    a!.factsEpoch === b!.factsEpoch
+  );
 }
 
 const URL_EDIT_CANCELLED_ERROR = 'SYNCNOS_URL_EDIT_CANCELLED';
@@ -297,6 +331,7 @@ function toOpenTargetFromConversation(
     id,
     source,
     conversationKey,
+    factsEpoch: (conversation as any).factsEpoch,
     title: String((conversation as any).title || '').trim() || undefined,
     url: String((conversation as any).url || '').trim() || undefined,
     sourceType,
@@ -316,6 +351,7 @@ function toConversationFromOpenTarget(target: ConversationListOpenTarget): Conve
     id: Number(target.id),
     source,
     conversationKey: String(target.conversationKey || '').trim(),
+    factsEpoch: target.factsEpoch,
     title: String(target.title || '').trim() || undefined,
     url,
     sourceType,
@@ -330,6 +366,7 @@ function sameOpenTarget(a: ConversationListOpenTarget | null, b: ConversationLis
     Number(a.id) === Number(b.id) &&
     String(a.source || '') === String(b.source || '') &&
     String(a.conversationKey || '') === String(b.conversationKey || '') &&
+    String(a.factsEpoch || '') === String(b.factsEpoch || '') &&
     String(a.title || '') === String(b.title || '') &&
     String(a.url || '') === String(b.url || '') &&
     String(a.sourceType || '') === String(b.sourceType || '') &&
@@ -428,8 +465,8 @@ type ConversationsAppState = {
 
 const ConversationsContext = createContext<ConversationsAppState | null>(null);
 
-async function loadDetailFor(id: number): Promise<ConversationDetail> {
-  return getConversationDetail(id);
+async function loadDetailFor(reference: ConversationFactsReference): Promise<ConversationDetail> {
+  return getConversationDetail(reference);
 }
 
 export function ConversationsProvider({
@@ -443,6 +480,7 @@ export function ConversationsProvider({
   const [loadingMoreList, setLoadingMoreList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [listCursor, setListCursor] = useState<ConversationListCursor | null>(null);
+  const [listFactsEpoch, setListFactsEpoch] = useState<FactsEpoch | null>(null);
   const [listHasMore, setListHasMore] = useState(false);
   const [listSummary, setListSummary] = useState<ConversationListSummary>(EMPTY_LIST_SUMMARY);
   const [listFacets, setListFacets] = useState<ConversationListFacets>(EMPTY_LIST_FACETS);
@@ -574,11 +612,15 @@ export function ConversationsProvider({
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
 
-      const target = await findConversationBySourceAndKey(safeSource, safeConversationKey).catch(() => null);
+      const target = await (
+        listFactsEpoch
+          ? findConversationBySourceAndKey(safeSource, safeConversationKey, listFactsEpoch)
+          : findConversationBySourceAndKey(safeSource, safeConversationKey)
+      ).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current) return;
       applyOpenTarget(target, options);
     },
-    [applyOpenTarget],
+    [applyOpenTarget, listFactsEpoch],
   );
 
   const openConversationExternalBySourceKey = useCallback(
@@ -622,11 +664,11 @@ export function ConversationsProvider({
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
 
-      const target = await findConversationById(id).catch(() => null);
+      const target = await findConversationById(id, listFactsEpoch ?? undefined).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current) return;
       applyOpenTarget(target, { preserveListScope: false });
     },
-    [applyOpenTarget, items],
+    [applyOpenTarget, items, listFactsEpoch],
   );
 
   const openConversationInListScopeById = useCallback(
@@ -642,11 +684,11 @@ export function ConversationsProvider({
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
 
-      const target = await findConversationById(id).catch(() => null);
+      const target = await findConversationById(id, listFactsEpoch ?? undefined).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current) return;
       applyOpenTarget(target, { preserveListScope: true });
     },
-    [applyOpenTarget, items],
+    [applyOpenTarget, items, listFactsEpoch],
   );
 
   const refreshList = useCallback(async () => {
@@ -661,6 +703,7 @@ export function ConversationsProvider({
     setLoadingMoreList(false);
     setListError(null);
     setListCursor(null);
+    setListFactsEpoch(null);
     setListHasMore(false);
     try {
       const page = await getConversationListBootstrap(
@@ -670,7 +713,10 @@ export function ConversationsProvider({
       if (requestSeq !== listRequestSeqRef.current) return;
 
       const list = Array.isArray(page?.items) ? page.items : [];
+      const factsEpoch = String(page?.factsEpoch || '').trim();
+      if (!factsEpoch) throw new Error('missing facts epoch');
       setItems(list);
+      setListFactsEpoch(factsEpoch as FactsEpoch);
       setListCursor(page?.cursor ?? null);
       setListHasMore(Boolean(page?.hasMore));
       setListSummary(normalizeConversationListSummary(page?.summary));
@@ -712,6 +758,7 @@ export function ConversationsProvider({
       if (requestSeq !== listRequestSeqRef.current) return;
       setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
       setListCursor(null);
+      setListFactsEpoch(null);
       setListHasMore(false);
       setListSummary(EMPTY_LIST_SUMMARY);
       setListFacets(EMPTY_LIST_FACETS);
@@ -724,7 +771,9 @@ export function ConversationsProvider({
 
   const loadMoreList = useCallback(async () => {
     const cursor = listCursor;
+    const factsEpoch = listFactsEpoch;
     if (!cursor) return;
+    if (!factsEpoch) return;
     if (!listHasMore) return;
     if (loadingInitialList || loadingMoreList) return;
 
@@ -741,6 +790,7 @@ export function ConversationsProvider({
       const page = await getConversationListPage(
         { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
         cursor,
+        factsEpoch,
         LIST_BOOTSTRAP_LIMIT,
       );
       if (requestSeq !== listRequestSeqRef.current) return;
@@ -759,7 +809,15 @@ export function ConversationsProvider({
         setLoadingMoreList(false);
       }
     }
-  }, [listCursor, listHasMore, listSiteFilterKey, listSourceFilterKey, loadingInitialList, loadingMoreList]);
+  }, [
+    listCursor,
+    listFactsEpoch,
+    listHasMore,
+    listSiteFilterKey,
+    listSourceFilterKey,
+    loadingInitialList,
+    loadingMoreList,
+  ]);
 
   const updateSelectedConversationUrl = useCallback(
     async (nextUrl: string) => {
@@ -912,7 +970,9 @@ export function ConversationsProvider({
 
   const refreshActiveDetail = useCallback(async () => {
     const id = Number(activeIdRef.current);
-    if (!Number.isFinite(id) || id <= 0) {
+    const reference = toConversationFactsReference(activeConversationSnapshot);
+    const snapshotId = Number(activeConversationSnapshot?.id);
+    if (!Number.isFinite(id) || id <= 0 || !reference || snapshotId !== id) {
       detailRequestSeqRef.current += 1;
       setLoadingDetail(false);
       setDetailError(null);
@@ -924,23 +984,29 @@ export function ConversationsProvider({
     detailRequestSeqRef.current = requestSeq;
     setLoadingDetail(true);
     setDetailError(null);
-    setDetail((current) => (Number((current as any)?.conversationId) === id ? current : null));
+    setDetail((current) =>
+      sameConversationFactsReference(toConversationFactsReference(current), reference) ? current : null,
+    );
+    const isCurrentReference = () =>
+      Number(activeIdRef.current) === id &&
+      sameConversationFactsReference(toConversationFactsReference(activeConversationSnapshotRef.current), reference);
     try {
-      const d = await loadDetailFor(id);
-      if (requestSeq !== detailRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
-      const detailId = Number((d as any)?.conversationId);
-      if (Number.isFinite(detailId) && detailId > 0 && detailId !== id) return;
+      const d = await loadDetailFor(reference);
+      if (requestSeq !== detailRequestSeqRef.current || !isCurrentReference()) return;
+      if (!sameConversationFactsReference(toConversationFactsReference(d), reference)) {
+        throw new Error('stale conversation detail');
+      }
       setDetail(d);
     } catch (e) {
-      if (requestSeq !== detailRequestSeqRef.current || Number(activeIdRef.current) !== id) return;
+      if (requestSeq !== detailRequestSeqRef.current || !isCurrentReference()) return;
       setDetailError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
       setDetail(null);
     } finally {
-      if (requestSeq === detailRequestSeqRef.current && Number(activeIdRef.current) === id) {
+      if (requestSeq === detailRequestSeqRef.current && isCurrentReference()) {
         setLoadingDetail(false);
       }
     }
-  }, []);
+  }, [activeConversationSnapshot]);
 
   useEffect(() => {
     activeIdRef.current = activeId;
@@ -1141,7 +1207,9 @@ export function ConversationsProvider({
         if (mergeSingle) {
           const docs: string[] = [];
           for (const c of selectedConversations) {
-            const d = await getConversationDetail(Number(c.id));
+            const reference = toConversationFactsReference(c);
+            if (!reference) throw new Error('stale conversation reference');
+            const d = await getConversationDetail(reference);
             docs.push(formatConversationMarkdown(c, d.messages || []));
           }
           const mergedBaseName = `SyncNos-md-${stamp}`;
@@ -1154,7 +1222,9 @@ export function ConversationsProvider({
           for (const attachment of mergedMaterialized.attachments) files.push(attachment);
         } else {
           for (const c of selectedConversations) {
-            const d = await getConversationDetail(Number(c.id));
+            const reference = toConversationFactsReference(c);
+            if (!reference) throw new Error('stale conversation reference');
+            const d = await getConversationDetail(reference);
             const basename = buildConversationBasename(c);
 
             const materialized = await materializeSyncnosAssetsForExport({

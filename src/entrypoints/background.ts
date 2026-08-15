@@ -26,6 +26,7 @@ import { onAlarm } from '@platform/alarms/alarms';
 import { initializeLocale } from '@i18n';
 import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 import { BackgroundStreamRouter } from '@services/local-data/background-stream-router';
+import { createConversationReadRunner } from '@services/conversations/data/storage';
 
 let backgroundInstanceId: string | null = null;
 function getBackgroundInstanceId(): string {
@@ -41,6 +42,7 @@ export default defineBackground(async () => {
   await initializeLocale();
   const factsGate = new FactsOperationGate();
   await factsGate.initializeFromJournal();
+  const conversationReadRunner = createConversationReadRunner(factsGate);
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
   const streamRouter = new BackgroundStreamRouter(factsGate);
 
@@ -54,9 +56,11 @@ export default defineBackground(async () => {
   });
 
   registerConversationHandlers(router, {
+    conversationReadRunner,
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
+    streamRouter,
   });
-  registerItemMentionHandlers(router);
+  registerItemMentionHandlers(router, { conversationReadRunner });
   registerChatWithBackgroundHandlers(router);
   registerArticleCommentsHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),

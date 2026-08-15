@@ -74,6 +74,8 @@ describe('item mention notionai controller', () => {
                 conversationId: 1,
                 title: 'A',
                 source: 'web',
+                conversationKey: 'a-1',
+                factsEpoch: 'idb-v1',
                 domain: 'a.com',
                 url: '',
                 sourceType: 'chat',
@@ -84,8 +86,10 @@ describe('item mention notionai controller', () => {
         };
       }
       if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) {
-        if (payload?.conversationId !== 1) return { ok: false, data: null, error: { message: 'bad id', extra: null } };
-        return { ok: true, data: { conversationId: 1, markdown: 'MD' } };
+        if (payload?.source !== 'web' || payload?.conversationKey !== 'a-1' || payload?.factsEpoch !== 'idb-v1') {
+          return { ok: false, data: null, error: { message: 'bad reference', extra: null } };
+        }
+        return { ok: true, data: { source: 'web', conversationKey: 'a-1', factsEpoch: 'idb-v1', markdown: 'MD' } };
       }
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });
@@ -124,6 +128,8 @@ describe('item mention notionai controller', () => {
                 conversationId: 1,
                 title: 'A',
                 source: 'web',
+                conversationKey: 'a-1',
+                factsEpoch: 'idb-v1',
                 domain: 'a.com',
                 url: '',
                 sourceType: 'chat',

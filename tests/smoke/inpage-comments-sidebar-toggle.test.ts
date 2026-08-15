@@ -6,6 +6,7 @@ import {
   createInpageCommentsDomSource,
   getInpageCommentsPanelApi,
 } from '../../src/ui/inpage/inpage-comments-panel-shadow';
+import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { createCommentSidebarPanelTestDriver } from '../helpers/comment-sidebar-panel-driver';
 
 function setupDom() {
@@ -140,6 +141,82 @@ describe('inpage comments sidebar toggle', () => {
       collapse?.click();
     });
     expect(api.isOpen()).toBe(false);
+    api.dispose();
+  });
+
+  it('resolves inpage ChatWith detail through a fresh stable reference and epoch', async () => {
+    const runtime = {
+      send: vi.fn(async (type: string, payload?: Record<string, unknown>) => {
+        if (type === ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB) {
+          return {
+            ok: true,
+            data: {
+              conversationId: 8,
+              url: 'https://example.com/article',
+              title: 'Example article',
+              author: 'Author',
+              publishedAt: '2026-08-15',
+            },
+          };
+        }
+        if (type === CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY) {
+          expect(payload).toEqual({ source: 'web', conversationKey: 'article:https://example.com/article' });
+          return {
+            ok: true,
+            data: {
+              id: 8,
+              source: 'web',
+              conversationKey: 'article:https://example.com/article',
+              factsEpoch: 'idb-v1',
+              lastCapturedAt: 1,
+            },
+          };
+        }
+        if (type === CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL) {
+          expect(payload).toEqual({
+            source: 'web',
+            conversationKey: 'article:https://example.com/article',
+            factsEpoch: 'idb-v1',
+          });
+          return {
+            ok: true,
+            data: {
+              conversationId: 8,
+              source: 'web',
+              conversationKey: 'article:https://example.com/article',
+              factsEpoch: 'idb-v1',
+              messages: [{ id: 1, conversationId: 8, messageKey: 'm1', role: 'assistant', contentText: 'Body' }],
+            },
+          };
+        }
+        return { ok: false, error: { message: `unexpected ${type}` } };
+      }),
+    };
+    const api = createCommentSidebarPanelTestDriver(getInpageCommentsPanelApi(runtime));
+
+    await act(async () => {
+      api.open({ focusComposer: false });
+      await flushReactScheduler();
+    });
+
+    const trigger = document
+      .getElementById('webclipper-inpage-comments-panel')
+      ?.shadowRoot?.querySelector(
+        '.webclipper-inpage-comments-panel__header .webclipper-inpage-comments-panel__overflow-trigger',
+      ) as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+
+    await act(async () => {
+      trigger?.click();
+      await vi.waitFor(() => {
+        expect(runtime.send).toHaveBeenCalledWith(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, expect.any(Object));
+      });
+    });
+
+    expect(runtime.send).not.toHaveBeenCalledWith(
+      CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL,
+      expect.objectContaining({ conversationId: expect.anything() }),
+    );
     api.dispose();
   });
 

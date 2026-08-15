@@ -77,7 +77,13 @@ function createRouter() {
       error: { message: `unknown message type: ${msg?.type}`, extra: null },
     }),
   });
-  registerConversationHandlers(router as any, { onConversationChanged: async () => {} });
+  registerConversationHandlers(router as any, {
+    conversationReadRunner: {
+      run: async ({ read }: any) => await read({ factsEpoch: 'idb-v1', mode: 'idb', repository: {} }),
+    },
+    onConversationChanged: async () => {},
+    streamRouter: { register: () => {} },
+  });
   return router;
 }
 

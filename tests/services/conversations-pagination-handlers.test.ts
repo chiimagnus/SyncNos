@@ -2,18 +2,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { LocalDataContractError } from '@services/local-data/contracts';
 
 const storageMocks = vi.hoisted(() => ({
   deleteConversationsByIds: vi.fn(),
-  findConversationById: vi.fn(),
-  findConversationBySourceAndKey: vi.fn(),
-  getConversationListBootstrap: vi.fn(),
-  getConversationListPage: vi.fn(),
-  getConversationDetail: vi.fn(),
-  getConversationTailWindowBySourceAndKey: vi.fn(),
   hasConversation: vi.fn(),
   mergeConversationsByIds: vi.fn(),
 }));
+
+const readMocks = vi.hoisted(() => ({
+  findConversationById: vi.fn(),
+  findConversationBySourceAndKey: vi.fn(),
+  getConversationByReference: vi.fn(),
+  getConversationDetail: vi.fn(),
+  getConversationListBootstrap: vi.fn(),
+  getConversationListPage: vi.fn(),
+  getConversationTailWindow: vi.fn(),
+  searchConversationMentionCandidates: vi.fn(),
+}));
+
+const streamRouterMocks = vi.hoisted(() => ({ register: vi.fn() }));
 
 const writeMocks = vi.hoisted(() => ({
   writeConversationMessagesSnapshot: vi.fn(),
@@ -22,12 +30,6 @@ const writeMocks = vi.hoisted(() => ({
 
 vi.mock('@services/conversations/data/storage', () => ({
   deleteConversationsByIds: storageMocks.deleteConversationsByIds,
-  findConversationById: storageMocks.findConversationById,
-  findConversationBySourceAndKey: storageMocks.findConversationBySourceAndKey,
-  getConversationListBootstrap: storageMocks.getConversationListBootstrap,
-  getConversationListPage: storageMocks.getConversationListPage,
-  getConversationDetail: storageMocks.getConversationDetail,
-  getConversationTailWindowBySourceAndKey: storageMocks.getConversationTailWindowBySourceAndKey,
   hasConversation: storageMocks.hasConversation,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
 }));
@@ -45,28 +47,42 @@ function createRouter() {
       error: { message: `unknown message type: ${msg?.type}`, extra: null },
     }),
   });
-  registerConversationHandlers(router as any, { onConversationChanged: async () => {} });
+  registerConversationHandlers(router as any, {
+    conversationReadRunner: {
+      run: async ({ expectedFactsEpoch, read }: any) => {
+        if (expectedFactsEpoch !== undefined && expectedFactsEpoch !== 'epoch-idb') {
+          throw new LocalDataContractError('STALE_BACKEND_EPOCH');
+        }
+        return await read({ factsEpoch: 'epoch-idb', mode: 'idb', repository: readMocks });
+      },
+    },
+    onConversationChanged: async () => {},
+    streamRouter: streamRouterMocks,
+  });
   return router;
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
   storageMocks.deleteConversationsByIds.mockReset();
-  storageMocks.findConversationById.mockReset();
-  storageMocks.findConversationBySourceAndKey.mockReset();
-  storageMocks.getConversationListBootstrap.mockReset();
-  storageMocks.getConversationListPage.mockReset();
-  storageMocks.getConversationDetail.mockReset();
-  storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
   storageMocks.hasConversation.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
+  readMocks.findConversationById.mockReset();
+  readMocks.findConversationBySourceAndKey.mockReset();
+  readMocks.getConversationByReference.mockReset();
+  readMocks.getConversationDetail.mockReset();
+  readMocks.getConversationListBootstrap.mockReset();
+  readMocks.getConversationListPage.mockReset();
+  readMocks.getConversationTailWindow.mockReset();
+  readMocks.searchConversationMentionCandidates.mockReset();
+  streamRouterMocks.register.mockReset();
   writeMocks.writeConversationMessagesSnapshot.mockReset();
   writeMocks.writeConversationSnapshot.mockReset();
 });
 
 describe('conversations pagination handlers', () => {
   it('routes bootstrap query to storage with normalized payload', async () => {
-    storageMocks.getConversationListBootstrap.mockResolvedValue({
+    readMocks.getConversationListBootstrap.mockResolvedValue({
       items: [],
       cursor: null,
       hasMore: false,
@@ -82,7 +98,7 @@ describe('conversations pagination handlers', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(storageMocks.getConversationListBootstrap).toHaveBeenCalledWith(
+    expect(readMocks.getConversationListBootstrap).toHaveBeenCalledWith(
       { sourceKey: 'web', siteKey: 'domain:example.com', limit: 25 },
       25,
     );
@@ -124,7 +140,7 @@ describe('conversations pagination handlers', () => {
   });
 
   it('returns open target on by-id lookup', async () => {
-    storageMocks.findConversationById.mockResolvedValue({
+    readMocks.findConversationById.mockResolvedValue({
       id: 99,
       source: 'chatgpt',
       conversationKey: 'k-99',
@@ -138,8 +154,8 @@ describe('conversations pagination handlers', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(storageMocks.findConversationById).toHaveBeenCalledWith(99);
-    expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99' });
+    expect(readMocks.findConversationById).toHaveBeenCalledWith(99);
+    expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99', factsEpoch: 'epoch-idb' });
   });
 
   it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {
@@ -176,12 +192,12 @@ describe('conversations pagination handlers', () => {
   });
 
   it('returns normalized tail window payload from storage', async () => {
-    storageMocks.getConversationTailWindowBySourceAndKey.mockResolvedValueOnce({
-      conversation: { id: 9 },
+    readMocks.getConversationTailWindow.mockResolvedValueOnce({
+      conversationId: 9,
       messages: [{ messageKey: 'm1' }],
     });
-    storageMocks.getConversationTailWindowBySourceAndKey.mockResolvedValueOnce({
-      conversation: null,
+    readMocks.getConversationTailWindow.mockResolvedValueOnce({
+      conversationId: 10,
       messages: [],
     });
     const router = createRouter();
@@ -196,8 +212,15 @@ describe('conversations pagination handlers', () => {
     expect(withLimit.data).toEqual({
       conversationId: 9,
       messages: [{ messageKey: 'm1' }],
+      source: 'chatgpt',
+      conversationKey: 'k1',
+      factsEpoch: 'epoch-idb',
     });
-    expect(storageMocks.getConversationTailWindowBySourceAndKey).toHaveBeenNthCalledWith(1, 'chatgpt', 'k1', 200);
+    expect(readMocks.getConversationTailWindow).toHaveBeenNthCalledWith(
+      1,
+      { source: 'chatgpt', conversationKey: 'k1' },
+      200,
+    );
 
     const withoutLimit = await router.__handleMessageForTests({
       type: 'getConversationTailWindowBySourceAndKey',
@@ -206,9 +229,30 @@ describe('conversations pagination handlers', () => {
     });
     expect(withoutLimit.ok).toBe(true);
     expect(withoutLimit.data).toEqual({
-      conversationId: null,
+      conversationId: 10,
       messages: [],
+      source: 'chatgpt',
+      conversationKey: 'k2',
+      factsEpoch: 'epoch-idb',
     });
-    expect(storageMocks.getConversationTailWindowBySourceAndKey).toHaveBeenNthCalledWith(2, 'chatgpt', 'k2', 200);
+    expect(readMocks.getConversationTailWindow).toHaveBeenNthCalledWith(
+      2,
+      { source: 'chatgpt', conversationKey: 'k2' },
+      200,
+    );
+  });
+
+  it('rejects an old list epoch before it reaches the selected backend', async () => {
+    const router = createRouter();
+    const res = await router.__handleMessageForTests({
+      type: 'getConversationListPage',
+      query: { sourceKey: 'all', siteKey: 'all' },
+      cursor: { lastCapturedAt: 1, id: 1 },
+      factsEpoch: 'epoch-before-migration',
+    });
+
+    expect(res.ok).toBe(false);
+    expect((res.error?.extra as any)?.code).toBe('STALE_BACKEND_EPOCH');
+    expect(readMocks.getConversationListPage).not.toHaveBeenCalled();
   });
 });

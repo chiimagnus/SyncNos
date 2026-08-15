@@ -150,8 +150,10 @@ function normalizeTimestamp(value: unknown): number | null {
   return Math.trunc(timestamp);
 }
 
-function toComparableCursor(value: ConversationListCursor | null | undefined): ConversationListCursor | null {
-  if (!value) return null;
+type SqliteConversationListCursor = Extract<ConversationListCursor, { id: number; lastCapturedAt: number }>;
+
+function toComparableCursor(value: ConversationListCursor | null | undefined): SqliteConversationListCursor | null {
+  if (!value || 'nativeCursor' in value) return null;
   const lastCapturedAt = Number(value.lastCapturedAt);
   const id = Number(value.id);
   if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
@@ -839,7 +841,7 @@ function articleCommentThreadCount(database: SyncNosSqliteDatabase, conversation
 function readConversationListPage(
   database: SyncNosSqliteDatabase,
   input: Readonly<{
-    cursor?: ConversationListCursor | null;
+    cursor?: SqliteConversationListCursor | null;
     limit?: number | null;
     queryInput?: ConversationListQueryInput | null;
   }>,
@@ -906,7 +908,7 @@ export function encodeSqliteConversationListCursor(
 export function decodeSqliteConversationListCursor(
   value: unknown,
   scope: SqliteConversationListScope,
-): ConversationListCursor {
+): SqliteConversationListCursor {
   if (typeof value !== 'string' || !value) invalidArgument();
   let bytes: Buffer;
   try {
@@ -940,7 +942,7 @@ export function decodeSqliteConversationListCursor(
 function readConversationListPageInSnapshot(
   database: SyncNosSqliteDatabase,
   input: Readonly<{
-    cursor?: ConversationListCursor | null;
+    cursor?: SqliteConversationListCursor | null;
     limit?: number | null;
     queryInput?: ConversationListQueryInput | null;
   }>,
@@ -1024,7 +1026,7 @@ export function createConversationsRepository(database: SyncNosSqliteDatabase) {
       execute(() => readConversationListPage(database, { queryInput, limit, cursor: null })),
     getConversationListPage: (
       queryInput: ConversationListQueryInput | null | undefined,
-      cursor: ConversationListCursor,
+      cursor: SqliteConversationListCursor,
       limit?: number | null,
     ) => execute(() => readConversationListPage(database, { queryInput, limit, cursor })),
     mergeConversationsByIds: (input: Readonly<{ keepConversationId: number; removeConversationId: number }>) =>

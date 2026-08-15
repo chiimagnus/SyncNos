@@ -41,7 +41,15 @@ function createHarness(options: {
           messages: [],
         };
         tailWindowCount += 1;
-        return { ok: true, data: cloneSnapshot(item) };
+        return {
+          ok: true,
+          data: {
+            ...cloneSnapshot(item),
+            source: String(payload?.source || ''),
+            conversationKey: String(payload?.conversationKey || ''),
+            factsEpoch: 'idb-v1',
+          },
+        };
       }
       if (type === 'upsertConversation') return { ok: true, data: { id: 101, __isNew: false } };
       if (type === 'syncConversationMessages')

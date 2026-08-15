@@ -1,62 +1,132 @@
 import * as idb from '@services/conversations/data/storage-idb';
+import { FactsBackend, type BoundFactsRepository } from '@services/local-data/facts-backend';
+import { LocalDataContractError, type StableConversationReference } from '@services/local-data/contracts';
+import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import type {
-  Conversation,
+  ConversationDetail,
   ConversationListCursor,
-  ConversationListOpenTarget,
-  ConversationListPage,
   ConversationListQueryInput,
+  ConversationTailWindow,
 } from '@services/conversations/domain/models';
+import {
+  createNativeConversationReadRepository,
+  type ConversationReadRepository,
+} from '@services/conversations/data/storage-native';
 
-export async function getConversationListBootstrap(
-  queryInput?: ConversationListQueryInput | null,
-  limit?: number | null,
-): Promise<ConversationListPage<Conversation>> {
-  return await idb.getConversationListBootstrap(queryInput, limit);
+export type { ConversationReadRepository } from '@services/conversations/data/storage-native';
+
+function assertReference(reference: StableConversationReference): StableConversationReference {
+  const source = String(reference?.source || '').trim();
+  const conversationKey = String(reference?.conversationKey || '').trim();
+  if (!source || !conversationKey) throw new LocalDataContractError('INVALID_ARGUMENT');
+  return { source, conversationKey };
 }
 
-export async function getConversationListPage(
-  queryInput: ConversationListQueryInput | null | undefined,
-  cursor: ConversationListCursor,
-  limit?: number | null,
-): Promise<ConversationListPage<Conversation>> {
-  return await idb.getConversationListPage(queryInput, cursor, limit);
+function createIdbConversationReadRepository(lease: FactsOperationLease): ConversationReadRepository {
+  const assertLease = () => assertFactsOperationLease(lease);
+  return Object.freeze({
+    async getConversationListBootstrap(queryInput?: ConversationListQueryInput | null, limit?: number | null) {
+      assertLease();
+      return await idb.getConversationListBootstrap(queryInput, limit);
+    },
+    async getConversationListPage(
+      queryInput: ConversationListQueryInput | null | undefined,
+      cursor: ConversationListCursor,
+      limit?: number | null,
+    ) {
+      assertLease();
+      if (!cursor || 'nativeCursor' in cursor) throw new LocalDataContractError('STALE_REFERENCE');
+      return await idb.getConversationListPage(queryInput, cursor, limit);
+    },
+    async findConversationById(conversationId: number) {
+      assertLease();
+      return await idb.findConversationById(conversationId);
+    },
+    async findConversationBySourceAndKey(source: string, conversationKey: string) {
+      assertLease();
+      const reference = assertReference({ source, conversationKey });
+      return await idb.findConversationBySourceAndKey(reference.source, reference.conversationKey);
+    },
+    async getConversationByReference(reference: StableConversationReference) {
+      assertLease();
+      const normalized = assertReference(reference);
+      return await idb.getConversationBySourceConversationKey(normalized.source, normalized.conversationKey);
+    },
+    async getConversationDetail(reference: StableConversationReference): Promise<ConversationDetail> {
+      assertLease();
+      const normalized = assertReference(reference);
+      const conversation = await idb.getConversationBySourceConversationKey(
+        normalized.source,
+        normalized.conversationKey,
+      );
+      if (!conversation) throw new LocalDataContractError('STALE_REFERENCE');
+      assertLease();
+      return {
+        conversationId: Number(conversation.id),
+        source: normalized.source,
+        conversationKey: normalized.conversationKey,
+        messages: await idb.getMessagesByConversationId(Number(conversation.id)),
+      };
+    },
+    async getConversationTailWindow(
+      reference: StableConversationReference,
+      limit: number,
+    ): Promise<ConversationTailWindow> {
+      assertLease();
+      const normalized = assertReference(reference);
+      const result = await idb.getConversationTailWindowBySourceAndKey(
+        normalized.source,
+        normalized.conversationKey,
+        limit,
+      );
+      if (!result.conversation) throw new LocalDataContractError('STALE_REFERENCE');
+      const conversationId = Number(result.conversation?.id);
+      return {
+        conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
+        messages: Array.isArray(result.messages) ? result.messages : [],
+      };
+    },
+    async searchConversationMentionCandidates(input) {
+      assertLease();
+      return await idb.searchConversationMentionCandidates(input);
+    },
+  });
 }
 
-export async function findConversationBySourceAndKey(
-  source: string,
-  conversationKey: string,
-): Promise<ConversationListOpenTarget | null> {
-  return await idb.findConversationBySourceAndKey(source, conversationKey);
+const conversationFactsBackend = new FactsBackend<ConversationReadRepository>({
+  createIdbRepository: createIdbConversationReadRepository,
+  createNativeRepository: createNativeConversationReadRepository,
+});
+
+export async function openConversationReadRepository(lease: FactsOperationLease, expectedFactsEpoch?: unknown) {
+  return await conversationFactsBackend.open(lease, expectedFactsEpoch);
 }
 
-export async function findConversationById(conversationId: number): Promise<ConversationListOpenTarget | null> {
-  return await idb.findConversationById(conversationId);
+export type ConversationReadRunner = Readonly<{
+  run: <T>(
+    input: Readonly<{
+      expectedFactsEpoch?: unknown;
+      kind: string;
+      read: (backend: BoundFactsRepository<ConversationReadRepository>) => Promise<T> | T;
+    }>,
+  ) => Promise<T>;
+}>;
+
+export function createConversationReadRunner(
+  gate: Readonly<{
+    runFactsOperation: <T>(kind: string, fn: (lease: FactsOperationLease) => Promise<T> | T) => Promise<T>;
+  }>,
+  openRepository: typeof openConversationReadRepository = openConversationReadRepository,
+): ConversationReadRunner {
+  return Object.freeze({
+    run: async ({ kind, expectedFactsEpoch, read }) =>
+      await gate.runFactsOperation(kind, async (lease) => await read(await openRepository(lease, expectedFactsEpoch))),
+  });
 }
 
-export async function getConversationById(conversationId: number): Promise<Conversation | null> {
-  return await idb.getConversationById(conversationId);
-}
-
+// ponytail: P3-T5's article capture operation is the last production caller; remove with its lease-bound snapshot write.
 export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {
   return await idb.getConversationBySourceConversationKey(source, conversationKey);
-}
-
-export async function getConversationTailWindowBySourceAndKey(source: string, conversationKey: string, limit: number) {
-  return await idb.getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
-}
-
-export async function getConversationDetail(conversationId: number) {
-  const messages = await idb.getMessagesByConversationId(conversationId);
-  return { conversationId, messages };
-}
-
-export async function searchConversationMentionCandidates(input?: {
-  query?: unknown;
-  limit?: unknown;
-  maxScan?: number;
-  maxDurationMs?: number;
-}) {
-  return await idb.searchConversationMentionCandidates(input);
 }
 
 export async function upsertConversation(payload: any) {

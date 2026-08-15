@@ -27,6 +27,7 @@ import type { SyncNosSqliteDatabase } from '../sqlite/schema';
 const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
   'CONVERSATION_BOOTSTRAP',
   'CONVERSATION_LOAD_MORE',
+  'CONVERSATION_LOOKUP',
   'CONVERSATION_DETAIL',
   'CONVERSATION_TAIL',
   'GET_SYNC_MAPPING',
@@ -123,6 +124,10 @@ export function readNativeHostConnectedCommand(database: SyncNosSqliteDatabase, 
     case 'CONVERSATION_BOOTSTRAP':
     case 'CONVERSATION_LOAD_MORE':
       return readConversationList(database, request);
+    case 'CONVERSATION_LOOKUP': {
+      const conversationId = resolveConversationId(database, request.payload);
+      return createConversationsRepository(database).getConversationById(conversationId);
+    }
     case 'CONVERSATION_DETAIL': {
       const conversationId = resolveConversationId(database, request.payload);
       return createMessagesRepository(database).getConversationDetail(conversationId);

@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { Conversation } from '@services/conversations/domain/models';
+import type { Conversation, ConversationFactsReference } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
+import type { FactsEpoch } from '@services/local-data/contracts';
 import { formatConversationMarkdownForExternalOutput } from '@services/integrations/chatwith/chatwith-settings';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { tabsCreate, openOrFocusExtensionAppTab } from '@services/shared/webext';
@@ -49,6 +50,20 @@ function sanitizeHttpUrl(url: unknown) {
   if (!text) return '';
   if (/^https?:\/\//i.test(text)) return text;
   return '';
+}
+
+function toConversationFactsReference(conversation: Conversation): ConversationFactsReference | null {
+  const source = String(conversation?.source || '').trim();
+  const conversationKey = String(conversation?.conversationKey || '').trim();
+  const factsEpoch = String(conversation?.factsEpoch || '').trim();
+  const conversationId = Number(conversation?.id);
+  if (!source || !conversationKey || !factsEpoch) return null;
+  return {
+    source,
+    conversationKey,
+    factsEpoch: factsEpoch as FactsEpoch,
+    ...(Number.isFinite(conversationId) && conversationId > 0 ? { conversationId } : {}),
+  };
 }
 
 function providerButtonLabel(provider: SyncProvider) {
@@ -515,7 +530,9 @@ export function ConversationListPane({
     e.stopPropagation();
     const id = Number((conversation as any).id);
     try {
-      const d = await getConversationDetail(id);
+      const reference = toConversationFactsReference(conversation);
+      if (!reference) throw new Error('stale conversation reference');
+      const d = await getConversationDetail(reference);
       const mdText = await formatConversationMarkdownForExternalOutput(conversation as any, d as any);
       await copyTextToClipboard(mdText);
       setCopiedId(id);

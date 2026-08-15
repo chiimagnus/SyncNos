@@ -70,6 +70,8 @@ describe('item mention chatgpt controller', () => {
                 conversationId: 1,
                 title: 'T',
                 source: 'chatgpt',
+                conversationKey: 't-1',
+                factsEpoch: 'idb-v1',
                 domain: 'x',
                 url: '',
                 sourceType: 'chat',
@@ -123,6 +125,8 @@ describe('item mention chatgpt controller', () => {
                 conversationId: 1,
                 title: 'A',
                 source: 'chatgpt',
+                conversationKey: 'a-1',
+                factsEpoch: 'idb-v1',
                 domain: 'a.com',
                 url: '',
                 sourceType: 'chat',
@@ -132,6 +136,8 @@ describe('item mention chatgpt controller', () => {
                 conversationId: 2,
                 title: 'B',
                 source: 'chatgpt',
+                conversationKey: 'b-2',
+                factsEpoch: 'idb-v1',
                 domain: 'b.com',
                 url: '',
                 sourceType: 'chat',
@@ -185,6 +191,8 @@ describe('item mention chatgpt controller', () => {
                 conversationId: 1,
                 title: 'A',
                 source: 'chatgpt',
+                conversationKey: 'a-1',
+                factsEpoch: 'idb-v1',
                 domain: 'a.com',
                 url: '',
                 sourceType: 'chat',
@@ -195,8 +203,13 @@ describe('item mention chatgpt controller', () => {
         };
       }
       if (type === ITEM_MENTION_MESSAGE_TYPES.BUILD_MENTION_INSERT_TEXT) {
-        if (payload?.conversationId !== 1) return { ok: false, data: null, error: { message: 'bad id', extra: null } };
-        return { ok: true, data: { conversationId: 1, markdown: 'MD' } };
+        if (payload?.source !== 'chatgpt' || payload?.conversationKey !== 'a-1' || payload?.factsEpoch !== 'idb-v1') {
+          return { ok: false, data: null, error: { message: 'bad reference', extra: null } };
+        }
+        return {
+          ok: true,
+          data: { source: 'chatgpt', conversationKey: 'a-1', factsEpoch: 'idb-v1', markdown: 'MD' },
+        };
       }
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });

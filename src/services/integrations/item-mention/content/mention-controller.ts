@@ -1,4 +1,5 @@
 import { buildMentionInsertText, searchMentionCandidates } from '@services/integrations/item-mention/client';
+import type { MentionInsertPayload } from '@services/integrations/item-mention/mention-contract';
 import type { EditorAdapter, EditorHandle } from '@services/integrations/item-mention/content/editor-adapter';
 import { chatgptComposerEditorAdapter } from '@services/integrations/item-mention/content/editor-chatgpt';
 import { geminiContentEditableAdapter } from '@services/integrations/item-mention/content/editor-gemini';
@@ -170,11 +171,17 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
 
         const index = clamp(session.highlightIndex || 0, 0, items.length - 1);
         const picked = items[index];
-        const conversationId = Number(picked?.conversationId);
-        if (!Number.isFinite(conversationId) || conversationId <= 0) return;
+        const source = String(picked?.source || '').trim();
+        const conversationKey = String(picked?.conversationKey || '').trim();
+        const factsEpoch = String(picked?.factsEpoch || '').trim();
+        if (!source || !conversationKey || !factsEpoch) return;
 
         try {
-          const payload = await buildMentionInsertText(rt, { conversationId });
+          const payload = await buildMentionInsertText(rt, {
+            source,
+            conversationKey,
+            factsEpoch: factsEpoch as MentionInsertPayload['factsEpoch'],
+          });
           if (stopped) return;
           if (pickId !== pickSeq) return;
           if (!session || !session.open) return;

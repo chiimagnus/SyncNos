@@ -4,15 +4,10 @@ export type MentionQuery = {
   empty: boolean;
 };
 
-export type MentionCandidate = {
-  conversationId: number;
-  title: string;
-  source: string;
-  url: string;
-  domain: string;
-  sourceType: string;
-  lastCapturedAt: number;
-};
+export type MentionCandidate = ConversationMentionCandidate &
+  Readonly<{
+    factsEpoch: FactsEpoch;
+  }>;
 
 export type MentionSearchResult = {
   query: MentionQuery;
@@ -22,9 +17,11 @@ export type MentionSearchResult = {
   truncatedByScanLimit?: boolean;
 };
 
-export type MentionInsertPayload = {
-  conversationId: number;
-};
+export type MentionInsertPayload = Readonly<{
+  conversationKey: string;
+  factsEpoch: FactsEpoch;
+  source: string;
+}>;
 
 export function normalizeMentionQuery(raw: unknown): MentionQuery {
   const text = String(raw || '');
@@ -40,3 +37,5 @@ export function normalizeMentionSearchLimit(raw: unknown, defaults?: { defaultLi
   if (!Number.isFinite(n) || n <= 0) return defaultLimit;
   return Math.min(Math.floor(n), maxLimit);
 }
+import type { ConversationMentionCandidate } from '@services/conversations/domain/models';
+import type { FactsEpoch } from '@services/local-data/contracts';

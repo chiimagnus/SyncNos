@@ -100,6 +100,7 @@ const baseConversation = {
   title: 'Sync feedback chat',
   source: 'chatgpt',
   conversationKey: 'conv-11',
+  factsEpoch: 'idb-v1',
   lastCapturedAt: Date.now(),
   url: 'https://example.com/chat/11',
 };
@@ -126,6 +127,7 @@ describe('Conversations sync feedback', () => {
     getFeishuSyncStatus.mockReset();
 
     getConversationListBootstrap.mockResolvedValue({
+      factsEpoch: 'idb-v1',
       items: [baseConversation],
       cursor: null,
       hasMore: false,
@@ -135,7 +137,13 @@ describe('Conversations sync feedback', () => {
         sites: [],
       },
     });
-    getConversationDetail.mockResolvedValue({ id: 11, messages: [] });
+    getConversationDetail.mockResolvedValue({
+      conversationId: 11,
+      source: 'chatgpt',
+      conversationKey: 'conv-11',
+      factsEpoch: 'idb-v1',
+      messages: [],
+    });
     deleteConversations.mockResolvedValue(null);
     clearNotionSyncJobStatus.mockResolvedValue({ provider: 'notion', job: null, instanceId: 'notion-test' });
     clearObsidianSyncStatus.mockResolvedValue({ provider: 'obsidian', job: null, instanceId: 'obsidian-test' });

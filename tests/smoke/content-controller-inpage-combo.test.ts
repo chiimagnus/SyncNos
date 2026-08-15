@@ -45,6 +45,18 @@ function createHarness(options?: {
   const runtime = {
     send: async (type: string, payload?: any) => {
       sendCalls.push({ type, payload });
+      if (type === 'getConversationTailWindowBySourceAndKey') {
+        return {
+          ok: true,
+          data: {
+            conversationId: null,
+            messages: [],
+            source: String(payload?.source || ''),
+            conversationKey: String(payload?.conversationKey || ''),
+            factsEpoch: 'idb-v1',
+          },
+        };
+      }
       if (typeof options?.sendImpl === 'function') return options.sendImpl(type, payload);
       return { ok: true, data: {} };
     },

@@ -2,14 +2,9 @@ import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-
 import { storageGet } from '@platform/storage/local';
 import {
   deleteConversationsByIds,
-  findConversationById,
-  findConversationBySourceAndKey,
-  getConversationListBootstrap,
-  getConversationListPage,
-  getConversationDetail,
-  getConversationTailWindowBySourceAndKey,
   hasConversation,
   mergeConversationsByIds,
+  type ConversationReadRunner,
 } from '@services/conversations/data/storage';
 import { writeConversationMessagesSnapshot, writeConversationSnapshot } from '@services/conversations/data/write';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
@@ -23,6 +18,21 @@ import {
   AUTO_SYNC_CONVERSATION_CHANGED_REASONS,
   type AutoSyncConversationChangedReason,
 } from '@services/sync/auto-sync/auto-sync-keys';
+import {
+  LocalDataContractError,
+  MAX_DETAIL_PREVIEW_BYTES,
+  MAX_ORDINARY_FACTS_RESPONSE_BYTES,
+  parseStreamDescriptor,
+  type FactsEpoch,
+} from '@services/local-data/contracts';
+import type {
+  Conversation,
+  ConversationDetailReadResponse,
+  ConversationListOpenTarget,
+  ConversationListPage,
+  ConversationReadStreamPreflight,
+  ConversationTailWindowReadResponse,
+} from '@services/conversations/domain/models';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -32,8 +42,91 @@ type AnyRouter = {
 };
 
 type ConversationHandlersDeps = {
+  conversationReadRunner: ConversationReadRunner;
   onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  streamRouter: ConversationReadStreamRouter;
 };
+
+type ConversationReadStreamRouter = Readonly<{
+  register: (
+    operation: 'conversation-detail',
+    handler: Readonly<{
+      download: (input: Readonly<{ requestId: string; send: (bytes: Uint8Array) => Promise<void> }>) => Promise<void>;
+    }>,
+  ) => void;
+}>;
+
+const PENDING_READ_STREAM_TTL_MS = 60_000;
+
+type PendingReadStream = {
+  bytes: Uint8Array;
+  expiresAt: number;
+  expirationTimer: ReturnType<typeof globalThis.setTimeout>;
+};
+
+function createReadStreamRequestId(): string {
+  const requestId = globalThis.crypto?.randomUUID?.();
+  if (typeof requestId !== 'string' || !requestId) throw new LocalDataContractError('HOST_UNAVAILABLE');
+  return requestId;
+}
+
+/** Holds one already-authorized response until its matching authenticated Port consumes it. */
+class PendingConversationReadStreams {
+  #bytes = 0;
+  #pending = new Map<string, PendingReadStream>();
+
+  publish<T>(value: T): T | ConversationReadStreamPreflight {
+    const serialized = JSON.stringify(value);
+    if (typeof serialized !== 'string') throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    const bytes = new TextEncoder().encode(serialized);
+    if (bytes.byteLength > MAX_DETAIL_PREVIEW_BYTES) {
+      throw new LocalDataContractError('PAYLOAD_TOO_LARGE', {
+        actualBytes: bytes.byteLength,
+        limitBytes: MAX_DETAIL_PREVIEW_BYTES,
+        operation: 'conversation-detail',
+      });
+    }
+    if (bytes.byteLength <= MAX_ORDINARY_FACTS_RESPONSE_BYTES) return value;
+
+    this.expire();
+    // ponytail: one detail ceiling of pending data; add a bounded queue only if concurrent detail UX needs it.
+    if (this.#bytes + bytes.byteLength > MAX_DETAIL_PREVIEW_BYTES) throw new LocalDataContractError('BUSY');
+
+    const requestId = createReadStreamRequestId();
+    if (this.#pending.has(requestId)) throw new LocalDataContractError('BUSY');
+    const expiresAt = Date.now() + PENDING_READ_STREAM_TTL_MS;
+    const expirationTimer = globalThis.setTimeout(() => this.drop(requestId), PENDING_READ_STREAM_TTL_MS);
+    this.#pending.set(requestId, { bytes, expiresAt, expirationTimer });
+    this.#bytes += bytes.byteLength;
+    return {
+      kind: 'stream',
+      requestId,
+      stream: parseStreamDescriptor({ operation: 'conversation-detail', declaredTotalBytes: bytes.byteLength }),
+    };
+  }
+
+  take(requestId: string): Uint8Array {
+    this.expire();
+    const pending = this.#pending.get(requestId);
+    if (!pending) throw new LocalDataContractError('STALE_REFERENCE');
+    this.drop(requestId, pending);
+    return pending.bytes;
+  }
+
+  private expire(now = Date.now()): void {
+    for (const [requestId, pending] of this.#pending) {
+      if (pending.expiresAt > now) continue;
+      this.drop(requestId, pending);
+    }
+  }
+
+  private drop(requestId: string, pending = this.#pending.get(requestId)): void {
+    if (!pending) return;
+    this.#pending.delete(requestId);
+    globalThis.clearTimeout(pending.expirationTimer);
+    this.#bytes = Math.max(0, this.#bytes - pending.bytes.byteLength);
+  }
+}
 
 function fireAndForget(task: void | Promise<void>) {
   Promise.resolve(task).catch(() => {});
@@ -43,11 +136,6 @@ type ListQueryPayload = {
   sourceKey: string;
   siteKey: string;
   limit?: number;
-};
-
-type ListCursorPayload = {
-  lastCapturedAt: number;
-  id: number;
 };
 
 function normalizeListFilterKey(value: unknown, fallback: string): string {
@@ -94,15 +182,63 @@ function parseListQueryPayload(msg: any): { query: ListQueryPayload; errorField?
   };
 }
 
-function parseListCursorPayload(value: unknown): ListCursorPayload | null {
+function parseListCursorPayload(value: unknown) {
   if (!value || typeof value !== 'object') return null;
+  if (typeof (value as any).nativeCursor === 'string' && (value as any).nativeCursor.trim()) {
+    return { nativeCursor: (value as any).nativeCursor.trim() };
+  }
   const lastCapturedAt = Number((value as any).lastCapturedAt);
   const id = Number((value as any).id);
   if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
   return { lastCapturedAt, id };
 }
 
+function stableReference(msg: any): { source: string; conversationKey: string } | null {
+  const source = String(msg?.source || '').trim();
+  const conversationKey = String(msg?.conversationKey || '').trim();
+  return source && conversationKey ? { source, conversationKey } : null;
+}
+
+function requireFactsEpoch(msg: any): FactsEpoch | null {
+  return typeof msg?.factsEpoch === 'string' && msg.factsEpoch ? (msg.factsEpoch as FactsEpoch) : null;
+}
+
+function factsError(router: AnyRouter, error: unknown) {
+  if (error instanceof LocalDataContractError) {
+    return router.err(error.message, { code: error.code, diagnostics: error.diagnostics ?? null });
+  }
+  return router.err(error instanceof Error ? error.message : String(error || 'facts read failed'));
+}
+
+function withFactsEpoch(conversation: Conversation, factsEpoch: FactsEpoch): Conversation {
+  return { ...conversation, factsEpoch };
+}
+
+function withFactsEpochPage(
+  page: ConversationListPage<Conversation>,
+  factsEpoch: FactsEpoch,
+): ConversationListPage<Conversation> {
+  return {
+    ...page,
+    factsEpoch,
+    items: (Array.isArray(page.items) ? page.items : []).map((conversation) =>
+      withFactsEpoch(conversation, factsEpoch),
+    ),
+  };
+}
+
+function withFactsEpochTarget(target: ConversationListOpenTarget | null, factsEpoch: FactsEpoch) {
+  return target ? { ...target, factsEpoch } : null;
+}
+
 export function registerConversationHandlers(router: AnyRouter, deps: ConversationHandlersDeps) {
+  const readStreams = new PendingConversationReadStreams();
+  deps.streamRouter.register('conversation-detail', {
+    download: async ({ requestId, send }) => {
+      await send(readStreams.take(requestId));
+    },
+  });
+
   const invalidArgument = (field: string, message: string, received: unknown) => {
     return router.err(message, {
       code: 'INVALID_ARGUMENT',
@@ -116,8 +252,19 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (parsed.errorField === 'query') return invalidArgument('query', 'invalid query', msg?.query);
     if (parsed.errorField === 'limit')
       return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
-    const page = await getConversationListBootstrap(parsed.query, parsed.query.limit);
-    return router.ok(page);
+    try {
+      const page = await deps.conversationReadRunner.run({
+        kind: 'conversation-bootstrap',
+        read: async ({ factsEpoch, repository }) =>
+          withFactsEpochPage(
+            await repository.getConversationListBootstrap(parsed.query, parsed.query.limit),
+            factsEpoch,
+          ),
+      });
+      return router.ok(page);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE, async (msg) => {
@@ -127,8 +274,22 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       return invalidArgument('limit', 'invalid limit', msg?.limit ?? msg?.query?.limit);
     const cursor = parseListCursorPayload(msg?.cursor);
     if (!cursor) return invalidArgument('cursor', 'invalid cursor', msg?.cursor);
-    const page = await getConversationListPage(parsed.query, cursor, parsed.query.limit);
-    return router.ok(page);
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    try {
+      const page = await deps.conversationReadRunner.run({
+        kind: 'conversation-load-more',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ factsEpoch: currentFactsEpoch, repository }) =>
+          withFactsEpochPage(
+            await repository.getConversationListPage(parsed.query, cursor, parsed.query.limit),
+            currentFactsEpoch,
+          ),
+      });
+      return router.ok(page);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, async (msg) => {
@@ -136,8 +297,17 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const conversationKey = String(msg?.conversationKey || '').trim();
     if (!source) return invalidArgument('source', 'invalid source', msg?.source);
     if (!conversationKey) return invalidArgument('conversationKey', 'invalid conversationKey', msg?.conversationKey);
-    const target = await findConversationBySourceAndKey(source, conversationKey);
-    return router.ok(target);
+    try {
+      const target = await deps.conversationReadRunner.run({
+        kind: 'conversation-find-by-source-key',
+        expectedFactsEpoch: msg?.factsEpoch,
+        read: async ({ factsEpoch, repository }) =>
+          withFactsEpochTarget(await repository.findConversationBySourceAndKey(source, conversationKey), factsEpoch),
+      });
+      return router.ok(target);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, async (msg) => {
@@ -145,15 +315,42 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!Number.isFinite(conversationId) || conversationId <= 0) {
       return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
     }
-    const target = await findConversationById(conversationId);
-    return router.ok(target);
+    try {
+      const target = await deps.conversationReadRunner.run({
+        kind: 'conversation-find-by-id',
+        expectedFactsEpoch: msg?.factsEpoch,
+        read: async ({ factsEpoch, repository }) => {
+          if (!repository.findConversationById) throw new LocalDataContractError('STALE_REFERENCE');
+          return withFactsEpochTarget(await repository.findConversationById(conversationId), factsEpoch);
+        },
+      });
+      return router.ok(target);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, async (msg) => {
-    const conversationId = Number(msg.conversationId);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const detail = await getConversationDetail(conversationId);
-    return router.ok(detail);
+    const reference = stableReference(msg);
+    if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    try {
+      const detail = await deps.conversationReadRunner.run({
+        kind: 'conversation-detail',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ factsEpoch: currentFactsEpoch, repository }) =>
+          readStreams.publish({
+            ...(await repository.getConversationDetail(reference)),
+            source: reference.source,
+            conversationKey: reference.conversationKey,
+            factsEpoch: currentFactsEpoch,
+          }),
+      });
+      return router.ok(detail as ConversationDetailReadResponse);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, async (msg) => {
@@ -161,15 +358,25 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const conversationKey = String(msg?.conversationKey || '').trim();
     if (!source) return invalidArgument('source', 'invalid source', msg?.source);
     if (!conversationKey) return invalidArgument('conversationKey', 'invalid conversationKey', msg?.conversationKey);
+    const reference = { source, conversationKey };
     const limit = normalizeTailWindowLimit(msg?.limit);
     if (limit == null) return invalidArgument('limit', 'invalid limit', msg?.limit);
-
-    const result = await getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
-    const conversationId = Number(result.conversation?.id);
-    return router.ok({
-      conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
-      messages: Array.isArray(result.messages) ? result.messages : [],
-    });
+    try {
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-tail',
+        expectedFactsEpoch: msg?.factsEpoch,
+        read: async ({ factsEpoch, repository }) =>
+          readStreams.publish({
+            ...(await repository.getConversationTailWindow(reference, limit)),
+            source: reference.source,
+            conversationKey: reference.conversationKey,
+            factsEpoch,
+          }),
+      });
+      return router.ok(result as ConversationTailWindowReadResponse);
+    } catch (error) {
+      return factsError(router, error);
+    }
   });
 
   router.register(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, async (msg) => {

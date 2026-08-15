@@ -8,13 +8,16 @@ import type { CommentSidebarItem, CommentSidebarPanelApi } from '@services/comme
 import { createInpageCommentRootSource } from '@ui/comments/inpage-comment-root-source';
 import { toDisplayCommentQuote } from '@services/comments/locator/comment-quote-policy';
 import type { InpageCommentsDomSource } from '@services/bootstrap/inpage-comments-panel-content-handlers';
-import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
+import type {
+  Conversation,
+  ConversationDetail,
+  ConversationListOpenTarget,
+} from '@services/conversations/domain/models';
 import {
   CORE_MESSAGE_TYPES,
   ARTICLE_MESSAGE_TYPES,
   CHATWITH_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
-import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { ChatWithOpenPlatformPort } from '@services/integrations/chatwith/chatwith-open-port';
 import {
@@ -92,23 +95,72 @@ function createInpageChatWithOpenPort(): ChatWithOpenPlatformPort {
 
 function buildConversationFromResolved(input: {
   conversationId: number;
+  conversationKey?: string;
+  source?: string;
   url: string;
   title: string;
   author: string;
   publishedAt: string;
 }): Conversation {
   const canonicalUrl = canonicalizeArticleUrl(input.url) || canonicalizeArticleUrl(globalThis.location?.href);
-  const conversationKey = canonicalUrl ? `article:${canonicalUrl}` : `article:${input.conversationId}`;
+  const conversationKey =
+    safeString(input.conversationKey) || (canonicalUrl ? `article:${canonicalUrl}` : `article:${input.conversationId}`);
   return {
     id: Number(input.conversationId),
     sourceType: 'article',
-    source: 'web',
+    source: safeString(input.source) || 'web',
     conversationKey,
     url: canonicalUrl || undefined,
     title: safeString(input.title) || canonicalUrl || 'Article',
     author: safeString(input.author) || undefined,
     publishedAt: safeString(input.publishedAt) || undefined,
   };
+}
+
+function articleReferenceFromResolved(resolved: any): { source: string; conversationKey: string } | null {
+  const canonicalUrl = canonicalizeArticleUrl(resolved?.data?.url) || canonicalizeArticleUrl(globalThis.location?.href);
+  if (!canonicalUrl) return null;
+  return { source: 'web', conversationKey: `article:${canonicalUrl}` };
+}
+
+async function loadResolvedArticleDetail(
+  rt: RuntimeClient,
+  resolved: any,
+): Promise<{ detail: ConversationDetail; target: ConversationListOpenTarget }> {
+  const reference = articleReferenceFromResolved(resolved);
+  if (!reference) throw new Error('No article conversation is available for this page');
+
+  const targetRes = await rt.send?.(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, reference);
+  if (!targetRes?.ok) {
+    throw new Error(safeString(targetRes?.error?.message) || 'Failed to resolve article conversation');
+  }
+  const target = targetRes.data as ConversationListOpenTarget | null;
+  const source = safeString(target?.source);
+  const conversationKey = safeString(target?.conversationKey);
+  const factsEpoch = safeString(target?.factsEpoch);
+  if (!target || !source || !conversationKey || !factsEpoch) {
+    throw new Error('No article conversation is available for this page');
+  }
+
+  const detailRes = await rt.send?.(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, {
+    source,
+    conversationKey,
+    factsEpoch,
+  });
+  if (!detailRes?.ok) {
+    throw new Error(safeString(detailRes?.error?.message) || 'Failed to load conversation detail');
+  }
+  const detail = detailRes.data as ConversationDetail | null;
+  if (
+    !detail ||
+    safeString(detail.source) !== source ||
+    safeString(detail.conversationKey) !== conversationKey ||
+    !Array.isArray(detail.messages) ||
+    !detail.messages.length
+  ) {
+    throw new Error('Conversation detail is not ready yet');
+  }
+  return { detail, target };
 }
 
 async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChatWithAction[]> {
@@ -122,22 +174,12 @@ async function resolveInpageChatWithActions(): Promise<ThreadedCommentsPanelChat
     throw new Error(safeString(resolved?.error?.message) || 'Failed to resolve current page article');
   }
 
-  const conversationId = normalizePositiveInt(resolved?.data?.conversationId);
-  if (!conversationId) {
-    throw new Error('No article conversation is available for this page');
-  }
-
-  const detailRes = await rt.send(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, { conversationId });
-  if (!detailRes?.ok) {
-    throw new Error(safeString(detailRes?.error?.message) || 'Failed to load conversation detail');
-  }
-  const detail = detailRes.data as ConversationDetail | null;
-  if (!detail || !Array.isArray(detail.messages) || !detail.messages.length) {
-    throw new Error('Conversation detail is not ready yet');
-  }
+  const { detail, target } = await loadResolvedArticleDetail(rt, resolved);
 
   const conversation = buildConversationFromResolved({
-    conversationId,
+    conversationId: Number(target.id),
+    source: target.source,
+    conversationKey: target.conversationKey,
     url: resolved?.data?.url,
     title: resolved?.data?.title,
     author: resolved?.data?.author,

@@ -14,6 +14,7 @@ const deleteConversations = vi.fn();
 const upsertConversation = vi.fn();
 const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
+const TEST_FACTS_EPOCH = 'idb-v1';
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
@@ -130,6 +131,7 @@ function makeConversation(id: number, source: string, conversationKey: string) {
     id,
     source,
     conversationKey,
+    factsEpoch: TEST_FACTS_EPOCH,
     title: `${source}-${id}`,
     lastCapturedAt: Date.now() - id * 100,
     url: `https://example.com/${conversationKey}`,
@@ -138,7 +140,8 @@ function makeConversation(id: number, source: string, conversationKey: string) {
 
 function makePage(items: any[], facets?: { sources?: any[]; sites?: any[] }) {
   return {
-    items,
+    factsEpoch: TEST_FACTS_EPOCH,
+    items: items.map((item) => ({ ...item, factsEpoch: item.factsEpoch || TEST_FACTS_EPOCH })),
     cursor: null,
     hasMore: false,
     summary: { totalCount: items.length, todayCount: items.length },
@@ -281,6 +284,7 @@ describe('ConversationsProvider pagination state', () => {
       id: 999,
       source: 'chatgpt',
       conversationKey: 'conv-999',
+      factsEpoch: TEST_FACTS_EPOCH,
       title: 'Target conversation',
       url: 'https://example.com/chat/999',
       sourceType: 'chat',
@@ -299,7 +303,7 @@ describe('ConversationsProvider pagination state', () => {
       await flushMicrotasks();
     });
 
-    expect(findConversationBySourceAndKey).toHaveBeenCalledWith('chatgpt', 'conv-999');
+    expect(findConversationBySourceAndKey).toHaveBeenCalledWith('chatgpt', 'conv-999', TEST_FACTS_EPOCH);
     expect(Number(latestState.activeId)).toBe(999);
     expect(latestState.selectedConversation).toBeTruthy();
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
@@ -313,6 +317,7 @@ describe('ConversationsProvider pagination state', () => {
       id: 999,
       source: 'chatgpt',
       conversationKey: 'conv-999',
+      factsEpoch: TEST_FACTS_EPOCH,
       title: 'Target conversation',
       url: 'https://example.com/chat/999',
       sourceType: 'chat',
@@ -367,6 +372,7 @@ describe('ConversationsProvider pagination state', () => {
         id: 999,
         source: 'chatgpt',
         conversationKey: 'conv-999',
+        factsEpoch: TEST_FACTS_EPOCH,
         title: 'Target conversation',
         url: 'https://example.com/chat/999',
         sourceType: 'chat',
@@ -390,8 +396,8 @@ describe('ConversationsProvider pagination state', () => {
       ]),
     );
     const detailReqs = new Map<number, ReturnType<typeof deferred<any>>>();
-    getConversationDetail.mockImplementation((conversationId: number) => {
-      const id = Number(conversationId);
+    getConversationDetail.mockImplementation((reference: any) => {
+      const id = Number(reference?.conversationId);
       const req = deferred<any>();
       detailReqs.set(id, req);
       return req.promise;
@@ -408,6 +414,9 @@ describe('ConversationsProvider pagination state', () => {
     await act(async () => {
       detailReqs.get(1)?.resolve({
         conversationId: 1,
+        source: 'web',
+        conversationKey: 'article-1',
+        factsEpoch: TEST_FACTS_EPOCH,
         messages: [{ id: 11, conversationId: 1, role: 'assistant', contentMarkdown: 'article one' }],
       });
       await flushMicrotasks();
@@ -429,6 +438,9 @@ describe('ConversationsProvider pagination state', () => {
     await act(async () => {
       detailReqs.get(2)?.resolve({
         conversationId: 2,
+        source: 'web',
+        conversationKey: 'article-2',
+        factsEpoch: TEST_FACTS_EPOCH,
         messages: [{ id: 21, conversationId: 2, role: 'assistant', contentMarkdown: 'stale article two' }],
       });
       await flushMicrotasks();
@@ -441,6 +453,9 @@ describe('ConversationsProvider pagination state', () => {
     await act(async () => {
       detailReqs.get(3)?.resolve({
         conversationId: 3,
+        source: 'web',
+        conversationKey: 'article-3',
+        factsEpoch: TEST_FACTS_EPOCH,
         messages: [{ id: 31, conversationId: 3, role: 'assistant', contentMarkdown: 'article three' }],
       });
       await flushMicrotasks();

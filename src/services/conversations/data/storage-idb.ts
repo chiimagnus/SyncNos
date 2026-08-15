@@ -144,8 +144,10 @@ function normalizeConversationListRecord<T extends Record<string, any>>(record: 
   } as T;
 }
 
-function toComparableCursor(cursor: ConversationListCursor | null | undefined): ConversationListCursor | null {
-  if (!cursor) return null;
+type IdbConversationListCursor = Extract<ConversationListCursor, { id: number; lastCapturedAt: number }>;
+
+function toComparableCursor(cursor: ConversationListCursor | null | undefined): IdbConversationListCursor | null {
+  if (!cursor || 'nativeCursor' in cursor) return null;
   const lastCapturedAt = Number(cursor.lastCapturedAt);
   const id = Number(cursor.id);
   if (!Number.isFinite(lastCapturedAt) || !Number.isFinite(id) || id <= 0) return null;
@@ -797,7 +799,7 @@ function resolveConversationListQuery(
 
 function buildListPageRange(
   query: ReturnType<typeof normalizeConversationListQuery>,
-  cursor: ConversationListCursor | null,
+  cursor: IdbConversationListCursor | null,
 ): {
   indexName:
     | 'by_lastCapturedAt_id'
@@ -891,8 +893,8 @@ async function readConversationListPageItems(input: {
   store: IDBObjectStore;
   articleCommentsStore: IDBObjectStore;
   query: ReturnType<typeof normalizeConversationListQuery>;
-  cursor: ConversationListCursor | null;
-}): Promise<{ items: Conversation[]; cursor: ConversationListCursor | null; hasMore: boolean }> {
+  cursor: IdbConversationListCursor | null;
+}): Promise<{ items: Conversation[]; cursor: IdbConversationListCursor | null; hasMore: boolean }> {
   const { store, articleCommentsStore, query, cursor } = input;
   const safeLimit = Number.isFinite(query.limit) && query.limit > 0 ? Math.floor(query.limit) : 1;
   const rangeInput = buildListPageRange(query, cursor);
@@ -1065,6 +1067,7 @@ export async function getConversationListPage(
   cursor: ConversationListCursor,
   limit?: number | null,
 ): Promise<ConversationListPage<Conversation>> {
+  if ('nativeCursor' in cursor) throw new Error('invalid list cursor');
   return await readConversationListPage({ queryInput, cursor, limit });
 }
 
@@ -1285,6 +1288,7 @@ export async function searchConversationMentionCandidates(input?: {
     conversationId: number;
     title: string;
     source: string;
+    conversationKey: string;
     url: string;
     domain: string;
     sourceType: string;
@@ -1310,6 +1314,7 @@ export async function searchConversationMentionCandidates(input?: {
     conversationId: number;
     title: string;
     source: string;
+    conversationKey: string;
     url: string;
     domain: string;
     sourceType: string;
@@ -1332,6 +1337,7 @@ export async function searchConversationMentionCandidates(input?: {
       const lastCapturedAt = Number(record?.lastCapturedAt) || 0;
       const title = safeString(record?.title);
       const source = safeString(record?.source);
+      const conversationKey = safeString(record?.conversationKey);
       const url = safeString(record?.url);
       const sourceType = safeString(record?.sourceType) || 'chat';
       const domain =
@@ -1352,6 +1358,7 @@ export async function searchConversationMentionCandidates(input?: {
           conversationId,
           title,
           source,
+          conversationKey,
           url,
           domain,
           sourceType,
