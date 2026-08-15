@@ -172,8 +172,7 @@ describe('content-controller inpage combo', () => {
         };
       },
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 11 } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 11, isNew: true } };
         return { ok: true, data: {} };
       },
     });
@@ -184,8 +183,9 @@ describe('content-controller inpage combo', () => {
 
     await cfg.onClick();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
     expect(harness.tipCalls.some((c) => c.opts?.kind === 'default')).toBe(true);
   });
 
@@ -209,8 +209,7 @@ describe('content-controller inpage combo', () => {
         prepareImpl,
         captureImpl,
         sendImpl: async (type: string) => {
-          if (type === 'upsertConversation') return { ok: true, data: { id: 11 } };
-          if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+          if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 11, isNew: true } };
           return { ok: true, data: {} };
         },
       });
@@ -254,17 +253,17 @@ describe('content-controller inpage combo', () => {
       captureImpl: () => snapshot,
       incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 22 } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 22, isNew: false } };
         return { ok: true, data: {} };
       },
     });
 
     await harness.runTick();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
-    expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+    expect(harness.tipCalls.some((c) => String(c.text) === 'Updated')).toBe(true);
   });
 
   it('skips auto-save when chatgpt deep research message is still a placeholder', async () => {
@@ -292,8 +291,7 @@ describe('content-controller inpage combo', () => {
 
     await harness.runTick();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(false);
     expect(harness.tipCalls.length).toBe(0);
   });
 
@@ -339,20 +337,18 @@ describe('content-controller inpage combo', () => {
             },
           };
         }
-        if (type === 'upsertConversation') return { ok: true, data: { id: 33 } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 33, isNew: true } };
         return { ok: true, data: {} };
       },
     });
 
     await harness.runTick();
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(false);
 
     await vi.advanceTimersByTimeAsync(15_000);
 
     expect(harness.sendCalls.some((c) => c.type === 'chatgptExtractDeepResearch')).toBe(false);
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(false);
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(false);
 
     vi.useRealTimers();
@@ -376,8 +372,7 @@ describe('content-controller inpage combo', () => {
         diff: { added: ['user_u1'], updated: [], removed: [] },
       }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 31 } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 31, isNew: true } };
         return { ok: true, data: {} };
       },
     });
@@ -390,8 +385,7 @@ describe('content-controller inpage combo', () => {
     button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     await vi.runAllTimersAsync();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(true);
 
     button.remove();
     vi.useRealTimers();
@@ -413,8 +407,7 @@ describe('content-controller inpage combo', () => {
         diff: { added: ['user_u2'], updated: [], removed: [] },
       }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 32 } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 32, isNew: true } };
         return { ok: true, data: {} };
       },
     });
@@ -430,8 +423,7 @@ describe('content-controller inpage combo', () => {
     );
     await vi.runAllTimersAsync();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(false);
 
     composer.remove();
     vi.useRealTimers();
@@ -448,23 +440,21 @@ describe('content-controller inpage combo', () => {
       captureImpl: () => snapshot,
       incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') return { ok: true, data: { id: 22 } };
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 22, isNew: true } };
         return { ok: true, data: {} };
       },
     });
 
     await harness.runTick();
 
-    expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(false);
-    expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(false);
+    expect(harness.sendCalls.some((c) => c.type === 'saveConversationSnapshot')).toBe(false);
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(false);
   });
 
   it('ignores repeated manual clicks while a save is still in progress', async () => {
-    let resolveUpsert!: (value: void | PromiseLike<void>) => void;
-    const upsertPending = new Promise<void>((resolve) => {
-      resolveUpsert = resolve;
+    let resolveSave!: (value: void | PromiseLike<void>) => void;
+    const savePending = new Promise<void>((resolve) => {
+      resolveSave = resolve;
     });
 
     const harness = createHarness({
@@ -476,11 +466,10 @@ describe('content-controller inpage combo', () => {
         };
       },
       sendImpl: async (type: string) => {
-        if (type === 'upsertConversation') {
-          await upsertPending;
-          return { ok: true, data: { id: 31 } };
+        if (type === 'saveConversationSnapshot') {
+          await savePending;
+          return { ok: true, data: { conversationId: 31, isNew: true } };
         }
-        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
         return { ok: true, data: {} };
       },
     });
@@ -493,12 +482,12 @@ describe('content-controller inpage combo', () => {
     const secondClick = cfg.onClick();
     await Promise.resolve();
 
-    expect(harness.sendCalls.filter((c) => c.type === 'upsertConversation')).toHaveLength(1);
+    expect(harness.sendCalls.filter((c) => c.type === 'saveConversationSnapshot')).toHaveLength(1);
 
-    resolveUpsert(undefined);
+    resolveSave(undefined);
     await firstClick;
     await secondClick;
 
-    expect(harness.sendCalls.filter((c) => c.type === 'syncConversationMessages')).toHaveLength(1);
+    expect(harness.sendCalls.filter((c) => c.type === 'saveConversationSnapshot')).toHaveLength(1);
   });
 });

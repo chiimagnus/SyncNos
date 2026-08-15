@@ -1,58 +1,44 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const storageMocks = {
-  getConversationBySourceConversationKey: vi.fn(),
-  hasConversation: vi.fn(),
-  upsertConversation: vi.fn(),
-  syncConversationMessages: vi.fn(),
+const persistenceMocks = {
+  findConversation: vi.fn(),
+  saveSnapshot: vi.fn(),
 };
 
 const settingsMocks = {
   storageGet: vi.fn(),
+  storageSet: vi.fn(),
 };
-
-vi.mock('@services/conversations/data/storage', () => ({
-  getConversationBySourceConversationKey: storageMocks.getConversationBySourceConversationKey,
-  hasConversation: storageMocks.hasConversation,
-  upsertConversation: storageMocks.upsertConversation,
-  syncConversationMessages: storageMocks.syncConversationMessages,
-}));
 
 vi.mock('@platform/storage/local', () => ({
   storageGet: settingsMocks.storageGet,
-}));
-
-vi.mock('@services/conversations/data/image-inline', () => ({
-  inlineChatImagesInMessages: vi.fn(async (input: any) => ({
-    messages: Array.isArray(input?.messages) ? input.messages : [],
-    inlinedCount: 0,
-    downloadedCount: 0,
-    fromCacheCount: 0,
-    inlinedBytes: 0,
-    warningFlags: [],
-  })),
+  storageSet: settingsMocks.storageSet,
 }));
 
 async function loadArticleFetchModule() {
   return await import('../../src/collectors/web/article-fetch.ts');
 }
 
+function persistence() {
+  return {
+    findConversation: persistenceMocks.findConversation,
+    saveSnapshot: persistenceMocks.saveSnapshot,
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
-  storageMocks.getConversationBySourceConversationKey.mockReset();
-  storageMocks.hasConversation.mockReset();
-  storageMocks.upsertConversation.mockReset();
-  storageMocks.syncConversationMessages.mockReset();
+  persistenceMocks.findConversation.mockReset();
+  persistenceMocks.saveSnapshot.mockReset();
   settingsMocks.storageGet.mockReset();
+  settingsMocks.storageSet.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
 
 describe('article-fetch discourse OP', () => {
   it('keeps topic canonical url and OP content after /20 -> /1 fallback', async () => {
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(async (payload: any) => ({ id: 51, ...payload }));
-    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 51, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     let currentUrl = 'https://linux.do/t/topic/1870532/820';
@@ -122,7 +108,7 @@ describe('article-fetch discourse OP', () => {
     };
 
     const mod = await loadArticleFetchModule();
-    const data = await mod.fetchActiveTabArticle();
+    const data = await mod.fetchActiveTabArticle({ persistence: persistence() });
 
     expect(tabsUpdate).toHaveBeenCalledWith(
       77,
@@ -134,16 +120,20 @@ describe('article-fetch discourse OP', () => {
       title: 'Topic Title',
       author: 'Op Author',
     });
-    expect(storageMocks.upsertConversation).toHaveBeenCalledWith(
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversationKey: 'article:https://linux.do/t/topic/1870532',
-        url: 'https://linux.do/t/topic/1870532',
+        snapshot: expect.objectContaining({
+          conversation: expect.objectContaining({
+            conversationKey: 'article:https://linux.do/t/topic/1870532',
+            url: 'https://linux.do/t/topic/1870532',
+          }),
+        }),
       }),
     );
   });
 
   it('resolveOrCapture reuses existing topic-level conversation key from non-OP floor url', async () => {
-    storageMocks.getConversationBySourceConversationKey.mockResolvedValue({
+    persistenceMocks.findConversation.mockResolvedValue({
       id: 88,
       title: 'Existing Topic',
       author: 'Author',
@@ -167,11 +157,13 @@ describe('article-fetch discourse OP', () => {
     };
 
     const mod = await loadArticleFetchModule();
-    const data = await mod.resolveOrCaptureActiveTabArticle();
+    const data = await mod.resolveOrCaptureActiveTabArticle({ persistence: persistence() });
 
-    expect(storageMocks.getConversationBySourceConversationKey).toHaveBeenCalledWith(
-      'web',
-      'article:https://linux.do/t/topic/1870532',
+    expect(persistenceMocks.findConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'web',
+        conversationKey: 'article:https://linux.do/t/topic/1870532',
+      }),
     );
     expect(data).toMatchObject({
       isNew: false,

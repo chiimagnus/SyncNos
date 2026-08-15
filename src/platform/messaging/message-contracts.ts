@@ -1,4 +1,5 @@
 export const CORE_MESSAGE_TYPES = {
+  SAVE_CONVERSATION_SNAPSHOT: 'saveConversationSnapshot',
   UPSERT_CONVERSATION: 'upsertConversation',
   MERGE_CONVERSATIONS: 'mergeConversations',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',

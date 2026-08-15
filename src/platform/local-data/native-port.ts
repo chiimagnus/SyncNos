@@ -1,13 +1,21 @@
 import { browserDigestProvider } from './browser-digest';
 
 import {
+  LOCAL_DATA_PROTOCOL_VERSION,
+  MAX_NATIVE_IMAGE_SLICE_BYTES,
   LocalDataContractError,
   parseHostFactsResponse,
+  parseMigrationId,
   parseNativeHostStreamResponseData,
   type HostFactsRequest,
+  type StreamDescriptor,
 } from '@services/local-data/contracts';
-import type { DigestProvider } from '@services/local-data/digest';
-import { NativeWireSessionReceiver, parseNativeWireFrame } from '@services/local-data/native-wire';
+import { OrderedFrameDigestAccumulator, type DigestProvider } from '@services/local-data/digest';
+import {
+  NativeWireSessionReceiver,
+  createNativeWireDataFrame,
+  parseNativeWireFrame,
+} from '@services/local-data/native-wire';
 
 type NativePortListener = (message?: unknown) => void;
 
@@ -39,6 +47,69 @@ function hasOkField(value: unknown): boolean {
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, 'ok');
 }
 
+function nativeSessionId(): string {
+  const value = globalThis.crypto?.randomUUID?.();
+  if (typeof value !== 'string') throw new LocalDataContractError('HOST_UNAVAILABLE');
+  return parseMigrationId(value);
+}
+
+async function postCaptureSnapshotStream(
+  input: Readonly<{
+    bytes: Uint8Array;
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+    stream: StreamDescriptor;
+  }>,
+): Promise<void> {
+  if (
+    input.request.command !== 'SAVE_CONVERSATION_SNAPSHOT' ||
+    input.stream.operation !== 'capture-snapshot' ||
+    input.bytes.byteLength !== input.stream.declaredTotalBytes
+  ) {
+    throw protocolFailure();
+  }
+
+  const provider = input.digestProvider ?? browserDigestProvider;
+  const sessionId = nativeSessionId();
+  const digest = await OrderedFrameDigestAccumulator.create(provider);
+  let sequence = 0;
+  input.port.postMessage(input.request);
+  input.port.postMessage({
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    sessionId,
+    sequence: sequence++,
+    type: 'begin',
+    operation: input.stream.operation,
+    declaredTotalBytes: input.stream.declaredTotalBytes,
+  });
+  for (let offset = 0; offset < input.bytes.byteLength; offset += MAX_NATIVE_IMAGE_SLICE_BYTES) {
+    const frame = await createNativeWireDataFrame({
+      bytes: input.bytes.subarray(offset, offset + MAX_NATIVE_IMAGE_SLICE_BYTES),
+      offset,
+      provider,
+      sequence: sequence++,
+      sessionId,
+    });
+    await digest.append({ sequence: frame.sequence, byteLength: frame.byteLength, digest: frame.sliceDigest });
+    input.port.postMessage(frame);
+  }
+  input.port.postMessage({
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    sessionId,
+    sequence: sequence++,
+    type: 'end',
+    digest: digest.finalize(),
+  });
+  input.port.postMessage({
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    sessionId,
+    sequence,
+    type: 'terminal',
+    status: 'ok',
+  });
+}
+
 /**
  * Reads one Host JSON response from one Native Messaging port. The port is never reused:
  * any terminal, cancellation, malformed frame, or disconnect releases it immediately.
@@ -48,6 +119,7 @@ export function readNativePortJson(
     digestProvider?: DigestProvider;
     port: NativeMessagingPort;
     request: HostFactsRequest;
+    start?: () => Promise<void>;
   }>,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -130,10 +202,32 @@ export function readNativePortJson(
 
     input.port.onMessage.addListener(onMessage);
     input.port.onDisconnect.addListener(onDisconnect);
-    try {
-      input.port.postMessage(input.request);
-    } catch (error) {
-      fail(error);
+    if (input.start) {
+      void input.start().catch(fail);
+    } else {
+      try {
+        input.port.postMessage(input.request);
+      } catch (error) {
+        fail(error);
+      }
     }
+  });
+}
+
+/** Uploads one large canonical capture through bounded Native Messaging frames before reading the typed Host result. */
+export async function writeNativePortCaptureSnapshot(
+  input: Readonly<{
+    bytes: Uint8Array;
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+    stream: StreamDescriptor;
+  }>,
+): Promise<unknown> {
+  return await readNativePortJson({
+    digestProvider: input.digestProvider,
+    port: input.port,
+    request: input.request,
+    start: async () => await postCaptureSnapshotStream(input),
   });
 }

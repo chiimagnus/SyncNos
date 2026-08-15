@@ -51,9 +51,9 @@ function createHarness(options: {
           },
         };
       }
-      if (type === 'upsertConversation') return { ok: true, data: { id: 101, __isNew: false } };
-      if (type === 'syncConversationMessages')
-        return { ok: true, data: { upserted: Number(payload?.messages?.length) || 0 } };
+      if (type === 'saveConversationSnapshot') {
+        return { ok: true, data: { conversationId: 101, isNew: false } };
+      }
       return { ok: true, data: {} };
     },
     onInvalidated: () => () => {},
@@ -157,11 +157,11 @@ describe('content-controller ai chat autosave backfill', () => {
       limit: 200,
     });
 
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
-    expect(syncCalls[0].payload.diff.added).toHaveLength(2);
+    expect(syncCalls[0].payload.snapshot.mode).toBe('append');
+    expect(syncCalls[0].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+    expect(syncCalls[0].payload.snapshot.diff.added).toHaveLength(2);
     expect(harness.getIncrementalCallCount()).toBe(1);
   });
 
@@ -191,11 +191,11 @@ describe('content-controller ai chat autosave backfill', () => {
 
     await harness.runTick();
 
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages).toHaveLength(2);
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+    expect(syncCalls[0].payload.snapshot.mode).toBe('append');
+    expect(syncCalls[0].payload.snapshot.messages).toHaveLength(2);
+    expect(syncCalls[0].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
   });
 
   it('writes append-only gap when overlap exists in tail', async () => {
@@ -216,10 +216,10 @@ describe('content-controller ai chat autosave backfill', () => {
 
     await harness.runTick();
 
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+    expect(syncCalls[0].payload.snapshot.mode).toBe('append');
+    expect(syncCalls[0].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
     expect(harness.tipCalls.length).toBeGreaterThan(0);
   });
 
@@ -247,10 +247,10 @@ describe('content-controller ai chat autosave backfill', () => {
 
     await harness.runTick();
 
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C', 'delta']);
-    expect(syncCalls[0].payload.diff.added).toContain('inc_1');
+    expect(syncCalls[0].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['C', 'delta']);
+    expect(syncCalls[0].payload.snapshot.diff.added).toContain('inc_1');
   });
 
   it('skips writes when no overlap and can continue later ticks', async () => {
@@ -283,7 +283,7 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
       2,
     );
-    expect(harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(0);
+    expect(harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot')).toHaveLength(0);
   });
 
   it('retries when page signature changes and succeeds after overlap appears', async () => {
@@ -316,10 +316,10 @@ describe('content-controller ai chat autosave backfill', () => {
     expect(harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey')).toHaveLength(
       2,
     );
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(1);
-    expect(syncCalls[0].payload.mode).toBe('append');
-    expect(syncCalls[0].payload.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
+    expect(syncCalls[0].payload.snapshot.mode).toBe('append');
+    expect(syncCalls[0].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['C']);
   });
 
   it('throttles backfill retries until retry interval elapses', async () => {
@@ -412,10 +412,10 @@ describe('content-controller ai chat autosave backfill', () => {
       tailWindows: [{ conversationId: null, messages: [] }],
       incrementalImpl: () => ({ changed: false }),
       sendImpl: (type: string) => {
-        if (type !== 'syncConversationMessages') return undefined;
+        if (type !== 'saveConversationSnapshot') return undefined;
         syncAttempt += 1;
         if (syncAttempt === 1) return { ok: false, error: { message: 'sync failed once' } };
-        return { ok: true, data: { upserted: 1 } };
+        return { ok: true, data: { conversationId: 101, isNew: false } };
       },
     });
 
@@ -426,9 +426,9 @@ describe('content-controller ai chat autosave backfill', () => {
     const tailCalls = harness.sendCalls.filter((entry) => entry.type === 'getConversationTailWindowBySourceAndKey');
     expect(tailCalls).toHaveLength(2);
 
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(2);
-    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B', 'C']);
+    expect(syncCalls[1].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B', 'C']);
   });
 
   it('retries backfill for the same page signature after append write failure', async () => {
@@ -443,10 +443,10 @@ describe('content-controller ai chat autosave backfill', () => {
       ],
       incrementalImpl: () => ({ changed: false }),
       sendImpl: (type: string) => {
-        if (type !== 'syncConversationMessages') return undefined;
+        if (type !== 'saveConversationSnapshot') return undefined;
         syncAttempt += 1;
         if (syncAttempt === 1) return { ok: false, error: { message: 'sync failed once' } };
-        return { ok: true, data: { upserted: 2 } };
+        return { ok: true, data: { conversationId: 101, isNew: false } };
       },
     });
 
@@ -454,9 +454,9 @@ describe('content-controller ai chat autosave backfill', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await harness.runTick();
 
-    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'syncConversationMessages');
+    const syncCalls = harness.sendCalls.filter((entry) => entry.type === 'saveConversationSnapshot');
     expect(syncCalls).toHaveLength(2);
-    expect(syncCalls[1].payload.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
+    expect(syncCalls[1].payload.snapshot.messages.map((entry: any) => entry.contentText)).toEqual(['A', 'B']);
   });
 
   it('keeps virtualized providers out of the auto-save source set', () => {

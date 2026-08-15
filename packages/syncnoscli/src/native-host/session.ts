@@ -5,16 +5,22 @@ import {
   LOCAL_DATA_PROTOCOL_VERSION,
   MAX_NATIVE_IMAGE_SLICE_BYTES,
   LocalDataContractError,
+  parseConversationCaptureSnapshot,
   getStreamByteLimit,
   isNativeHostSessionCompleteControl,
   parseNativeHostSessionCompleteControl,
+  type ConversationCaptureSnapshot,
   type LocalDataStreamOperation,
   type HostFactsRequest,
 } from '@services/local-data/contracts';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 import { OrderedFrameDigestAccumulator } from '@services/local-data/digest';
-import { encodeCanonicalJson } from '@services/local-data/facts-archive';
-import { createNativeWireDataFrame } from '@services/local-data/native-wire';
+import { decodeCanonicalJson, encodeCanonicalJson } from '@services/local-data/facts-archive';
+import {
+  createNativeWireDataFrame,
+  parseNativeWireFrame,
+  NativeWireSessionReceiver,
+} from '@services/local-data/native-wire';
 
 import {
   createStagedFactsImporter,
@@ -157,6 +163,89 @@ export function encodeNativeHostJson(value: unknown): Uint8Array {
   } catch (_error) {
     throw new LocalDataContractError('INVALID_ARGUMENT');
   }
+}
+
+export type NativeHostCaptureSnapshotSession = Readonly<{
+  accept: (value: unknown) => Promise<NativeHostCaptureSnapshotSessionEvent>;
+  cleanup: () => void;
+}>;
+
+export type NativeHostCaptureSnapshotSessionEvent =
+  | Readonly<{ kind: 'continue' }>
+  | Readonly<{ kind: 'complete'; snapshot: ConversationCaptureSnapshot }>;
+
+function captureSnapshotStreamDescriptor(request: HostFactsRequest) {
+  if (request.command !== 'SAVE_CONVERSATION_SNAPSHOT' || 'snapshot' in request.payload) {
+    throw new LocalDataContractError('INVALID_ARGUMENT');
+  }
+  return request.payload.transfer;
+}
+
+/**
+ * Receives one canonical capture snapshot before the Host opens SQLite. The bounded
+ * buffer is discarded on every non-terminal path, so invalid uploads cannot mutate facts.
+ */
+export async function createNativeHostCaptureSnapshotSession(
+  input: Readonly<{
+    request: HostFactsRequest;
+  }>,
+): Promise<NativeHostCaptureSnapshotSession> {
+  const stream = captureSnapshotStreamDescriptor(input.request);
+  let receiver: NativeWireSessionReceiver | null = null;
+  let bytes: Uint8Array | null = null;
+  let closed = false;
+
+  const cleanup = () => {
+    closed = true;
+    bytes = null;
+    receiver = null;
+  };
+
+  return Object.freeze({
+    accept: async (value) => {
+      if (closed) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      try {
+        let frame: ReturnType<typeof parseNativeWireFrame> | null = null;
+        if (!receiver) {
+          frame = parseNativeWireFrame(value);
+          if (
+            frame.type !== 'begin' ||
+            frame.operation !== stream.operation ||
+            frame.declaredTotalBytes !== stream.declaredTotalBytes
+          ) {
+            throw new LocalDataContractError('PROTOCOL_MISMATCH');
+          }
+          receiver = await NativeWireSessionReceiver.create(frame.sessionId, nodeDigestProvider);
+          bytes = new Uint8Array(stream.declaredTotalBytes);
+        }
+
+        const event = await receiver.accept(frame ?? value);
+        if (event?.kind === 'data') {
+          bytes!.set(event.bytes, event.frame.offset);
+          return Object.freeze({ kind: 'continue' as const });
+        }
+        if (event?.kind !== 'terminal') {
+          return Object.freeze({ kind: 'continue' as const });
+        }
+        if (event.terminalFrame.status !== 'ok' || !bytes) {
+          throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+        }
+
+        let snapshot: ConversationCaptureSnapshot;
+        try {
+          snapshot = parseConversationCaptureSnapshot(decodeCanonicalJson(bytes));
+        } catch (_error) {
+          throw new LocalDataContractError('PROTOCOL_MISMATCH');
+        }
+        cleanup();
+        return Object.freeze({ kind: 'complete' as const, snapshot });
+      } catch (error) {
+        cleanup();
+        throw error;
+      }
+    },
+    cleanup,
+  });
 }
 
 export type NativeHostImportSession = Readonly<{

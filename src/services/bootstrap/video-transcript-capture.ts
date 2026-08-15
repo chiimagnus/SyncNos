@@ -1,13 +1,9 @@
 import { extractVideoTranscriptFromCurrentPage } from '@collectors/video/video-transcript-extract';
+import { saveConversationSnapshot } from '@services/conversations/client/repo';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
-
-const CORE_MESSAGE_TYPES = Object.freeze({
-  UPSERT_CONVERSATION: 'upsertConversation',
-  SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
-});
 
 function normalizeText(text: unknown) {
   return String(text || '')
@@ -94,8 +90,8 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
       };
     }
 
-    const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-      payload: {
+    const saved = await saveConversationSnapshot(send, {
+      conversation: {
         sourceType: 'video',
         source: 'video',
         conversationKey: `video:${url}`,
@@ -111,48 +107,26 @@ export function createVideoTranscriptCaptureService(deps: { runtime: RuntimeClie
         transcriptSource: extracted?.source || 'C',
         hasTimestamps: extracted?.hasTimestamps === true,
       },
-    });
-    if (!conversationRes?.ok) {
-      throw toError(conversationRes?.error?.message || 'upsertConversation failed');
-    }
-    const conversation = conversationRes.data;
-    const conversationId = Number((conversation as any)?.id);
-    const conversationSource = normalizeText((conversation as any)?.source);
-    const conversationKey = normalizeText((conversation as any)?.conversationKey);
-    if (!Number.isFinite(conversationId) || conversationId <= 0 || !conversationSource || !conversationKey) {
-      throw toError('invalid conversation identity');
-    }
-
-    const messages = [
-      {
-        messageKey: 'video_transcript',
-        role: 'transcript',
-        contentText: transcriptText,
-        contentMarkdown: transcriptMarkdown,
-        sequence: 1,
-        updatedAt: capturedAt,
-      },
-    ];
-
-    const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      source: conversationSource,
-      conversationKey,
-      messages,
+      messages: [
+        {
+          messageKey: 'video_transcript',
+          role: 'transcript',
+          contentText: transcriptText,
+          contentMarkdown: transcriptMarkdown,
+          sequence: 1,
+          updatedAt: capturedAt,
+        },
+      ],
       mode: 'snapshot',
       diff: null,
-      conversationSourceType: 'video',
-      conversationUrl: url,
     });
-    if (!messagesRes?.ok) {
-      throw toError(messagesRes?.error?.message || 'syncConversationMessages failed');
-    }
-
-    const rawIsNew = (conversation as any)?.__isNew;
+    const conversationId = Number(saved.conversationId);
+    if (!Number.isFinite(conversationId) || conversationId <= 0) throw toError('invalid conversation identity');
     return {
       conversationId,
       title: title || undefined,
       url,
-      isNew: typeof rawIsNew === 'boolean' ? rawIsNew : undefined,
+      isNew: saved.isNew,
       subtitleStatus,
     };
   }

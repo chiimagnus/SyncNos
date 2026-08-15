@@ -2,7 +2,8 @@ import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { resolveActiveOrInpageCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
-import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { ARTICLE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { saveConversationSnapshot } from '@services/conversations/client/repo';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 
@@ -154,31 +155,15 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
 
-    const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-      payload: normalizedSnapshot.conversation,
-    });
-    if (!conversationRes?.ok) {
-      throw new Error(conversationRes?.error?.message || 'upsertConversation failed');
-    }
-
-    const conversation = conversationRes.data;
-    const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      source: normalizedSnapshot.conversation.source,
-      conversationKey: normalizedSnapshot.conversation.conversationKey,
+    const saved = await saveConversationSnapshot(send, {
+      conversation: normalizedSnapshot.conversation,
       messages: normalizedSnapshot.messages || [],
       mode: integrity.persistence.mode,
       diff: integrity.persistence.diff,
-      conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
-      conversationUrl: normalizedSnapshot?.conversation?.url || '',
     });
-    if (!messagesRes?.ok) {
-      throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
-    }
-
-    const rawIsNew = (conversation as any)?.__isNew;
     return {
-      conversationId: normalizeConversationId(conversation.id),
-      isNew: typeof rawIsNew === 'boolean' ? rawIsNew : undefined,
+      conversationId: normalizeConversationId(saved.conversationId),
+      isNew: saved.isNew,
       captureCompleteness: integrity.meta?.completeness,
       captureReasons: integrity.meta?.reasons?.slice(),
     };

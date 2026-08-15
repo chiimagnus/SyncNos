@@ -1,12 +1,15 @@
 import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { storageGet } from '@platform/storage/local';
 import {
+  openConversationReadRepository,
+  type ConversationFactsRepository,
   type ConversationReadRunner,
   type ConversationMessageSyncOptions,
   type ResolvedConversationReference,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
+import { decodeCanonicalJson } from '@services/local-data/facts-archive';
 import {
   ABOUT_YOU_USER_NAME_STORAGE_KEY,
   DEFAULT_ABOUT_YOU_USER_NAME,
@@ -18,9 +21,12 @@ import {
 } from '@services/sync/auto-sync/auto-sync-keys';
 import {
   LocalDataContractError,
+  parseConversationCaptureSnapshot,
   MAX_DETAIL_PREVIEW_BYTES,
   MAX_ORDINARY_FACTS_RESPONSE_BYTES,
+  parseRuntimeCaptureSnapshotPayload,
   parseStreamDescriptor,
+  type ConversationCaptureSnapshot,
   type JsonObject,
   type JsonValue,
   type FactsEpoch,
@@ -34,6 +40,8 @@ import type {
   ConversationReadStreamPreflight,
   ConversationTailWindowReadResponse,
 } from '@services/conversations/domain/models';
+import type { BackgroundStreamHandler } from '@services/local-data/background-stream-router';
+import type { LocalDataStreamOperation, StreamDescriptor } from '@services/local-data/contracts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -49,15 +57,12 @@ type ConversationHandlersDeps = {
 };
 
 type ConversationReadStreamRouter = Readonly<{
-  register: (
-    operation: 'conversation-detail',
-    handler: Readonly<{
-      download: (input: Readonly<{ requestId: string; send: (bytes: Uint8Array) => Promise<void> }>) => Promise<void>;
-    }>,
-  ) => void;
+  register: (operation: LocalDataStreamOperation, handler: BackgroundStreamHandler) => void;
 }>;
 
 const PENDING_READ_STREAM_TTL_MS = 60_000;
+const PENDING_CAPTURE_STREAM_TTL_MS = 60_000;
+const MAX_PENDING_CAPTURE_STREAMS = 8;
 
 type PendingReadStream = {
   bytes: Uint8Array;
@@ -127,6 +132,68 @@ class PendingConversationReadStreams {
     globalThis.clearTimeout(pending.expirationTimer);
     this.#bytes = Math.max(0, this.#bytes - pending.bytes.byteLength);
   }
+}
+
+type PendingCaptureSnapshotStream = Readonly<{
+  expiresAt: number;
+  expirationTimer: ReturnType<typeof setTimeout>;
+  stream: StreamDescriptor;
+}>;
+
+/** Keeps only a bounded stream descriptor; facts stay untouched until the authenticated Port reaches terminal. */
+class PendingCaptureSnapshotStreams {
+  #pending = new Map<string, PendingCaptureSnapshotStream>();
+
+  publish(stream: StreamDescriptor): Readonly<{ kind: 'stream'; requestId: string; stream: StreamDescriptor }> {
+    this.expire();
+    if (this.#pending.size >= MAX_PENDING_CAPTURE_STREAMS) throw new LocalDataContractError('BUSY');
+    const requestId = createReadStreamRequestId();
+    if (this.#pending.has(requestId)) throw new LocalDataContractError('BUSY');
+    const expiresAt = Date.now() + PENDING_CAPTURE_STREAM_TTL_MS;
+    const expirationTimer = globalThis.setTimeout(() => this.drop(requestId), PENDING_CAPTURE_STREAM_TTL_MS);
+    this.#pending.set(requestId, { stream, expiresAt, expirationTimer });
+    return { kind: 'stream', requestId, stream };
+  }
+
+  take(requestId: string, stream: StreamDescriptor): void {
+    this.expire();
+    const pending = this.#pending.get(requestId);
+    if (!pending) throw new LocalDataContractError('STALE_REFERENCE');
+    this.drop(requestId, pending);
+    if (
+      pending.stream.operation !== stream.operation ||
+      pending.stream.declaredTotalBytes !== stream.declaredTotalBytes
+    ) {
+      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    }
+  }
+
+  private expire(now = Date.now()): void {
+    for (const [requestId, pending] of this.#pending) {
+      if (pending.expiresAt > now) continue;
+      this.drop(requestId, pending);
+    }
+  }
+
+  private drop(requestId: string, pending = this.#pending.get(requestId)): void {
+    if (!pending) return;
+    this.#pending.delete(requestId);
+    globalThis.clearTimeout(pending.expirationTimer);
+  }
+}
+
+function parseCaptureSnapshotBytes(bytes: Uint8Array): ConversationCaptureSnapshot {
+  try {
+    return parseConversationCaptureSnapshot(decodeCanonicalJson(bytes));
+  } catch {
+    throw new LocalDataContractError('PROTOCOL_MISMATCH');
+  }
+}
+
+function parseRuntimeCaptureMessage(msg: unknown) {
+  if (!msg || typeof msg !== 'object' || Array.isArray(msg)) throw new LocalDataContractError('INVALID_ARGUMENT');
+  const { type: _type, ...payload } = msg as Record<string, unknown>;
+  return parseRuntimeCaptureSnapshotPayload(payload);
 }
 
 type ListQueryPayload = {
@@ -248,6 +315,148 @@ function normalizeMessageSyncOptions(msg: any): ConversationMessageSyncOptions |
   return { mode, diff: { added, updated, removed } };
 }
 
+async function withCaptureAuthorNames(messages: readonly JsonObject[]): Promise<JsonObject[]> {
+  let next = messages.map((message) => ({ ...message })) as JsonObject[];
+  try {
+    const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
+    const aboutYouUserName = normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
+    next = next.map((message) => {
+      const role = String(message.role || '')
+        .trim()
+        .toLowerCase();
+      if (role !== 'user' || String(message.authorName || '').trim()) return message;
+      return { ...message, authorName: aboutYouUserName };
+    });
+  } catch {
+    // Author names are optional and retain the renderer fallback.
+  }
+  return next;
+}
+
+async function inlineCaptureImages(input: {
+  conversationId: number;
+  conversationSourceType: string;
+  conversationUrl: string;
+  forceHttpImageCache?: boolean;
+  messages: JsonObject[];
+  options: ConversationMessageSyncOptions;
+}): Promise<JsonObject[]> {
+  try {
+    const sourceType = String(input.conversationSourceType || '')
+      .trim()
+      .toLowerCase();
+    const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+    const enableHttpImages =
+      input.forceHttpImageCache === true ||
+      (sourceType === 'article'
+        ? local?.web_article_cache_images_enabled === true
+        : local?.ai_chat_cache_images_enabled === true);
+    const keys =
+      (input.options.mode === 'incremental' || input.options.mode === 'append') && input.options.diff
+        ? new Set([...(input.options.diff.added || []), ...(input.options.diff.updated || [])])
+        : null;
+    const inlined = await inlineChatImagesInMessages({
+      conversationId: input.conversationId,
+      conversationUrl: input.conversationUrl,
+      messages: input.messages,
+      onlyMessageKeys: keys,
+      enableHttpImages,
+    });
+    if (
+      inlined.inlinedCount > 0 ||
+      inlined.downloadedCount > 0 ||
+      inlined.fromCacheCount > 0 ||
+      inlined.warningFlags.length > 0
+    ) {
+      console.info('[ImageInline]', {
+        conversationId: input.conversationId,
+        mode: input.options.mode,
+        inlinedCount: inlined.inlinedCount,
+        downloadedCount: inlined.downloadedCount,
+        fromCacheCount: inlined.fromCacheCount,
+        inlinedBytes: inlined.inlinedBytes,
+        warningFlags: inlined.warningFlags,
+      });
+    }
+    return inlined.messages as JsonObject[];
+  } catch (error) {
+    console.warn('[ImageInline] failed but capture continues', {
+      conversationId: input.conversationId,
+      mode: input.options.mode,
+      error: error instanceof Error ? error.message : String(error || ''),
+    });
+    return input.messages;
+  }
+}
+
+export type ConversationCaptureSnapshotSaveResult = Readonly<{
+  conversationId: number;
+  isNew: boolean;
+}>;
+
+/** Persists one validated capture while its caller already owns the facts lease. */
+export async function saveConversationCaptureSnapshotInLease(
+  input: Readonly<{
+    forceHttpImageCache?: boolean;
+    mode: 'idb' | 'native';
+    onConversationChanged: ConversationHandlersDeps['onConversationChanged'];
+    repository: ConversationFactsRepository;
+    snapshot: ConversationCaptureSnapshot;
+  }>,
+): Promise<ConversationCaptureSnapshotSaveResult> {
+  const reference = stableReference(input.snapshot.conversation);
+  if (!reference) throw new LocalDataContractError('INVALID_ARGUMENT');
+  const options: ConversationMessageSyncOptions = {
+    ...(input.snapshot.mode === undefined ? { mode: 'snapshot' } : { mode: input.snapshot.mode }),
+    ...(input.snapshot.diff === undefined ? { diff: null } : { diff: input.snapshot.diff }),
+  };
+  const messages = await withCaptureAuthorNames(input.snapshot.messages);
+
+  if (input.mode === 'native') {
+    // ponytail: P3-T7 adds Native image capabilities; active capture must not fall back to image IDB meanwhile.
+    const saved = await input.repository.saveConversationSnapshot({
+      ...input.snapshot,
+      messages,
+      mode: options.mode,
+      diff: options.diff,
+    });
+    const conversationId = Number(saved.conversation.id);
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    }
+    await input.onConversationChanged(
+      conversationId,
+      saved.isNew
+        ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
+        : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+    );
+    return { conversationId, isNew: saved.isNew };
+  }
+
+  const existing = await input.repository.getConversationByReference(reference);
+  const conversation = await input.repository.upsertConversation(input.snapshot.conversation);
+  const resolved = await resolveConversationReference(input.repository, {
+    source: String(conversation.source || '').trim(),
+    conversationKey: String(conversation.conversationKey || '').trim(),
+  });
+  const inlinedMessages = await inlineCaptureImages({
+    conversationId: resolved.conversationId,
+    conversationSourceType: String(conversation.sourceType || input.snapshot.conversation.sourceType || ''),
+    conversationUrl: String(conversation.url || input.snapshot.conversation.url || ''),
+    forceHttpImageCache: input.forceHttpImageCache,
+    messages,
+    options,
+  });
+  await input.repository.syncConversationMessages(resolved, inlinedMessages, options);
+  await input.onConversationChanged(
+    resolved.conversationId,
+    existing
+      ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages
+      : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation,
+  );
+  return { conversationId: resolved.conversationId, isNew: !existing };
+}
+
 function factsError(router: AnyRouter, error: unknown) {
   if (error instanceof LocalDataContractError) {
     return router.err(error.message, { code: error.code, diagnostics: error.diagnostics ?? null });
@@ -278,9 +487,28 @@ function withFactsEpochTarget(target: ConversationListOpenTarget | null, factsEp
 
 export function registerConversationHandlers(router: AnyRouter, deps: ConversationHandlersDeps) {
   const readStreams = new PendingConversationReadStreams();
+  const captureStreams = new PendingCaptureSnapshotStreams();
   deps.streamRouter.register('conversation-detail', {
     download: async ({ requestId, send }) => {
       await send(readStreams.take(requestId));
+    },
+  });
+  deps.streamRouter.register('capture-snapshot', {
+    authorizeUpload: ({ requestId, stream }) => captureStreams.take(requestId, stream),
+    upload: async ({ bytes, lease }) => {
+      const snapshot = parseCaptureSnapshotBytes(bytes);
+      const backend = await openConversationReadRepository(lease);
+      const result = await saveConversationCaptureSnapshotInLease({
+        mode: backend.mode,
+        repository: backend.repository,
+        snapshot,
+        onConversationChanged: deps.onConversationChanged,
+      });
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'captureSnapshot',
+        conversationId: result.conversationId,
+      });
+      return result;
     },
   });
 
@@ -291,6 +519,30 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       received,
     });
   };
+
+  router.register(CORE_MESSAGE_TYPES.SAVE_CONVERSATION_SNAPSHOT, async (msg) => {
+    try {
+      const payload = parseRuntimeCaptureMessage(msg);
+      if (!('snapshot' in payload)) return router.ok(captureStreams.publish(payload.transfer));
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-capture-snapshot',
+        read: async ({ mode, repository }) =>
+          await saveConversationCaptureSnapshotInLease({
+            mode,
+            repository,
+            snapshot: payload.snapshot,
+            onConversationChanged: deps.onConversationChanged,
+          }),
+      });
+      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+        reason: 'captureSnapshot',
+        conversationId: result.conversationId,
+      });
+      return router.ok(result);
+    } catch (error) {
+      return factsError(router, error);
+    }
+  });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP, async (msg) => {
     const parsed = parseListQueryPayload(msg);

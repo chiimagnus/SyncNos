@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 
 import { mergeMigrationConversationPayload } from '@services/local-data/facts-archive';
-import { LocalDataContractError } from '@services/local-data/contracts';
+import { LocalDataContractError, type ConversationCaptureSnapshot } from '@services/local-data/contracts';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
 import {
@@ -478,28 +478,53 @@ export function upsertMigrationConversationWithinTransaction(
   return asConversation(writeConversationRecord(database, existing.id, next));
 }
 
+function upsertConversationWithinFactsTransaction(
+  database: SyncNosSqliteDatabase,
+  payload: ReturnType<typeof canonicalInputPayload>,
+): Readonly<{ conversation: Conversation; isNew: boolean }> {
+  const existing = findExistingConversationForPayload(database, payload);
+  const next = buildConversationRecord(payload, existing);
+  let stored: ConversationRow;
+  if (existing) {
+    migrateSyncMappingKeyWithinTransaction(database, {
+      legacySource: existing.source,
+      legacyConversationKey: existing.conversation_key,
+      nextSource: next.source,
+      nextConversationKey: next.conversationKey,
+      fallbackNotionPageId: next.notionPageId,
+    });
+    stored = writeConversationRecord(database, existing.id, next);
+  } else {
+    stored = insertConversationRecord(database, next);
+  }
+  refreshConversationFtsDocumentWithinFactsTransaction(database, stored.id);
+  return { conversation: asConversation(stored), isNew: !existing };
+}
+
 function upsertConversation(database: SyncNosSqliteDatabase, value: unknown): Conversation {
   const payload = canonicalInputPayload(value);
   return execute(
     () =>
+      runFactsTransaction(database, () => upsertConversationWithinFactsTransaction(database, payload).conversation)
+        .result,
+  );
+}
+
+function saveConversationSnapshot(database: SyncNosSqliteDatabase, snapshot: ConversationCaptureSnapshot) {
+  const payload = canonicalInputPayload(snapshot.conversation);
+  const options: MessagePersistenceOptions = {
+    ...(snapshot.mode === undefined ? {} : { mode: snapshot.mode }),
+    ...(snapshot.diff === undefined ? {} : { diff: snapshot.diff }),
+  };
+  return execute(
+    () =>
       runFactsTransaction(database, () => {
-        const existing = findExistingConversationForPayload(database, payload);
-        const next = buildConversationRecord(payload, existing);
-        let stored: ConversationRow;
-        if (existing) {
-          migrateSyncMappingKeyWithinTransaction(database, {
-            legacySource: existing.source,
-            legacyConversationKey: existing.conversation_key,
-            nextSource: next.source,
-            nextConversationKey: next.conversationKey,
-            fallbackNotionPageId: next.notionPageId,
-          });
-          stored = writeConversationRecord(database, existing.id, next);
-        } else {
-          stored = insertConversationRecord(database, next);
+        const saved = upsertConversationWithinFactsTransaction(database, payload);
+        const messages = syncMessagesWithinTransaction(database, saved.conversation.id, snapshot.messages, options);
+        if (messages.upserted || messages.deleted) {
+          refreshConversationFtsDocumentWithinFactsTransaction(database, saved.conversation.id);
         }
-        refreshConversationFtsDocumentWithinFactsTransaction(database, stored.id);
-        return asConversation(stored);
+        return { ...saved, ...messages };
       }).result,
   );
 }
@@ -1124,6 +1149,7 @@ export function createConversationsRepository(database: SyncNosSqliteDatabase) {
       messages: unknown,
       options?: MessagePersistenceOptions,
     ) => syncConversationMessagesByReference(database, reference, messages, options),
+    saveConversationSnapshot: (snapshot: ConversationCaptureSnapshot) => saveConversationSnapshot(database, snapshot),
     upsertConversation: (payload: unknown) => upsertConversation(database, payload),
   });
 }

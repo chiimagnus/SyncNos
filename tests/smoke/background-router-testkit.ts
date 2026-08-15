@@ -68,7 +68,24 @@ export function createTestBackgroundRouter() {
     onConversationChanged: async () => {},
     streamRouter: { register: () => {} },
   });
-  registerWebArticleHandlers(router);
+  let articleConversation: any = null;
+  registerWebArticleHandlers(router, {
+    conversationReadRunner: {
+      run: async ({ read }: any) =>
+        await read({
+          mode: 'idb',
+          repository: {
+            getConversationByReference: async () => articleConversation,
+            syncConversationMessages: async () => ({ deleted: 0, upserted: 0 }),
+            upsertConversation: async (conversation: any) => {
+              articleConversation = { ...conversation, id: 1 };
+              return articleConversation;
+            },
+          },
+        }),
+    },
+    onConversationChanged: async () => {},
+  });
   registerChatWithBackgroundHandlers(router);
   registerNotionSettingsHandlers(router, { notionSyncJobStore, conversationKinds });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });

@@ -66,6 +66,7 @@ export default defineBackground(async () => {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
   registerWebArticleHandlers(router, {
+    conversationReadRunner,
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
   registerChatgptDeepResearchHandlers(router);

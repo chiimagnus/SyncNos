@@ -8,11 +8,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MAX_NATIVE_IMAGE_SLICE_BYTES,
+  MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
   LocalDataContractError,
   parseHostFactsRequest,
 } from '@services/local-data/contracts';
+import { OrderedFrameDigestAccumulator } from '@services/local-data/digest';
+import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
-import { NativeWireSessionReceiver } from '@services/local-data/native-wire';
+import { NativeWireSessionReceiver, createNativeWireDataFrame } from '@services/local-data/native-wire';
 
 import { runNativeHost } from '../../packages/syncnoscli/src/native-host/main';
 import {
@@ -83,6 +87,59 @@ function importRequest(migrationId = MIGRATION_ID) {
       schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
     },
   };
+}
+
+function captureSnapshotRequest(byteLength: number) {
+  return {
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    requestId: 'capture-stream-1',
+    command: 'SAVE_CONVERSATION_SNAPSHOT',
+    payload: {
+      transfer: { operation: 'capture-snapshot', declaredTotalBytes: byteLength },
+    },
+  };
+}
+
+async function captureSnapshotWireFrames(bytes: Uint8Array): Promise<unknown[]> {
+  const digest = await OrderedFrameDigestAccumulator.create(nodeDigestProvider);
+  let sequence = 0;
+  const result: unknown[] = [
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId: SESSION_ID,
+      sequence: sequence++,
+      type: 'begin',
+      operation: 'capture-snapshot',
+      declaredTotalBytes: bytes.byteLength,
+    },
+  ];
+  for (let offset = 0; offset < bytes.byteLength; offset += MAX_NATIVE_IMAGE_SLICE_BYTES) {
+    const frame = await createNativeWireDataFrame({
+      bytes: bytes.subarray(offset, offset + MAX_NATIVE_IMAGE_SLICE_BYTES),
+      offset,
+      provider: nodeDigestProvider,
+      sequence: sequence++,
+      sessionId: SESSION_ID,
+    });
+    await digest.append({ sequence: frame.sequence, byteLength: frame.byteLength, digest: frame.sliceDigest });
+    result.push(frame);
+  }
+  result.push({
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    sessionId: SESSION_ID,
+    sequence: sequence++,
+    type: 'end',
+    digest: digest.finalize(),
+  });
+  result.push({
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    sessionId: SESSION_ID,
+    sequence,
+    type: 'terminal',
+    status: 'ok',
+  });
+  return result;
 }
 
 async function* frames(values: readonly unknown[]): AsyncGenerator<Uint8Array> {
@@ -482,6 +539,100 @@ describe('Native Host session', () => {
     const verify = await openReadOnly({ paths });
     try {
       expect(createConversationsRepository(verify.database).getConversationById(conversationId)).toBeNull();
+    } finally {
+      verify.close();
+    }
+  });
+
+  it('validates streamed capture snapshots before opening SQLite, then persists the complete snapshot atomically', async () => {
+    const snapshot = {
+      conversation: { source: 'chatgpt', conversationKey: 'captured-stream', sourceType: 'chat', title: 'Captured' },
+      messages: [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentText: 'x'.repeat(MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES),
+        },
+      ],
+    };
+    const bytes = encodeCanonicalJson(snapshot).bytes;
+    const request = captureSnapshotRequest(bytes.byteLength);
+    const wire = await captureSnapshotWireFrames(bytes);
+    const rejectedOpener = vi.fn();
+    const cancelled = [
+      request,
+      wire[0],
+      {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        sessionId: SESSION_ID,
+        sequence: 1,
+        type: 'cancel',
+        reason: 'cancelled',
+      },
+      {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        sessionId: SESSION_ID,
+        sequence: 2,
+        type: 'terminal',
+        status: 'cancelled',
+      },
+    ];
+    const invalidDigest = wire.map((frame) =>
+      frame && typeof frame === 'object' && (frame as { type?: unknown }).type === 'end'
+        ? { ...(frame as Record<string, unknown>), digest: DIGEST }
+        : frame,
+    );
+
+    for (const values of [[request], cancelled, [request, ...invalidDigest]]) {
+      const output = outputCollector();
+      await expect(
+        runNativeHost({
+          argv: [nativeHostContract.browsers.chrome.origin],
+          openReadWriteForHost: rejectedOpener,
+          platform: 'darwin',
+          stderr: { write: () => true },
+          stdin: frames(values),
+          stdout: output.output,
+        }),
+      ).resolves.toBe(1);
+      await expect(decodedMessages(output.frames)).resolves.toMatchObject([
+        { ok: false, requestId: 'capture-stream-1' },
+      ]);
+    }
+    expect(rejectedOpener).not.toHaveBeenCalled();
+
+    const root = await mkdtemp(join(tmpdir(), 'syncnoscli-native-host-capture-stream-'));
+    temporaryRoots.push(root);
+    const paths = resolveSyncNosRuntimePaths({ homeDirectory: root, platform: 'darwin' });
+    const opener = vi.fn(async () => await openReadWriteForHost({ paths }));
+    const output = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadWriteForHost: opener,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([request, ...wire]),
+        stdout: output.output,
+      }),
+    ).resolves.toBe(0);
+    expect(opener).toHaveBeenCalledTimes(1);
+    await expect(decodeHostJsonStream(await decodedMessages(output.frames))).resolves.toMatchObject({
+      isNew: true,
+      upserted: 1,
+      conversation: { conversationKey: 'captured-stream' },
+    });
+
+    const verify = await openReadOnly({ paths });
+    try {
+      const conversation = createConversationsRepository(verify.database).findConversationBySourceAndKey(
+        'chatgpt',
+        'captured-stream',
+      );
+      expect(conversation).toMatchObject({ title: 'Captured' });
+      expect(createMessagesRepository(verify.database).getConversationDetail(conversation!.id)).toMatchObject({
+        messages: [{ messageKey: 'm1' }],
+      });
     } finally {
       verify.close();
     }

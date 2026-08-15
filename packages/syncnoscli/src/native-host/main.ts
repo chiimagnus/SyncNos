@@ -5,6 +5,7 @@ import {
   hostFactsCommandRequiresConnectedSession,
   parseNativeHostStreamResponseData,
   parseHostFactsRequest,
+  type CaptureSnapshotStreamRequestPayload,
   type HostFactsRequest,
   type LocalDataErrorCode,
 } from '@services/local-data/contracts';
@@ -22,6 +23,7 @@ import {
 } from './dispatcher';
 import {
   NativeHostLaunchError,
+  createNativeHostCaptureSnapshotSession,
   createNativeHostImportSession,
   encodeNativeHostJson,
   validateNativeHostLaunch,
@@ -35,6 +37,10 @@ import {
   type NativeMessagingInput,
   type NativeMessagingOutput,
 } from './stdio';
+
+type HostCaptureSnapshotRequest = Extract<HostFactsRequest, Readonly<{ command: 'SAVE_CONVERSATION_SNAPSHOT' }>>;
+type HostCaptureSnapshotStreamRequest = HostCaptureSnapshotRequest &
+  Readonly<{ payload: CaptureSnapshotStreamRequestPayload }>;
 
 type NativeHostErrorOutput = Readonly<{
   write: (chunk: string) => boolean;
@@ -122,6 +128,10 @@ function readSingleMessageCommand(handle: SyncNosSqliteHandle, request: HostFact
     default:
       throw new LocalDataContractError('INVALID_ARGUMENT');
   }
+}
+
+function isHostCaptureSnapshotStreamRequest(request: HostFactsRequest): request is HostCaptureSnapshotStreamRequest {
+  return request.command === 'SAVE_CONVERSATION_SNAPSHOT' && !('snapshot' in request.payload);
 }
 
 async function writeHostFailure(
@@ -267,6 +277,58 @@ async function runConnectedMutationCommand(
   }
 }
 
+async function runCaptureSnapshotUploadSession(
+  request: HostCaptureSnapshotStreamRequest,
+  messages: AsyncIterator<unknown>,
+  input: Readonly<{
+    openReadWriteForHost: DatabaseOpener;
+    signal: AbortSignal;
+    stderr: NativeHostErrorOutput;
+    stdout: NativeMessagingOutput;
+  }>,
+): Promise<number> {
+  let handle: SyncNosSqliteHandle | null = null;
+  let session: Awaited<ReturnType<typeof createNativeHostCaptureSnapshotSession>> | null = null;
+  let responseStarted = false;
+  try {
+    session = await createNativeHostCaptureSnapshotSession({ request });
+    for (;;) {
+      if (input.signal.aborted) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      const next = await nextMessageOrAbort(messages, input.signal);
+      if (next.done) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      const event = await session.accept(next.value);
+      if (event.kind !== 'complete') continue;
+
+      handle = await input.openReadWriteForHost();
+      const completedRequest: HostCaptureSnapshotRequest = Object.freeze({
+        protocolVersion: request.protocolVersion,
+        schemaVersion: request.schemaVersion,
+        requestId: request.requestId,
+        command: 'SAVE_CONVERSATION_SNAPSHOT',
+        payload: Object.freeze({ snapshot: event.snapshot, transfer: request.payload.transfer }),
+      });
+      const bytes = encodeNativeHostJson(writeNativeHostConnectedCommand(handle.database, completedRequest));
+      const stream = parseNativeHostStreamResponseData({
+        stream: { operation: 'host-json', declaredTotalBytes: bytes.byteLength },
+      });
+      await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, stream));
+      responseStarted = true;
+      await writeNativeHostByteStream({ bytes, operation: stream.stream.operation, output: input.stdout });
+      return 0;
+    }
+  } catch (error) {
+    if (responseStarted) {
+      writeDiagnostic(input.stderr, 'SyncNos Native Host could not finish its streamed response.');
+    } else {
+      await writeHostFailure(input.stdout, input.stderr, request, error, true);
+    }
+    return 1;
+  } finally {
+    session?.cleanup();
+    closeHandle(handle);
+  }
+}
+
 async function runConnectedCommand(
   request: HostFactsRequest,
   messages: AsyncIterator<unknown>,
@@ -279,6 +341,14 @@ async function runConnectedCommand(
     stdout: NativeMessagingOutput;
   }>,
 ): Promise<number> {
+  if (isHostCaptureSnapshotStreamRequest(request)) {
+    return await runCaptureSnapshotUploadSession(request, messages, {
+      openReadWriteForHost: input.openReadWriteForHost,
+      signal: input.signal,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    });
+  }
   if (isNativeHostConnectedReadCommand(request.command)) {
     return await runConnectedReadCommand(request, {
       openReadOnly: input.openReadOnly,

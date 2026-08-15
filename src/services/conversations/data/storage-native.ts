@@ -2,6 +2,7 @@ import { connectNative, type NativeHostRequest } from '@platform/local-data/nati
 import {
   LocalDataContractError,
   serializedJsonUtf8ByteLength,
+  type ConversationCaptureSnapshot,
   type ConversationMessageSyncMode,
   type HostConversationReference,
   type HostFactsCommand,
@@ -29,6 +30,7 @@ type NativeConnectedCommand = Extract<
   | 'CONVERSATION_DETAIL'
   | 'CONVERSATION_TAIL'
   | 'SAVE_CONVERSATION_SNAPSHOT'
+  | 'UPSERT_CONVERSATION'
   | 'DELETE_CONVERSATIONS'
   | 'MERGE_CONVERSATIONS'
   | 'SYNC_CONVERSATION_MESSAGES'
@@ -77,8 +79,15 @@ export type ResolvedConversationReference = StableConversationReference &
   }>;
 
 export type ConversationMessageSyncOptions = Readonly<{
-  diff?: { added?: string[]; removed?: string[]; updated?: string[] } | null;
+  diff?: { added?: readonly string[]; removed?: readonly string[]; updated?: readonly string[] } | null;
   mode?: ConversationMessageSyncMode;
+}>;
+
+export type ConversationCaptureSnapshotPersistenceResult = Readonly<{
+  conversation: Conversation;
+  deleted: number;
+  isNew: boolean;
+  upserted: number;
 }>;
 
 export type ConversationMappingRead = Readonly<{
@@ -111,6 +120,9 @@ export type ConversationMutationRepository = Readonly<{
     removedConversationId: number;
   }>;
   patchSyncMapping: (reference: ResolvedConversationReference, provider: string, patch: JsonObject) => Promise<true>;
+  saveConversationSnapshot: (
+    snapshot: ConversationCaptureSnapshot,
+  ) => Promise<ConversationCaptureSnapshotPersistenceResult>;
   setConversationNotionPageId: (
     reference: ResolvedConversationReference,
     notionPageId: string,
@@ -306,6 +318,17 @@ function asMessageSyncResult(
   };
 }
 
+function asCaptureSnapshotResult(value: unknown): ConversationCaptureSnapshotPersistenceResult {
+  const input = record(value);
+  if (typeof input.isNew !== 'boolean') protocolFailure();
+  return {
+    conversation: asConversation(input.conversation),
+    deleted: nonNegativeInteger(input.deleted),
+    isNew: input.isNew,
+    upserted: nonNegativeInteger(input.upserted),
+  };
+}
+
 function asMappingRead(value: unknown): ConversationMappingRead | null {
   if (value == null) return null;
   const input = record(value);
@@ -418,8 +441,10 @@ export function createNativeConversationReadRepository(
       }
     },
     async upsertConversation(payload) {
-      const snapshot = record(payload) as JsonObject;
-      return asConversation(
+      return asConversation(await request('UPSERT_CONVERSATION', record(payload) as JsonObject));
+    },
+    async saveConversationSnapshot(snapshot) {
+      return asCaptureSnapshotResult(
         await request('SAVE_CONVERSATION_SNAPSHOT', {
           snapshot,
           transfer: {

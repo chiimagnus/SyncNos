@@ -9,7 +9,7 @@ import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import normalizeApi from '@services/shared/normalize.ts';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
-import { resolveConversationTailWindowResponse } from '@services/conversations/client/repo';
+import { resolveConversationTailWindowResponse, saveConversationSnapshot } from '@services/conversations/client/repo';
 import {
   readInpageButtonGlobalPosition,
   writeInpageButtonGlobalPosition,
@@ -157,30 +157,13 @@ export function createContentController(deps: Deps) {
   ) {
     if (!snapshot || !snapshot.conversation) return null;
 
-    const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-      payload: snapshot.conversation,
-    });
-    if (!conversationRes?.ok) {
-      throw new Error(conversationRes?.error?.message || 'upsertConversation failed');
-    }
-
-    const conversation = conversationRes.data;
-    const rawIsNew = (conversation as any)?.__isNew;
-    const isNew = typeof rawIsNew === 'boolean' ? rawIsNew : undefined;
-    const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
-      source: snapshot.conversation.source,
-      conversationKey: snapshot.conversation.conversationKey,
+    const saved = await saveConversationSnapshot(send, {
+      conversation: snapshot.conversation,
       messages: snapshot.messages || [],
       mode: options?.mode || 'snapshot',
       diff: options?.diff || null,
-      conversationSourceType: snapshot?.conversation?.sourceType || 'chat',
-      conversationUrl: snapshot?.conversation?.url || '',
     });
-    if (!messagesRes?.ok) {
-      throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
-    }
-
-    return { conversationId: conversation.id, isNew };
+    return saved;
   }
 
   function createAutoCaptureController() {

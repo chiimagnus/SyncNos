@@ -1,17 +1,12 @@
-import {
-  getConversationBySourceConversationKey,
-  hasConversation,
-  syncConversationMessages,
-  upsertConversation,
-} from '@services/conversations/data/storage';
-import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { storageGet } from '@platform/storage/local';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery, tabsSendMessage, tabsUpdate } from '@platform/webext/tabs';
-import { storageGet } from '@platform/storage/local';
 import { getAntiHotlinkRulesSnapshot, includesAnyAntiHotlinkDomain } from '@platform/webext/anti-hotlink-rules-store';
 import { CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import type { Conversation } from '@services/conversations/domain/models';
+import type { ConversationCaptureSnapshot } from '@services/local-data/contracts';
 import {
   buildDiscourseTopicFloorUrl,
   isSameDiscourseTopicFloorUrl,
@@ -38,6 +33,16 @@ const ARTICLE_STABILIZATION_TIMEOUT_MS = 10_000;
 const ARTICLE_STABILIZATION_MIN_TEXT_LENGTH = 240;
 const CONTENT_MESSAGE_RETRY_DELAY_MS = 320;
 const XIAOHONGSHU_COMMENTS_CAPTURE_ENABLED_STORAGE_KEY = 'xiaohongshu_comments_capture_enabled';
+
+export type ArticleCapturePersistence = Readonly<{
+  findConversation: (reference: Readonly<{ conversationKey: string; source: string }>) => Promise<Conversation | null>;
+  saveSnapshot: (
+    input: Readonly<{
+      forceHttpImageCache?: boolean;
+      snapshot: ConversationCaptureSnapshot;
+    }>,
+  ) => Promise<Readonly<{ conversationId: number; isNew: boolean }>>;
+}>;
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
@@ -200,7 +205,10 @@ async function shouldCaptureXiaohongshuComments(): Promise<boolean> {
   }
 }
 
-export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) {
+export async function fetchActiveTabArticle({
+  tabId,
+  persistence,
+}: Readonly<{ persistence: ArticleCapturePersistence; tabId?: number }>) {
   const tab = await resolveTargetTab(tabId);
   const targetTabId = Number(tab.id);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
@@ -254,92 +262,41 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   if (!textContent) throw toError('No article content detected');
 
   const capturedAt = Date.now();
-  let existed = false;
-  try {
-    existed = await hasConversation({
-      sourceType: ARTICLE_SOURCE_TYPE,
-      source: ARTICLE_SOURCE,
-      conversationKey: conversationKeyForUrl(canonicalUrl),
-      url: canonicalUrl,
-    });
-  } catch (_e) {
-    existed = false;
-  }
-  const conversation = await upsertConversation({
-    sourceType: ARTICLE_SOURCE_TYPE,
-    source: ARTICLE_SOURCE,
-    conversationKey: conversationKeyForUrl(canonicalUrl),
-    title,
-    url: canonicalUrl,
-    author,
-    publishedAt,
-    warningFlags,
-    lastCapturedAt: capturedAt,
-  });
-
   const body = textContent;
   const markdown = markdownContent || body;
-  const conversationId = Number((conversation as any).id);
-  let messagesToSave = [
-    {
-      messageKey: 'article_body',
-      role: 'article',
-      contentText: body,
-      contentMarkdown: markdown,
-      sequence: 1,
-      updatedAt: capturedAt,
+  const forceHttpImageCache = await hasAntiHotlinkImages(markdown);
+  const saved = await persistence.saveSnapshot({
+    forceHttpImageCache,
+    snapshot: {
+      conversation: {
+        sourceType: ARTICLE_SOURCE_TYPE,
+        source: ARTICLE_SOURCE,
+        conversationKey: conversationKeyForUrl(canonicalUrl),
+        title,
+        url: canonicalUrl,
+        author,
+        publishedAt,
+        warningFlags,
+        lastCapturedAt: capturedAt,
+      },
+      messages: [
+        {
+          messageKey: 'article_body',
+          role: 'article',
+          contentText: body,
+          contentMarkdown: markdown,
+          sequence: 1,
+          updatedAt: capturedAt,
+        },
+      ],
+      mode: 'snapshot',
+      diff: null,
     },
-  ];
-
-  try {
-    const local = await storageGet(['web_article_cache_images_enabled']);
-    const hasAntiHotlink = await hasAntiHotlinkImages(markdown);
-    const shouldCacheImages = local?.web_article_cache_images_enabled === true || hasAntiHotlink;
-
-    if (shouldCacheImages) {
-      const inlined = await inlineChatImagesInMessages({
-        conversationId,
-        conversationUrl: canonicalUrl,
-        messages: messagesToSave,
-        enableHttpImages: true,
-      });
-      messagesToSave = inlined.messages;
-
-      if (hasAntiHotlink && !local?.web_article_cache_images_enabled) {
-        console.info('[ArticleFetch] auto-caching anti-hotlink images (user setting is off)', {
-          conversationId,
-          url: canonicalUrl,
-        });
-      }
-
-      if (
-        inlined.inlinedCount > 0 ||
-        inlined.downloadedCount > 0 ||
-        inlined.fromCacheCount > 0 ||
-        (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
-      ) {
-        console.info('[ImageInline][ArticleFetch]', {
-          conversationId,
-          inlinedCount: inlined.inlinedCount,
-          downloadedCount: inlined.downloadedCount,
-          fromCacheCount: inlined.fromCacheCount,
-          inlinedBytes: inlined.inlinedBytes,
-          warningFlags: inlined.warningFlags,
-        });
-      }
-    }
-  } catch (error) {
-    console.warn('[ImageInline][ArticleFetch] failed but capture continues', {
-      conversationId,
-      error: error instanceof Error ? error.message : String(error || ''),
-    });
-  }
-
-  await syncConversationMessages(conversationId, messagesToSave);
+  });
 
   return {
-    isNew: !existed,
-    conversationId,
+    isNew: saved.isNew,
+    conversationId: saved.conversationId,
     url: canonicalUrl,
     title,
     author,
@@ -350,7 +307,10 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
   };
 }
 
-export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: number } = {}) {
+export async function resolveOrCaptureActiveTabArticle({
+  tabId,
+  persistence,
+}: Readonly<{ persistence: ArticleCapturePersistence; tabId?: number }>) {
   const tab = await resolveTargetTab(tabId);
   const normalizedUrl = normalizeHttpUrl(tab.url || '');
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
@@ -358,7 +318,7 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
 
   const key = conversationKeyForUrl(canonicalUrl);
   try {
-    const existing = await getConversationBySourceConversationKey(ARTICLE_SOURCE, key);
+    const existing = await persistence.findConversation({ source: ARTICLE_SOURCE, conversationKey: key });
     const existingId = Number((existing as any)?.id);
     if (existing && Number.isFinite(existingId) && existingId > 0) {
       const warningFlags = Array.isArray((existing as any)?.warningFlags)
@@ -380,5 +340,5 @@ export async function resolveOrCaptureActiveTabArticle({ tabId }: { tabId?: numb
     // ignore and fallback to capture
   }
 
-  return await fetchActiveTabArticle({ tabId: Number((tab as any)?.id) });
+  return await fetchActiveTabArticle({ tabId: Number((tab as any)?.id), persistence });
 }

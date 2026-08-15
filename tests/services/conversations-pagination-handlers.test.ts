@@ -4,12 +4,6 @@ import { createBackgroundRouter } from '../../src/platform/messaging/background-
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { LocalDataContractError } from '@services/local-data/contracts';
 
-const storageMocks = vi.hoisted(() => ({
-  deleteConversationsByIds: vi.fn(),
-  hasConversation: vi.fn(),
-  mergeConversationsByIds: vi.fn(),
-}));
-
 const readMocks = vi.hoisted(() => ({
   findConversationById: vi.fn(),
   findConversationBySourceAndKey: vi.fn(),
@@ -22,22 +16,6 @@ const readMocks = vi.hoisted(() => ({
 }));
 
 const streamRouterMocks = vi.hoisted(() => ({ register: vi.fn() }));
-
-const writeMocks = vi.hoisted(() => ({
-  writeConversationMessagesSnapshot: vi.fn(),
-  writeConversationSnapshot: vi.fn(),
-}));
-
-vi.mock('@services/conversations/data/storage', () => ({
-  deleteConversationsByIds: storageMocks.deleteConversationsByIds,
-  hasConversation: storageMocks.hasConversation,
-  mergeConversationsByIds: storageMocks.mergeConversationsByIds,
-}));
-
-vi.mock('@services/conversations/data/write', () => ({
-  writeConversationMessagesSnapshot: writeMocks.writeConversationMessagesSnapshot,
-  writeConversationSnapshot: writeMocks.writeConversationSnapshot,
-}));
 
 function createRouter() {
   const router = createBackgroundRouter({
@@ -64,9 +42,6 @@ function createRouter() {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  storageMocks.deleteConversationsByIds.mockReset();
-  storageMocks.hasConversation.mockReset();
-  storageMocks.mergeConversationsByIds.mockReset();
   readMocks.findConversationById.mockReset();
   readMocks.findConversationBySourceAndKey.mockReset();
   readMocks.getConversationByReference.mockReset();
@@ -76,8 +51,6 @@ afterEach(() => {
   readMocks.getConversationTailWindow.mockReset();
   readMocks.searchConversationMentionCandidates.mockReset();
   streamRouterMocks.register.mockReset();
-  writeMocks.writeConversationMessagesSnapshot.mockReset();
-  writeMocks.writeConversationSnapshot.mockReset();
 });
 
 describe('conversations pagination handlers', () => {

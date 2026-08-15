@@ -1,8 +1,9 @@
-import { readNativePortJson, type NativeMessagingPort } from './native-port';
+import { readNativePortJson, writeNativePortCaptureSnapshot, type NativeMessagingPort } from './native-port';
 
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
   NATIVE_HOST_SINGLE_MESSAGE_COMMANDS,
   LocalDataContractError,
   parseHostFactsRequest,
@@ -11,6 +12,7 @@ import {
   type HostFactsPayloadByCommand,
 } from '@services/local-data/contracts';
 import type { DigestProvider } from '@services/local-data/digest';
+import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 
 export type NativeHostSingleMessageCommand = (typeof NATIVE_HOST_SINGLE_MESSAGE_COMMANDS)[number];
@@ -85,6 +87,31 @@ function createRequest<TCommand extends HostFactsCommand>(input: NativeHostReque
   });
 }
 
+function captureSnapshotUpload(request: ReturnType<typeof createRequest>) {
+  if (
+    request.command !== 'SAVE_CONVERSATION_SNAPSHOT' ||
+    !('snapshot' in request.payload) ||
+    request.payload.transfer.declaredTotalBytes <= MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES
+  ) {
+    return null;
+  }
+  const bytes = encodeCanonicalJson(request.payload.snapshot).bytes;
+  if (bytes.byteLength !== request.payload.transfer.declaredTotalBytes) {
+    throw new LocalDataContractError('PROTOCOL_MISMATCH');
+  }
+  return Object.freeze({
+    bytes,
+    request: parseHostFactsRequest({
+      protocolVersion: request.protocolVersion,
+      schemaVersion: request.schemaVersion,
+      requestId: request.requestId,
+      command: request.command,
+      payload: { transfer: request.payload.transfer },
+    }),
+    stream: request.payload.transfer,
+  });
+}
+
 function callNativeMessage(
   runtime: ResolvedNativeRuntime,
   request: ReturnType<typeof createRequest>,
@@ -150,6 +177,16 @@ export async function connectNative<TData = unknown, TCommand extends HostFactsC
     const runtime = resolveRuntime(input.dependencies, 'connectNative').runtime;
     const port = runtime.connectNative?.(nativeHostContract.host.name);
     if (!port) throw new LocalDataContractError('HOST_UNAVAILABLE');
+    const upload = captureSnapshotUpload(request);
+    if (upload) {
+      return (await writeNativePortCaptureSnapshot({
+        bytes: upload.bytes,
+        digestProvider: input.dependencies?.digestProvider,
+        port,
+        request: upload.request,
+        stream: upload.stream,
+      })) as TData;
+    }
     return (await readNativePortJson({
       port,
       request,

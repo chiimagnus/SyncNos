@@ -7,6 +7,7 @@ import {
   LocalDataContractError,
   createLocalDataError,
   parseLocalDataError,
+  parseJsonValue,
   parseMigrationId,
   parseStreamDescriptor,
   serializedJsonUtf8ByteLength,
@@ -66,6 +67,7 @@ export type RuntimeStreamAckMessage = Readonly<{
 }>;
 
 export type RuntimeStreamCompleteMessage = Readonly<{
+  data?: JsonValue;
   requestId: string;
   type: 'complete';
 }>;
@@ -118,6 +120,10 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): voi
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) invalidArgument();
+}
+
+function allowedKeys(value: Record<string, unknown>, keys: readonly string[]): void {
+  if (Object.keys(value).some((key) => !keys.includes(key))) invalidArgument();
 }
 
 function requestId(value: unknown): string {
@@ -210,8 +216,12 @@ export function parseRuntimeStreamMessage(value: unknown): RuntimeStreamMessage 
         acknowledgedSequence: nonNegativeSafeInteger(input.acknowledgedSequence),
       });
     case LOCAL_DATA_STREAM_MESSAGE_TYPES.COMPLETE:
-      exactKeys(input, ['type', 'requestId']);
-      return Object.freeze({ type: 'complete', requestId: requestId(input.requestId) });
+      allowedKeys(input, ['type', 'requestId', 'data']);
+      return Object.freeze({
+        type: 'complete',
+        requestId: requestId(input.requestId),
+        ...(Object.prototype.hasOwnProperty.call(input, 'data') ? { data: parseJsonValue(input.data) } : {}),
+      });
     case LOCAL_DATA_STREAM_MESSAGE_TYPES.ERROR:
       exactKeys(input, ['type', 'requestId', 'error']);
       return Object.freeze({

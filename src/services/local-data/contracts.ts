@@ -17,6 +17,7 @@ export const MAX_STREAM_FRAME_BYTES = 512 * KIBIBYTE;
 // Keep ordinary runtime replies comfortably below browser message implementation limits.
 // Larger facts are always negotiated onto the authenticated Port protocol below.
 export const MAX_ORDINARY_FACTS_RESPONSE_BYTES = 256 * KIBIBYTE;
+export const MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES = MAX_ORDINARY_FACTS_RESPONSE_BYTES;
 export const MAX_CAPTURE_SNAPSHOT_BYTES = 64 * MEBIBYTE;
 export const MAX_DETAIL_PREVIEW_BYTES = 64 * MEBIBYTE;
 export const MAX_IMAGE_ASSET_BYTES = 64 * MEBIBYTE;
@@ -259,7 +260,7 @@ function hasUnpairedSurrogate(value: string): boolean {
   return false;
 }
 
-function parseJsonValue(value: unknown): JsonValue {
+export function parseJsonValue(value: unknown): JsonValue {
   const stack: unknown[] = [value];
   const seen = new Set<object>();
 
@@ -807,10 +808,23 @@ export type ConversationTailRequestPayload<TReference extends StableConversation
   limit?: number;
 }>;
 
-export type CaptureSnapshotRequestPayload = Readonly<{
-  snapshot: JsonValue;
+export type ConversationCaptureSnapshot = Readonly<{
+  conversation: JsonObject;
+  diff?: ConversationMessageSyncDiff | null;
+  messages: readonly JsonObject[];
+  mode?: ConversationMessageSyncMode;
+}>;
+
+export type CaptureSnapshotOneShotRequestPayload = Readonly<{
+  snapshot: ConversationCaptureSnapshot;
   transfer: StreamDescriptor;
 }>;
+
+export type CaptureSnapshotStreamRequestPayload = Readonly<{
+  transfer: StreamDescriptor;
+}>;
+
+export type CaptureSnapshotRequestPayload = CaptureSnapshotOneShotRequestPayload | CaptureSnapshotStreamRequestPayload;
 
 export type SyncMessagesRequestPayload<TReference extends StableConversationReference> = Readonly<{
   conversation: TReference;
@@ -1059,6 +1073,7 @@ export const HOST_FACTS_COMMANDS = Object.freeze([
   'CONVERSATION_DETAIL',
   'CONVERSATION_TAIL',
   'SAVE_CONVERSATION_SNAPSHOT',
+  'UPSERT_CONVERSATION',
   'DELETE_CONVERSATION',
   'DELETE_CONVERSATIONS',
   'MERGE_CONVERSATIONS',
@@ -1116,6 +1131,7 @@ export type HostFactsPayloadByCommand = {
   CONVERSATION_DETAIL: HostConversationReference;
   CONVERSATION_TAIL: ConversationTailRequestPayload<HostConversationReference>;
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
+  UPSERT_CONVERSATION: JsonObject;
   DELETE_CONVERSATION: HostConversationReference;
   DELETE_CONVERSATIONS: DeleteConversationsRequestPayload<HostConversationReference>;
   MERGE_CONVERSATIONS: MergeConversationsRequestPayload<HostConversationReference>;
@@ -1376,13 +1392,72 @@ function parseConversationTailPayload<TReference extends StableConversationRefer
   };
 }
 
-function parseCaptureSnapshotPayload(value: unknown): CaptureSnapshotRequestPayload {
+export function parseConversationCaptureSnapshot(value: unknown): ConversationCaptureSnapshot {
   const input = record(value);
-  exactKeys(input, ['snapshot', 'transfer']);
+  allowedKeys(input, ['conversation', 'messages', 'mode', 'diff']);
+  const conversation = parseJsonObject(input.conversation);
+  parseText(conversation.source);
+  parseText(conversation.conversationKey);
+  if (!Array.isArray(input.messages)) fail();
+  const mode = hasOwn(input, 'mode')
+    ? parseEnum(input.mode, ['snapshot', 'incremental', 'append'] as const)
+    : undefined;
+  const diff = hasOwn(input, 'diff') ? parseConversationMessageSyncDiff(input.diff) : undefined;
   return {
-    snapshot: parseJsonValue(input.snapshot),
-    transfer: parseStreamDescriptor(input.transfer, ['capture-snapshot']),
+    conversation,
+    messages: input.messages.map((message) => parseJsonObject(message)),
+    ...(mode ? { mode } : {}),
+    ...(diff !== undefined ? { diff } : {}),
   };
+}
+
+function parseCaptureSnapshotPayload(
+  value: unknown,
+  input: Readonly<{ allowStream: boolean; ordinaryRuntime: boolean }>,
+): CaptureSnapshotRequestPayload | CaptureSnapshotOneShotRequestPayload {
+  const payload = record(value);
+  if (!hasOwn(payload, 'snapshot')) {
+    if (!input.allowStream) fail();
+    exactKeys(payload, ['transfer']);
+    const transfer = parseStreamDescriptor(payload.transfer, ['capture-snapshot']);
+    if (transfer.declaredTotalBytes <= MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES) fail();
+    return { transfer };
+  }
+
+  exactKeys(payload, ['snapshot', 'transfer']);
+  const snapshot = parseConversationCaptureSnapshot(payload.snapshot);
+  const transfer = parseStreamDescriptor(payload.transfer, ['capture-snapshot']);
+  const actualBytes = serializedJsonUtf8ByteLength(snapshot);
+  if (actualBytes !== transfer.declaredTotalBytes) {
+    fail('PROTOCOL_MISMATCH', {
+      actualBytes,
+      declaredBytes: transfer.declaredTotalBytes,
+      operation: transfer.operation,
+    });
+  }
+  if (input.ordinaryRuntime && actualBytes > MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES) {
+    fail('PAYLOAD_TOO_LARGE', {
+      actualBytes,
+      limitBytes: MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
+      operation: transfer.operation,
+    });
+  }
+  return { snapshot, transfer };
+}
+
+/** Validates the browser-only small payload or stream-header form of a capture snapshot. */
+export function parseRuntimeCaptureSnapshotPayload(value: unknown): CaptureSnapshotRequestPayload {
+  return parseCaptureSnapshotPayload(value, {
+    allowStream: true,
+    ordinaryRuntime: true,
+  }) as CaptureSnapshotRequestPayload;
+}
+
+function parseHostCaptureSnapshotPayload(value: unknown): CaptureSnapshotRequestPayload {
+  return parseCaptureSnapshotPayload(value, {
+    allowStream: true,
+    ordinaryRuntime: false,
+  }) as CaptureSnapshotRequestPayload;
 }
 
 function parseSyncMessagesPayload<TReference extends StableConversationReference>(
@@ -1742,7 +1817,7 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
         parseBrowserConversationReference,
       ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'SAVE_CONVERSATION_SNAPSHOT':
-      return parseCaptureSnapshotPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+      return parseRuntimeCaptureSnapshotPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'MERGE_CONVERSATIONS':
       return parseMergeConversationsPayload(
         value,
@@ -1846,7 +1921,13 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
     case 'CONVERSATION_TAIL':
       return parseConversationTailPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];
     case 'SAVE_CONVERSATION_SNAPSHOT':
-      return parseCaptureSnapshotPayload(value) as HostFactsPayloadByCommand[TCommand];
+      return parseHostCaptureSnapshotPayload(value) as HostFactsPayloadByCommand[TCommand];
+    case 'UPSERT_CONVERSATION': {
+      const payload = parseJsonObject(value);
+      parseText(payload.source);
+      parseText(payload.conversationKey);
+      return payload as HostFactsPayloadByCommand[TCommand];
+    }
     case 'MERGE_CONVERSATIONS':
       return parseMergeConversationsPayload(
         value,

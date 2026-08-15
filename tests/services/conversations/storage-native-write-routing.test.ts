@@ -55,7 +55,7 @@ describe('native conversation mutation repository', () => {
     const connectNative = vi.fn(async ({ command, payload }: any) => {
       calls.push({ command, payload });
       switch (command) {
-        case 'SAVE_CONVERSATION_SNAPSHOT':
+        case 'UPSERT_CONVERSATION':
           return conversation;
         case 'DELETE_CONVERSATIONS':
           return { deletedConversations: 1, deletedMessages: 2, deletedMappings: 1, deletedImageCache: 3 };
@@ -114,7 +114,7 @@ describe('native conversation mutation repository', () => {
     });
 
     expect(calls.map((call) => call.command)).toEqual([
-      'SAVE_CONVERSATION_SNAPSHOT',
+      'UPSERT_CONVERSATION',
       'DELETE_CONVERSATIONS',
       'MERGE_CONVERSATIONS',
       'SYNC_CONVERSATION_MESSAGES',
@@ -124,12 +124,10 @@ describe('native conversation mutation repository', () => {
       'SET_CONVERSATION_NOTION_PAGE_ID',
       'CLEAR_SYNC_MAPPING',
     ]);
-    expect(calls[0].payload).toMatchObject({
-      snapshot: { source: conversation.source, conversationKey: conversation.conversationKey },
-      transfer: {
-        operation: 'capture-snapshot',
-        declaredTotalBytes: serializedJsonUtf8ByteLength(calls[0].payload.snapshot),
-      },
+    expect(calls[0].payload).toEqual({
+      source: conversation.source,
+      conversationKey: conversation.conversationKey,
+      title: 'Updated',
     });
     expect(calls[1].payload).toEqual({
       conversations: [

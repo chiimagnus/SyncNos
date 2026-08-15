@@ -7,10 +7,12 @@ import type { NativeMessagingPort } from '@platform/local-data/native-port';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
   createHostFactsFailure,
   createHostFactsSuccess,
 } from '@services/local-data/contracts';
 import { OrderedFrameDigestAccumulator } from '@services/local-data/digest';
+import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 import { createNativeWireDataFrame } from '@services/local-data/native-wire';
 
@@ -98,6 +100,20 @@ async function hostJsonFrames(value: unknown) {
   ];
 }
 
+function captureSnapshotPayload(contentText: string) {
+  const snapshot = {
+    conversation: { source: 'chatgpt', conversationKey: 'native-large', sourceType: 'chat' },
+    messages: [{ messageKey: 'm1', role: 'assistant', contentText }],
+  };
+  return {
+    snapshot,
+    transfer: {
+      operation: 'capture-snapshot' as const,
+      declaredTotalBytes: encodeCanonicalJson(snapshot).bytes.byteLength,
+    },
+  };
+}
+
 describe('Native Messaging client', () => {
   it('uses the canonical Host name for a bounded one-shot command', async () => {
     const send = vi.fn().mockResolvedValue(createHostFactsSuccess('small-request', { factsRevision: 7 }));
@@ -175,6 +191,50 @@ describe('Native Messaging client', () => {
 
     await expect(operation).resolves.toEqual({ items: ['first'] });
     expect(harness.postMessage).toHaveBeenCalledTimes(1);
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads a large capture through bounded NativeWire frames instead of one Native Messaging payload', async () => {
+    const harness = createPortHarness();
+    const payload = captureSnapshotPayload('x'.repeat(MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES));
+    const responseFrames = await hostJsonFrames({ saved: true });
+    harness.postMessage.mockImplementation((message: unknown) => {
+      if (!(message && typeof message === 'object' && (message as { type?: unknown }).type === 'terminal')) return;
+      queueMicrotask(() => {
+        harness.emitMessage(
+          createHostFactsSuccess('large-capture', {
+            stream: {
+              operation: 'host-json',
+              declaredTotalBytes: new TextEncoder().encode('{"saved":true}').byteLength,
+            },
+          }),
+        );
+        for (const frame of responseFrames) harness.emitMessage(frame);
+      });
+    });
+
+    await expect(
+      connectNative<{ saved: boolean }>({
+        command: 'SAVE_CONVERSATION_SNAPSHOT',
+        payload,
+        dependencies: {
+          createRequestId: () => 'large-capture',
+          digestProvider,
+          runtime: { connectNative: vi.fn(() => harness.port) },
+        },
+      }),
+    ).resolves.toEqual({ saved: true });
+
+    const sent = harness.postMessage.mock.calls.map(([message]) => message as Record<string, unknown>);
+    expect(sent[0]).toMatchObject({
+      requestId: 'large-capture',
+      command: 'SAVE_CONVERSATION_SNAPSHOT',
+      payload: { transfer: payload.transfer },
+    });
+    expect(sent[0]?.payload).not.toHaveProperty('snapshot');
+    expect(sent[1]).toMatchObject({ type: 'begin', operation: 'capture-snapshot' });
+    expect(sent.filter((message) => message.type === 'data')).not.toHaveLength(0);
+    expect(sent.at(-1)).toMatchObject({ type: 'terminal', status: 'ok' });
     expect(harness.disconnect).toHaveBeenCalledTimes(1);
   });
 

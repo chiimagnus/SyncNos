@@ -5,11 +5,13 @@ import {
 } from '@platform/messaging/message-contracts';
 import {
   RuntimeStreamReceiver,
+  RuntimeStreamSender,
   parseRuntimeStreamMessage,
   type RuntimeStreamPort,
 } from '@platform/messaging/stream-port';
 import { connectPort } from '@platform/runtime/ports';
 import { send } from '@platform/runtime/runtime';
+import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import type {
   Conversation,
   ConversationDetail,
@@ -27,8 +29,11 @@ import type {
 } from '@services/conversations/domain/models';
 import {
   LocalDataContractError,
+  MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
+  parseConversationCaptureSnapshot,
   parseFactsEpoch,
   parseStreamDescriptor,
+  type ConversationCaptureSnapshot,
   type FactsEpoch,
   type StreamDescriptor,
 } from '@services/local-data/contracts';
@@ -50,6 +55,17 @@ type ConversationReadStreamPort = RuntimeStreamPort &
   }>;
 
 const STREAM_TIMEOUT_MS = 60_000;
+
+export type ConversationCaptureSnapshotResult = Readonly<{
+  conversationId: number;
+  isNew: boolean;
+}>;
+
+type ConversationCaptureSnapshotStreamPreflight = Readonly<{
+  kind: 'stream';
+  requestId: string;
+  stream: StreamDescriptor;
+}>;
 
 function unwrap<T>(res: ApiResponse<T>): T {
   if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
@@ -127,6 +143,32 @@ function parseReadPreflight(value: unknown): ConversationReadStreamPreflight | n
   if (opened.type !== 'open' || opened.direction !== 'download') protocolFailure();
   const stream = parseStreamDescriptor(input.stream, ['conversation-detail']);
   return { kind: 'stream', requestId: opened.requestId, stream };
+}
+
+function parseCaptureSnapshotPreflight(value: unknown): ConversationCaptureSnapshotStreamPreflight | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const input = record(value);
+  if (input.kind !== 'stream') return null;
+  exactKeys(input, ['kind', 'requestId', 'stream']);
+  const opened = parseRuntimeStreamMessage({
+    type: LOCAL_DATA_STREAM_MESSAGE_TYPES.OPEN,
+    requestId: input.requestId,
+    direction: 'upload',
+    stream: input.stream,
+  });
+  if (opened.type !== 'open' || opened.direction !== 'upload') protocolFailure();
+  return {
+    kind: 'stream',
+    requestId: opened.requestId,
+    stream: parseStreamDescriptor(input.stream, ['capture-snapshot']),
+  };
+}
+
+function asCaptureSnapshotResult(value: unknown): ConversationCaptureSnapshotResult {
+  const input = record(value);
+  exactKeys(input, ['conversationId', 'isNew']);
+  if (typeof input.isNew !== 'boolean') protocolFailure();
+  return { conversationId: positiveId(input.conversationId), isNew: input.isNew };
 }
 
 function asConversationDetail(value: unknown): ConversationDetailResponse {
@@ -260,6 +302,97 @@ async function receiveConversationReadStream(preflight: ConversationReadStreamPr
       fail(error);
     }
   });
+}
+
+async function uploadConversationCaptureSnapshot(
+  preflight: ConversationCaptureSnapshotStreamPreflight,
+  bytes: Uint8Array,
+): Promise<ConversationCaptureSnapshotResult> {
+  const port = asConversationReadStreamPort(connectPort(UI_PORT_NAMES.LOCAL_DATA_STREAM));
+  const sender = new RuntimeStreamSender({ announceHeader: false, port, requestId: preflight.requestId });
+
+  return await new Promise<ConversationCaptureSnapshotResult>((resolve, reject) => {
+    let closed = false;
+    let queue = Promise.resolve();
+    const timeout = globalThis.setTimeout(
+      () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
+      STREAM_TIMEOUT_MS,
+    );
+
+    const cleanup = () => {
+      globalThis.clearTimeout(timeout);
+      sender.dispose();
+      port.onMessage?.removeListener?.(onMessage);
+      port.onDisconnect?.removeListener?.(onDisconnect);
+      try {
+        port.disconnect?.();
+      } catch {
+        // A disconnected Port cannot be reused.
+      }
+    };
+    const complete = (value: ConversationCaptureSnapshotResult) => {
+      if (closed) return;
+      closed = true;
+      cleanup();
+      resolve(value);
+    };
+    const fail = (error: unknown) => {
+      if (closed) return;
+      closed = true;
+      cleanup();
+      reject(error);
+    };
+    const accept = (raw: unknown) => {
+      const message = parseRuntimeStreamMessage(raw);
+      if (message.requestId !== preflight.requestId) protocolFailure();
+      if (message.type === 'complete') {
+        if (message.data === undefined) protocolFailure();
+        complete(asCaptureSnapshotResult(message.data));
+        return;
+      }
+      if (message.type === 'error') throw new LocalDataContractError(message.error.code, message.error.diagnostics);
+      sender.accept(message);
+    };
+    const onMessage: RuntimePortListener = (raw) => {
+      queue = queue.then(() => accept(raw)).catch(fail);
+    };
+    const onDisconnect: RuntimePortListener = () => fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+
+    try {
+      port.onMessage?.addListener?.(onMessage);
+      port.onDisconnect?.addListener?.(onDisconnect);
+      port.postMessage({
+        type: LOCAL_DATA_STREAM_MESSAGE_TYPES.OPEN,
+        requestId: preflight.requestId,
+        direction: 'upload',
+        stream: preflight.stream,
+      });
+      void sender.send(bytes, preflight.stream).catch(fail);
+    } catch (error) {
+      fail(error);
+    }
+  });
+}
+
+/** Sends one canonical capture snapshot, using the authenticated Port once it exceeds the ordinary runtime bound. */
+export async function saveConversationSnapshot(
+  sendRuntime: (type: string, payload?: Record<string, unknown>) => Promise<unknown>,
+  rawSnapshot: ConversationCaptureSnapshot,
+): Promise<ConversationCaptureSnapshotResult> {
+  if (typeof sendRuntime !== 'function') throw new LocalDataContractError('HOST_UNAVAILABLE');
+  const snapshot = parseConversationCaptureSnapshot(rawSnapshot);
+  const bytes = encodeCanonicalJson(snapshot).bytes;
+  const stream = parseStreamDescriptor({ operation: 'capture-snapshot', declaredTotalBytes: bytes.byteLength });
+
+  if (bytes.byteLength <= MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES) {
+    const response = await sendRuntime(CORE_MESSAGE_TYPES.SAVE_CONVERSATION_SNAPSHOT, { snapshot, transfer: stream });
+    return asCaptureSnapshotResult(unwrap(response as ApiResponse<unknown>));
+  }
+
+  const response = await sendRuntime(CORE_MESSAGE_TYPES.SAVE_CONVERSATION_SNAPSHOT, { transfer: stream });
+  const preflight = parseCaptureSnapshotPreflight(unwrap(response as ApiResponse<unknown>));
+  if (!preflight || !sameDescriptor(preflight.stream, stream)) protocolFailure();
+  return await uploadConversationCaptureSnapshot(preflight, bytes);
 }
 
 export async function resolveConversationDetailResponse(

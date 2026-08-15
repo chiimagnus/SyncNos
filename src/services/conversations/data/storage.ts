@@ -2,6 +2,7 @@ import * as idb from '@services/conversations/data/storage-idb';
 import { FactsBackend, type BoundFactsRepository } from '@services/local-data/facts-backend';
 import {
   LocalDataContractError,
+  type ConversationCaptureSnapshot,
   type JsonObject,
   type JsonValue,
   type StableConversationReference,
@@ -118,6 +119,20 @@ function createIdbConversationReadRepository(lease: FactsOperationLease): Conver
       assertLease();
       return await idb.upsertConversation(payload);
     },
+    async saveConversationSnapshot(snapshot: ConversationCaptureSnapshot) {
+      assertLease();
+      const isNew = !(await idb.hasConversation(snapshot.conversation));
+      const conversation = await idb.upsertConversation(snapshot.conversation);
+      const conversationId = Number(conversation.id);
+      if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+        throw new LocalDataContractError('PROTOCOL_MISMATCH');
+      }
+      const result = await idb.syncConversationMessages(conversationId, [...snapshot.messages], {
+        ...(snapshot.mode === undefined ? {} : { mode: snapshot.mode }),
+        ...(snapshot.diff === undefined ? {} : { diff: snapshot.diff }),
+      });
+      return { conversation, isNew, ...result };
+    },
     async deleteConversations(references) {
       assertLease();
       const resolved = references.map(assertResolvedReference);
@@ -196,28 +211,4 @@ export function createConversationReadRunner(
     run: async ({ kind, expectedFactsEpoch, read }) =>
       await gate.runFactsOperation(kind, async (lease) => await read(await openRepository(lease, expectedFactsEpoch))),
   });
-}
-
-// ponytail: P3-T5's article capture operation is the last production caller; remove with its lease-bound snapshot write.
-export async function getConversationBySourceConversationKey(source: string, conversationKey: string) {
-  return await idb.getConversationBySourceConversationKey(source, conversationKey);
-}
-
-export async function upsertConversation(payload: any) {
-  return await idb.upsertConversation(payload);
-}
-
-export async function hasConversation(payload: any) {
-  return await idb.hasConversation(payload);
-}
-
-export async function syncConversationMessages(
-  conversationId: number,
-  messages: any[],
-  options?: {
-    mode?: 'snapshot' | 'incremental' | 'append';
-    diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
-  },
-) {
-  return await idb.syncConversationMessages(conversationId, messages, options);
 }

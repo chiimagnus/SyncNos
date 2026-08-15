@@ -203,11 +203,10 @@ describe('native conversation read repository', () => {
 describe('conversation read streaming', () => {
   it('preflights large detail and tail snapshots, then consumes each request id once', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '550e8400-e29b-41d4-a716-446655440000' });
-    let download: ((input: { requestId: string; send: (bytes: Uint8Array) => Promise<void> }) => Promise<void>) | null =
-      null;
+    const handlers = new Map<string, any>();
     const streamRouter = {
-      register(_operation: 'conversation-detail', handler: any) {
-        download = handler.download;
+      register(operation: string, handler: any) {
+        handlers.set(operation, handler);
       },
     };
     const detail = {
@@ -248,6 +247,9 @@ describe('conversation read streaming', () => {
       data: { kind: 'stream', requestId: '550e8400-e29b-41d4-a716-446655440000' },
     });
     expect(preflight.data.stream).toMatchObject({ operation: 'conversation-detail' });
+    const download = handlers.get('conversation-detail')?.download as
+      | ((input: { requestId: string; send: (bytes: Uint8Array) => Promise<void> }) => Promise<void>)
+      | undefined;
     expect(typeof download).toBe('function');
 
     const sent: Uint8Array[] = [];

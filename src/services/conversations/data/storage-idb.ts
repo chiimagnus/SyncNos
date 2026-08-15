@@ -612,7 +612,7 @@ export async function syncConversationMessages(
   messages: any[],
   options?: {
     mode?: 'snapshot' | 'incremental' | 'append';
-    diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
+    diff?: { added?: readonly string[]; updated?: readonly string[]; removed?: readonly string[] } | null;
   },
 ): Promise<{ upserted: number; deleted: number }> {
   const requestedMode = options?.mode;

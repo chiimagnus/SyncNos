@@ -1,10 +1,13 @@
 import { ARTICLE_MESSAGE_TYPES, UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
-import { fetchActiveTabArticle, resolveOrCaptureActiveTabArticle } from '@collectors/web/article-fetch';
-import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import {
-  AUTO_SYNC_CONVERSATION_CHANGED_REASONS,
-  type AutoSyncConversationChangedReason,
-} from '@services/sync/auto-sync/auto-sync-keys';
+  fetchActiveTabArticle,
+  resolveOrCaptureActiveTabArticle,
+  type ArticleCapturePersistence,
+} from '@collectors/web/article-fetch';
+import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
+import { saveConversationCaptureSnapshotInLease } from '@services/conversations/background/handlers';
+import { type ConversationReadRunner } from '@services/conversations/data/storage';
+import { type AutoSyncConversationChangedReason } from '@services/sync/auto-sync/auto-sync-keys';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -13,9 +16,10 @@ type AnyRouter = {
   eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
-type WebArticleHandlersDeps = {
-  onConversationChanged?: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
-};
+type WebArticleHandlersDeps = Readonly<{
+  conversationReadRunner: ConversationReadRunner;
+  onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+}>;
 
 function normalizeArticleFetchError(error: unknown, fallback: string): string {
   const raw =
@@ -25,14 +29,40 @@ function normalizeArticleFetchError(error: unknown, fallback: string): string {
   return message || fallback;
 }
 
-function fireAndForget(task: void | Promise<void>) {
-  Promise.resolve(task).catch(() => {});
-}
+export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHandlersDeps) {
+  const run = async (
+    tabId: unknown,
+    operation: (input: Readonly<{ persistence: ArticleCapturePersistence; tabId?: number }>) => Promise<unknown>,
+  ) => {
+    let saved = false;
+    const data = await deps.conversationReadRunner.run({
+      kind: 'article-fetch',
+      read: async ({ mode, repository }) => {
+        const persistence: ArticleCapturePersistence = {
+          findConversation: async (reference) => await repository.getConversationByReference(reference),
+          saveSnapshot: async (input) => {
+            saved = true;
+            return await saveConversationCaptureSnapshotInLease({
+              mode,
+              repository,
+              snapshot: input.snapshot,
+              ...(input.forceHttpImageCache ? { forceHttpImageCache: true } : {}),
+              onConversationChanged: deps.onConversationChanged,
+            });
+          },
+        };
+        return await operation({
+          persistence,
+          ...(Number.isFinite(Number(tabId)) ? { tabId: Number(tabId) } : {}),
+        });
+      },
+    });
+    return { data, saved };
+  };
 
-export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHandlersDeps = {}) {
   router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg) => {
     try {
-      const data = await fetchActiveTabArticle({ tabId: msg?.tabId });
+      const { data } = await run(msg?.tabId, fetchActiveTabArticle);
 
       const conversationId = Number((data as any)?.conversationId);
       if (Number.isFinite(conversationId) && conversationId > 0) {
@@ -40,9 +70,6 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
           reason: 'articleFetch',
           conversationId,
         });
-        fireAndForget(
-          deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
-        );
       }
 
       return router.ok(data);
@@ -53,18 +80,14 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
 
   router.register(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, async (msg) => {
     try {
-      const data = await resolveOrCaptureActiveTabArticle({ tabId: msg?.tabId });
+      const { data, saved } = await run(msg?.tabId, resolveOrCaptureActiveTabArticle);
 
       const conversationId = Number((data as any)?.conversationId);
-      const isNew = (data as any)?.isNew === true;
-      if (isNew && Number.isFinite(conversationId) && conversationId > 0) {
+      if (saved && Number.isFinite(conversationId) && conversationId > 0) {
         router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
           reason: 'articleFetch',
           conversationId,
         });
-        fireAndForget(
-          deps.onConversationChanged?.(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
-        );
       }
 
       return router.ok(data);

@@ -9,9 +9,12 @@ import {
 import {
   LocalDataContractError,
   createLocalDataError,
+  parseJsonValue,
   parseStreamDescriptor,
+  type JsonValue,
   type LocalDataError,
   type LocalDataStreamOperation,
+  type StreamDescriptor,
 } from './contracts';
 import { type FactsOperationGate, type FactsOperationLease } from './facts-operation-gate';
 
@@ -42,6 +45,7 @@ type ConnectedBackgroundStreamPort = BackgroundStreamPort &
   }>;
 
 export type BackgroundStreamHandler = Readonly<{
+  authorizeUpload?: (input: Readonly<{ requestId: string; stream: StreamDescriptor }>) => void;
   download?: (
     input: Readonly<{
       lease: FactsOperationLease;
@@ -56,8 +60,9 @@ export type BackgroundStreamHandler = Readonly<{
       lease: FactsOperationLease;
       operation: LocalDataStreamOperation;
       requestId: string;
+      stream: StreamDescriptor;
     }>,
-  ) => Promise<void>;
+  ) => Promise<JsonValue | void>;
 }>;
 
 type Deferred<T> = Readonly<{
@@ -128,6 +133,7 @@ export class BackgroundStreamRouter {
     if (
       !handler ||
       typeof handler !== 'object' ||
+      (handler.authorizeUpload !== undefined && typeof handler.authorizeUpload !== 'function') ||
       (handler.upload !== undefined && typeof handler.upload !== 'function') ||
       (handler.download !== undefined && typeof handler.download !== 'function') ||
       (!handler.upload && !handler.download) ||
@@ -177,24 +183,34 @@ export class BackgroundStreamRouter {
     };
 
     const startUpload = (message: Extract<RuntimeStreamMessage, { type: 'open'; direction: 'upload' }>) => {
-      const handler = this.#handlers.get(message.stream.operation)?.upload;
-      if (!handler) throw new LocalDataContractError('INVALID_ARGUMENT');
+      const registered = this.#handlers.get(message.stream.operation);
+      if (!registered?.upload) throw new LocalDataContractError('INVALID_ARGUMENT');
+      registered.authorizeUpload?.({
+        requestId: message.requestId,
+        stream: message.stream,
+      });
+      const handler = registered.upload;
       requestId = message.requestId;
       receiver = new RuntimeStreamReceiver(message.requestId, message.stream);
       upload = deferred<Uint8Array>();
       void this.gate
         .runFactsOperation(`stream:${message.stream.operation}`, async (lease) => {
           const bytes = await upload!.promise;
-          await handler({
+          return await handler({
             bytes,
             lease,
             operation: message.stream.operation,
             requestId: message.requestId,
+            stream: message.stream,
           });
         })
-        .then(() => {
+        .then((data) => {
           if (closed) return;
-          port.postMessage({ type: 'complete', requestId: message.requestId });
+          port.postMessage({
+            type: 'complete',
+            requestId: message.requestId,
+            ...(data === undefined ? {} : { data: parseJsonValue(data) }),
+          });
           close();
         })
         .catch((error) => fail(error, message.requestId));

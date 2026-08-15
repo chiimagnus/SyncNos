@@ -32,7 +32,9 @@ describe('background-router article fetch', () => {
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({ conversationId: 7, tabId: 42 });
     expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledTimes(1);
-    expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 42 });
+    expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith(
+      expect.objectContaining({ tabId: 42, persistence: expect.any(Object) }),
+    );
   });
 
   it('returns integration errors as router errors', async () => {
@@ -83,10 +85,20 @@ describe('background-router article fetch', () => {
     expect(String(res.error?.message || '')).toContain('Discourse OP not found');
   });
 
-  it('broadcasts conversationsChanged only for newly captured resolveOrCapture result', async () => {
-    articleFetchMocks.resolveOrCaptureActiveTabArticle.mockResolvedValue({
-      isNew: true,
-      conversationId: 77,
+  it('broadcasts conversationsChanged only after resolveOrCapture persists a snapshot', async () => {
+    articleFetchMocks.resolveOrCaptureActiveTabArticle.mockImplementation(async ({ persistence }: any) => {
+      await persistence.saveSnapshot({
+        snapshot: {
+          conversation: { source: 'web', conversationKey: 'article:https://example.com/a', sourceType: 'article' },
+          messages: [{ messageKey: 'article_body', role: 'article', contentText: 'body', sequence: 1 }],
+          mode: 'snapshot',
+          diff: null,
+        },
+      });
+      return {
+        isNew: true,
+        conversationId: 77,
+      };
     });
 
     const router = createTestBackgroundRouter();

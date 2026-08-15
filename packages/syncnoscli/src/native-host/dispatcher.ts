@@ -38,6 +38,7 @@ const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
 
 const NATIVE_HOST_CONNECTED_MUTATION_COMMANDS = Object.freeze([
   'SAVE_CONVERSATION_SNAPSHOT',
+  'UPSERT_CONVERSATION',
   'DELETE_CONVERSATION',
   'DELETE_CONVERSATIONS',
   'MERGE_CONVERSATIONS',
@@ -174,7 +175,7 @@ export function readNativeHostConnectedCommand(database: SyncNosSqliteDatabase, 
 }
 
 /**
- * Executes only the typed conversation/mapping writes that P3-T4 exposes through
+ * Executes only the typed conversation/mapping writes exposed through
  * the lease-bound facade. References are re-resolved by each repository inside its
  * SQLite transaction; browser epochs and browser-local IDs never enter this Host.
  */
@@ -183,12 +184,13 @@ export function writeNativeHostConnectedCommand(database: SyncNosSqliteDatabase,
   const mappings = createMappingsRepository(database);
   switch (request.command) {
     case 'SAVE_CONVERSATION_SNAPSHOT': {
+      if (!('snapshot' in request.payload)) invalidArgument();
       const snapshot = request.payload.snapshot;
-      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) invalidArgument();
       if (serializedJsonUtf8ByteLength(snapshot) !== request.payload.transfer.declaredTotalBytes) protocolMismatch();
-      // ponytail: P3-T5 replaces this legacy conversation-only snapshot with the atomic conversation+messages capture.
-      return conversations.upsertConversation(snapshot);
+      return conversations.saveConversationSnapshot(snapshot);
     }
+    case 'UPSERT_CONVERSATION':
+      return conversations.upsertConversation(request.payload);
     case 'DELETE_CONVERSATION':
       return conversations.deleteConversationsByReferences([request.payload]);
     case 'DELETE_CONVERSATIONS':

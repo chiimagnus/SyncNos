@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const storageMocks = {
-  hasConversation: vi.fn(),
-  upsertConversation: vi.fn(),
-  syncConversationMessages: vi.fn(),
+const persistenceMocks = {
+  findConversation: vi.fn(),
+  saveSnapshot: vi.fn(),
 };
 
 const settingsMocks = {
@@ -11,75 +10,53 @@ const settingsMocks = {
   storageSet: vi.fn(),
 };
 
-const imageInlineMocks = {
-  inlineChatImagesInMessages: vi.fn(),
-};
-
-vi.mock('@services/conversations/data/storage', () => ({
-  hasConversation: storageMocks.hasConversation,
-  upsertConversation: storageMocks.upsertConversation,
-  syncConversationMessages: storageMocks.syncConversationMessages,
-}));
-
 vi.mock('@platform/storage/local', () => ({
   storageGet: settingsMocks.storageGet,
   storageSet: settingsMocks.storageSet,
 }));
 
-vi.mock('@services/conversations/data/image-inline', () => ({
-  inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
-}));
-
 async function loadArticleFetchService() {
   const module = await import('../../src/collectors/web/article-fetch-service.ts');
-  return module.default || module;
+  const api = module.default || module;
+  return {
+    ...api,
+    fetchActiveTabArticle: async (input: { tabId?: number } = {}) =>
+      await api.fetchActiveTabArticle({
+        ...input,
+        persistence: {
+          findConversation: persistenceMocks.findConversation,
+          saveSnapshot: persistenceMocks.saveSnapshot,
+        },
+      }),
+  };
 }
 
 beforeEach(() => {
   vi.resetModules();
   settingsMocks.storageSet.mockResolvedValue(undefined);
+  persistenceMocks.findConversation.mockResolvedValue(null);
+  persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 1, isNew: true });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
-  storageMocks.hasConversation.mockReset();
-  storageMocks.upsertConversation.mockReset();
-  storageMocks.syncConversationMessages.mockReset();
+  persistenceMocks.findConversation.mockReset();
+  persistenceMocks.saveSnapshot.mockReset();
   settingsMocks.storageGet.mockReset();
   settingsMocks.storageSet.mockReset();
-  imageInlineMocks.inlineChatImagesInMessages.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.chrome;
 });
 
 describe('article-fetch-service', () => {
-  it('stores extracted active-tab article into conversations/messages', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 11, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+  it('passes the extracted active-tab article as one snapshot', async () => {
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 11, isNew: true });
     settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
       if (keys.includes('xiaohongshu_comments_capture_enabled')) {
         return { xiaohongshu_comments_capture_enabled: true };
       }
       return { web_article_cache_images_enabled: true };
     });
-    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => ({
-      messages: (Array.isArray(input?.messages) ? input.messages : []).map((message: any) => ({
-        ...message,
-        contentMarkdown: String(message?.contentMarkdown || '').replace(
-          'https://example.com/a.png',
-          'syncnos-asset://conversation/11/a.png',
-        ),
-      })),
-      inlinedCount: 1,
-      downloadedCount: 1,
-      fromCacheCount: 0,
-      inlinedBytes: 123,
-      warningFlags: [],
-    }));
-
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       cb(Array.isArray(details?.files) ? [{}] : []);
     });
@@ -133,8 +110,10 @@ describe('article-fetch-service', () => {
     });
 
     expect(executeScript).toHaveBeenCalledTimes(0);
-    expect(upsertConversation).toHaveBeenCalledTimes(1);
-    expect(upsertConversation.mock.calls[0][0]).toMatchObject({
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledTimes(1);
+    const [[{ snapshot, forceHttpImageCache }]] = persistenceMocks.saveSnapshot.mock.calls;
+    expect(forceHttpImageCache).toBe(false);
+    expect(snapshot.conversation).toMatchObject({
       sourceType: 'article',
       source: 'web',
       conversationKey: 'article:https://example.com/post',
@@ -143,31 +122,17 @@ describe('article-fetch-service', () => {
       author: 'Author',
     });
 
-    expect(syncConversationMessages).toHaveBeenCalledTimes(1);
-    const [conversationId, messages] = syncConversationMessages.mock.calls[0];
-    expect(conversationId).toBe(11);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
-    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0][0]).toMatchObject({
-      conversationId: 11,
-      conversationUrl: 'https://example.com/post',
-      enableHttpImages: true,
-    });
-    expect(Array.isArray(messages)).toBe(true);
-    expect(messages[0]).toMatchObject({
+    expect(snapshot.messages[0]).toMatchObject({
       messageKey: 'article_body',
       role: 'article',
       sequence: 1,
       contentText: 'Hello world article text.',
-      contentMarkdown: '## Heading\n\n![img](syncnos-asset://conversation/11/a.png)\n\nHello world article text.',
+      contentMarkdown: '## Heading\n\n![img](https://example.com/a.png)\n\nHello world article text.',
     });
   });
 
   it('navigates discourse topic to /1 when current floor misses OP and keeps topic-level canonical url', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 31, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 31, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     let currentUrl = 'https://linux.do/t/topic/1870532/xxx?u=abc#reply-2';
@@ -245,15 +210,18 @@ describe('article-fetch-service', () => {
     });
     expect(data.url).toBe('https://linux.do/t/topic/1870532');
 
-    expect(upsertConversation).toHaveBeenCalledWith(
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversationKey: 'article:https://linux.do/t/topic/1870532',
-        url: 'https://linux.do/t/topic/1870532',
+        snapshot: expect.objectContaining({
+          conversation: expect.objectContaining({
+            conversationKey: 'article:https://linux.do/t/topic/1870532',
+            url: 'https://linux.do/t/topic/1870532',
+          }),
+        }),
       }),
     );
 
-    const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
-    expect(messages[0]).toMatchObject({
+    expect(persistenceMocks.saveSnapshot.mock.calls[0][0].snapshot.messages[0]).toMatchObject({
       contentText: 'OP body',
       contentMarkdown: 'OP body',
     });
@@ -261,11 +229,7 @@ describe('article-fetch-service', () => {
   });
 
   it('does not navigate to /1 when OP is already extractable on a high discourse floor', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 33, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 33, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const currentUrl = 'https://linux.do/t/topic/1870532/820?u=abc#reply-9';
@@ -310,19 +274,13 @@ describe('article-fetch-service', () => {
 
     expect(tabsUpdate).not.toHaveBeenCalled();
     expect(data.url).toBe('https://linux.do/t/topic/1870532');
-    const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
-    expect(messages[0]).toMatchObject({
+    expect(persistenceMocks.saveSnapshot.mock.calls[0][0].snapshot.messages[0]).toMatchObject({
       contentText: 'OP body',
       contentMarkdown: 'OP body',
     });
   });
 
   it('fails strictly when discourse OP is still missing on /1', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 41, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
@@ -365,17 +323,12 @@ describe('article-fetch-service', () => {
     const service = await loadArticleFetchService();
     await expect(service.fetchActiveTabArticle()).rejects.toThrow('Discourse OP not found');
 
-    expect(upsertConversation).not.toHaveBeenCalled();
-    expect(syncConversationMessages).not.toHaveBeenCalled();
+    expect(persistenceMocks.saveSnapshot).not.toHaveBeenCalled();
     expect(tabsUpdate).not.toHaveBeenCalled();
   });
 
-  it('does not inline article images when web article cache toggle is disabled', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 21, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+  it('does not force image cache when no anti-hotlink rule matches', async () => {
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 21, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
@@ -416,29 +369,15 @@ describe('article-fetch-service', () => {
     const data = await service.fetchActiveTabArticle();
 
     expect(data.conversationId).toBe(21);
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
-    expect(syncConversationMessages).toHaveBeenCalledTimes(1);
-    const [_conversationId, messages] = syncConversationMessages.mock.calls[0];
-    expect(messages[0]).toMatchObject({
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({ forceHttpImageCache: false }));
+    expect(persistenceMocks.saveSnapshot.mock.calls[0][0].snapshot.messages[0]).toMatchObject({
       contentMarkdown: '![img](https://example.com/no-inline.png)\n\nArticle body.',
     });
   });
 
-  it('auto inlines anti-hotlink article images even when toggle is disabled', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 71, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+  it('forces image cache for anti-hotlink article images even when toggle is disabled', async () => {
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 71, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
-    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => ({
-      messages: Array.isArray(input?.messages) ? input.messages : [],
-      inlinedCount: 1,
-      downloadedCount: 1,
-      fromCacheCount: 0,
-      inlinedBytes: 256,
-      warningFlags: [],
-    }));
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       cb(Array.isArray(details?.files) ? [{}] : []);
@@ -478,7 +417,7 @@ describe('article-fetch-service', () => {
     const data = await service.fetchActiveTabArticle();
 
     expect(data.conversationId).toBe(71);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({ forceHttpImageCache: true }));
     expect(settingsMocks.storageSet).toHaveBeenCalledWith(
       expect.objectContaining({
         anti_hotlink_rules_v1: expect.arrayContaining([
@@ -489,11 +428,7 @@ describe('article-fetch-service', () => {
   });
 
   it('keeps capture successful when anti-hotlink rule lookup fails', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 72, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 72, isNew: true });
     settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
       if (Array.isArray(keys) && keys.includes('web_article_cache_images_enabled')) {
         return { web_article_cache_images_enabled: false };
@@ -539,16 +474,11 @@ describe('article-fetch-service', () => {
     const data = await service.fetchActiveTabArticle();
 
     expect(data.conversationId).toBe(72);
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
-    expect(syncConversationMessages).toHaveBeenCalledTimes(1);
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({ forceHttpImageCache: false }));
   });
 
   it('does not force inline when anti-hotlink rules are explicitly empty', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 73, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 73, isNew: true });
     settingsMocks.storageGet.mockImplementation(async (keys: string[]) => {
       if (Array.isArray(keys) && keys.includes('web_article_cache_images_enabled')) {
         return { web_article_cache_images_enabled: false };
@@ -597,12 +527,10 @@ describe('article-fetch-service', () => {
     const data = await service.fetchActiveTabArticle();
 
     expect(data.conversationId).toBe(73);
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(persistenceMocks.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({ forceHttpImageCache: false }));
   });
 
   it('rejects non-http active tab url', async () => {
-    storageMocks.upsertConversation.mockResolvedValue({ id: 1 });
-    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
 
     const executeScript = vi.fn((_details: any, cb: (results: any[]) => void) => cb([{}]));
@@ -622,12 +550,11 @@ describe('article-fetch-service', () => {
     const service = await loadArticleFetchService();
     await expect(service.fetchActiveTabArticle()).rejects.toThrow('active tab must be an http(s) page');
     expect(executeScript).not.toHaveBeenCalled();
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(persistenceMocks.saveSnapshot).not.toHaveBeenCalled();
   });
 
-  it('fails when storage module is unavailable', async () => {
-    storageMocks.upsertConversation.mockRejectedValue(new Error('storage module missing'));
-    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+  it('fails when snapshot persistence rejects', async () => {
+    persistenceMocks.saveSnapshot.mockRejectedValue(new Error('snapshot persistence failed'));
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
@@ -664,17 +591,13 @@ describe('article-fetch-service', () => {
     };
 
     const service = await loadArticleFetchService();
-    await expect(service.fetchActiveTabArticle()).rejects.toThrow('storage module missing');
+    await expect(service.fetchActiveTabArticle()).rejects.toThrow('snapshot persistence failed');
   });
 
   it('retries extract message once when content script is not ready yet', async () => {
     vi.useFakeTimers();
 
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 51, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 51, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const runtime = { lastError: null as any };
@@ -731,11 +654,7 @@ describe('article-fetch-service', () => {
   });
 
   it('continues capture when readability injection fails', async () => {
-    const upsertConversation = vi.fn(async (payload: any) => ({ id: 61, ...payload }));
-    const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-    storageMocks.hasConversation.mockResolvedValue(false);
-    storageMocks.upsertConversation.mockImplementation(upsertConversation);
-    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
+    persistenceMocks.saveSnapshot.mockResolvedValue({ conversationId: 61, isNew: true });
     settingsMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: false });
 
     const runtime = { lastError: null as any };

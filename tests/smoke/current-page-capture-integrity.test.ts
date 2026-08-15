@@ -29,8 +29,7 @@ function createHarness(input: { collectorId: string; snapshot?: any; prepare?: (
       if (type === 'fetchActiveTabArticle') {
         return { ok: true, data: input.article || { conversationId: 9, title: 'Article', isNew: true } };
       }
-      if (type === 'upsertConversation') return { ok: true, data: { id: 7, __isNew: true } };
-      if (type === 'syncConversationMessages') return { ok: true, data: { upserted: 1 } };
+      if (type === 'saveConversationSnapshot') return { ok: true, data: { conversationId: 7, isNew: true } };
       return { ok: true, data: {} };
     }),
   };
@@ -52,8 +51,8 @@ describe('current page capture integrity routing', () => {
 
     await harness.service.captureCurrentPage();
 
-    expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
-    expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
+    expect(harness.calls.map((call) => call.type)).toEqual(['saveConversationSnapshot']);
+    expect(harness.calls[0].payload.snapshot).toMatchObject({ mode: 'snapshot', diff: null });
   });
 
   it('persists verified partial capture as append with normalized diff', async () => {
@@ -67,12 +66,12 @@ describe('current page capture integrity routing', () => {
 
     expect(result).toMatchObject({ captureCompleteness: 'partial' });
     expect(progress.at(-1)?.message).toBe(t('partialCaptureSaved'));
-    expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
-    expect(harness.calls[1].payload).toMatchObject({
+    expect(harness.calls.map((call) => call.type)).toEqual(['saveConversationSnapshot']);
+    expect(harness.calls[0].payload.snapshot).toMatchObject({
       mode: 'append',
       diff: { added: ['m1'], updated: [], removed: [] },
     });
-    expect(harness.calls[1].payload.messages[0]).toMatchObject({
+    expect(harness.calls[0].payload.snapshot.messages[0]).toMatchObject({
       captureSequencePolicy: 'preserve-existing-tail',
     });
   });
@@ -109,9 +108,9 @@ describe('current page capture integrity routing', () => {
 
     await harness.service.captureCurrentPage();
 
-    const sync = harness.calls.find((call) => call.type === 'syncConversationMessages');
-    expect(sync?.payload).toMatchObject({ mode: 'append' });
-    expect(sync?.payload.messages[0]).toMatchObject({
+    const snapshot = harness.calls.find((call) => call.type === 'saveConversationSnapshot');
+    expect(snapshot?.payload.snapshot).toMatchObject({ mode: 'append' });
+    expect(snapshot?.payload.snapshot.messages[0]).toMatchObject({
       captureMergePolicy: 'preserve-existing-content',
     });
   });
@@ -144,12 +143,12 @@ describe('current page capture integrity routing', () => {
 
     await harness.service.captureCurrentPage();
 
-    expect(harness.calls[0].payload).not.toHaveProperty('captureMeta');
-    expect(harness.calls[1].payload).toMatchObject({
+    expect(harness.calls[0].payload.snapshot).not.toHaveProperty('captureMeta');
+    expect(harness.calls[0].payload.snapshot).toMatchObject({
       mode: 'append',
       diff: { added: ['m1'], updated: [], removed: [] },
     });
-    expect(harness.calls[1].payload.messages[0]).toMatchObject({
+    expect(harness.calls[0].payload.snapshot.messages[0]).toMatchObject({
       captureSequencePolicy: 'preserve-existing-tail',
       captureMergePolicy: 'preserve-existing-markdown',
     });
@@ -161,7 +160,7 @@ describe('current page capture integrity routing', () => {
 
     await harness.service.captureCurrentPage();
 
-    expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
+    expect(harness.calls[0].payload.snapshot).toMatchObject({ mode: 'snapshot', diff: null });
   });
 
   it.each(['chatgpt', 'googleaistudio'])(
