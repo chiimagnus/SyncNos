@@ -92,6 +92,18 @@ describe('native host contract', () => {
     expect(safariManifest).not.toHaveProperty('browser_specific_settings');
   });
 
+  it('enables Native Messaging only for Chrome, Edge, and Firefox', () => {
+    for (const browser of ['chrome', 'edge', 'firefox'] as const) {
+      const manifest = resolveManifest({ browser } as Parameters<typeof resolveManifest>[0]) as Record<string, any>;
+      expect(manifest.permissions).toContain('nativeMessaging');
+    }
+    const safariManifest = resolveManifest({ browser: 'safari' } as Parameters<typeof resolveManifest>[0]) as Record<
+      string,
+      any
+    >;
+    expect(safariManifest.permissions).not.toContain('nativeMessaging');
+  });
+
   it('rejects release-time Gecko overrides before a browser build starts', () => {
     const argumentOverride = spawnSync(
       process.execPath,

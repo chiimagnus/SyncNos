@@ -60,6 +60,9 @@ try {
   fail(`manifest.json parse error: ${e?.message || e}`);
 }
 
+const isSafariBuild = String(root).includes('safari-mv3');
+const hasNativeMessaging = Array.isArray(manifest.permissions) && manifest.permissions.includes('nativeMessaging');
+
 if (manifest.manifest_version !== 3) fail('manifest_version must be 3');
 if (
   !manifest.background?.service_worker &&
@@ -70,13 +73,15 @@ if (
 if (!manifest.action?.default_popup) fail('action.default_popup missing');
 if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length === 0) fail('content_scripts missing');
 if (!manifest.icons?.['16'] || !manifest.icons?.['48'] || !manifest.icons?.['128']) fail('icons 16/48/128 missing');
+if (isSafariBuild ? hasNativeMessaging : !hasNativeMessaging) {
+  fail(isSafariBuild ? 'Safari manifest must not request nativeMessaging' : 'nativeMessaging permission missing');
+}
 
 for (const size of [16, 48, 128]) {
   const p = join(root, manifest.icons[String(size)]);
   if (!existsSync(p)) fail(`icon missing: ${manifest.icons[String(size)]}`);
 }
 
-const isSafariBuild = String(root).includes('safari-mv3');
 if (isSafariBuild) {
   const localesRoot = join(root, '_locales');
   const nameKey = extractManifestMsgKey(manifest.name);

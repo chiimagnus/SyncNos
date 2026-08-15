@@ -89,6 +89,7 @@ export const UI_EVENT_TYPES = {
 } as const;
 
 export const UI_PORT_NAMES = {
+  LOCAL_DATA_STREAM: 'local-data:stream',
   POPUP_EVENTS: 'popup:events',
 } as const;
 

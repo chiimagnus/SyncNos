@@ -1923,6 +1923,70 @@ export function createHostFactsFailure(
   return failureEnvelope(requestId, error, diagnostics);
 }
 
+/** Validates the fixed Host response envelope before a platform adapter consumes its data. */
+export function parseHostFactsResponse(value: unknown): HostFactsResponse<unknown> {
+  try {
+    const input = record(value);
+    if (input.ok === true) {
+      exactKeys(input, ['protocolVersion', 'schemaVersion', 'requestId', 'ok', 'data']);
+    } else if (input.ok === false) {
+      exactKeys(input, ['protocolVersion', 'schemaVersion', 'requestId', 'ok', 'error']);
+    } else {
+      fail('PROTOCOL_MISMATCH');
+    }
+    if (input.protocolVersion !== LOCAL_DATA_PROTOCOL_VERSION) {
+      fail('PROTOCOL_MISMATCH', {
+        expectedProtocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        receivedProtocolVersion:
+          typeof input.protocolVersion === 'number' &&
+          Number.isSafeInteger(input.protocolVersion) &&
+          input.protocolVersion >= 0
+            ? input.protocolVersion
+            : 'invalid',
+      });
+    }
+    if (input.schemaVersion !== LOCAL_DATA_SCHEMA_VERSION) {
+      fail('SCHEMA_MISMATCH', {
+        expectedSchemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+        receivedSchemaVersion:
+          typeof input.schemaVersion === 'number' &&
+          Number.isSafeInteger(input.schemaVersion) &&
+          input.schemaVersion >= 0
+            ? input.schemaVersion
+            : 'invalid',
+      });
+    }
+    const requestId = parseRequestId(input.requestId);
+    if (input.ok === true) {
+      return {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+        requestId,
+        ok: true,
+        data: input.data,
+      };
+    }
+    if (input.ok === false) {
+      return {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+        requestId,
+        ok: false,
+        error: parseLocalDataError(input.error),
+      };
+    }
+    fail('PROTOCOL_MISMATCH');
+  } catch (error) {
+    if (
+      error instanceof LocalDataContractError &&
+      (error.code === 'PROTOCOL_MISMATCH' || error.code === 'SCHEMA_MISMATCH')
+    ) {
+      throw error;
+    }
+    throw new LocalDataContractError('PROTOCOL_MISMATCH');
+  }
+}
+
 export function createCliJsonSuccess<TData>(requestId: unknown, data: TData): CliJsonEnvelope<TData> {
   return successEnvelope(requestId, data);
 }

@@ -45,6 +45,7 @@ const chromeBinary = process.platform === 'darwin' ? resolveChromiumBinaryForMac
 export const resolveManifest: UserManifestFn = (env) => {
   const isSafari = env.browser === 'safari';
   const isFirefox = env.browser === 'firefox';
+  const supportsNativeMessaging = env.browser === 'chrome' || env.browser === 'edge' || isFirefox;
 
   // Base permissions shared by all browsers.
   const permissions: string[] = ['storage', 'contextMenus', 'tabs', 'webNavigation', 'scripting', 'alarms'];
@@ -59,6 +60,7 @@ export const resolveManifest: UserManifestFn = (env) => {
     // `tabGroups` is Chrome-only; the runtime already feature-detects it.
     permissions.push('tabGroups');
   }
+  if (supportsNativeMessaging) permissions.push('nativeMessaging');
 
   const manifest = {
     name: isSafari ? '__MSG_name__' : '__MSG_extName__',
