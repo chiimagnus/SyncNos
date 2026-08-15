@@ -8,6 +8,7 @@ import {
   type ResolvedConversationReference,
 } from '@services/conversations/data/storage';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { createImageStorage, type ImageStorage } from '@services/conversations/data/image-storage';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 import { decodeCanonicalJson } from '@services/local-data/facts-archive';
 import {
@@ -32,6 +33,7 @@ import {
   type FactsEpoch,
   type StableConversationReference,
 } from '@services/local-data/contracts';
+import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import type {
   Conversation,
   ConversationDetailReadResponse,
@@ -334,18 +336,24 @@ async function withCaptureAuthorNames(messages: readonly JsonObject[]): Promise<
 }
 
 async function inlineCaptureImages(input: {
-  conversationId: number;
   conversationSourceType: string;
   conversationUrl: string;
   forceHttpImageCache?: boolean;
+  imageStorage: Pick<ImageStorage, 'findAssetByUrl' | 'putAsset'>;
   messages: JsonObject[];
+  owner: ResolvedConversationReference;
   options: ConversationMessageSyncOptions;
-}): Promise<JsonObject[]> {
+}): Promise<Awaited<ReturnType<typeof inlineChatImagesInMessages>>> {
   try {
     const sourceType = String(input.conversationSourceType || '')
       .trim()
       .toLowerCase();
-    const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+    let local: Record<string, unknown> = {};
+    try {
+      local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
+    } catch {
+      // Image preference lookup is optional; data: images still stay eligible below.
+    }
     const enableHttpImages =
       input.forceHttpImageCache === true ||
       (sourceType === 'article'
@@ -356,7 +364,8 @@ async function inlineCaptureImages(input: {
         ? new Set([...(input.options.diff.added || []), ...(input.options.diff.updated || [])])
         : null;
     const inlined = await inlineChatImagesInMessages({
-      conversationId: input.conversationId,
+      imageStorage: input.imageStorage,
+      owner: input.owner,
       conversationUrl: input.conversationUrl,
       messages: input.messages,
       onlyMessageKeys: keys,
@@ -369,7 +378,7 @@ async function inlineCaptureImages(input: {
       inlined.warningFlags.length > 0
     ) {
       console.info('[ImageInline]', {
-        conversationId: input.conversationId,
+        conversationId: input.owner.conversationId,
         mode: input.options.mode,
         inlinedCount: inlined.inlinedCount,
         downloadedCount: inlined.downloadedCount,
@@ -378,14 +387,22 @@ async function inlineCaptureImages(input: {
         warningFlags: inlined.warningFlags,
       });
     }
-    return inlined.messages as JsonObject[];
+    return inlined;
   } catch (error) {
     console.warn('[ImageInline] failed but capture continues', {
-      conversationId: input.conversationId,
+      conversationId: input.owner.conversationId,
       mode: input.options.mode,
       error: error instanceof Error ? error.message : String(error || ''),
     });
-    return input.messages;
+    return {
+      messages: input.messages,
+      inlinedCount: 0,
+      fromCacheCount: 0,
+      downloadedCount: 0,
+      inlinedBytes: 0,
+      updatedMessageKeys: [],
+      warningFlags: ['inline_images_download_failed'],
+    };
   }
 }
 
@@ -398,6 +415,7 @@ export type ConversationCaptureSnapshotSaveResult = Readonly<{
 export async function saveConversationCaptureSnapshotInLease(
   input: Readonly<{
     forceHttpImageCache?: boolean;
+    lease: FactsOperationLease;
     mode: 'idb' | 'native';
     onConversationChanged: ConversationHandlersDeps['onConversationChanged'];
     repository: ConversationFactsRepository;
@@ -411,26 +429,38 @@ export async function saveConversationCaptureSnapshotInLease(
     ...(input.snapshot.diff === undefined ? { diff: null } : { diff: input.snapshot.diff }),
   };
   const messages = await withCaptureAuthorNames(input.snapshot.messages);
+  const imageStorage = createImageStorage({ lease: input.lease, mode: input.mode });
 
   if (input.mode === 'native') {
-    // ponytail: P3-T7 adds Native image capabilities; active capture must not fall back to image IDB meanwhile.
     const saved = await input.repository.saveConversationSnapshot({
       ...input.snapshot,
       messages,
       mode: options.mode,
       diff: options.diff,
     });
-    const conversationId = Number(saved.conversation.id);
-    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
-      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    const resolved = await resolveConversationReference(input.repository, reference);
+    if (Number(saved.conversation.id) !== resolved.conversationId) {
+      throw new LocalDataContractError('STALE_REFERENCE');
+    }
+    const inlined = await inlineCaptureImages({
+      owner: resolved,
+      imageStorage,
+      conversationSourceType: String(saved.conversation.sourceType || input.snapshot.conversation.sourceType || ''),
+      conversationUrl: String(saved.conversation.url || input.snapshot.conversation.url || ''),
+      forceHttpImageCache: input.forceHttpImageCache,
+      messages,
+      options,
+    });
+    if (inlined.updatedMessageKeys.length) {
+      await input.repository.syncConversationMessages(resolved, inlined.messages as JsonValue, options);
     }
     await input.onConversationChanged(
-      conversationId,
+      resolved.conversationId,
       saved.isNew
         ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
         : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
     );
-    return { conversationId, isNew: saved.isNew };
+    return { conversationId: resolved.conversationId, isNew: saved.isNew };
   }
 
   const existing = await input.repository.getConversationByReference(reference);
@@ -439,15 +469,16 @@ export async function saveConversationCaptureSnapshotInLease(
     source: String(conversation.source || '').trim(),
     conversationKey: String(conversation.conversationKey || '').trim(),
   });
-  const inlinedMessages = await inlineCaptureImages({
-    conversationId: resolved.conversationId,
+  const inlined = await inlineCaptureImages({
+    owner: resolved,
+    imageStorage,
     conversationSourceType: String(conversation.sourceType || input.snapshot.conversation.sourceType || ''),
     conversationUrl: String(conversation.url || input.snapshot.conversation.url || ''),
     forceHttpImageCache: input.forceHttpImageCache,
     messages,
     options,
   });
-  await input.repository.syncConversationMessages(resolved, inlinedMessages, options);
+  await input.repository.syncConversationMessages(resolved, inlined.messages as JsonValue, options);
   await input.onConversationChanged(
     resolved.conversationId,
     existing
@@ -499,6 +530,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       const snapshot = parseCaptureSnapshotBytes(bytes);
       const backend = await openConversationReadRepository(lease);
       const result = await saveConversationCaptureSnapshotInLease({
+        lease,
         mode: backend.mode,
         repository: backend.repository,
         snapshot,
@@ -526,8 +558,9 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       if (!('snapshot' in payload)) return router.ok(captureStreams.publish(payload.transfer));
       const result = await deps.conversationReadRunner.run({
         kind: 'conversation-capture-snapshot',
-        read: async ({ mode, repository }) =>
+        read: async ({ lease, mode, repository }) =>
           await saveConversationCaptureSnapshotInLease({
+            lease,
             mode,
             repository,
             snapshot: payload.snapshot,
@@ -775,7 +808,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       const result = await deps.conversationReadRunner.run({
         kind: 'conversation-sync-messages',
         ...(expectedFactsEpoch ? { expectedFactsEpoch } : {}),
-        read: async ({ mode: backendMode, repository }) => {
+        read: async ({ lease, mode, repository }) => {
           const resolved = await resolveConversationReference(repository, reference);
           let messages = msg.messages.slice();
           try {
@@ -794,54 +827,15 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
             // Author names are optional and retain the renderer fallback.
           }
 
-          if (backendMode === 'idb') {
-            try {
-              const sourceType =
-                String(msg?.conversationSourceType || '')
-                  .trim()
-                  .toLowerCase() || 'chat';
-              const local = await storageGet(['ai_chat_cache_images_enabled', 'web_article_cache_images_enabled']);
-              const enableHttpImages =
-                sourceType === 'article'
-                  ? local?.web_article_cache_images_enabled === true
-                  : local?.ai_chat_cache_images_enabled === true;
-              const keys =
-                (options.mode === 'incremental' || options.mode === 'append') && options.diff
-                  ? new Set([...(options.diff.added || []), ...(options.diff.updated || [])])
-                  : null;
-              const inlined = await inlineChatImagesInMessages({
-                conversationId: resolved.conversationId,
-                conversationUrl: String(msg?.conversationUrl || ''),
-                messages,
-                onlyMessageKeys: keys,
-                enableHttpImages,
-              });
-              messages = inlined.messages;
-              if (
-                inlined.inlinedCount > 0 ||
-                inlined.downloadedCount > 0 ||
-                inlined.fromCacheCount > 0 ||
-                inlined.warningFlags.length > 0
-              ) {
-                console.info('[ImageInline]', {
-                  conversationId: resolved.conversationId,
-                  mode: options.mode,
-                  inlinedCount: inlined.inlinedCount,
-                  downloadedCount: inlined.downloadedCount,
-                  fromCacheCount: inlined.fromCacheCount,
-                  inlinedBytes: inlined.inlinedBytes,
-                  warningFlags: inlined.warningFlags,
-                });
-              }
-            } catch (error) {
-              console.warn('[ImageInline] failed but capture continues', {
-                conversationId: resolved.conversationId,
-                mode: options.mode,
-                error: error instanceof Error ? error.message : String(error || ''),
-              });
-            }
-          }
-          // ponytail: P3-T7 supplies the Native image capability; active message writes must not touch image IDB here.
+          const inlined = await inlineCaptureImages({
+            owner: resolved,
+            imageStorage: createImageStorage({ lease, mode }),
+            conversationSourceType: String(msg?.conversationSourceType || ''),
+            conversationUrl: String(msg?.conversationUrl || ''),
+            messages: messages as JsonObject[],
+            options,
+          });
+          messages = inlined.messages;
           const response = await repository.syncConversationMessages(resolved, messages as JsonValue, options);
           await deps.onConversationChanged(
             resolved.conversationId,
@@ -870,14 +864,12 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       const result = await deps.conversationReadRunner.run({
         kind: 'conversation-backfill-images',
         expectedFactsEpoch: factsEpoch,
-        read: async ({ mode, repository }) => {
+        read: async ({ lease, mode, repository }) => {
           const resolved = await resolveConversationReference(repository, reference);
-          if (mode !== 'idb') {
-            // ponytail: P3-T7 replaces this IDB-only image job with the typed Native image facade.
-            throw new LocalDataContractError('PROTOCOL_MISMATCH');
-          }
           const response = await backfillConversationImages({
-            conversationId: resolved.conversationId,
+            imageStorage: createImageStorage({ lease, mode }),
+            owner: resolved,
+            repository,
             conversationUrl,
           });
           await deps.onConversationChanged(

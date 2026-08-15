@@ -100,6 +100,44 @@ async function hostJsonFrames(value: unknown) {
   ];
 }
 
+async function imageAssetFrames(bytes: Uint8Array) {
+  const sessionId = '650e8400-e29b-41d4-a716-446655440000';
+  const digest = await OrderedFrameDigestAccumulator.create(digestProvider);
+  const data = await createNativeWireDataFrame({
+    bytes,
+    offset: 0,
+    provider: digestProvider,
+    sequence: 1,
+    sessionId,
+  });
+  await digest.append({ sequence: data.sequence, byteLength: data.byteLength, digest: data.sliceDigest });
+  return [
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId,
+      sequence: 0,
+      type: 'begin' as const,
+      operation: 'image-asset' as const,
+      declaredTotalBytes: bytes.byteLength,
+    },
+    data,
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId,
+      sequence: 2,
+      type: 'end' as const,
+      digest: digest.finalize(),
+    },
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId,
+      sequence: 3,
+      type: 'terminal' as const,
+      status: 'ok' as const,
+    },
+  ];
+}
+
 function captureSnapshotPayload(contentText: string) {
   const snapshot = {
     conversation: { source: 'chatgpt', conversationKey: 'native-large', sourceType: 'chat' },
@@ -235,6 +273,99 @@ describe('Native Messaging client', () => {
     expect(sent[1]).toMatchObject({ type: 'begin', operation: 'capture-snapshot' });
     expect(sent.filter((message) => message.type === 'data')).not.toHaveLength(0);
     expect(sent.at(-1)).toMatchObject({ type: 'terminal', status: 'ok' });
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the strict image header and raw NativeWire bytes for asset reads', async () => {
+    const harness = createPortHarness();
+    const bytes = Uint8Array.from([7, 8, 9]);
+    const operation = connectNative<{
+      backendAssetId: number;
+      byteSize: number;
+      bytes: Uint8Array;
+      contentType: string;
+    }>({
+      command: 'GET_IMAGE_ASSET',
+      payload: {
+        owner: { source: 'chatgpt', conversationKey: 'asset-owner', backendConversationId: 4 },
+        backendAssetId: 12,
+        transfer: { operation: 'image-asset', declaredTotalBytes: 0 },
+      },
+      dependencies: {
+        createRequestId: () => 'image-read',
+        digestProvider,
+        runtime: { connectNative: vi.fn(() => harness.port) },
+      },
+    });
+    harness.emitMessage(
+      createHostFactsSuccess('image-read', {
+        asset: { backendAssetId: 12, byteSize: bytes.byteLength, contentType: 'image/png' },
+        stream: { operation: 'image-asset', declaredTotalBytes: bytes.byteLength },
+      }),
+    );
+    for (const frame of await imageAssetFrames(bytes)) harness.emitMessage(frame);
+
+    await expect(operation).resolves.toEqual({
+      backendAssetId: 12,
+      byteSize: 3,
+      bytes,
+      contentType: 'image/png',
+    });
+    expect(harness.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'GET_IMAGE_ASSET', requestId: 'image-read' }),
+    );
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads image bytes through NativeWire without adding them to the Host JSON request', async () => {
+    const harness = createPortHarness();
+    const bytes = Uint8Array.from([3, 2, 1]);
+    const responseFrames = await hostJsonFrames({ backendAssetId: 13, byteSize: 3, contentType: 'image/png' });
+    harness.postMessage.mockImplementation((message: unknown) => {
+      if ((message as { type?: unknown })?.type !== 'terminal') return;
+      queueMicrotask(() => {
+        harness.emitMessage(
+          createHostFactsSuccess('image-write', {
+            stream: {
+              operation: 'host-json',
+              declaredTotalBytes: new TextEncoder().encode(
+                '{"backendAssetId":13,"byteSize":3,"contentType":"image/png"}',
+              ).byteLength,
+            },
+          }),
+        );
+        for (const frame of responseFrames) harness.emitMessage(frame);
+      });
+    });
+
+    await expect(
+      connectNative<{ backendAssetId: number }>({
+        command: 'PUT_IMAGE_ASSET',
+        payload: {
+          owner: { source: 'chatgpt', conversationKey: 'asset-owner', backendConversationId: 4 },
+          metadata: { url: 'https://example.com/image.png', contentType: 'image/png' },
+          transfer: { operation: 'image-asset', declaredTotalBytes: bytes.byteLength },
+        },
+        uploadBytes: bytes,
+        dependencies: {
+          createRequestId: () => 'image-write',
+          digestProvider,
+          runtime: { connectNative: vi.fn(() => harness.port) },
+        },
+      }),
+    ).resolves.toMatchObject({ backendAssetId: 13 });
+
+    const sent = harness.postMessage.mock.calls.map(([message]) => message as Record<string, unknown>);
+    expect(sent[0]).toMatchObject({
+      command: 'PUT_IMAGE_ASSET',
+      payload: {
+        owner: { source: 'chatgpt', conversationKey: 'asset-owner', backendConversationId: 4 },
+        metadata: { url: 'https://example.com/image.png', contentType: 'image/png' },
+      },
+    });
+    expect(JSON.stringify(sent[0])).not.toContain('uploadBytes');
+    expect(sent[1]).toMatchObject({ type: 'begin', operation: 'image-asset' });
+    expect(sent.filter((message) => message.type === 'data')).not.toHaveLength(0);
     expect(harness.disconnect).toHaveBeenCalledTimes(1);
   });
 

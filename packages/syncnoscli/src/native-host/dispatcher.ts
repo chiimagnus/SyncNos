@@ -17,6 +17,7 @@ import {
   decodeSqliteConversationListCursor,
   encodeSqliteConversationListCursor,
 } from '../sqlite/conversations-repository';
+import { createImagesRepository } from '../sqlite/images-repository';
 import { createMappingsRepository } from '../sqlite/mappings-repository';
 import { createMessagesRepository } from '../sqlite/messages-repository';
 import { createSearchRepository } from '../sqlite/search';
@@ -30,6 +31,7 @@ const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
   'CONVERSATION_TAIL',
   'GET_SYNC_MAPPING',
   'LIST_ARTICLE_COMMENTS',
+  'FIND_IMAGE_ASSET_BY_URL',
   'SEARCH_CONVERSATIONS',
 ] as const);
 
@@ -152,6 +154,56 @@ function articleCommentInvariantResult(error: unknown): Readonly<{
   return Object.freeze({ kind: 'article-comment-invariant', code: error.code });
 }
 
+function imageAssetResponse(asset: Readonly<{ byteSize: number; contentType: string; id: number }>) {
+  return Object.freeze({
+    backendAssetId: asset.id,
+    byteSize: asset.byteSize,
+    contentType: asset.contentType,
+  });
+}
+
+/** Reads raw image bytes only after resolving the stable owner in the same Host session. */
+export function readNativeHostImageAsset(
+  database: SyncNosSqliteDatabase,
+  request: HostFactsRequest,
+): Readonly<{ bytes: Uint8Array; metadata: ReturnType<typeof imageAssetResponse> }> {
+  if (request.command !== 'GET_IMAGE_ASSET') invalidArgument();
+  const conversationId = resolveConversationId(database, request.payload.owner);
+  const asset = createImagesRepository(database).getImageAssetById({
+    conversationId,
+    id: request.payload.backendAssetId,
+  });
+  if (!asset) staleReference();
+  return Object.freeze({ bytes: asset.bytes, metadata: imageAssetResponse(asset) });
+}
+
+/** Persists streamed bytes under a re-resolved owner; browser epochs never cross this boundary. */
+export async function writeNativeHostImageAsset(
+  database: SyncNosSqliteDatabase,
+  request: HostFactsRequest,
+  bytes: Uint8Array,
+): Promise<ReturnType<typeof imageAssetResponse>> {
+  if (request.command !== 'PUT_IMAGE_ASSET' || !(bytes instanceof Uint8Array)) invalidArgument();
+  if (bytes.byteLength !== request.payload.transfer.declaredTotalBytes) protocolMismatch();
+  const conversationId = resolveConversationId(database, request.payload.owner);
+  const images = createImagesRepository(database);
+  if (request.payload.backendAssetId !== undefined) {
+    const existing = images.getImageAssetById({
+      conversationId,
+      id: request.payload.backendAssetId,
+    });
+    if (!existing || existing.url !== String(request.payload.metadata.url || '').trim()) staleReference();
+  }
+  const asset = await images.putImageAsset({
+    bytes,
+    contentType: request.payload.metadata.contentType,
+    conversationId,
+    metadata: request.payload.metadata,
+    url: request.payload.metadata.url,
+  });
+  return imageAssetResponse(asset);
+}
+
 /**
  * Dispatches only lease-bound facts reads. Capture streaming and the remaining facts
  * domains gain their matching P3 facades instead of falling through to an IDB path.
@@ -186,6 +238,14 @@ export function readNativeHostConnectedCommand(database: SyncNosSqliteDatabase, 
     }
     case 'LIST_ARTICLE_COMMENTS':
       return readComments(database, request);
+    case 'FIND_IMAGE_ASSET_BY_URL': {
+      const conversationId = resolveConversationId(database, request.payload.owner);
+      const asset = createImagesRepository(database).findImageAssetByConversationAndUrl({
+        conversationId,
+        url: request.payload.url,
+      });
+      return asset ? imageAssetResponse(asset) : null;
+    }
     case 'SEARCH_CONVERSATIONS':
       return createSearchRepository(database).searchConversations(request.payload);
     default:

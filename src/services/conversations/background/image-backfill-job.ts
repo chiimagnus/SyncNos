@@ -1,5 +1,11 @@
-import { getMessagesByConversationId, syncConversationMessages } from '@services/conversations/data/storage-idb';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import type { ImageStorage } from '@services/conversations/data/image-storage';
+import type {
+  ConversationFactsRepository,
+  ConversationMessageSyncOptions,
+  ResolvedConversationReference,
+} from '@services/conversations/data/storage';
+import { LocalDataContractError, type JsonValue } from '@services/local-data/contracts';
 
 export type BackfillConversationImagesResult = {
   scannedMessages: number;
@@ -22,17 +28,24 @@ export type BackfillConversationImagesProgress = {
   latestMessageKey?: string;
 };
 
+/** Backfill receives already-bound facts capabilities; it never opens an IDB convenience path. */
 export async function backfillConversationImages(input: {
-  conversationId: number;
+  imageStorage: Pick<ImageStorage, 'findAssetByUrl' | 'putAsset'>;
+  owner: ResolvedConversationReference;
+  repository: Pick<ConversationFactsRepository, 'getConversationDetail' | 'syncConversationMessages'>;
   conversationUrl?: string;
   onProgress?: (progress: BackfillConversationImagesProgress) => Promise<void> | void;
 }): Promise<BackfillConversationImagesResult> {
-  const conversationId = Number(input.conversationId);
-  if (!Number.isFinite(conversationId) || conversationId <= 0) {
-    throw new Error('invalid conversationId');
-  }
+  const owner = input.owner;
+  const conversationId = Number(owner?.conversationId);
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new LocalDataContractError('STALE_REFERENCE');
 
-  const messages = await getMessagesByConversationId(conversationId);
+  const detail = await input.repository.getConversationDetail({
+    source: owner.source,
+    conversationKey: owner.conversationKey,
+  });
+  if (Number(detail.conversationId) !== conversationId) throw new LocalDataContractError('STALE_REFERENCE');
+  const messages = Array.isArray(detail.messages) ? (detail.messages as any[]) : [];
   const beforeMarkdown = new Map<string, string>();
   for (const msg of messages) {
     const key = msg && (msg as any).messageKey ? String((msg as any).messageKey) : '';
@@ -44,19 +57,19 @@ export async function backfillConversationImages(input: {
   const persistedUpdatedKeys = new Set<string>();
 
   const inlined = await inlineChatImagesInMessages({
-    conversationId,
+    imageStorage: input.imageStorage,
+    owner,
     conversationUrl: input.conversationUrl,
-    messages: messages as any,
+    messages,
     onMessageUpdated: progressCallback
       ? async (update) => {
           const key = String(update?.messageKey || '').trim();
-          if (!key) return;
-          if (persistedUpdatedKeys.has(key)) return;
-
-          await syncConversationMessages(conversationId, [update.message], {
+          if (!key || persistedUpdatedKeys.has(key)) return;
+          const options: ConversationMessageSyncOptions = {
             mode: 'incremental',
             diff: { added: [], updated: [key], removed: [] },
-          });
+          };
+          await input.repository.syncConversationMessages(owner, [update.message] as JsonValue, options);
           persistedUpdatedKeys.add(key);
 
           await progressCallback({
@@ -83,7 +96,7 @@ export async function backfillConversationImages(input: {
   }
 
   if (updatedKeys.length && !progressCallback) {
-    await syncConversationMessages(conversationId, inlined.messages, {
+    await input.repository.syncConversationMessages(owner, inlined.messages as JsonValue, {
       mode: 'incremental',
       diff: { added: [], updated: updatedKeys, removed: [] },
     });

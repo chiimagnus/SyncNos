@@ -37,12 +37,13 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
     let saved = false;
     const data = await deps.conversationReadRunner.run({
       kind: 'article-fetch',
-      read: async ({ factsEpoch, mode, repository }) => {
+      read: async ({ factsEpoch, lease, mode, repository }) => {
         const persistence: ArticleCapturePersistence = {
           findConversation: async (reference) => await repository.getConversationByReference(reference),
           saveSnapshot: async (input) => {
             saved = true;
             return await saveConversationCaptureSnapshotInLease({
+              lease,
               mode,
               repository,
               snapshot: input.snapshot,

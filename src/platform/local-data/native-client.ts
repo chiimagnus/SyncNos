@@ -1,8 +1,15 @@
-import { readNativePortJson, writeNativePortCaptureSnapshot, type NativeMessagingPort } from './native-port';
+import {
+  readNativePortImageAsset,
+  readNativePortJson,
+  writeNativePortCaptureSnapshot,
+  writeNativePortImageAsset,
+  type NativeMessagingPort,
+} from './native-port';
 
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MAX_IMAGE_ASSET_BYTES,
   MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
   NATIVE_HOST_SINGLE_MESSAGE_COMMANDS,
   LocalDataContractError,
@@ -10,6 +17,7 @@ import {
   parseHostFactsResponse,
   type HostFactsCommand,
   type HostFactsPayloadByCommand,
+  type HostFactsRequest,
 } from '@services/local-data/contracts';
 import type { DigestProvider } from '@services/local-data/digest';
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
@@ -36,6 +44,8 @@ export type NativeHostRequest<TCommand extends HostFactsCommand = HostFactsComma
   command: TCommand;
   dependencies?: NativeClientDependencies;
   payload: HostFactsPayloadByCommand[TCommand];
+  /** Raw bytes are local to the browser port and are never part of the Host JSON request. */
+  uploadBytes?: Uint8Array;
 }>;
 
 type ResolvedNativeRuntime = Readonly<{
@@ -112,6 +122,27 @@ function captureSnapshotUpload(request: ReturnType<typeof createRequest>) {
   });
 }
 
+function imageAssetUpload(
+  input: NativeHostRequest,
+  request: ReturnType<typeof createRequest>,
+): Readonly<{
+  bytes: Uint8Array;
+  request: HostFactsRequest;
+  stream: HostFactsPayloadByCommand['PUT_IMAGE_ASSET']['transfer'];
+}> | null {
+  if (request.command !== 'PUT_IMAGE_ASSET') return null;
+  const bytes = input.uploadBytes;
+  if (!(bytes instanceof Uint8Array)) throw new LocalDataContractError('INVALID_ARGUMENT');
+  if (
+    request.payload.transfer.operation !== 'image-asset' ||
+    bytes.byteLength !== request.payload.transfer.declaredTotalBytes ||
+    bytes.byteLength > MAX_IMAGE_ASSET_BYTES
+  ) {
+    throw new LocalDataContractError('PROTOCOL_MISMATCH');
+  }
+  return Object.freeze({ bytes, request, stream: request.payload.transfer });
+}
+
 function callNativeMessage(
   runtime: ResolvedNativeRuntime,
   request: ReturnType<typeof createRequest>,
@@ -185,6 +216,23 @@ export async function connectNative<TData = unknown, TCommand extends HostFactsC
         port,
         request: upload.request,
         stream: upload.stream,
+      })) as TData;
+    }
+    const imageUpload = imageAssetUpload(input, request);
+    if (imageUpload) {
+      return (await writeNativePortImageAsset({
+        bytes: imageUpload.bytes,
+        digestProvider: input.dependencies?.digestProvider,
+        port,
+        request: imageUpload.request,
+        stream: imageUpload.stream,
+      })) as TData;
+    }
+    if (request.command === 'GET_IMAGE_ASSET') {
+      return (await readNativePortImageAsset({
+        digestProvider: input.dependencies?.digestProvider,
+        port,
+        request,
       })) as TData;
     }
     return (await readNativePortJson({

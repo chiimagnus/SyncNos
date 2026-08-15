@@ -30,7 +30,7 @@ describe('background-router article fetch', () => {
     const res = await router.__handleMessageForTests({ type: 'fetchActiveTabArticle', tabId: 42 });
 
     expect(res.ok).toBe(true);
-    expect(res.data).toEqual({ conversationId: 7, tabId: 42 });
+    expect(res.data).toEqual({ conversationId: 7, factsEpoch: 'idb-v1', tabId: 42 });
     expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledTimes(1);
     expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith(
       expect.objectContaining({ tabId: 42, persistence: expect.any(Object) }),

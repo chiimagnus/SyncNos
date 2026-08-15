@@ -1,11 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
-import {
-  inlineChatImagesInMessages,
-  __closeDbForTests as __closeImageInlineDbForTests,
-} from '@services/conversations/data/image-inline';
+import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { createImageStorage } from '@services/conversations/data/image-storage';
+import { __closeImageStorageDbForTests } from '@services/conversations/data/image-storage-idb';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 import { openDb as openSchemaDb } from '../../src/platform/idb/schema';
+
+const owner = { source: 'chatgpt', conversationKey: 'image-inline', conversationId: 1 };
+
+async function withIdbImages<T>(
+  callback: (imageStorage: ReturnType<typeof createImageStorage>) => Promise<T>,
+): Promise<T> {
+  const gate = new FactsOperationGate({
+    readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
+  });
+  await gate.initializeFromJournal();
+  return await gate.runFactsOperation(
+    'image-inline-test',
+    async (lease) => await callback(createImageStorage({ lease, mode: 'idb' })),
+  );
+}
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -28,7 +43,7 @@ async function deleteDb(name: string) {
 }
 
 beforeEach(async () => {
-  await __closeImageInlineDbForTests();
+  await __closeImageStorageDbForTests();
 
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
@@ -38,7 +53,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeImageInlineDbForTests();
+  await __closeImageStorageDbForTests();
   vi.restoreAllMocks();
 });
 
@@ -60,7 +75,9 @@ describe('image-inline', () => {
       { messageKey: 'm2', contentMarkdown: '![](https://example.com/b.png)', role: 'assistant', sequence: 2 },
       { messageKey: 'm3', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 3 },
     ];
-    const r1 = await inlineChatImagesInMessages({ conversationId: 1, messages: messages1 });
+    const r1 = await withIdbImages(
+      async (imageStorage) => await inlineChatImagesInMessages({ imageStorage, owner, messages: messages1 }),
+    );
     expect(r1.downloadedCount).toBe(3);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(messages1[0].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
@@ -89,7 +106,9 @@ describe('image-inline', () => {
       { messageKey: 'm1', contentMarkdown: '![](https://example.com/a.png)', role: 'assistant', sequence: 1 },
       { messageKey: 'm3', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 3 },
     ];
-    const r2 = await inlineChatImagesInMessages({ conversationId: 1, messages: messages2 });
+    const r2 = await withIdbImages(
+      async (imageStorage) => await inlineChatImagesInMessages({ imageStorage, owner, messages: messages2 }),
+    );
     expect(r2.fromCacheCount).toBe(2);
     expect(r2.downloadedCount).toBe(0);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -111,7 +130,15 @@ describe('image-inline', () => {
       },
     ];
 
-    const result = await inlineChatImagesInMessages({ conversationId: 3, messages, enableHttpImages: false });
+    const result = await withIdbImages(
+      async (imageStorage) =>
+        await inlineChatImagesInMessages({
+          imageStorage,
+          owner: { ...owner, conversationId: 3, conversationKey: 'image-policy' },
+          messages,
+          enableHttpImages: false,
+        }),
+    );
 
     expect(result.messages[0]).toMatchObject({
       captureSequencePolicy: 'preserve-existing-tail',
@@ -136,11 +163,15 @@ describe('image-inline', () => {
       { messageKey: 'm2', contentMarkdown: `![](${dataImageUrl})`, role: 'assistant', sequence: 2 },
     ];
 
-    const res = await inlineChatImagesInMessages({
-      conversationId: 2,
-      messages,
-      enableHttpImages: false,
-    });
+    const res = await withIdbImages(
+      async (imageStorage) =>
+        await inlineChatImagesInMessages({
+          imageStorage,
+          owner: { ...owner, conversationId: 2, conversationKey: 'image-disabled' },
+          messages,
+          enableHttpImages: false,
+        }),
+    );
     expect(fetchMock).not.toHaveBeenCalled();
     expect(res.downloadedCount).toBe(1);
     expect(String(messages[0].contentMarkdown)).toBe('![](https://example.com/a.png)');

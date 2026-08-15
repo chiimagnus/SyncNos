@@ -1,4 +1,5 @@
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
@@ -22,6 +23,17 @@ import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settin
 
 export function createTestBackgroundRouter() {
   const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const gate = new FactsOperationGate({
+    readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
+  });
+  const initialized = gate.initializeFromJournal();
+  const runWithLease = async (kind: string, read: (backend: any) => Promise<unknown>, repository: unknown) => {
+    await initialized;
+    return await gate.runFactsOperation(
+      kind,
+      async (lease) => await read({ factsEpoch: 'idb-v1', lease, mode: 'idb', repository }),
+    );
+  };
 
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
@@ -33,36 +45,32 @@ export function createTestBackgroundRouter() {
 
   registerConversationHandlers(router, {
     conversationReadRunner: {
-      run: async ({ read }: any) =>
-        await read({
-          factsEpoch: 'idb-v1',
-          mode: 'idb',
-          repository: {
-            findConversationById: async () => null,
-            findConversationBySourceAndKey: async () => null,
-            getConversationByReference: async () => null,
-            getConversationDetail: async () => ({ conversationId: 1, messages: [] }),
-            getConversationListBootstrap: async () => ({
-              items: [],
-              cursor: null,
-              hasMore: false,
-              summary: { totalCount: 0, todayCount: 0 },
-              facets: { sources: [], sites: [] },
-            }),
-            getConversationListPage: async () => ({
-              items: [],
-              cursor: null,
-              hasMore: false,
-              summary: { totalCount: 0, todayCount: 0 },
-              facets: { sources: [], sites: [] },
-            }),
-            getConversationTailWindow: async () => ({ conversationId: 1, messages: [] }),
-            searchConversationMentionCandidates: async () => ({
-              candidates: [],
-              scannedCount: 0,
-              truncatedByScanLimit: false,
-            }),
-          },
+      run: async ({ kind, read }: any) =>
+        await runWithLease(kind, read, {
+          findConversationById: async () => null,
+          findConversationBySourceAndKey: async () => null,
+          getConversationByReference: async () => null,
+          getConversationDetail: async () => ({ conversationId: 1, messages: [] }),
+          getConversationListBootstrap: async () => ({
+            items: [],
+            cursor: null,
+            hasMore: false,
+            summary: { totalCount: 0, todayCount: 0 },
+            facets: { sources: [], sites: [] },
+          }),
+          getConversationListPage: async () => ({
+            items: [],
+            cursor: null,
+            hasMore: false,
+            summary: { totalCount: 0, todayCount: 0 },
+            facets: { sources: [], sites: [] },
+          }),
+          getConversationTailWindow: async () => ({ conversationId: 1, messages: [] }),
+          searchConversationMentionCandidates: async () => ({
+            candidates: [],
+            scannedCount: 0,
+            truncatedByScanLimit: false,
+          }),
         }),
     },
     onConversationChanged: async () => {},
@@ -71,16 +79,13 @@ export function createTestBackgroundRouter() {
   let articleConversation: any = null;
   registerWebArticleHandlers(router, {
     conversationReadRunner: {
-      run: async ({ read }: any) =>
-        await read({
-          mode: 'idb',
-          repository: {
-            getConversationByReference: async () => articleConversation,
-            syncConversationMessages: async () => ({ deleted: 0, upserted: 0 }),
-            upsertConversation: async (conversation: any) => {
-              articleConversation = { ...conversation, id: 1 };
-              return articleConversation;
-            },
+      run: async ({ kind, read }: any) =>
+        await runWithLease(kind, read, {
+          getConversationByReference: async () => articleConversation,
+          syncConversationMessages: async () => ({ deleted: 0, upserted: 0 }),
+          upsertConversation: async (conversation: any) => {
+            articleConversation = { ...conversation, id: 1 };
+            return articleConversation;
           },
         }),
     },

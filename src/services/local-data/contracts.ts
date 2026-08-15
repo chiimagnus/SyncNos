@@ -957,6 +957,12 @@ export type HostPutImageAssetRequestPayload = Readonly<{
   transfer: StreamDescriptor;
 }>;
 
+/** Internal Host-only cache lookup used by the lease-bound image facade. */
+export type HostImageAssetLookupRequestPayload = Readonly<{
+  owner: HostConversationReference;
+  url: string;
+}>;
+
 export type MigrationStreamRequestPayload = Readonly<{
   migrationId: MigrationId;
   protocolVersion: typeof LOCAL_DATA_PROTOCOL_VERSION;
@@ -971,6 +977,16 @@ export type NativeHostSessionCompleteControl = Readonly<{
 
 /** The small header that precedes a bounded, canonical JSON response on a Host port. */
 export type NativeHostStreamResponseData = Readonly<{
+  stream: StreamDescriptor;
+}>;
+
+/** The strict small header that precedes raw image bytes on a Host port. */
+export type NativeHostImageAssetResponseData = Readonly<{
+  asset: Readonly<{
+    backendAssetId: number;
+    byteSize: number;
+    contentType: string;
+  }>;
   stream: StreamDescriptor;
 }>;
 
@@ -1097,6 +1113,7 @@ export const HOST_FACTS_COMMANDS = Object.freeze([
   'ENSURE_ARTICLE_COMMENT_CONTEXT',
   'GET_IMAGE_ASSET',
   'PUT_IMAGE_ASSET',
+  'FIND_IMAGE_ASSET_BY_URL',
   'BACKFILL_CONVERSATION_IMAGES',
   'IMPORT_FACTS',
   'EXPORT_FACTS',
@@ -1155,6 +1172,7 @@ export type HostFactsPayloadByCommand = {
   ENSURE_ARTICLE_COMMENT_CONTEXT: EnsureArticleCommentContextRequestPayload<HostCommentContext>;
   GET_IMAGE_ASSET: HostImageAssetRequestPayload;
   PUT_IMAGE_ASSET: HostPutImageAssetRequestPayload;
+  FIND_IMAGE_ASSET_BY_URL: HostImageAssetLookupRequestPayload;
   BACKFILL_CONVERSATION_IMAGES: HostConversationReference;
   IMPORT_FACTS: MigrationStreamRequestPayload;
   EXPORT_FACTS: MigrationStreamRequestPayload;
@@ -1739,6 +1757,15 @@ function parseHostPutImageAssetPayload(value: unknown): HostPutImageAssetRequest
   };
 }
 
+function parseHostImageAssetLookupPayload(value: unknown): HostImageAssetLookupRequestPayload {
+  const input = record(value);
+  exactKeys(input, ['owner', 'url']);
+  return {
+    owner: parseHostConversationReference(input.owner),
+    url: parseText(input.url),
+  };
+}
+
 /** Starts a streamed migration; the final manifest arrives only after all bounded sessions. */
 export function parseMigrationStreamRequestPayload(value: unknown): MigrationStreamRequestPayload {
   const input = record(value);
@@ -1769,6 +1796,25 @@ export function parseNativeHostStreamResponseData(value: unknown): NativeHostStr
   const input = record(value);
   exactKeys(input, ['stream']);
   return Object.freeze({ stream: parseStreamDescriptor(input.stream, ['host-json']) });
+}
+
+/** Native Host image replies declare matching metadata before any image bytes are accepted. */
+export function parseNativeHostImageAssetResponseData(value: unknown): NativeHostImageAssetResponseData {
+  const input = record(value);
+  exactKeys(input, ['asset', 'stream']);
+  const asset = record(input.asset);
+  exactKeys(asset, ['backendAssetId', 'byteSize', 'contentType']);
+  const stream = parseStreamDescriptor(input.stream, ['image-asset']);
+  const byteSize = parsePositiveSafeInteger(asset.byteSize, MAX_IMAGE_ASSET_BYTES);
+  if (stream.declaredTotalBytes !== byteSize) fail('PROTOCOL_MISMATCH');
+  return Object.freeze({
+    asset: Object.freeze({
+      backendAssetId: parsePositiveSafeInteger(asset.backendAssetId),
+      byteSize,
+      contentType: parseText(asset.contentType),
+    }),
+    stream,
+  });
 }
 
 function parseBackupStreamPayload(value: unknown): BackupStreamRequestPayload {
@@ -1985,6 +2031,8 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
       return parseHostImageAssetPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'PUT_IMAGE_ASSET':
       return parseHostPutImageAssetPayload(value) as HostFactsPayloadByCommand[TCommand];
+    case 'FIND_IMAGE_ASSET_BY_URL':
+      return parseHostImageAssetLookupPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'IMPORT_FACTS':
     case 'EXPORT_FACTS':
       return parseMigrationStreamRequestPayload(value) as HostFactsPayloadByCommand[TCommand];

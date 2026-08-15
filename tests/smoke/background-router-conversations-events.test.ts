@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { LocalDataContractError } from '@services/local-data/contracts';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 
 const localStorageMocks = vi.hoisted(() => ({ storageGet: vi.fn() }));
 const imageInlineMocks = vi.hoisted(() => ({ inlineChatImagesInMessages: vi.fn() }));
@@ -51,6 +52,10 @@ function createRepository() {
 }
 
 function createRouter(repository = createRepository(), onConversationChanged = vi.fn(async () => {})) {
+  const gate = new FactsOperationGate({
+    readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
+  });
+  const initialized = gate.initializeFromJournal();
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
       ok: false,
@@ -61,10 +66,14 @@ function createRouter(repository = createRepository(), onConversationChanged = v
   registerConversationHandlers(router as any, {
     conversationReadRunner: {
       run: async ({ expectedFactsEpoch, read }: any) => {
+        await initialized;
         if (expectedFactsEpoch !== undefined && expectedFactsEpoch !== 'idb-v1') {
           throw new LocalDataContractError('STALE_BACKEND_EPOCH');
         }
-        return await read({ factsEpoch: 'idb-v1', mode: 'idb', repository });
+        return await gate.runFactsOperation(
+          'background-router-events-test',
+          async (lease) => await read({ factsEpoch: 'idb-v1', lease, mode: 'idb', repository }),
+        );
       },
     },
     onConversationChanged,
@@ -81,6 +90,7 @@ beforeEach(() => {
     fromCacheCount: 0,
     downloadedCount: 0,
     inlinedBytes: 0,
+    updatedMessageKeys: [],
     warningFlags: [],
   }));
   backfillJobMocks.backfillConversationImages.mockResolvedValue({
@@ -225,10 +235,14 @@ describe('background-router conversations events', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({
-      conversationId: 123,
-      conversationUrl: 'https://chatgpt.com/c/thread-123',
-    });
+    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { source: conversation.source, conversationKey: conversation.conversationKey, conversationId: 123 },
+        repository,
+        imageStorage: expect.any(Object),
+        conversationUrl: 'https://chatgpt.com/c/thread-123',
+      }),
+    );
     expect(events).toEqual(['queue', 'broadcast']);
   });
 });

@@ -1,79 +1,7 @@
-import { openDb as openSchemaDb } from '@platform/idb/schema';
+import type { ImageAssetOwner, ImageStorage } from './image-storage';
 
 const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
 const SYNCNOS_ASSET_PREFIX = 'syncnos-asset://';
-
-type ImageCacheRow = {
-  id?: number;
-  conversationId: number;
-  url: string;
-  dataUrl?: string;
-  blob?: Blob;
-  byteSize: number;
-  contentType: string;
-  createdAt: number;
-  updatedAt: number;
-};
-
-type CachedAsset = {
-  id: number;
-  byteSize: number;
-};
-
-let cachedDb: IDBDatabase | null = null;
-let openingDb: Promise<IDBDatabase> | null = null;
-
-async function openDb(): Promise<IDBDatabase> {
-  if (cachedDb) return cachedDb;
-  if (openingDb) return openingDb;
-  openingDb = openSchemaDb()
-    .then((db) => {
-      cachedDb = db;
-      return db;
-    })
-    .finally(() => {
-      openingDb = null;
-    });
-  return openingDb;
-}
-
-export async function __closeDbForTests(): Promise<void> {
-  try {
-    const db = cachedDb || (openingDb ? await openingDb : null);
-    db?.close?.();
-  } catch (_e) {
-    // ignore
-  } finally {
-    cachedDb = null;
-    openingDb = null;
-  }
-}
-
-function tx(
-  db: IDBDatabase,
-  storeNames: string[],
-  mode: IDBTransactionMode,
-): { t: IDBTransaction; stores: Record<string, IDBObjectStore> } {
-  const t = db.transaction(storeNames, mode);
-  const stores: Record<string, IDBObjectStore> = {};
-  for (const name of storeNames) stores[name] = t.objectStore(name);
-  return { t, stores };
-}
-
-function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('indexedDB request failed'));
-  });
-}
-
-function txDone(t: IDBTransaction): Promise<true> {
-  return new Promise((resolve, reject) => {
-    t.oncomplete = () => resolve(true);
-    t.onerror = () => reject(t.error || new Error('transaction failed'));
-    t.onabort = () => reject(t.error || new Error('transaction aborted'));
-  });
-}
 
 function isHttpUrl(url: unknown): boolean {
   const text = String(url || '').trim();
@@ -229,80 +157,6 @@ function parseDataImageUrl(input: {
   return { ok: true, blob, byteSize, contentType, cacheKey };
 }
 
-async function getCachedImage(conversationId: number, url: string): Promise<ImageCacheRow | null> {
-  const safeUrl = String(url || '').trim();
-  if (!safeUrl) return null;
-  const db = await openDb();
-  const { t, stores } = tx(db, ['image_cache'], 'readonly');
-  const idx = stores.image_cache.index('by_conversationId_url');
-  const row = (await reqToPromise(idx.get([conversationId, safeUrl]) as any)) as ImageCacheRow | undefined;
-  await txDone(t);
-  return row || null;
-}
-
-async function upsertCachedImageAsset(input: {
-  conversationId: number;
-  url: string;
-  blob: Blob;
-  byteSize: number;
-  contentType: string;
-  dataUrl?: string;
-}): Promise<CachedAsset> {
-  const safeUrl = String(input.url || '').trim();
-  if (!safeUrl) throw new Error('image cache url required');
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['image_cache'], 'readwrite');
-  const idx = stores.image_cache.index('by_conversationId_url');
-
-  const existing = (await reqToPromise(idx.get([input.conversationId, safeUrl]) as any)) as ImageCacheRow | undefined;
-  const now = Date.now();
-  const byteSize = Number(input.byteSize) || input.blob.size || 0;
-  const contentType = parseContentType(input.contentType || input.blob.type);
-  const dataUrl = String(input.dataUrl || '').trim();
-  const record: ImageCacheRow = {
-    ...(existing && existing.id ? { id: existing.id } : {}),
-    conversationId: input.conversationId,
-    url: safeUrl,
-    ...(dataUrl ? { dataUrl } : existing?.dataUrl ? { dataUrl: existing.dataUrl } : {}),
-    blob: input.blob,
-    byteSize,
-    contentType,
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-  };
-
-  const putResult = await reqToPromise(stores.image_cache.put(record as any));
-  await txDone(t);
-
-  const nextId = Number(putResult ?? existing?.id);
-  if (!Number.isFinite(nextId) || nextId <= 0) throw new Error('invalid image cache id');
-  return { id: nextId, byteSize };
-}
-
-async function ensureCachedAssetRecord(row: ImageCacheRow): Promise<CachedAsset | null> {
-  const id = Number(row?.id);
-  if (!Number.isFinite(id) || id <= 0) return null;
-
-  if (row.blob instanceof Blob) {
-    const byteSize = Number(row.byteSize) || row.blob.size || 0;
-    if (byteSize > 0) return { id, byteSize };
-  }
-
-  if (!row.dataUrl || !isDataImageUrl(row.dataUrl)) return null;
-  const parsed = parseDataImageUrl({ dataUrl: row.dataUrl, maxBytes: NO_IMAGE_SIZE_LIMIT });
-  if (!parsed.ok) return null;
-
-  return upsertCachedImageAsset({
-    conversationId: row.conversationId,
-    url: row.url,
-    blob: parsed.blob,
-    byteSize: parsed.byteSize,
-    contentType: parsed.contentType,
-    dataUrl: row.dataUrl,
-  });
-}
-
 async function downloadImageAsBlob(input: {
   url: string;
   referrer?: string;
@@ -386,6 +240,7 @@ export type InlineChatImagesResult = {
   fromCacheCount: number;
   downloadedCount: number;
   inlinedBytes: number;
+  updatedMessageKeys: string[];
   warningFlags: string[];
 };
 
@@ -400,14 +255,14 @@ export type InlineChatImageMessageUpdate = {
 };
 
 export async function inlineChatImagesInMessages(input: {
-  conversationId: number;
+  imageStorage: Pick<ImageStorage, 'findAssetByUrl' | 'putAsset'>;
+  owner: ImageAssetOwner;
   conversationUrl?: string;
   messages: any[];
   onlyMessageKeys?: Set<string> | null;
   enableHttpImages?: boolean;
   onMessageUpdated?: (update: InlineChatImageMessageUpdate) => Promise<void> | void;
 }): Promise<InlineChatImagesResult> {
-  const conversationId = Number(input.conversationId);
   const messages = Array.isArray(input.messages) ? input.messages : [];
   const onlyKeys = input.onlyMessageKeys || null;
   const enableHttpImages = input.enableHttpImages !== false;
@@ -418,6 +273,7 @@ export async function inlineChatImagesInMessages(input: {
   let fromCacheCount = 0;
   let downloadedCount = 0;
   let inlinedBytes = 0;
+  const updatedMessageKeys = new Set<string>();
 
   for (const msg of messages) {
     if (!msg || !msg.messageKey) continue;
@@ -450,32 +306,39 @@ export async function inlineChatImagesInMessages(input: {
         cacheLookupUrl = parsedDataUrl.cacheKey;
       }
 
-      const cached =
-        (await getCachedImage(conversationId, cacheLookupUrl)) ||
-        (isDataUrl ? await getCachedImage(conversationId, url) : null);
+      let cached = null;
+      try {
+        cached =
+          (await input.imageStorage.findAssetByUrl(input.owner, cacheLookupUrl)) ||
+          (isDataUrl ? await input.imageStorage.findAssetByUrl(input.owner, url) : null);
+      } catch {
+        warningFlags.add('inline_images_download_failed');
+        continue;
+      }
       if (cached) {
-        const cachedAsset = await ensureCachedAssetRecord(cached);
-        if (cachedAsset) {
-          replacements.set(url, toSyncnosAssetUrl(cachedAsset.id));
-          fromCacheCount += 1;
-          inlinedCount += 1;
-          inlinedBytes += cachedAsset.byteSize;
-          continue;
-        }
+        replacements.set(url, toSyncnosAssetUrl(cached.id));
+        fromCacheCount += 1;
+        inlinedCount += 1;
+        inlinedBytes += cached.byteSize;
+        continue;
       }
 
-      let nextAsset: CachedAsset | null = null;
+      let nextAsset: Awaited<ReturnType<ImageStorage['putAsset']>> | null = null;
       if (isDataUrl) {
         const parsed = parsedDataUrl && parsedDataUrl.ok ? parsedDataUrl : null;
         if (!parsed) continue;
-
-        nextAsset = await upsertCachedImageAsset({
-          conversationId,
-          url: parsed.cacheKey,
-          blob: parsed.blob,
-          byteSize: parsed.byteSize,
-          contentType: parsed.contentType,
-        });
+        try {
+          nextAsset = await input.imageStorage.putAsset({
+            owner: input.owner,
+            url: parsed.cacheKey,
+            blob: parsed.blob,
+            byteSize: parsed.byteSize,
+            contentType: parsed.contentType,
+          });
+        } catch {
+          warningFlags.add('inline_images_download_failed');
+          continue;
+        }
       } else {
         const downloaded = await downloadImageAsBlob({
           url,
@@ -487,13 +350,18 @@ export async function inlineChatImagesInMessages(input: {
           continue;
         }
 
-        nextAsset = await upsertCachedImageAsset({
-          conversationId,
-          url,
-          blob: downloaded.blob,
-          byteSize: downloaded.byteSize,
-          contentType: downloaded.contentType,
-        });
+        try {
+          nextAsset = await input.imageStorage.putAsset({
+            owner: input.owner,
+            url,
+            blob: downloaded.blob,
+            byteSize: downloaded.byteSize,
+            contentType: downloaded.contentType,
+          });
+        } catch {
+          warningFlags.add('inline_images_download_failed');
+          continue;
+        }
       }
 
       replacements.set(url, toSyncnosAssetUrl(nextAsset.id));
@@ -506,6 +374,7 @@ export async function inlineChatImagesInMessages(input: {
     const nextMarkdown = replaceMarkdownImageUrls(markdown, replacements);
     if (nextMarkdown !== markdown) {
       msg.contentMarkdown = nextMarkdown;
+      updatedMessageKeys.add(String(msg.messageKey || '').trim());
       if (typeof input.onMessageUpdated === 'function') {
         await input.onMessageUpdated({
           messageKey: String(msg.messageKey || '').trim(),
@@ -526,6 +395,7 @@ export async function inlineChatImagesInMessages(input: {
     fromCacheCount,
     downloadedCount,
     inlinedBytes,
+    updatedMessageKeys: Array.from(updatedMessageKeys),
     warningFlags: Array.from(warningFlags),
   };
 }

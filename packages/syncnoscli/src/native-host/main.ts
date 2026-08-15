@@ -3,6 +3,7 @@ import {
   createHostFactsFailure,
   createHostFactsSuccess,
   hostFactsCommandRequiresConnectedSession,
+  parseNativeHostImageAssetResponseData,
   parseNativeHostStreamResponseData,
   parseHostFactsRequest,
   type CaptureSnapshotStreamRequestPayload,
@@ -18,12 +19,15 @@ import { getSqliteDatabaseUuid } from '../sqlite/schema';
 import {
   isNativeHostConnectedMutationCommand,
   isNativeHostConnectedReadCommand,
+  readNativeHostImageAsset,
   readNativeHostConnectedCommand,
+  writeNativeHostImageAsset,
   writeNativeHostConnectedCommand,
 } from './dispatcher';
 import {
   NativeHostLaunchError,
   createNativeHostCaptureSnapshotSession,
+  createNativeHostImageAssetSession,
   createNativeHostImportSession,
   encodeNativeHostJson,
   validateNativeHostLaunch,
@@ -41,6 +45,7 @@ import {
 type HostCaptureSnapshotRequest = Extract<HostFactsRequest, Readonly<{ command: 'SAVE_CONVERSATION_SNAPSHOT' }>>;
 type HostCaptureSnapshotStreamRequest = HostCaptureSnapshotRequest &
   Readonly<{ payload: CaptureSnapshotStreamRequestPayload }>;
+type HostImageAssetUploadRequest = Extract<HostFactsRequest, Readonly<{ command: 'PUT_IMAGE_ASSET' }>>;
 
 type NativeHostErrorOutput = Readonly<{
   write: (chunk: string) => boolean;
@@ -132,6 +137,10 @@ function readSingleMessageCommand(handle: SyncNosSqliteHandle, request: HostFact
 
 function isHostCaptureSnapshotStreamRequest(request: HostFactsRequest): request is HostCaptureSnapshotStreamRequest {
   return request.command === 'SAVE_CONVERSATION_SNAPSHOT' && !('snapshot' in request.payload);
+}
+
+function isHostImageAssetUploadRequest(request: HostFactsRequest): request is HostImageAssetUploadRequest {
+  return request.command === 'PUT_IMAGE_ASSET';
 }
 
 async function writeHostFailure(
@@ -245,6 +254,39 @@ async function runConnectedReadCommand(
   }
 }
 
+async function runConnectedImageReadCommand(
+  request: HostFactsRequest,
+  input: Readonly<{
+    openReadOnly: DatabaseOpener;
+    stderr: NativeHostErrorOutput;
+    stdout: NativeMessagingOutput;
+  }>,
+): Promise<number> {
+  let handle: SyncNosSqliteHandle | null = null;
+  let responseStarted = false;
+  try {
+    handle = await input.openReadOnly();
+    const image = readNativeHostImageAsset(handle.database, request);
+    const response = parseNativeHostImageAssetResponseData({
+      asset: image.metadata,
+      stream: { operation: 'image-asset', declaredTotalBytes: image.bytes.byteLength },
+    });
+    await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, response));
+    responseStarted = true;
+    await writeNativeHostByteStream({ bytes: image.bytes, operation: response.stream.operation, output: input.stdout });
+    return 0;
+  } catch (error) {
+    if (responseStarted) {
+      writeDiagnostic(input.stderr, 'SyncNos Native Host could not finish its streamed image response.');
+    } else {
+      await writeHostFailure(input.stdout, input.stderr, request, error, true);
+    }
+    return 1;
+  } finally {
+    closeHandle(handle);
+  }
+}
+
 async function runConnectedMutationCommand(
   request: HostFactsRequest,
   input: Readonly<{
@@ -329,6 +371,52 @@ async function runCaptureSnapshotUploadSession(
   }
 }
 
+async function runImageAssetUploadSession(
+  request: HostImageAssetUploadRequest,
+  messages: AsyncIterator<unknown>,
+  input: Readonly<{
+    openReadWriteForHost: DatabaseOpener;
+    signal: AbortSignal;
+    stderr: NativeHostErrorOutput;
+    stdout: NativeMessagingOutput;
+  }>,
+): Promise<number> {
+  let handle: SyncNosSqliteHandle | null = null;
+  let session: Awaited<ReturnType<typeof createNativeHostImageAssetSession>> | null = null;
+  let responseStarted = false;
+  try {
+    session = await createNativeHostImageAssetSession({ request });
+    for (;;) {
+      if (input.signal.aborted) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      const next = await nextMessageOrAbort(messages, input.signal);
+      if (next.done) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      const event = await session.accept(next.value);
+      if (event.kind !== 'complete') continue;
+
+      handle = await input.openReadWriteForHost();
+      const result = await writeNativeHostImageAsset(handle.database, request, event.bytes);
+      const bytes = encodeNativeHostJson(result);
+      const stream = parseNativeHostStreamResponseData({
+        stream: { operation: 'host-json', declaredTotalBytes: bytes.byteLength },
+      });
+      await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, stream));
+      responseStarted = true;
+      await writeNativeHostByteStream({ bytes, operation: stream.stream.operation, output: input.stdout });
+      return 0;
+    }
+  } catch (error) {
+    if (responseStarted) {
+      writeDiagnostic(input.stderr, 'SyncNos Native Host could not finish its streamed image write response.');
+    } else {
+      await writeHostFailure(input.stdout, input.stderr, request, error, true);
+    }
+    return 1;
+  } finally {
+    session?.cleanup();
+    closeHandle(handle);
+  }
+}
+
 async function runConnectedCommand(
   request: HostFactsRequest,
   messages: AsyncIterator<unknown>,
@@ -343,6 +431,21 @@ async function runConnectedCommand(
 ): Promise<number> {
   if (isHostCaptureSnapshotStreamRequest(request)) {
     return await runCaptureSnapshotUploadSession(request, messages, {
+      openReadWriteForHost: input.openReadWriteForHost,
+      signal: input.signal,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    });
+  }
+  if (request.command === 'GET_IMAGE_ASSET') {
+    return await runConnectedImageReadCommand(request, {
+      openReadOnly: input.openReadOnly,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    });
+  }
+  if (isHostImageAssetUploadRequest(request)) {
+    return await runImageAssetUploadSession(request, messages, {
       openReadWriteForHost: input.openReadWriteForHost,
       signal: input.signal,
       stderr: input.stderr,

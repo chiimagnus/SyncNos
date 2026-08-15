@@ -153,6 +153,17 @@ async function createHarness() {
   const router = createBackgroundRouter({ fallback: () => ({ ok: false, data: null, error: null }) });
   const order: string[] = [];
   const repository = {
+    getConversationByReference: vi.fn(async (reference: any) =>
+      reference?.source === 'gemini' && reference?.conversationKey === 'capture-1'
+        ? {
+            id: 41,
+            source: 'gemini',
+            conversationKey: 'capture-1',
+            sourceType: 'chat',
+            url: 'https://gemini.google.com/app/capture-1',
+          }
+        : null,
+    ),
     saveConversationSnapshot: vi.fn(async (input: ConversationCaptureSnapshot) => {
       order.push('save');
       return {
@@ -169,7 +180,11 @@ async function createHarness() {
   streamRepositoryMocks.open.mockResolvedValue({ mode: 'native', repository });
   registerConversationHandlers(router as any, {
     conversationReadRunner: {
-      run: async ({ read }: any) => await read({ mode: 'native', repository }),
+      run: async ({ read }: any) =>
+        await gate.runFactsOperation(
+          'capture-snapshot-test',
+          async (lease) => await read({ lease, mode: 'native', repository }),
+        ),
     },
     onConversationChanged,
     streamRouter,

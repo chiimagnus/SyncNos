@@ -6,6 +6,7 @@ import {
   LocalDataContractError,
   parseHostFactsResponse,
   parseMigrationId,
+  parseNativeHostImageAssetResponseData,
   parseNativeHostStreamResponseData,
   type HostFactsRequest,
   type StreamDescriptor,
@@ -53,7 +54,7 @@ function nativeSessionId(): string {
   return parseMigrationId(value);
 }
 
-async function postCaptureSnapshotStream(
+async function postNativeByteStream(
   input: Readonly<{
     bytes: Uint8Array;
     digestProvider?: DigestProvider;
@@ -62,13 +63,7 @@ async function postCaptureSnapshotStream(
     stream: StreamDescriptor;
   }>,
 ): Promise<void> {
-  if (
-    input.request.command !== 'SAVE_CONVERSATION_SNAPSHOT' ||
-    input.stream.operation !== 'capture-snapshot' ||
-    input.bytes.byteLength !== input.stream.declaredTotalBytes
-  ) {
-    throw protocolFailure();
-  }
+  if (input.bytes.byteLength !== input.stream.declaredTotalBytes) throw protocolFailure();
 
   const provider = input.digestProvider ?? browserDigestProvider;
   const sessionId = nativeSessionId();
@@ -110,21 +105,21 @@ async function postCaptureSnapshotStream(
   });
 }
 
-/**
- * Reads one Host JSON response from one Native Messaging port. The port is never reused:
- * any terminal, cancellation, malformed frame, or disconnect releases it immediately.
- */
-export function readNativePortJson(
+type NativePortStreamHeader = Readonly<{ stream: StreamDescriptor }>;
+
+function readNativePortStream<THeader extends NativePortStreamHeader, TResult>(
   input: Readonly<{
+    decode: (header: THeader, bytes: Uint8Array) => TResult;
     digestProvider?: DigestProvider;
+    parseHeader: (value: unknown) => THeader;
     port: NativeMessagingPort;
     request: HostFactsRequest;
     start?: () => Promise<void>;
   }>,
-): Promise<unknown> {
+): Promise<TResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
-    let stream: ReturnType<typeof parseNativeHostStreamResponseData> | null = null;
+    let stream: THeader | null = null;
     let receiver: NativeWireSessionReceiver | null = null;
     let bytes: Uint8Array | null = null;
     let processing = Promise.resolve();
@@ -144,7 +139,7 @@ export function readNativePortJson(
       const safeError = error instanceof LocalDataContractError ? error : protocolFailure();
       finish(() => reject(safeError));
     };
-    const succeed = (data: unknown) => finish(() => resolve(data));
+    const succeed = (data: TResult) => finish(() => resolve(data));
 
     const acceptWireFrame = async (value: unknown) => {
       const frame = parseNativeWireFrame(value);
@@ -170,13 +165,7 @@ export function readNativePortJson(
       if (event?.kind !== 'terminal') return;
       if (event.terminalFrame.status !== 'ok') throw new LocalDataContractError('HOST_UNAVAILABLE');
 
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes!));
-      } catch {
-        throw protocolFailure();
-      }
-      succeed(parsed);
+      succeed(input.decode(stream!, bytes!));
     };
 
     const onMessage: NativePortListener = (message) => {
@@ -187,7 +176,7 @@ export function readNativePortJson(
             const response = parseHostFactsResponse(message);
             if (response.requestId !== input.request.requestId) throw protocolFailure();
             if (!response.ok) throw new LocalDataContractError(response.error.code, response.error.diagnostics);
-            stream = parseNativeHostStreamResponseData(response.data);
+            stream = input.parseHeader(response.data);
             return;
           }
           if (hasOkField(message)) {
@@ -214,6 +203,57 @@ export function readNativePortJson(
   });
 }
 
+/**
+ * Reads one Host JSON response from one Native Messaging port. The port is never reused:
+ * any terminal, cancellation, malformed frame, or disconnect releases it immediately.
+ */
+export function readNativePortJson(
+  input: Readonly<{
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+    start?: () => Promise<void>;
+  }>,
+): Promise<unknown> {
+  return readNativePortStream({
+    ...input,
+    parseHeader: parseNativeHostStreamResponseData,
+    decode: (_header, bytes) => {
+      try {
+        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      } catch {
+        throw protocolFailure();
+      }
+    },
+  });
+}
+
+export type NativePortImageAsset = Readonly<{
+  backendAssetId: number;
+  byteSize: number;
+  bytes: Uint8Array;
+  contentType: string;
+}>;
+
+/** Reads raw image bytes only after the strict ownership-bound image header is verified. */
+export function readNativePortImageAsset(
+  input: Readonly<{
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+  }>,
+): Promise<NativePortImageAsset> {
+  return readNativePortStream({
+    ...input,
+    parseHeader: parseNativeHostImageAssetResponseData,
+    decode: (header, bytes) =>
+      Object.freeze({
+        ...header.asset,
+        bytes: Uint8Array.from(bytes),
+      }),
+  });
+}
+
 /** Uploads one large canonical capture through bounded Native Messaging frames before reading the typed Host result. */
 export async function writeNativePortCaptureSnapshot(
   input: Readonly<{
@@ -224,10 +264,34 @@ export async function writeNativePortCaptureSnapshot(
     stream: StreamDescriptor;
   }>,
 ): Promise<unknown> {
+  if (input.request.command !== 'SAVE_CONVERSATION_SNAPSHOT' || input.stream.operation !== 'capture-snapshot') {
+    throw protocolFailure();
+  }
   return await readNativePortJson({
     digestProvider: input.digestProvider,
     port: input.port,
     request: input.request,
-    start: async () => await postCaptureSnapshotStream(input),
+    start: async () => await postNativeByteStream(input),
+  });
+}
+
+/** Uploads one image through bounded Native Messaging frames before reading the compact typed Host result. */
+export async function writeNativePortImageAsset(
+  input: Readonly<{
+    bytes: Uint8Array;
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+    stream: StreamDescriptor;
+  }>,
+): Promise<unknown> {
+  if (input.request.command !== 'PUT_IMAGE_ASSET' || input.stream.operation !== 'image-asset') {
+    throw protocolFailure();
+  }
+  return await readNativePortJson({
+    digestProvider: input.digestProvider,
+    port: input.port,
+    request: input.request,
+    start: async () => await postNativeByteStream(input),
   });
 }

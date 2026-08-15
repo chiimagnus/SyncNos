@@ -323,8 +323,23 @@ function getImageAssetById(
   });
 }
 
+function findImageAssetByConversationAndUrl(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{ conversationId: unknown; url: unknown }>,
+): SqliteImageAsset | null {
+  const conversationId = positiveId(input.conversationId);
+  const url = safeString(input.url);
+  if (!conversationId || !url) return null;
+  return execute(() => {
+    const row = selectImageByConversationAndUrl(database, conversationId, url);
+    return row ? asAsset(row) : null;
+  });
+}
+
 export function createImagesRepository(database: SyncNosSqliteDatabase) {
   return Object.freeze({
+    findImageAssetByConversationAndUrl: (input: Readonly<{ conversationId: unknown; url: unknown }>) =>
+      findImageAssetByConversationAndUrl(database, input),
     getImageAssetById: (input: Readonly<{ conversationId?: unknown; id: unknown }>) =>
       getImageAssetById(database, input),
     putImageAsset: async (input: PutImageAssetInput) => await putImageAsset(database, input),
