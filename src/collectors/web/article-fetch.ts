@@ -215,6 +215,7 @@ export async function fetchActiveTabArticle({
   if (!normalizedUrl) throw toError('active tab must be an http(s) page');
   const discourseTopic = parseDiscourseTopicUrl(normalizedUrl);
   const canonicalUrl = canonicalizeArticleUrl(normalizedUrl) || normalizedUrl;
+  const conversationKey = conversationKeyForUrl(canonicalUrl);
   const includeXiaohongshuComments = await shouldCaptureXiaohongshuComments();
 
   let readabilityInjected = false;
@@ -271,7 +272,7 @@ export async function fetchActiveTabArticle({
       conversation: {
         sourceType: ARTICLE_SOURCE_TYPE,
         source: ARTICLE_SOURCE,
-        conversationKey: conversationKeyForUrl(canonicalUrl),
+        conversationKey,
         title,
         url: canonicalUrl,
         author,
@@ -297,6 +298,8 @@ export async function fetchActiveTabArticle({
   return {
     isNew: saved.isNew,
     conversationId: saved.conversationId,
+    source: ARTICLE_SOURCE,
+    conversationKey,
     url: canonicalUrl,
     title,
     author,
@@ -327,6 +330,8 @@ export async function resolveOrCaptureActiveTabArticle({
       return {
         isNew: false,
         conversationId: existingId,
+        source: ARTICLE_SOURCE,
+        conversationKey: key,
         url: canonicalUrl,
         title: normalizeText((existing as any)?.title || '') || fallbackTitle(canonicalUrl, (tab as any)?.title || ''),
         author: normalizeText((existing as any)?.author || ''),

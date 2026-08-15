@@ -206,6 +206,7 @@ describe('local data contracts', () => {
             canonicalUrl: 'https://example.test/article',
             conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
           },
+          authorName: 'Alice',
           commentText: 'reply',
           backendParentId: 17,
         }),
@@ -215,6 +216,7 @@ describe('local data contracts', () => {
         canonicalUrl: 'https://example.test/article',
         conversation: { source: 'web', conversationKey: 'conversation-a', backendConversationId: 91 },
       },
+      authorName: 'Alice',
       commentText: 'reply',
       backendParentId: 17,
     });

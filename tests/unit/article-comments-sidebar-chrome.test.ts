@@ -3,9 +3,8 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-const { listArticleCommentsByCanonicalUrlMock, listArticleCommentsByConversationIdMock } = vi.hoisted(() => ({
-  listArticleCommentsByCanonicalUrlMock: vi.fn(async () => []),
-  listArticleCommentsByConversationIdMock: vi.fn(async () => []),
+const { listArticleCommentsMock } = vi.hoisted(() => ({
+  listArticleCommentsMock: vi.fn(async () => []),
 }));
 
 vi.mock('../../src/ui/i18n', () => ({
@@ -29,9 +28,20 @@ vi.mock('@services/comments/client/repo', () => ({
     createdAt: Date.now(),
     updatedAt: Date.now(),
   })),
-  deleteArticleCommentById: vi.fn(async () => true),
-  listArticleCommentsByCanonicalUrl: listArticleCommentsByCanonicalUrlMock,
-  listArticleCommentsByConversationId: listArticleCommentsByConversationIdMock,
+  addArticleCommentReply: vi.fn(async () => ({
+    id: 2,
+    parentId: 1,
+    conversationId: 21,
+    canonicalUrl: 'https://example.com/article',
+    quoteText: '',
+    commentText: 'reply',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  })),
+  deleteArticleComment: vi.fn(async () => true),
+  ensureArticleCommentContext: vi.fn(async () => ({ updated: 0 })),
+  listArticleComments: listArticleCommentsMock,
+  migrateArticleCommentCanonicalUrl: vi.fn(async () => ({ updated: 0 })),
 }));
 
 vi.mock('../../src/platform/runtime/ports', () => ({
@@ -342,75 +352,79 @@ describe('ArticleCommentsSection shared chrome', () => {
 });
 
 describe('article comments sidebar adapters', () => {
+  const articleContext = {
+    canonicalUrl: 'https://example.com/article',
+    conversationId: 21,
+    conversation: { source: 'web', conversationKey: 'article:https://example.com/article' },
+    factsEpoch: 'idb-v1' as const,
+  };
+  const orphanContext = {
+    canonicalUrl: 'https://example.com/article',
+    conversationId: null,
+    factsEpoch: 'idb-v1' as const,
+  };
+
   beforeEach(() => {
-    listArticleCommentsByCanonicalUrlMock.mockReset();
-    listArticleCommentsByConversationIdMock.mockReset();
-    listArticleCommentsByCanonicalUrlMock.mockResolvedValue([]);
-    listArticleCommentsByConversationIdMock.mockResolvedValue([]);
+    listArticleCommentsMock.mockReset();
+    listArticleCommentsMock.mockResolvedValue([]);
   });
 
-  it('merges conversation comments with same-context orphans and deduplicates by comment identity', async () => {
-    listArticleCommentsByConversationIdMock.mockResolvedValue([
-      comment({ id: 2, conversationId: 21, createdAt: 2 }),
+  it('uses one current-context facts command for the already-merged comment list', async () => {
+    listArticleCommentsMock.mockResolvedValue([
       comment({ id: 1, conversationId: 21, createdAt: 1 }),
-    ]);
-    listArticleCommentsByCanonicalUrlMock.mockResolvedValue([
       comment({ id: 2, conversationId: 21, createdAt: 2 }),
       comment({ id: 3, conversationId: null, createdAt: 3 }),
-      comment({ id: 4, conversationId: 99, createdAt: 4 }),
     ]);
 
     const result = await createArticleCommentsSidebarAppAdapter().list({
-      canonicalUrl: 'https://example.com/article#fragment',
-      conversationId: 21,
+      context: { ...articleContext, canonicalUrl: 'https://example.com/article#fragment' },
       fallbackPolicy: 'include-orphan-url',
     });
 
-    expect(listArticleCommentsByConversationIdMock).toHaveBeenCalledWith(21);
-    expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/article');
+    expect(listArticleCommentsMock).toHaveBeenCalledWith({
+      context: {
+        canonicalUrl: 'https://example.com/article',
+        conversation: articleContext.conversation,
+        factsEpoch: 'idb-v1',
+      },
+      fallbackPolicy: 'include-orphan-url',
+    });
     expect(result.map((item) => item.id)).toEqual([1, 2, 3]);
   });
 
-  it('uses URL identity only for orphan comments when no conversation exists', async () => {
-    listArticleCommentsByCanonicalUrlMock.mockResolvedValue([
-      comment({ id: 1, conversationId: null }),
-      comment({ id: 2, conversationId: 21 }),
-    ]);
+  it('keeps an orphan context free of a numeric conversation reference', async () => {
+    listArticleCommentsMock.mockResolvedValue([comment({ id: 1, conversationId: null })]);
 
     const result = await createArticleCommentsSidebarAppAdapter().list({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: null,
+      context: orphanContext,
       fallbackPolicy: 'include-orphan-url',
     });
 
-    expect(listArticleCommentsByConversationIdMock).not.toHaveBeenCalled();
+    expect(listArticleCommentsMock).toHaveBeenCalledWith({
+      context: { canonicalUrl: 'https://example.com/article', factsEpoch: 'idb-v1' },
+      fallbackPolicy: 'include-orphan-url',
+    });
     expect(result.map((item) => item.id)).toEqual([1]);
   });
 
-  it('sends explicit ID and URL runtime queries and merges only matching identities', async () => {
-    const send = vi.fn(async (_type: string, payload?: Record<string, unknown>) => {
-      if (payload?.conversationId === 21) {
-        return { ok: true, data: [comment({ id: 1, conversationId: 21 })] };
-      }
-      return {
-        ok: true,
-        data: [
-          comment({ id: 1, conversationId: 21 }),
-          comment({ id: 2, conversationId: null }),
-          comment({ id: 3, conversationId: 99 }),
-        ],
-      };
-    });
+  it('sends one epoch-bound runtime query without a UI numeric id', async () => {
+    const send = vi.fn(async () => ({
+      ok: true,
+      data: [comment({ id: 1, conversationId: 21 }), comment({ id: 2, conversationId: null })],
+    }));
 
     const result = await createArticleCommentsSidebarInpageAdapter({ send }).list({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: 21,
+      context: articleContext,
       fallbackPolicy: 'include-orphan-url',
     });
 
-    expect(send).toHaveBeenNthCalledWith(1, 'listArticleComments', { conversationId: 21 });
-    expect(send).toHaveBeenNthCalledWith(2, 'listArticleComments', {
-      canonicalUrl: 'https://example.com/article',
+    expect(send).toHaveBeenCalledWith('listArticleComments', {
+      context: {
+        canonicalUrl: 'https://example.com/article',
+        conversation: articleContext.conversation,
+      },
+      factsEpoch: 'idb-v1',
+      fallbackPolicy: 'include-orphan-url',
     });
     expect(result.map((item) => item.id)).toEqual([1, 2]);
   });
@@ -420,15 +434,16 @@ describe('article comments sidebar adapters', () => {
       send: vi.fn(async () => ({ ok: true, data: { ok: false } })),
     });
 
-    await expect(adapter.delete({ id: 42 })).rejects.toThrow('failed to delete article comment');
+    await expect(
+      adapter.delete({ context: articleContext, comment: comment({ id: 42, conversationId: 21 }) }),
+    ).rejects.toThrow('invalid delete response');
   });
 
   it('throws typed errors instead of treating runtime failures as empty comments', async () => {
     const unavailable = createArticleCommentsSidebarInpageAdapter(null);
     await expect(
       unavailable.list({
-        canonicalUrl: 'https://example.com/article',
-        conversationId: null,
+        context: orphanContext,
         fallbackPolicy: 'none',
       }),
     ).rejects.toMatchObject<ArticleCommentsSidebarAdapterError>({
@@ -441,8 +456,7 @@ describe('article comments sidebar adapters', () => {
     });
     await expect(
       failed.list({
-        canonicalUrl: 'https://example.com/article',
-        conversationId: null,
+        context: orphanContext,
         fallbackPolicy: 'none',
       }),
     ).rejects.toMatchObject<ArticleCommentsSidebarAdapterError>({

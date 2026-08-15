@@ -196,7 +196,9 @@ export type ConversationReadRunner = Readonly<{
     input: Readonly<{
       expectedFactsEpoch?: unknown;
       kind: string;
-      read: (backend: BoundFactsRepository<ConversationFactsRepository>) => Promise<T> | T;
+      read: (
+        backend: BoundFactsRepository<ConversationFactsRepository> & Readonly<{ lease: FactsOperationLease }>,
+      ) => Promise<T> | T;
     }>,
   ) => Promise<T>;
 }>;
@@ -209,6 +211,9 @@ export function createConversationReadRunner(
 ): ConversationReadRunner {
   return Object.freeze({
     run: async ({ kind, expectedFactsEpoch, read }) =>
-      await gate.runFactsOperation(kind, async (lease) => await read(await openRepository(lease, expectedFactsEpoch))),
+      await gate.runFactsOperation(
+        kind,
+        async (lease) => await read({ ...(await openRepository(lease, expectedFactsEpoch)), lease }),
+      ),
   });
 }

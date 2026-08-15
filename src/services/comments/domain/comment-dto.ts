@@ -1,28 +1,12 @@
-import type { ArticleComment, ArticleCommentLocator } from '@services/comments/domain/models';
+import type { ArticleComment } from '@services/comments/domain/models';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 export type ArticleCommentDto = ArticleComment;
-export type ArticleCommentListRequestDto = { canonicalUrl?: string; conversationId?: number | null };
-export type ArticleCommentAddRequestDto = {
-  canonicalUrl: string;
-  conversationId: number | null;
-  parentId: number | null;
-  quoteText: string;
-  commentText: string;
-  locator: ArticleCommentLocator | null;
-};
-export type ArticleCommentDeleteRequestDto = { id: number };
 
 function positiveInt(value: unknown): number | null {
   const n = Number(value);
   return Number.isSafeInteger(n) && n > 0 ? n : null;
-}
-
-function parseOptionalPositiveInt(value: unknown): { ok: true; value: number | null } | { ok: false } {
-  if (value == null) return { ok: true, value: null };
-  const parsed = positiveInt(value);
-  return parsed == null ? { ok: false } : { ok: true, value: parsed };
 }
 
 export function parseArticleCommentDto(value: unknown): ArticleCommentDto | null {
@@ -58,25 +42,5 @@ export function serializeArticleCommentDto(value: ArticleComment): ArticleCommen
     ...value,
     authorName: value.authorName ?? null,
     locator: normalizeArticleCommentLocator(value.locator),
-  };
-}
-
-export function parseArticleCommentAddRequest(value: unknown): ArticleCommentAddRequestDto | null {
-  if (!value || typeof value !== 'object') return null;
-  const row = value as Record<string, unknown>;
-  const canonicalUrl = canonicalizeArticleUrl(row.canonicalUrl);
-  const commentText = String(row.commentText ?? '').trim();
-  if (!canonicalUrl || !commentText) return null;
-  const parent = parseOptionalPositiveInt(row.parentId);
-  const conversation = parseOptionalPositiveInt(row.conversationId);
-  if (!parent.ok || !conversation.ok) return null;
-  const parentId = parent.value;
-  return {
-    canonicalUrl,
-    conversationId: conversation.value,
-    parentId,
-    quoteText: parentId ? '' : String(row.quoteText ?? ''),
-    commentText,
-    locator: parentId ? null : normalizeArticleCommentLocator(row.locator),
   };
 }

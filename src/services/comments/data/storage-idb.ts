@@ -3,13 +3,18 @@ import { openDb as openSchemaDb } from '@platform/idb/schema';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import { serializeArticleCommentDto } from '@services/comments/domain/comment-dto';
-
-export class ArticleCommentInvariantError extends Error {
-  constructor(public readonly code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch') {
-    super(code);
-    this.name = 'ArticleCommentInvariantError';
-  }
-}
+import { ArticleCommentInvariantError } from '@services/comments/domain/comment-errors';
+import { LocalDataContractError } from '@services/local-data/contracts';
+import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
+import type {
+  ArticleCommentsAddReplyInput,
+  ArticleCommentsAddRootInput,
+  ArticleCommentsDeleteInput,
+  ArticleCommentsEnsureContextInput,
+  ArticleCommentsFactsRepository,
+  ArticleCommentsListInput,
+  ArticleCommentsMigrateInput,
+} from '@services/comments/data/storage';
 
 export type ArticleCommentDeleteContext = {
   conversationId: number | null;
@@ -200,15 +205,7 @@ function toDeleteContext(row: any): ArticleCommentDeleteContext {
   };
 }
 
-export async function getArticleCommentDeleteContextById(id: number): Promise<ArticleCommentDeleteContext | null> {
-  const commentId = Number(id);
-  if (!Number.isFinite(commentId) || commentId <= 0) return null;
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readonly');
-  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
-  await txDone(t);
-
+function deleteContextFromRows(rows: readonly any[], commentId: number): ArticleCommentDeleteContext | null {
   const byId = new Map<number, any>();
   for (const row of rows) {
     const rowId = Number(row?.id);
@@ -219,41 +216,25 @@ export async function getArticleCommentDeleteContextById(id: number): Promise<Ar
   const target = byId.get(commentId);
   if (!target) {
     for (const row of rows) {
-      if (normalizeParentId(row?.parentId) !== commentId) continue;
-      return toDeleteContext(row);
+      if (normalizeParentId(row?.parentId) === commentId) return toDeleteContext(row);
     }
     return null;
   }
 
   const context = toDeleteContext(target);
   if (context.conversationId != null && context.canonicalUrl) return context;
-
-  const parentId = normalizeParentId(target?.parentId);
-  if (parentId != null) {
-    const parent = byId.get(parentId);
-    if (parent) {
-      const parentContext = toDeleteContext(parent);
-      return {
-        conversationId: context.conversationId ?? parentContext.conversationId,
-        canonicalUrl: context.canonicalUrl || parentContext.canonicalUrl,
-      };
-    }
-  }
-  return context;
+  const parentId = normalizeParentId(target.parentId);
+  const parent = parentId == null ? null : byId.get(parentId);
+  if (!parent) return context;
+  const parentContext = toDeleteContext(parent);
+  return {
+    conversationId: context.conversationId ?? parentContext.conversationId,
+    canonicalUrl: context.canonicalUrl || parentContext.canonicalUrl,
+  };
 }
 
-export async function deleteArticleCommentById(id: number): Promise<boolean> {
-  const commentId = Number(id);
-  if (!Number.isFinite(commentId) || commentId <= 0) return false;
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
-  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
-  const targetExists = rows.some((row) => Number(row?.id) === commentId);
-  if (!targetExists) {
-    t.abort();
-    return false;
-  }
+function descendantCommentIds(rows: readonly any[], commentId: number): number[] | null {
+  if (!rows.some((row) => Number(row?.id) === commentId)) return null;
   const descendants = new Set<number>([commentId]);
   let changed = true;
   while (changed) {
@@ -266,6 +247,57 @@ export async function deleteArticleCommentById(id: number): Promise<boolean> {
       descendants.add(rowId);
       changed = true;
     }
+  }
+  return [...descendants];
+}
+
+export async function getArticleCommentDeleteContextById(id: number): Promise<ArticleCommentDeleteContext | null> {
+  const commentId = Number(id);
+  if (!Number.isFinite(commentId) || commentId <= 0) return null;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['article_comments'], 'readonly');
+  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
+  await txDone(t);
+
+  return deleteContextFromRows(rows, commentId);
+}
+
+export async function deleteArticleCommentById(id: number): Promise<boolean> {
+  const commentId = Number(id);
+  if (!Number.isFinite(commentId) || commentId <= 0) return false;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
+  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
+  const descendants = descendantCommentIds(rows, commentId);
+  if (!descendants) {
+    await txDone(t);
+    return false;
+  }
+  for (const rowId of descendants) stores.article_comments.delete(rowId);
+  await txDone(t);
+  return true;
+}
+
+async function deleteArticleCommentByIdInContext(input: {
+  canonicalUrl: string;
+  commentId: number;
+  conversationId: number | null;
+}): Promise<boolean> {
+  const commentId = normalizeParentId(input.commentId);
+  const canonicalUrl = normalizeCanonicalUrl(input.canonicalUrl);
+  const conversationId = input.conversationId == null ? null : normalizeConversationId(input.conversationId);
+  if (!commentId || !canonicalUrl || (input.conversationId != null && !conversationId)) return false;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['article_comments'], 'readwrite');
+  const rows = (await reqToPromise<any[]>(stores.article_comments.getAll() as any)) || [];
+  const actual = deleteContextFromRows(rows, commentId);
+  const descendants = descendantCommentIds(rows, commentId);
+  if (!commentContextMatches({ actual, expected: { canonicalUrl, conversationId } }) || !descendants) {
+    await txDone(t);
+    return false;
   }
   for (const rowId of descendants) stores.article_comments.delete(rowId);
   await txDone(t);
@@ -379,4 +411,120 @@ export async function migrateArticleCommentsCanonicalUrl(input: {
 
   await txDone(t);
   return { updated };
+}
+
+function mergeArticleCommentsByIdentity(...groups: ArticleComment[][]): ArticleComment[] {
+  const byId = new Map<number, ArticleComment>();
+  for (const group of groups) {
+    for (const comment of group) {
+      const id = normalizeParentId(comment?.id);
+      if (!id || byId.has(id)) continue;
+      byId.set(id, comment);
+    }
+  }
+  return [...byId.values()].sort((left, right) => left.createdAt - right.createdAt || left.id - right.id);
+}
+
+function commentContextMatches(input: {
+  actual: ArticleCommentDeleteContext | null;
+  expected: { canonicalUrl: string; conversationId: number | null };
+}): boolean {
+  return (
+    !!input.actual &&
+    input.actual.canonicalUrl === input.expected.canonicalUrl &&
+    input.actual.conversationId === input.expected.conversationId
+  );
+}
+
+function resolvedConversationId(input: { conversation: { conversationId: number } | null }): number | null {
+  return input.conversation?.conversationId ?? null;
+}
+
+function assertBoundContext(input: { canonicalUrl: string; conversation: { conversationId: number } | null }) {
+  const canonicalUrl = normalizeCanonicalUrl(input.canonicalUrl);
+  if (!canonicalUrl) throw new LocalDataContractError('INVALID_ARGUMENT');
+  const conversationId = resolvedConversationId(input);
+  if (conversationId != null && !normalizeConversationId(conversationId)) {
+    throw new LocalDataContractError('STALE_REFERENCE');
+  }
+  return { canonicalUrl, conversationId };
+}
+
+/** Lease-bound IndexedDB implementation; direct exports above remain only for isolated legacy/provider callers. */
+export function createIdbArticleCommentsRepository(lease: FactsOperationLease): ArticleCommentsFactsRepository {
+  const assertLease = () => assertFactsOperationLease(lease);
+  const list = async ({ context, fallbackPolicy }: ArticleCommentsListInput) => {
+    assertLease();
+    const bound = assertBoundContext(context);
+    const byConversation = bound.conversationId ? await listArticleCommentsByConversationId(bound.conversationId) : [];
+    assertLease();
+    if (fallbackPolicy === 'none') return byConversation;
+    const byCanonicalUrl = (await listArticleCommentsByCanonicalUrl(bound.canonicalUrl)).filter((comment) => {
+      const commentConversationId = normalizeConversationId(comment.conversationId);
+      return bound.conversationId
+        ? commentConversationId == null || commentConversationId === bound.conversationId
+        : commentConversationId == null;
+    });
+    assertLease();
+    return mergeArticleCommentsByIdentity(byConversation, byCanonicalUrl);
+  };
+  const addRoot = async ({ context, authorName, quoteText, commentText, locator }: ArticleCommentsAddRootInput) => {
+    assertLease();
+    const bound = assertBoundContext(context);
+    const comment = await addArticleComment({
+      canonicalUrl: bound.canonicalUrl,
+      conversationId: bound.conversationId,
+      authorName,
+      quoteText,
+      commentText,
+      locator: locator ?? null,
+      parentId: null,
+    });
+    assertLease();
+    return comment;
+  };
+  const addReply = async ({ context, authorName, commentText, parentId }: ArticleCommentsAddReplyInput) => {
+    assertLease();
+    const bound = assertBoundContext(context);
+    const comment = await addArticleComment({
+      canonicalUrl: bound.canonicalUrl,
+      conversationId: bound.conversationId,
+      authorName,
+      quoteText: '',
+      commentText,
+      locator: null,
+      parentId,
+    });
+    assertLease();
+    return comment;
+  };
+  const remove = async ({ context, commentId }: ArticleCommentsDeleteInput) => {
+    assertLease();
+    const bound = assertBoundContext(context);
+    const deleted = await deleteArticleCommentByIdInContext({ ...bound, commentId });
+    assertLease();
+    if (!deleted) throw new LocalDataContractError('STALE_REFERENCE');
+    return true;
+  };
+  const ensureContext = async ({ context }: ArticleCommentsEnsureContextInput) => {
+    assertLease();
+    const bound = assertBoundContext(context);
+    if (!bound.conversationId) throw new LocalDataContractError('STALE_REFERENCE');
+    const result = await attachOrphanCommentsToConversation(bound.canonicalUrl, bound.conversationId);
+    assertLease();
+    return result;
+  };
+  const migrateCanonicalUrl = async ({ context, fromCanonicalUrl, toCanonicalUrl }: ArticleCommentsMigrateInput) => {
+    assertLease();
+    const bound = assertBoundContext(context);
+    if (!bound.conversationId) throw new LocalDataContractError('STALE_REFERENCE');
+    const result = await migrateArticleCommentsCanonicalUrl({
+      fromCanonicalUrl,
+      toCanonicalUrl,
+      conversationId: bound.conversationId,
+    });
+    assertLease();
+    return result;
+  };
+  return Object.freeze({ addReply, addRoot, delete: remove, ensureContext, list, migrateCanonicalUrl });
 }

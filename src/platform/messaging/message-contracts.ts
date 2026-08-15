@@ -73,9 +73,10 @@ export const CONTENT_MESSAGE_TYPES = {
 export const COMMENTS_MESSAGE_TYPES = {
   LIST_ARTICLE_COMMENTS: 'listArticleComments',
   ADD_ARTICLE_COMMENT: 'addArticleComment',
+  ADD_ARTICLE_COMMENT_REPLY: 'addArticleCommentReply',
   DELETE_ARTICLE_COMMENT: 'deleteArticleComment',
-  ATTACH_ORPHAN_ARTICLE_COMMENTS: 'attachOrphanArticleComments',
-  MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL: 'migrateArticleCommentsCanonicalUrl',
+  ENSURE_ARTICLE_COMMENT_CONTEXT: 'ensureArticleCommentContext',
+  MIGRATE_ARTICLE_COMMENT_URL: 'migrateArticleCommentUrl',
 } as const;
 
 export const UI_MESSAGE_TYPES = {

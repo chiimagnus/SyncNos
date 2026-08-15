@@ -63,6 +63,7 @@ export default defineBackground(async () => {
   registerItemMentionHandlers(router, { conversationReadRunner });
   registerChatWithBackgroundHandlers(router);
   registerArticleCommentsHandlers(router, {
+    conversationReadRunner,
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
   registerWebArticleHandlers(router, {

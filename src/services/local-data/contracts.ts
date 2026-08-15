@@ -894,6 +894,11 @@ export type AddArticleCommentRequestPayload<TContext extends BrowserCommentConte
   quoteText: string;
 }>;
 
+export type HostAddArticleCommentRequestPayload = AddArticleCommentRequestPayload<HostCommentContext> &
+  Readonly<{
+    authorName: string;
+  }>;
+
 export type AddArticleCommentReplyRequestPayload<TContext extends BrowserCommentContext | HostCommentContext> =
   Readonly<{
     commentText: string;
@@ -907,6 +912,7 @@ export type DeleteArticleCommentRequestPayload<TContext extends BrowserCommentCo
 }>;
 
 export type HostAddArticleCommentReplyRequestPayload = Readonly<{
+  authorName: string;
   backendParentId: number;
   commentText: string;
   context: HostCommentContext;
@@ -920,11 +926,10 @@ export type HostDeleteArticleCommentRequestPayload = Readonly<{
 export type MigrateArticleCommentUrlRequestPayload<TReference extends StableConversationReference> =
   UpdateArticleUrlRequestPayload<TReference>;
 
-export type EnsureArticleCommentContextRequestPayload = Readonly<{
-  canonicalUrlFallback?: string;
-  ensureArticle?: boolean;
-  tabId?: number;
-}>;
+export type EnsureArticleCommentContextRequestPayload<TContext extends BrowserCommentContext | HostCommentContext> =
+  Readonly<{
+    context: TContext;
+  }>;
 
 export type BrowserImageAssetRequestPayload = Readonly<{
   assetId: number;
@@ -1051,7 +1056,7 @@ export type BrowserRuntimeFactsPayloadByCommand = {
   ADD_ARTICLE_COMMENT_REPLY: AddArticleCommentReplyRequestPayload<BrowserCommentContext>;
   DELETE_ARTICLE_COMMENT: DeleteArticleCommentRequestPayload<BrowserCommentContext>;
   MIGRATE_ARTICLE_COMMENT_URL: MigrateArticleCommentUrlRequestPayload<BrowserConversationReference>;
-  ENSURE_ARTICLE_COMMENT_CONTEXT: EnsureArticleCommentContextRequestPayload;
+  ENSURE_ARTICLE_COMMENT_CONTEXT: EnsureArticleCommentContextRequestPayload<BrowserCommentContext>;
   GET_IMAGE_ASSET: BrowserImageAssetRequestPayload;
   PUT_IMAGE_ASSET: BrowserPutImageAssetRequestPayload;
   BACKFILL_CONVERSATION_IMAGES: BrowserConversationReference;
@@ -1143,11 +1148,11 @@ export type HostFactsPayloadByCommand = {
   CLEAR_SYNC_MAPPING: MappingRequestPayload<HostConversationReference>;
   UPDATE_ARTICLE_URL: UpdateArticleUrlRequestPayload<HostConversationReference>;
   LIST_ARTICLE_COMMENTS: ListArticleCommentsRequestPayload<HostCommentContext>;
-  ADD_ARTICLE_COMMENT: AddArticleCommentRequestPayload<HostCommentContext>;
+  ADD_ARTICLE_COMMENT: HostAddArticleCommentRequestPayload;
   ADD_ARTICLE_COMMENT_REPLY: HostAddArticleCommentReplyRequestPayload;
   DELETE_ARTICLE_COMMENT: HostDeleteArticleCommentRequestPayload;
   MIGRATE_ARTICLE_COMMENT_URL: MigrateArticleCommentUrlRequestPayload<HostConversationReference>;
-  ENSURE_ARTICLE_COMMENT_CONTEXT: EnsureArticleCommentContextRequestPayload;
+  ENSURE_ARTICLE_COMMENT_CONTEXT: EnsureArticleCommentContextRequestPayload<HostCommentContext>;
   GET_IMAGE_ASSET: HostImageAssetRequestPayload;
   PUT_IMAGE_ASSET: HostPutImageAssetRequestPayload;
   BACKFILL_CONVERSATION_IMAGES: HostConversationReference;
@@ -1623,6 +1628,19 @@ function parseAddArticleCommentPayload<TContext extends BrowserCommentContext | 
   };
 }
 
+function parseHostAddArticleCommentPayload(value: unknown): HostAddArticleCommentRequestPayload {
+  const input = record(value);
+  allowedKeys(input, ['context', 'quoteText', 'commentText', 'locator', 'authorName']);
+  const locator = hasOwn(input, 'locator') ? parseJsonObject(input.locator) : undefined;
+  return {
+    context: parseHostCommentContext(input.context),
+    quoteText: parseFactText(input.quoteText),
+    commentText: parseFactText(input.commentText),
+    authorName: parseText(input.authorName),
+    ...(locator ? { locator } : {}),
+  };
+}
+
 function parseAddArticleCommentReplyPayload<TContext extends BrowserCommentContext | HostCommentContext>(
   value: unknown,
   parseContext: (input: unknown) => TContext,
@@ -1650,9 +1668,10 @@ function parseDeleteArticleCommentPayload<TContext extends BrowserCommentContext
 
 function parseHostAddArticleCommentReplyPayload(value: unknown): HostAddArticleCommentReplyRequestPayload {
   const input = record(value);
-  exactKeys(input, ['context', 'commentText', 'backendParentId']);
+  exactKeys(input, ['context', 'authorName', 'commentText', 'backendParentId']);
   return {
     context: parseHostCommentContext(input.context),
+    authorName: parseText(input.authorName),
     commentText: parseFactText(input.commentText),
     backendParentId: parsePositiveSafeInteger(input.backendParentId),
   };
@@ -1667,17 +1686,13 @@ function parseHostDeleteArticleCommentPayload(value: unknown): HostDeleteArticle
   };
 }
 
-function parseEnsureArticleCommentContextPayload(value: unknown): EnsureArticleCommentContextRequestPayload {
+function parseEnsureArticleCommentContextPayload<TContext extends BrowserCommentContext | HostCommentContext>(
+  value: unknown,
+  parseContext: (input: unknown) => TContext,
+): EnsureArticleCommentContextRequestPayload<TContext> {
   const input = record(value);
-  allowedKeys(input, ['tabId', 'canonicalUrlFallback', 'ensureArticle']);
-  const tabId = hasOwn(input, 'tabId') ? parseNonNegativeSafeInteger(input.tabId) : undefined;
-  const canonicalUrlFallback = parseOptionalText(input, 'canonicalUrlFallback');
-  const ensureArticle = parseOptionalBoolean(input, 'ensureArticle');
-  return {
-    ...(tabId === undefined ? {} : { tabId }),
-    ...(canonicalUrlFallback ? { canonicalUrlFallback } : {}),
-    ...(ensureArticle === undefined ? {} : { ensureArticle }),
-  };
+  exactKeys(input, ['context']);
+  return { context: parseContext(input.context) };
 }
 
 function parseBrowserImageAssetPayload(value: unknown): BrowserImageAssetRequestPayload {
@@ -1878,7 +1893,10 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
         parseBrowserCommentContext,
       ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'ENSURE_ARTICLE_COMMENT_CONTEXT':
-      return parseEnsureArticleCommentContextPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+      return parseEnsureArticleCommentContextPayload(
+        value,
+        parseBrowserCommentContext,
+      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'GET_IMAGE_ASSET':
       return parseBrowserImageAssetPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'PUT_IMAGE_ASSET':
@@ -1953,13 +1971,16 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
     case 'LIST_ARTICLE_COMMENTS':
       return parseListArticleCommentsPayload(value, parseHostCommentContext) as HostFactsPayloadByCommand[TCommand];
     case 'ADD_ARTICLE_COMMENT':
-      return parseAddArticleCommentPayload(value, parseHostCommentContext) as HostFactsPayloadByCommand[TCommand];
+      return parseHostAddArticleCommentPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'ADD_ARTICLE_COMMENT_REPLY':
       return parseHostAddArticleCommentReplyPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'DELETE_ARTICLE_COMMENT':
       return parseHostDeleteArticleCommentPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'ENSURE_ARTICLE_COMMENT_CONTEXT':
-      return parseEnsureArticleCommentContextPayload(value) as HostFactsPayloadByCommand[TCommand];
+      return parseEnsureArticleCommentContextPayload(
+        value,
+        parseHostCommentContext,
+      ) as HostFactsPayloadByCommand[TCommand];
     case 'GET_IMAGE_ASSET':
       return parseHostImageAssetPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'PUT_IMAGE_ASSET':

@@ -37,7 +37,7 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
     let saved = false;
     const data = await deps.conversationReadRunner.run({
       kind: 'article-fetch',
-      read: async ({ mode, repository }) => {
+      read: async ({ factsEpoch, mode, repository }) => {
         const persistence: ArticleCapturePersistence = {
           findConversation: async (reference) => await repository.getConversationByReference(reference),
           saveSnapshot: async (input) => {
@@ -51,13 +51,20 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
             });
           },
         };
-        return await operation({
+        const data = await operation({
           persistence,
           ...(Number.isFinite(Number(tabId)) ? { tabId: Number(tabId) } : {}),
         });
+        return {
+          data:
+            data && typeof data === 'object' && !Array.isArray(data)
+              ? { ...(data as Record<string, unknown>), factsEpoch }
+              : data,
+          saved,
+        };
       },
     });
-    return { data, saved };
+    return data;
   };
 
   router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg) => {

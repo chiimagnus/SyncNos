@@ -27,7 +27,7 @@ import {
   upsertConversation,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
-import { migrateArticleCommentsCanonicalUrl } from '@services/comments/client/repo';
+import { migrateArticleCommentCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
@@ -871,10 +871,14 @@ export function ConversationsProvider({
       await upsertConversation({ payload, reference });
 
       if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
-        await migrateArticleCommentsCanonicalUrl({
+        await migrateArticleCommentCanonicalUrl({
+          context: {
+            canonicalUrl: nextCanonical,
+            factsEpoch: reference.factsEpoch,
+            conversation: { source: reference.source, conversationKey: reference.conversationKey },
+          },
           fromCanonicalUrl: currentCanonical,
           toCanonicalUrl: nextCanonical,
-          conversationId: Number((convo as any)?.id) || null,
         });
       }
 

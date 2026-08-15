@@ -1,14 +1,14 @@
 import { ARTICLE_MESSAGE_TYPES, COMMENTS_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
-import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
+import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import { parseArticleCommentDto, parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
 import {
   ArticleCommentsSidebarAdapterError,
-  filterArticleCommentsForListIdentity,
-  mergeArticleCommentsByIdentity,
-  normalizeArticleCommentsSidebarListInput,
+  toArticleCommentsClientContext,
+  type ArticleCommentsSidebarAdapter,
+  type ArticleCommentsSidebarContext,
 } from '@services/comments/sidebar/article-comments-sidebar-adapter';
-
-import type { ArticleCommentsSidebarAdapter } from '@services/comments/sidebar/article-comments-sidebar-adapter';
+import { parseFactsEpoch } from '@services/local-data/contracts';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
@@ -16,14 +16,21 @@ type RuntimeClient = {
 
 function normalizeConversationId(value: unknown): number | null {
   const id = Number(value);
-  if (!Number.isFinite(id) || id <= 0) return null;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function commentId(value: unknown): number {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new ArticleCommentsSidebarAdapterError('invalid_query', 'invalid article comment');
+  }
   return id;
 }
 
 function getLocationHrefFallback(): string {
   try {
     return String(globalThis.location?.href || '');
-  } catch (_e) {
+  } catch (_error) {
     return '';
   }
 }
@@ -31,120 +38,143 @@ function getLocationHrefFallback(): string {
 export function createArticleCommentsSidebarInpageAdapter(
   runtime: RuntimeClient | null,
 ): ArticleCommentsSidebarAdapter {
-  const rt = runtime;
-
-  const listFromRuntime = async (payload: { canonicalUrl?: string; conversationId?: number }) => {
-    if (!rt?.send) {
+  const request = async <T>(type: string, payload?: Record<string, unknown>): Promise<T> => {
+    if (!runtime?.send) {
       throw new ArticleCommentsSidebarAdapterError(
         'runtime_unavailable',
         'runtime is unavailable for article comments',
       );
     }
-    let res: any;
+    let response: any;
     try {
-      res = await rt.send(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, payload);
+      response = await runtime.send(type, payload);
     } catch (error) {
-      throw new ArticleCommentsSidebarAdapterError('request_failed', 'failed to list article comments', {
+      throw new ArticleCommentsSidebarAdapterError('request_failed', 'article comments request failed', {
         cause: error,
       });
     }
-    if (!res || typeof res.ok !== 'boolean') {
+    if (!response || typeof response.ok !== 'boolean') {
       throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article comments runtime response');
     }
-    if (!res.ok) {
+    if (!response.ok) {
       throw new ArticleCommentsSidebarAdapterError(
         'request_failed',
-        String(res?.error?.message || 'failed to list article comments'),
+        String(response?.error?.message || 'article comments request failed'),
       );
     }
-    if (!Array.isArray(res.data)) {
-      throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article comments payload');
-    }
-    return parseArticleCommentDtos(res.data);
+    return response.data as T;
+  };
+
+  const commandContext = (context: ArticleCommentsSidebarContext) => {
+    const current = toArticleCommentsClientContext(context);
+    return {
+      context: {
+        canonicalUrl: current.canonicalUrl,
+        ...(current.conversation ? { conversation: current.conversation } : {}),
+      },
+      factsEpoch: current.factsEpoch,
+    };
   };
 
   return {
     async list(input) {
-      const query = normalizeArticleCommentsSidebarListInput(input);
-      const byConversation = query.conversationId
-        ? await listFromRuntime({ conversationId: query.conversationId })
-        : [];
-      const shouldReadUrl =
-        !!query.canonicalUrl && (!query.conversationId || query.fallbackPolicy === 'include-orphan-url');
-      const byCanonicalUrl = shouldReadUrl
-        ? filterArticleCommentsForListIdentity(await listFromRuntime({ canonicalUrl: query.canonicalUrl }), query)
-        : [];
-      return mergeArticleCommentsByIdentity(byConversation, byCanonicalUrl);
+      const data = await request<unknown>(COMMENTS_MESSAGE_TYPES.LIST_ARTICLE_COMMENTS, {
+        ...commandContext(input.context),
+        fallbackPolicy: input.fallbackPolicy,
+      });
+      if (!Array.isArray(data)) {
+        throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article comments payload');
+      }
+      return parseArticleCommentDtos(data);
     },
     async ensureContext(input) {
-      const ensureArticle = input?.ensureArticle !== false;
       const fallbackUrl =
         canonicalizeArticleUrl(input?.canonicalUrlFallback) || canonicalizeArticleUrl(getLocationHrefFallback());
-
-      if (!rt?.send || !ensureArticle) {
+      if (input?.ensureArticle === false || !runtime?.send) {
         return { canonicalUrl: fallbackUrl, conversationId: null };
       }
-
-      const payload = input?.tabId ? { tabId: Number(input.tabId) } : null;
-      const res = await rt.send(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, payload ?? undefined);
-      if (!res?.ok) {
-        return { canonicalUrl: fallbackUrl, conversationId: null };
+      const payload = input?.tabId == null ? undefined : { tabId: Number(input.tabId) };
+      const data = await request<Record<string, unknown>>(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, payload);
+      const canonicalUrl = canonicalizeArticleUrl(data.url) || fallbackUrl;
+      const conversationId = normalizeConversationId(data.conversationId);
+      const source = String(data.source || '').trim();
+      const conversationKey = String(data.conversationKey || '').trim();
+      let factsEpoch = null;
+      try {
+        factsEpoch = parseFactsEpoch(data.factsEpoch);
+      } catch {
+        // The capture response is unusable without a current facts epoch.
       }
-
-      const canonicalUrl = canonicalizeArticleUrl(res?.data?.url) || fallbackUrl;
-      const conversationId = normalizeConversationId(res?.data?.conversationId);
-      if (canonicalUrl && conversationId) {
-        try {
-          await rt.send(COMMENTS_MESSAGE_TYPES.ATTACH_ORPHAN_ARTICLE_COMMENTS, { canonicalUrl, conversationId });
-        } catch (_e) {
-          // ignore
-        }
+      if (!canonicalUrl || !conversationId || !source || !conversationKey || !factsEpoch) {
+        throw new ArticleCommentsSidebarAdapterError(
+          'invalid_response',
+          'article context is missing a current facts reference',
+        );
       }
-      return { canonicalUrl, conversationId };
-    },
-    async addRoot({ canonicalUrl, conversationId, quoteText, commentText, locator }) {
-      const normalized = canonicalizeArticleUrl(canonicalUrl);
-      if (!normalized) throw new Error('missing canonicalUrl for adding article comment');
-      if (!rt?.send) throw new Error('missing runtime for adding article comment');
-      const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
-        canonicalUrl: normalized,
+      const context: ArticleCommentsSidebarContext = {
+        canonicalUrl,
         conversationId,
+        conversation: { source, conversationKey },
+        factsEpoch,
+      };
+      await request<{ updated: number }>(
+        COMMENTS_MESSAGE_TYPES.ENSURE_ARTICLE_COMMENT_CONTEXT,
+        commandContext(context),
+      );
+      return context;
+    },
+    async addRoot({ context, quoteText, commentText, locator }) {
+      const normalizedLocator = normalizeArticleCommentLocator(locator);
+      const data = await request<unknown>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
+        ...commandContext(context),
         quoteText,
         commentText,
-        locator: locator ?? null,
+        ...(normalizedLocator ? { locator: normalizedLocator } : {}),
       });
-      if (!res?.ok) throw new Error('failed to add article comment');
-      const id = Number(res?.data?.id);
-      if (!Number.isFinite(id) || id <= 0) throw new Error('failed to add article comment');
-      return { id };
+      const comment = parseArticleCommentDto(data);
+      if (!comment) throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article comment payload');
+      return { id: commentId(comment.id) };
     },
-    async addReply({ canonicalUrl, conversationId, parentId, commentText }) {
-      const normalized = canonicalizeArticleUrl(canonicalUrl);
-      if (!normalized) throw new Error('missing canonicalUrl for replying article comment');
-      if (!rt?.send) throw new Error('missing runtime for replying article comment');
-      const res = await rt.send(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT, {
-        canonicalUrl: normalized,
-        conversationId,
-        parentId,
-        quoteText: '',
+    async addReply({ context, parent, commentText }) {
+      const data = await request<unknown>(COMMENTS_MESSAGE_TYPES.ADD_ARTICLE_COMMENT_REPLY, {
+        ...commandContext(context),
+        parentId: commentId(parent?.id),
         commentText,
       });
-      if (!res?.ok) throw new Error('failed to reply article comment');
+      if (!parseArticleCommentDto(data)) {
+        throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid article comment payload');
+      }
     },
-    async delete({ id }) {
-      if (!rt?.send) throw new Error('missing runtime for deleting article comment');
-      const res = await rt.send(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, { id });
-      if (!res?.ok || res?.data?.ok !== true) throw new Error('failed to delete article comment');
+    async delete({ context, comment }) {
+      const data = await request<{ ok: boolean }>(COMMENTS_MESSAGE_TYPES.DELETE_ARTICLE_COMMENT, {
+        ...commandContext(context),
+        commentId: commentId(comment?.id),
+      });
+      if (data?.ok !== true)
+        throw new ArticleCommentsSidebarAdapterError('invalid_response', 'invalid delete response');
     },
-    async migrateCanonicalUrl({ fromCanonicalUrl, toCanonicalUrl, conversationId }) {
-      const from = canonicalizeArticleUrl(fromCanonicalUrl);
-      const to = canonicalizeArticleUrl(toCanonicalUrl);
-      if (!from || !to || from === to) return;
-      if (!rt?.send) return;
-      await rt.send(COMMENTS_MESSAGE_TYPES.MIGRATE_ARTICLE_COMMENTS_CANONICAL_URL, {
-        fromCanonicalUrl: from,
-        toCanonicalUrl: to,
-        conversationId,
+    async ensureAttachedContext(context) {
+      await request<{ updated: number }>(
+        COMMENTS_MESSAGE_TYPES.ENSURE_ARTICLE_COMMENT_CONTEXT,
+        commandContext(context),
+      );
+    },
+    async migrateCanonicalUrl({ previous, next }) {
+      const context = toArticleCommentsClientContext(next);
+      const fromCanonicalUrl = canonicalizeArticleUrl(previous.canonicalUrl);
+      const toCanonicalUrl = canonicalizeArticleUrl(next.canonicalUrl);
+      if (!fromCanonicalUrl || !toCanonicalUrl || fromCanonicalUrl === toCanonicalUrl) return;
+      if (!context.conversation) {
+        throw new ArticleCommentsSidebarAdapterError(
+          'invalid_query',
+          'article comments require a conversation reference',
+        );
+      }
+      await request<{ updated: number }>(COMMENTS_MESSAGE_TYPES.MIGRATE_ARTICLE_COMMENT_URL, {
+        conversation: context.conversation,
+        factsEpoch: context.factsEpoch,
+        fromCanonicalUrl,
+        toCanonicalUrl,
       });
     },
   };

@@ -7,7 +7,6 @@ import type {
 } from '@services/comments/sidebar/comment-sidebar-contract';
 import { normalizeCommentSidebarQuoteText } from '@services/comments/sidebar/comment-sidebar-session';
 import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
-import { normalizePositiveInt } from '@services/shared/numbers';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
   buildCommentContextIdentityKey,
@@ -70,10 +69,6 @@ class ControllerOperationAbortedError extends Error {
 
 function safeString(value: unknown): string {
   return String(value ?? '').trim();
-}
-
-function normalizeConversationId(value: unknown): number | null {
-  return normalizePositiveInt(value);
 }
 
 function normalizeContext(
@@ -243,8 +238,7 @@ export function createArticleCommentsSidebarController(input: {
     try {
       const items = await waitForOperation(
         adapter.list({
-          canonicalUrl: context.canonicalUrl,
-          conversationId: context.conversationId,
+          context,
           fallbackPolicy: 'include-orphan-url',
           signal: operation.abortController.signal,
         }),
@@ -260,22 +254,25 @@ export function createArticleCommentsSidebarController(input: {
   };
 
   const migrateThenLoad = async (operation: ControllerOperation, transition: CommentContextTransition) => {
-    if (
+    const migrate =
       transition.kind === 'url-migrate' &&
       transition.previous &&
       transition.next &&
-      typeof adapter.migrateCanonicalUrl === 'function'
-    ) {
+      typeof adapter.migrateCanonicalUrl === 'function';
+    const attach =
+      transition.kind === 'attach-orphan' && transition.next && typeof adapter.ensureAttachedContext === 'function';
+    if (migrate || attach) {
       try {
         await waitForOperation(
-          Promise.resolve(
-            adapter.migrateCanonicalUrl({
-              fromCanonicalUrl: transition.previous.canonicalUrl,
-              toCanonicalUrl: transition.next.canonicalUrl,
-              conversationId: transition.next.conversationId,
-              signal: operation.abortController.signal,
-            }),
-          ),
+          migrate
+            ? Promise.resolve(
+                adapter.migrateCanonicalUrl!({
+                  previous: transition.previous!,
+                  next: transition.next!,
+                  signal: operation.abortController.signal,
+                }),
+              )
+            : Promise.resolve(adapter.ensureAttachedContext!(transition.next!)),
           operation.abortController.signal,
         );
       } catch (error) {
@@ -338,8 +335,7 @@ export function createArticleCommentsSidebarController(input: {
         const quoteText = normalizeCommentSidebarQuoteText(attachment.displayQuote);
         const selectionRevision = attachment.selectionRevision;
         const created = await adapter.addRoot({
-          canonicalUrl,
-          conversationId: normalizeConversationId(ctx?.conversationId),
+          context: { ...ctx!, canonicalUrl },
           quoteText,
           commentText: value,
           locator: quoteText ? normalizeArticleCommentLocator(attachment.locator) : null,
@@ -364,11 +360,12 @@ export function createArticleCommentsSidebarController(input: {
         if (!isMutationCurrent(generation)) return false;
         const canonicalUrl = canonicalizeArticleUrl(ctx?.canonicalUrl);
         if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment reply');
+        const parent = session.getSnapshot().comments.find((comment) => Number(comment?.id) === id);
+        if (!parent) return false;
 
         await adapter.addReply({
-          canonicalUrl,
-          conversationId: normalizeConversationId(ctx?.conversationId),
-          parentId: id,
+          context: { ...ctx!, canonicalUrl },
+          parent,
           commentText: value,
         });
         if (!isMutationCurrent(generation)) return false;
@@ -381,7 +378,13 @@ export function createArticleCommentsSidebarController(input: {
         if (!isMutationCurrent(generation)) return;
         const commentId = Number(id);
         if (!Number.isFinite(commentId) || commentId <= 0) return;
-        await adapter.delete({ id: commentId });
+        const ctx = await ensureContextForAction(generation);
+        if (!isMutationCurrent(generation)) return;
+        const canonicalUrl = canonicalizeArticleUrl(ctx?.canonicalUrl);
+        if (!canonicalUrl) throw new Error('missing canonicalUrl for article comment delete');
+        const comment = session.getSnapshot().comments.find((item) => Number(item?.id) === commentId);
+        if (!comment) return;
+        await adapter.delete({ context: { ...ctx!, canonicalUrl }, comment });
         if (!isMutationCurrent(generation)) return;
         await refresh();
       },

@@ -7,10 +7,7 @@ import {
   type HostFactsCommand,
   type HostFactsRequest,
 } from '@services/local-data/contracts';
-import {
-  filterArticleCommentsForListIdentity,
-  mergeArticleCommentsByIdentity,
-} from '@services/comments/sidebar/article-comments-sidebar-adapter';
+import { ArticleCommentInvariantError } from '@services/comments/domain/comment-errors';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 import { createCommentsRepository } from '../sqlite/comments-repository';
@@ -47,6 +44,11 @@ const NATIVE_HOST_CONNECTED_MUTATION_COMMANDS = Object.freeze([
   'SET_SYNC_CURSOR',
   'SET_CONVERSATION_NOTION_PAGE_ID',
   'CLEAR_SYNC_MAPPING',
+  'ADD_ARTICLE_COMMENT',
+  'ADD_ARTICLE_COMMENT_REPLY',
+  'DELETE_ARTICLE_COMMENT',
+  'MIGRATE_ARTICLE_COMMENT_URL',
+  'ENSURE_ARTICLE_COMMENT_CONTEXT',
 ] as const);
 
 type NativeHostConnectedReadCommand = (typeof NATIVE_HOST_CONNECTED_READ_COMMANDS)[number];
@@ -126,11 +128,28 @@ function readComments(database: SyncNosSqliteDatabase, request: HostFactsRequest
   const repository = createCommentsRepository(database);
   const byConversation = conversationId ? repository.listArticleCommentsByConversationId(conversationId) : [];
   if (request.payload.fallbackPolicy === 'none') return byConversation;
-  const byCanonicalUrl = filterArticleCommentsForListIdentity(
-    repository.listArticleCommentsByCanonicalUrl(request.payload.context.canonicalUrl),
-    { conversationId },
-  );
-  return mergeArticleCommentsByIdentity(byConversation, byCanonicalUrl);
+  const byId = new Map<number, ReturnType<typeof repository.listArticleCommentsByCanonicalUrl>[number]>();
+  for (const comment of [
+    ...byConversation,
+    ...repository.listArticleCommentsByCanonicalUrl(request.payload.context.canonicalUrl),
+  ]) {
+    if (
+      conversationId
+        ? comment.conversationId != null && comment.conversationId !== conversationId
+        : comment.conversationId != null
+    )
+      continue;
+    if (!byId.has(comment.id)) byId.set(comment.id, comment);
+  }
+  return [...byId.values()].sort((left, right) => left.createdAt - right.createdAt || left.id - right.id);
+}
+
+function articleCommentInvariantResult(error: unknown): Readonly<{
+  code: 'parent_not_found' | 'parent_not_root' | 'parent_context_mismatch';
+  kind: 'article-comment-invariant';
+}> | null {
+  if (!(error instanceof ArticleCommentInvariantError)) return null;
+  return Object.freeze({ kind: 'article-comment-invariant', code: error.code });
 }
 
 /**
@@ -220,6 +239,73 @@ export function writeNativeHostConnectedCommand(database: SyncNosSqliteDatabase,
       );
     case 'CLEAR_SYNC_MAPPING':
       return mappings.clearSyncCursorByReference(request.payload.conversation);
+    case 'ADD_ARTICLE_COMMENT': {
+      const conversationId = resolveCommentContext(database, request.payload.context);
+      try {
+        return createCommentsRepository(database).addArticleComment({
+          canonicalUrl: request.payload.context.canonicalUrl,
+          conversationId,
+          authorName: request.payload.authorName,
+          quoteText: request.payload.quoteText,
+          commentText: request.payload.commentText,
+          ...(request.payload.locator ? { locator: request.payload.locator } : {}),
+        });
+      } catch (error) {
+        const invariant = articleCommentInvariantResult(error);
+        if (invariant) return invariant;
+        throw error;
+      }
+    }
+    case 'ADD_ARTICLE_COMMENT_REPLY': {
+      const conversationId = resolveCommentContext(database, request.payload.context);
+      try {
+        return createCommentsRepository(database).addArticleComment({
+          canonicalUrl: request.payload.context.canonicalUrl,
+          conversationId,
+          authorName: request.payload.authorName,
+          quoteText: '',
+          commentText: request.payload.commentText,
+          parentId: request.payload.backendParentId,
+        });
+      } catch (error) {
+        const invariant = articleCommentInvariantResult(error);
+        if (invariant) return invariant;
+        throw error;
+      }
+    }
+    case 'DELETE_ARTICLE_COMMENT': {
+      const conversationId = resolveCommentContext(database, request.payload.context);
+      const canonicalUrl = canonicalizeArticleUrl(request.payload.context.canonicalUrl);
+      if (!canonicalUrl) invalidArgument();
+      const repository = createCommentsRepository(database);
+      repository.deleteArticleCommentByIdInContext({
+        canonicalUrl,
+        conversationId,
+        commentId: request.payload.backendCommentId,
+      });
+      return Object.freeze({ ok: true });
+    }
+    case 'ENSURE_ARTICLE_COMMENT_CONTEXT': {
+      const conversationId = resolveCommentContext(database, request.payload.context);
+      if (!conversationId) staleReference();
+      return createCommentsRepository(database).attachOrphanCommentsToConversation(
+        request.payload.context.canonicalUrl,
+        conversationId,
+      );
+    }
+    case 'MIGRATE_ARTICLE_COMMENT_URL': {
+      if (!request.payload.conversation) invalidArgument();
+      const conversationId = resolveCommentContext(database, {
+        canonicalUrl: request.payload.toCanonicalUrl,
+        conversation: request.payload.conversation,
+      });
+      if (!conversationId) staleReference();
+      return createCommentsRepository(database).migrateArticleCommentsCanonicalUrl({
+        conversationId,
+        fromCanonicalUrl: request.payload.fromCanonicalUrl,
+        toCanonicalUrl: request.payload.toCanonicalUrl,
+      });
+    }
     default:
       invalidArgument();
   }

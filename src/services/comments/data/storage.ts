@@ -1,38 +1,79 @@
-import * as idb from '@services/comments/data/storage-idb';
-import type { AddArticleCommentInput } from '@services/comments/domain/models';
+import { createIdbArticleCommentsRepository } from '@services/comments/data/storage-idb';
+import { createNativeArticleCommentsRepository } from '@services/comments/data/storage-native';
+import type { ArticleComment, ArticleCommentLocator } from '@services/comments/domain/models';
+import type { FactsBackendMode } from '@services/local-data/facts-backend';
+import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
+import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
 
-export async function addArticleComment(payload: AddArticleCommentInput) {
-  return await idb.addArticleComment(payload);
-}
+export type ResolvedArticleCommentContext = Readonly<{
+  canonicalUrl: string;
+  conversation: ResolvedConversationReference | null;
+}>;
 
-export async function listArticleCommentsByCanonicalUrl(canonicalUrl: string) {
-  return await idb.listArticleCommentsByCanonicalUrl(canonicalUrl);
-}
+export type ArticleCommentsListFallbackPolicy = 'none' | 'include-orphan-url';
 
-export async function listArticleCommentsByConversationId(conversationId: number) {
-  return await idb.listArticleCommentsByConversationId(conversationId);
-}
+export type ArticleCommentsListInput = Readonly<{
+  context: ResolvedArticleCommentContext;
+  fallbackPolicy: ArticleCommentsListFallbackPolicy;
+}>;
 
-export async function getArticleCommentDeleteContextById(id: number) {
-  return await idb.getArticleCommentDeleteContextById(id);
-}
+export type ArticleCommentsAddRootInput = Readonly<{
+  authorName: string;
+  commentText: string;
+  context: ResolvedArticleCommentContext;
+  locator?: ArticleCommentLocator | null;
+  quoteText: string;
+}>;
 
-export async function deleteArticleCommentById(id: number) {
-  return await idb.deleteArticleCommentById(id);
-}
+export type ArticleCommentsAddReplyInput = Readonly<{
+  authorName: string;
+  commentText: string;
+  context: ResolvedArticleCommentContext;
+  parentId: number;
+}>;
 
-export async function hasAnyArticleCommentsForCanonicalUrl(canonicalUrl: string) {
-  return await idb.hasAnyArticleCommentsForCanonicalUrl(canonicalUrl);
-}
+export type ArticleCommentsDeleteInput = Readonly<{
+  commentId: number;
+  context: ResolvedArticleCommentContext;
+}>;
 
-export async function attachOrphanCommentsToConversation(canonicalUrl: string, conversationId: number) {
-  return await idb.attachOrphanCommentsToConversation(canonicalUrl, conversationId);
-}
-
-export async function migrateArticleCommentsCanonicalUrl(input: {
+export type ArticleCommentsMigrateInput = Readonly<{
+  context: ResolvedArticleCommentContext;
   fromCanonicalUrl: string;
   toCanonicalUrl: string;
-  conversationId: number | null;
-}): Promise<{ updated: number }> {
-  return await idb.migrateArticleCommentsCanonicalUrl(input);
+}>;
+
+export type ArticleCommentsEnsureContextInput = Readonly<{
+  context: ResolvedArticleCommentContext;
+}>;
+
+export type ArticleCommentsRepository = Readonly<{
+  addReply: (input: ArticleCommentsAddReplyInput) => Promise<ArticleComment>;
+  addRoot: (input: ArticleCommentsAddRootInput) => Promise<ArticleComment>;
+  delete: (input: ArticleCommentsDeleteInput) => Promise<boolean>;
+  ensureContext: (input: ArticleCommentsEnsureContextInput) => Promise<{ updated: number }>;
+  list: (input: ArticleCommentsListInput) => Promise<ArticleComment[]>;
+  migrateCanonicalUrl: (input: ArticleCommentsMigrateInput) => Promise<{ updated: number }>;
+}>;
+
+export type ArticleCommentsFactsRepository = ArticleCommentsRepository;
+
+/** Selects only the facts adapter admitted by the caller's already-held operation lease. */
+export function createArticleCommentsRepository(
+  input: Readonly<{
+    lease: FactsOperationLease;
+    mode: FactsBackendMode;
+  }>,
+): ArticleCommentsRepository {
+  const repository: ArticleCommentsFactsRepository =
+    input.mode === 'native'
+      ? createNativeArticleCommentsRepository(input.lease)
+      : createIdbArticleCommentsRepository(input.lease);
+  return repository;
 }
+
+// P3-T9 still owns these two provider-only legacy readers. Delete them with its last consumers.
+export {
+  attachOrphanCommentsToConversation,
+  listArticleCommentsByConversationId,
+} from '@services/comments/data/storage-idb';

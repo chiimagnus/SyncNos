@@ -7,19 +7,18 @@ import { cleanupCommentsReactRoot, flushCommentsReactWork, waitForCommentsUi } f
 
 const {
   commentsByUrl,
-  listArticleCommentsByCanonicalUrlMock,
-  listArticleCommentsByConversationIdMock,
+  listArticleCommentsMock,
   responsiveTierState,
   detailPaneMockState,
   addArticleCommentMock,
-  deleteArticleCommentByIdMock,
+  addArticleCommentReplyMock,
+  deleteArticleCommentMock,
   mutationState,
 } = vi.hoisted(() => {
   const commentsByUrl = new Map<string, Array<{ id: number; parentId: number | null; commentText: string }>>();
-  const listArticleCommentsByCanonicalUrlMock = vi.fn(async (canonicalUrl: string) => {
-    return commentsByUrl.get(String(canonicalUrl || '')) || [];
+  const listArticleCommentsMock = vi.fn(async (input: any) => {
+    return commentsByUrl.get(String(input?.context?.canonicalUrl || '')) || [];
   });
-  const listArticleCommentsByConversationIdMock = vi.fn(async () => []);
   const responsiveTierState = { value: 'wide' as 'narrow' | 'medium' | 'wide' };
   const detailPaneMockState = { provideLocatorRoot: true };
   const mutationState = { nextId: 500 };
@@ -27,9 +26,9 @@ const {
     const id = mutationState.nextId++;
     const comment = {
       id,
-      parentId: input.parentId ?? null,
-      conversationId: input.conversationId ?? null,
-      canonicalUrl: String(input.canonicalUrl || ''),
+      parentId: null,
+      conversationId: null,
+      canonicalUrl: String(input?.context?.canonicalUrl || ''),
       quoteText: String(input.quoteText || ''),
       commentText: String(input.commentText || ''),
       locator: input.locator ?? null,
@@ -41,7 +40,26 @@ const {
     commentsByUrl.set(comment.canonicalUrl, list);
     return comment;
   });
-  const deleteArticleCommentByIdMock = vi.fn(async (id: number) => {
+  const addArticleCommentReplyMock = vi.fn(async (input: any) => {
+    const id = mutationState.nextId++;
+    const comment = {
+      id,
+      parentId: Number(input.parentId),
+      conversationId: null,
+      canonicalUrl: String(input?.context?.canonicalUrl || ''),
+      quoteText: '',
+      commentText: String(input.commentText || ''),
+      locator: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const list = commentsByUrl.get(comment.canonicalUrl) || [];
+    list.push(comment);
+    commentsByUrl.set(comment.canonicalUrl, list);
+    return comment;
+  });
+  const deleteArticleCommentMock = vi.fn(async (input: any) => {
+    const id = Number(input?.commentId);
     for (const [url, comments] of commentsByUrl) {
       commentsByUrl.set(
         url,
@@ -52,12 +70,12 @@ const {
   });
   return {
     commentsByUrl,
-    listArticleCommentsByCanonicalUrlMock,
-    listArticleCommentsByConversationIdMock,
+    listArticleCommentsMock,
     responsiveTierState,
     detailPaneMockState,
     addArticleCommentMock,
-    deleteArticleCommentByIdMock,
+    addArticleCommentReplyMock,
+    deleteArticleCommentMock,
     mutationState,
   };
 });
@@ -107,6 +125,7 @@ const currentState = {
     sourceType: 'article',
     conversationKey: 'article-21',
     url: 'https://example.com/article',
+    factsEpoch: 'idb-v1',
   },
 };
 
@@ -155,9 +174,11 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
 
 vi.mock('@services/comments/client/repo', () => ({
   addArticleComment: addArticleCommentMock,
-  deleteArticleCommentById: deleteArticleCommentByIdMock,
-  listArticleCommentsByCanonicalUrl: listArticleCommentsByCanonicalUrlMock,
-  listArticleCommentsByConversationId: listArticleCommentsByConversationIdMock,
+  addArticleCommentReply: addArticleCommentReplyMock,
+  deleteArticleComment: deleteArticleCommentMock,
+  ensureArticleCommentContext: vi.fn(async () => ({ updated: 0 })),
+  listArticleComments: listArticleCommentsMock,
+  migrateArticleCommentCanonicalUrl: vi.fn(async () => ({ updated: 0 })),
 }));
 
 vi.mock('../../src/ui/conversations/ConversationDetailPane', () => ({
@@ -291,13 +312,13 @@ describe('AppShell comments sidebar', () => {
 
   beforeEach(() => {
     commentsByUrl.clear();
-    listArticleCommentsByCanonicalUrlMock.mockClear();
-    listArticleCommentsByConversationIdMock.mockClear();
+    listArticleCommentsMock.mockClear();
     responsiveTierState.value = 'wide';
     detailPaneMockState.provideLocatorRoot = true;
     mutationState.nextId = 500;
     addArticleCommentMock.mockClear();
-    deleteArticleCommentByIdMock.mockClear();
+    addArticleCommentReplyMock.mockClear();
+    deleteArticleCommentMock.mockClear();
     currentState.selectedConversation = {
       id: 21,
       title: 'Article',
@@ -305,6 +326,7 @@ describe('AppShell comments sidebar', () => {
       sourceType: 'article',
       conversationKey: 'article-21',
       url: 'https://example.com/article',
+      factsEpoch: 'idb-v1',
     };
     setupDom();
     window.localStorage.clear();
@@ -541,7 +563,10 @@ describe('AppShell comments sidebar', () => {
       ).toBe(true);
     });
     expect(addArticleCommentMock).toHaveBeenCalledWith(
-      expect.objectContaining({ parentId: null, commentText: 'Created root' }),
+      expect.objectContaining({
+        commentText: 'Created root',
+        context: expect.objectContaining({ factsEpoch: 'idb-v1' }),
+      }),
     );
 
     const existingThread = shadow.querySelector('[data-thread-root-id="101"]') as HTMLElement | null;
@@ -577,7 +602,7 @@ describe('AppShell comments sidebar', () => {
         ),
       ).toBe(true);
     });
-    const replyCall = addArticleCommentMock.mock.calls.find(([input]) => input.parentId === 101);
+    const replyCall = addArticleCommentReplyMock.mock.calls.find(([input]) => input.parentId === 101);
     expect(replyCall?.[0]).toEqual(expect.objectContaining({ parentId: 101, commentText: 'Created reply' }));
     const replyId = Number(
       (commentsByUrl.get('https://example.com/article') || []).find((item) => item.commentText === 'Created reply')?.id,
@@ -594,7 +619,9 @@ describe('AppShell comments sidebar', () => {
     await waitForCommentsUi(() => {
       expect(shadow.querySelector(`[data-reply-id="${replyId}"]`)).toBeFalsy();
     });
-    expect(deleteArticleCommentByIdMock).toHaveBeenCalledWith(replyId);
+    expect(deleteArticleCommentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ commentId: replyId, context: expect.objectContaining({ factsEpoch: 'idb-v1' }) }),
+    );
   });
 
   it('keeps quote empty when locator root is unavailable in app flow', async () => {
@@ -644,6 +671,7 @@ describe('AppShell comments sidebar', () => {
       sourceType: 'article',
       conversationKey: 'article-a',
       url: 'https://example.com/a',
+      factsEpoch: 'idb-v1',
     };
 
     act(() => {
@@ -671,6 +699,7 @@ describe('AppShell comments sidebar', () => {
       sourceType: 'article',
       conversationKey: 'article-b',
       url: 'https://example.com/b',
+      factsEpoch: 'idb-v1',
     };
 
     act(() => {
@@ -685,10 +714,16 @@ describe('AppShell comments sidebar', () => {
       expect(body?.textContent).toBe('Comment B');
     });
 
-    expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/a');
-    expect(listArticleCommentsByCanonicalUrlMock).toHaveBeenCalledWith('https://example.com/b');
-    expect(listArticleCommentsByConversationIdMock).toHaveBeenCalledWith(21);
-    expect(listArticleCommentsByConversationIdMock).toHaveBeenCalledWith(22);
+    expect(listArticleCommentsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/a', factsEpoch: 'idb-v1' }),
+      }),
+    );
+    expect(listArticleCommentsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/b', factsEpoch: 'idb-v1' }),
+      }),
+    );
   });
 
   it('keeps medium tier comments sidebar closed by default', () => {
@@ -736,6 +771,7 @@ describe('AppShell comments sidebar', () => {
       sourceType: 'article',
       conversationKey: 'article-medium',
       url: 'https://example.com/medium-article',
+      factsEpoch: 'idb-v1',
     };
 
     act(() => {
@@ -771,6 +807,7 @@ describe('AppShell comments sidebar', () => {
       sourceType: 'article',
       conversationKey: 'article-medium-open',
       url: 'https://example.com/medium-open',
+      factsEpoch: 'idb-v1',
     };
 
     act(() => {

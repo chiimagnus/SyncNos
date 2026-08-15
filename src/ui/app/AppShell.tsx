@@ -222,15 +222,32 @@ export default function AppShell() {
     const commentsSidebarEnabled = Boolean(selectedConversationView?.commentsSidebar);
     const canonicalUrl = canonicalizeArticleUrl((selectedConversation as any)?.url);
     const selectedConversationId = Number((selectedConversation as any)?.id || 0) || null;
+    const selectedConversationSource = String((selectedConversation as any)?.source || '').trim();
+    const selectedConversationKey = String((selectedConversation as any)?.conversationKey || '').trim();
+    const selectedConversationFactsEpoch =
+      typeof (selectedConversation as any)?.factsEpoch === 'string' && (selectedConversation as any).factsEpoch
+        ? (selectedConversation as any).factsEpoch
+        : null;
     const commentsSidebarContext = useMemo(
       () =>
         commentsSidebarEnabled && canonicalUrl
           ? {
               canonicalUrl,
               conversationId: selectedConversationId,
+              ...(selectedConversationSource && selectedConversationKey
+                ? { conversation: { source: selectedConversationSource, conversationKey: selectedConversationKey } }
+                : {}),
+              ...(selectedConversationFactsEpoch ? { factsEpoch: selectedConversationFactsEpoch } : {}),
             }
           : null,
-      [canonicalUrl, commentsSidebarEnabled, selectedConversationId],
+      [
+        canonicalUrl,
+        commentsSidebarEnabled,
+        selectedConversationFactsEpoch,
+        selectedConversationId,
+        selectedConversationKey,
+        selectedConversationSource,
+      ],
     );
     const canToggleCommentsSidebar = !isNarrow && commentsSidebarEnabled && Boolean(canonicalUrl);
     const commentsSidebarCollapsed = isMedium ? mediumCommentsSidebarCollapsed : wideCommentsSidebarCollapsed;

@@ -37,6 +37,23 @@ describe('comment context transition', () => {
     ).toBe('conversation-change');
   });
 
+  it('does not reuse a rendered comment context after its facts epoch changes', () => {
+    const previous = {
+      canonicalUrl: 'https://example.com/old',
+      conversationId: 12,
+      conversation: { source: 'web', conversationKey: 'article:https://example.com/old' },
+      factsEpoch: 'native:550e8400-e29b-41d4-a716-446655440000',
+    };
+    const next = {
+      ...previous,
+      canonicalUrl: 'https://example.com/new',
+      factsEpoch: 'native:550e8400-e29b-41d4-a716-446655440001',
+    };
+
+    expect(classifyCommentContextTransition(previous, next).kind).toBe('conversation-change');
+    expect(buildCommentContextIdentityKey(previous)).not.toBe(buildCommentContextIdentityKey(next));
+  });
+
   it('returns invalid for a missing or non-http next identity', () => {
     expect(classifyCommentContextTransition(null, null).kind).toBe('invalid');
     expect(

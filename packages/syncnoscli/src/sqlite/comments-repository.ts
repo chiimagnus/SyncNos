@@ -1,6 +1,7 @@
 import type { MigrationCommentFact } from '@services/local-data/facts-archive';
 import { LocalDataContractError } from '@services/local-data/contracts';
 import { parseArticleCommentDto, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
+import { ArticleCommentInvariantError } from '@services/comments/domain/comment-errors';
 import { parseArticleCommentLocator } from '@services/comments/domain/comment-locator';
 import type { ArticleComment } from '@services/comments/domain/models';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
@@ -67,6 +68,7 @@ function execute<T>(operation: () => T): T {
   try {
     return operation();
   } catch (error) {
+    if (error instanceof ArticleCommentInvariantError) throw error;
     throw mapSqliteError(error);
   }
 }
@@ -308,7 +310,9 @@ function addArticleComment(database: SyncNosSqliteDatabase, input: AddSqliteArti
           invalidArgument();
         if (payload.parentId) {
           const parent = selectCommentById(database, payload.parentId);
-          if (!parent || parent.parent_comment_id != null || !contextMatches(parent, payload)) invalidArgument();
+          if (!parent) throw new ArticleCommentInvariantError('parent_not_found');
+          if (parent.parent_comment_id != null) throw new ArticleCommentInvariantError('parent_not_root');
+          if (!contextMatches(parent, payload)) throw new ArticleCommentInvariantError('parent_context_mismatch');
         }
         const result = database
           .prepare(
@@ -376,22 +380,29 @@ function descendants(database: SyncNosSqliteDatabase, commentId: number): number
   return ids;
 }
 
+function deleteCommentAndDescendantsWithinFactsTransaction(
+  database: SyncNosSqliteDatabase,
+  commentId: number,
+): boolean {
+  if (!selectCommentById(database, commentId)) return false;
+  const ids = descendants(database, commentId);
+  const placeholders = ids.map(() => '?').join(', ');
+  // A damaged historical cycle cannot be deleted leaf-first. Null the links only
+  // among rows already selected for deletion, then remove the same exact set.
+  database
+    .prepare(`UPDATE article_comments SET parent_comment_id = NULL WHERE parent_comment_id IN (${placeholders})`)
+    .run(...ids);
+  database.prepare(`DELETE FROM article_comments WHERE id IN (${placeholders})`).run(...ids);
+  return true;
+}
+
 function deleteArticleCommentById(database: SyncNosSqliteDatabase, value: unknown): boolean {
   const commentId = positiveId(value);
   if (!commentId) return false;
   return execute(() => {
     if (!selectCommentById(database, commentId)) return false;
-    return runFactsTransaction(database, () => {
-      const ids = descendants(database, commentId);
-      const placeholders = ids.map(() => '?').join(', ');
-      // A damaged historical cycle cannot be deleted leaf-first. Null the links only
-      // among rows already selected for deletion, then remove the same exact set.
-      database
-        .prepare(`UPDATE article_comments SET parent_comment_id = NULL WHERE parent_comment_id IN (${placeholders})`)
-        .run(...ids);
-      database.prepare(`DELETE FROM article_comments WHERE id IN (${placeholders})`).run(...ids);
-      return true;
-    }).result;
+    return runFactsTransaction(database, () => deleteCommentAndDescendantsWithinFactsTransaction(database, commentId))
+      .result;
   });
 }
 
@@ -422,6 +433,37 @@ function getArticleCommentDeleteContextById(
     }
     return Object.freeze({ canonicalUrl, conversationId });
   });
+}
+
+function deleteContextMatches(
+  actual: Readonly<{ canonicalUrl: string; conversationId: number | null }> | null,
+  expected: Readonly<{ canonicalUrl: string; conversationId: number | null }>,
+): boolean {
+  return !!actual && actual.canonicalUrl === expected.canonicalUrl && actual.conversationId === expected.conversationId;
+}
+
+function deleteArticleCommentByIdInContext(
+  database: SyncNosSqliteDatabase,
+  input: Readonly<{ canonicalUrl: unknown; commentId: unknown; conversationId: unknown }>,
+): boolean {
+  const commentId = positiveId(input.commentId);
+  const canonicalUrl = canonicalizeArticleUrl(input.canonicalUrl);
+  const conversationId = input.conversationId == null ? null : positiveId(input.conversationId);
+  if (!commentId || !canonicalUrl || (input.conversationId != null && !conversationId)) invalidArgument();
+  return execute(
+    () =>
+      runFactsTransaction(database, () => {
+        if (!selectCommentById(database, commentId)) throw new LocalDataContractError('STALE_REFERENCE');
+        const actual = getArticleCommentDeleteContextById(database, commentId);
+        if (!deleteContextMatches(actual, { canonicalUrl, conversationId })) {
+          throw new LocalDataContractError('STALE_REFERENCE');
+        }
+        if (!deleteCommentAndDescendantsWithinFactsTransaction(database, commentId)) {
+          throw new LocalDataContractError('STALE_REFERENCE');
+        }
+        return true;
+      }).result,
+  );
 }
 
 function rewriteCommentPayload(row: CommentRow, input: Readonly<{ canonicalUrl?: string; updatedAt: number }>): string {
@@ -616,6 +658,9 @@ export function createCommentsRepository(database: SyncNosSqliteDatabase) {
     attachOrphanCommentsToConversation: (canonicalUrl: unknown, conversationId: unknown) =>
       attachOrphanCommentsToConversation(database, canonicalUrl, conversationId),
     deleteArticleCommentById: (commentId: unknown) => deleteArticleCommentById(database, commentId),
+    deleteArticleCommentByIdInContext: (
+      input: Readonly<{ canonicalUrl: unknown; commentId: unknown; conversationId: unknown }>,
+    ) => deleteArticleCommentByIdInContext(database, input),
     getArticleCommentDeleteContextById: (commentId: unknown) => getArticleCommentDeleteContextById(database, commentId),
     hasAnyArticleCommentsForCanonicalUrl: (canonicalUrl: unknown) =>
       hasAnyArticleCommentsForCanonicalUrl(database, canonicalUrl),

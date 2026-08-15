@@ -100,12 +100,13 @@ describe('article-comments-sidebar-controller', () => {
     expect(snapshot.open).toBe(true);
     expect(snapshot.contextKey).toContain('/article');
     expect(adapter.ensureContext).toHaveBeenCalledTimes(1);
-    expect(adapter.list).toHaveBeenCalledWith({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: 21,
-      fallbackPolicy: 'include-orphan-url',
-      signal: expect.any(AbortSignal),
-    });
+    expect(adapter.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/article', conversationId: 21 }),
+        fallbackPolicy: 'include-orphan-url',
+        signal: expect.any(AbortSignal),
+      }),
+    );
     expect(panel.getState().focusCount).toBe(1);
     expect(panel.getState().comments.length).toBe(1);
   });
@@ -131,13 +132,14 @@ describe('article-comments-sidebar-controller', () => {
 
     const res = await handlers.onSave('Hello');
     expect(res).toEqual({ ok: true, createdRootId: 91 });
-    expect(adapter.addRoot).toHaveBeenCalledWith({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: 21,
-      quoteText: 'Quoted',
-      commentText: 'Hello',
-      locator: null,
-    });
+    expect(adapter.addRoot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/article', conversationId: 21 }),
+        quoteText: 'Quoted',
+        commentText: 'Hello',
+        locator: null,
+      }),
+    );
     expect(adapter.list).toHaveBeenCalled();
     expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
   });
@@ -180,13 +182,14 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Quoted from page');
 
     await handlers.onSave('root comment');
-    expect(adapter.addRoot).toHaveBeenLastCalledWith({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: 21,
-      quoteText: 'Quoted from page',
-      commentText: 'root comment',
-      locator,
-    });
+    expect(adapter.addRoot).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/article', conversationId: 21 }),
+        quoteText: 'Quoted from page',
+        commentText: 'root comment',
+        locator,
+      }),
+    );
     expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
 
     await handlers.onComposerSelectionRequest({ trigger: 'button' });
@@ -261,13 +264,14 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().composerAttachment.displayQuote).toBe('Selection text only');
 
     await handlers.onSave('comment');
-    expect(adapter.addRoot).toHaveBeenLastCalledWith({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: 21,
-      quoteText: 'Selection text only',
-      commentText: 'comment',
-      locator: null,
-    });
+    expect(adapter.addRoot).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/article', conversationId: 21 }),
+        quoteText: 'Selection text only',
+        commentText: 'comment',
+        locator: null,
+      }),
+    );
   });
 
   it('does not clear a newer attachment after an older selection finishes saving', async () => {
@@ -299,13 +303,14 @@ describe('article-comments-sidebar-controller', () => {
     save.resolve({ id: 7 });
     await savePromise;
 
-    expect(adapter.addRoot).toHaveBeenCalledWith({
-      canonicalUrl: 'https://example.com/article',
-      conversationId: 21,
-      quoteText: 'first quote',
-      commentText: 'comment',
-      locator: firstLocator,
-    });
+    expect(adapter.addRoot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/article', conversationId: 21 }),
+        quoteText: 'first quote',
+        commentText: 'comment',
+        locator: firstLocator,
+      }),
+    );
     expect(first.selectionRevision).toBeLessThan(second.selectionRevision);
     expect(session.getSnapshot().composerAttachment).toEqual(second);
   });
@@ -348,13 +353,14 @@ describe('article-comments-sidebar-controller', () => {
     expect(session.getSnapshot().composerAttachment.displayQuote).toBe('');
 
     await handlers.onSave('comment in b');
-    expect(adapter.addRoot).toHaveBeenLastCalledWith({
-      canonicalUrl: 'https://example.com/b',
-      conversationId: 2,
-      quoteText: '',
-      commentText: 'comment in b',
-      locator: null,
-    });
+    expect(adapter.addRoot).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/b', conversationId: 2 }),
+        quoteText: '',
+        commentText: 'comment in b',
+        locator: null,
+      }),
+    );
   });
 
   it('setContext: refreshes comments when canonicalUrl switches', async () => {
@@ -362,7 +368,8 @@ describe('article-comments-sidebar-controller', () => {
     const session = createCommentSidebarSession(panel.api as any);
 
     const adapter = {
-      list: vi.fn(async ({ canonicalUrl }: { canonicalUrl: string }) => {
+      list: vi.fn(async ({ context }: { context: { canonicalUrl: string } }) => {
+        const canonicalUrl = context.canonicalUrl;
         if (canonicalUrl.includes('/a')) {
           return [{ id: 1, parentId: null, commentText: 'A', quoteText: '', createdAt: 1 }];
         }
@@ -385,18 +392,22 @@ describe('article-comments-sidebar-controller', () => {
       expect(panel.getState().comments[0]?.commentText).toBe('B');
     });
 
-    expect(adapter.list).toHaveBeenNthCalledWith(1, {
-      canonicalUrl: 'https://example.com/a',
-      conversationId: 1,
-      fallbackPolicy: 'include-orphan-url',
-      signal: expect.any(AbortSignal),
-    });
-    expect(adapter.list).toHaveBeenNthCalledWith(2, {
-      canonicalUrl: 'https://example.com/b',
-      conversationId: 2,
-      fallbackPolicy: 'include-orphan-url',
-      signal: expect.any(AbortSignal),
-    });
+    expect(adapter.list).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/a', conversationId: 1 }),
+        fallbackPolicy: 'include-orphan-url',
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(adapter.list).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        context: expect.objectContaining({ canonicalUrl: 'https://example.com/b', conversationId: 2 }),
+        fallbackPolicy: 'include-orphan-url',
+        signal: expect.any(AbortSignal),
+      }),
+    );
   });
 
   it('setContext: ignores stale refresh results from previous context', async () => {
@@ -407,7 +418,8 @@ describe('article-comments-sidebar-controller', () => {
 
     const seenSignals: AbortSignal[] = [];
     const adapter = {
-      list: vi.fn(({ canonicalUrl, signal }: { canonicalUrl: string; signal: AbortSignal }) => {
+      list: vi.fn(({ context, signal }: { context: { canonicalUrl: string }; signal: AbortSignal }) => {
+        const canonicalUrl = context.canonicalUrl;
         seenSignals.push(signal);
         if (canonicalUrl.includes('/a')) return deferredA.promise;
         return deferredB.promise;
@@ -474,8 +486,11 @@ describe('article-comments-sidebar-controller', () => {
     const session = createCommentSidebarSession(panel.api as any);
     const migration = createDeferred<void>();
     const adapter = {
-      list: vi.fn(async ({ canonicalUrl }: { canonicalUrl: string }) => [
-        { id: 1, parentId: null, commentText: canonicalUrl, quoteText: '', createdAt: 1 },
+      list: vi.fn(async ({ context }: { context: { canonicalUrl: string } }) => [
+        (() => {
+          const canonicalUrl = context.canonicalUrl;
+          return { id: 1, parentId: null, commentText: canonicalUrl, quoteText: '', createdAt: 1 };
+        })(),
       ]),
       addRoot: vi.fn(async () => ({ id: 1 })),
       addReply: vi.fn(async () => {}),
@@ -515,14 +530,14 @@ describe('article-comments-sidebar-controller', () => {
     const migrationToB = createDeferred<void>();
     const migrationToC = createDeferred<void>();
     const adapter = {
-      list: vi.fn(async ({ canonicalUrl }: { canonicalUrl: string }) => [
-        { id: 1, parentId: null, commentText: canonicalUrl, quoteText: '', createdAt: 1 },
+      list: vi.fn(async ({ context }: { context: { canonicalUrl: string } }) => [
+        { id: 1, parentId: null, commentText: context.canonicalUrl, quoteText: '', createdAt: 1 },
       ]),
       addRoot: vi.fn(async () => ({ id: 1 })),
       addReply: vi.fn(async () => {}),
       delete: vi.fn(async () => {}),
-      migrateCanonicalUrl: vi.fn(({ toCanonicalUrl }: { toCanonicalUrl: string }) =>
-        toCanonicalUrl.endsWith('/b') ? migrationToB.promise : migrationToC.promise,
+      migrateCanonicalUrl: vi.fn(({ next }: { next: { canonicalUrl: string } }) =>
+        next.canonicalUrl.endsWith('/b') ? migrationToB.promise : migrationToC.promise,
       ),
     };
 
@@ -718,7 +733,7 @@ describe('article-comments-sidebar-controller', () => {
     await expect(savePromise).resolves.toBe(false);
 
     expect(adapter.list).toHaveBeenCalledTimes(2);
-    expect(controller.getContext()).toEqual({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
+    expect(controller.getContext()).toMatchObject({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     expect(session.getSnapshot().contextKey).toContain('/b');
   });
 
