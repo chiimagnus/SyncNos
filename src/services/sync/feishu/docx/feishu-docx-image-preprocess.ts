@@ -1,5 +1,5 @@
 import { sha256Hex } from '@services/sync/shared/content-hash';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 
 function safeString(v: unknown) {
   return String(v == null ? '' : v).trim();
@@ -97,7 +97,10 @@ async function toPlaceholderUrl(prefix: string, stableKey: string, ext: string):
   return `https://syncnos.invalid/${prefix}/${id}.${normalizeImageExt(ext)}`;
 }
 
-export async function preprocessFeishuDocxMarkdownImages(markdown: string): Promise<FeishuMarkdownPreprocessResult> {
+export async function preprocessFeishuDocxMarkdownImages(
+  markdown: string,
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>,
+): Promise<FeishuMarkdownPreprocessResult> {
   const src = String(markdown || '');
   if (!src) return { markdownForConvert: '', imageSourcesInOrder: [] };
 
@@ -127,7 +130,7 @@ export async function preprocessFeishuDocxMarkdownImages(markdown: string): Prom
 
           const assetId = parseSyncnosAssetId(sourceUrl);
           if (assetId) {
-            const asset = await getImageCacheAssetById({ id: assetId }).catch(() => null);
+            const asset = await resolveImageAsset(assetId).catch(() => null);
             const contentType = safeString(asset?.contentType);
             const ext = extFromContentType(contentType || 'image/png');
             const blob = asset?.blob instanceof Blob ? asset.blob : undefined;

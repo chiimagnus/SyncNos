@@ -1,5 +1,5 @@
-import type { JsonObject } from '@services/local-data/contracts';
-import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
+import type { BackgroundStorage } from '@services/conversations/background/storage';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 import type { ReconcileRunningSyncJobOptions } from '@services/sync/sync-job-store';
 
 export type NotionToken = {
@@ -27,22 +27,17 @@ export type NotionConversationKinds = {
   getNotionStorageKeys?: () => string[];
 };
 
-export type NotionBackgroundStorage = {
-  getSyncMappingByConversation: (conversation: ResolvedConversationReference) => Promise<any>;
-  getMessagesByConversation: (conversation: ResolvedConversationReference) => Promise<any[]>;
-  setConversationNotionPageId: (
-    conversation: ResolvedConversationReference,
-    pageId: string,
-    meta?: { notionPageUrl?: string; notionWorkspaceSlug?: string },
-  ) => Promise<any>;
-  setSyncCursor: (conversation: ResolvedConversationReference, cursor: JsonObject) => Promise<any>;
-  patchSyncMapping: (conversation: ResolvedConversationReference, patch: JsonObject) => Promise<any>;
-  getArticleCommentsByConversation: (conversation: ResolvedConversationReference) => Promise<unknown[]>;
-  attachOrphanArticleCommentsToConversation: (
-    canonicalUrl: string,
-    conversation: ResolvedConversationReference,
-  ) => Promise<any>;
-};
+export type NotionBackgroundStorage = Pick<
+  BackgroundStorage,
+  | 'getSyncMappingByConversation'
+  | 'getMessagesByConversation'
+  | 'setConversationNotionPageId'
+  | 'setSyncCursor'
+  | 'patchSyncMapping'
+  | 'getArticleCommentsByConversation'
+  | 'attachOrphanArticleCommentsToConversation'
+  | 'getImageAsset'
+>;
 
 export type NotionDbManager = {
   ensureDatabase: (input: {
@@ -64,7 +59,11 @@ export type NotionSyncService = {
   isPageUsableForDatabase?: (page: any, databaseId?: string) => boolean;
   pageBelongsToDatabase?: (page: any, databaseId: string) => boolean;
   hasExternalImageBlocks?: (blocks: any[]) => boolean;
-  upgradeImageBlocksToFileUploads?: (accessToken: string, blocks: any[]) => Promise<any[]>;
+  upgradeImageBlocksToFileUploads?: (
+    accessToken: string,
+    blocks: any[],
+    resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>,
+  ) => Promise<any[]>;
 };
 
 export type NotionApi = Record<string, unknown>;

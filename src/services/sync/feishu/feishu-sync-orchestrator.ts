@@ -1,5 +1,6 @@
 import { storageGet, storageSet } from '@platform/storage/local';
 import type { BackgroundStorage } from '@services/conversations/background/storage';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
 import { formatConversationMarkdownForFeishuDocxSync } from '@services/sync/feishu/docx/feishu-docx-markdown';
 import { fetchFeishuJson } from '@services/sync/feishu/feishu-api';
@@ -594,12 +595,14 @@ async function appendMarkdownWithConvertFallback({
   accessToken,
   docId,
   markdown,
+  resolveImageAsset,
 }: {
   accessToken: string;
   docId: string;
   markdown: string;
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>;
 }): Promise<{ appended: number; warnings: string[] }> {
-  const preprocessed = await preprocessFeishuDocxMarkdownImages(markdown).catch(() => ({
+  const preprocessed = await preprocessFeishuDocxMarkdownImages(markdown, resolveImageAsset).catch(() => ({
     markdownForConvert: markdown,
     imageSourcesInOrder: [],
   }));
@@ -851,7 +854,12 @@ async function syncConversations({
         let appended = 0;
         let appendWarnings: string[] = [];
         try {
-          const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
+          const res = await appendMarkdownWithConvertFallback({
+            accessToken,
+            docId,
+            markdown,
+            resolveImageAsset: (assetId) => storage.getImageAsset(reference, assetId),
+          });
           appended = res.appended;
           appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
         } catch (e) {
@@ -860,7 +868,12 @@ async function syncConversations({
             await persistCurrentJob({ currentStage: 'creating_destination_page' });
             docId = await createDoc({ accessToken, title: currentTitle });
             await persistCurrentJob({ currentStage: 'uploading_message_blocks' });
-            const res = await appendMarkdownWithConvertFallback({ accessToken, docId, markdown });
+            const res = await appendMarkdownWithConvertFallback({
+              accessToken,
+              docId,
+              markdown,
+              resolveImageAsset: (assetId) => storage.getImageAsset(reference, assetId),
+            });
             appended = res.appended;
             appendWarnings = Array.isArray(res.warnings) ? res.warnings : [];
           } else {

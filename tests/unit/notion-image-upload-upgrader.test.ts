@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
-import * as imageCacheRead from '@services/conversations/data/image-cache-read';
 import { upgradeImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader';
 
 function externalImageBlock(url: string) {
@@ -31,16 +30,20 @@ describe('notion-image-upload-upgrader', () => {
       .spyOn(notionFilesApi, 'waitUntilUploaded')
       .mockResolvedValue({ id: 'up-syncnos-1' } as any);
 
-    vi.spyOn(imageCacheRead, 'getImageCacheAssetById').mockResolvedValue({
+    const resolveImageAsset = vi.fn(async () => ({
       id: 42,
       conversationId: 1,
       url: 'https://example.com/image.webp',
       blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/webp' }),
       byteSize: 3,
       contentType: 'image/webp',
-    } as any);
+    }));
 
-    const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('syncnos-asset://42')] as any);
+    const out = await upgradeImageBlocksToFileUploads(
+      'token',
+      [externalImageBlock('syncnos-asset://42')] as any,
+      resolveImageAsset,
+    );
 
     expect(createExternalUrlUpload).not.toHaveBeenCalled();
     expect(createFileUpload).toHaveBeenCalledWith(
@@ -62,9 +65,13 @@ describe('notion-image-upload-upgrader', () => {
     const createFileUpload = vi
       .spyOn(notionFilesApi, 'createFileUpload')
       .mockResolvedValue({ id: 'up-syncnos-2' } as any);
-    vi.spyOn(imageCacheRead, 'getImageCacheAssetById').mockResolvedValue(null as any);
+    const resolveImageAsset = vi.fn(async () => null);
 
-    const out = await upgradeImageBlocksToFileUploads('token', [externalImageBlock('syncnos-asset://999')] as any);
+    const out = await upgradeImageBlocksToFileUploads(
+      'token',
+      [externalImageBlock('syncnos-asset://999')] as any,
+      resolveImageAsset,
+    );
 
     expect(createFileUpload).not.toHaveBeenCalled();
     expect(out[0]?.type).toBe('paragraph');

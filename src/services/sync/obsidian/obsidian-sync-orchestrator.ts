@@ -1,5 +1,6 @@
 import { parseArticleCommentDtos, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import type { BackgroundStorage } from '@services/conversations/background/storage';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
 import { getObsidianConnectionConfig, getObsidianPathConfig } from '@services/sync/obsidian/settings-store';
 import {
@@ -18,7 +19,6 @@ import {
   readSyncnosObject as readDefaultSyncnosObject,
 } from '@services/sync/obsidian/obsidian-sync-metadata.ts';
 import obsidianSyncJobStore from '@services/sync/obsidian/obsidian-sync-job-store.ts';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
 const SYNC_PROVIDER = 'obsidian';
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(\s+"[^"]*")?\s*\)/g;
@@ -125,11 +125,13 @@ async function materializeMarkdownAssetsForObsidian({
   filePath,
   markdown,
   indexScopeMarkdown,
+  resolveImageAsset,
 }: {
   client: any;
   filePath: string;
   markdown: string;
   indexScopeMarkdown?: string;
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>;
 }): Promise<string> {
   const targetMarkdown = String(markdown || '');
   if (!targetMarkdown) return targetMarkdown;
@@ -155,7 +157,7 @@ async function materializeMarkdownAssetsForObsidian({
     const index = indexByAssetId.get(assetId);
     if (!index) throw new Error(`missing asset index mapping: ${assetId}`);
 
-    const asset = await getImageCacheAssetById({ id: assetId });
+    const asset = await resolveImageAsset(assetId);
     if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
     const ext = inferImageExtFromAsset(asset);
@@ -692,6 +694,7 @@ async function syncConversations({
             filePath: decision.filePath,
             markdown: rawMarkdown,
             indexScopeMarkdown: rawMarkdown,
+            resolveImageAsset: (assetId) => storage.getImageAsset(reference, assetId),
           });
           const putRes = await client.putVaultFile(decision.filePath, markdown);
           if (!putRes || !putRes.ok) {

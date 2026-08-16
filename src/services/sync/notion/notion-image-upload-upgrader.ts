@@ -1,5 +1,5 @@
 import notionFilesApi from '@services/sync/notion/notion-files-api.ts';
-import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read.ts';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
@@ -223,11 +223,16 @@ async function uploadFromDataUrl(files: any, accessToken: string, dataUrl: unkno
   return ready && ready.id ? String(ready.id).trim() : fileId;
 }
 
-async function uploadFromSyncnosAsset(files: any, accessToken: string, url: unknown) {
+async function uploadFromSyncnosAsset(
+  files: any,
+  accessToken: string,
+  url: unknown,
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>,
+) {
   const assetId = parseSyncnosAssetId(url);
   if (!assetId) throw new Error('invalid syncnos asset url');
 
-  const asset = await getImageCacheAssetById({ id: assetId });
+  const asset = await resolveImageAsset(assetId);
   if (!asset || !(asset.blob instanceof Blob)) throw new Error(`missing local asset blob: ${assetId}`);
 
   const bytes = new Uint8Array(await asset.blob.arrayBuffer());
@@ -252,7 +257,11 @@ async function uploadFromSyncnosAsset(files: any, accessToken: string, url: unkn
   return ready && ready.id ? String(ready.id).trim() : fileId;
 }
 
-async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any) {
+async function upgradeImageBlocksToFileUploads(
+  accessToken: string,
+  blocks: any,
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>,
+) {
   const list = Array.isArray(blocks) ? blocks : [];
   if (!list.length) return [];
   const files = getNotionFilesApi();
@@ -296,7 +305,7 @@ async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: any)
         }
       } else if (isSyncnosAssetUrl(url)) {
         try {
-          uploadId = await uploadFromSyncnosAsset(files, accessToken, url);
+          uploadId = await uploadFromSyncnosAsset(files, accessToken, url, resolveImageAsset);
           if (uploadId) cache.set(url, uploadId);
         } catch (e) {
           const msg = e && (e as any).message ? String((e as any).message) : String(e);

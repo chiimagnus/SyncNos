@@ -17,6 +17,7 @@ import {
   recoverSectionHeadingBlockId,
 } from '@services/sync/notion/notion-managed-sections.ts';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 
 const SYNC_PROVIDER = 'notion';
 const SYNC_CONVERSATION_CONCURRENCY = 2;
@@ -288,17 +289,25 @@ async function buildBlocksForSync({
   accessToken,
   source,
   messagesList,
+  resolveImageAsset,
 }: {
   notionSyncService: any;
   accessToken?: string;
   source?: unknown;
   messagesList?: any;
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>;
 }) {
   const warnings: any[] = [];
   let blocks = notionSyncService.messagesToBlocks(messagesList, {
     source,
   });
-  blocks = await maybeUpgradeBlocksWithNotionFileUploads({ notionSyncService, accessToken, blocks, warnings });
+  blocks = await maybeUpgradeBlocksWithNotionFileUploads({
+    notionSyncService,
+    accessToken,
+    blocks,
+    warnings,
+    resolveImageAsset,
+  });
   return { blocks, warnings };
 }
 
@@ -307,18 +316,20 @@ async function maybeUpgradeBlocksWithNotionFileUploads({
   accessToken,
   blocks,
   warnings,
+  resolveImageAsset,
 }: {
   notionSyncService: any;
   accessToken?: string;
   blocks?: any;
   warnings: any[];
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>;
 }) {
   let nextBlocks = Array.isArray(blocks) ? blocks : [];
   if (!canUpgradeImageBlocks(notionSyncService, nextBlocks)) return nextBlocks;
 
   const externalBefore = countExternalImageBlocks(nextBlocks);
   try {
-    nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks);
+    nextBlocks = await notionSyncService.upgradeImageBlocksToFileUploads(accessToken, nextBlocks, resolveImageAsset);
   } catch (e) {
     warnings.push({
       code: 'notion_image_upload_failed',
@@ -860,6 +871,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 notionSyncService,
                 accessToken: token.accessToken,
                 source: convo.source,
+                resolveImageAsset: (assetId: number) => storage.getImageAsset(referenceFor(id), assetId),
                 messagesList: pickArticleBodyMessages(messages),
               });
               const articleBlocks = stripLeadingArticleRoleHeading(
@@ -948,6 +960,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               notionSyncService,
               accessToken: token.accessToken,
               source: convo.source,
+              resolveImageAsset: (assetId: number) => storage.getImageAsset(referenceFor(id), assetId),
               messagesList: messages,
             });
             const blocks = Array.isArray(built?.blocks) ? built.blocks : [];
@@ -1072,9 +1085,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                 ? String(commentsDigest || '') !== prevCommentsDigest
                 : articleComments.length > 0);
 
-            const mappingSections =
+            const mappingSections: Record<string, any> =
               mapping && mapping.notionSections && typeof mapping.notionSections === 'object'
-                ? mapping.notionSections
+                ? (mapping.notionSections as Record<string, any>)
                 : {};
             const hasArticleAnchor = !!(mappingSections.article && mappingSections.article.headingBlockId);
             const hasCommentsAnchor = !!(mappingSections.comments && mappingSections.comments.headingBlockId);
@@ -1091,6 +1104,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   notionSyncService,
                   accessToken: token.accessToken,
                   source: convo.source,
+                  resolveImageAsset: (assetId: number) => storage.getImageAsset(referenceFor(id), assetId),
                   messagesList: pickArticleBodyMessages(messages),
                 });
                 articleBlocks = stripLeadingArticleRoleHeading(
@@ -1268,9 +1282,9 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           // Migrate legacy pages (no Conversations section anchor) by forcing a rebuild once,
           // so subsequent syncs can append under the section without scanning page children.
           // Also rebuild when local edits happen without new messages (append cannot fix historical edits).
-          const mappingSections =
+          const mappingSections: Record<string, any> =
             mapping && mapping.notionSections && typeof mapping.notionSections === 'object'
-              ? mapping.notionSections
+              ? (mapping.notionSections as Record<string, any>)
               : {};
           const hasConversationsAnchor = !!(
             mappingSections.conversations && String(mappingSections.conversations.headingBlockId || '').trim()
@@ -1279,7 +1293,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             shouldRebuild = true;
           } else if (!shouldRebuild && !(inc.newMessages && inc.newMessages.length)) {
             let maxUpdatedAt = 0;
-            for (const m of Array.isArray(messages) ? messages : []) {
+            for (const m of Array.isArray(messages) ? (messages as any[]) : []) {
               const at = Number(m && (m.updatedAt as any));
               if (Number.isFinite(at)) maxUpdatedAt = Math.max(maxUpdatedAt, at);
             }
@@ -1324,6 +1338,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               notionSyncService,
               accessToken: token.accessToken,
               source: convo.source,
+              resolveImageAsset: (assetId: number) => storage.getImageAsset(referenceFor(id), assetId),
               messagesList: messages,
             });
             const blocks = Array.isArray(built.blocks) ? built.blocks : [];
@@ -1412,6 +1427,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
               notionSyncService,
               accessToken: token.accessToken,
               source: convo.source,
+              resolveImageAsset: (assetId: number) => storage.getImageAsset(referenceFor(id), assetId),
               messagesList: inc.newMessages,
             });
             const blocks = Array.isArray(built.blocks) ? built.blocks : [];

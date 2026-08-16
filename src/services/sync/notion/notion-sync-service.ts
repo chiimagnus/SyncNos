@@ -1,6 +1,7 @@
 import { optionNameForSource as defaultOptionNameForSource } from '@services/sync/notion/notion-ai.ts';
 import { notionFetch as defaultNotionFetch } from '@services/sync/notion/notion-api.ts';
 import notionImageUploadUpgrader from '@services/sync/notion/notion-image-upload-upgrader.ts';
+import type { ImageAsset } from '@services/conversations/data/image-storage';
 import notionMarkdownBlocks from '@services/sync/notion/notion-markdown-blocks.ts';
 
 const MAX_TEXT = 1900;
@@ -417,10 +418,14 @@ function hasExternalImageBlocks(blocks: unknown): boolean {
   );
 }
 
-async function upgradeImageBlocksToFileUploads(accessToken: string, blocks: unknown) {
+async function upgradeImageBlocksToFileUploads(
+  accessToken: string,
+  blocks: unknown,
+  resolveImageAsset: (assetId: number) => Promise<ImageAsset | null>,
+) {
   const api = getImageUploadUpgraderApi();
   if (api && typeof api.upgradeImageBlocksToFileUploads === 'function') {
-    return api.upgradeImageBlocksToFileUploads(accessToken, blocks);
+    return api.upgradeImageBlocksToFileUploads(accessToken, blocks, resolveImageAsset);
   }
   return Array.isArray(blocks) ? blocks : [];
 }
