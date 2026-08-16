@@ -6,6 +6,8 @@ import {
   retrieveBlock,
   archiveBlock,
 } from '@services/sync/notion/notion-section-blocks.ts';
+import type { ResolvedConversationReference } from '@services/conversations/data/storage';
+import type { JsonObject } from '@services/local-data/contracts';
 
 type ToggleHeadingLevel = 1 | 2 | 3;
 
@@ -75,8 +77,8 @@ export async function ensureSectionHeadingBlockId(input: {
   section: NotionManagedSectionSpec;
   mapping: any | null | undefined;
   notionSyncService: { appendChildren: (accessToken: string, blockId: string, blocks: any[]) => Promise<any> };
-  storage?: { patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any> };
-  conversationId?: number;
+  storage: { patchSyncMapping: (conversation: ResolvedConversationReference, patch: JsonObject) => Promise<any> };
+  conversation: ResolvedConversationReference;
 }): Promise<{ headingBlockId: string; discoveredBy: 'mapping' | 'scan' | 'created' }> {
   const sectionId = safeString(input?.section?.id);
   const title = safeString(input?.section?.title);
@@ -119,18 +121,15 @@ export async function ensureSectionHeadingBlockId(input: {
 
 async function maybePersistHeadingIdToMapping(
   input: {
-    storage?: { patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any> };
-    conversationId?: number;
+    storage: { patchSyncMapping: (conversation: ResolvedConversationReference, patch: JsonObject) => Promise<any> };
+    conversation: ResolvedConversationReference;
   },
   anchors: NotionSectionAnchors,
   sectionId: string,
   headingBlockId: string,
 ): Promise<void> {
-  const conversationId = Number(input?.conversationId);
-  if (!Number.isFinite(conversationId) || conversationId <= 0) return;
-  if (!input?.storage?.patchSyncMapping) return;
   const patch = mergeNotionSectionAnchorsPatch(anchors, { sectionId, headingBlockId });
-  await input.storage.patchSyncMapping(conversationId, patch as any);
+  await input.storage.patchSyncMapping(input.conversation, patch as JsonObject);
 }
 
 export async function rebuildSectionByArchivingHeading(input: {

@@ -1,18 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const backgroundStorageMocks = vi.hoisted(() => ({
+const storageMocks = vi.hoisted(() => ({
   getSyncMappingByConversation: vi.fn(),
-  getMessagesByConversationId: vi.fn(),
+  getMessagesByConversation: vi.fn(),
   patchSyncMapping: vi.fn(),
 }));
 
-vi.mock('@services/conversations/background/storage', () => ({
-  backgroundStorage: {
-    getSyncMappingByConversation: backgroundStorageMocks.getSyncMappingByConversation,
-    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
-    patchSyncMapping: backgroundStorageMocks.patchSyncMapping,
-  },
-}));
+const resolved = { source: 'test', conversationKey: 'conversation-1', conversationId: 1 } as const;
+function providerStorage() {
+  return {
+    resolveConversation: vi.fn(async () => resolved),
+    getConversationByReference: vi.fn(async () => null),
+    getMessagesByConversation: storageMocks.getMessagesByConversation,
+    getSyncMappingByConversation: storageMocks.getSyncMappingByConversation,
+    patchSyncMapping: storageMocks.patchSyncMapping,
+    setConversationNotionPageId: vi.fn(async () => true),
+    setSyncCursor: vi.fn(async () => true),
+    clearSyncCursor: vi.fn(async () => true),
+    getArticleCommentsByConversation: vi.fn(async () => []),
+    attachOrphanArticleCommentsToConversation: vi.fn(async () => 0),
+    getImageAsset: vi.fn(async () => null),
+  };
+}
 
 const tokenMocks = vi.hoisted(() => ({
   getFeishuOAuthToken: vi.fn(),
@@ -123,11 +132,11 @@ describe('feishu docx image bind flow', () => {
     jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
     jobStoreMocks.isRunningJob.mockReturnValue(false);
 
-    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+    storageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
       mapping: { feishuDocId: '' },
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+    storageMocks.getMessagesByConversation.mockResolvedValue([]);
 
     downloadImageSmartMock.mockResolvedValue({
       ok: true,
@@ -162,7 +171,11 @@ describe('feishu docx image bind flow', () => {
     });
 
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
-    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const res = await orch.syncConversations({
+      conversations: [resolved],
+      instanceId: 'x',
+      storage: providerStorage(),
+    });
     expect(res.okCount).toBe(1);
 
     expect(fetchFeishuJsonMock.mock.calls.map((c) => String(c[0] || ''))).toContain(
@@ -178,11 +191,11 @@ describe('feishu docx image bind flow', () => {
     jobStoreMocks.abortRunningJobIfFromOtherInstance.mockResolvedValue(null);
     jobStoreMocks.isRunningJob.mockReturnValue(false);
 
-    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+    storageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
       mapping: { feishuDocId: '' },
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+    storageMocks.getMessagesByConversation.mockResolvedValue([]);
 
     downloadImageSmartMock.mockResolvedValue({
       ok: true,
@@ -208,7 +221,11 @@ describe('feishu docx image bind flow', () => {
     });
 
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
-    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const res = await orch.syncConversations({
+      conversations: [resolved],
+      instanceId: 'x',
+      storage: providerStorage(),
+    });
     expect(res.okCount).toBe(1);
     expect(String(res.results?.[0]?.warnings?.join('\n') || '')).toContain('missing docx image blocks');
   });

@@ -180,8 +180,8 @@ describe('background-router conversations events', () => {
   it('queues the retained conversation before broadcasting a completed merge', async () => {
     const repository = createRepository();
     const events: string[] = [];
-    const router = createRouter(repository, async (conversationId, reason) => {
-      events.push(`queue:${conversationId}:${reason}`);
+    const router = createRouter(repository, async (reference, reason) => {
+      events.push(`queue:${reference.source}:${reference.conversationKey}:${reason}`);
     });
     router.eventsHub.broadcast = () => events.push('broadcast');
 
@@ -193,7 +193,10 @@ describe('background-router conversations events', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(events).toEqual(['queue:123:upsertConversation', 'broadcast']);
+    expect(events).toEqual([
+      `queue:${conversation.source}:${conversation.conversationKey}:upsertConversation`,
+      'broadcast',
+    ]);
   });
 
   it('does not enqueue or broadcast a no-op merge', async () => {

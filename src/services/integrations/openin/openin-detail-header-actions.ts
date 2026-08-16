@@ -1,7 +1,7 @@
-import type { Conversation } from '@services/conversations/domain/models';
+import type { Conversation, ConversationFactsReference } from '@services/conversations/domain/models';
 import { t } from '@i18n';
 import type { DetailHeaderAction, DetailHeaderActionPort } from '@services/integrations/detail-header-action-types';
-import { getSyncMappingByConversation } from '@services/conversations/data/storage-idb';
+import { getConversationSyncMapping } from '@services/conversations/client/repo';
 import { isSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 import { buildFeishuOpenInAction } from '@services/integrations/openin/feishu-openin';
 import {
@@ -22,6 +22,14 @@ export { buildNotionPageUrl, normalizeNotionPageId };
 
 function safeString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function factsReference(conversation: Conversation | null | undefined): ConversationFactsReference | null {
+  const source = safeString(conversation?.source);
+  const conversationKey = safeString(conversation?.conversationKey);
+  const factsEpoch = safeString(conversation?.factsEpoch);
+  if (!source || !conversationKey || !factsEpoch) return null;
+  return { source, conversationKey, factsEpoch: factsEpoch as ConversationFactsReference['factsEpoch'] };
 }
 
 async function buildObsidianOpenInAction({
@@ -88,9 +96,10 @@ export async function resolveOpenInDetailHeaderActions({
       (!safeString((convo as any).notionPageUrl) || !safeString((convo as any).notionWorkspaceSlug)) &&
       safeString((convo as any).notionPageId)
     ) {
-      const mappingRes = await getSyncMappingByConversation(Number((convo as any).id) || 0).catch(() => null);
-      const pageUrl = safeString(mappingRes?.mapping?.notionPageUrl);
-      const workspaceSlug = safeString(mappingRes?.mapping?.notionWorkspaceSlug);
+      const reference = factsReference(convo);
+      const mapping = reference ? await getConversationSyncMapping(reference).catch(() => null) : null;
+      const pageUrl = safeString((mapping as any)?.notionPageUrl);
+      const workspaceSlug = safeString((mapping as any)?.notionWorkspaceSlug);
       if (pageUrl || workspaceSlug) {
         convo = {
           ...(convo as any),
@@ -106,8 +115,9 @@ export async function resolveOpenInDetailHeaderActions({
   if (feishuEnabled) {
     let convo = conversation;
     if (convo && !safeString((convo as any).feishuDocId)) {
-      const mappingRes = await getSyncMappingByConversation(Number((convo as any).id) || 0).catch(() => null);
-      const docId = safeString(mappingRes?.mapping?.feishuDocId);
+      const reference = factsReference(convo);
+      const mapping = reference ? await getConversationSyncMapping(reference).catch(() => null) : null;
+      const docId = safeString((mapping as any)?.feishuDocId);
       if (docId) convo = { ...(convo as any), feishuDocId: docId } as any;
     }
     const feishuAction = buildFeishuOpenInAction({ conversation: convo, port, labels: DETAIL_HEADER_ACTION_LABELS });

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { t } from '@i18n';
 import { getSyncProviderDefinition } from '@services/sync/sync-provider-registry';
+import type { SyncConversationReference } from '@services/sync/models';
 import type { ConversationSyncFeedbackState } from '@viewmodels/conversations/useConversationSyncFeedback';
 import { buttonIconCircleCardClassName } from '@ui/shared/button-styles';
 import type { TranslationKey } from '@i18n/locales/en';
@@ -9,7 +10,8 @@ import type { TranslationKey } from '@i18n/locales/en';
 type ConversationSyncFeedbackNoticeProps = {
   feedback: ConversationSyncFeedbackState;
   onDismiss: () => void;
-  onJumpToConversation?: (conversationId: number) => void;
+  canJumpToConversation?: (reference: SyncConversationReference) => boolean;
+  onJumpToConversation?: (reference: SyncConversationReference) => void;
 };
 
 type NoticeTones = {
@@ -114,14 +116,15 @@ function SummaryBody(props: {
   message: string;
   showRunningStageDetail: boolean;
   currentStageLabel: string;
-  currentConversationId: number | null;
+  currentConversation: SyncConversationReference | null;
   currentConversationLabel: string;
   progressWidth: number;
   issueCount: number;
   detailsOpen: boolean;
   canShowDetails: boolean;
   onToggleDetails: () => void;
-  onJumpToConversation?: (conversationId: number) => void;
+  canJumpToConversation?: (reference: SyncConversationReference) => boolean;
+  onJumpToConversation?: (reference: SyncConversationReference) => void;
 }) {
   const {
     tones,
@@ -130,7 +133,7 @@ function SummaryBody(props: {
     message,
     showRunningStageDetail,
     currentStageLabel,
-    currentConversationId,
+    currentConversation,
     currentConversationLabel,
     progressWidth,
     issueCount,
@@ -182,10 +185,10 @@ function SummaryBody(props: {
         {feedback.phase === 'running' && currentConversationLabel ? (
           <span>
             {t('currentPrefix')}{' '}
-            {onJumpToConversation && currentConversationId && currentConversationId > 0 ? (
+            {onJumpToConversation && currentConversation ? (
               <button
                 type="button"
-                onClick={() => onJumpToConversation(currentConversationId)}
+                onClick={() => onJumpToConversation(currentConversation)}
                 className={[
                   'tw-inline-flex tw-max-w-full tw-items-baseline tw-text-left tw-font-bold tw-text-inherit',
                   'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
@@ -227,7 +230,7 @@ function SummaryBody(props: {
 }
 
 export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNoticeProps) {
-  const { feedback, onDismiss, onJumpToConversation } = props;
+  const { feedback, onDismiss, canJumpToConversation, onJumpToConversation } = props;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const prevProviderRef = useRef<ConversationSyncFeedbackState['provider']>(feedback.provider);
@@ -311,10 +314,12 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
       : feedback.message;
   const showRunningStageDetail = feedback.phase === 'running' && !!currentItemLabel && !!currentStageLabel;
 
-  const onJump = (conversationId: unknown) => {
-    const safeId = Number(conversationId);
-    if (!Number.isFinite(safeId) || safeId <= 0) return;
-    onJumpToConversation?.(Math.floor(safeId));
+  const canJump = (reference: SyncConversationReference | null | undefined) =>
+    !!reference && !!onJumpToConversation && (canJumpToConversation ? canJumpToConversation(reference) : true);
+
+  const onJump = (reference: SyncConversationReference | null | undefined) => {
+    if (!reference || !canJump(reference)) return;
+    onJumpToConversation?.(reference);
     setDetailsOpen(false);
   };
 
@@ -337,14 +342,14 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
           message={message}
           showRunningStageDetail={showRunningStageDetail}
           currentStageLabel={currentStageLabel}
-          currentConversationId={feedback.currentConversationId}
+          currentConversation={canJump(feedback.currentConversation) ? feedback.currentConversation : null}
           currentConversationLabel={currentItemLabel}
           progressWidth={progressWidth}
           issueCount={issueCount}
           detailsOpen={detailsOpen}
           canShowDetails={canShowDetails}
           onToggleDetails={() => setDetailsOpen((open) => !open)}
-          onJumpToConversation={(conversationId) => onJump(conversationId)}
+          onJumpToConversation={(reference) => onJump(reference)}
         />
 
         {canDismiss ? (
@@ -393,10 +398,10 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                       key={`${warning?.conversationId || 'unknown'}-${warning?.code || 'warning'}-${index}`}
                       className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-2.5"
                     >
-                      {Number(warning?.conversationId) > 0 ? (
+                      {canJump(warning?.reference) ? (
                         <button
                           type="button"
-                          onClick={() => onJump(warning?.conversationId)}
+                          onClick={() => onJump(warning?.reference)}
                           className={[
                             'tw-w-full tw-text-left tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]',
                             'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',
@@ -427,10 +432,10 @@ export function ConversationSyncFeedbackNotice(props: ConversationSyncFeedbackNo
                 key={`${failure.conversationId || 'unknown'}-${index}`}
                 className="tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[color-mix(in_srgb,var(--bg-sunken)_70%,var(--bg-card))] tw-p-2.5"
               >
-                {Number(failure.conversationId) > 0 ? (
+                {canJump(failure.reference) ? (
                   <button
                     type="button"
-                    onClick={() => onJump(failure.conversationId)}
+                    onClick={() => onJump(failure.reference)}
                     className={[
                       'tw-w-full tw-text-left tw-text-[11px] tw-font-black tw-text-[var(--text-primary)]',
                       'tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-shadow-none',

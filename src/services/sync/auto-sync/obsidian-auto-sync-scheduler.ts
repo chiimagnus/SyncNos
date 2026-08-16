@@ -1,8 +1,9 @@
 import { create, clear, isAlarmsAvailable } from '@platform/alarms/alarms';
 import { storageGet, storageSet } from '@services/shared/storage';
+import type { StableConversationReference } from '@services/local-data/contracts';
+import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import { isSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 
-import type { ObsidianSyncOrchestrator } from '@services/bootstrap/background-services';
 import {
   OBSIDIAN_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
   OBSIDIAN_AUTO_SYNC_DEBOUNCE_MS,
@@ -14,6 +15,7 @@ import {
   createAutoSyncSchedulerCore,
   type AutoSyncScheduler,
   type AutoSyncSchedulerInfra,
+  type ResolvedAutoSyncQueueEntry,
 } from '@services/sync/auto-sync/auto-sync-scheduler-core';
 
 export type ObsidianAutoSyncScheduler = AutoSyncScheduler;
@@ -21,7 +23,21 @@ export type ObsidianAutoSyncScheduler = AutoSyncScheduler;
 export function createObsidianAutoSyncScheduler(
   deps: {
     getInstanceId: () => string;
-    obsidianSyncOrchestrator: ObsidianSyncOrchestrator;
+    runFactsOperation: <T>(kind: string, fn: (lease: FactsOperationLease) => Promise<T> | T) => Promise<T>;
+    resolveConversationId: (
+      reference: StableConversationReference,
+      lease: FactsOperationLease,
+    ) => Promise<number | null>;
+    resolveLegacyConversationId?: (
+      conversationId: number,
+      lease: FactsOperationLease,
+    ) => Promise<StableConversationReference | null>;
+    canConvertLegacyQueue?: (lease: FactsOperationLease) => Promise<boolean>;
+    syncConversations: (
+      entries: ResolvedAutoSyncQueueEntry[],
+      instanceId: string,
+      lease: FactsOperationLease,
+    ) => Promise<void>;
   },
   infraOverrides?: Partial<AutoSyncSchedulerInfra>,
 ): ObsidianAutoSyncScheduler {
@@ -45,7 +61,10 @@ export function createObsidianAutoSyncScheduler(
     infra,
     getInstanceId: deps.getInstanceId,
     isProviderEnabled: () => isSyncProviderEnabled('obsidian'),
-    syncConversations: (conversationIds, instanceId) =>
-      deps.obsidianSyncOrchestrator.syncConversations({ conversationIds, instanceId } as any) as any,
+    runFactsOperation: deps.runFactsOperation,
+    resolveConversationId: deps.resolveConversationId,
+    ...(deps.resolveLegacyConversationId ? { resolveLegacyConversationId: deps.resolveLegacyConversationId } : {}),
+    ...(deps.canConvertLegacyQueue ? { canConvertLegacyQueue: deps.canConvertLegacyQueue } : {}),
+    syncConversations: deps.syncConversations,
   });
 }

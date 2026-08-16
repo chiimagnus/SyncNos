@@ -2,29 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createAutoSyncSchedulerCore,
+  type AutoSyncScheduler,
   type AutoSyncSchedulerInfra,
 } from '@services/sync/auto-sync/auto-sync-scheduler-core';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
+
+const REF_1 = { source: 'chatgpt', conversationKey: 'conversation-1' } as const;
+const REF_2 = { source: 'chatgpt', conversationKey: 'conversation-2' } as const;
 
 function makeInfra(startNow = 1_000_000) {
   let now = startNow;
   const storage: Record<string, any> = {};
-  const alarm = {
-    name: '',
-    when: 0,
-    cleared: false,
-  };
-
+  const alarm = { name: '', when: 0, cleared: false };
   const infra: AutoSyncSchedulerInfra = {
     now: () => now,
     storage: {
-      get: async (keys) => {
-        const out: Record<string, any> = {};
-        for (const key of keys) out[key] = storage[key];
-        return out;
-      },
-      set: async (patch) => {
-        Object.assign(storage, patch);
-      },
+      get: async (keys) => Object.fromEntries(keys.map((key) => [key, storage[key]])),
+      set: async (patch) => Object.assign(storage, patch),
     },
     alarms: {
       isAvailable: () => true,
@@ -40,7 +34,6 @@ function makeInfra(startNow = 1_000_000) {
       },
     },
   };
-
   return {
     infra,
     storage,
@@ -48,10 +41,18 @@ function makeInfra(startNow = 1_000_000) {
     advance: (ms: number) => {
       now += ms;
     },
-    setNow: (value: number) => {
-      now = value;
-    },
   };
+}
+
+function entries(storage: Record<string, any>, key: string) {
+  return storage[key]?.entries ?? [];
+}
+
+function makeGate() {
+  const gate = new FactsOperationGate({
+    readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
+  });
+  return gate;
 }
 
 describe('auto-sync-scheduler-core', () => {
@@ -60,18 +61,19 @@ describe('auto-sync-scheduler-core', () => {
   const ALARM_NAME = 'alarm_name';
 
   let infraPack: ReturnType<typeof makeInfra>;
+  let gate: FactsOperationGate;
   let isProviderEnabled: ReturnType<typeof vi.fn>;
   let syncConversations: ReturnType<typeof vi.fn>;
+  let scheduler: AutoSyncScheduler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     infraPack = makeInfra();
+    infraPack.storage[ENABLED_KEY] = true;
+    gate = makeGate();
+    await gate.initializeFromJournal();
     isProviderEnabled = vi.fn().mockResolvedValue(true);
     syncConversations = vi.fn().mockResolvedValue(undefined);
-  });
-
-  it('updates dueAt on repeated enqueue for same conversation', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    const scheduler = createAutoSyncSchedulerCore({
+    scheduler = createAutoSyncSchedulerCore({
       queueStorageKey: QUEUE_KEY,
       enabledStorageKey: ENABLED_KEY,
       alarmName: ALARM_NAME,
@@ -80,166 +82,91 @@ describe('auto-sync-scheduler-core', () => {
       infra: infraPack.infra,
       getInstanceId: () => 'i-1',
       isProviderEnabled,
+      runFactsOperation: gate.runFactsOperation.bind(gate),
+      resolveConversationId: async (reference) => (reference.conversationKey === REF_1.conversationKey ? 1 : 2),
       syncConversations,
     });
+  });
 
-    await scheduler.enqueue(1, 'a');
-    const firstDueAt = infraPack.storage[QUEUE_KEY]['1'];
+  const enqueue = async (target: typeof REF_1 | typeof REF_2, reason = 'activity') =>
+    await gate.runFactsOperation('test-mutation', async (lease) => await scheduler.enqueue(target, reason, lease));
+
+  it('updates dueAt on repeated enqueue for the same stable conversation', async () => {
+    await enqueue(REF_1, 'a');
+    const firstDueAt = entries(infraPack.storage, QUEUE_KEY)[0].dueAt;
     infraPack.advance(5_000);
-    await scheduler.enqueue(1, 'b');
-    const secondDueAt = infraPack.storage[QUEUE_KEY]['1'];
-    expect(secondDueAt).toBeGreaterThan(firstDueAt);
+    await enqueue(REF_1, 'b');
+    const queue = entries(infraPack.storage, QUEUE_KEY);
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject(REF_1);
+    expect(queue[0].dueAt).toBeGreaterThan(firstDueAt);
   });
 
-  it('schedules alarm at earliest dueAt across ids', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-1',
-      isProviderEnabled,
-      syncConversations,
-    });
-
-    await scheduler.enqueue(1, 'a'); // due at now+60s
+  it('schedules the alarm at the earliest stable entry dueAt', async () => {
+    await enqueue(REF_1);
     infraPack.advance(10_000);
-    await scheduler.enqueue(2, 'a'); // due at now+60s, later than id1
+    await enqueue(REF_2);
+    const queue = entries(infraPack.storage, QUEUE_KEY);
     expect(infraPack.alarm.name).toBe(ALARM_NAME);
-    expect(infraPack.alarm.when).toBe(infraPack.storage[QUEUE_KEY]['1']);
+    expect(infraPack.alarm.when).toBe(
+      queue.find((entry: any) => entry.conversationKey === REF_1.conversationKey).dueAt,
+    );
   });
 
-  it('flush processes due items and removes them from queue', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1, '2': infraPack.infra.now() + 10_000 };
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-2',
-      isProviderEnabled,
-      syncConversations,
-    });
-
+  it('flush resolves due stable references inside one outer lease', async () => {
+    infraPack.storage[QUEUE_KEY] = {
+      version: 2,
+      entries: [
+        { ...REF_1, dueAt: infraPack.infra.now() - 1 },
+        { ...REF_2, dueAt: infraPack.infra.now() + 10_000 },
+      ],
+    };
     await scheduler.flush();
-    expect(syncConversations).toHaveBeenCalledWith([1], 'i-2');
-    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '2': infraPack.storage[QUEUE_KEY]['2'] });
+    expect(syncConversations).toHaveBeenCalledTimes(1);
+    expect(syncConversations.mock.calls[0][0]).toEqual([expect.objectContaining({ ...REF_1, conversationId: 1 })]);
+    expect(entries(infraPack.storage, QUEUE_KEY)).toEqual([expect.objectContaining(REF_2)]);
   });
 
-  it('flush does not sync when provider is disabled, but clears due items', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1 };
+  it('drops due entries without remote sync when provider is disabled', async () => {
+    infraPack.storage[QUEUE_KEY] = { version: 2, entries: [{ ...REF_1, dueAt: infraPack.infra.now() - 1 }] };
     isProviderEnabled.mockResolvedValue(false);
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-3',
-      isProviderEnabled,
-      syncConversations,
-    });
-
     await scheduler.flush();
     expect(syncConversations).not.toHaveBeenCalled();
-    expect(infraPack.storage[QUEUE_KEY]).toEqual({});
+    expect(entries(infraPack.storage, QUEUE_KEY)).toEqual([]);
   });
 
-  it('dedupes concurrent flush calls (non-reentrant)', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1 };
-
-    let resolveSync: (() => void) | null = null;
-    const syncPromise = new Promise<void>((resolve) => {
+  it('dedupes concurrent flush calls', async () => {
+    infraPack.storage[QUEUE_KEY] = { version: 2, entries: [{ ...REF_1, dueAt: infraPack.infra.now() - 1 }] };
+    let resolveSync!: () => void;
+    const pending = new Promise<void>((resolve) => {
       resolveSync = resolve;
     });
-    let markSyncCalled: (() => void) | null = null;
-    const syncCalled = new Promise<void>((resolve) => {
-      markSyncCalled = resolve;
-    });
-    syncConversations.mockImplementation(() => {
-      markSyncCalled?.();
-      return syncPromise;
-    });
-
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-6',
-      isProviderEnabled,
-      syncConversations,
-    });
-
+    syncConversations.mockReturnValue(pending);
     const p1 = scheduler.flush();
     const p2 = scheduler.flush();
     expect(p2).toBe(p1);
-    await syncCalled;
-    expect(syncConversations).toHaveBeenCalledTimes(1);
-
-    resolveSync?.();
+    await vi.waitFor(() => expect(syncConversations).toHaveBeenCalledTimes(1));
+    resolveSync();
     await p1;
-    expect(infraPack.storage[QUEUE_KEY]).toEqual({});
+    expect(entries(infraPack.storage, QUEUE_KEY)).toEqual([]);
   });
 
-  it('keeps queue when sync_already_running is thrown (reschedules due items)', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1 };
-    const err: any = new Error('sync already in progress');
-    err.code = 'sync_already_running';
-    syncConversations.mockRejectedValue(err);
-
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-4',
-      isProviderEnabled,
-      syncConversations,
-    });
-
-    const before = infraPack.storage[QUEUE_KEY]['1'];
+  it('reschedules stable entries when provider reports sync_already_running', async () => {
+    infraPack.storage[QUEUE_KEY] = { version: 2, entries: [{ ...REF_1, dueAt: infraPack.infra.now() - 1 }] };
+    const error = Object.assign(new Error('sync already in progress'), { code: 'sync_already_running' });
+    syncConversations.mockRejectedValue(error);
+    const before = entries(infraPack.storage, QUEUE_KEY)[0].dueAt;
     await scheduler.flush();
-    const after = infraPack.storage[QUEUE_KEY]['1'];
+    const after = entries(infraPack.storage, QUEUE_KEY)[0].dueAt;
     expect(after).toBeGreaterThan(before);
+    expect(entries(infraPack.storage, QUEUE_KEY)[0]).toMatchObject(REF_1);
   });
 
-  it('flushes due items on enqueue when alarms are unavailable (best-effort fallback)', async () => {
-    infraPack.storage[ENABLED_KEY] = true;
-
-    // Make alarms unavailable.
+  it('reuses the mutation lease for the no-alarms opportunistic flush', async () => {
     (infraPack.infra.alarms as any).isAvailable = () => false;
-
-    // Seed a due item (e.g. queued while background was asleep).
-    infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1 };
-
-    const scheduler = createAutoSyncSchedulerCore({
-      queueStorageKey: QUEUE_KEY,
-      enabledStorageKey: ENABLED_KEY,
-      alarmName: ALARM_NAME,
-      debounceMs: 60_000,
-      maxItems: 200,
-      infra: infraPack.infra,
-      getInstanceId: () => 'i-5',
-      isProviderEnabled,
-      syncConversations,
-    });
-
-    await scheduler.enqueue(2, 'activity');
-    expect(syncConversations).toHaveBeenCalledWith([1], 'i-5');
+    infraPack.storage[QUEUE_KEY] = { version: 2, entries: [{ ...REF_1, dueAt: infraPack.infra.now() - 1 }] };
+    await enqueue(REF_2);
+    expect(syncConversations).toHaveBeenCalledTimes(1);
+    expect(syncConversations.mock.calls[0][0][0]).toMatchObject(REF_1);
   });
 });

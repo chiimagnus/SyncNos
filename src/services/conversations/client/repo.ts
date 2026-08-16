@@ -484,6 +484,20 @@ export async function findConversationById(
   return unwrap(res);
 }
 
+export async function getConversationSyncMapping(
+  input: ConversationFactsReference,
+): Promise<Record<string, unknown> | null> {
+  const res = await send<ApiResponse<Record<string, unknown> | null>>(
+    CORE_MESSAGE_TYPES.GET_CONVERSATION_SYNC_MAPPING,
+    {
+      source: input.source,
+      conversationKey: input.conversationKey,
+      factsEpoch: input.factsEpoch,
+    },
+  );
+  return unwrap(res);
+}
+
 export async function getConversationDetail(input: ConversationFactsReference): Promise<ConversationDetailResponse> {
   const res = await send<ApiResponse<ConversationDetailReadResponse>>(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, {
     source: input.source,

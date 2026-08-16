@@ -2,19 +2,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { sha256Hex } from '@services/sync/shared/content-hash';
 
-const backgroundStorageMocks = vi.hoisted(() => ({
+const storageMocks = vi.hoisted(() => ({
   getSyncMappingByConversation: vi.fn(),
-  getMessagesByConversationId: vi.fn(),
+  getMessagesByConversation: vi.fn(),
   patchSyncMapping: vi.fn(),
 }));
 
-vi.mock('@services/conversations/background/storage', () => ({
-  backgroundStorage: {
-    getSyncMappingByConversation: backgroundStorageMocks.getSyncMappingByConversation,
-    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
-    patchSyncMapping: backgroundStorageMocks.patchSyncMapping,
-  },
-}));
+const resolved = { source: 'test', conversationKey: 'conversation-1', conversationId: 1 } as const;
+function providerStorage() {
+  return {
+    resolveConversation: vi.fn(async () => resolved),
+    getConversationByReference: vi.fn(async () => null),
+    getMessagesByConversation: storageMocks.getMessagesByConversation,
+    getSyncMappingByConversation: storageMocks.getSyncMappingByConversation,
+    patchSyncMapping: storageMocks.patchSyncMapping,
+    setConversationNotionPageId: vi.fn(async () => true),
+    setSyncCursor: vi.fn(async () => true),
+    clearSyncCursor: vi.fn(async () => true),
+    getArticleCommentsByConversation: vi.fn(async () => []),
+    attachOrphanArticleCommentsToConversation: vi.fn(async () => 0),
+    getImageAsset: vi.fn(async () => null),
+  };
+}
 
 const tokenMocks = vi.hoisted(() => ({
   getFeishuOAuthToken: vi.fn(),
@@ -106,11 +115,11 @@ describe('feishu skip unchanged missing doc', () => {
     jobStoreMocks.isRunningJob.mockReturnValue(false);
 
     const hash = await sha256Hex('![img](https://example.com/a.png)');
-    backgroundStorageMocks.getSyncMappingByConversation.mockResolvedValue({
+    storageMocks.getSyncMappingByConversation.mockResolvedValue({
       conversation: { id: 1, title: 't' },
       mapping: { feishuDocId: 'doc1', feishuLastContentHash: hash },
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([]);
+    storageMocks.getMessagesByConversation.mockResolvedValue([]);
 
     fetchFeishuJsonMock.mockImplementation(async (path: string, init: any) => {
       if (path === '/docx/v1/documents/doc1' && String(init?.method || 'GET').toUpperCase() === 'GET') {
@@ -125,12 +134,16 @@ describe('feishu skip unchanged missing doc', () => {
     });
 
     const orch = await loadModule('@services/sync/feishu/feishu-sync-orchestrator.ts');
-    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const res = await orch.syncConversations({
+      conversations: [resolved],
+      instanceId: 'x',
+      storage: providerStorage(),
+    });
 
     expect(res.okCount).toBe(1);
     expect(res.results?.[0]?.mode).toBe('create');
-    expect(backgroundStorageMocks.patchSyncMapping).toHaveBeenCalledWith(
-      1,
+    expect(storageMocks.patchSyncMapping).toHaveBeenCalledWith(
+      resolved,
       expect.objectContaining({ feishuDocId: 'doc_new' }),
     );
   });

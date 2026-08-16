@@ -1,16 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const backgroundStorageMocks = vi.hoisted(() => ({
-  getConversationById: vi.fn(),
-  getMessagesByConversationId: vi.fn(),
+const storageMocks = vi.hoisted(() => ({
+  getConversationByReference: vi.fn(),
+  getMessagesByConversation: vi.fn(),
 }));
 
-vi.mock('@services/conversations/background/storage', () => ({
-  backgroundStorage: {
-    getConversationById: backgroundStorageMocks.getConversationById,
-    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
-  },
-}));
+const resolved = { source: 'test', conversationKey: 'conversation-1', conversationId: 1 } as const;
+function providerStorage() {
+  return {
+    resolveConversation: vi.fn(async () => resolved),
+    getConversationByReference: storageMocks.getConversationByReference,
+    getMessagesByConversation: storageMocks.getMessagesByConversation,
+    getSyncMappingByConversation: vi.fn(async () => null),
+    patchSyncMapping: vi.fn(async () => true),
+    setConversationNotionPageId: vi.fn(async () => true),
+    setSyncCursor: vi.fn(async () => true),
+    clearSyncCursor: vi.fn(async () => true),
+    getArticleCommentsByConversation: vi.fn(async () => []),
+    attachOrphanArticleCommentsToConversation: vi.fn(async () => 0),
+    getImageAsset: vi.fn(async () => null),
+  };
+}
+
+async function sync(orch: any) {
+  return await orch.syncConversations({ conversations: [resolved], instanceId: 'x', storage: providerStorage() });
+}
 
 async function load(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -53,14 +67,14 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
 
     // Local data
     let messages: any[] = [{ messageKey: 'm1', sequence: 1, role: 'assistant', contentMarkdown: 'a', updatedAt: 1 }];
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    storageMocks.getConversationByReference.mockResolvedValue({
       id: 1,
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'k1',
       title: 't',
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockImplementation(async () => messages.slice());
+    storageMocks.getMessagesByConversation.mockImplementation(async () => messages.slice());
 
     await settingsStore.saveObsidianSettings({ enabled: true, apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
 
@@ -110,34 +124,34 @@ describe('obsidian local rest api sync e2e flow (mock)', () => {
     };
 
     // 1) First sync: remote missing -> full rebuild
-    const r1 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const r1 = await sync(orch);
     expect(r1.okCount).toBe(1);
     expect(r1.results[0].mode).toBe('full_rebuild');
 
     // 2) Add one new message locally -> rebuild again
     messages = [...messages, { messageKey: 'm2', sequence: 2, role: 'assistant', contentMarkdown: 'b', updatedAt: 2 }];
-    const r2 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const r2 = await sync(orch);
     expect(r2.okCount).toBe(1);
     expect(r2.results[0].mode).toBe('full_rebuild');
     expect(r2.results[0].appended).toBe(2);
 
     // 3) Remote deleted -> rebuild again
     remoteExists = false;
-    const r3 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const r3 = await sync(orch);
     expect(r3.okCount).toBe(1);
     expect(r3.results[0].mode).toBe('full_rebuild');
 
     // 4) Auth fails -> failure result
     authFail = true;
-    const r4 = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const r4 = await sync(orch);
     expect(r4.failCount).toBe(1);
     expect(r4.results[0].mode).toBe('failed');
   });
 });
 
 afterEach(() => {
-  backgroundStorageMocks.getConversationById.mockReset();
-  backgroundStorageMocks.getMessagesByConversationId.mockReset();
+  storageMocks.getConversationByReference.mockReset();
+  storageMocks.getMessagesByConversation.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup

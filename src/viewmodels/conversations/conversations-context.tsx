@@ -1287,23 +1287,28 @@ export function ConversationsProvider({
     [items, resolveConversationImageAsset, selectedIds],
   );
 
+  const selectedSyncReferences = useMemo(
+    () =>
+      selectedIds
+        .map((id) => toConversationFactsReference(items.find((conversation) => Number(conversation.id) === Number(id))))
+        .filter((reference): reference is ConversationFactsReference => !!reference),
+    [items, selectedIds],
+  );
+
   const syncSelectedNotion = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('notion', ids);
-  }, [selectedIds, startSync]);
+    if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
+    await startSync('notion', selectedSyncReferences);
+  }, [selectedIds.length, selectedSyncReferences, startSync]);
 
   const syncSelectedObsidian = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('obsidian', ids);
-  }, [selectedIds, startSync]);
+    if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
+    await startSync('obsidian', selectedSyncReferences);
+  }, [selectedIds.length, selectedSyncReferences, startSync]);
 
   const syncSelectedFeishu = useCallback(async () => {
-    const ids = selectedIds.slice();
-    if (!ids.length) return;
-    await startSync('feishu', ids);
-  }, [selectedIds, startSync]);
+    if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
+    await startSync('feishu', selectedSyncReferences);
+  }, [selectedIds.length, selectedSyncReferences, startSync]);
 
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();

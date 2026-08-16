@@ -1,20 +1,42 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const backgroundStorageMocks = vi.hoisted(() => ({
-  getConversationById: vi.fn(),
-  getMessagesByConversationId: vi.fn(),
-  getArticleCommentsByConversationId: vi.fn(),
+const storageMocks = vi.hoisted(() => ({
+  getConversationByReference: vi.fn(),
+  getMessagesByConversation: vi.fn(),
+  getArticleCommentsByConversation: vi.fn(),
   attachOrphanArticleCommentsToConversation: vi.fn(),
 }));
 
-vi.mock('@services/conversations/background/storage', () => ({
-  backgroundStorage: {
-    getConversationById: backgroundStorageMocks.getConversationById,
-    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
-    getArticleCommentsByConversationId: backgroundStorageMocks.getArticleCommentsByConversationId,
-    attachOrphanArticleCommentsToConversation: backgroundStorageMocks.attachOrphanArticleCommentsToConversation,
-  },
-}));
+function resolvedReference(conversationId: number) {
+  return { source: 'test', conversationKey: `conversation-${conversationId}`, conversationId } as const;
+}
+
+function providerStorage() {
+  return {
+    resolveConversation: vi.fn(async (reference: any) => ({
+      ...reference,
+      conversationId: Number(reference.conversationId),
+    })),
+    getConversationByReference: storageMocks.getConversationByReference,
+    getMessagesByConversation: storageMocks.getMessagesByConversation,
+    getSyncMappingByConversation: vi.fn(async () => null),
+    patchSyncMapping: vi.fn(async () => true),
+    setConversationNotionPageId: vi.fn(async () => true),
+    setSyncCursor: vi.fn(async () => true),
+    clearSyncCursor: vi.fn(async () => true),
+    getArticleCommentsByConversation: storageMocks.getArticleCommentsByConversation,
+    attachOrphanArticleCommentsToConversation: storageMocks.attachOrphanArticleCommentsToConversation,
+    getImageAsset: vi.fn(async () => null),
+  };
+}
+
+async function syncConversations(orch: any, conversationIds: number[], instanceId = 'x') {
+  return await orch.syncConversations({
+    conversations: conversationIds.map(resolvedReference),
+    instanceId,
+    storage: providerStorage(),
+  });
+}
 
 async function loadModule(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -85,14 +107,14 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    storageMocks.getConversationByReference.mockResolvedValue({
       id: 1,
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'k1',
       title: 't',
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'm1', sequence: 1, contentMarkdown: 'hi', updatedAt: Date.now() },
     ]);
 
@@ -120,7 +142,7 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const syncRes = await syncConversations(orch, [1]);
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(syncRes.results[0].ok).toBe(true);
   });
@@ -134,14 +156,14 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    storageMocks.getConversationByReference.mockResolvedValue({
       id: 1,
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'k1',
       title: 't',
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'm1', sequence: 1, contentMarkdown: 'a', updatedAt: 1 },
       { messageKey: 'm2', sequence: 2, contentMarkdown: 'b', updatedAt: 2 },
     ]);
@@ -181,7 +203,7 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const syncRes = await syncConversations(orch, [1]);
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(syncRes.results[0].appended).toBe(2);
     expect(syncRes.results[0].ok).toBe(true);
@@ -233,12 +255,12 @@ describe('obsidian-sync-orchestrator', () => {
       title: 't',
       url: 'https://example.com',
     };
-    backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getConversationByReference.mockResolvedValue(convo);
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'article_body', sequence: 1, contentMarkdown: 'Body', updatedAt: 1 },
     ]);
-    backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockResolvedValue({ ok: true });
-    backgroundStorageMocks.getArticleCommentsByConversationId.mockResolvedValue([
+    storageMocks.attachOrphanArticleCommentsToConversation.mockResolvedValue({ ok: true });
+    storageMocks.getArticleCommentsByConversation.mockResolvedValue([
       {
         id: 1,
         parentId: null,
@@ -287,7 +309,7 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const syncRes = await syncConversations(orch, [1]);
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(putCount).toBe(1);
@@ -304,14 +326,14 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    storageMocks.getConversationByReference.mockResolvedValue({
       id: 1,
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'k1',
       title: 't',
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'm1', sequence: 1, contentMarkdown: 'a', updatedAt: 1 },
       { messageKey: 'm2', sequence: 2, contentMarkdown: 'b', updatedAt: 2 },
     ]);
@@ -351,7 +373,7 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const syncRes = await syncConversations(orch, [1]);
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe('full_rebuild');
   });
@@ -365,14 +387,14 @@ describe('obsidian-sync-orchestrator', () => {
     await loadModule('@services/sync/obsidian/obsidian-markdown-writer.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    storageMocks.getConversationByReference.mockResolvedValue({
       id: 1,
       sourceType: 'chat',
       source: 'chatgpt',
       conversationKey: 'k1',
       title: 't',
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'm1', sequence: 1, contentMarkdown: 'a', updatedAt: 1 },
       { messageKey: 'm2', sequence: 2, contentMarkdown: 'b', updatedAt: 2 },
     ]);
@@ -421,7 +443,7 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const syncRes = await syncConversations(orch, [1]);
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(patchCount).toBe(0);
@@ -444,8 +466,8 @@ describe('obsidian-sync-orchestrator', () => {
     const oldFilename = `chatgpt-Old Title-${stableId10}.md`;
     const oldFilenameEncoded = oldFilename.replace(/ /g, '%20');
 
-    backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getConversationByReference.mockResolvedValue(convo);
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'm1', sequence: 1, contentMarkdown: 'hi', updatedAt: 1 },
     ]);
 
@@ -507,7 +529,7 @@ describe('obsidian-sync-orchestrator', () => {
     };
 
     await settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://127.0.0.1:27123', apiKey: 'k' });
-    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const syncRes = await syncConversations(orch, [1]);
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe('full_rebuild_rename');
 
@@ -519,10 +541,10 @@ describe('obsidian-sync-orchestrator', () => {
 });
 
 afterEach(() => {
-  backgroundStorageMocks.getConversationById.mockReset();
-  backgroundStorageMocks.getMessagesByConversationId.mockReset();
-  backgroundStorageMocks.getArticleCommentsByConversationId.mockReset();
-  backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockReset();
+  storageMocks.getConversationByReference.mockReset();
+  storageMocks.getMessagesByConversation.mockReset();
+  storageMocks.getArticleCommentsByConversation.mockReset();
+  storageMocks.attachOrphanArticleCommentsToConversation.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup

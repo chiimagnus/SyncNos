@@ -73,7 +73,8 @@ describe('notion-sync-orchestrator kind routing', () => {
     };
 
     const storage = {
-      getSyncMappingByConversation: async (id: number) => {
+      getSyncMappingByConversation: async (reference: any) => {
+        const id = Number(reference.conversationId);
         if (id === 1) {
           return {
             conversation: {
@@ -100,10 +101,11 @@ describe('notion-sync-orchestrator kind routing', () => {
           mapping: null,
         };
       },
-      getMessagesByConversationId: async () => [
+      getMessagesByConversation: async () => [
         { messageKey: 'm1', role: 'assistant', contentText: 'hi', sequence: 1, updatedAt: 1 },
       ],
-      getArticleCommentsByConversationId: async (conversationId: number) => {
+      getArticleCommentsByConversation: async (reference: any) => {
+        const conversationId = Number(reference.conversationId);
         if (conversationId !== 1) return [];
         return [
           {
@@ -132,6 +134,8 @@ describe('notion-sync-orchestrator kind routing', () => {
           },
         ];
       },
+      attachOrphanArticleCommentsToConversation: async () => 0,
+      patchSyncMapping: async () => true,
       setConversationNotionPageId: async () => true,
       setSyncCursor: async () => true,
     };
@@ -167,7 +171,13 @@ describe('notion-sync-orchestrator kind routing', () => {
       syncService,
       jobStore,
     });
-    const res = await orchestrator.syncConversations({ conversationIds: [1, 2], instanceId: 'i' });
+    const res = await orchestrator.syncConversations({
+      conversations: [
+        { source: 'article', conversationKey: 'article-1', conversationId: 1 },
+        { source: 'chatgpt', conversationKey: 'chat-2', conversationId: 2 },
+      ],
+      instanceId: 'i',
+    });
     expect(res.okCount).toBe(2);
 
     // Ensure dbSpec-driven ensureDatabase was invoked for both storage keys.
@@ -226,7 +236,8 @@ describe('notion-sync-orchestrator kind routing', () => {
           notionSectionDigests: { article: { digest: 'old' } },
         },
       }),
-      getMessagesByConversationId: async () => [
+      getArticleCommentsByConversation: async () => [],
+      getMessagesByConversation: async () => [
         {
           messageKey: 'article_body',
           role: 'assistant',
@@ -236,6 +247,8 @@ describe('notion-sync-orchestrator kind routing', () => {
           updatedAt: 2000,
         },
       ],
+      attachOrphanArticleCommentsToConversation: async () => 0,
+      patchSyncMapping: async () => true,
       setConversationNotionPageId: async () => true,
       setSyncCursor: async () => true,
     };
@@ -276,7 +289,10 @@ describe('notion-sync-orchestrator kind routing', () => {
       syncService,
       jobStore,
     });
-    const res = await orchestrator.syncConversations({ conversationIds: [1], instanceId: 'i' });
+    const res = await orchestrator.syncConversations({
+      conversations: [{ source: 'article', conversationKey: 'article-1', conversationId: 1 }],
+      instanceId: 'i',
+    });
     expect(res.okCount).toBe(1);
     expect(res.results[0].mode).toBe('rebuilt');
     expect(calls.some((c) => c.op === 'fetch' && c.req?.method === 'DELETE')).toBe(true);
@@ -327,7 +343,7 @@ describe('notion-sync-orchestrator kind routing', () => {
       tokenStore: { getToken: async () => ({ accessToken: 't' }) },
       storage: {
         getSyncMappingByConversation: async () => null,
-        getMessagesByConversationId: async () => [],
+        getMessagesByConversation: async () => [],
       },
       conversationKinds,
       notionApi: {},

@@ -10,7 +10,7 @@ import { storageOnChanged } from '@services/shared/storage';
 import { buildConversationSidebarRenderItems } from '@services/conversations/domain/sidebar-time-groups';
 
 import { t, formatConversationTitle, getCurrentLocale } from '@i18n';
-import type { SyncProvider } from '@services/sync/models';
+import type { SyncConversationReference, SyncProvider } from '@services/sync/models';
 import { getEnabledSyncProviders, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { getSyncProviderDefinition, listSyncProviders } from '@services/sync/sync-provider-registry';
 import {
@@ -576,9 +576,19 @@ export function ConversationListPane({
       : providerButtonLabel(singleSyncProvider)
     : '';
 
-  const onNoticeJumpToConversation = (conversationId: number) => {
-    const id = Number(conversationId);
-    if (!Number.isFinite(id) || id <= 0) return;
+  const resolveNoticeConversationId = (reference: SyncConversationReference): number | null => {
+    const current = items.find(
+      (conversation) =>
+        String(conversation.source || '').trim() === reference.source &&
+        String(conversation.conversationKey || '').trim() === reference.conversationKey,
+    );
+    const id = Number(current?.id);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  };
+
+  const onNoticeJumpToConversation = (reference: SyncConversationReference) => {
+    const id = resolveNoticeConversationId(reference);
+    if (id == null) return;
     openConversationInListScopeById(id);
     onOpenConversation?.(id);
   };
@@ -1188,6 +1198,7 @@ export function ConversationListPane({
           <ConversationSyncFeedbackNotice
             feedback={syncFeedback}
             onDismiss={clearSyncFeedback}
+            canJumpToConversation={(reference) => resolveNoticeConversationId(reference) != null}
             onJumpToConversation={onNoticeJumpToConversation}
           />
         </div>

@@ -1,5 +1,5 @@
 import { storageGet, storageSet } from '@platform/storage/local';
-import type { SyncJobSnapshot, SyncProvider } from '@services/sync/models';
+import type { SyncConversationReference, SyncJobSnapshot, SyncProvider } from '@services/sync/models';
 
 const DEFAULT_STALE_MS = 5 * 60 * 1000;
 
@@ -8,6 +8,29 @@ export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
   obsidian: 'obsidian_sync_job_v1',
   feishu: 'feishu_sync_job_v1',
 };
+
+function normalizeSyncReference(value: unknown): SyncConversationReference | null {
+  const source = String((value as any)?.source || '').trim();
+  const conversationKey = String((value as any)?.conversationKey || '').trim();
+  if (!source || !conversationKey) return null;
+  const conversationId = Number((value as any)?.conversationId);
+  return {
+    source,
+    conversationKey,
+    ...(Number.isSafeInteger(conversationId) && conversationId > 0 ? { conversationId } : {}),
+  };
+}
+
+function normalizeConversationReferences(value: unknown): SyncConversationReference[] {
+  if (!Array.isArray(value)) return [];
+  const byKey = new Map<string, SyncConversationReference>();
+  for (const item of value) {
+    const reference = normalizeSyncReference(item);
+    if (!reference) continue;
+    byKey.set(`${reference.source}\u0000${reference.conversationKey}`, reference);
+  }
+  return [...byKey.values()];
+}
 
 function normalizeConversationIds(ids: unknown): number[] {
   if (!Array.isArray(ids)) return [];
@@ -21,6 +44,7 @@ function normalizePerConversation(rows: unknown) {
     return {
       conversationId: Number(value.conversationId) || 0,
       conversationTitle: value.conversationTitle == null ? undefined : String(value.conversationTitle || ''),
+      ...(normalizeSyncReference(value.reference) ? { reference: normalizeSyncReference(value.reference)! } : {}),
       ok: value.ok === true,
       mode: String(value.mode || (value.ok === true ? 'ok' : 'failed')),
       appended: Number(value.appended) || 0,
@@ -35,6 +59,8 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   if (!job || typeof job !== 'object') return null;
   const value = job as Record<string, unknown>;
   const perConversation = normalizePerConversation(value.perConversation);
+  const conversations = normalizeConversationReferences(value.conversations);
+  const currentConversation = normalizeSyncReference(value.currentConversation);
   const okCount = Number(value.okCount);
   const failCount = Number(value.failCount);
   const status = String(value.status || 'done');
@@ -47,10 +73,14 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
     startedAt: Number(value.startedAt) || 0,
     updatedAt: Number(value.updatedAt) || Date.now(),
     finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,
-    conversationIds: normalizeConversationIds(value.conversationIds),
-    currentConversationId: Number.isFinite(Number(value.currentConversationId))
-      ? Number(value.currentConversationId)
-      : undefined,
+    conversations,
+    conversationIds: conversations.length
+      ? conversations.flatMap((reference) => (reference.conversationId ? [reference.conversationId] : []))
+      : normalizeConversationIds(value.conversationIds),
+    ...(currentConversation ? { currentConversation } : {}),
+    currentConversationId:
+      currentConversation?.conversationId ??
+      (Number.isFinite(Number(value.currentConversationId)) ? Number(value.currentConversationId) : undefined),
     currentConversationTitle:
       value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),
     currentStage: value.currentStage == null ? undefined : String(value.currentStage || ''),

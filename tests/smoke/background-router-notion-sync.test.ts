@@ -6,6 +6,8 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { NOTION_SYNC_JOB_KEY } from '@services/sync/notion/notion-sync-job-store.ts';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
+import { FactsOperationGate, assertFactsOperationLease } from '@services/local-data/facts-operation-gate';
+import { LocalDataContractError } from '@services/local-data/contracts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = {
@@ -84,6 +86,43 @@ async function waitForJobDone(jobStore: { __getJob: () => any }, label = 'sync j
   return jobStore.__getJob();
 }
 
+const TEST_FACTS_EPOCH = 'idb-v1';
+
+function testReference(conversationId: number) {
+  return { source: 'test', conversationKey: `conversation-${conversationId}` } as const;
+}
+
+function testResolvedReference(conversationId: number) {
+  return { ...testReference(conversationId), conversationId } as const;
+}
+
+function testSyncMessage(conversationIds: number[]) {
+  return {
+    type: 'notionSyncConversations',
+    factsEpoch: TEST_FACTS_EPOCH,
+    conversations: conversationIds.map(testReference),
+  };
+}
+
+function createTestFactsGate() {
+  const gate = new FactsOperationGate();
+  gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: TEST_FACTS_EPOCH, error: null });
+  return gate;
+}
+
+async function runNotionOrchestrator(orchestrator: any, conversationIds: number[], instanceId: string) {
+  const gate = createTestFactsGate();
+  return await gate.runFactsOperation(
+    'test-notion-sync',
+    async (lease) =>
+      await orchestrator.syncConversations({
+        conversations: conversationIds.map(testResolvedReference),
+        instanceId,
+        lease,
+      }),
+  );
+}
+
 function createDelayedJobStore() {
   let job: any = null;
   const runningCounts: number[] = [];
@@ -147,6 +186,17 @@ function createRouter({
     };
   }
 
+  if (notionServices?.storage) {
+    notionServices.storage = {
+      patchSyncMapping: async () => true,
+      setConversationNotionPageId: async () => true,
+      setSyncCursor: async () => true,
+      getArticleCommentsByConversation: async () => [],
+      attachOrphanArticleCommentsToConversation: async () => 0,
+      ...notionServices.storage,
+    };
+  }
+
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
     ...notionServices,
     conversationKinds,
@@ -159,10 +209,30 @@ function createRouter({
     conversationKinds,
   });
 
+  const factsGate = createTestFactsGate();
   registerSyncHandlers(router as any, {
     getInstanceId: () => instanceId,
+    factsOperations: factsGate,
+    resolveConversationReferences: async (expectedFactsEpoch: string, references: any[], lease: any) => {
+      assertFactsOperationLease(lease);
+      if (expectedFactsEpoch !== TEST_FACTS_EPOCH) throw new LocalDataContractError('STALE_BACKEND_EPOCH');
+      return references.map((reference) => {
+        const matched = /^conversation-(\d+)$/.exec(String(reference?.conversationKey || ''));
+        const conversationId = Number(matched?.[1]);
+        if (reference?.source !== 'test' || !Number.isSafeInteger(conversationId) || conversationId <= 0) {
+          throw new LocalDataContractError('STALE_REFERENCE');
+        }
+        return { source: 'test', conversationKey: reference.conversationKey, conversationId };
+      });
+    },
     notionSyncOrchestrator,
     obsidianSyncOrchestrator: {
+      getSyncStatus: async () => ({ job: null }),
+      clearSyncStatus: async () => ({ job: null }),
+      testConnection: async () => ({ ok: true }),
+      syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+    },
+    feishuSyncOrchestrator: {
       getSyncStatus: async () => ({ job: null }),
       clearSyncStatus: async () => ({ job: null }),
       syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
@@ -173,7 +243,7 @@ function createRouter({
 }
 
 async function startNotionSync(router: any, jobStore: { __getJob: () => any }, conversationIds: number[]) {
-  const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds });
+  const res = await router.__handleMessageForTests(testSyncMessage(conversationIds));
   expect(res.ok).toBe(true);
   expect(res.data?.started).toBe(true);
   return await waitForJobDone(jobStore);
@@ -279,7 +349,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p_old' },
             mapping: { notionPageId: 'p_old', lastSyncedMessageKey: 'm0' },
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setConversationNotionPageId: async (_id: number, pageId: string) => calls.push({ op: 'setPageId', pageId }),
           setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
         },
@@ -302,7 +372,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const res = await router.__handleMessageForTests(testSyncMessage([1]));
     expect(res.ok).toBe(true);
     expect(res.data?.started).toBe(true);
 
@@ -337,7 +407,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             { messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 },
             { messageKey: 'm2', role: 'assistant', contentText: 'yo', sequence: 2 },
           ],
@@ -434,10 +504,10 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             { messageKey: 'article_body', role: 'article', contentMarkdown: '# Hello', sequence: 1, updatedAt: 1 },
           ],
-          getArticleCommentsByConversationId: async () => [
+          getArticleCommentsByConversation: async () => [
             {
               id: 11,
               parentId: null,
@@ -566,10 +636,10 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             { messageKey: 'article_body', role: 'article', contentMarkdown: '# Hello', sequence: 1, updatedAt: 1 },
           ],
-          getArticleCommentsByConversationId: async () => [
+          getArticleCommentsByConversation: async () => [
             {
               id: 11,
               parentId: null,
@@ -692,7 +762,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             { messageKey: 'article_body', role: 'article', contentMarkdown: '# Hello', sequence: 1, updatedAt: 1 },
           ],
           setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
@@ -771,7 +841,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             {
               messageKey: 'article_body',
               role: 'assistant',
@@ -855,7 +925,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             {
               messageKey: 'm1',
               role: 'assistant',
@@ -934,7 +1004,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             { messageKey: 'new_key', role: 'user', contentText: 'hi', sequence: 1, updatedAt: 1 },
             { messageKey: 'm2', role: 'assistant', contentText: 'yo', sequence: 2, updatedAt: 2 },
           ],
@@ -998,7 +1068,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             {
               messageKey: 'article_body',
               role: 'assistant',
@@ -1071,7 +1141,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
-          getSyncMappingByConversation: async (conversationId: number) => ({
+          getSyncMappingByConversation: async ({ conversationId }: any) => ({
             conversation: {
               id: conversationId,
               title: `Hello ${conversationId}`,
@@ -1092,7 +1162,7 @@ describe('background-router notion sync', () => {
               },
             },
           }),
-          getMessagesByConversationId: async (conversationId: number) => [
+          getMessagesByConversation: async ({ conversationId }: any) => [
             { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
             { messageKey: `m1_${conversationId}`, role: 'assistant', contentText: 'new', sequence: 2 },
           ],
@@ -1120,10 +1190,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const startRes = await router.__handleMessageForTests({
-      type: 'notionSyncConversations',
-      conversationIds: [1, 2, 3],
-    });
+    const startRes = await router.__handleMessageForTests(testSyncMessage([1, 2, 3]));
     expect(startRes.ok).toBe(true);
     expect(startRes.data?.started).toBe(true);
 
@@ -1154,7 +1221,7 @@ describe('background-router notion sync', () => {
         tokenStore: { getToken: async () => ({ accessToken: 't' }) },
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
-          getSyncMappingByConversation: async (conversationId: number) => ({
+          getSyncMappingByConversation: async ({ conversationId }: any) => ({
             conversation: {
               id: conversationId,
               title: `Hello ${conversationId}`,
@@ -1164,10 +1231,14 @@ describe('background-router notion sync', () => {
             },
             mapping: { notionPageId: `p_${conversationId}`, lastSyncedMessageKey: `m0_${conversationId}` },
           }),
-          getMessagesByConversationId: async (conversationId: number) => [
+          getMessagesByConversation: async ({ conversationId }: any) => [
             { messageKey: `m0_${conversationId}`, role: 'user', contentText: 'old', sequence: 1 },
             { messageKey: `m1_${conversationId}`, role: 'assistant', contentText: 'new', sequence: 2 },
           ],
+          attachOrphanArticleCommentsToConversation: async () => 0,
+          getArticleCommentsByConversation: async () => [],
+          patchSyncMapping: async () => true,
+          setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
         syncService: {
@@ -1188,7 +1259,7 @@ describe('background-router notion sync', () => {
         notionFilesApi: {},
       } as any);
 
-      const syncPromise = orchestrator.syncConversations({ conversationIds: [1, 2], instanceId: 'status-test' });
+      const syncPromise = runNotionOrchestrator(orchestrator, [1, 2], 'status-test');
       await vi.runAllTimersAsync();
       const result = await syncPromise;
 
@@ -1218,7 +1289,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p1' },
             mapping: { notionPageId: 'p1' },
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setSyncCursor: async () => calls.push({ op: 'setCursor' }),
         },
         syncService: {
@@ -1259,7 +1330,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1279,7 +1350,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const syncRes = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const syncRes = await router.__handleMessageForTests(testSyncMessage([1]));
     expect(syncRes.ok).toBe(true);
     expect(syncRes.data?.started).toBe(true);
 
@@ -1314,7 +1385,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             {
               messageKey: 'm1',
               role: 'user',
@@ -1381,7 +1452,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             {
               messageKey: 'm1',
               role: 'user',
@@ -1440,7 +1511,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [
+          getMessagesByConversation: async () => [
             {
               messageKey: 'm1',
               role: 'user',
@@ -1513,7 +1584,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1565,7 +1636,7 @@ describe('background-router notion sync', () => {
           clearCachedDatabaseId: async () => true,
         },
         storage: {
-          getSyncMappingByConversation: async (conversationId: number) => ({
+          getSyncMappingByConversation: async ({ conversationId }: any) => ({
             conversation: {
               id: conversationId,
               title: `Hello ${conversationId}`,
@@ -1574,7 +1645,7 @@ describe('background-router notion sync', () => {
             },
             mapping: null,
           }),
-          getMessagesByConversationId: async (conversationId: number) => [
+          getMessagesByConversation: async ({ conversationId }: any) => [
             { messageKey: `m${conversationId}`, role: 'user', contentText: 'hi', sequence: 1 },
           ],
           setConversationNotionPageId: async () => true,
@@ -1630,7 +1701,7 @@ describe('background-router notion sync', () => {
         dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
         storage: {
           getSyncMappingByConversation: async () => null,
-          getMessagesByConversationId: async () => [],
+          getMessagesByConversation: async () => [],
         },
         syncService: {
           createPageInDatabase: async () => ({ id: 'p1' }),
@@ -1641,7 +1712,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const res = await router.__handleMessageForTests(testSyncMessage([1]));
     expect(res.ok).toBe(false);
     expect(res.error?.message).toBe('sync already in progress');
     expect(res.error?.extra?.code).toBe('sync_already_running');
@@ -1677,7 +1748,7 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.__handleMessageForTests({ type: 'notionSyncConversations', conversationIds: [1] });
+    const res = await router.__handleMessageForTests(testSyncMessage([1]));
     expect(res.ok).toBe(false);
     expect(res.error?.message).toBe('sync provider disabled');
     expect(res.error?.extra?.code).toBe('sync_provider_disabled');
@@ -1698,7 +1769,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1744,7 +1815,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },
@@ -1787,7 +1858,7 @@ describe('background-router notion sync', () => {
             conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
             mapping: null,
           }),
-          getMessagesByConversationId: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
+          getMessagesByConversation: async () => [{ messageKey: 'm1', role: 'user', contentText: 'hi', sequence: 1 }],
           setConversationNotionPageId: async () => true,
           setSyncCursor: async () => true,
         },

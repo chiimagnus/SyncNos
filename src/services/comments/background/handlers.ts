@@ -25,6 +25,7 @@ import {
   type StableConversationReference,
 } from '@services/local-data/contracts';
 import type { ConversationFactsRepository, ConversationReadRunner } from '@services/conversations/data/storage';
+import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 type AnyRouter = {
@@ -36,7 +37,11 @@ type AnyRouter = {
 
 type ArticleCommentsHandlersDeps = {
   conversationReadRunner: ConversationReadRunner;
-  onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  onConversationChanged: (
+    reference: StableConversationReference,
+    reason: AutoSyncConversationChangedReason,
+    lease: FactsOperationLease,
+  ) => void | Promise<void>;
 };
 
 function factsError(router: AnyRouter, error: unknown) {
@@ -193,8 +198,9 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
           const conversationId = conversationIdForEvent(context);
           if (conversationId) {
             await deps.onConversationChanged(
-              conversationId,
+              context.conversation!,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+              lease,
             );
           }
           return { comment, conversationId };
@@ -227,8 +233,9 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
           const conversationId = conversationIdForEvent(context);
           if (conversationId) {
             await deps.onConversationChanged(
-              conversationId,
+              context.conversation!,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+              lease,
             );
           }
           return { comment, conversationId };
@@ -258,8 +265,9 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
           const conversationId = conversationIdForEvent(context);
           if (conversationId) {
             await deps.onConversationChanged(
-              conversationId,
+              context.conversation!,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+              lease,
             );
           }
           return { conversationId };
@@ -286,8 +294,9 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
           const conversationId = conversationIdForEvent(context);
           if (attached.updated > 0 && conversationId) {
             await deps.onConversationChanged(
-              conversationId,
+              context.conversation!,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+              lease,
             );
           }
           return { ...attached, conversationId };
@@ -324,8 +333,9 @@ export function registerArticleCommentsHandlers(router: AnyRouter, deps: Article
           const conversationId = conversationIdForEvent(context);
           if (migrated.updated > 0 && conversationId) {
             await deps.onConversationChanged(
-              conversationId,
+              context.conversation!,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.articleCommentChanged,
+              lease,
             );
           }
           return { ...migrated, conversationId };

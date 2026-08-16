@@ -1,5 +1,6 @@
 import { storageGet, storageSet } from '@platform/storage/local';
-import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
+import type { BackgroundStorage } from '@services/conversations/background/storage';
+import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
 import { formatConversationMarkdownForFeishuDocxSync } from '@services/sync/feishu/docx/feishu-docx-markdown';
 import { fetchFeishuJson } from '@services/sync/feishu/feishu-api';
 import { getFeishuOAuthToken, setFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
@@ -74,11 +75,6 @@ function normalizeOAuthTokenResponse(
     refresh_token: typeof data?.refresh_token === 'string' ? data.refresh_token : undefined,
     expires_in: Number.isFinite(Number(data?.expires_in)) ? Number(data.expires_in) : undefined,
   };
-}
-
-function normalizeIds(list: unknown) {
-  const ids = Array.isArray(list) ? list : [];
-  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
 }
 
 function buildAlreadyRunningError() {
@@ -675,13 +671,21 @@ async function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
 }
 
 async function syncConversations({
-  conversationIds,
+  conversations,
   instanceId,
+  storage,
 }: {
-  conversationIds?: unknown[];
+  conversations?: ResolvedConversationReference[];
   instanceId?: string;
-} = {}) {
-  const ids = normalizeIds(conversationIds);
+  storage: BackgroundStorage;
+}) {
+  const referenceById = new Map<number, ResolvedConversationReference>();
+  for (const reference of conversations || []) {
+    if (Number.isSafeInteger(reference.conversationId) && reference.conversationId > 0) {
+      referenceById.set(reference.conversationId, reference);
+    }
+  }
+  const ids = [...referenceById.keys()];
   if (!ids.length) {
     return {
       provider: SYNC_PROVIDER,
@@ -705,6 +709,7 @@ async function syncConversations({
     startedAt: Date.now(),
     updatedAt: Date.now(),
     finishedAt: null,
+    conversations: [...referenceById.values()],
     conversationIds: ids,
     okCount: 0,
     failCount: 0,
@@ -712,11 +717,16 @@ async function syncConversations({
   };
 
   async function persistCurrentJob(partial: Record<string, unknown> = {}) {
-    Object.assign(currentJob, partial, { updatedAt: Date.now() });
+    const next = { ...partial } as Record<string, unknown>;
+    if (partial.currentConversationId != null) {
+      next.currentConversation = referenceById.get(Number(partial.currentConversationId));
+    }
+    Object.assign(currentJob, next, { updatedAt: Date.now() });
     await feishuSyncJobStore.setJob({ ...(currentJob as any) });
   }
 
   await persistCurrentJob({
+    currentConversation: referenceById.get(ids[0]),
     currentConversationId: ids[0] || undefined,
     currentStage: ids.length ? 'preparing_queue' : '',
   });
@@ -725,6 +735,7 @@ async function syncConversations({
   let accessToken = '';
 
   for (const conversationId of ids) {
+    const reference = referenceById.get(conversationId)!;
     let row: any = null;
     try {
       await persistCurrentJob({
@@ -735,7 +746,7 @@ async function syncConversations({
 
       accessToken = accessToken || (await resolveFeishuAccessToken());
 
-      const mappingRes = await defaultBackgroundStorage.getSyncMappingByConversation(conversationId);
+      const mappingRes = await storage.getSyncMappingByConversation(reference);
       if (!mappingRes || !mappingRes.conversation) {
         row = buildPerConversationResult({
           conversationId,
@@ -749,7 +760,7 @@ async function syncConversations({
       } else {
         const convo: any = mappingRes.conversation;
         const currentTitle = safeString(convo.title) || `conversation#${conversationId}`;
-        const messages = await defaultBackgroundStorage.getMessagesByConversationId(conversationId);
+        const messages = await storage.getMessagesByConversation(reference);
         const detail = { id: conversationId, messages: Array.isArray(messages) ? messages : [] } as any;
 
         await persistCurrentJob({
@@ -782,7 +793,7 @@ async function syncConversations({
             docId = '';
             mode = 'create';
           } else {
-            await defaultBackgroundStorage.patchSyncMapping(conversationId, {
+            await storage.patchSyncMapping(reference, {
               feishuDocId: existingDocId,
               feishuLastContentHash: contentHash,
             });
@@ -797,6 +808,7 @@ async function syncConversations({
               warnings: [],
               at: Date.now(),
             });
+            row = { ...row, reference };
             results.push(row);
             currentJob.perConversation.push(row);
             currentJob.okCount = results.filter((r) => r.ok).length;
@@ -856,7 +868,7 @@ async function syncConversations({
           }
         }
 
-        await defaultBackgroundStorage.patchSyncMapping(conversationId, {
+        await storage.patchSyncMapping(reference, {
           feishuDocId: docId,
           feishuLastContentHash: contentHash,
         });
@@ -884,11 +896,13 @@ async function syncConversations({
       });
     }
 
+    row = { ...row, reference };
     results.push(row);
     currentJob.perConversation.push(row);
     currentJob.okCount = results.filter((r) => r.ok).length;
     currentJob.failCount = results.length - currentJob.okCount;
     await persistCurrentJob({
+      currentConversation: reference,
       currentConversationId: conversationId,
       currentConversationTitle: undefined,
       currentStage: 'finishing_current_item',
@@ -898,6 +912,7 @@ async function syncConversations({
   currentJob.status = 'done';
   currentJob.finishedAt = Date.now();
   await persistCurrentJob({
+    currentConversation: undefined,
     currentConversationId: undefined,
     currentConversationTitle: undefined,
     currentStage: undefined,

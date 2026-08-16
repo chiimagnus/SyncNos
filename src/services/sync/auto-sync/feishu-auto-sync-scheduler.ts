@@ -1,8 +1,9 @@
 import { create, clear, isAlarmsAvailable } from '@platform/alarms/alarms';
 import { storageGet, storageSet } from '@services/shared/storage';
+import type { StableConversationReference } from '@services/local-data/contracts';
+import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import { isSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 
-import type { FeishuSyncOrchestrator } from '@services/bootstrap/background-services';
 import {
   FEISHU_AUTO_SYNC_DEBOUNCE_ALARM_NAME,
   FEISHU_AUTO_SYNC_DEBOUNCE_MS,
@@ -14,6 +15,7 @@ import {
   createAutoSyncSchedulerCore,
   type AutoSyncScheduler,
   type AutoSyncSchedulerInfra,
+  type ResolvedAutoSyncQueueEntry,
 } from '@services/sync/auto-sync/auto-sync-scheduler-core';
 
 export type FeishuAutoSyncScheduler = AutoSyncScheduler;
@@ -21,7 +23,21 @@ export type FeishuAutoSyncScheduler = AutoSyncScheduler;
 export function createFeishuAutoSyncScheduler(
   deps: {
     getInstanceId: () => string;
-    feishuSyncOrchestrator: FeishuSyncOrchestrator;
+    runFactsOperation: <T>(kind: string, fn: (lease: FactsOperationLease) => Promise<T> | T) => Promise<T>;
+    resolveConversationId: (
+      reference: StableConversationReference,
+      lease: FactsOperationLease,
+    ) => Promise<number | null>;
+    resolveLegacyConversationId?: (
+      conversationId: number,
+      lease: FactsOperationLease,
+    ) => Promise<StableConversationReference | null>;
+    canConvertLegacyQueue?: (lease: FactsOperationLease) => Promise<boolean>;
+    syncConversations: (
+      entries: ResolvedAutoSyncQueueEntry[],
+      instanceId: string,
+      lease: FactsOperationLease,
+    ) => Promise<void>;
   },
   infraOverrides?: Partial<AutoSyncSchedulerInfra>,
 ): FeishuAutoSyncScheduler {
@@ -45,7 +61,10 @@ export function createFeishuAutoSyncScheduler(
     infra,
     getInstanceId: deps.getInstanceId,
     isProviderEnabled: () => isSyncProviderEnabled('feishu'),
-    syncConversations: (conversationIds, instanceId) =>
-      deps.feishuSyncOrchestrator.syncConversations({ conversationIds, instanceId } as any) as any,
+    runFactsOperation: deps.runFactsOperation,
+    resolveConversationId: deps.resolveConversationId,
+    ...(deps.resolveLegacyConversationId ? { resolveLegacyConversationId: deps.resolveLegacyConversationId } : {}),
+    ...(deps.canConvertLegacyQueue ? { canConvertLegacyQueue: deps.canConvertLegacyQueue } : {}),
+    syncConversations: deps.syncConversations,
   });
 }

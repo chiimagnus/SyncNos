@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
+import { FactsOperationGate, assertFactsOperationLease } from '@services/local-data/facts-operation-gate';
+import { LocalDataContractError } from '@services/local-data/contracts';
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -11,6 +13,22 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+const FACTS_EPOCH = 'idb-v1';
+
+function stableReference(id: number) {
+  return { source: 'test', conversationKey: `conversation-${id}` } as const;
+}
+
+function syncMessage(ids: number[], forceFullIds: number[] = []) {
+  const forceFull = new Set(forceFullIds);
+  return {
+    type: 'obsidianSyncConversations',
+    factsEpoch: FACTS_EPOCH,
+    conversations: ids.map(stableReference),
+    ...(forceFull.size ? { forceFullConversations: forceFullIds.map(stableReference) } : {}),
+  };
 }
 
 describe('background-router obsidian sync routes', () => {
@@ -62,8 +80,23 @@ describe('background-router obsidian sync routes', () => {
         return { ok: true, instanceId };
       },
     });
+    const factsGate = new FactsOperationGate();
+    factsGate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: FACTS_EPOCH, error: null });
     registerSyncHandlers(router as any, {
       getInstanceId: () => instanceId,
+      factsOperations: factsGate,
+      resolveConversationReferences: async (epoch: string, references: any[], lease: any) => {
+        assertFactsOperationLease(lease);
+        if (epoch !== FACTS_EPOCH) throw new LocalDataContractError('STALE_BACKEND_EPOCH');
+        return references.map((reference) => {
+          const match = /^conversation-(\d+)$/.exec(String(reference?.conversationKey || ''));
+          const conversationId = Number(match?.[1]);
+          if (reference?.source !== 'test' || !Number.isSafeInteger(conversationId) || conversationId <= 0) {
+            throw new LocalDataContractError('STALE_REFERENCE');
+          }
+          return { source: 'test', conversationKey: reference.conversationKey, conversationId };
+        });
+      },
       notionSyncOrchestrator: {
         syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
         getSyncJobStatus: async () => ({ job: null }),
@@ -92,13 +125,15 @@ describe('background-router obsidian sync routes', () => {
           return { okCount: 1, failCount: 0, results: [{ conversationId: 1, ok: true }], payload };
         },
       },
+      feishuSyncOrchestrator: {
+        getSyncStatus: async () => ({ job: null }),
+        clearSyncStatus: async () => ({ job: null }),
+        syncConversations: async () => ({ okCount: 0, failCount: 0, results: [] }),
+      },
     });
 
     store['webclipper_sync_provider_obsidian_enabled'] = false;
-    const disabledRes = await router.__handleMessageForTests({
-      type: 'obsidianSyncConversations',
-      conversationIds: [1],
-    });
+    const disabledRes = await router.__handleMessageForTests(syncMessage([1]));
     expect(disabledRes.ok).toBe(false);
     expect(disabledRes.error?.message).toBe('sync provider disabled');
     expect(disabledRes.error?.extra?.code).toBe('sync_provider_disabled');
@@ -131,24 +166,21 @@ describe('background-router obsidian sync routes', () => {
     expect(calls.getSyncStatus).toBe(1);
     expect(typeof statusRes.data?.instanceId).toBe('string');
 
-    const syncRes = await router.__handleMessageForTests({
-      type: 'obsidianSyncConversations',
-      conversationIds: [1, 2],
-      forceFullConversationIds: [2],
-    });
+    const syncRes = await router.__handleMessageForTests(syncMessage([1, 2], [2]));
     expect(syncRes.ok).toBe(true);
     expect(syncRes.data?.started).toBe(true);
-    expect(Array.isArray(calls.syncConversations?.conversationIds)).toBe(true);
-    expect(calls.syncConversations?.conversationIds).toEqual([1, 2]);
-    expect(calls.syncConversations?.forceFullConversationIds).toEqual([2]);
+    expect(calls.syncConversations?.conversations).toEqual([
+      { source: 'test', conversationKey: 'conversation-1', conversationId: 1 },
+      { source: 'test', conversationKey: 'conversation-2', conversationId: 2 },
+    ]);
+    expect(calls.syncConversations?.forceFullConversations).toEqual([
+      { source: 'test', conversationKey: 'conversation-2', conversationId: 2 },
+    ]);
     expect(typeof calls.syncConversations?.instanceId).toBe('string');
 
     calls.syncConversations = null;
     calls.syncPreflightMode = 'network_error';
-    const preflightFailRes = await router.__handleMessageForTests({
-      type: 'obsidianSyncConversations',
-      conversationIds: [3],
-    });
+    const preflightFailRes = await router.__handleMessageForTests(syncMessage([3]));
     expect(preflightFailRes.ok).toBe(false);
     expect(String(preflightFailRes.error?.message || '')).toContain('Open Obsidian');
     expect(String(preflightFailRes.error?.message || '')).toContain('Failed to fetch');
@@ -159,16 +191,10 @@ describe('background-router obsidian sync routes', () => {
     calls.syncPreflightMode = 'ok';
 
     calls.syncMode = 'long-running';
-    const firstRun = router.__handleMessageForTests({
-      type: 'obsidianSyncConversations',
-      conversationIds: [1],
-    });
+    const firstRun = router.__handleMessageForTests(syncMessage([1]));
     expect((await firstRun).ok).toBe(true);
 
-    const conflictRes = await router.__handleMessageForTests({
-      type: 'obsidianSyncConversations',
-      conversationIds: [1],
-    });
+    const conflictRes = await router.__handleMessageForTests(syncMessage([1]));
     expect(conflictRes.ok).toBe(false);
     expect(conflictRes.error?.message).toBe('sync already in progress');
     expect(conflictRes.error?.extra?.code).toBe('sync_already_running');

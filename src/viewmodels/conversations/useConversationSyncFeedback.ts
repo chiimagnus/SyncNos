@@ -14,6 +14,7 @@ import {
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { storageOnChanged } from '@services/shared/storage';
 import type {
+  SyncConversationReference,
   SyncFailureSummary,
   SyncJobSnapshot,
   SyncJobStatusResponse,
@@ -22,6 +23,7 @@ import type {
   SyncWarning,
 } from '@services/sync/models';
 import type { SyncStartAck } from '@services/sync/repo';
+import type { ConversationFactsReference } from '@services/conversations/domain/models';
 import { t } from '@i18n';
 import { getSyncProviderDefinition } from '@services/sync/sync-provider-registry';
 
@@ -32,6 +34,7 @@ export type ConversationSyncFeedbackState = {
   phase: ConversationSyncFeedbackPhase;
   total: number;
   done: number;
+  currentConversation: SyncConversationReference | null;
   currentConversationId: number | null;
   currentConversationTitle: string;
   currentStage: string;
@@ -49,9 +52,9 @@ type UseConversationSyncFeedbackDeps = {
   getFeishuSyncStatus?: () => Promise<SyncJobStatusResponse>;
   getNotionSyncJobStatus?: () => Promise<SyncJobStatusResponse>;
   getObsidianSyncStatus?: () => Promise<SyncJobStatusResponse>;
-  syncFeishuConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
-  syncNotionConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
-  syncObsidianConversations?: (conversationIds: number[]) => Promise<SyncStartAck>;
+  syncFeishuConversations?: (references: ConversationFactsReference[]) => Promise<SyncStartAck>;
+  syncNotionConversations?: (references: ConversationFactsReference[]) => Promise<SyncStartAck>;
+  syncObsidianConversations?: (references: ConversationFactsReference[]) => Promise<SyncStartAck>;
 };
 
 type ActiveRun = {
@@ -64,6 +67,7 @@ const IDLE_FEEDBACK: ConversationSyncFeedbackState = {
   phase: 'idle',
   total: 0,
   done: 0,
+  currentConversation: null,
   currentConversationId: null,
   currentConversationTitle: '',
   currentStage: '',
@@ -81,10 +85,26 @@ function providerLabel(provider: SyncProvider) {
   return label || String(provider || '');
 }
 
-function normalizeIds(ids: number[]) {
+function displayIds(references: readonly ConversationFactsReference[]) {
   return Array.from(
-    new Set((Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
+    new Set(
+      (Array.isArray(references) ? references : [])
+        .map((reference) => Number(reference?.conversationId))
+        .filter((id) => Number.isFinite(id) && id > 0),
+    ),
   );
+}
+
+function syncReference(value: unknown): SyncConversationReference | undefined {
+  const source = String((value as any)?.source || '').trim();
+  const conversationKey = String((value as any)?.conversationKey || '').trim();
+  if (!source || !conversationKey) return undefined;
+  const conversationId = Number((value as any)?.conversationId);
+  return {
+    source,
+    conversationKey,
+    ...(Number.isSafeInteger(conversationId) && conversationId > 0 ? { conversationId } : {}),
+  };
 }
 
 function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
@@ -95,11 +115,13 @@ function toFailureSummariesFromRows(rows: unknown): SyncFailureSummary[] {
       conversationId: Number((row as any).conversationId) || 0,
       conversationTitle: String((row as any).conversationTitle || '').trim(),
       error: String((row as any).error || 'unknown error'),
+      ...(syncReference((row as any).reference) ? { reference: syncReference((row as any).reference) } : {}),
     }));
 }
 
 export type SyncWarningSummary = {
   conversationId: number;
+  reference?: SyncConversationReference;
   conversationTitle?: string;
   code: string;
   message: string;
@@ -120,7 +142,14 @@ function toWarningSummariesFromRows(rows: unknown): SyncWarningSummary[] {
       const code = String((w as any).code || '').trim() || 'warning';
       const message = String((w as any).message || '').trim() || code;
       const extra = (w as any).extra;
-      out.push({ conversationId, conversationTitle, code, message, extra });
+      out.push({
+        conversationId,
+        conversationTitle,
+        code,
+        message,
+        extra,
+        ...(syncReference((row as any).reference) ? { reference: syncReference((row as any).reference) } : {}),
+      });
     }
   }
   return out;
@@ -154,6 +183,7 @@ function toFailureSummaries(summary: SyncRunSummary) {
       conversationId: Number(result.conversationId) || 0,
       conversationTitle: String(result.conversationTitle || '').trim(),
       error: String(result.error || 'unknown error'),
+      ...(syncReference(result.reference) ? { reference: syncReference(result.reference) } : {}),
     }));
 }
 
@@ -173,6 +203,7 @@ function toTerminalFeedback(summary: SyncRunSummary, total: number): Conversatio
     phase,
     total: safeTotal,
     done: safeTotal,
+    currentConversation: null,
     currentConversationId: null,
     currentConversationTitle: '',
     currentStage: '',
@@ -218,6 +249,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       phase: 'running',
       total,
       done: Math.min(completed, total || completed),
+      currentConversation: syncReference(job.currentConversation) || null,
       currentConversationId: Number(job.currentConversationId) || null,
       currentConversationTitle: String(job.currentConversationTitle || ''),
       currentStage: String(job.currentStage || ''),
@@ -235,6 +267,7 @@ function toFeedbackFromJob(job: SyncJobSnapshot): ConversationSyncFeedbackState 
       phase: 'failed',
       total,
       done: Math.min(completed, total || completed),
+      currentConversation: syncReference(job.currentConversation) || null,
       currentConversationId: Number(job.currentConversationId) || null,
       currentConversationTitle: String(job.currentConversationTitle || ''),
       currentStage: String(job.currentStage || ''),
@@ -443,16 +476,16 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
   }, [clearNotionSyncJobStatus, clearObsidianSyncStatus, clearFeishuSyncStatus, feedback, refreshFromBackground]);
 
   const startSync = useCallback(
-    async (provider: SyncProvider, conversationIds: number[]): Promise<SyncStartAck | null> => {
-      const ids = normalizeIds(conversationIds);
-      if (!ids.length) return null;
+    async (provider: SyncProvider, references: ConversationFactsReference[]): Promise<SyncStartAck | null> => {
+      if (!Array.isArray(references) || !references.length) return null;
+      const ids = displayIds(references);
 
       if (provider === 'obsidian') {
         const token = runTokenRef.current + 1;
         runTokenRef.current = token;
 
         try {
-          const ack = await syncObsidianConversations(ids);
+          const ack = await syncObsidianConversations(references);
           if (disposedRef.current) return ack;
 
           const nextRun: ActiveRun = { provider, token };
@@ -464,6 +497,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
             phase: 'running',
             total: ids.length,
             done: 0,
+            currentConversation: syncReference(references[0]) || null,
             currentConversationId: ids[0] || null,
             currentConversationTitle: '',
             currentStage: 'preparing_queue',
@@ -504,6 +538,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
             phase: 'failed',
             total: 0,
             done: 0,
+            currentConversation: null,
             currentConversationId: null,
             currentConversationTitle: '',
             currentStage: '',
@@ -529,6 +564,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           phase: 'running',
           total: ids.length,
           done: 0,
+          currentConversation: syncReference(references[0]) || null,
           currentConversationId: ids[0] || null,
           currentConversationTitle: '',
           currentStage: 'preparing_queue',
@@ -542,7 +578,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         setFeedback(runningFeedback);
 
         try {
-          const ack = await syncFeishuConversations(ids);
+          const ack = await syncFeishuConversations(references);
           if (disposedRef.current) return ack;
           await refreshFromBackground(provider);
           return ack;
@@ -572,6 +608,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
             phase: 'failed',
             total: 0,
             done: 0,
+            currentConversation: null,
             currentConversationId: null,
             currentConversationTitle: '',
             currentStage: '',
@@ -596,6 +633,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
         phase: 'running',
         total: ids.length,
         done: 0,
+        currentConversation: syncReference(references[0]) || null,
         currentConversationId: ids[0] || null,
         currentConversationTitle: '',
         currentStage: 'preparing_queue',
@@ -609,7 +647,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
       setFeedback(runningFeedback);
 
       try {
-        const ack = await syncNotionConversations(ids);
+        const ack = await syncNotionConversations(references);
         if (disposedRef.current) return ack;
         await refreshFromBackground(provider);
         return ack;
@@ -639,6 +677,7 @@ export function useConversationSyncFeedback(deps: UseConversationSyncFeedbackDep
           phase: 'failed',
           total: 0,
           done: 0,
+          currentConversation: null,
           currentConversationId: null,
           currentConversationTitle: '',
           currentStage: '',

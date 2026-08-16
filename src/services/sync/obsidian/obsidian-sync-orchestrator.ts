@@ -1,5 +1,6 @@
 import { parseArticleCommentDtos, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
-import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
+import type { BackgroundStorage } from '@services/conversations/background/storage';
+import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
 import { getObsidianConnectionConfig, getObsidianPathConfig } from '@services/sync/obsidian/settings-store';
 import {
   NOTE_JSON_ACCEPT,
@@ -177,11 +178,6 @@ async function materializeMarkdownAssetsForObsidian({
   return replaceSyncnosAssetsWithAttachmentNames(targetMarkdown, attachmentNameByAssetId);
 }
 
-function normalizeIds(list: unknown) {
-  const ids = Array.isArray(list) ? list : [];
-  return Array.from(new Set(ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
-}
-
 function buildPerConversationResult({
   conversationId,
   conversationTitle,
@@ -233,10 +229,6 @@ function toCurrentConversationTitle(convo: any, _conversationId: number) {
   const title = safeString(convo && convo.title);
   if (title) return title;
   return '';
-}
-
-function getBackgroundStorageModule() {
-  return defaultBackgroundStorage;
 }
 
 function getSettingsStoreModule() {
@@ -298,22 +290,16 @@ async function buildClient() {
 }
 
 async function decideSyncModeForConversation({
-  conversationId,
+  conversation,
   forceFull,
+  storage,
 }: {
-  conversationId: number;
+  conversation: ResolvedConversationReference;
   forceFull?: boolean;
+  storage: BackgroundStorage;
 }) {
-  const storage = getBackgroundStorageModule();
-  if (
-    !storage ||
-    typeof storage.getConversationById !== 'function' ||
-    typeof storage.getMessagesByConversationId !== 'function'
-  ) {
-    throw new Error('storage module missing');
-  }
-
-  const convo = await storage.getConversationById(conversationId);
+  const conversationId = conversation.conversationId;
+  const convo = await storage.getConversationByReference(conversation);
   if (!convo) {
     return {
       isFinal: true,
@@ -329,7 +315,7 @@ async function decideSyncModeForConversation({
     };
   }
 
-  const messages = await storage.getMessagesByConversationId(conversationId);
+  const messages = await storage.getMessagesByConversation(conversation);
   if (!Array.isArray(messages) || !messages.length) {
     return {
       isFinal: true,
@@ -350,11 +336,9 @@ async function decideSyncModeForConversation({
   if (isArticle) {
     const canonicalUrl = safeString(convo?.url);
     if (canonicalUrl && typeof storage.attachOrphanArticleCommentsToConversation === 'function') {
-      await storage.attachOrphanArticleCommentsToConversation(canonicalUrl, conversationId);
+      await storage.attachOrphanArticleCommentsToConversation(canonicalUrl, conversation);
     }
-    if (typeof storage.getArticleCommentsByConversationId === 'function') {
-      articleComments = parseArticleCommentDtos(await storage.getArticleCommentsByConversationId(conversationId));
-    }
+    articleComments = parseArticleCommentDtos(await storage.getArticleCommentsByConversation(conversation));
   }
 
   const notePathMod = getNotePathModule();
@@ -579,16 +563,26 @@ async function clearSyncStatus({ instanceId }: { instanceId?: string } = {}) {
 }
 
 async function syncConversations({
-  conversationIds,
-  forceFullConversationIds,
+  conversations,
+  forceFullConversations,
   instanceId,
+  storage,
 }: {
-  conversationIds?: unknown[];
-  forceFullConversationIds?: unknown[];
+  conversations?: ResolvedConversationReference[];
+  forceFullConversations?: ResolvedConversationReference[];
   instanceId?: string;
-} = {}) {
-  const ids = normalizeIds(conversationIds);
-  const forceFullIds = new Set(normalizeIds(forceFullConversationIds));
+  storage: BackgroundStorage;
+}) {
+  const referenceById = new Map<number, ResolvedConversationReference>();
+  for (const reference of conversations || []) {
+    if (Number.isSafeInteger(reference.conversationId) && reference.conversationId > 0) {
+      referenceById.set(reference.conversationId, reference);
+    }
+  }
+  const ids = [...referenceById.keys()];
+  const forceFullKeys = new Set(
+    (forceFullConversations || []).map((reference) => `${reference.source}\u0000${reference.conversationKey}`),
+  );
   if (!ids.length) {
     return {
       provider: SYNC_PROVIDER,
@@ -612,17 +606,23 @@ async function syncConversations({
     startedAt: Date.now(),
     updatedAt: Date.now(),
     finishedAt: null,
+    conversations: [...referenceById.values()],
     conversationIds: ids,
     okCount: 0,
     failCount: 0,
     perConversation: [],
   };
   async function persistCurrentJob(partial: Record<string, unknown> = {}) {
-    Object.assign(currentJob, partial, { updatedAt: Date.now() });
+    const next = { ...partial } as Record<string, unknown>;
+    if (partial.currentConversationId != null) {
+      next.currentConversation = referenceById.get(Number(partial.currentConversationId));
+    }
+    Object.assign(currentJob, next, { updatedAt: Date.now() });
     await obsidianSyncJobStore.setJob({ ...currentJob });
   }
 
   await persistCurrentJob({
+    currentConversation: referenceById.get(ids[0]),
     currentConversationId: ids[0] || undefined,
     currentStage: ids.length ? 'preparing_queue' : '',
   });
@@ -630,6 +630,7 @@ async function syncConversations({
   const results: any[] = [];
 
   for (const conversationId of ids) {
+    const reference = referenceById.get(conversationId)!;
     let row: any = null;
     try {
       await persistCurrentJob({
@@ -638,8 +639,9 @@ async function syncConversations({
         currentStage: 'loading_conversation',
       });
       const decision: any = await decideSyncModeForConversation({
-        conversationId,
-        forceFull: forceFullIds.has(conversationId),
+        conversation: reference,
+        forceFull: forceFullKeys.has(`${reference.source}\u0000${reference.conversationKey}`),
+        storage,
       });
       if (decision && decision.isFinal) {
         await persistCurrentJob({
@@ -783,11 +785,13 @@ async function syncConversations({
         at: Date.now(),
       });
     }
+    row = { ...row, reference };
     results.push(row);
     currentJob.perConversation.push(row);
     currentJob.okCount = results.filter((r) => r.ok).length;
     currentJob.failCount = results.length - currentJob.okCount;
     await persistCurrentJob({
+      currentConversation: reference,
       currentConversationId: conversationId,
       currentConversationTitle: undefined,
       currentStage: 'finishing_current_item',
@@ -797,6 +801,7 @@ async function syncConversations({
   currentJob.status = 'done';
   currentJob.finishedAt = Date.now();
   await persistCurrentJob({
+    currentConversation: undefined,
     currentConversationId: undefined,
     currentConversationTitle: undefined,
     currentStage: undefined,

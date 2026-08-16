@@ -43,7 +43,7 @@ export default defineBackground(async () => {
   const factsGate = new FactsOperationGate();
   await factsGate.initializeFromJournal();
   const conversationReadRunner = createConversationReadRunner(factsGate);
-  const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
+  const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId, factsOperations: factsGate });
   const streamRouter = new BackgroundStreamRouter(factsGate);
 
   const router = createBackgroundRouter({
@@ -57,18 +57,21 @@ export default defineBackground(async () => {
 
   registerConversationHandlers(router, {
     conversationReadRunner,
-    onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
+    onConversationChanged: (reference, reason, lease) =>
+      services.autoSync.onConversationChanged(reference, reason, lease),
     streamRouter,
   });
   registerItemMentionHandlers(router, { conversationReadRunner });
   registerChatWithBackgroundHandlers(router);
   registerArticleCommentsHandlers(router, {
     conversationReadRunner,
-    onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
+    onConversationChanged: (reference, reason, lease) =>
+      services.autoSync.onConversationChanged(reference, reason, lease),
   });
   registerWebArticleHandlers(router, {
     conversationReadRunner,
-    onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
+    onConversationChanged: (reference, reason, lease) =>
+      services.autoSync.onConversationChanged(reference, reason, lease),
   });
   registerChatgptDeepResearchHandlers(router);
   registerNotionSettingsHandlers(router, {
@@ -83,6 +86,8 @@ export default defineBackground(async () => {
   registerUiMessageHandlers(router);
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
+    factsOperations: factsGate,
+    resolveConversationReferences: services.resolveConversationReferences,
     notionSyncOrchestrator: services.notionSyncOrchestrator,
     obsidianSyncOrchestrator: services.obsidianSyncOrchestrator,
     feishuSyncOrchestrator: services.feishuSyncOrchestrator,
@@ -119,25 +124,21 @@ export default defineBackground(async () => {
 
   try {
     onAlarm((alarm) => {
-      // ponytail: P3-T9 will hold outer leases across the complete scheduler run; this keeps recovery
-      // from starting a legacy flush while the durable journal already blocks facts admissions.
-      if (!factsGate.allowsFactsOperations) return;
-      void services.autoSync.handleAlarm(String(alarm?.name || ''));
+      void services.autoSync.handleAlarm(String(alarm?.name || '')).catch(() => {});
     });
   } catch (_e) {
     // ignore
   }
 
-  // Best-effort flush for any overdue auto-sync queue items. This complements
-  // alarms-based wakeups and helps after extension reload / background restart.
+  // Restart only restores alarm wakeups. Facts are not touched until a due alarm obtains an outer lease.
   try {
-    if (factsGate.allowsFactsOperations) {
-      void services.autoSync.notionScheduler.flush();
-      void services.autoSync.obsidianScheduler.flush();
-      void services.autoSync.feishuScheduler.flush();
-    }
+    await Promise.all([
+      services.autoSync.notionScheduler.rearm(),
+      services.autoSync.obsidianScheduler.rearm(),
+      services.autoSync.feishuScheduler.rearm(),
+    ]);
   } catch (_e) {
-    // ignore
+    // Best-effort alarm restoration; the next enqueue also re-arms the queue.
   }
 
   router.start();

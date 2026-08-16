@@ -55,7 +55,11 @@ type AnyRouter = {
 
 type ConversationHandlersDeps = {
   conversationReadRunner: ConversationReadRunner;
-  onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  onConversationChanged: (
+    reference: StableConversationReference,
+    reason: AutoSyncConversationChangedReason,
+    lease: FactsOperationLease,
+  ) => void | Promise<void>;
   streamRouter: ConversationReadStreamRouter;
 };
 
@@ -488,10 +492,11 @@ export async function saveConversationCaptureSnapshotInLease(
       await input.repository.syncConversationMessages(resolved, inlined.messages as JsonValue, options);
     }
     await input.onConversationChanged(
-      resolved.conversationId,
+      resolved,
       saved.isNew
         ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
         : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+      input.lease,
     );
     return { conversationId: resolved.conversationId, isNew: saved.isNew };
   }
@@ -513,10 +518,11 @@ export async function saveConversationCaptureSnapshotInLease(
   });
   await input.repository.syncConversationMessages(resolved, inlined.messages as JsonValue, options);
   await input.onConversationChanged(
-    resolved.conversationId,
+    resolved,
     existing
       ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages
       : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation,
+    input.lease,
   );
   return { conversationId: resolved.conversationId, isNew: !existing };
 }
@@ -721,6 +727,31 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
   });
 
+  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_SYNC_MAPPING, async (msg) => {
+    const reference = stableReference(msg);
+    if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
+    const factsEpoch = requireFactsEpoch(msg);
+    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
+    try {
+      const result = await deps.conversationReadRunner.run({
+        kind: 'conversation-sync-mapping',
+        expectedFactsEpoch: factsEpoch,
+        read: async ({ repository }) => {
+          const resolved = await resolveConversationReference(repository, reference);
+          const [notion, feishu] = await Promise.all([
+            repository.getSyncMapping(resolved, 'notion'),
+            repository.getSyncMapping(resolved, 'feishu'),
+          ]);
+          if (!notion?.mapping && !feishu?.mapping) return null;
+          return { ...(notion?.mapping || {}), ...(feishu?.mapping || {}) };
+        },
+      });
+      return router.ok(result);
+    } catch (error) {
+      return factsError(router, error);
+    }
+  });
+
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_IMAGE_ASSET, async (msg) => {
     const reference = stableReference(msg);
     if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
@@ -800,7 +831,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       const result = await deps.conversationReadRunner.run({
         kind: 'conversation-upsert',
         ...(expectedFactsEpoch ? { expectedFactsEpoch } : {}),
-        read: async ({ repository }) => {
+        read: async ({ lease, repository }) => {
           const existing = await repository.getConversationByReference(payloadReference);
           if (expectedFactsEpoch && !existing) throw new LocalDataContractError('STALE_REFERENCE');
           const conversation = await repository.upsertConversation(payload as JsonObject);
@@ -810,10 +841,11 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           }
           const isNew = !existing;
           await deps.onConversationChanged(
-            conversationId,
+            { ...payloadReference },
             isNew
               ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
               : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+            lease,
           );
           return { conversation, conversationId, isNew };
         },
@@ -839,14 +871,15 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       const result = await deps.conversationReadRunner.run({
         kind: 'conversation-merge',
         expectedFactsEpoch: factsEpoch,
-        read: async ({ repository }) => {
+        read: async ({ lease, repository }) => {
           const resolvedKeep = await resolveConversationReference(repository, keep);
           const resolvedRemove = await resolveConversationReference(repository, remove);
           const response = await repository.mergeConversations({ keep: resolvedKeep, remove: resolvedRemove });
           if (response.merged) {
             await deps.onConversationChanged(
-              response.keptConversationId,
+              resolvedKeep,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
+              lease,
             );
           }
           return { response };
@@ -910,8 +943,9 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           messages = inlined.messages;
           const response = await repository.syncConversationMessages(resolved, messages as JsonValue, options);
           await deps.onConversationChanged(
-            resolved.conversationId,
+            resolved,
             AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
+            lease,
           );
           return { response, conversationId: resolved.conversationId };
         },
@@ -944,10 +978,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
             repository,
             conversationUrl,
           });
-          await deps.onConversationChanged(
-            resolved.conversationId,
-            AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages,
-          );
+          await deps.onConversationChanged(resolved, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages, lease);
           return { response, conversationId: resolved.conversationId };
         },
       });

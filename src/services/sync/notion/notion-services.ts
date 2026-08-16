@@ -1,4 +1,5 @@
-import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
+import type { JsonObject } from '@services/local-data/contracts';
+import type { ResolvedConversationReference } from '@services/conversations/data/storage-native';
 import type { ReconcileRunningSyncJobOptions } from '@services/sync/sync-job-store';
 
 export type NotionToken = {
@@ -27,13 +28,20 @@ export type NotionConversationKinds = {
 };
 
 export type NotionBackgroundStorage = {
-  getSyncMappingByConversation: (conversationId: number) => Promise<any>;
-  getMessagesByConversationId: (conversationId: number) => Promise<any[]>;
-  setConversationNotionPageId?: (conversationId: number, pageId: string) => Promise<any>;
-  setSyncCursor?: (conversationId: number, cursor: any) => Promise<any>;
-  patchSyncMapping?: (conversationId: number, patch: Record<string, unknown>) => Promise<any>;
-  getArticleCommentsByConversationId?: (conversationId: number) => Promise<ArticleCommentDto[]>;
-  attachOrphanArticleCommentsToConversation?: (canonicalUrl: string, conversationId: number) => Promise<any>;
+  getSyncMappingByConversation: (conversation: ResolvedConversationReference) => Promise<any>;
+  getMessagesByConversation: (conversation: ResolvedConversationReference) => Promise<any[]>;
+  setConversationNotionPageId: (
+    conversation: ResolvedConversationReference,
+    pageId: string,
+    meta?: { notionPageUrl?: string; notionWorkspaceSlug?: string },
+  ) => Promise<any>;
+  setSyncCursor: (conversation: ResolvedConversationReference, cursor: JsonObject) => Promise<any>;
+  patchSyncMapping: (conversation: ResolvedConversationReference, patch: JsonObject) => Promise<any>;
+  getArticleCommentsByConversation: (conversation: ResolvedConversationReference) => Promise<unknown[]>;
+  attachOrphanArticleCommentsToConversation: (
+    canonicalUrl: string,
+    conversation: ResolvedConversationReference,
+  ) => Promise<any>;
 };
 
 export type NotionDbManager = {

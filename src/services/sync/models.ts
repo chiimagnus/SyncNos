@@ -1,11 +1,19 @@
+import type { StableConversationReference } from '@services/local-data/contracts';
+
 export type SyncProvider = 'notion' | 'obsidian' | 'feishu';
 
 export type SyncJobPhase = 'running' | 'done' | 'aborted';
+
+export type SyncConversationReference = StableConversationReference &
+  Readonly<{
+    conversationId?: number;
+  }>;
 
 export type SyncFailureSummary = {
   conversationId: number;
   conversationTitle?: string;
   error: string;
+  reference?: SyncConversationReference;
 };
 
 export type SyncWarning = {
@@ -17,6 +25,7 @@ export type SyncWarning = {
 export type SyncPerConversationResult = {
   conversationId: number;
   conversationTitle?: string;
+  reference?: SyncConversationReference;
   ok: boolean;
   mode: string;
   appended: number;
@@ -43,7 +52,9 @@ export type SyncJobSnapshot = {
   startedAt: number;
   updatedAt: number;
   finishedAt: number | null;
+  conversations: SyncConversationReference[];
   conversationIds: number[];
+  currentConversation?: SyncConversationReference;
   currentConversationId?: number;
   currentConversationTitle?: string;
   currentStage?: string;

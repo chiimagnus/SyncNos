@@ -7,6 +7,8 @@ import {
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { saveConversationCaptureSnapshotInLease } from '@services/conversations/background/handlers';
 import { type ConversationReadRunner } from '@services/conversations/data/storage';
+import type { StableConversationReference } from '@services/local-data/contracts';
+import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
 import { type AutoSyncConversationChangedReason } from '@services/sync/auto-sync/auto-sync-keys';
 
 type AnyRouter = {
@@ -18,7 +20,11 @@ type AnyRouter = {
 
 type WebArticleHandlersDeps = Readonly<{
   conversationReadRunner: ConversationReadRunner;
-  onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  onConversationChanged: (
+    reference: StableConversationReference,
+    reason: AutoSyncConversationChangedReason,
+    lease: FactsOperationLease,
+  ) => void | Promise<void>;
 }>;
 
 function normalizeArticleFetchError(error: unknown, fallback: string): string {

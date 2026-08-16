@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createNotionAutoSyncScheduler } from '@services/sync/auto-sync/notion-auto-sync-scheduler';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 import {
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY,
@@ -78,7 +79,7 @@ beforeEach(() => {
     workspaceName: 'W',
     createdAt: Date.now(),
   });
-  alarmsMocks.isAlarmsAvailable.mockReturnValue(false);
+  alarmsMocks.isAlarmsAvailable.mockReturnValue(true);
   alarmsMocks.create.mockReset();
   alarmsMocks.clear.mockResolvedValue(true);
   jobStoreMocks.setJob.mockResolvedValue(true);
@@ -92,24 +93,33 @@ describe('notion-auto-sync-scheduler', () => {
       notion_parent_page_id: 'parent',
     });
 
+    const gate = new FactsOperationGate();
+    gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null });
     const scheduler = createNotionAutoSyncScheduler({
       getInstanceId: () => 'instance-1',
-      notionSyncOrchestrator: {
-        syncConversations,
-        getSyncJobStatus: async () => ({}),
-        clearSyncJobStatus: async () => ({}),
-      } as any,
+      runFactsOperation: gate.runFactsOperation.bind(gate),
+      resolveConversationId: async () => 123,
+      syncConversations,
     });
 
-    await scheduler.enqueue(123, 'syncConversationMessages');
+    await gate.runFactsOperation('enqueue', async (lease) => {
+      await scheduler.enqueue({ source: 'chatgpt', conversationKey: 'thread-123' }, 'syncConversationMessages', lease);
+    });
     const queue = storageState[NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY];
     expect(queue).toBeTruthy();
 
     // force due
-    storageState[NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY] = { '123': Date.now() - 1 };
+    storageState[NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY] = {
+      version: 2,
+      entries: [{ source: 'chatgpt', conversationKey: 'thread-123', dueAt: Date.now() - 1 }],
+    };
     await scheduler.flush();
 
-    expect(syncConversations).toHaveBeenCalledWith({ conversationIds: [123], instanceId: 'instance-1' });
+    expect(syncConversations).toHaveBeenCalledWith(
+      [{ source: 'chatgpt', conversationKey: 'thread-123', conversationId: 123, dueAt: expect.any(Number) }],
+      'instance-1',
+      expect.any(Object),
+    );
   });
 
   it('writes a visible job failure when Notion is not connected', async () => {
@@ -118,16 +128,19 @@ describe('notion-auto-sync-scheduler', () => {
     setStoragePatch({
       [NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY]: true,
       notion_parent_page_id: 'parent',
-      [NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]: { '7': Date.now() - 1 },
+      [NOTION_AUTO_SYNC_QUEUE_STORAGE_KEY]: {
+        version: 2,
+        entries: [{ source: 'chatgpt', conversationKey: 'thread-7', dueAt: Date.now() - 1 }],
+      },
     });
 
+    const gate = new FactsOperationGate();
+    gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null });
     const scheduler = createNotionAutoSyncScheduler({
       getInstanceId: () => 'instance-2',
-      notionSyncOrchestrator: {
-        syncConversations,
-        getSyncJobStatus: async () => ({}),
-        clearSyncJobStatus: async () => ({}),
-      } as any,
+      runFactsOperation: gate.runFactsOperation.bind(gate),
+      resolveConversationId: async () => 7,
+      syncConversations,
     });
 
     await scheduler.flush();

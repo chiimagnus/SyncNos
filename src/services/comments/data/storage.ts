@@ -71,9 +71,3 @@ export function createArticleCommentsRepository(
       : createIdbArticleCommentsRepository(input.lease);
   return repository;
 }
-
-// P3-T9 still owns these two provider-only legacy readers. Delete them with its last consumers.
-export {
-  attachOrphanCommentsToConversation,
-  listArticleCommentsByConversationId,
-} from '@services/comments/data/storage-idb';

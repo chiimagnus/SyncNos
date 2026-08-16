@@ -1,20 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const backgroundStorageMocks = vi.hoisted(() => ({
-  getConversationById: vi.fn(),
-  getMessagesByConversationId: vi.fn(),
-  getArticleCommentsByConversationId: vi.fn(),
+const storageMocks = vi.hoisted(() => ({
+  getConversationByReference: vi.fn(),
+  getMessagesByConversation: vi.fn(),
+  getArticleCommentsByConversation: vi.fn(),
   attachOrphanArticleCommentsToConversation: vi.fn(),
 }));
 
-vi.mock('@services/conversations/background/storage', () => ({
-  backgroundStorage: {
-    getConversationById: backgroundStorageMocks.getConversationById,
-    getMessagesByConversationId: backgroundStorageMocks.getMessagesByConversationId,
-    getArticleCommentsByConversationId: backgroundStorageMocks.getArticleCommentsByConversationId,
-    attachOrphanArticleCommentsToConversation: backgroundStorageMocks.attachOrphanArticleCommentsToConversation,
-  },
-}));
+function providerStorage() {
+  return {
+    resolveConversation: vi.fn(async (reference: any) => ({
+      ...reference,
+      conversationId: Number(reference.conversationId),
+    })),
+    getConversationByReference: storageMocks.getConversationByReference,
+    getMessagesByConversation: storageMocks.getMessagesByConversation,
+    getSyncMappingByConversation: vi.fn(async () => null),
+    patchSyncMapping: vi.fn(async () => true),
+    setConversationNotionPageId: vi.fn(async () => true),
+    setSyncCursor: vi.fn(async () => true),
+    clearSyncCursor: vi.fn(async () => true),
+    getArticleCommentsByConversation: storageMocks.getArticleCommentsByConversation,
+    attachOrphanArticleCommentsToConversation: storageMocks.attachOrphanArticleCommentsToConversation,
+    getImageAsset: vi.fn(async () => null),
+  };
+}
 
 async function load(rel: string) {
   const mod = await import(/* @vite-ignore */ rel);
@@ -55,7 +65,7 @@ describe('obsidian article sync replaces sections without duplicating headings',
     await load('@services/sync/obsidian/obsidian-markdown-writer.ts');
     const orch = await load('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
 
-    backgroundStorageMocks.getConversationById.mockResolvedValue({
+    storageMocks.getConversationByReference.mockResolvedValue({
       id: 1,
       sourceType: 'article',
       source: 'web',
@@ -63,10 +73,10 @@ describe('obsidian article sync replaces sections without duplicating headings',
       title: 't',
       url: 'https://example.com',
     });
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+    storageMocks.getMessagesByConversation.mockResolvedValue([
       { messageKey: 'article_body', sequence: 1, role: 'assistant', contentMarkdown: 'New body', updatedAt: 1 },
     ]);
-    backgroundStorageMocks.getArticleCommentsByConversationId.mockResolvedValue([
+    storageMocks.getArticleCommentsByConversation.mockResolvedValue([
       {
         id: 1,
         parentId: null,
@@ -195,7 +205,11 @@ describe('obsidian article sync replaces sections without duplicating headings',
       });
     };
 
-    const res = await orch.syncConversations({ conversationIds: [1], instanceId: 'x' });
+    const res = await orch.syncConversations({
+      conversations: [{ source: 'web', conversationKey: 'k1', conversationId: 1 }],
+      instanceId: 'x',
+      storage: providerStorage(),
+    });
     expect(res.okCount).toBe(1);
     expect(res.results[0].ok).toBe(true);
     expect(lastPutBody).toContain('## Comments');
@@ -210,10 +224,10 @@ describe('obsidian article sync replaces sections without duplicating headings',
 });
 
 afterEach(() => {
-  backgroundStorageMocks.getConversationById.mockReset();
-  backgroundStorageMocks.getMessagesByConversationId.mockReset();
-  backgroundStorageMocks.getArticleCommentsByConversationId.mockReset();
-  backgroundStorageMocks.attachOrphanArticleCommentsToConversation.mockReset();
+  storageMocks.getConversationByReference.mockReset();
+  storageMocks.getMessagesByConversation.mockReset();
+  storageMocks.getArticleCommentsByConversation.mockReset();
+  storageMocks.attachOrphanArticleCommentsToConversation.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.fetch;
   // @ts-expect-error test cleanup
