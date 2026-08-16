@@ -23,11 +23,9 @@ import {
   getConversationListBootstrap,
   getConversationListPage,
   getConversationDetail,
-  mergeConversations,
-  upsertConversation,
+  updateArticleUrl,
 } from '@services/conversations/client/repo';
 import { backfillConversationImages } from '@services/conversations/client/repo';
-import { migrateArticleCommentCanonicalUrl } from '@services/comments/client/repo';
 import type { DetailHeaderAction } from '@services/integrations/detail-header-actions';
 import { resolveDetailHeaderActions } from '@services/integrations/detail-header-actions';
 import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contracts';
@@ -837,91 +835,58 @@ export function ConversationsProvider({
 
   const updateSelectedConversationUrl = useCallback(
     async (nextUrl: string) => {
-      const convo = selectedConversation;
-      if (!convo) throw new Error('No conversation selected');
-
-      const nextCanonical = canonicalizeHttpUrl(nextUrl);
-      if (!nextCanonical) throw new Error('URL must be an http(s) page');
-
-      const currentCanonical = canonicalizeHttpUrl((convo as any)?.url);
-      const sourceType = String((convo as any)?.sourceType || '')
+      const conversation = selectedConversation;
+      if (!conversation) throw new Error('No conversation selected');
+      const sourceType = String(conversation.sourceType || '')
         .trim()
         .toLowerCase();
-      const isArticle = sourceType === 'article';
+      if (sourceType !== 'article') throw new Error('Only article URLs can be edited');
 
-      if (isArticle) {
-        const conflict = (Array.isArray(items) ? items : []).find((item) => {
-          if (!item) return false;
-          const id = Number((item as any).id);
-          if (!Number.isFinite(id) || id <= 0) return false;
-          if (id === Number((convo as any).id)) return false;
-          const itemSourceType = String((item as any).sourceType || '')
+      const fromCanonicalUrl = canonicalizeHttpUrl(conversation.url);
+      const toCanonicalUrl = canonicalizeHttpUrl(nextUrl);
+      if (!fromCanonicalUrl || !toCanonicalUrl) throw new Error('URL must be an http(s) page');
+      if (fromCanonicalUrl === toCanonicalUrl) return;
+
+      const conversationReference = toConversationFactsReference(conversation);
+      if (!conversationReference) throw new Error('stale conversation reference');
+      const conflict = (Array.isArray(items) ? items : []).find((item) => {
+        if (
+          !item ||
+          String(item.sourceType || '')
             .trim()
-            .toLowerCase();
-          if (itemSourceType !== 'article') return false;
-          const itemCanonical = canonicalizeHttpUrl((item as any).url);
-          if (!itemCanonical) return false;
-          return itemCanonical === nextCanonical;
-        });
+            .toLowerCase() !== 'article'
+        )
+          return false;
+        if (
+          String(item.source || '').trim() === conversationReference.source &&
+          String(item.conversationKey || '').trim() === conversationReference.conversationKey
+        ) {
+          return false;
+        }
+        return canonicalizeHttpUrl(item.url) === toCanonicalUrl;
+      });
 
-        if (conflict) {
-          const confirmed =
-            typeof globalThis.window?.confirm === 'function'
-              ? globalThis.window.confirm(
-                  '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
-                )
-              : true;
-          if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
+      let confirmedConflict: ConversationFactsReference | undefined;
+      if (conflict) {
+        const confirmed =
+          typeof globalThis.window?.confirm === 'function'
+            ? globalThis.window.confirm(
+                '这个 URL 已存在于另一条文章记录中。继续将会合并评论并去重合并文章记录，是否继续？',
+              )
+            : true;
+        if (!confirmed) throw new Error(URL_EDIT_CANCELLED_ERROR);
+        confirmedConflict = toConversationFactsReference(conflict) ?? undefined;
+        if (!confirmedConflict || confirmedConflict.factsEpoch !== conversationReference.factsEpoch) {
+          throw new Error('stale conversation reference');
         }
       }
 
-      const payload: any = {
-        source: (convo as any)?.source,
-        conversationKey: (convo as any)?.conversationKey,
-        sourceType: (convo as any)?.sourceType || (isArticle ? 'article' : 'chat'),
-        url: nextCanonical,
-        lastCapturedAt: (convo as any)?.lastCapturedAt,
-      };
-      const reference = toConversationFactsReference(convo);
-      if (!reference) throw new Error('stale conversation reference');
-      await upsertConversation({ payload, reference });
-
-      if (isArticle && currentCanonical && currentCanonical !== nextCanonical) {
-        await migrateArticleCommentCanonicalUrl({
-          context: {
-            canonicalUrl: nextCanonical,
-            factsEpoch: reference.factsEpoch,
-            conversation: { source: reference.source, conversationKey: reference.conversationKey },
-          },
-          fromCanonicalUrl: currentCanonical,
-          toCanonicalUrl: nextCanonical,
-        });
-      }
-
-      if (isArticle) {
-        const conflict = (Array.isArray(items) ? items : []).find((item) => {
-          if (!item) return false;
-          const id = Number((item as any).id);
-          if (!Number.isFinite(id) || id <= 0) return false;
-          if (id === Number((convo as any).id)) return false;
-          const itemSourceType = String((item as any).sourceType || '')
-            .trim()
-            .toLowerCase();
-          if (itemSourceType !== 'article') return false;
-          const itemCanonical = canonicalizeHttpUrl((item as any).url);
-          if (!itemCanonical) return false;
-          return itemCanonical === nextCanonical;
-        });
-
-        if (conflict) {
-          const conflictReference = toConversationFactsReference(conflict);
-          if (!conflictReference) throw new Error('stale conversation reference');
-          await mergeConversations({
-            keep: reference,
-            remove: conflictReference,
-          });
-        }
-      }
+      await updateArticleUrl({
+        conversation: conversationReference,
+        ...(confirmedConflict ? { confirmedConflict } : {}),
+        fromCanonicalUrl,
+        toCanonicalUrl,
+      });
     },
     [items, selectedConversation],
   );

@@ -8,6 +8,7 @@ import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 const localStorageMocks = vi.hoisted(() => ({ storageGet: vi.fn() }));
 const imageInlineMocks = vi.hoisted(() => ({ inlineChatImagesInMessages: vi.fn() }));
 const backfillJobMocks = vi.hoisted(() => ({ backfillConversationImages: vi.fn() }));
+const articleUrlMocks = vi.hoisted(() => ({ update: vi.fn() }));
 
 vi.mock('@platform/storage/local', () => ({ storageGet: localStorageMocks.storageGet }));
 vi.mock('@services/conversations/data/image-inline', () => ({
@@ -15,6 +16,9 @@ vi.mock('@services/conversations/data/image-inline', () => ({
 }));
 vi.mock('@services/conversations/background/image-backfill-job', () => ({
   backfillConversationImages: backfillJobMocks.backfillConversationImages,
+}));
+vi.mock('@services/conversations/data/article-url-operation', () => ({
+  createArticleUrlOperation: () => ({ update: articleUrlMocks.update }),
 }));
 
 const conversation = {
@@ -25,12 +29,33 @@ const conversation = {
   title: 'Thread',
 };
 
+const articleConversation = {
+  id: 201,
+  source: 'web',
+  conversationKey: 'article:https://example.com/from',
+  sourceType: 'article',
+  title: 'Article',
+  url: 'https://example.com/from',
+};
+
+const articleConflict = {
+  id: 202,
+  source: 'web',
+  conversationKey: 'article:https://example.com/to',
+  sourceType: 'article',
+  title: 'Target',
+  url: 'https://example.com/to',
+};
+
 function createRepository() {
   return {
     getConversationByReference: vi.fn(async ({ source, conversationKey }: any) => {
-      if (source !== conversation.source) return null;
-      if (conversationKey === conversation.conversationKey) return conversation;
-      if (conversationKey === 'thread-124') return { ...conversation, id: 124, conversationKey };
+      if (source === conversation.source && conversationKey === conversation.conversationKey) return conversation;
+      if (source === articleConversation.source && conversationKey === articleConversation.conversationKey) {
+        return articleConversation;
+      }
+      if (source === articleConflict.source && conversationKey === articleConflict.conversationKey)
+        return articleConflict;
       return null;
     }),
     syncConversationMessages: vi.fn(async () => ({ upserted: 1, deleted: 0 })),
@@ -39,13 +64,6 @@ function createRepository() {
       deletedMessages: 0,
       deletedMappings: 0,
       deletedImageCache: 0,
-    })),
-    mergeConversations: vi.fn(async () => ({
-      keptConversationId: 123,
-      removedConversationId: 124,
-      movedMessages: 0,
-      movedImageCache: 0,
-      merged: true,
     })),
     upsertConversation: vi.fn(async () => conversation),
   };
@@ -93,6 +111,15 @@ beforeEach(() => {
     updatedMessageKeys: [],
     warningFlags: [],
   }));
+  articleUrlMocks.update.mockResolvedValue({
+    commentsUpdated: 0,
+    conversation: {
+      source: articleConversation.source,
+      conversationKey: articleConflict.conversationKey,
+      conversationId: articleConversation.id,
+    },
+    merged: false,
+  });
   backfillJobMocks.backfillConversationImages.mockResolvedValue({
     scannedMessages: 0,
     updatedMessages: 0,
@@ -108,54 +135,64 @@ afterEach(() => {
   vi.restoreAllMocks();
   localStorageMocks.storageGet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
+  articleUrlMocks.update.mockReset();
   backfillJobMocks.backfillConversationImages.mockReset();
 });
 
 describe('background-router conversations events', () => {
-  it('resolves the stable capture identity before sync and broadcasts only after auto-sync is durable', async () => {
+  it('queues the updated stable article before broadcasting the compound URL commit', async () => {
     const repository = createRepository();
     const events: string[] = [];
-    const router = createRouter(repository, async () => {
-      events.push('queue');
+    const router = createRouter(repository, async (reference, reason) => {
+      events.push(`queue:${reference.source}:${reference.conversationKey}:${reason}`);
     });
     router.eventsHub.broadcast = () => events.push('broadcast');
 
     const res = await router.__handleMessageForTests({
-      type: 'syncConversationMessages',
-      source: conversation.source,
-      conversationKey: conversation.conversationKey,
-      messages: [{ messageKey: 'm-1', role: 'user', contentText: 'hello' }],
+      type: 'updateArticleUrl',
+      factsEpoch: 'idb-v1',
+      conversation: { source: articleConversation.source, conversationKey: articleConversation.conversationKey },
+      fromCanonicalUrl: articleConversation.url,
+      toCanonicalUrl: articleConflict.url,
     });
 
     expect(res.ok).toBe(true);
     expect(repository.getConversationByReference).toHaveBeenCalledWith({
-      source: conversation.source,
-      conversationKey: conversation.conversationKey,
+      source: articleConversation.source,
+      conversationKey: articleConversation.conversationKey,
     });
-    expect(repository.syncConversationMessages).toHaveBeenCalledWith(
-      { source: conversation.source, conversationKey: conversation.conversationKey, conversationId: 123 },
-      [expect.objectContaining({ messageKey: 'm-1', authorName: 'You' })],
-      { mode: 'snapshot', diff: null },
-    );
-    expect(events).toEqual(['queue', 'broadcast']);
+    expect(articleUrlMocks.update).toHaveBeenCalledWith({
+      conversation: {
+        source: articleConversation.source,
+        conversationKey: articleConversation.conversationKey,
+        conversationId: articleConversation.id,
+      },
+      fromCanonicalUrl: articleConversation.url,
+      toCanonicalUrl: articleConflict.url,
+    });
+    expect(events).toEqual([
+      `queue:${articleConversation.source}:${articleConflict.conversationKey}:upsertConversation`,
+      'broadcast',
+    ]);
   });
 
-  it('rejects an invalid sync mode before touching image or facts storage', async () => {
+  it('does not queue or broadcast when the compound article URL operation rejects a stale conflict', async () => {
     const repository = createRepository();
-    const router = createRouter(repository);
+    articleUrlMocks.update.mockRejectedValueOnce(new LocalDataContractError('STALE_REFERENCE'));
+    const events: string[] = [];
+    const router = createRouter(repository, async () => events.push('queue'));
+    router.eventsHub.broadcast = () => events.push('broadcast');
 
     const res = await router.__handleMessageForTests({
-      type: 'syncConversationMessages',
-      source: conversation.source,
-      conversationKey: conversation.conversationKey,
-      mode: 'snapshop',
-      messages: [],
+      type: 'updateArticleUrl',
+      factsEpoch: 'idb-v1',
+      conversation: { source: articleConversation.source, conversationKey: articleConversation.conversationKey },
+      fromCanonicalUrl: articleConversation.url,
+      toCanonicalUrl: articleConflict.url,
     });
 
-    expect(res).toMatchObject({ ok: false, error: { extra: { code: 'INVALID_ARGUMENT' } } });
-    expect(repository.getConversationByReference).not.toHaveBeenCalled();
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
-    expect(repository.syncConversationMessages).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ ok: false, error: { extra: { code: 'STALE_REFERENCE' } } });
+    expect(events).toEqual([]);
   });
 
   it('uses stable references for delete and broadcasts the re-resolved local hint', async () => {
@@ -177,35 +214,69 @@ describe('background-router conversations events', () => {
     expect(broadcast).toHaveBeenCalledWith('conversationsChanged', { reason: 'delete', conversationIds: [123] });
   });
 
-  it('queues the retained conversation before broadcasting a completed merge', async () => {
+  it('passes the confirmed stable conflict into the compound operation and broadcasts the retained target hint', async () => {
     const repository = createRepository();
+    articleUrlMocks.update.mockResolvedValueOnce({
+      commentsUpdated: 2,
+      conversation: {
+        source: articleConflict.source,
+        conversationKey: articleConflict.conversationKey,
+        conversationId: articleConflict.id,
+      },
+      merged: true,
+      removedConversationId: articleConversation.id,
+    });
     const events: string[] = [];
     const router = createRouter(repository, async (reference, reason) => {
       events.push(`queue:${reference.source}:${reference.conversationKey}:${reason}`);
     });
-    router.eventsHub.broadcast = () => events.push('broadcast');
+    const broadcast = vi.fn(() => events.push('broadcast'));
+    router.eventsHub.broadcast = broadcast;
 
     const res = await router.__handleMessageForTests({
-      type: 'mergeConversations',
+      type: 'updateArticleUrl',
       factsEpoch: 'idb-v1',
-      keep: { source: conversation.source, conversationKey: conversation.conversationKey },
-      remove: { source: conversation.source, conversationKey: 'thread-124' },
+      conversation: { source: articleConversation.source, conversationKey: articleConversation.conversationKey },
+      confirmedConflict: { source: articleConflict.source, conversationKey: articleConflict.conversationKey },
+      fromCanonicalUrl: articleConversation.url,
+      toCanonicalUrl: articleConflict.url,
     });
 
     expect(res.ok).toBe(true);
+    expect(articleUrlMocks.update).toHaveBeenCalledWith({
+      conversation: {
+        source: articleConversation.source,
+        conversationKey: articleConversation.conversationKey,
+        conversationId: articleConversation.id,
+      },
+      confirmedConflict: {
+        source: articleConflict.source,
+        conversationKey: articleConflict.conversationKey,
+        conversationId: articleConflict.id,
+      },
+      fromCanonicalUrl: articleConversation.url,
+      toCanonicalUrl: articleConflict.url,
+    });
     expect(events).toEqual([
-      `queue:${conversation.source}:${conversation.conversationKey}:upsertConversation`,
+      `queue:${articleConflict.source}:${articleConflict.conversationKey}:upsertConversation`,
       'broadcast',
     ]);
+    expect(broadcast).toHaveBeenCalledWith('conversationsChanged', {
+      reason: 'articleUrlUpdated',
+      conversationId: articleConflict.id,
+      removedConversationId: articleConversation.id,
+    });
   });
 
-  it('does not enqueue or broadcast a no-op merge', async () => {
+  it('does not enqueue or broadcast a canonical no-op URL update', async () => {
     const repository = createRepository();
-    repository.mergeConversations.mockResolvedValue({
-      keptConversationId: 123,
-      removedConversationId: 123,
-      movedMessages: 0,
-      movedImageCache: 0,
+    articleUrlMocks.update.mockResolvedValueOnce({
+      commentsUpdated: 0,
+      conversation: {
+        source: articleConversation.source,
+        conversationKey: articleConversation.conversationKey,
+        conversationId: articleConversation.id,
+      },
       merged: false,
     });
     const events: string[] = [];
@@ -213,10 +284,11 @@ describe('background-router conversations events', () => {
     router.eventsHub.broadcast = () => events.push('broadcast');
 
     const res = await router.__handleMessageForTests({
-      type: 'mergeConversations',
+      type: 'updateArticleUrl',
       factsEpoch: 'idb-v1',
-      keep: { source: conversation.source, conversationKey: conversation.conversationKey },
-      remove: { source: conversation.source, conversationKey: conversation.conversationKey },
+      conversation: { source: articleConversation.source, conversationKey: articleConversation.conversationKey },
+      fromCanonicalUrl: articleConversation.url,
+      toCanonicalUrl: `${articleConversation.url}#fragment`,
     });
 
     expect(res.ok).toBe(true);

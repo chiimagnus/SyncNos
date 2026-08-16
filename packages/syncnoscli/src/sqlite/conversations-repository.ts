@@ -85,7 +85,7 @@ type SqliteConversationDeleteResult = Readonly<{
   deletedMessages: number;
 }>;
 
-type SqliteConversationReference = Readonly<{
+export type SqliteConversationReference = Readonly<{
   backendConversationId?: unknown;
   conversationKey?: unknown;
   source?: unknown;
@@ -104,6 +104,7 @@ export type SqliteArticleUrlUpdateResult = Readonly<{
   conversationSource: string;
   fromCanonicalUrl: string;
   merged: boolean;
+  removedConversationId?: number;
   toCanonicalUrl: string;
 }>;
 
@@ -620,43 +621,6 @@ export function mergeConversationsWithinTransaction(
   });
 }
 
-function mergeConversationsByIds(
-  database: SyncNosSqliteDatabase,
-  input: Readonly<{ keepConversationId: number; removeConversationId: number }>,
-): SqliteConversationMergeResult {
-  const keepConversationId = positiveId(input.keepConversationId);
-  const removeConversationId = positiveId(input.removeConversationId);
-  if (!keepConversationId || !removeConversationId) invalidArgument();
-  if (keepConversationId === removeConversationId)
-    return unmergedConversationResult(keepConversationId, removeConversationId);
-  return execute(() => {
-    if (!selectConversationRowById(database, keepConversationId)) invalidArgument();
-    if (!selectConversationRowById(database, removeConversationId)) {
-      return unmergedConversationResult(keepConversationId, removeConversationId);
-    }
-    return runFactsTransaction(database, () =>
-      mergeConversationsWithinTransaction(database, { keepConversationId, removeConversationId }),
-    ).result;
-  });
-}
-
-function mergeConversationsByReferences(
-  database: SyncNosSqliteDatabase,
-  input: Readonly<{ keep: SqliteConversationReference; remove: SqliteConversationReference }>,
-): SqliteConversationMergeResult {
-  return execute(
-    () =>
-      runFactsTransaction(database, () => {
-        const keep = resolveConversationRowByReference(database, input.keep);
-        const remove = resolveConversationRowByReference(database, input.remove);
-        return mergeConversationsWithinTransaction(database, {
-          keepConversationId: keep.id,
-          removeConversationId: remove.id,
-        });
-      }).result,
-  );
-}
-
 function syncConversationMessagesByReference(
   database: SyncNosSqliteDatabase,
   reference: SqliteConversationReference,
@@ -683,23 +647,20 @@ function syncConversationMessagesByReference(
 export function updateArticleConversationUrlWithinTransaction(
   database: SyncNosSqliteDatabase,
   input: Readonly<{
-    conversationKey: unknown;
+    confirmedConflict?: SqliteConversationReference;
+    conversation: SqliteConversationReference;
     fromCanonicalUrl: unknown;
-    source: unknown;
     toCanonicalUrl: unknown;
   }>,
 ): SqliteArticleUrlUpdateResult {
-  const source = safeString(input.source);
-  const conversationKey = safeString(input.conversationKey);
   const fromCanonicalUrl = canonicalizeArticleUrl(input.fromCanonicalUrl);
   const toCanonicalUrl = canonicalizeArticleUrl(input.toCanonicalUrl);
-  if (!source || !conversationKey || !fromCanonicalUrl || !toCanonicalUrl) invalidArgument();
+  if (!fromCanonicalUrl || !toCanonicalUrl) invalidArgument();
 
-  const current = selectConversationRowBySourceAndKey(database, source, conversationKey);
-  if (!current) staleReference();
+  const current = resolveConversationRowByReference(database, input.conversation);
   const currentCanonicalUrl = canonicalizeArticleUrl(current.url);
   if (
-    source.toLowerCase() !== 'web' ||
+    safeString(current.source).toLowerCase() !== 'web' ||
     safeString(current.source_type).toLowerCase() !== 'article' ||
     !currentCanonicalUrl ||
     currentCanonicalUrl !== fromCanonicalUrl
@@ -707,6 +668,7 @@ export function updateArticleConversationUrlWithinTransaction(
     staleReference();
   }
   if (fromCanonicalUrl === toCanonicalUrl) {
+    if (input.confirmedConflict) staleReference();
     return Object.freeze({
       conversationId: current.id,
       conversationKey: current.conversation_key,
@@ -720,6 +682,10 @@ export function updateArticleConversationUrlWithinTransaction(
   const targetConversationKey = `article:${toCanonicalUrl}`;
   const conflict = selectConversationRowBySourceAndKey(database, 'web', targetConversationKey);
   if (conflict && conflict.id !== current.id) {
+    if (!input.confirmedConflict) staleReference();
+    const confirmed = resolveConversationRowByReference(database, input.confirmedConflict);
+    if (confirmed.id !== conflict.id) staleReference();
+
     const merged = mergeConversationsWithinTransaction(database, {
       keepConversationId: conflict.id,
       removeConversationId: current.id,
@@ -745,10 +711,12 @@ export function updateArticleConversationUrlWithinTransaction(
       conversationSource: updated.source,
       fromCanonicalUrl,
       merged: true,
+      removedConversationId: current.id,
       toCanonicalUrl,
     });
   }
 
+  if (input.confirmedConflict) staleReference();
   const next = buildConversationRecord(
     {
       ...storedPayload(current.payload_json),
@@ -1139,11 +1107,6 @@ export function createConversationsRepository(database: SyncNosSqliteDatabase) {
       cursor: SqliteConversationListCursor,
       limit?: number | null,
     ) => execute(() => readConversationListPage(database, { queryInput, limit, cursor })),
-    mergeConversationsByIds: (input: Readonly<{ keepConversationId: number; removeConversationId: number }>) =>
-      mergeConversationsByIds(database, input),
-    mergeConversationsByReferences: (
-      input: Readonly<{ keep: SqliteConversationReference; remove: SqliteConversationReference }>,
-    ) => mergeConversationsByReferences(database, input),
     syncConversationMessagesByReference: (
       reference: SqliteConversationReference,
       messages: unknown,

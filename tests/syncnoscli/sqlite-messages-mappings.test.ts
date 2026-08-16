@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readFactsRevision } from '../../packages/syncnoscli/src/sqlite/revision';
+import { mergeConversationsWithinTransaction } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
+import { readFactsRevision, runFactsTransaction } from '../../packages/syncnoscli/src/sqlite/revision';
 
 import { createSqliteTestFixture } from './sqlite-test-fixture';
 
@@ -146,7 +147,7 @@ describe('SQLite messages repository', () => {
 
 describe('SQLite sync mappings repository', () => {
   it('keeps cursor anchors conservative across a conversation merge and moves messages in the same facts transaction', async () => {
-    const { conversations, handle, mappings, messages } = await fixture.open();
+    const { conversations, database, handle, mappings, messages } = await fixture.open();
     try {
       const keep = conversations.upsertConversation({
         sourceType: 'chat',
@@ -179,10 +180,12 @@ describe('SQLite sync mappings repository', () => {
         notionSectionCursors: { body: { lastSyncedMessageKey: 'm2', lastSyncedSequence: 2 } },
       });
 
-      const result = conversations.mergeConversationsByIds({
-        keepConversationId: keep.id,
-        removeConversationId: remove.id,
-      });
+      const result = runFactsTransaction(database, () =>
+        mergeConversationsWithinTransaction(database, {
+          keepConversationId: keep.id,
+          removeConversationId: remove.id,
+        }),
+      ).result;
       expect(result).toMatchObject({ merged: true, movedMessages: 1 });
       expect(messages.getMessagesByConversationId(keep.id).map((message) => message.messageKey)).toEqual(['move']);
       const mapping = mappings.getSyncMappingByConversation(keep.id)?.mapping as Record<string, unknown>;

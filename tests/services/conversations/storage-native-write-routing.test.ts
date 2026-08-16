@@ -55,18 +55,8 @@ describe('native conversation mutation repository', () => {
     const connectNative = vi.fn(async ({ command, payload }: any) => {
       calls.push({ command, payload });
       switch (command) {
-        case 'UPSERT_CONVERSATION':
-          return conversation;
         case 'DELETE_CONVERSATIONS':
           return { deletedConversations: 1, deletedMessages: 2, deletedMappings: 1, deletedImageCache: 3 };
-        case 'MERGE_CONVERSATIONS':
-          return {
-            keptConversationId: 8,
-            removedConversationId: 9,
-            movedMessages: 2,
-            movedImageCache: 1,
-            merged: true,
-          };
         case 'SYNC_CONVERSATION_MESSAGES':
           return { upserted: 1, deleted: 0 };
         case 'GET_SYNC_MAPPING':
@@ -92,13 +82,8 @@ describe('native conversation mutation repository', () => {
       const repository = createNativeConversationReadRepository(lease, {
         connectNative,
       }) as ConversationFactsRepository;
-      const payload = { source: conversation.source, conversationKey: conversation.conversationKey, title: 'Updated' };
-      await repository.upsertConversation(payload);
+      expect(repository.upsertConversation).toBeUndefined();
       await repository.deleteConversations([resolvedReference]);
-      await repository.mergeConversations({
-        keep: resolvedReference,
-        remove: { ...resolvedReference, conversationId: 9 },
-      });
       await repository.syncConversationMessages(
         resolvedReference,
         [{ messageKey: 'm-1', role: 'user', contentText: 'hello' }],
@@ -114,9 +99,7 @@ describe('native conversation mutation repository', () => {
     });
 
     expect(calls.map((call) => call.command)).toEqual([
-      'UPSERT_CONVERSATION',
       'DELETE_CONVERSATIONS',
-      'MERGE_CONVERSATIONS',
       'SYNC_CONVERSATION_MESSAGES',
       'GET_SYNC_MAPPING',
       'PATCH_SYNC_MAPPING',
@@ -125,11 +108,6 @@ describe('native conversation mutation repository', () => {
       'CLEAR_SYNC_MAPPING',
     ]);
     expect(calls[0].payload).toEqual({
-      source: conversation.source,
-      conversationKey: conversation.conversationKey,
-      title: 'Updated',
-    });
-    expect(calls[1].payload).toEqual({
       conversations: [
         {
           source: conversation.source,
@@ -138,11 +116,7 @@ describe('native conversation mutation repository', () => {
         },
       ],
     });
-    expect(calls[2].payload).toEqual({
-      source: { source: conversation.source, conversationKey: conversation.conversationKey, backendConversationId: 9 },
-      target: { source: conversation.source, conversationKey: conversation.conversationKey, backendConversationId: 8 },
-    });
-    expect(calls[3].payload).toMatchObject({
+    expect(calls[1].payload).toMatchObject({
       conversation: {
         source: conversation.source,
         conversationKey: conversation.conversationKey,
@@ -150,7 +124,7 @@ describe('native conversation mutation repository', () => {
       },
       transfer: { operation: 'capture-snapshot' },
     });
-    expect(calls[3].payload.transfer.declaredTotalBytes).toBe(serializedJsonUtf8ByteLength(calls[3].payload.messages));
+    expect(calls[1].payload.transfer.declaredTotalBytes).toBe(serializedJsonUtf8ByteLength(calls[1].payload.messages));
     for (const call of calls) expect(JSON.stringify(call.payload)).not.toContain('factsEpoch');
   });
 });
@@ -166,13 +140,6 @@ describe('conversation mutation handlers', () => {
         deletedMessages: 0,
         deletedMappings: 0,
         deletedImageCache: 0,
-      })),
-      mergeConversations: vi.fn(async () => ({
-        keptConversationId: 8,
-        removedConversationId: 9,
-        movedMessages: 0,
-        movedImageCache: 0,
-        merged: true,
       })),
     };
   }
@@ -194,7 +161,7 @@ describe('conversation mutation handlers', () => {
     return router;
   }
 
-  it('rejects stale epoch delete, merge, and backfill before any identity or facts side effect', async () => {
+  it('rejects stale epoch delete and backfill before any identity or facts side effect', async () => {
     const repository = createRepository();
     const router = createRouter(repository);
     const broadcast = vi.fn();
@@ -205,12 +172,6 @@ describe('conversation mutation handlers', () => {
         type: 'deleteConversations',
         factsEpoch: 'idb-v1',
         conversations: [{ source: conversation.source, conversationKey: conversation.conversationKey }],
-      },
-      {
-        type: 'mergeConversations',
-        factsEpoch: 'idb-v1',
-        keep: { source: conversation.source, conversationKey: conversation.conversationKey },
-        remove: { source: conversation.source, conversationKey: conversation.conversationKey },
       },
       {
         type: 'backfillConversationImages',
@@ -227,7 +188,6 @@ describe('conversation mutation handlers', () => {
 
     expect(repository.getConversationByReference).not.toHaveBeenCalled();
     expect(repository.deleteConversations).not.toHaveBeenCalled();
-    expect(repository.mergeConversations).not.toHaveBeenCalled();
     expect(backfillMocks.backfillConversationImages).not.toHaveBeenCalled();
     expect(broadcast).not.toHaveBeenCalled();
   });

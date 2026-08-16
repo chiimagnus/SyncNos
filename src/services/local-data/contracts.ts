@@ -846,11 +846,6 @@ export type DeleteConversationsRequestPayload<TReference extends StableConversat
   conversations: readonly TReference[];
 }>;
 
-export type MergeConversationsRequestPayload<TReference extends StableConversationReference> = Readonly<{
-  source: TReference;
-  target: TReference;
-}>;
-
 export type MappingRequestPayload<TReference extends StableConversationReference> = Readonly<{
   conversation: TReference;
   provider: string;
@@ -877,7 +872,8 @@ export type SetConversationNotionPageIdRequestPayload<TReference extends StableC
 }>;
 
 export type UpdateArticleUrlRequestPayload<TReference extends StableConversationReference> = Readonly<{
-  conversation?: TReference;
+  conversation: TReference;
+  confirmedConflict?: TReference;
   fromCanonicalUrl: string;
   toCanonicalUrl: string;
 }>;
@@ -923,8 +919,11 @@ export type HostDeleteArticleCommentRequestPayload = Readonly<{
   context: HostCommentContext;
 }>;
 
-export type MigrateArticleCommentUrlRequestPayload<TReference extends StableConversationReference> =
-  UpdateArticleUrlRequestPayload<TReference>;
+export type MigrateArticleCommentUrlRequestPayload<TReference extends StableConversationReference> = Readonly<{
+  conversation: TReference;
+  fromCanonicalUrl: string;
+  toCanonicalUrl: string;
+}>;
 
 export type EnsureArticleCommentContextRequestPayload<TContext extends BrowserCommentContext | HostCommentContext> =
   Readonly<{
@@ -1018,8 +1017,6 @@ export const BROWSER_RUNTIME_FACTS_COMMANDS = Object.freeze([
   'SAVE_CONVERSATION_SNAPSHOT',
   'DELETE_CONVERSATION',
   'DELETE_CONVERSATIONS',
-  'MERGE_CONVERSATIONS',
-  'SYNC_CONVERSATION_MESSAGES',
   'GET_SYNC_MAPPING',
   'PATCH_SYNC_MAPPING',
   'SET_SYNC_CURSOR',
@@ -1059,8 +1056,6 @@ export type BrowserRuntimeFactsPayloadByCommand = {
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
   DELETE_CONVERSATION: BrowserConversationReference;
   DELETE_CONVERSATIONS: DeleteConversationsRequestPayload<BrowserConversationReference>;
-  MERGE_CONVERSATIONS: MergeConversationsRequestPayload<BrowserConversationReference>;
-  SYNC_CONVERSATION_MESSAGES: SyncMessagesRequestPayload<BrowserConversationReference>;
   GET_SYNC_MAPPING: MappingRequestPayload<BrowserConversationReference>;
   PATCH_SYNC_MAPPING: PatchMappingRequestPayload<BrowserConversationReference>;
   SET_SYNC_CURSOR: SetSyncCursorRequestPayload<BrowserConversationReference>;
@@ -1094,10 +1089,8 @@ export const HOST_FACTS_COMMANDS = Object.freeze([
   'CONVERSATION_DETAIL',
   'CONVERSATION_TAIL',
   'SAVE_CONVERSATION_SNAPSHOT',
-  'UPSERT_CONVERSATION',
   'DELETE_CONVERSATION',
   'DELETE_CONVERSATIONS',
-  'MERGE_CONVERSATIONS',
   'SYNC_CONVERSATION_MESSAGES',
   'GET_SYNC_MAPPING',
   'PATCH_SYNC_MAPPING',
@@ -1153,10 +1146,8 @@ export type HostFactsPayloadByCommand = {
   CONVERSATION_DETAIL: HostConversationReference;
   CONVERSATION_TAIL: ConversationTailRequestPayload<HostConversationReference>;
   SAVE_CONVERSATION_SNAPSHOT: CaptureSnapshotRequestPayload;
-  UPSERT_CONVERSATION: JsonObject;
   DELETE_CONVERSATION: HostConversationReference;
   DELETE_CONVERSATIONS: DeleteConversationsRequestPayload<HostConversationReference>;
-  MERGE_CONVERSATIONS: MergeConversationsRequestPayload<HostConversationReference>;
   SYNC_CONVERSATION_MESSAGES: SyncMessagesRequestPayload<HostConversationReference>;
   GET_SYNC_MAPPING: MappingRequestPayload<HostConversationReference>;
   PATCH_SYNC_MAPPING: PatchMappingRequestPayload<HostConversationReference>;
@@ -1533,15 +1524,6 @@ function parseConversationReferencesPayload<TReference extends StableConversatio
   return { conversations: input.conversations.map(parseReference) };
 }
 
-function parseMergeConversationsPayload<TReference extends StableConversationReference>(
-  value: unknown,
-  parseReference: (input: unknown) => TReference,
-): MergeConversationsRequestPayload<TReference> {
-  const input = record(value);
-  exactKeys(input, ['source', 'target']);
-  return { source: parseReference(input.source), target: parseReference(input.target) };
-}
-
 function parseMappingPayload<TReference extends StableConversationReference>(
   value: unknown,
   parseReference: (input: unknown) => TReference,
@@ -1610,12 +1592,25 @@ function parseUpdateArticleUrlPayload<TReference extends StableConversationRefer
   parseReference: (input: unknown) => TReference,
 ): UpdateArticleUrlRequestPayload<TReference> {
   const input = record(value);
-  allowedKeys(input, ['fromCanonicalUrl', 'toCanonicalUrl', 'conversation']);
-  const conversation = hasOwn(input, 'conversation') ? parseReference(input.conversation) : undefined;
+  allowedKeys(input, ['fromCanonicalUrl', 'toCanonicalUrl', 'conversation', 'confirmedConflict']);
   return {
+    conversation: parseReference(input.conversation),
     fromCanonicalUrl: parseText(input.fromCanonicalUrl),
     toCanonicalUrl: parseText(input.toCanonicalUrl),
-    ...(conversation ? { conversation } : {}),
+    ...(hasOwn(input, 'confirmedConflict') ? { confirmedConflict: parseReference(input.confirmedConflict) } : {}),
+  };
+}
+
+function parseMigrateArticleCommentUrlPayload<TReference extends StableConversationReference>(
+  value: unknown,
+  parseReference: (input: unknown) => TReference,
+): MigrateArticleCommentUrlRequestPayload<TReference> {
+  const input = record(value);
+  exactKeys(input, ['conversation', 'fromCanonicalUrl', 'toCanonicalUrl']);
+  return {
+    conversation: parseReference(input.conversation),
+    fromCanonicalUrl: parseText(input.fromCanonicalUrl),
+    toCanonicalUrl: parseText(input.toCanonicalUrl),
   };
 }
 
@@ -1879,16 +1874,6 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
       ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'SAVE_CONVERSATION_SNAPSHOT':
       return parseRuntimeCaptureSnapshotPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
-    case 'MERGE_CONVERSATIONS':
-      return parseMergeConversationsPayload(
-        value,
-        parseBrowserConversationReference,
-      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
-    case 'SYNC_CONVERSATION_MESSAGES':
-      return parseSyncMessagesPayload(
-        value,
-        parseBrowserConversationReference,
-      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'GET_SYNC_MAPPING':
     case 'CLEAR_SYNC_MAPPING':
       return parseMappingPayload(
@@ -1913,8 +1898,12 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
         parseBrowserConversationReference,
       ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'UPDATE_ARTICLE_URL':
-    case 'MIGRATE_ARTICLE_COMMENT_URL':
       return parseUpdateArticleUrlPayload(
+        value,
+        parseBrowserConversationReference,
+      ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+    case 'MIGRATE_ARTICLE_COMMENT_URL':
+      return parseMigrateArticleCommentUrlPayload(
         value,
         parseBrowserConversationReference,
       ) as BrowserRuntimeFactsPayloadByCommand[TCommand];
@@ -1986,17 +1975,6 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
       return parseConversationTailPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];
     case 'SAVE_CONVERSATION_SNAPSHOT':
       return parseHostCaptureSnapshotPayload(value) as HostFactsPayloadByCommand[TCommand];
-    case 'UPSERT_CONVERSATION': {
-      const payload = parseJsonObject(value);
-      parseText(payload.source);
-      parseText(payload.conversationKey);
-      return payload as HostFactsPayloadByCommand[TCommand];
-    }
-    case 'MERGE_CONVERSATIONS':
-      return parseMergeConversationsPayload(
-        value,
-        parseHostConversationReference,
-      ) as HostFactsPayloadByCommand[TCommand];
     case 'SYNC_CONVERSATION_MESSAGES':
       return parseSyncMessagesPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];
     case 'GET_SYNC_MAPPING':
@@ -2012,8 +1990,12 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
         parseHostConversationReference,
       ) as HostFactsPayloadByCommand[TCommand];
     case 'UPDATE_ARTICLE_URL':
-    case 'MIGRATE_ARTICLE_COMMENT_URL':
       return parseUpdateArticleUrlPayload(value, parseHostConversationReference) as HostFactsPayloadByCommand[TCommand];
+    case 'MIGRATE_ARTICLE_COMMENT_URL':
+      return parseMigrateArticleCommentUrlPayload(
+        value,
+        parseHostConversationReference,
+      ) as HostFactsPayloadByCommand[TCommand];
     case 'LIST_ARTICLE_COMMENTS':
       return parseListArticleCommentsPayload(value, parseHostCommentContext) as HostFactsPayloadByCommand[TCommand];
     case 'ADD_ARTICLE_COMMENT':
@@ -2083,14 +2065,12 @@ function browserPayloadCarriesNumericFactId(command: BrowserRuntimeFactsCommand,
     case 'BACKFILL_CONVERSATION_IMAGES':
       return referenceHasId(input);
     case 'CONVERSATION_TAIL':
-    case 'SYNC_CONVERSATION_MESSAGES':
     case 'GET_SYNC_MAPPING':
     case 'PATCH_SYNC_MAPPING':
     case 'CLEAR_SYNC_MAPPING':
       return referenceHasId(input.conversation);
-    case 'MERGE_CONVERSATIONS':
-      return referenceHasId(input.source) || referenceHasId(input.target);
     case 'UPDATE_ARTICLE_URL':
+      return referenceHasId(input.conversation) || referenceHasId(input.confirmedConflict);
     case 'MIGRATE_ARTICLE_COMMENT_URL':
       return referenceHasId(input.conversation);
     case 'LIST_ARTICLE_COMMENTS':

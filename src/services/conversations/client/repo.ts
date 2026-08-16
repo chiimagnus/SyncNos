@@ -535,51 +535,59 @@ export async function deleteConversations(references: readonly ConversationFacts
   return unwrap(res);
 }
 
-export async function upsertConversation(
-  input: Readonly<{ payload: Partial<Conversation>; reference: ConversationFactsReference }>,
-): Promise<Conversation & { __isNew?: boolean }> {
-  const reference = mutationReference(input.reference);
-  const payloadReference = {
-    source: text(input.payload?.source, true),
-    conversationKey: text(input.payload?.conversationKey, true),
-  };
-  if (payloadReference.source !== reference.source || payloadReference.conversationKey !== reference.conversationKey) {
-    protocolFailure();
-  }
-  const res = await send<ApiResponse<Conversation & { __isNew?: boolean }>>(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
-    factsEpoch: reference.factsEpoch,
-    reference: { source: reference.source, conversationKey: reference.conversationKey },
-    payload: input.payload as any,
-  });
-  return unwrap(res);
-}
-
-export async function mergeConversations(input: {
-  keep: ConversationFactsReference;
-  remove: ConversationFactsReference;
-}): Promise<{
-  keptConversationId: number;
-  removedConversationId: number;
-  movedMessages: number;
-  movedImageCache: number;
+export type UpdateArticleUrlResult = Readonly<{
+  commentsUpdated: number;
+  conversationId: number;
+  conversationKey: string;
   merged: boolean;
-}> {
-  const [keep, remove] = mutationReferences([input.keep, input.remove]);
-  if (!keep || !remove) protocolFailure();
-  const res = await send<
-    ApiResponse<{
-      keptConversationId: number;
-      removedConversationId: number;
-      movedMessages: number;
-      movedImageCache: number;
-      merged: boolean;
-    }>
-  >(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, {
-    factsEpoch: keep.factsEpoch,
-    keep: { source: keep.source, conversationKey: keep.conversationKey },
-    remove: { source: remove.source, conversationKey: remove.conversationKey },
+  removedConversationId?: number;
+  source: string;
+}>;
+
+export async function updateArticleUrl(
+  input: Readonly<{
+    confirmedConflict?: ConversationFactsReference;
+    conversation: ConversationFactsReference;
+    fromCanonicalUrl: string;
+    toCanonicalUrl: string;
+  }>,
+): Promise<UpdateArticleUrlResult> {
+  const conversation = mutationReference(input.conversation);
+  const confirmedConflict = input.confirmedConflict ? mutationReference(input.confirmedConflict) : undefined;
+  if (confirmedConflict && confirmedConflict.factsEpoch !== conversation.factsEpoch) protocolFailure();
+  const res = await send<ApiResponse<UpdateArticleUrlResult>>(CORE_MESSAGE_TYPES.UPDATE_ARTICLE_URL, {
+    factsEpoch: conversation.factsEpoch,
+    conversation: { source: conversation.source, conversationKey: conversation.conversationKey },
+    ...(confirmedConflict
+      ? { confirmedConflict: { source: confirmedConflict.source, conversationKey: confirmedConflict.conversationKey } }
+      : {}),
+    fromCanonicalUrl: text(input.fromCanonicalUrl, true),
+    toCanonicalUrl: text(input.toCanonicalUrl, true),
   });
-  return unwrap(res);
+  if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
+  if (!res.ok) {
+    const error = new Error(res.error?.message ?? 'unknown error') as Error & { code?: string };
+    const extra = res.error?.extra;
+    if (extra && typeof extra === 'object' && typeof (extra as Record<string, unknown>).code === 'string') {
+      error.code = String((extra as Record<string, unknown>).code);
+    }
+    throw error;
+  }
+  const row = record(res.data);
+  const conversationId = positiveId(row.conversationId);
+  const removedConversationId =
+    row.removedConversationId === undefined ? undefined : positiveId(row.removedConversationId);
+  const commentsUpdated = Number(row.commentsUpdated);
+  if (!Number.isSafeInteger(commentsUpdated) || commentsUpdated < 0 || typeof row.merged !== 'boolean')
+    protocolFailure();
+  return {
+    commentsUpdated,
+    conversationId,
+    conversationKey: text(row.conversationKey, true),
+    merged: row.merged,
+    ...(removedConversationId === undefined ? {} : { removedConversationId }),
+    source: text(row.source, true),
+  };
 }
 
 export type BackfillConversationImagesResult = {

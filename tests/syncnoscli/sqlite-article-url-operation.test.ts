@@ -42,8 +42,23 @@ function articlePayload(url: string, title = url) {
   };
 }
 
-function updateInput(source: string, conversationKey: string, fromCanonicalUrl: string, toCanonicalUrl: string) {
-  return { source, conversationKey, fromCanonicalUrl, toCanonicalUrl };
+function updateInput(
+  conversation: { id: number; source: string; conversationKey: string },
+  fromCanonicalUrl: string,
+  toCanonicalUrl: string,
+  confirmedConflict?: { id: number; source: string; conversationKey: string },
+) {
+  const reference = (value: { id: number; source: string; conversationKey: string }) => ({
+    source: value.source,
+    conversationKey: value.conversationKey,
+    backendConversationId: value.id,
+  });
+  return {
+    conversation: reference(conversation),
+    ...(confirmedConflict ? { confirmedConflict: reference(confirmedConflict) } : {}),
+    fromCanonicalUrl,
+    toCanonicalUrl,
+  };
 }
 
 afterEach(async () => {
@@ -78,17 +93,11 @@ describe('SQLite article URL operation', () => {
       const revisionBefore = readFactsRevision(database);
 
       expect(() =>
-        updateSqliteArticleUrl(
-          database,
-          updateInput(article.source, article.conversationKey, 'https://example.com/not-the-current-article', to),
-        ),
+        updateSqliteArticleUrl(database, updateInput(article, 'https://example.com/not-the-current-article', to)),
       ).toThrow();
       expect(readFactsRevision(database)).toBe(revisionBefore);
 
-      const result = updateSqliteArticleUrl(
-        database,
-        updateInput(article.source, article.conversationKey, from, `${to}#fragment`),
-      );
+      const result = updateSqliteArticleUrl(database, updateInput(article, from, `${to}#fragment`));
       expect(result).toMatchObject({
         commentsUpdated: 3,
         conversationId: article.id,
@@ -179,7 +188,7 @@ describe('SQLite article URL operation', () => {
         conversationId: target.id,
       });
 
-      const result = updateSqliteArticleUrl(database, updateInput(source.source, source.conversationKey, from, to));
+      const result = updateSqliteArticleUrl(database, updateInput(source, from, to, target));
       expect(result).toMatchObject({
         commentsUpdated: 2,
         conversationId: target.id,
@@ -248,9 +257,7 @@ describe('SQLite article URL operation', () => {
         END;
       `);
 
-      expect(() =>
-        updateSqliteArticleUrl(database, updateInput(source.source, source.conversationKey, from, to)),
-      ).toThrow();
+      expect(() => updateSqliteArticleUrl(database, updateInput(source, from, to, target))).toThrow();
       expect(readFactsRevision(database)).toBe(revisionBefore);
       expect(conversations.getConversationById(source.id)).toMatchObject({
         conversationKey: `article:${from}`,

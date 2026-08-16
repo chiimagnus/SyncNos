@@ -139,15 +139,6 @@ function createIdbConversationReadRepository(lease: FactsOperationLease): Conver
       if (!resolved.length) throw new LocalDataContractError('INVALID_ARGUMENT');
       return await idb.deleteConversationsByIds(resolved.map((reference) => reference.conversationId));
     },
-    async mergeConversations(input) {
-      assertLease();
-      const keep = assertResolvedReference(input.keep);
-      const remove = assertResolvedReference(input.remove);
-      return await idb.mergeConversationsByIds({
-        keepConversationId: keep.conversationId,
-        removeConversationId: remove.conversationId,
-      });
-    },
     async syncConversationMessages(reference, messages: JsonValue, options?: ConversationMessageSyncOptions) {
       assertLease();
       const resolved = assertResolvedReference(reference);

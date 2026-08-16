@@ -11,8 +11,7 @@ const findConversationBySourceAndKey = vi.fn();
 const findConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
-const upsertConversation = vi.fn();
-const mergeConversations = vi.fn();
+const updateArticleUrl = vi.fn();
 const backfillConversationImages = vi.fn();
 const getConversationImageAsset = vi.fn();
 const TEST_FACTS_EPOCH = 'idb-v1';
@@ -24,8 +23,7 @@ vi.mock('@services/conversations/client/repo', () => ({
   findConversationById: (...args: any[]) => findConversationById(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
-  upsertConversation: (...args: any[]) => upsertConversation(...args),
-  mergeConversations: (...args: any[]) => mergeConversations(...args),
+  updateArticleUrl: (...args: any[]) => updateArticleUrl(...args),
   backfillConversationImages: (...args: any[]) => backfillConversationImages(...args),
 }));
 
@@ -179,8 +177,7 @@ describe('ConversationsProvider pagination state', () => {
     findConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
-    upsertConversation.mockReset();
-    mergeConversations.mockReset();
+    updateArticleUrl.mockReset();
     backfillConversationImages.mockReset();
     getConversationImageAsset.mockReset();
 
@@ -188,13 +185,12 @@ describe('ConversationsProvider pagination state', () => {
     findConversationById.mockResolvedValue(null);
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
-    upsertConversation.mockResolvedValue({});
-    mergeConversations.mockResolvedValue({
-      keptConversationId: 0,
-      removedConversationId: 0,
-      movedMessages: 0,
-      movedImageCache: 0,
+    updateArticleUrl.mockResolvedValue({
+      commentsUpdated: 0,
+      conversationId: 1,
+      conversationKey: 'article:https://example.com/article',
       merged: false,
+      source: 'web',
     });
     backfillConversationImages.mockResolvedValue({
       scannedMessages: 0,

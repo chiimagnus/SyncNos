@@ -10,6 +10,7 @@ import {
 import { ArticleCommentInvariantError } from '@services/comments/domain/comment-errors';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
+import { updateSqliteArticleUrl } from '../sqlite/article-url-operation';
 import { createCommentsRepository } from '../sqlite/comments-repository';
 import {
   createSqliteConversationListScope,
@@ -37,15 +38,14 @@ const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
 
 const NATIVE_HOST_CONNECTED_MUTATION_COMMANDS = Object.freeze([
   'SAVE_CONVERSATION_SNAPSHOT',
-  'UPSERT_CONVERSATION',
   'DELETE_CONVERSATION',
   'DELETE_CONVERSATIONS',
-  'MERGE_CONVERSATIONS',
   'SYNC_CONVERSATION_MESSAGES',
   'PATCH_SYNC_MAPPING',
   'SET_SYNC_CURSOR',
   'SET_CONVERSATION_NOTION_PAGE_ID',
   'CLEAR_SYNC_MAPPING',
+  'UPDATE_ARTICLE_URL',
   'ADD_ARTICLE_COMMENT',
   'ADD_ARTICLE_COMMENT_REPLY',
   'DELETE_ARTICLE_COMMENT',
@@ -268,17 +268,10 @@ export function writeNativeHostConnectedCommand(database: SyncNosSqliteDatabase,
       if (serializedJsonUtf8ByteLength(snapshot) !== request.payload.transfer.declaredTotalBytes) protocolMismatch();
       return conversations.saveConversationSnapshot(snapshot);
     }
-    case 'UPSERT_CONVERSATION':
-      return conversations.upsertConversation(request.payload);
     case 'DELETE_CONVERSATION':
       return conversations.deleteConversationsByReferences([request.payload]);
     case 'DELETE_CONVERSATIONS':
       return conversations.deleteConversationsByReferences(request.payload.conversations);
-    case 'MERGE_CONVERSATIONS':
-      return conversations.mergeConversationsByReferences({
-        keep: request.payload.target,
-        remove: request.payload.source,
-      });
     case 'SYNC_CONVERSATION_MESSAGES':
       if (serializedJsonUtf8ByteLength(request.payload.messages) !== request.payload.transfer.declaredTotalBytes) {
         protocolMismatch();
@@ -299,6 +292,8 @@ export function writeNativeHostConnectedCommand(database: SyncNosSqliteDatabase,
       );
     case 'CLEAR_SYNC_MAPPING':
       return mappings.clearSyncCursorByReference(request.payload.conversation);
+    case 'UPDATE_ARTICLE_URL':
+      return updateSqliteArticleUrl(database, request.payload);
     case 'ADD_ARTICLE_COMMENT': {
       const conversationId = resolveCommentContext(database, request.payload.context);
       try {

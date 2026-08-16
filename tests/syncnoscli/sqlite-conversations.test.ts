@@ -2,8 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 
-import { createConversationsRepository } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
+import {
+  createConversationsRepository,
+  mergeConversationsWithinTransaction,
+} from '../../packages/syncnoscli/src/sqlite/conversations-repository';
 import { openReadOnly } from '../../packages/syncnoscli/src/sqlite/database';
+import { runFactsTransaction } from '../../packages/syncnoscli/src/sqlite/revision';
 
 import { createSqliteTestFixture } from './sqlite-test-fixture';
 
@@ -202,7 +206,7 @@ describe('SQLite conversation repository', () => {
   });
 
   it('merges payloads, preserves standalone comments, and never reuses deleted numeric conversation ids', async () => {
-    const { comments, conversations: repository, handle } = await fixture.open();
+    const { comments, conversations: repository, database, handle } = await fixture.open();
     try {
       const keep = repository.upsertConversation({
         sourceType: 'chat',
@@ -220,10 +224,12 @@ describe('SQLite conversation repository', () => {
         lastCapturedAt: 2,
         opaqueRemove: true,
       });
-      const merged = repository.mergeConversationsByIds({
-        keepConversationId: keep.id,
-        removeConversationId: remove.id,
-      });
+      const merged = runFactsTransaction(database, () =>
+        mergeConversationsWithinTransaction(database, {
+          keepConversationId: keep.id,
+          removeConversationId: remove.id,
+        }),
+      ).result;
       expect(merged).toMatchObject({ keptConversationId: keep.id, removedConversationId: remove.id, merged: true });
       expect(repository.getConversationById(keep.id)).toMatchObject({
         title: 'from remove',

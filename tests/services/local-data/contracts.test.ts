@@ -119,8 +119,6 @@ describe('local data contracts', () => {
       'SAVE_CONVERSATION_SNAPSHOT',
       'DELETE_CONVERSATION',
       'DELETE_CONVERSATIONS',
-      'MERGE_CONVERSATIONS',
-      'SYNC_CONVERSATION_MESSAGES',
       'GET_SYNC_MAPPING',
       'PATCH_SYNC_MAPPING',
       'SET_SYNC_CURSOR',
@@ -145,6 +143,9 @@ describe('local data contracts', () => {
       'GET_MIGRATION_RECEIPT',
     ]);
     expect(HOST_FACTS_COMMANDS).toContain('UPDATE_ARTICLE_URL');
+    expect(HOST_FACTS_COMMANDS).not.toContain('UPSERT_CONVERSATION');
+    expect(HOST_FACTS_COMMANDS).not.toContain('MERGE_CONVERSATIONS');
+    expect(BROWSER_RUNTIME_FACTS_COMMANDS).not.toContain('SYNC_CONVERSATION_MESSAGES');
     expect(HOST_FACTS_COMMANDS).toContain('IMPORT_FACTS');
     expect(HOST_FACTS_COMMANDS).toContain('SEARCH_CONVERSATIONS');
     expect(CLI_FACTS_COMMANDS).toEqual([

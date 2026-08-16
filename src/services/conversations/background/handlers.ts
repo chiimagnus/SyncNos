@@ -7,6 +7,7 @@ import {
   type ConversationMessageSyncOptions,
   type ResolvedConversationReference,
 } from '@services/conversations/data/storage';
+import { createArticleUrlOperation } from '@services/conversations/data/article-url-operation';
 import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { createImageStorage, type ImageStorage } from '@services/conversations/data/image-storage';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
@@ -21,13 +22,18 @@ import {
   type AutoSyncConversationChangedReason,
 } from '@services/sync/auto-sync/auto-sync-keys';
 import {
+  LOCAL_DATA_PROTOCOL_VERSION,
+  LOCAL_DATA_SCHEMA_VERSION,
   LocalDataContractError,
+  parseBrowserRuntimeFactsRequest,
   parseConversationCaptureSnapshot,
   MAX_DETAIL_PREVIEW_BYTES,
   MAX_IMAGE_ASSET_BYTES,
   MAX_ORDINARY_FACTS_RESPONSE_BYTES,
   parseRuntimeCaptureSnapshotPayload,
   parseStreamDescriptor,
+  type BrowserConversationReference,
+  type BrowserRuntimeFactsCommand,
   type ConversationCaptureSnapshot,
   type JsonObject,
   type JsonValue,
@@ -45,6 +51,7 @@ import type {
 } from '@services/conversations/domain/models';
 import type { BackgroundStreamHandler } from '@services/local-data/background-stream-router';
 import type { LocalDataStreamOperation, StreamDescriptor } from '@services/local-data/contracts';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -302,6 +309,27 @@ function stableReference(value: unknown): StableConversationReference | null {
   return source && conversationKey ? { source, conversationKey } : null;
 }
 
+function browserStableReference(value: BrowserConversationReference): StableConversationReference {
+  if (Object.hasOwn(value, 'conversationId')) throw new LocalDataContractError('INVALID_ARGUMENT');
+  const reference = stableReference(value);
+  if (!reference) throw new LocalDataContractError('INVALID_ARGUMENT');
+  return reference;
+}
+
+function parseRuntimeConversationFactsRequest(msg: unknown, command: BrowserRuntimeFactsCommand) {
+  if (!msg || typeof msg !== 'object' || Array.isArray(msg)) throw new LocalDataContractError('INVALID_ARGUMENT');
+  const row = msg as Record<string, unknown>;
+  const { type: _type, factsEpoch, ...payload } = row;
+  return parseBrowserRuntimeFactsRequest({
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    requestId: 'conversations-runtime',
+    command,
+    payload,
+    ...(Object.hasOwn(row, 'factsEpoch') ? { factsEpoch } : {}),
+  });
+}
+
 function requireFactsEpoch(msg: any): FactsEpoch | null {
   return typeof msg?.factsEpoch === 'string' && msg.factsEpoch ? (msg.factsEpoch as FactsEpoch) : null;
 }
@@ -331,27 +359,6 @@ async function resolveConversationReference(
     throw new LocalDataContractError('STALE_REFERENCE');
   }
   return { source, conversationKey, conversationId };
-}
-
-function normalizeMessageSyncOptions(msg: any): ConversationMessageSyncOptions | null {
-  const rawMode = String(msg?.mode || '')
-    .trim()
-    .toLowerCase();
-  if (rawMode && rawMode !== 'snapshot' && rawMode !== 'incremental' && rawMode !== 'append') return null;
-  const mode = rawMode === 'incremental' ? 'incremental' : rawMode === 'append' ? 'append' : 'snapshot';
-  if (msg?.diff == null) return { mode, diff: null };
-  if (typeof msg.diff !== 'object' || Array.isArray(msg.diff)) return null;
-  const normalizeKeys = (value: unknown): string[] | null => {
-    if (value === undefined) return [];
-    if (!Array.isArray(value)) return null;
-    const keys = value.map((item) => String(item || '').trim());
-    return keys.every(Boolean) ? [...new Set(keys)] : null;
-  };
-  const added = normalizeKeys(msg.diff.added);
-  const updated = normalizeKeys(msg.diff.updated);
-  const removed = normalizeKeys(msg.diff.removed);
-  if (!added || !updated || !removed) return null;
-  return { mode, diff: { added, updated, removed } };
 }
 
 async function withCaptureAuthorNames(messages: readonly JsonObject[]): Promise<JsonObject[]> {
@@ -502,6 +509,7 @@ export async function saveConversationCaptureSnapshotInLease(
   }
 
   const existing = await input.repository.getConversationByReference(reference);
+  if (!input.repository.upsertConversation) throw new LocalDataContractError('PROTOCOL_MISMATCH');
   const conversation = await input.repository.upsertConversation(input.snapshot.conversation);
   const resolved = await resolveConversationReference(input.repository, {
     source: String(conversation.source || '').trim(),
@@ -812,149 +820,59 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
   });
 
-  router.register(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, async (msg) => {
-    const payload = msg?.payload;
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return invalidArgument('payload', 'invalid conversation payload', payload);
-    }
-    const payloadReference = stableReference(payload);
-    if (!payloadReference) return invalidArgument('payload', 'missing conversation reference', payload);
-    const expectedFactsEpoch = msg?.factsEpoch === undefined ? undefined : requireFactsEpoch(msg);
-    if (msg?.factsEpoch !== undefined && !expectedFactsEpoch) {
-      return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
-    }
-    const observedReference = msg?.reference === undefined ? null : stableReference(msg.reference);
-    if (expectedFactsEpoch && (!observedReference || !sameReference(observedReference, payloadReference))) {
-      return router.err('stale conversation reference', { code: 'STALE_REFERENCE' });
-    }
+  router.register(CORE_MESSAGE_TYPES.UPDATE_ARTICLE_URL, async (msg) => {
     try {
-      const result = await deps.conversationReadRunner.run({
-        kind: 'conversation-upsert',
-        ...(expectedFactsEpoch ? { expectedFactsEpoch } : {}),
-        read: async ({ lease, repository }) => {
-          const existing = await repository.getConversationByReference(payloadReference);
-          if (expectedFactsEpoch && !existing) throw new LocalDataContractError('STALE_REFERENCE');
-          const conversation = await repository.upsertConversation(payload as JsonObject);
-          const conversationId = Number(conversation.id);
-          if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
-            throw new LocalDataContractError('PROTOCOL_MISMATCH');
-          }
-          const isNew = !existing;
-          await deps.onConversationChanged(
-            { ...payloadReference },
-            isNew
-              ? AUTO_SYNC_CONVERSATION_CHANGED_REASONS.createConversation
-              : AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
-            lease,
-          );
-          return { conversation, conversationId, isNew };
-        },
-      });
-      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-        reason: result.isNew ? 'createConversation' : 'upsertConversation',
-        conversationId: result.conversationId,
-      });
-      return router.ok({ ...result.conversation, __isNew: result.isNew });
-    } catch (error) {
-      return factsError(router, error);
-    }
-  });
+      const request = parseRuntimeConversationFactsRequest(msg, 'UPDATE_ARTICLE_URL');
+      if (request.command !== 'UPDATE_ARTICLE_URL') throw new LocalDataContractError('INVALID_ARGUMENT');
+      const factsEpoch = request.factsEpoch;
+      if (!factsEpoch) throw new LocalDataContractError('STALE_BACKEND_EPOCH');
+      const conversation = browserStableReference(request.payload.conversation);
+      const confirmedConflict = request.payload.confirmedConflict
+        ? browserStableReference(request.payload.confirmedConflict)
+        : undefined;
+      const fromCanonicalUrl = canonicalizeArticleUrl(request.payload.fromCanonicalUrl);
+      const toCanonicalUrl = canonicalizeArticleUrl(request.payload.toCanonicalUrl);
+      if (!fromCanonicalUrl || !toCanonicalUrl) throw new LocalDataContractError('INVALID_ARGUMENT');
 
-  router.register(CORE_MESSAGE_TYPES.MERGE_CONVERSATIONS, async (msg) => {
-    const keep = stableReference(msg?.keep);
-    const remove = stableReference(msg?.remove);
-    if (!keep) return invalidArgument('keep', 'invalid keep conversation reference', msg?.keep);
-    if (!remove) return invalidArgument('remove', 'invalid remove conversation reference', msg?.remove);
-    const factsEpoch = requireFactsEpoch(msg);
-    if (!factsEpoch) return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
-    try {
       const result = await deps.conversationReadRunner.run({
-        kind: 'conversation-merge',
+        kind: 'conversation-update-article-url',
         expectedFactsEpoch: factsEpoch,
-        read: async ({ lease, repository }) => {
-          const resolvedKeep = await resolveConversationReference(repository, keep);
-          const resolvedRemove = await resolveConversationReference(repository, remove);
-          const response = await repository.mergeConversations({ keep: resolvedKeep, remove: resolvedRemove });
-          if (response.merged) {
+        read: async ({ lease, mode, repository }) => {
+          const resolved = await resolveConversationReference(repository, conversation);
+          const resolvedConflict = confirmedConflict
+            ? await resolveConversationReference(repository, confirmedConflict)
+            : undefined;
+          const response = await createArticleUrlOperation({ lease, mode }).update({
+            conversation: resolved,
+            ...(resolvedConflict ? { confirmedConflict: resolvedConflict } : {}),
+            fromCanonicalUrl,
+            toCanonicalUrl,
+          });
+          if (fromCanonicalUrl !== toCanonicalUrl) {
             await deps.onConversationChanged(
-              resolvedKeep,
+              response.conversation,
               AUTO_SYNC_CONVERSATION_CHANGED_REASONS.upsertConversation,
               lease,
             );
           }
-          return { response };
+          return response;
         },
       });
-      if (result.response.merged) {
+      if (fromCanonicalUrl !== toCanonicalUrl) {
         router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-          reason: 'mergeConversations',
-          conversationId: result.response.keptConversationId,
-          removedConversationId: result.response.removedConversationId,
+          reason: 'articleUrlUpdated',
+          conversationId: result.conversation.conversationId,
+          ...(result.removedConversationId ? { removedConversationId: result.removedConversationId } : {}),
         });
       }
-      return router.ok(result.response);
-    } catch (error) {
-      return factsError(router, error);
-    }
-  });
-
-  router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
-    const reference = stableReference(msg);
-    if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);
-    const expectedFactsEpoch = msg?.factsEpoch === undefined ? undefined : requireFactsEpoch(msg);
-    if (msg?.factsEpoch !== undefined && !expectedFactsEpoch) {
-      return router.err('stale facts epoch', { code: 'STALE_BACKEND_EPOCH' });
-    }
-    if (!Array.isArray(msg?.messages))
-      return invalidArgument('messages', 'invalid conversation messages', msg?.messages);
-    const options = normalizeMessageSyncOptions(msg);
-    if (!options) return invalidArgument('mode', 'invalid message sync options', { mode: msg?.mode, diff: msg?.diff });
-    try {
-      const result = await deps.conversationReadRunner.run({
-        kind: 'conversation-sync-messages',
-        ...(expectedFactsEpoch ? { expectedFactsEpoch } : {}),
-        read: async ({ lease, mode, repository }) => {
-          const resolved = await resolveConversationReference(repository, reference);
-          let messages = msg.messages.slice();
-          try {
-            const local = await storageGet([ABOUT_YOU_USER_NAME_STORAGE_KEY]);
-            const aboutYouUserName =
-              normalizeUserName(local?.[ABOUT_YOU_USER_NAME_STORAGE_KEY]) || DEFAULT_ABOUT_YOU_USER_NAME;
-            messages = messages.map((message: any) => {
-              if (!message || typeof message !== 'object') return message;
-              const role = String(message.role || '')
-                .trim()
-                .toLowerCase();
-              if (role !== 'user' || String(message.authorName || '').trim()) return message;
-              return { ...message, authorName: aboutYouUserName };
-            });
-          } catch {
-            // Author names are optional and retain the renderer fallback.
-          }
-
-          const inlined = await inlineCaptureImages({
-            owner: resolved,
-            imageStorage: createImageStorage({ lease, mode }),
-            conversationSourceType: String(msg?.conversationSourceType || ''),
-            conversationUrl: String(msg?.conversationUrl || ''),
-            messages: messages as JsonObject[],
-            options,
-          });
-          messages = inlined.messages;
-          const response = await repository.syncConversationMessages(resolved, messages as JsonValue, options);
-          await deps.onConversationChanged(
-            resolved,
-            AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages,
-            lease,
-          );
-          return { response, conversationId: resolved.conversationId };
-        },
+      return router.ok({
+        commentsUpdated: result.commentsUpdated,
+        conversationId: result.conversation.conversationId,
+        conversationKey: result.conversation.conversationKey,
+        source: result.conversation.source,
+        merged: result.merged,
+        ...(result.removedConversationId ? { removedConversationId: result.removedConversationId } : {}),
       });
-      router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
-        reason: 'upsert',
-        conversationId: result.conversationId,
-      });
-      return router.ok(result.response);
     } catch (error) {
       return factsError(router, error);
     }

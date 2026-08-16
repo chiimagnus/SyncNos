@@ -30,9 +30,7 @@ type NativeConnectedCommand = Extract<
   | 'CONVERSATION_DETAIL'
   | 'CONVERSATION_TAIL'
   | 'SAVE_CONVERSATION_SNAPSHOT'
-  | 'UPSERT_CONVERSATION'
   | 'DELETE_CONVERSATIONS'
-  | 'MERGE_CONVERSATIONS'
   | 'SYNC_CONVERSATION_MESSAGES'
   | 'GET_SYNC_MAPPING'
   | 'PATCH_SYNC_MAPPING'
@@ -107,18 +105,6 @@ export type ConversationMutationRepository = Readonly<{
     reference: ResolvedConversationReference,
     provider: string,
   ) => Promise<ConversationMappingRead | null>;
-  mergeConversations: (
-    input: Readonly<{
-      keep: ResolvedConversationReference;
-      remove: ResolvedConversationReference;
-    }>,
-  ) => Promise<{
-    keptConversationId: number;
-    merged: boolean;
-    movedImageCache: number;
-    movedMessages: number;
-    removedConversationId: number;
-  }>;
   patchSyncMapping: (reference: ResolvedConversationReference, provider: string, patch: JsonObject) => Promise<true>;
   saveConversationSnapshot: (
     snapshot: ConversationCaptureSnapshot,
@@ -134,7 +120,8 @@ export type ConversationMutationRepository = Readonly<{
     messages: JsonValue,
     options?: ConversationMessageSyncOptions,
   ) => Promise<{ deleted: number; upserted: number }>;
-  upsertConversation: (payload: JsonObject) => Promise<Conversation>;
+  /** IDB capture needs this before image materialization; Native capture uses SAVE_CONVERSATION_SNAPSHOT. */
+  upsertConversation?: (payload: JsonObject) => Promise<Conversation>;
 }>;
 
 export type ConversationFactsRepository = ConversationReadRepository & ConversationMutationRepository;
@@ -296,18 +283,6 @@ function asDeleteResult(value: unknown): Awaited<ReturnType<ConversationMutation
   };
 }
 
-function asMergeResult(value: unknown): Awaited<ReturnType<ConversationMutationRepository['mergeConversations']>> {
-  const input = record(value);
-  if (typeof input.merged !== 'boolean') protocolFailure();
-  return {
-    keptConversationId: positiveId(input.keptConversationId),
-    merged: input.merged,
-    movedImageCache: nonNegativeInteger(input.movedImageCache),
-    movedMessages: nonNegativeInteger(input.movedMessages),
-    removedConversationId: positiveId(input.removedConversationId),
-  };
-}
-
 function asMessageSyncResult(
   value: unknown,
 ): Awaited<ReturnType<ConversationMutationRepository['syncConversationMessages']>> {
@@ -440,9 +415,6 @@ export function createNativeConversationReadRepository(
         page = await repository.getConversationListPage({}, page.cursor, Math.min(pageLimit, maxScan - scannedCount));
       }
     },
-    async upsertConversation(payload) {
-      return asConversation(await request('UPSERT_CONVERSATION', record(payload) as JsonObject));
-    },
     async saveConversationSnapshot(snapshot) {
       return asCaptureSnapshotResult(
         await request('SAVE_CONVERSATION_SNAPSHOT', {
@@ -459,14 +431,6 @@ export function createNativeConversationReadRepository(
       return asDeleteResult(
         await request('DELETE_CONVERSATIONS', {
           conversations: references.map(hostReference),
-        }),
-      );
-    },
-    async mergeConversations(input) {
-      return asMergeResult(
-        await request('MERGE_CONVERSATIONS', {
-          source: hostReference(input.remove),
-          target: hostReference(input.keep),
         }),
       );
     },

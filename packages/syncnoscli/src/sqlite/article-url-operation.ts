@@ -4,13 +4,14 @@ import { runFactsTransaction } from './revision';
 import {
   updateArticleConversationUrlWithinTransaction,
   type SqliteArticleUrlUpdateResult,
+  type SqliteConversationReference,
 } from './conversations-repository';
 import type { SyncNosSqliteDatabase } from './schema';
 
 export type UpdateSqliteArticleUrlInput = Readonly<{
-  conversationKey: unknown;
+  confirmedConflict?: SqliteConversationReference;
+  conversation: SqliteConversationReference;
   fromCanonicalUrl: unknown;
-  source: unknown;
   toCanonicalUrl: unknown;
 }>;
 

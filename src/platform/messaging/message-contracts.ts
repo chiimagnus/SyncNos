@@ -1,8 +1,6 @@
 export const CORE_MESSAGE_TYPES = {
   SAVE_CONVERSATION_SNAPSHOT: 'saveConversationSnapshot',
-  UPSERT_CONVERSATION: 'upsertConversation',
-  MERGE_CONVERSATIONS: 'mergeConversations',
-  SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
+  UPDATE_ARTICLE_URL: 'updateArticleUrl',
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
   GET_CONVERSATION_LIST_BOOTSTRAP: 'getConversationListBootstrap',
   GET_CONVERSATION_LIST_PAGE: 'getConversationListPage',

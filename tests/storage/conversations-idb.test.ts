@@ -6,12 +6,10 @@ import { openDb } from '../../src/platform/idb/schema';
 import {
   __closeDbForTests,
   deleteConversationsByIds,
-  getConversationById,
   getConversationTailWindowBySourceAndKey,
   getConversationListBootstrap,
   getMessagesByConversationId,
   getMessagesTailByConversationId,
-  mergeConversationsByIds,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
@@ -825,117 +823,5 @@ describe('conversations storage-idb', () => {
       conversationKey: 'article:https://example.com/post',
       notionPageId: 'page_old',
     });
-  });
-
-  it('merges conversations by ids and migrates messages + sync mappings', async () => {
-    const keep = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'keep',
-      title: '',
-      url: 'https://example.com/a',
-      notionPageId: '',
-      warningFlags: ['w1'],
-      lastCapturedAt: 10,
-    });
-    const remove = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'remove',
-      title: 'From remove',
-      url: 'https://example.com/b',
-      notionPageId: 'page_remove',
-      warningFlags: ['w2'],
-      lastCapturedAt: 20,
-    });
-    const keepId = Number(keep.id);
-    const removeId = Number(remove.id);
-    const keepKey = String(keep.conversationKey || '');
-    const removeKey = String(remove.conversationKey || '');
-
-    await syncConversationMessages(removeId, [
-      { messageKey: 'm1', role: 'user', contentText: 'u', sequence: 1, updatedAt: 1 },
-      { messageKey: 'm2', role: 'assistant', contentText: 'a', sequence: 2, updatedAt: 2 },
-    ]);
-
-    // Insert mapping for remove directly.
-    const db = await openDb();
-    const t = db.transaction(['sync_mappings'], 'readwrite');
-    await reqToPromise(
-      t.objectStore('sync_mappings').add({
-        source: 'web',
-        conversationKey: removeKey,
-        notionPageId: 'page_remove',
-        lastSyncedMessageKey: 'x',
-        updatedAt: 1,
-      }),
-    );
-    await txDone(t);
-    db.close();
-
-    const res = await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
-    expect(res.keptConversationId).toBe(keepId);
-    expect(res.removedConversationId).toBe(removeId);
-    expect(res.merged).toBe(true);
-
-    const items = await listAllConversationsForTests();
-    expect(items.map((c) => c.conversationKey)).toEqual([keepKey]);
-    expect(items[0]).toMatchObject({
-      conversationKey: keepKey,
-      title: 'From remove',
-      notionPageId: 'page_remove',
-    });
-    expect(items[0].warningFlags).toEqual(['w1', 'w2']);
-    expect(Number(items[0].lastCapturedAt)).toBe(20);
-
-    const moved = await getMessagesByConversationId(keepId);
-    expect(moved.map((m) => m.messageKey)).toEqual(['m1', 'm2']);
-
-    const reopened = await openDb();
-    const verifyTx = reopened.transaction(['sync_mappings'], 'readonly');
-    const verifyMappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
-    await txDone(verifyTx);
-    reopened.close();
-
-    expect(verifyMappings).toHaveLength(1);
-    expect(verifyMappings[0]).toMatchObject({
-      source: 'web',
-      conversationKey: keepKey,
-      notionPageId: 'page_remove',
-      lastSyncedMessageKey: 'x',
-    });
-  });
-
-  it('maintains listSourceKey/listSiteKey on upsert and merge writes', async () => {
-    const keep = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'key_keep',
-      title: 'keep',
-      url: '',
-      lastCapturedAt: 1,
-    });
-    const remove = await upsertConversation({
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'key_remove',
-      title: 'remove',
-      url: 'https://example.com/post',
-      lastCapturedAt: 2,
-    });
-
-    expect(keep.listSourceKey).toBe('web');
-    expect(keep.listSiteKey).toBe('unknown');
-    expect(remove.listSourceKey).toBe('web');
-    expect(remove.listSiteKey).toBe('domain:example.com');
-
-    const keepId = Number(keep.id);
-    const removeId = Number(remove.id);
-    await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
-
-    const merged = await getConversationById(keepId);
-    expect(merged).toBeTruthy();
-    expect(merged?.listSourceKey).toBe('web');
-    expect(merged?.listSiteKey).toBe('domain:example.com');
   });
 });

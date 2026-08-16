@@ -2,7 +2,8 @@ import { Blob } from 'node:buffer';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readFactsRevision } from '../../packages/syncnoscli/src/sqlite/revision';
+import { mergeConversationsWithinTransaction } from '../../packages/syncnoscli/src/sqlite/conversations-repository';
+import { readFactsRevision, runFactsTransaction } from '../../packages/syncnoscli/src/sqlite/revision';
 
 import { createSqliteTestFixture } from './sqlite-test-fixture';
 
@@ -123,10 +124,12 @@ describe('SQLite image repository', () => {
       });
 
       expect(
-        conversations.mergeConversationsByIds({
-          keepConversationId: keep.id,
-          removeConversationId: remove.id,
-        }),
+        runFactsTransaction(database, () =>
+          mergeConversationsWithinTransaction(database, {
+            keepConversationId: keep.id,
+            removeConversationId: remove.id,
+          }),
+        ).result,
       ).toMatchObject({ merged: true, movedImageCache: 1, movedMessages: 0 });
       expect(images.getImageAssetById({ conversationId: keep.id, id: keptShared.id })).toMatchObject({
         bytes: Uint8Array.from([1]),

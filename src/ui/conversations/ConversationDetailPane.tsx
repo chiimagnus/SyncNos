@@ -366,21 +366,23 @@ export function ConversationDetailPane({
                       </button>
                       <span className="tw-shrink-0 tw-whitespace-nowrap tw-opacity-80">Enter 保存 · Esc 取消</span>
                     </>
+                  ) : isArticleRenderer ? (
+                    <button
+                      type="button"
+                      className="tw-min-w-0 tw-flex-1 tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
+                      onClick={() => {
+                        setUrlDraft(displayedUrl);
+                        setUrlEditing(true);
+                      }}
+                      aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
+                      title={displayedUrl || t('noLinkAvailable')}
+                    >
+                      {displayedUrl || t('noLinkAvailable')}
+                    </button>
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="tw-min-w-0 tw-flex-1 tw-truncate tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left tw-shadow-none tw-cursor-text focus:tw-outline-none focus-visible:tw-outline-none"
-                        onClick={() => {
-                          setUrlDraft(displayedUrl);
-                          setUrlEditing(true);
-                        }}
-                        aria-label={displayedUrl ? 'Edit URL' : 'Set URL'}
-                        title={displayedUrl || t('noLinkAvailable')}
-                      >
-                        {displayedUrl || t('noLinkAvailable')}
-                      </button>
-                    </>
+                    <span className="tw-min-w-0 tw-flex-1 tw-truncate" title={displayedUrl || t('noLinkAvailable')}>
+                      {displayedUrl || t('noLinkAvailable')}
+                    </span>
                   )}
                 </div>
               ) : (
