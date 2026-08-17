@@ -143,81 +143,89 @@ export function ConversationsScene({
     listPane
   );
 
+  let sceneRootClassName: string;
+  let underlyingScene: ReactNode;
+
   if (isNarrow) {
     if (narrowRoute === 'detail') {
-      return (
-        <div className="route-scroll webclipper-detail-route-scroll tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]">
-          <ConversationDetailPane
-            onBack={returnToList}
-            onTriggerCommentsSidebar={
-              canOpenCommentsFromDetail
-                ? () => {
-                    if (typeof onOpenCommentsExternally === 'function') {
-                      onOpenCommentsExternally();
-                      return;
-                    }
-                    if (!commentsSidebarRuntime) return;
-                    openComments();
-                    void commentsSidebarRuntime.sidebarController.open({
-                      focusComposer: true,
-                      source: narrowCommentsOpenSource,
-                      ensureContext: false,
-                    });
+      sceneRootClassName =
+        'route-scroll webclipper-detail-route-scroll tw-relative tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]';
+      underlyingScene = (
+        <ConversationDetailPane
+          onBack={returnToList}
+          onTriggerCommentsSidebar={
+            canOpenCommentsFromDetail
+              ? () => {
+                  if (typeof onOpenCommentsExternally === 'function') {
+                    onOpenCommentsExternally();
+                    return;
                   }
-                : undefined
-            }
-            onCommentsLocatorRootsChange={(roots) => {
-              onCommentsLocatorSurfaceRootsChange?.(roots);
-            }}
-          />
-        </div>
+                  if (!commentsSidebarRuntime) return;
+                  openComments();
+                  void commentsSidebarRuntime.sidebarController.open({
+                    focusComposer: true,
+                    source: narrowCommentsOpenSource,
+                    ensureContext: false,
+                  });
+                }
+              : undefined
+          }
+          onCommentsLocatorRootsChange={(roots) => {
+            onCommentsLocatorSurfaceRootsChange?.(roots);
+          }}
+        />
       );
-    }
-
-    if (narrowRoute === 'comments' && commentsSidebarRuntime) {
-      return (
-        <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]">
-          <ArticleCommentsSection
-            sidebarSession={commentsSidebarRuntime.sidebarSession}
-            containerClassName="tw-h-full tw-min-h-0"
-            getLocatorSurfaceRoots={() => getCommentsLocatorSurfaceRoots?.() || null}
-            subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
-            resolveChatWithActions={resolveCommentsSidebarChatWithActions}
-            resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
-            commentChatWith={commentsSidebarCommentChatWith}
-            fullWidth
-          />
-        </div>
+    } else if (narrowRoute === 'comments' && commentsSidebarRuntime) {
+      sceneRootClassName =
+        'tw-relative tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]';
+      underlyingScene = (
+        <ArticleCommentsSection
+          sidebarSession={commentsSidebarRuntime.sidebarSession}
+          containerClassName="tw-h-full tw-min-h-0"
+          getLocatorSurfaceRoots={() => getCommentsLocatorSurfaceRoots?.() || null}
+          subscribeLocatorSurfaceRoots={subscribeCommentsLocatorSurfaceRoots}
+          resolveChatWithActions={resolveCommentsSidebarChatWithActions}
+          resolveChatWithSingleActionLabel={resolveCommentsSidebarSingleChatWithLabel}
+          commentChatWith={commentsSidebarCommentChatWith}
+          fullWidth
+        />
       );
+    } else {
+      sceneRootClassName =
+        'tw-relative tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]';
+      underlyingScene = list;
     }
+  } else {
+    sceneRootClassName =
+      wideChrome === 'none'
+        ? 'tw-relative tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]'
+        : 'tw-relative tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]';
 
-    return (
-      <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-        {list}
-      </div>
+    underlyingScene = (
+      <>
+        {wideHideList ? null : (
+          <aside
+            className={[
+              'tw-flex tw-min-h-0 tw-w-[min(360px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
+              columnDividerRightClassName(),
+            ].join(' ')}
+          >
+            {list}
+          </aside>
+        )}
+        <main className="route-scroll webclipper-detail-route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-card)] tw-overflow-auto tw-overflow-x-hidden">
+          {wideDetail ?? <ConversationDetailPane />}
+        </main>
+      </>
     );
   }
 
-  const wideContainerClassName =
-    wideChrome === 'none'
-      ? 'tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]'
-      : 'tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]';
-
   return (
-    <div className={wideContainerClassName}>
-      {wideHideList ? null : (
-        <aside
-          className={[
-            'tw-flex tw-min-h-0 tw-w-[min(360px,40%)] tw-min-w-[320px] tw-flex-col tw-bg-[var(--bg-primary)]',
-            columnDividerRightClassName(),
-          ].join(' ')}
-        >
-          {list}
-        </aside>
-      )}
-      <main className="route-scroll webclipper-detail-route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-card)] tw-overflow-auto tw-overflow-x-hidden">
-        {wideDetail ?? <ConversationDetailPane />}
-      </main>
+    <div data-conversations-scene-root="" className={sceneRootClassName}>
+      <div data-conversations-scene-underlay="" className="tw-contents">
+        {underlyingScene}
+      </div>
+      <div data-conversations-scene-overlay-host="" className="tw-pointer-events-none tw-absolute tw-inset-0" />
     </div>
   );
 }
