@@ -111,6 +111,7 @@ function createWindowsFilesystem(files: Map<string, FakeEntry>): {
         files.set(destination, { bytes: Buffer.from(entry.bytes) });
       },
       chmod: async () => undefined,
+      unlink,
     },
     registrationDependencies: {
       lstat,

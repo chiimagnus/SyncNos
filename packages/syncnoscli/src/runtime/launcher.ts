@@ -21,6 +21,7 @@ import {
 } from './paths';
 
 export const SYNCNOSCLI_RUNTIME_OWNER_MARKER = 'syncnoscli-runtime-v1' as const;
+export const SYNCNOSCLI_LAUNCHER_UPDATE_INTENT = 'syncnoscli-launcher-update-v1' as const;
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
@@ -48,6 +49,20 @@ type RuntimeOwnerMarker = Readonly<{
   launcherDigest: string;
   packageDigest: string;
   prebuiltDigest: string | null;
+}>;
+
+type LauncherUpdateIntentTarget = Readonly<{
+  newDigest: string;
+  oldDigest: string | null;
+}>;
+
+type LauncherUpdateIntent = Readonly<{
+  version: 1;
+  ownerMarker: typeof SYNCNOSCLI_LAUNCHER_UPDATE_INTENT;
+  platform: SyncNosRuntimePaths['platform'];
+  config: LauncherUpdateIntentTarget;
+  launcher: LauncherUpdateIntentTarget;
+  runtimeOwnerMarker: LauncherUpdateIntentTarget;
 }>;
 
 type WindowsPrebuildManifest = Readonly<{
@@ -272,6 +287,38 @@ function parseRuntimeOwnerMarker(bytes: Uint8Array): RuntimeOwnerMarker {
   } catch (error) {
     if (error instanceof NativeHostLauncherError) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
     throw error;
+  }
+}
+
+function parseLauncherUpdateIntent(bytes: Uint8Array): LauncherUpdateIntent {
+  try {
+    const input = strictRecord(JSON.parse(UTF8_DECODER.decode(bytes)));
+    exactKeys(input, ['version', 'ownerMarker', 'platform', 'config', 'launcher', 'runtimeOwnerMarker']);
+    if (
+      input.version !== 1 ||
+      input.ownerMarker !== SYNCNOSCLI_LAUNCHER_UPDATE_INTENT ||
+      (input.platform !== 'darwin' && input.platform !== 'linux' && input.platform !== 'win32')
+    ) {
+      launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+    }
+    const target = (value: unknown): LauncherUpdateIntentTarget => {
+      const record = strictRecord(value);
+      exactKeys(record, ['newDigest', 'oldDigest']);
+      return Object.freeze({
+        newDigest: digest(record.newDigest),
+        oldDigest: record.oldDigest === null ? null : digest(record.oldDigest),
+      });
+    };
+    return Object.freeze({
+      version: 1,
+      ownerMarker: SYNCNOSCLI_LAUNCHER_UPDATE_INTENT,
+      platform: input.platform,
+      config: target(input.config),
+      launcher: target(input.launcher),
+      runtimeOwnerMarker: target(input.runtimeOwnerMarker),
+    });
+  } catch (_error) {
+    launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
   }
 }
 
@@ -530,13 +577,6 @@ async function inspectOwnedLauncher(
   });
 }
 
-async function inspectExistingLauncher(
-  paths: SyncNosRuntimePaths,
-  dependencies: ResolvedDependencies,
-): Promise<'absent' | 'owned'> {
-  return (await inspectOwnedLauncher(paths, dependencies)) ? 'owned' : 'absent';
-}
-
 /** Reads the fixed runtime trio without creating it; malformed or partial state fails closed. */
 export async function inspectNativeHostLauncher(
   input: Pick<EnsureNativeHostLauncherInput, 'dependencies' | 'paths'> = {},
@@ -554,15 +594,41 @@ async function assertTemporaryPathAbsent(
   if (await lstatIfPresent(dependencies, path)) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
 }
 
-async function replaceWithBytes(
+async function readOptionalOwnedFile(
   paths: SyncNosRuntimePaths,
-  destination: string,
+  path: string,
+  dependencies: ResolvedDependencies,
+): Promise<Buffer | null> {
+  assertRuntimeOwnedFilePath(paths, path);
+  const status = await lstatIfPresent(dependencies, path);
+  if (!status) return null;
+  assertRegularFile(status, 'LAUNCHER_OWNERSHIP_INVALID');
+  return await readVerifiedFile(dependencies, path, 'LAUNCHER_OWNERSHIP_INVALID');
+}
+
+async function unlinkOwnedRuntimeFile(
+  paths: SyncNosRuntimePaths,
+  path: string,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  assertRuntimeOwnedFilePath(paths, path);
+  const status = await lstatIfPresent(dependencies, path);
+  if (!status) return;
+  assertRegularFile(status, 'LAUNCHER_OWNERSHIP_INVALID');
+  try {
+    await dependencies.unlink(path);
+  } catch (_error) {
+    launcherFailure('LAUNCHER_WRITE_FAILED');
+  }
+}
+
+async function stageWithBytes(
+  paths: SyncNosRuntimePaths,
   temporary: string,
   contents: Buffer,
   mode: number,
   dependencies: ResolvedDependencies,
 ): Promise<void> {
-  assertRuntimeOwnedFilePath(paths, destination);
   await assertTemporaryPathAbsent(paths, temporary, dependencies);
   try {
     await dependencies.writeFile(temporary, contents, { flag: 'wx', mode });
@@ -570,37 +636,204 @@ async function replaceWithBytes(
   } catch (_error) {
     launcherFailure('LAUNCHER_WRITE_FAILED');
   }
-  const temporaryBytes = await readVerifiedFile(dependencies, temporary, 'LAUNCHER_WRITE_FAILED');
-  if (!temporaryBytes.equals(contents)) launcherFailure('LAUNCHER_WRITE_FAILED');
-  try {
-    await dependencies.rename(temporary, destination);
-  } catch (_error) {
-    launcherFailure('LAUNCHER_WRITE_FAILED');
-  }
-  const destinationBytes = await readVerifiedFile(dependencies, destination, 'LAUNCHER_WRITE_FAILED');
-  if (!destinationBytes.equals(contents)) launcherFailure('LAUNCHER_WRITE_FAILED');
+  const staged = await readVerifiedFile(dependencies, temporary, 'LAUNCHER_WRITE_FAILED');
+  if (!staged.equals(contents)) launcherFailure('LAUNCHER_WRITE_FAILED');
 }
 
-async function replaceWithPrebuilt(source: LauncherSource, dependencies: ResolvedDependencies): Promise<Buffer> {
+async function stagePrebuilt(source: LauncherSource, dependencies: ResolvedDependencies): Promise<void> {
   if (!source.prebuiltPath || !source.config.prebuiltDigest) launcherFailure('LAUNCHER_ARTIFACT_INVALID');
   const { paths } = source;
-  assertRuntimeOwnedFilePath(paths, paths.launcherPath);
   await assertTemporaryPathAbsent(paths, paths.launcherTemporaryPath, dependencies);
   try {
     await dependencies.copyFile(source.prebuiltPath, paths.launcherTemporaryPath, fsConstants.COPYFILE_EXCL);
   } catch (_error) {
     launcherFailure('LAUNCHER_WRITE_FAILED');
   }
-  const temporaryBytes = await readVerifiedFile(dependencies, paths.launcherTemporaryPath, 'LAUNCHER_WRITE_FAILED');
-  if (sha256(temporaryBytes) !== source.config.prebuiltDigest) launcherFailure('LAUNCHER_WRITE_FAILED');
+  const staged = await readVerifiedFile(dependencies, paths.launcherTemporaryPath, 'LAUNCHER_WRITE_FAILED');
+  if (sha256(staged) !== source.config.prebuiltDigest) launcherFailure('LAUNCHER_WRITE_FAILED');
+}
+
+async function commitStagedTarget(
+  paths: SyncNosRuntimePaths,
+  destination: string,
+  temporary: string,
+  expectedDigest: string,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  assertRuntimeOwnedFilePath(paths, destination);
+  assertRuntimeOwnedFilePath(paths, temporary);
+  const staged = await readOptionalOwnedFile(paths, temporary, dependencies);
+  if (!staged || sha256(staged) !== expectedDigest) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
   try {
-    await dependencies.rename(paths.launcherTemporaryPath, paths.launcherPath);
+    await dependencies.rename(temporary, destination);
   } catch (_error) {
     launcherFailure('LAUNCHER_WRITE_FAILED');
   }
-  const launcherBytes = await readVerifiedFile(dependencies, paths.launcherPath, 'LAUNCHER_WRITE_FAILED');
-  if (sha256(launcherBytes) !== source.config.prebuiltDigest) launcherFailure('LAUNCHER_WRITE_FAILED');
-  return launcherBytes;
+  const committed = await readVerifiedFile(dependencies, destination, 'LAUNCHER_WRITE_FAILED');
+  if (sha256(committed) !== expectedDigest) launcherFailure('LAUNCHER_WRITE_FAILED');
+}
+
+async function recoverLauncherTarget(
+  paths: SyncNosRuntimePaths,
+  destination: string,
+  temporary: string,
+  target: LauncherUpdateIntentTarget,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  const current = await readOptionalOwnedFile(paths, destination, dependencies);
+  const currentDigest = current ? sha256(current) : null;
+  const staged = await readOptionalOwnedFile(paths, temporary, dependencies);
+  const stagedDigest = staged ? sha256(staged) : null;
+
+  if (currentDigest === target.newDigest) {
+    if (stagedDigest !== null && stagedDigest !== target.newDigest) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+    if (stagedDigest !== null) await unlinkOwnedRuntimeFile(paths, temporary, dependencies);
+    return;
+  }
+  if (currentDigest !== target.oldDigest || stagedDigest !== target.newDigest) {
+    launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  }
+  await commitStagedTarget(paths, destination, temporary, target.newDigest, dependencies);
+}
+
+async function prepareLauncherUpdateIntent(
+  paths: SyncNosRuntimePaths,
+  intent: LauncherUpdateIntent,
+  dependencies: ResolvedDependencies,
+): Promise<Buffer> {
+  await assertTemporaryPathAbsent(paths, paths.launcherUpdateIntentPath, dependencies);
+  const bytes = Buffer.from(JSON.stringify(intent), 'utf8');
+  await stageWithBytes(paths, paths.launcherUpdateIntentTemporaryPath, bytes, 0o600, dependencies);
+  return bytes;
+}
+
+async function commitLauncherUpdateIntent(
+  paths: SyncNosRuntimePaths,
+  expectedBytes: Buffer,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  const prepared = await readVerifiedFile(
+    dependencies,
+    paths.launcherUpdateIntentTemporaryPath,
+    'LAUNCHER_OWNERSHIP_INVALID',
+  );
+  if (!prepared.equals(expectedBytes)) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  try {
+    await dependencies.rename(paths.launcherUpdateIntentTemporaryPath, paths.launcherUpdateIntentPath);
+  } catch (_error) {
+    launcherFailure('LAUNCHER_WRITE_FAILED');
+  }
+  const committed = await readVerifiedFile(dependencies, paths.launcherUpdateIntentPath, 'LAUNCHER_WRITE_FAILED');
+  if (!committed.equals(expectedBytes)) launcherFailure('LAUNCHER_WRITE_FAILED');
+}
+
+async function assertNoUntrackedLauncherStages(
+  paths: SyncNosRuntimePaths,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  for (const path of [
+    paths.launcherConfigTemporaryPath,
+    paths.launcherTemporaryPath,
+    paths.runtimeOwnerMarkerTemporaryPath,
+  ]) {
+    if (await readOptionalOwnedFile(paths, path, dependencies)) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  }
+}
+
+async function rollbackPreparedLauncherTarget(
+  paths: SyncNosRuntimePaths,
+  destination: string,
+  temporary: string,
+  target: LauncherUpdateIntentTarget,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  const current = await readOptionalOwnedFile(paths, destination, dependencies);
+  const currentDigest = current ? sha256(current) : null;
+  if (currentDigest !== target.oldDigest) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  const staged = await readOptionalOwnedFile(paths, temporary, dependencies);
+  if (!staged) return;
+  if (sha256(staged) !== target.newDigest) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  await unlinkOwnedRuntimeFile(paths, temporary, dependencies);
+}
+
+/**
+ * Completes only an update whose fixed intent proves every final file is still exactly the
+ * previous owned generation or the staged next generation. Unknown bytes always fail closed.
+ */
+export async function recoverNativeHostLauncherUpdate(
+  input: Pick<EnsureNativeHostLauncherInput, 'dependencies' | 'paths'> = {},
+): Promise<boolean> {
+  const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
+  const dependencies = resolveDependencies(input.dependencies);
+  const [committedIntentBytes, preparedIntentBytes] = await Promise.all([
+    readOptionalOwnedFile(paths, paths.launcherUpdateIntentPath, dependencies),
+    readOptionalOwnedFile(paths, paths.launcherUpdateIntentTemporaryPath, dependencies),
+  ]);
+  if (!committedIntentBytes && !preparedIntentBytes) {
+    await assertNoUntrackedLauncherStages(paths, dependencies);
+    return false;
+  }
+  if (committedIntentBytes && preparedIntentBytes) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+
+  const intentBytes = committedIntentBytes ?? preparedIntentBytes!;
+  const intent = parseLauncherUpdateIntent(intentBytes);
+  if (intent.platform !== paths.platform) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+
+  if (preparedIntentBytes) {
+    await rollbackPreparedLauncherTarget(
+      paths,
+      paths.launcherConfigPath,
+      paths.launcherConfigTemporaryPath,
+      intent.config,
+      dependencies,
+    );
+    await rollbackPreparedLauncherTarget(
+      paths,
+      paths.launcherPath,
+      paths.launcherTemporaryPath,
+      intent.launcher,
+      dependencies,
+    );
+    await rollbackPreparedLauncherTarget(
+      paths,
+      paths.runtimeOwnerMarkerPath,
+      paths.runtimeOwnerMarkerTemporaryPath,
+      intent.runtimeOwnerMarker,
+      dependencies,
+    );
+    const recheckedPrepared = await readVerifiedFile(
+      dependencies,
+      paths.launcherUpdateIntentTemporaryPath,
+      'LAUNCHER_OWNERSHIP_INVALID',
+    );
+    if (!recheckedPrepared.equals(intentBytes)) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+    await unlinkOwnedRuntimeFile(paths, paths.launcherUpdateIntentTemporaryPath, dependencies);
+    return true;
+  }
+
+  await recoverLauncherTarget(
+    paths,
+    paths.launcherConfigPath,
+    paths.launcherConfigTemporaryPath,
+    intent.config,
+    dependencies,
+  );
+  await recoverLauncherTarget(paths, paths.launcherPath, paths.launcherTemporaryPath, intent.launcher, dependencies);
+  await recoverLauncherTarget(
+    paths,
+    paths.runtimeOwnerMarkerPath,
+    paths.runtimeOwnerMarkerTemporaryPath,
+    intent.runtimeOwnerMarker,
+    dependencies,
+  );
+  const recheckedIntent = await readVerifiedFile(
+    dependencies,
+    paths.launcherUpdateIntentPath,
+    'LAUNCHER_OWNERSHIP_INVALID',
+  );
+  if (!recheckedIntent.equals(intentBytes)) launcherFailure('LAUNCHER_OWNERSHIP_INVALID');
+  await unlinkOwnedRuntimeFile(paths, paths.launcherUpdateIntentPath, dependencies);
+  return true;
 }
 
 /**
@@ -611,50 +844,77 @@ export async function ensureNativeHostLauncher(
 ): Promise<NativeHostLauncherResult> {
   const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
   const dependencies = resolveDependencies(input.dependencies);
+  await recoverNativeHostLauncherUpdate({ paths, dependencies: input.dependencies });
   const source = await loadLauncherSource(paths, input, dependencies);
   await dependencies.ensureRuntimeDirectory(paths);
-  const existing = await inspectExistingLauncher(paths, dependencies);
+  const existing = await inspectOwnedLauncher(paths, dependencies);
 
-  await replaceWithBytes(
-    paths,
-    paths.launcherConfigPath,
-    paths.launcherConfigTemporaryPath,
-    source.configBytes,
-    0o600,
-    dependencies,
-  );
-  const launcherBytes =
+  const launcherDigest =
     paths.platform === 'win32'
-      ? await replaceWithPrebuilt(source, dependencies)
-      : await (async () => {
-          const contents = source.launcherBytes;
-          if (!contents) launcherFailure('LAUNCHER_ARTIFACT_INVALID');
-          await replaceWithBytes(paths, paths.launcherPath, paths.launcherTemporaryPath, contents, 0o700, dependencies);
-          return contents;
-        })();
+      ? source.config.prebuiltDigest
+      : source.launcherBytes
+        ? sha256(source.launcherBytes)
+        : null;
+  if (!launcherDigest) launcherFailure('LAUNCHER_ARTIFACT_INVALID');
   const ownerMarker = Buffer.from(
     JSON.stringify({
       version: 1,
       ownerMarker: SYNCNOSCLI_RUNTIME_OWNER_MARKER,
       platform: paths.platform,
       configDigest: sha256(source.configBytes),
-      launcherDigest: sha256(launcherBytes),
+      launcherDigest,
       packageDigest: source.config.packageDigest,
       prebuiltDigest: source.config.prebuiltDigest,
     } satisfies RuntimeOwnerMarker),
     'utf8',
   );
-  await replaceWithBytes(
+  const intent = Object.freeze({
+    version: 1 as const,
+    ownerMarker: SYNCNOSCLI_LAUNCHER_UPDATE_INTENT,
+    platform: paths.platform,
+    config: Object.freeze({ oldDigest: existing?.configDigest ?? null, newDigest: sha256(source.configBytes) }),
+    launcher: Object.freeze({ oldDigest: existing?.launcherDigest ?? null, newDigest: launcherDigest }),
+    runtimeOwnerMarker: Object.freeze({
+      oldDigest: existing?.ownerMarkerDigest ?? null,
+      newDigest: sha256(ownerMarker),
+    }),
+  } satisfies LauncherUpdateIntent);
+
+  const intentBytes = await prepareLauncherUpdateIntent(paths, intent, dependencies);
+  await stageWithBytes(paths, paths.launcherConfigTemporaryPath, source.configBytes, 0o600, dependencies);
+  if (paths.platform === 'win32') {
+    await stagePrebuilt(source, dependencies);
+  } else {
+    if (!source.launcherBytes) launcherFailure('LAUNCHER_ARTIFACT_INVALID');
+    await stageWithBytes(paths, paths.launcherTemporaryPath, source.launcherBytes, 0o700, dependencies);
+  }
+  await stageWithBytes(paths, paths.runtimeOwnerMarkerTemporaryPath, ownerMarker, 0o600, dependencies);
+  await commitLauncherUpdateIntent(paths, intentBytes, dependencies);
+  await commitStagedTarget(
+    paths,
+    paths.launcherConfigPath,
+    paths.launcherConfigTemporaryPath,
+    intent.config.newDigest,
+    dependencies,
+  );
+  await commitStagedTarget(
+    paths,
+    paths.launcherPath,
+    paths.launcherTemporaryPath,
+    intent.launcher.newDigest,
+    dependencies,
+  );
+  await commitStagedTarget(
     paths,
     paths.runtimeOwnerMarkerPath,
     paths.runtimeOwnerMarkerTemporaryPath,
-    ownerMarker,
-    0o600,
+    intent.runtimeOwnerMarker.newDigest,
     dependencies,
   );
+  await unlinkOwnedRuntimeFile(paths, paths.launcherUpdateIntentPath, dependencies);
 
   return Object.freeze({
-    created: existing === 'absent',
+    created: existing === null,
     platform: paths.platform,
     launcherPath: paths.launcherPath,
     configPath: paths.launcherConfigPath,

@@ -231,6 +231,8 @@ describe('SyncNos CLI runtime paths', () => {
     expect(classifySyncNosRuntimePath(paths, paths.databaseWalPath)).toBe('user-data');
     expect(classifySyncNosRuntimePath(paths, paths.databaseShmPath)).toBe('user-data');
     expect(classifySyncNosRuntimePath(paths, paths.launcherPath)).toBe('runtime-owned-file');
+    expect(classifySyncNosRuntimePath(paths, paths.launcherUpdateIntentPath)).toBe('runtime-owned-file');
+    expect(classifySyncNosRuntimePath(paths, paths.launcherUpdateIntentTemporaryPath)).toBe('runtime-owned-file');
     expect(classifySyncNosRuntimePath(paths, paths.stagingDirectory)).toBe('runtime-owned-directory');
     expect(classifySyncNosRuntimePath(paths, '/home/chii/.syncnoscli/unknown.txt')).toBe('unknown');
     expect(assertRuntimeOwnedFilePath(paths, paths.launcherConfigPath)).toBe(paths.launcherConfigPath);

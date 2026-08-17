@@ -1,5 +1,16 @@
 import { createHash } from 'node:crypto';
-import { access, lstat, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rename as nodeRename,
+  rm,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,6 +19,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ensureNativeHostLauncher,
   inspectNativeHostLauncher,
+  recoverNativeHostLauncherUpdate,
   NativeHostLauncherError,
   type NativeHostLauncherDependencies,
 } from '../../packages/syncnoscli/src/runtime/launcher';
@@ -81,6 +93,9 @@ function createWindowsDependencies(files: Map<string, FakeEntry>): NativeHostLau
       files.set(destination, entry);
     },
     chmod: async () => undefined,
+    unlink: async (path) => {
+      if (!files.delete(path)) throw missing();
+    },
   };
 }
 
@@ -153,6 +168,149 @@ describe('SyncNos Native Host launcher', () => {
       code: 'LAUNCHER_OWNERSHIP_INVALID',
     } satisfies Partial<NativeHostLauncherError>);
     await expect(readFile(fixture.paths.launcherConfigPath, 'utf8')).resolves.toBe('{}');
+  });
+
+  it('rolls back a proven pre-commit interruption and never deletes an untracked .next file', async () => {
+    const fixture = await createUnixFixture();
+    await expect(
+      ensureNativeHostLauncher({
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+        dependencies: {
+          writeFile: async (path, contents, options) => {
+            if (path === fixture.paths.launcherTemporaryPath) throw new Error('injected staging failure');
+            await writeFile(path, contents, options);
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'LAUNCHER_WRITE_FAILED' } satisfies Partial<NativeHostLauncherError>);
+    await expect(access(fixture.paths.launcherUpdateIntentTemporaryPath)).resolves.toBeUndefined();
+    await expect(access(fixture.paths.launcherConfigTemporaryPath)).resolves.toBeUndefined();
+    await expect(recoverNativeHostLauncherUpdate({ paths: fixture.paths })).resolves.toBe(true);
+    for (const path of [
+      fixture.paths.launcherConfigPath,
+      fixture.paths.launcherPath,
+      fixture.paths.runtimeOwnerMarkerPath,
+      fixture.paths.launcherConfigTemporaryPath,
+      fixture.paths.launcherTemporaryPath,
+      fixture.paths.runtimeOwnerMarkerTemporaryPath,
+      fixture.paths.launcherUpdateIntentPath,
+      fixture.paths.launcherUpdateIntentTemporaryPath,
+    ]) {
+      await expect(access(path)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+
+    await writeFile(fixture.paths.launcherConfigTemporaryPath, 'unknown third-party bytes');
+    await expect(recoverNativeHostLauncherUpdate({ paths: fixture.paths })).rejects.toMatchObject({
+      code: 'LAUNCHER_OWNERSHIP_INVALID',
+    } satisfies Partial<NativeHostLauncherError>);
+    await expect(readFile(fixture.paths.launcherConfigTemporaryPath, 'utf8')).resolves.toBe(
+      'unknown third-party bytes',
+    );
+  });
+
+  it('recovers fresh-install interruptions at every launcher generation commit boundary', async () => {
+    for (const target of ['config', 'launcher', 'marker'] as const) {
+      const fixture = await createUnixFixture();
+      const destination =
+        target === 'config'
+          ? fixture.paths.launcherConfigPath
+          : target === 'launcher'
+            ? fixture.paths.launcherPath
+            : fixture.paths.runtimeOwnerMarkerPath;
+      let injected = false;
+      const dependencies: NativeHostLauncherDependencies = {
+        rename: async (source, nextDestination) => {
+          if (!injected && nextDestination === destination) {
+            injected = true;
+            throw new Error(`injected ${target} commit failure`);
+          }
+          await nodeRename(source, nextDestination);
+        },
+      };
+
+      await expect(
+        ensureNativeHostLauncher({ packageRoot: fixture.packageRoot, paths: fixture.paths, dependencies }),
+      ).rejects.toMatchObject({ code: 'LAUNCHER_WRITE_FAILED' } satisfies Partial<NativeHostLauncherError>);
+      expect(injected).toBe(true);
+      await expect(access(fixture.paths.launcherUpdateIntentPath)).resolves.toBeUndefined();
+
+      await expect(recoverNativeHostLauncherUpdate({ paths: fixture.paths })).resolves.toBe(true);
+      await expect(inspectNativeHostLauncher({ paths: fixture.paths })).resolves.toMatchObject({
+        launcherPath: fixture.paths.launcherPath,
+        configPath: fixture.paths.launcherConfigPath,
+        ownerMarkerPath: fixture.paths.runtimeOwnerMarkerPath,
+      });
+      for (const temporary of [
+        fixture.paths.launcherConfigTemporaryPath,
+        fixture.paths.launcherTemporaryPath,
+        fixture.paths.runtimeOwnerMarkerTemporaryPath,
+        fixture.paths.launcherUpdateIntentPath,
+        fixture.paths.launcherUpdateIntentTemporaryPath,
+      ]) {
+        await expect(access(temporary)).rejects.toMatchObject({ code: 'ENOENT' });
+      }
+      await expect(access(fixture.paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+  });
+
+  it('finishes an interrupted owned upgrade but refuses to overwrite bytes changed after the interruption', async () => {
+    const fixture = await createUnixFixture();
+    await ensureNativeHostLauncher({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+    const alternateNode = join(fixture.root, 'alternate-node');
+    await writeFile(alternateNode, 'node');
+    let injected = false;
+    const dependencies: NativeHostLauncherDependencies = {
+      rename: async (source, destination) => {
+        if (!injected && destination === fixture.paths.launcherPath) {
+          injected = true;
+          throw new Error('injected launcher commit failure');
+        }
+        await nodeRename(source, destination);
+      },
+    };
+
+    await expect(
+      ensureNativeHostLauncher({
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+        nodePath: alternateNode,
+        dependencies,
+      }),
+    ).rejects.toMatchObject({ code: 'LAUNCHER_WRITE_FAILED' } satisfies Partial<NativeHostLauncherError>);
+    await expect(recoverNativeHostLauncherUpdate({ paths: fixture.paths })).resolves.toBe(true);
+    await expect(inspectNativeHostLauncher({ paths: fixture.paths })).resolves.toMatchObject({
+      nodePath: await realpath(alternateNode),
+    });
+
+    const tamperedFixture = await createUnixFixture();
+    await ensureNativeHostLauncher({ packageRoot: tamperedFixture.packageRoot, paths: tamperedFixture.paths });
+    const tamperedNode = join(tamperedFixture.root, 'alternate-node');
+    await writeFile(tamperedNode, 'node');
+    let tamperFailureInjected = false;
+    await expect(
+      ensureNativeHostLauncher({
+        packageRoot: tamperedFixture.packageRoot,
+        paths: tamperedFixture.paths,
+        nodePath: tamperedNode,
+        dependencies: {
+          rename: async (source, destination) => {
+            if (!tamperFailureInjected && destination === tamperedFixture.paths.launcherPath) {
+              tamperFailureInjected = true;
+              throw new Error('injected launcher commit failure');
+            }
+            await nodeRename(source, destination);
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'LAUNCHER_WRITE_FAILED' } satisfies Partial<NativeHostLauncherError>);
+    await writeFile(tamperedFixture.paths.launcherConfigPath, '{}');
+    await expect(recoverNativeHostLauncherUpdate({ paths: tamperedFixture.paths })).rejects.toMatchObject({
+      code: 'LAUNCHER_OWNERSHIP_INVALID',
+    } satisfies Partial<NativeHostLauncherError>);
+    await expect(readFile(tamperedFixture.paths.launcherConfigPath, 'utf8')).resolves.toBe('{}');
+
+    await unlink(tamperedFixture.paths.launcherUpdateIntentPath);
   });
 
   it('copies only the manifest-pinned Windows PE shim and records its digest in the fixed config', async () => {
