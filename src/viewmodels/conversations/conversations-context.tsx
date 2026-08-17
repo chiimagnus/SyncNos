@@ -32,6 +32,7 @@ import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contr
 import { connectPort } from '@services/shared/ports';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
+import { createLocalFactsRevisionMonitor } from '@viewmodels/conversations/local-revision-refresh';
 import {
   useConversationSyncFeedback,
   type ConversationSyncFeedbackState,
@@ -482,6 +483,8 @@ export function ConversationsProvider({
   const [listError, setListError] = useState<string | null>(null);
   const [listCursor, setListCursor] = useState<ConversationListCursor | null>(null);
   const [listFactsEpoch, setListFactsEpoch] = useState<FactsEpoch | null>(null);
+  const localRevisionMonitorRef = useRef<ReturnType<typeof createLocalFactsRevisionMonitor> | null>(null);
+  if (!localRevisionMonitorRef.current) localRevisionMonitorRef.current = createLocalFactsRevisionMonitor();
   const [listHasMore, setListHasMore] = useState(false);
   const [listSummary, setListSummary] = useState<ConversationListSummary>(EMPTY_LIST_SUMMARY);
   const [listFacets, setListFacets] = useState<ConversationListFacets>(EMPTY_LIST_FACETS);
@@ -1148,6 +1151,36 @@ export function ConversationsProvider({
       port = null;
     };
   }, [refreshActiveDetail, refreshList]);
+
+  useEffect(() => {
+    const monitor = localRevisionMonitorRef.current!;
+    monitor.setFactsEpoch(listFactsEpoch);
+    if (!String(listFactsEpoch || '').startsWith('native:')) return;
+
+    const refreshStableSnapshot = async () => {
+      const active = activeConversationSnapshotRef.current as any;
+      const source = String(active?.source || '').trim();
+      const conversationKey = String(active?.conversationKey || '').trim();
+      const migrationReselect: StableConversationReference | null =
+        source && conversationKey ? { source, conversationKey } : null;
+      await refreshList({ migrationReselect });
+    };
+    const probeRevision = () => {
+      void monitor.checkForExternalChange(refreshStableSnapshot).catch(() => {
+        // Focus refresh is best-effort; normal facts operations keep their own epoch/lease safety.
+      });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') probeRevision();
+    };
+
+    window.addEventListener('focus', probeRevision);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', probeRevision);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [listFactsEpoch, refreshList]);
 
   useEffect(() => {
     let cancelled = false;

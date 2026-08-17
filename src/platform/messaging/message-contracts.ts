@@ -1,5 +1,6 @@
 export const LOCAL_DATA_MESSAGE_TYPES = {
   GET_STATUS: 'getLocalDataMigrationStatus',
+  GET_FACTS_REVISION: 'getLocalDataFactsRevision',
   START_MIGRATION: 'startLocalDataMigration',
   RESUME_MIGRATION: 'resumeLocalDataMigration',
 } as const;

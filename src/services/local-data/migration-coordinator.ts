@@ -47,6 +47,7 @@ import {
   type LocalDataMigrationHostStatus,
   type LocalDataMigrationJournalStatus,
   type LocalDataMigrationStatus,
+  type LocalDataProfileState,
 } from './migration-status';
 import { nativeHostContract } from './native-host-contract';
 import { createProfileReferenceRebase, type ProfileReferenceRebase } from './profile-reference-rebase';
@@ -58,7 +59,7 @@ export type MigrationRuntimeEnvironment = Readonly<{
 }>;
 
 export type MigrationNativeRequest = (
-  command: 'GET_STATUS' | 'GET_MIGRATION_RECEIPT',
+  command: 'GET_STATUS' | 'GET_FACTS_REVISION' | 'GET_MIGRATION_RECEIPT',
   payload: Readonly<Record<string, unknown>>,
 ) => Promise<unknown>;
 
@@ -87,6 +88,7 @@ export type MigrationCoordinatorDependencies = Readonly<{
 }>;
 
 export type MigrationCoordinator = Readonly<{
+  getFactsRevision: () => Promise<number | null>;
   getStatus: () => Promise<LocalDataMigrationStatus>;
   resume: () => Promise<LocalDataMigrationStatus>;
   start: () => Promise<LocalDataMigrationStatus>;
@@ -129,10 +131,13 @@ function defaultEnvironment(): MigrationRuntimeEnvironment {
 }
 
 async function defaultNativeRequest(
-  command: 'GET_STATUS' | 'GET_MIGRATION_RECEIPT',
+  command: 'GET_STATUS' | 'GET_FACTS_REVISION' | 'GET_MIGRATION_RECEIPT',
   payload: Readonly<Record<string, unknown>>,
 ): Promise<unknown> {
   if (command === 'GET_STATUS') return await sendNativeMessage({ command: 'GET_STATUS', payload: {} });
+  if (command === 'GET_FACTS_REVISION') {
+    return await sendNativeMessage({ command: 'GET_FACTS_REVISION', payload: {} });
+  }
   return await sendNativeMessage({
     command: 'GET_MIGRATION_RECEIPT',
     payload: { migrationId: parseMigrationId(payload.migrationId) },
@@ -390,6 +395,22 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
   const onActivated = dependencies.onActivated ?? (async () => {});
   let transitionRunning = false;
 
+  const getFactsRevision = async (): Promise<number | null> => {
+    const snapshot = await readMigrationJournal(dependencies.journalRuntime);
+    if (snapshot.mode !== 'active') return null;
+    const environment = await readEnvironment();
+    assertEnvironment(environment);
+    const value = record(await nativeRequest('GET_FACTS_REVISION', {}));
+    if (Object.keys(value).sort().join(',') !== 'factsRevision') {
+      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    }
+    const factsRevision = Number(value.factsRevision);
+    if (!Number.isSafeInteger(factsRevision) || factsRevision < 0) {
+      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    }
+    return factsRevision;
+  };
+
   const getStatus = async (): Promise<LocalDataMigrationStatus> => {
     const environment = await readEnvironment();
     const snapshot = await readMigrationJournal(dependencies.journalRuntime);
@@ -413,6 +434,15 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       digestProvider,
     );
     const hostReady = hostProbe.host.registration === 'available' && hostProbe.host.compatibility === 'compatible';
+    const profileState: LocalDataProfileState = (() => {
+      if (snapshot.mode === 'blocked') return 'blocked';
+      if (snapshot.mode === 'active') return 'active';
+      if (snapshot.mode === 'transitional') return 'migration_in_progress';
+      if (!capability.supported || !capability.officialIdentity || !hostReady) return 'unavailable';
+      return hostProbe.database.presence === 'present' && hostProbe.database.factsHealth === 'healthy'
+        ? 'join_existing_required'
+        : 'setup_required';
+    })();
     return Object.freeze({
       actions: Object.freeze({
         canStart: snapshot.mode === 'not_started' && capability.supported && capability.officialIdentity && hostReady,
@@ -423,6 +453,7 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       diagnostics: Object.freeze(diagnostics),
       host: hostProbe.host,
       journal: journalStatus(snapshot),
+      profileState,
       resumeReceipt,
     });
   };
@@ -582,6 +613,7 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
   };
 
   return Object.freeze({
+    getFactsRevision,
     getStatus,
     start: async () => await runTransition('start'),
     resume: async () => await runTransition('resume'),
@@ -608,6 +640,14 @@ function handlerError(router: MigrationRouter, error: unknown): unknown {
 }
 
 export function registerMigrationCoordinatorHandlers(router: MigrationRouter, coordinator: MigrationCoordinator): void {
+  router.register(LOCAL_DATA_MESSAGE_TYPES.GET_FACTS_REVISION, async (message) => {
+    try {
+      parseEmptyMigrationMessage(message, 'GET_FACTS_REVISION');
+      return router.ok({ factsRevision: await coordinator.getFactsRevision() });
+    } catch (error) {
+      return handlerError(router, error);
+    }
+  });
   router.register(LOCAL_DATA_MESSAGE_TYPES.GET_STATUS, async (message) => {
     try {
       parseEmptyMigrationMessage(message, 'GET_LOCAL_DATA_STATUS');

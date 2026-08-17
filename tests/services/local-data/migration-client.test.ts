@@ -11,21 +11,28 @@ function status() {
     diagnostics: [],
     host: { registration: 'available', compatibility: 'compatible' },
     journal: { mode: 'not_started', stage: 'not_started' },
+    profileState: 'setup_required',
     resumeReceipt: 'not_applicable',
   };
 }
 
 describe('local data migration client', () => {
-  it('maps typed status/start/resume calls through the shared runtime helper surface', async () => {
-    const send = vi.fn(async () => ({ ok: true, data: status(), error: null }));
+  it('maps typed status/revision/start/resume calls through the shared runtime helper surface', async () => {
+    const send = vi.fn(async (type: string) =>
+      type === LOCAL_DATA_MESSAGE_TYPES.GET_FACTS_REVISION
+        ? { ok: true, data: { factsRevision: 17 }, error: null }
+        : { ok: true, data: status(), error: null },
+    );
     const client = createLocalDataMigrationClient({ send });
 
     await expect(client.getStatus()).resolves.toEqual(status());
+    await expect(client.getFactsRevision()).resolves.toBe(17);
     await expect(client.start()).resolves.toEqual(status());
     await expect(client.resume()).resolves.toEqual(status());
 
     expect(send.mock.calls).toEqual([
       [LOCAL_DATA_MESSAGE_TYPES.GET_STATUS],
+      [LOCAL_DATA_MESSAGE_TYPES.GET_FACTS_REVISION],
       [LOCAL_DATA_MESSAGE_TYPES.START_MIGRATION],
       [LOCAL_DATA_MESSAGE_TYPES.RESUME_MIGRATION],
     ]);
