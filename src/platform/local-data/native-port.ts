@@ -24,6 +24,8 @@ import {
   type NativeWireFrame,
 } from '@services/local-data/native-wire';
 
+export const NATIVE_PORT_OPERATION_TIMEOUT_MS = 10 * 60_000;
+
 type NativePortListener = (message?: unknown) => void;
 
 type NativePortEvent = Readonly<{
@@ -129,8 +131,13 @@ function readNativePortStream<THeader extends NativePortStreamHeader, TResult>(
     let receiver: NativeWireSessionReceiver | null = null;
     let bytes: Uint8Array | null = null;
     let processing = Promise.resolve();
+    let operationTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
     const cleanup = () => {
+      if (operationTimer !== null) {
+        globalThis.clearTimeout(operationTimer);
+        operationTimer = null;
+      }
       input.port.onMessage.removeListener?.(onMessage);
       input.port.onDisconnect.removeListener?.(onDisconnect);
     };
@@ -197,6 +204,10 @@ function readNativePortStream<THeader extends NativePortStreamHeader, TResult>(
 
     input.port.onMessage.addListener(onMessage);
     input.port.onDisconnect.addListener(onDisconnect);
+    operationTimer = globalThis.setTimeout(
+      () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
+      NATIVE_PORT_OPERATION_TIMEOUT_MS,
+    );
     if (input.start) {
       void input.start().catch(fail);
     } else {
@@ -302,8 +313,13 @@ export function writeNativePortFactsImport(
     let completeSent = false;
     let processing = Promise.resolve();
     let settled = false;
+    let operationTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
     const cleanup = () => {
+      if (operationTimer !== null) {
+        globalThis.clearTimeout(operationTimer);
+        operationTimer = null;
+      }
       input.port.onMessage.removeListener?.(onMessage);
       input.port.onDisconnect.removeListener?.(onDisconnect);
     };
@@ -362,6 +378,10 @@ export function writeNativePortFactsImport(
 
     input.port.onMessage.addListener(onMessage);
     input.port.onDisconnect.addListener(onDisconnect);
+    operationTimer = globalThis.setTimeout(
+      () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
+      NATIVE_PORT_OPERATION_TIMEOUT_MS,
+    );
     try {
       post(input.request);
     } catch (error) {
