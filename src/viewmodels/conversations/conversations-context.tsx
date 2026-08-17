@@ -33,6 +33,8 @@ import { connectPort } from '@services/shared/ports';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
 import { createLocalFactsRevisionMonitor } from '@viewmodels/conversations/local-revision-refresh';
+import { useConversationSearchSheet } from '@viewmodels/conversations/useConversationSearchSheet';
+import type { ConversationSearchSheetController } from '@viewmodels/conversations/search-sheet-types';
 import {
   useConversationSyncFeedback,
   type ConversationSyncFeedbackState,
@@ -436,6 +438,9 @@ type ConversationsAppState = {
   setListSourceFilterKeyPersistent: (next: string) => void;
   setListSiteFilterKeyPersistent: (next: string) => void;
 
+  localSearchSheet: ConversationSearchSheetController;
+  openLocalSearch: () => Promise<void>;
+
   pendingListLocateId: number | null;
   requestListLocate: (conversationId: number) => void;
   consumeListLocate: () => number | null;
@@ -510,6 +515,7 @@ export function ConversationsProvider({
 
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
+  const localSearchSheet = useConversationSearchSheet({ listSourceFilterKey, listSiteFilterKey });
   const activeConversationSnapshotRef = useRef<ConversationListOpenTarget | null>(null);
   const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(
     null,
@@ -1403,6 +1409,8 @@ export function ConversationsProvider({
     listSiteFilterKey,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
+    localSearchSheet,
+    openLocalSearch: localSearchSheet.openLocalSearch,
     pendingListLocateId,
     requestListLocate,
     consumeListLocate,
