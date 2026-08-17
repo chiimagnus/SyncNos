@@ -654,6 +654,24 @@ describe('conversations storage-idb', () => {
     expect(stored[1]).toMatchObject({ contentText: placeholder, contentMarkdown: placeholder });
   });
 
+  it('keeps snapshot messageKey identity exact, including leading and trailing whitespace', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'exact-message-key',
+      title: 'Exact message key',
+      lastCapturedAt: 1,
+    } as any);
+
+    await syncConversationMessages(Number(conversation.id), [
+      { messageKey: ' m1 ', role: 'assistant', contentText: 'kept', sequence: 1 },
+    ] as any);
+
+    expect((await getMessagesByConversationId(Number(conversation.id))).map((message) => message.messageKey)).toEqual([
+      ' m1 ',
+    ]);
+  });
+
   it('reads message tails by conversation id with ascending sequence order', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

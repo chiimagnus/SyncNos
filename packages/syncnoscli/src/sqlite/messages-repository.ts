@@ -166,6 +166,7 @@ function upsertMessageWithinTransaction(
   input: Readonly<{
     conversationId: number;
     existing: MessageRow | null;
+    messageKey: string;
     raw: Record<string, unknown>;
     sequence: number;
   }>,
@@ -188,8 +189,8 @@ function upsertMessageWithinTransaction(
   const updatedAt = preserveExistingContent
     ? normalizedTimestamp(input.existing?.updated_at)
     : normalizedTimestamp(input.raw.updatedAt);
-  const messageKey = safeString(input.raw.messageKey);
-  if (!messageKey) invalidArgument();
+  if (!input.messageKey) invalidArgument();
+  const messageKey = input.messageKey;
 
   const nextPayload: Record<string, unknown> = {
     ...existingPayload,
@@ -257,13 +258,14 @@ export function upsertMigrationMessageWithinTransaction(
   const conversationId = positiveId(input.conversationId);
   if (!conversationId || !conversationExists(database, conversationId)) invalidArgument();
   const incoming = messagePayload(input.payload) as Record<string, unknown>;
-  const messageKey = safeString(incoming.messageKey);
-  if (!messageKey) invalidArgument();
+  const messageKey = typeof incoming.messageKey === 'string' ? incoming.messageKey : '';
+  if (!messageKey || !messageKey.trim()) invalidArgument();
   const existing = selectMessageByConversationAndKey(database, conversationId, messageKey);
   const merged = mergeMigrationMessagePayload(existing ? readCanonicalJsonRecord(existing.payload_json) : {}, incoming);
   const row = upsertMessageWithinTransaction(database, {
     conversationId,
     existing,
+    messageKey,
     raw: merged,
     sequence: normalizedSequence(merged.sequence),
   });
@@ -361,7 +363,7 @@ export function syncMessagesWithinTransaction(
           ? existing.sequence
           : nextTailSequence++
         : normalizedSequence(message.sequence);
-      upsertMessageWithinTransaction(database, { conversationId, existing, raw: message, sequence });
+      upsertMessageWithinTransaction(database, { conversationId, existing, messageKey: key, raw: message, sequence });
       upserted += 1;
     }
 
@@ -386,6 +388,7 @@ export function syncMessagesWithinTransaction(
     upsertMessageWithinTransaction(database, {
       conversationId,
       existing,
+      messageKey: key,
       raw: message,
       sequence: normalizedSequence(message.sequence),
     });

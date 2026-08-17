@@ -113,6 +113,28 @@ describe('SQLite messages repository', () => {
     }
   });
 
+  it('keeps snapshot messageKey identity exact instead of trimming and then deleting the inserted row', async () => {
+    const { conversations, handle, messages } = await fixture.open();
+    try {
+      const conversation = conversations.upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'exact-message-key',
+        title: 'Exact message key',
+        lastCapturedAt: 1,
+      });
+
+      expect(
+        messages.syncConversationMessages(conversation.id, [
+          { messageKey: ' m1 ', role: 'assistant', contentText: 'kept', sequence: 1 },
+        ]),
+      ).toEqual({ upserted: 1, deleted: 0 });
+      expect(messages.getMessagesByConversationId(conversation.id).map((message) => message.messageKey)).toEqual([' m1 ']);
+    } finally {
+      handle.close();
+    }
+  });
+
   it('rolls back a failed facts write without publishing a revision', async () => {
     const { conversations, database, handle, messages } = await fixture.open();
     try {
