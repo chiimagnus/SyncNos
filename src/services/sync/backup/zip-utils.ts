@@ -1,5 +1,14 @@
 import { unzipSync, zipSync, type ZipOptions, type Zippable } from 'fflate';
 
+import { LocalDataContractError, MAX_ZIP_STREAM_BYTES } from '@services/local-data/contracts';
+
+const ZIP_EOCD_SIGNATURE = 0x06054b50;
+const ZIP_CENTRAL_FILE_SIGNATURE = 0x02014b50;
+const ZIP_EOCD_MIN_BYTES = 22;
+const ZIP_MAX_COMMENT_BYTES = 0xffff;
+const ZIP_CENTRAL_FILE_MIN_BYTES = 46;
+const ZIP_MAX_ENTRY_COUNT = 250_000;
+
 function normalizeEntryName(name: unknown, fallback: string) {
   const raw = String(name || '').trim() || fallback;
   return raw
@@ -37,6 +46,83 @@ function zipToUint8Array(data: Zippable, opts: ZipOptions): Uint8Array {
   //   which then fails under that CSP and can leave the callback unresolved.
   // - `zipSync()` avoids workers entirely and is therefore CSP-safe across browsers.
   return zipSync(data, opts);
+}
+
+function zipPayloadTooLarge(actualBytes: number): never {
+  throw new LocalDataContractError('PAYLOAD_TOO_LARGE', {
+    actualBytes,
+    declaredBytes: actualBytes,
+    limitBytes: MAX_ZIP_STREAM_BYTES,
+    operation: 'zip-backup',
+  });
+}
+
+function invalidZip(message: string): never {
+  throw new Error(`Invalid ZIP: ${message}`);
+}
+
+function assertBoundedZipCentralDirectory(bytes: Uint8Array): void {
+  if (bytes.byteLength > MAX_ZIP_STREAM_BYTES) zipPayloadTooLarge(bytes.byteLength);
+  if (bytes.byteLength < ZIP_EOCD_MIN_BYTES) invalidZip('missing end-of-central-directory record');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const minimumOffset = Math.max(0, bytes.byteLength - ZIP_EOCD_MIN_BYTES - ZIP_MAX_COMMENT_BYTES);
+  let eocdOffset = -1;
+  for (let offset = bytes.byteLength - ZIP_EOCD_MIN_BYTES; offset >= minimumOffset; offset -= 1) {
+    if (view.getUint32(offset, true) !== ZIP_EOCD_SIGNATURE) continue;
+    const commentLength = view.getUint16(offset + 20, true);
+    if (offset + ZIP_EOCD_MIN_BYTES + commentLength !== bytes.byteLength) continue;
+    eocdOffset = offset;
+    break;
+  }
+  if (eocdOffset < 0) invalidZip('missing end-of-central-directory record');
+
+  const diskNumber = view.getUint16(eocdOffset + 4, true);
+  const centralDisk = view.getUint16(eocdOffset + 6, true);
+  const entriesOnDisk = view.getUint16(eocdOffset + 8, true);
+  const totalEntries = view.getUint16(eocdOffset + 10, true);
+  const centralSize = view.getUint32(eocdOffset + 12, true);
+  const centralOffset = view.getUint32(eocdOffset + 16, true);
+  if (diskNumber !== 0 || centralDisk !== 0 || entriesOnDisk !== totalEntries)
+    invalidZip('multi-disk archives are unsupported');
+  if (totalEntries === 0xffff || centralSize === 0xffffffff || centralOffset === 0xffffffff) {
+    invalidZip('ZIP64 archives are unsupported for bounded backups');
+  }
+  if (totalEntries > ZIP_MAX_ENTRY_COUNT) invalidZip('too many entries');
+  if (centralOffset + centralSize !== eocdOffset || centralOffset > eocdOffset)
+    invalidZip('invalid central directory bounds');
+
+  let cursor = centralOffset;
+  let parsedEntries = 0;
+  let totalUncompressedBytes = 0;
+  while (cursor < eocdOffset) {
+    if (
+      cursor + ZIP_CENTRAL_FILE_MIN_BYTES > eocdOffset ||
+      view.getUint32(cursor, true) !== ZIP_CENTRAL_FILE_SIGNATURE
+    ) {
+      invalidZip('invalid central directory entry');
+    }
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const nameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const diskStart = view.getUint16(cursor + 34, true);
+    const localHeaderOffset = view.getUint32(cursor + 42, true);
+    if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localHeaderOffset === 0xffffffff) {
+      invalidZip('ZIP64 entries are unsupported for bounded backups');
+    }
+    if (diskStart !== 0) invalidZip('multi-disk entries are unsupported');
+    totalUncompressedBytes += uncompressedSize;
+    if (uncompressedSize > MAX_ZIP_STREAM_BYTES || totalUncompressedBytes > MAX_ZIP_STREAM_BYTES) {
+      zipPayloadTooLarge(totalUncompressedBytes);
+    }
+    const next = cursor + ZIP_CENTRAL_FILE_MIN_BYTES + nameLength + extraLength + commentLength;
+    if (next <= cursor || next > eocdOffset) invalidZip('invalid central directory entry bounds');
+    cursor = next;
+    parsedEntries += 1;
+    if (parsedEntries > ZIP_MAX_ENTRY_COUNT) invalidZip('too many entries');
+  }
+  if (cursor !== eocdOffset || parsedEntries !== totalEntries) invalidZip('central directory entry count mismatch');
 }
 
 function normalizeRezippedTopLevelFolder(entries: Map<string, Uint8Array>): Map<string, Uint8Array> {
@@ -107,8 +193,10 @@ export async function createZipBlob(entries: ZipInputEntry[]): Promise<Blob> {
 
 export async function extractZipEntries(blob: Blob): Promise<Map<string, Uint8Array>> {
   const inputBlob = blob instanceof Blob ? blob : new Blob([]);
+  if (inputBlob.size > MAX_ZIP_STREAM_BYTES) zipPayloadTooLarge(inputBlob.size);
   const ab = await inputBlob.arrayBuffer();
   const bytes = new Uint8Array(ab);
+  assertBoundedZipCentralDirectory(bytes);
 
   let unzipped: Record<string, Uint8Array>;
   try {

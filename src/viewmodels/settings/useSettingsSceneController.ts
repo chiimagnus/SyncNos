@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { exportBackupZipV2 } from '@services/sync/backup/export';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
-import {
-  importBackupLegacyJsonMerge,
-  importBackupZipV2Merge,
-  type ImportProgress,
-  type ImportStats,
-} from '@services/sync/backup/import';
-import { extractZipEntries } from '@services/sync/backup/zip-utils';
+import { exportBackupZip, importBackupFile, type ImportStats } from '@services/sync/backup/client';
 import { disconnectNotion } from '@services/sync/notion/auth/settings-client';
 import { getNotionOAuthDefaults } from '@services/sync/notion/auth/oauth';
 import { disconnectFeishu } from '@services/sync/feishu/auth/settings-client';
@@ -79,14 +72,7 @@ import {
   type InsightTimeRange,
 } from '@viewmodels/settings/insight-stats';
 
-import {
-  formatProgress,
-  isZipFile,
-  openHttpUrl,
-  unwrap,
-  type ApiResponse,
-  type NotionPageOption,
-} from '@viewmodels/settings/utils';
+import { openHttpUrl, unwrap, type ApiResponse, type NotionPageOption } from '@viewmodels/settings/utils';
 import type { SettingsSectionKey } from '@viewmodels/settings/types';
 import { getLocalePreference, saveLocalePreference, type LocalePreference, t } from '@i18n';
 import { ABOUT_YOU_USER_NAME_STORAGE_KEY, normalizeUserName } from '@services/shared/user-profile';
@@ -1396,46 +1382,18 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setExportStatus(t('backupExporting'));
     await runTask(
       async () => {
-        // Show coarse-grained progress. Export uses `zipSync()` (CSP-safe on Firefox),
-        // so the UI cannot update continuously while the synchronous zip step is running.
-        const stageLabel = (stage: string) => {
-          switch (stage) {
-            case 'open_db':
-              return '1/6';
-            case 'read_db':
-              return '2/6';
-            case 'read_storage':
-              return '3/6';
-            case 'assemble_files':
-              return '4/6';
-            case 'zip':
-              return '5/6';
-            case 'finalize':
-              return '6/6';
-            default:
-              return '';
-          }
-        };
-
-        // Ensure status paint happens before the potentially long synchronous zip step.
+        // Ensure status paint happens before the background-owned stream starts.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-        const result = await exportBackupZipV2({
-          onProgress: ({ stage }) => {
-            const label = stageLabel(stage);
-            if (label) setExportStatus(`${t('backupExporting')} (${label})`);
-          },
-        });
+        const result = await exportBackupZip();
         const url = URL.createObjectURL(result.blob);
         const anchor = document.createElement('a');
         anchor.href = url;
         anchor.download = result.filename;
         anchor.click();
 
-        setExportStatus(
-          `${t('backupExported')} (${t('statsConversations')} ${result.counts.conversations}, ${t('statsMessages')} ${result.counts.messages}, ${t('statsComments')} ${result.counts.article_comments})`,
-        );
-        setLastBackupExportAt(Date.parse(result.exportedAt) || Date.now());
+        setExportStatus(t('backupExported'));
+        setLastBackupExportAt(Date.now());
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       },
       {
@@ -1456,23 +1414,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       await runTask(
         async () => {
-          const asZip = await isZipFile(file);
-          let stats: ImportStats;
-
-          if (asZip) {
-            const entries = await extractZipEntries(file);
-            stats = await importBackupZipV2Merge(entries, (progress: ImportProgress) => {
-              const view = formatProgress(progress);
-              setImportStatus(view.text);
-            });
-          } else {
-            const text = await file.text();
-            const doc = JSON.parse(text);
-            stats = await importBackupLegacyJsonMerge(doc, (progress: ImportProgress) => {
-              const view = formatProgress(progress);
-              setImportStatus(view.text);
-            });
-          }
+          const stats: ImportStats = await importBackupFile(file);
 
           setImportStats(stats);
           setImportStatus(t('backupImported'));

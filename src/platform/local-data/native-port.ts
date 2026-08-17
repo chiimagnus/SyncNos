@@ -7,6 +7,7 @@ import {
   parseFactsMigrationReceipt,
   parseHostFactsResponse,
   parseMigrationId,
+  parseNativeHostBackupStreamResponseData,
   parseNativeHostImageAssetResponseData,
   parseNativeHostImportAcceptedData,
   parseNativeHostStreamResponseData,
@@ -240,6 +241,22 @@ export type NativePortImageAsset = Readonly<{
   contentType: string;
 }>;
 
+/** Reads one bounded portable backup facts payload from the Host. */
+export function readNativePortBackupBytes(
+  input: Readonly<{
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+  }>,
+): Promise<Uint8Array> {
+  if (input.request.command !== 'EXPORT_BACKUP') return Promise.reject(protocolFailure());
+  return readNativePortStream({
+    ...input,
+    parseHeader: parseNativeHostBackupStreamResponseData,
+    decode: (_header, bytes) => bytes,
+  });
+}
+
 /** Reads raw image bytes only after the strict ownership-bound image header is verified. */
 export function readNativePortImageAsset(
   input: Readonly<{
@@ -364,6 +381,27 @@ export async function writeNativePortCaptureSnapshot(
   }>,
 ): Promise<unknown> {
   if (input.request.command !== 'SAVE_CONVERSATION_SNAPSHOT' || input.stream.operation !== 'capture-snapshot') {
+    throw protocolFailure();
+  }
+  return await readNativePortJson({
+    digestProvider: input.digestProvider,
+    port: input.port,
+    request: input.request,
+    start: async () => await postNativeByteStream(input),
+  });
+}
+
+/** Uploads one fully validated portable backup facts payload before reading the compact import stats. */
+export async function writeNativePortBackupBytes(
+  input: Readonly<{
+    bytes: Uint8Array;
+    digestProvider?: DigestProvider;
+    port: NativeMessagingPort;
+    request: HostFactsRequest;
+    stream: StreamDescriptor;
+  }>,
+): Promise<unknown> {
+  if (input.request.command !== 'IMPORT_BACKUP' || input.stream.operation !== 'zip-backup') {
     throw protocolFailure();
   }
   return await readNativePortJson({

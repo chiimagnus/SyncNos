@@ -17,6 +17,11 @@ import { OrderedFrameDigestAccumulator } from '@services/local-data/digest';
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 import { NativeWireSessionReceiver, createNativeWireDataFrame } from '@services/local-data/native-wire';
+import {
+  buildPortableBackupFacts,
+  decodeBackupPortableExport,
+  encodeBackupPortableFacts,
+} from '@services/sync/backup/local-data';
 
 import { runNativeHost } from '../../packages/syncnoscli/src/native-host/main';
 import {
@@ -142,6 +147,49 @@ async function captureSnapshotWireFrames(bytes: Uint8Array): Promise<unknown[]> 
   return result;
 }
 
+async function backupWireFrames(bytes: Uint8Array): Promise<unknown[]> {
+  const digest = await OrderedFrameDigestAccumulator.create(nodeDigestProvider);
+  let sequence = 0;
+  const result: unknown[] = [
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId: SESSION_ID,
+      sequence: sequence++,
+      type: 'begin',
+      operation: 'zip-backup',
+      declaredTotalBytes: bytes.byteLength,
+    },
+  ];
+  for (let offset = 0; offset < bytes.byteLength; offset += MAX_NATIVE_IMAGE_SLICE_BYTES) {
+    const frame = await createNativeWireDataFrame({
+      bytes: bytes.subarray(offset, offset + MAX_NATIVE_IMAGE_SLICE_BYTES),
+      offset,
+      provider: nodeDigestProvider,
+      sequence: sequence++,
+      sessionId: SESSION_ID,
+    });
+    await digest.append({ sequence: frame.sequence, byteLength: frame.byteLength, digest: frame.sliceDigest });
+    result.push(frame);
+  }
+  result.push(
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId: SESSION_ID,
+      sequence: sequence++,
+      type: 'end',
+      digest: digest.finalize(),
+    },
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId: SESSION_ID,
+      sequence,
+      type: 'terminal',
+      status: 'ok',
+    },
+  );
+  return result;
+}
+
 async function* frames(values: readonly unknown[]): AsyncGenerator<Uint8Array> {
   for (const value of values) yield encodeNativeMessage(value);
 }
@@ -155,9 +203,12 @@ async function decodedMessages(values: readonly Uint8Array[]): Promise<unknown[]
   return result;
 }
 
-async function decodeHostJsonStream(values: readonly unknown[]): Promise<unknown> {
+async function decodeHostByteStream(
+  values: readonly unknown[],
+  operation: 'host-json' | 'zip-backup',
+): Promise<Uint8Array> {
   const [header, ...wire] = values;
-  expect(header).toMatchObject({ ok: true, data: { stream: { operation: 'host-json' } } });
+  expect(header).toMatchObject({ ok: true, data: { stream: { operation } } });
   const begin = wire[0] as { sessionId?: string } | undefined;
   expect(begin?.sessionId).toEqual(expect.any(String));
   const receiver = await NativeWireSessionReceiver.create(begin!.sessionId!, nodeDigestProvider);
@@ -174,6 +225,11 @@ async function decodeHostJsonStream(values: readonly unknown[]): Promise<unknown
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  return bytes;
+}
+
+async function decodeHostJsonStream(values: readonly unknown[]): Promise<unknown> {
+  const bytes = await decodeHostByteStream(values, 'host-json');
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 
@@ -462,6 +518,137 @@ describe('Native Host session', () => {
       messageCount: 2,
     });
     expect(openReadWriteConnection).not.toHaveBeenCalled();
+  });
+
+  it('streams active backup export from a read-only SQLite session without opening read-write', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'syncnoscli-native-host-backup-export-'));
+    temporaryRoots.push(root);
+    const paths = resolveSyncNosRuntimePaths({ homeDirectory: root, platform: 'darwin' });
+    const seed = await openReadWriteForHost({ paths });
+    try {
+      createConversationsRepository(seed.database).upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'backup-export',
+        title: 'Backup export',
+        lastCapturedAt: 1,
+      });
+    } finally {
+      seed.close();
+    }
+
+    const openReadOnlyConnection = vi.fn(async () => await openReadOnly({ paths }));
+    const openReadWriteConnection = vi.fn();
+    const output = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: openReadOnlyConnection,
+        openReadWriteForHost: openReadWriteConnection,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([
+          {
+            protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+            schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+            requestId: 'backup-export-host',
+            command: 'EXPORT_BACKUP',
+            payload: { transfer: { operation: 'zip-backup', declaredTotalBytes: 0 } },
+          },
+        ]),
+        stdout: output.output,
+      }),
+    ).resolves.toBe(0);
+    expect(openReadOnlyConnection).toHaveBeenCalledTimes(1);
+    expect(openReadWriteConnection).not.toHaveBeenCalled();
+    const bytes = await decodeHostByteStream(await decodedMessages(output.frames), 'zip-backup');
+    const exported = decodeBackupPortableExport(bytes);
+    expect(exported.facts.bundles).toHaveLength(1);
+    expect(exported.facts.bundles[0]?.conversation).toMatchObject({
+      source: 'chatgpt',
+      conversationKey: 'backup-export',
+      title: 'Backup export',
+    });
+  });
+
+  it('validates the complete backup upload before opening read-write SQLite, then imports it once', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'syncnoscli-native-host-backup-import-'));
+    temporaryRoots.push(root);
+    const paths = resolveSyncNosRuntimePaths({ homeDirectory: root, platform: 'darwin' });
+    const facts = buildPortableBackupFacts({
+      conversations: [
+        {
+          id: 1,
+          sourceType: 'chat',
+          source: 'chatgpt',
+          conversationKey: 'backup-import',
+          title: 'Backup import',
+          lastCapturedAt: 1,
+        },
+      ],
+      messages: [],
+      syncMappings: [],
+      imageCache: [],
+      articleComments: [],
+    }).facts;
+    const bytes = encodeBackupPortableFacts(facts);
+    const request = {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      requestId: 'backup-import-host',
+      command: 'IMPORT_BACKUP',
+      payload: { transfer: { operation: 'zip-backup', declaredTotalBytes: bytes.byteLength } },
+    };
+    const openReadWriteConnection = vi.fn(async () => await openReadWriteForHost({ paths }));
+    const output = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: vi.fn(),
+        openReadWriteForHost: openReadWriteConnection,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([request, ...(await backupWireFrames(bytes))]),
+        stdout: output.output,
+      }),
+    ).resolves.toBe(0);
+    expect(openReadWriteConnection).toHaveBeenCalledTimes(1);
+    expect(await decodeHostJsonStream(await decodedMessages(output.frames))).toMatchObject({ conversationsAdded: 1 });
+
+    const verify = await openReadOnly({ paths });
+    try {
+      expect(
+        createConversationsRepository(verify.database).findConversationBySourceAndKey('chatgpt', 'backup-import'),
+      ).toMatchObject({
+        title: 'Backup import',
+      });
+    } finally {
+      verify.close();
+    }
+
+    const malformedBytes = new TextEncoder().encode('{not-portable-facts');
+    const malformedRequest = {
+      ...request,
+      requestId: 'backup-import-malformed',
+      payload: { transfer: { operation: 'zip-backup', declaredTotalBytes: malformedBytes.byteLength } },
+    };
+    const malformedOpenReadWrite = vi.fn(async () => await openReadWriteForHost({ paths }));
+    const malformedOutput = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: vi.fn(),
+        openReadWriteForHost: malformedOpenReadWrite,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([malformedRequest, ...(await backupWireFrames(malformedBytes))]),
+        stdout: malformedOutput.output,
+      }),
+    ).resolves.toBe(1);
+    expect(malformedOpenReadWrite).not.toHaveBeenCalled();
+    expect(await decodedMessages(malformedOutput.frames)).toEqual([
+      expect.objectContaining({ ok: false, requestId: 'backup-import-malformed' }),
+    ]);
   });
 
   it('routes typed conversation mutations through one read-write Host session', async () => {

@@ -2060,6 +2060,13 @@ export function parseNativeHostStreamResponseData(value: unknown): NativeHostStr
   return Object.freeze({ stream: parseStreamDescriptor(input.stream, ['host-json']) });
 }
 
+/** Native Host backup replies declare their exact portable-facts byte stream before any bytes are accepted. */
+export function parseNativeHostBackupStreamResponseData(value: unknown): NativeHostStreamResponseData {
+  const input = record(value);
+  exactKeys(input, ['stream']);
+  return Object.freeze({ stream: parseStreamDescriptor(input.stream, ['zip-backup']) });
+}
+
 /** Native Host image replies declare matching metadata before any image bytes are accepted. */
 export function parseNativeHostImageAssetResponseData(value: unknown): NativeHostImageAssetResponseData {
   const input = record(value);

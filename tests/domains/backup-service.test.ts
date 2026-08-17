@@ -2,11 +2,59 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
-import { exportBackupZipV2 } from '@services/sync/backup/export';
-import { importBackupLegacyJsonMerge, importBackupZipV2Merge } from '@services/sync/backup/import';
+import { storageGetAll, storageSet } from '@platform/storage/local';
+import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
+import { filterStorageForBackup } from '@services/sync/backup/backup-utils';
+import { buildBackupZipV2 } from '@services/sync/backup/export';
+import { createIdbBackupFactsAdapter } from '@services/sync/backup/idb-facts-adapter';
+import { parseBackupLegacyJson, parseBackupZipV2 } from '@services/sync/backup/import';
+import type { ImportProgress } from '@services/sync/backup/local-data';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
-import { __closeDbForTests } from '@services/sync/backup/idb';
 import { openDb } from '../../src/platform/idb/schema';
+
+const notStarted = { mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null } as const;
+
+async function withIdbBackupAdapter<T>(
+  run: (adapter: ReturnType<typeof createIdbBackupFactsAdapter>) => Promise<T>,
+): Promise<T> {
+  const gate = new FactsOperationGate({ readJournal: async () => notStarted });
+  gate.reopenForJournalState(notStarted);
+  return await gate.runFactsOperation('backup-test', async (lease) => await run(createIdbBackupFactsAdapter(lease)));
+}
+
+async function exportViaIdbAdapter() {
+  const exported = await withIdbBackupAdapter((adapter) => adapter.exportFacts());
+  return await buildBackupZipV2({
+    facts: exported.facts,
+    storageLocal: filterStorageForBackup(await storageGetAll()),
+    warnings: exported.warnings,
+  });
+}
+
+async function applyParsedImport(
+  parsed: ReturnType<typeof parseBackupZipV2>,
+  onProgress?: (progress: ImportProgress) => void,
+) {
+  const stats = await withIdbBackupAdapter((adapter) => adapter.importFacts(parsed.facts, onProgress));
+  stats.messagesSkipped += parsed.preSkippedMessages;
+  const settings = filterStorageForBackup(parsed.storageLocal);
+  if (Object.keys(settings).length) {
+    await storageSet(settings);
+    stats.settingsApplied = Object.keys(settings).length;
+  }
+  return stats;
+}
+
+async function importZipViaIdbAdapter(
+  entries: Map<string, Uint8Array>,
+  onProgress?: (progress: ImportProgress) => void,
+) {
+  return await applyParsedImport(parseBackupZipV2(entries), onProgress);
+}
+
+async function importLegacyViaIdbAdapter(doc: unknown, onProgress?: (progress: ImportProgress) => void) {
+  return await applyParsedImport(parseBackupLegacyJson(doc), onProgress);
+}
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -63,12 +111,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await __closeDbForTests();
   await deleteDb('webclipper');
 });
 
 describe('backup service', () => {
-  it('exportBackupZipV2 emits manifest + bundles and filters storage.local', async () => {
+  it('exportViaIdbAdapter emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',
       notion_parent_page_id: 'page',
@@ -129,7 +176,7 @@ describe('backup service', () => {
     });
     db.close();
 
-    const out = await exportBackupZipV2();
+    const out = await exportViaIdbAdapter();
     expect(out.filename.endsWith('.zip')).toBe(true);
 
     const entries = await extractZipEntries(out.blob);
@@ -202,14 +249,14 @@ describe('backup service', () => {
     });
     db.close();
 
-    const entries = await extractZipEntries((await exportBackupZipV2()).blob);
+    const entries = await extractZipEntries((await exportViaIdbAdapter()).blob);
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
     const imageIndex = JSON.parse(new TextDecoder().decode(entries.get(manifest.assets.imageCacheIndexPath)!));
     expect(imageIndex.assets).toHaveLength(1);
     expect([...entries.get(imageIndex.assets[0].blobPath)!]).toEqual([1, 2, 3]);
   });
 
-  it('importBackupZipV2Merge restores image cache and rewrites syncnos-asset urls', async () => {
+  it('importZipViaIdbAdapter restores image cache and rewrites syncnos-asset urls', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -258,13 +305,12 @@ describe('backup service', () => {
     });
     db.close();
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportViaIdbAdapter();
     const entries = await extractZipEntries(exported.blob);
 
-    await __closeDbForTests();
     await deleteDb('webclipper');
 
-    const stats = await importBackupZipV2Merge(entries);
+    const stats = await importZipViaIdbAdapter(entries);
     expect(stats.conversationsAdded + stats.conversationsUpdated).toBeGreaterThanOrEqual(1);
 
     const db2 = await openDb();
@@ -287,7 +333,7 @@ describe('backup service', () => {
     expect(assets.some((a) => Number(a.id) === referencedId)).toBe(true);
   });
 
-  it('importBackupZipV2Merge tolerates missing image index and strips syncnos-asset urls', async () => {
+  it('importZipViaIdbAdapter tolerates missing image index and strips syncnos-asset urls', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -336,7 +382,7 @@ describe('backup service', () => {
     });
     db.close();
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportViaIdbAdapter();
     const entries = await extractZipEntries(exported.blob);
 
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
@@ -347,10 +393,9 @@ describe('backup service', () => {
     entries.delete(indexPath);
     if (blobPath) entries.delete(blobPath);
 
-    await __closeDbForTests();
     await deleteDb('webclipper');
 
-    await importBackupZipV2Merge(entries);
+    await importZipViaIdbAdapter(entries);
 
     const db2 = await openDb();
     const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
@@ -370,7 +415,7 @@ describe('backup service', () => {
     );
   });
 
-  it('importBackupZipV2Merge tolerates missing image blob and falls back to https url', async () => {
+  it('importZipViaIdbAdapter tolerates missing image blob and falls back to https url', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -419,7 +464,7 @@ describe('backup service', () => {
     });
     db.close();
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportViaIdbAdapter();
     const entries = await extractZipEntries(exported.blob);
 
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
@@ -428,10 +473,9 @@ describe('backup service', () => {
     const blobPath = String(indexDoc.assets?.[0]?.blobPath || '');
     if (blobPath) entries.delete(blobPath);
 
-    await __closeDbForTests();
     await deleteDb('webclipper');
 
-    await importBackupZipV2Merge(entries);
+    await importZipViaIdbAdapter(entries);
 
     const db2 = await openDb();
     const t2 = db2.transaction(['messages', 'image_cache'], 'readonly');
@@ -448,7 +492,7 @@ describe('backup service', () => {
     expect(String(msgs[0].contentMarkdown || '')).toContain('https://img.example/x.png');
   });
 
-  it('importBackupZipV2Merge tolerates missing conversation bundle entry', async () => {
+  it('importZipViaIdbAdapter tolerates missing conversation bundle entry', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -508,7 +552,7 @@ describe('backup service', () => {
     });
     db.close();
 
-    const exported = await exportBackupZipV2();
+    const exported = await exportViaIdbAdapter();
     const entries = await extractZipEntries(exported.blob);
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
 
@@ -516,10 +560,9 @@ describe('backup service', () => {
     const firstBundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
     if (firstBundlePath) entries.delete(firstBundlePath);
 
-    await __closeDbForTests();
     await deleteDb('webclipper');
 
-    const stats = await importBackupZipV2Merge(entries);
+    const stats = await importZipViaIdbAdapter(entries);
     expect(stats.conversationsAdded + stats.conversationsUpdated).toBeGreaterThanOrEqual(1);
 
     const db2 = await openDb();
@@ -534,14 +577,13 @@ describe('backup service', () => {
     expect(convs.length).toBe(1);
   });
 
-  it('importBackupZipV2Merge recovers bundles when manifest paths do not match zip entry names', async () => {
+  it('importZipViaIdbAdapter recovers bundles when manifest paths do not match zip entry names', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    await __closeDbForTests();
     await deleteDb('webclipper');
 
     const manifest = {
@@ -580,7 +622,7 @@ describe('backup service', () => {
     entries.set('sources/conversations.csv', enc.encode('source,conversationKey\n'));
     entries.set('sources/notionai/notionai-µëôµï¢σæ╝-abc.json', enc.encode(JSON.stringify(bundle)));
 
-    const stats = await importBackupZipV2Merge(entries);
+    const stats = await importZipViaIdbAdapter(entries);
     expect(stats.conversationsAdded).toBe(1);
     expect(stats.messagesAdded).toBe(1);
   });
@@ -642,7 +684,7 @@ describe('backup service', () => {
       ['assets/article-comments/index.json', enc.encode(JSON.stringify(comments))],
     ]);
 
-    await importBackupZipV2Merge(entries);
+    await importZipViaIdbAdapter(entries);
     const db = await openDb();
     const tx = db.transaction(['article_comments'], 'readonly');
     const rows = await reqToPromise<any[]>(tx.objectStore('article_comments').getAll());
@@ -651,7 +693,7 @@ describe('backup service', () => {
     expect(rows[0]?.conversationId ?? null).toBeNull();
   });
 
-  it('importBackupLegacyJsonMerge merges into IndexedDB and applies allowlisted settings only', async () => {
+  it('importLegacyViaIdbAdapter merges into IndexedDB and applies allowlisted settings only', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -702,7 +744,7 @@ describe('backup service', () => {
       },
     };
 
-    const stats = await importBackupLegacyJsonMerge(doc);
+    const stats = await importLegacyViaIdbAdapter(doc);
     expect(stats.conversationsAdded).toBe(1);
     expect(stats.messagesAdded).toBe(1);
     expect(stats.mappingsAdded).toBe(1);

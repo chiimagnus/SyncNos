@@ -9,11 +9,8 @@ const mocks = vi.hoisted(() => ({
   storageSet: vi.fn(),
   storageRemove: vi.fn(),
   portListener: null as ((message: any) => void) | null,
-  exportBackupZipV2: vi.fn(),
-  importBackupLegacyJsonMerge: vi.fn(),
-  importBackupZipV2Merge: vi.fn(),
-  extractZipEntries: vi.fn(),
-  isZipFile: vi.fn(),
+  exportBackupZip: vi.fn(),
+  importBackupFile: vi.fn(),
 }));
 
 vi.mock('@services/shared/runtime', () => ({ send: mocks.send }));
@@ -36,12 +33,10 @@ vi.mock('@services/shared/ports', () => ({
     disconnect: vi.fn(),
   }),
 }));
-vi.mock('@services/sync/backup/export', () => ({ exportBackupZipV2: mocks.exportBackupZipV2 }));
-vi.mock('@services/sync/backup/import', () => ({
-  importBackupLegacyJsonMerge: mocks.importBackupLegacyJsonMerge,
-  importBackupZipV2Merge: mocks.importBackupZipV2Merge,
+vi.mock('@services/sync/backup/client', () => ({
+  exportBackupZip: mocks.exportBackupZip,
+  importBackupFile: mocks.importBackupFile,
 }));
-vi.mock('@services/sync/backup/zip-utils', () => ({ extractZipEntries: mocks.extractZipEntries }));
 vi.mock('@services/sync/feishu/settings-store', async (importOriginal) => {
   const actual = await importOriginal<any>();
   return {
@@ -68,7 +63,6 @@ vi.mock('@viewmodels/settings/utils', async (importOriginal) => {
   const actual = await importOriginal<any>();
   return {
     ...actual,
-    isZipFile: mocks.isZipFile,
     openHttpUrl: vi.fn(() => true),
   };
 });
@@ -405,19 +399,14 @@ describe('Local Database settings flow', () => {
     mocks.storageGet.mockReset();
     mocks.storageSet.mockReset();
     mocks.storageRemove.mockReset();
-    mocks.exportBackupZipV2.mockReset();
-    mocks.importBackupLegacyJsonMerge.mockReset();
-    mocks.importBackupZipV2Merge.mockReset();
-    mocks.extractZipEntries.mockReset();
-    mocks.isZipFile.mockReset();
+    mocks.exportBackupZip.mockReset();
+    mocks.importBackupFile.mockReset();
     mocks.portListener = null;
     mocks.send.mockResolvedValue({ ok: true, data: { connected: false }, error: null });
     mocks.storageGet.mockResolvedValue({});
     mocks.storageSet.mockResolvedValue(undefined);
     mocks.storageRemove.mockResolvedValue(undefined);
-    mocks.isZipFile.mockResolvedValue(true);
-    mocks.extractZipEntries.mockResolvedValue(new Map());
-    mocks.importBackupZipV2Merge.mockResolvedValue({
+    mocks.importBackupFile.mockResolvedValue({
       conversationsAdded: 0,
       conversationsUpdated: 0,
       messagesAdded: 0,
@@ -430,11 +419,9 @@ describe('Local Database settings flow', () => {
       mappingsUpdated: 0,
       settingsApplied: 0,
     });
-    mocks.exportBackupZipV2.mockResolvedValue({
+    mocks.exportBackupZip.mockResolvedValue({
       blob: new Blob(['zip']),
       filename: 'syncnos-backup.zip',
-      exportedAt: '2026-08-17T00:00:00.000Z',
-      counts: { conversations: 0, messages: 0, article_comments: 0 },
     });
     Object.defineProperty(globalThis, 'browser', {
       configurable: true,
@@ -551,14 +538,14 @@ describe('Local Database settings flow', () => {
     });
     vi.clearAllTimers();
     vi.useRealTimers();
-    expect(mocks.exportBackupZipV2).toHaveBeenCalledTimes(1);
+    expect(mocks.exportBackupZip).toHaveBeenCalledTimes(1);
     expect(await readMigrationJournal(profileA.journalRuntime)).toEqual(beforeBackup);
 
     await act(async () => {
       await latest.importFromFile({ name: 'backup.zip' } as File);
       await flush();
     });
-    expect(mocks.importBackupZipV2Merge).toHaveBeenCalledTimes(1);
+    expect(mocks.importBackupFile).toHaveBeenCalledTimes(1);
     expect(await readMigrationJournal(profileA.journalRuntime)).toEqual(beforeBackup);
   });
 });

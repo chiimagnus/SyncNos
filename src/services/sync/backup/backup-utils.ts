@@ -2,7 +2,10 @@ import {
   ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA,
   validateArticleCommentArchiveDocument,
 } from '@services/comments/domain/comment-archive';
+import { MIGRATION_JOURNAL_STORAGE_KEY } from '@platform/local-data/migration-journal';
 import { uniqueConversationKey } from '@services/local-data/facts-archive';
+import { AUTO_SYNC_QUEUE_STORAGE_KEYS } from '@services/sync/auto-sync/auto-sync-keys';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-keys';
 
 export {
   mergeConversationRecord,
@@ -23,6 +26,8 @@ export const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
 export const ARTICLE_COMMENTS_INDEX_SCHEMA_VERSION = ARTICLE_COMMENT_ARCHIVE_CURRENT_SCHEMA;
 
 const STORAGE_BACKUP_DENYLIST_EXACT = new Set<string>([
+  ...Object.values(AUTO_SYNC_QUEUE_STORAGE_KEYS),
+  ...Object.values(SYNC_JOB_STORAGE_KEYS),
   // Never export tokens (explicit product constraint).
   'notion_oauth_token_v1',
   'feishu_oauth_token_v1',
@@ -60,6 +65,13 @@ export function filterStorageForBackup(storageLocal: unknown): Record<string, un
     if (!shouldIncludeStorageKeyInBackup(key)) continue;
     out[key] = value;
   }
+  return out;
+}
+
+/** Import-only guard: Local mode ownership is never a cross-profile user setting. */
+export function filterStorageForBackupImport(storageLocal: unknown): Record<string, unknown> {
+  const out = filterStorageForBackup(storageLocal);
+  delete out[MIGRATION_JOURNAL_STORAGE_KEY];
   return out;
 }
 

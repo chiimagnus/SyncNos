@@ -1,155 +1,70 @@
-import { storageGetAll, storageSet } from '@platform/storage/local';
-import {
-  BACKUP_ZIP_SCHEMA_VERSION,
-  filterStorageForBackup,
-  isDataImageUrl,
-  LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
-  normalizeImageContentType,
-  uniqueConversationKey,
-} from '@services/sync/backup/backup-utils';
-import { buildConversationBasename } from '@services/conversations/domain/file-naming';
-import { openDb, reqToPromise, tx, txDone } from '@services/sync/backup/idb';
-import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { DB_NAME, DB_VERSION } from '@platform/idb/schema';
+import { buildConversationBasename } from '@services/conversations/domain/file-naming';
+import type { CommentArchiveSerializationWarning } from '@services/comments/domain/comment-archive';
+import { LocalDataContractError, MAX_ZIP_STREAM_BYTES } from '@services/local-data/contracts';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
-import {
-  serializeArticleCommentArchive,
-  type CommentArchiveSerializationWarning,
-} from '@services/comments/domain/comment-archive';
-
-type AnyRecord = Record<string, any>;
+import { BACKUP_ZIP_SCHEMA_VERSION, filterStorageForBackup } from '@services/sync/backup/backup-utils';
+import { backupBytesForBlob, type BackupPortableFacts } from '@services/sync/backup/local-data';
+import { createZipBlob } from '@services/sync/backup/zip-utils';
 
 const IMAGE_CACHE_INDEX_PATH = 'assets/image-cache/index.json';
 const IMAGE_CACHE_BLOBS_PREFIX = 'assets/image-cache/blobs/';
 const ARTICLE_COMMENTS_INDEX_PATH = 'assets/article-comments/index.json';
 
-function sanitizeZipPathPart(input: unknown, fallback: string) {
+type AnyRecord = Record<string, any>;
+
+function sanitizeZipPathPart(input: unknown, fallback: string): string {
   const text = String(input || '').trim();
   if (!text) return fallback;
   const cleaned = text
     .replace(/[\\/:*?"<>|]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!cleaned || cleaned === '.' || cleaned === '..') return fallback;
-  return cleaned;
+  return !cleaned || cleaned === '.' || cleaned === '..' ? fallback : cleaned;
 }
 
-function csvCell(raw: unknown) {
+function csvCell(raw: unknown): string {
   const text = raw == null ? '' : String(raw);
-  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
-  return text;
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function stripLocalConversation(conversation: AnyRecord) {
-  const c = conversation && typeof conversation === 'object' ? { ...conversation } : {};
-  delete (c as any).id;
-  return c;
+function backupPayloadTooLarge(actualBytes: number): never {
+  throw new LocalDataContractError('PAYLOAD_TOO_LARGE', {
+    actualBytes,
+    declaredBytes: actualBytes,
+    limitBytes: MAX_ZIP_STREAM_BYTES,
+    operation: 'zip-backup',
+  });
 }
 
-function stripLocalMessage(message: AnyRecord) {
-  const m = message && typeof message === 'object' ? { ...message } : {};
-  delete (m as any).id;
-  delete (m as any).conversationId;
-  return m;
+function zipEntryDataByteLength(data: unknown): number {
+  if (typeof data === 'string') return new TextEncoder().encode(data).byteLength;
+  if (data instanceof Uint8Array) return data.byteLength;
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  if (ArrayBuffer.isView(data)) return data.byteLength;
+  if (typeof Blob !== 'undefined' && data instanceof Blob) return data.size;
+  return new TextEncoder().encode(String(data == null ? '' : data)).byteLength;
 }
 
-function stripLocalMapping(mapping: AnyRecord) {
-  const m = mapping && typeof mapping === 'object' ? { ...mapping } : {};
-  delete (m as any).id;
-  return m;
-}
-
-function compareMessages(a: AnyRecord, b: AnyRecord) {
-  const aSeq = Number(a && a.sequence);
-  const bSeq = Number(b && b.sequence);
-  if (Number.isFinite(aSeq) && Number.isFinite(bSeq) && aSeq !== bSeq) return aSeq - bSeq;
-  const aAt = Number(a && a.updatedAt) || 0;
-  const bAt = Number(b && b.updatedAt) || 0;
-  if (aAt !== bAt) return aAt - bAt;
-  const aKey = a && a.messageKey ? String(a.messageKey) : '';
-  const bKey = b && b.messageKey ? String(b.messageKey) : '';
-  return aKey.localeCompare(bKey);
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const normalized = String(base64 || '').replace(/\s+/g, '');
-  if (!normalized) return new Uint8Array();
-
-  const atobFn = (globalThis as any).atob as ((input: string) => string) | undefined;
-  if (typeof atobFn === 'function') {
-    const binary = atobFn(normalized);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-    return bytes;
+function assertZipInputWithinLimit(files: readonly Readonly<{ data: unknown }>[]): void {
+  let totalBytes = 0;
+  for (const file of files) {
+    totalBytes += zipEntryDataByteLength(file.data);
+    if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_ZIP_STREAM_BYTES) backupPayloadTooLarge(totalBytes);
   }
-
-  const bufferApi = (globalThis as any).Buffer as any;
-  if (bufferApi && typeof bufferApi.from === 'function') {
-    const nodeBuffer = bufferApi.from(normalized, 'base64');
-    return new Uint8Array(nodeBuffer);
-  }
-
-  throw new Error('base64 decoder unavailable');
-}
-
-function utf8ToBytes(text: string): Uint8Array {
-  const encoder = (globalThis as any).TextEncoder as (new () => TextEncoder) | undefined;
-  if (encoder) {
-    return new encoder().encode(String(text || ''));
-  }
-  const bufferApi = (globalThis as any).Buffer as any;
-  if (bufferApi && typeof bufferApi.from === 'function') {
-    const nodeBuffer = bufferApi.from(String(text || ''), 'utf8');
-    return new Uint8Array(nodeBuffer);
-  }
-  const raw = String(text || '');
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i) & 0xff;
-  return out;
-}
-
-function decodeDataImageUrlToBlob(dataUrl: string): Blob | null {
-  const safeDataUrl = String(dataUrl || '').trim();
-  if (!isDataImageUrl(safeDataUrl)) return null;
-
-  const commaAt = safeDataUrl.indexOf(',');
-  if (commaAt <= 0) return null;
-
-  const meta = safeDataUrl.slice('data:'.length, commaAt).trim();
-  const payload = safeDataUrl.slice(commaAt + 1);
-  const metaParts = meta
-    .split(';')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const contentType = normalizeImageContentType(metaParts[0] || '');
-  if (!contentType.startsWith('image/')) return null;
-
-  const isBase64 = metaParts.some((part) => part.toLowerCase() === 'base64');
-  let bytes: Uint8Array;
-  try {
-    bytes = isBase64 ? base64ToBytes(payload) : utf8ToBytes(decodeURIComponent(payload));
-  } catch (_e) {
-    return null;
-  }
-
-  if ((bytes.byteLength || 0) <= 0) return null;
-  return new Blob([Uint8Array.from(bytes)], { type: contentType });
 }
 
 function extFromImageContentType(contentType: string): string {
-  const ct = String(contentType || '')
+  const value = String(contentType || '')
     .trim()
     .toLowerCase();
-  if (!ct.startsWith('image/')) return 'bin';
-  if (ct === 'image/jpeg') return 'jpg';
-  if (ct === 'image/jpg') return 'jpg';
-  if (ct === 'image/png') return 'png';
-  if (ct === 'image/webp') return 'webp';
-  if (ct === 'image/gif') return 'gif';
-  if (ct === 'image/svg+xml') return 'svg';
-  const raw = ct.slice('image/'.length);
-  const cleaned = raw.replace(/[^a-z0-9.+-]/g, '');
-  return cleaned || 'bin';
+  if (value === 'image/jpeg' || value === 'image/jpg') return 'jpg';
+  if (value === 'image/png') return 'png';
+  if (value === 'image/webp') return 'webp';
+  if (value === 'image/gif') return 'gif';
+  if (value === 'image/svg+xml') return 'svg';
+  if (!value.startsWith('image/')) return 'bin';
+  return value.slice('image/'.length).replace(/[^a-z0-9.+-]/g, '') || 'bin';
 }
 
 export type BackupZipV2ExportResult = {
@@ -167,77 +82,33 @@ export type BackupZipV2ExportResult = {
 };
 
 export type BackupZipV2ExportProgress = {
-  stage: 'open_db' | 'read_db' | 'read_storage' | 'assemble_files' | 'zip' | 'finalize';
+  stage: 'assemble_files' | 'zip' | 'finalize';
 };
 
-export async function exportBackupZipV2(
-  options: { onProgress?: (p: BackupZipV2ExportProgress) => void } = {},
+export async function buildBackupZipV2(
+  input: Readonly<{
+    facts: BackupPortableFacts;
+    storageLocal: Record<string, unknown>;
+    warnings?: readonly CommentArchiveSerializationWarning[];
+    exportedAtMs?: number;
+    onProgress?: (progress: BackupZipV2ExportProgress) => void;
+  }>,
 ): Promise<BackupZipV2ExportResult> {
-  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
-  onProgress?.({ stage: 'open_db' });
-  const db = await openDb();
-  onProgress?.({ stage: 'read_db' });
-  const { t, stores } = tx(
-    db,
-    ['conversations', 'messages', 'sync_mappings', 'image_cache', 'article_comments'],
-    'readonly',
-  );
-  const conversations = (await reqToPromise(stores.conversations.getAll() as any)) as AnyRecord[];
-  const messages = (await reqToPromise(stores.messages.getAll() as any)) as AnyRecord[];
-  const syncMappings = (await reqToPromise(stores.sync_mappings.getAll() as any)) as AnyRecord[];
-  const imageCache = (await reqToPromise(stores.image_cache.getAll() as any)) as AnyRecord[];
-  const articleComments = (await reqToPromise(stores.article_comments.getAll() as any)) as AnyRecord[];
-  await txDone(t);
-
-  onProgress?.({ stage: 'read_storage' });
-  const rawStorage = await storageGetAll();
-  const storageLocal = filterStorageForBackup(rawStorage);
-
-  const exportedAtMs = Date.now();
+  const facts = input.facts;
+  const storageLocal = filterStorageForBackup(input.storageLocal);
+  const exportedAtMs = Number.isFinite(input.exportedAtMs) ? Number(input.exportedAtMs) : Date.now();
   const exportedAt = new Date(exportedAtMs).toISOString();
-
-  const allConversations = Array.isArray(conversations) ? conversations : [];
-  const allMessages = Array.isArray(messages) ? messages : [];
-  const allMappings = Array.isArray(syncMappings) ? syncMappings : [];
-  const allImageCache = Array.isArray(imageCache) ? imageCache : [];
-  const allArticleComments = Array.isArray(articleComments) ? articleComments : [];
-
-  const messagesByConversationId = new Map<number, AnyRecord[]>();
-  for (const m of allMessages) {
-    const cid = Number(m && m.conversationId);
-    if (!Number.isFinite(cid) || cid <= 0) continue;
-    const list = messagesByConversationId.get(cid) || [];
-    list.push(m);
-    messagesByConversationId.set(cid, list);
-  }
-
-  const mappingByUniqueKey = new Map<string, AnyRecord>();
-  for (const m of allMappings) {
-    if (!m || typeof m !== 'object') continue;
-    const uk = uniqueConversationKey(m);
-    if (!uk) continue;
-    const existing = mappingByUniqueKey.get(uk) || null;
-    if (!existing) {
-      mappingByUniqueKey.set(uk, m);
-      continue;
-    }
-    const aUpdated = Number(existing.updatedAt) || 0;
-    const bUpdated = Number(m.updatedAt) || 0;
-    if (bUpdated > aUpdated) mappingByUniqueKey.set(uk, m);
-  }
-
-  const sources = new Map<string, AnyRecord[]>();
-  for (const c of allConversations) {
-    if (!c || typeof c !== 'object') continue;
-    const source = c.source ? String(c.source) : '';
-    if (!source) continue;
-    const list = sources.get(source) || [];
-    list.push(c);
-    sources.set(source, list);
-  }
-
   const files: { name: string; data: unknown; lastModified?: unknown }[] = [];
   const manifestSources: { source: string; conversationCount: number; files: string[] }[] = [];
+  const sourceBundles = new Map<string, typeof facts.bundles>();
+
+  for (const bundle of facts.bundles) {
+    const source = String(bundle.conversation?.source || '').trim();
+    if (!source) continue;
+    const list = sourceBundles.get(source) || [];
+    list.push(bundle);
+    sourceBundles.set(source, list);
+  }
 
   const indexHeader = [
     'source',
@@ -251,94 +122,55 @@ export async function exportBackupZipV2(
     'filePath',
   ];
   const indexLines = [indexHeader.map(csvCell).join(',')];
-
   const usedPathsBySource = new Map<string, Set<string>>();
 
-  const uniqueKeyByConversationId = new Map<number, string>();
-  for (const c of allConversations) {
-    const cid = Number(c && c.id);
-    if (!Number.isFinite(cid) || cid <= 0) continue;
-    const uk = uniqueConversationKey(c);
-    if (!uk) continue;
-    uniqueKeyByConversationId.set(cid, uk);
-  }
-
-  onProgress?.({ stage: 'assemble_files' });
-  for (const [source, convos] of sources.entries()) {
+  input.onProgress?.({ stage: 'assemble_files' });
+  for (const [source, bundles] of sourceBundles.entries()) {
     const safeSource = sanitizeZipPathPart(source.toLowerCase(), 'unknown');
     const used = usedPathsBySource.get(safeSource) || new Set<string>();
     usedPathsBySource.set(safeSource, used);
-
     const groupFiles: string[] = [];
-    for (const c of convos) {
-      const conversationKey = c && c.conversationKey ? String(c.conversationKey) : '';
-      if (!conversationKey) continue;
 
-      const basename = buildConversationBasename(c);
+    for (const bundle of bundles) {
+      const conversation = bundle.conversation;
+      const conversationKey = String(conversation?.conversationKey || '').trim();
+      if (!conversationKey) continue;
+      const basename = buildConversationBasename(conversation);
       const safeKeyBase = sanitizeZipPathPart(basename, 'conversation').slice(0, 140);
       let safeKey = safeKeyBase;
       let suffix = 2;
       let entryPath = `sources/${safeSource}/${safeKey}.json`;
       while (used.has(entryPath)) {
-        safeKey = `${safeKeyBase}-${suffix}`;
+        safeKey = `${safeKeyBase}-${suffix++}`;
         entryPath = `sources/${safeSource}/${safeKey}.json`;
-        suffix += 1;
       }
       used.add(entryPath);
 
-      const cid = Number(c && c.id);
-      const rawMsgs = Number.isFinite(cid) && cid > 0 ? messagesByConversationId.get(cid) || [] : [];
-      const msgs = rawMsgs.slice().sort(compareMessages).map(stripLocalMessage);
-
-      const uk = uniqueConversationKey(c);
-      const mapping = uk ? mappingByUniqueKey.get(uk) || null : null;
-      const safeConversation = stripLocalConversation(c);
-      const safeMapping = mapping ? stripLocalMapping(mapping) : null;
-
-      const bundle = {
-        schemaVersion: 1,
-        conversation: safeConversation,
-        messages: msgs,
-        syncMapping: safeMapping,
-      };
-
       files.push({ name: entryPath, data: JSON.stringify(bundle, null, 2), lastModified: exportedAt });
       groupFiles.push(entryPath);
-
-      const notionPageId =
-        safeMapping && safeMapping.notionPageId
-          ? String(safeMapping.notionPageId)
-          : safeConversation.notionPageId
-            ? String(safeConversation.notionPageId)
-            : '';
-      const hasNotionPageId = notionPageId ? 'true' : 'false';
-
+      const mapping = bundle.syncMapping;
+      const notionPageId = String(mapping?.notionPageId || conversation?.notionPageId || '');
       indexLines.push(
         [
           csvCell(source),
           csvCell(conversationKey),
-          csvCell(safeConversation.title || ''),
-          csvCell(safeConversation.url || ''),
-          csvCell(safeConversation.lastCapturedAt || ''),
-          csvCell(msgs.length),
+          csvCell(conversation?.title || ''),
+          csvCell(conversation?.url || ''),
+          csvCell(conversation?.lastCapturedAt || ''),
+          csvCell(bundle.messages.length),
           csvCell(notionPageId),
-          csvCell(hasNotionPageId),
+          csvCell(notionPageId ? 'true' : 'false'),
           csvCell(entryPath.replace(/^sources\//, '')),
         ].join(','),
       );
     }
 
-    manifestSources.push({
-      source,
-      conversationCount: groupFiles.length,
-      files: groupFiles,
-    });
+    manifestSources.push({ source, conversationCount: groupFiles.length, files: groupFiles });
   }
 
-  const storageDoc = { schemaVersion: 1, storageLocal };
   files.push({
     name: 'config/storage-local.json',
-    data: JSON.stringify(storageDoc, null, 2),
+    data: JSON.stringify({ schemaVersion: 1, storageLocal }, null, 2),
     lastModified: exportedAt,
   });
   files.push({
@@ -348,100 +180,69 @@ export async function exportBackupZipV2(
   });
 
   const imageCacheAssets: AnyRecord[] = [];
-  for (const row of allImageCache) {
-    const assetId = Number(row && row.id);
-    if (!Number.isFinite(assetId) || assetId <= 0) continue;
-    const conversationId = Number(row && row.conversationId);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
-    const uniqueKey = uniqueKeyByConversationId.get(conversationId) || '';
-    if (!uniqueKey) continue;
-
-    const url = row && row.url ? String(row.url) : '';
-    if (!url.trim()) continue;
-
-    let blob: Blob | null = null;
-    if (row && row.blob instanceof Blob) blob = row.blob;
-    else if (row && typeof row.dataUrl === 'string') blob = decodeDataImageUrlToBlob(row.dataUrl);
-    if (!blob) continue;
-
-    const contentType = normalizeImageContentType(row.contentType || blob.type);
-    if (!contentType.startsWith('image/')) continue;
-
-    const byteSize = Number(row.byteSize) || blob.size || 0;
-    if (byteSize <= 0) continue;
-
-    const ext = extFromImageContentType(contentType);
-    const blobPath = `${IMAGE_CACHE_BLOBS_PREFIX}${assetId}.${ext}`;
-
-    files.push({ name: blobPath, data: blob, lastModified: exportedAt });
+  for (const asset of facts.imageAssets) {
+    if (!asset.bytes || asset.bytes.byteLength <= 0) continue;
+    const blobPath = `${IMAGE_CACHE_BLOBS_PREFIX}${asset.assetId}.${extFromImageContentType(asset.contentType)}`;
+    files.push({
+      name: blobPath,
+      data: new Blob([backupBytesForBlob(asset.bytes)], { type: asset.contentType }),
+      lastModified: exportedAt,
+    });
     imageCacheAssets.push({
-      assetId,
-      uniqueKey,
-      url,
-      contentType,
-      byteSize,
-      createdAt: Number(row.createdAt) || 0,
-      updatedAt: Number(row.updatedAt) || 0,
+      assetId: asset.assetId,
+      uniqueKey: asset.uniqueKey,
+      url: asset.url,
+      contentType: asset.contentType,
+      byteSize: asset.bytes.byteLength,
+      createdAt: asset.createdAt,
+      updatedAt: asset.updatedAt,
       blobPath,
     });
   }
 
-  const imageCacheIndexDoc = { schemaVersion: 1, assets: imageCacheAssets };
   files.push({
     name: IMAGE_CACHE_INDEX_PATH,
-    data: JSON.stringify(imageCacheIndexDoc, null, 2),
+    data: JSON.stringify({ schemaVersion: 1, assets: imageCacheAssets }, null, 2),
     lastModified: exportedAt,
   });
-
-  const articleCommentsArchive = serializeArticleCommentArchive(allArticleComments, uniqueKeyByConversationId);
-  const articleCommentItems = articleCommentsArchive.document.comments;
-
-  const articleCommentsIndexDoc = articleCommentsArchive.document;
   files.push({
     name: ARTICLE_COMMENTS_INDEX_PATH,
-    data: JSON.stringify(articleCommentsIndexDoc, null, 2),
+    data: JSON.stringify(facts.articleComments, null, 2),
     lastModified: exportedAt,
   });
 
+  const counts = {
+    conversations: facts.bundles.length,
+    messages: facts.bundles.reduce((count, bundle) => count + bundle.messages.length, 0),
+    sync_mappings: facts.bundles.reduce((count, bundle) => count + (bundle.syncMapping ? 1 : 0), 0),
+    image_cache: imageCacheAssets.length,
+    article_comments: facts.articleComments.comments.length,
+  };
   const manifest = {
     backupSchemaVersion: BACKUP_ZIP_SCHEMA_VERSION,
     exportedAt,
     db: { name: DB_NAME, version: DB_VERSION },
-    counts: {
-      conversations: allConversations.length,
-      messages: allMessages.length,
-      sync_mappings: allMappings.length,
-      image_cache: imageCacheAssets.length,
-      article_comments: articleCommentItems.length,
-    },
+    counts,
     config: { storageLocalPath: 'config/storage-local.json' },
     index: { conversationsCsvPath: 'sources/conversations.csv' },
     sources: manifestSources,
-    assets: { imageCacheIndexPath: IMAGE_CACHE_INDEX_PATH, articleCommentsIndexPath: ARTICLE_COMMENTS_INDEX_PATH },
+    assets: {
+      imageCacheIndexPath: IMAGE_CACHE_INDEX_PATH,
+      articleCommentsIndexPath: ARTICLE_COMMENTS_INDEX_PATH,
+    },
   };
-  files.unshift({
-    name: 'manifest.json',
-    data: JSON.stringify(manifest, null, 2),
-    lastModified: exportedAt,
-  });
+  files.unshift({ name: 'manifest.json', data: JSON.stringify(manifest, null, 2), lastModified: exportedAt });
+  assertZipInputWithinLimit(files);
 
-  const stamp = buildLocalTimestampForFilename();
-  const filename = `SyncNos-Backup-${stamp}.zip`;
-  onProgress?.({ stage: 'zip' });
+  input.onProgress?.({ stage: 'zip' });
   const blob = await createZipBlob(files);
-  onProgress?.({ stage: 'finalize' });
-
-  try {
-    await storageSet({ [LAST_BACKUP_EXPORT_AT_STORAGE_KEY]: exportedAtMs });
-  } catch (_e) {
-    // non-fatal
-  }
-
+  if (blob.size > MAX_ZIP_STREAM_BYTES) backupPayloadTooLarge(blob.size);
+  input.onProgress?.({ stage: 'finalize' });
   return {
-    filename,
+    filename: `SyncNos-Backup-${buildLocalTimestampForFilename()}.zip`,
     blob,
     exportedAt,
-    counts: manifest.counts,
-    warnings: articleCommentsArchive.warnings,
+    counts,
+    warnings: [...(input.warnings || [])],
   };
 }

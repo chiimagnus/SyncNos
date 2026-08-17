@@ -3,6 +3,7 @@ import {
   createHostFactsFailure,
   createHostFactsSuccess,
   hostFactsCommandRequiresConnectedSession,
+  parseNativeHostBackupStreamResponseData,
   parseNativeHostImageAssetResponseData,
   parseNativeHostStreamResponseData,
   parseHostFactsRequest,
@@ -10,9 +11,11 @@ import {
   type HostFactsRequest,
   type LocalDataErrorCode,
 } from '@services/local-data/contracts';
+import { decodeBackupPortableFacts, encodeBackupPortableExport } from '@services/sync/backup/local-data';
 
 import { isOwnedFirefoxNativeHostManifest } from '../install/host-registration';
 import { cleanupStaleHostImportStaging, getFactsMigrationReceipt } from '../sqlite/archive-import';
+import { exportBackupPortableFacts, importBackupPortableFacts } from '../sqlite/backup-repository';
 import { openReadOnly, openReadWriteForHost, type SyncNosSqliteHandle } from '../sqlite/database';
 import { readFactsRevision } from '../sqlite/revision';
 import { getSqliteDatabaseUuid } from '../sqlite/schema';
@@ -26,6 +29,7 @@ import {
 } from './dispatcher';
 import {
   NativeHostLaunchError,
+  createNativeHostBackupUploadSession,
   createNativeHostCaptureSnapshotSession,
   createNativeHostImageAssetSession,
   createNativeHostImportSession,
@@ -46,6 +50,7 @@ type HostCaptureSnapshotRequest = Extract<HostFactsRequest, Readonly<{ command: 
 type HostCaptureSnapshotStreamRequest = HostCaptureSnapshotRequest &
   Readonly<{ payload: CaptureSnapshotStreamRequestPayload }>;
 type HostImageAssetUploadRequest = Extract<HostFactsRequest, Readonly<{ command: 'PUT_IMAGE_ASSET' }>>;
+type HostBackupImportRequest = Extract<HostFactsRequest, Readonly<{ command: 'IMPORT_BACKUP' }>>;
 
 type NativeHostErrorOutput = Readonly<{
   write: (chunk: string) => boolean;
@@ -287,6 +292,82 @@ async function runConnectedImageReadCommand(
   }
 }
 
+async function runBackupExportCommand(
+  request: HostFactsRequest,
+  input: Readonly<{
+    openReadOnly: DatabaseOpener;
+    stderr: NativeHostErrorOutput;
+    stdout: NativeMessagingOutput;
+  }>,
+): Promise<number> {
+  let handle: SyncNosSqliteHandle | null = null;
+  let responseStarted = false;
+  try {
+    if (request.command !== 'EXPORT_BACKUP') throw new LocalDataContractError('INVALID_ARGUMENT');
+    handle = await input.openReadOnly();
+    const bytes = encodeBackupPortableExport(exportBackupPortableFacts(handle.database));
+    const stream = parseNativeHostBackupStreamResponseData({
+      stream: { operation: 'zip-backup', declaredTotalBytes: bytes.byteLength },
+    });
+    await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, stream));
+    responseStarted = true;
+    await writeNativeHostByteStream({ bytes, operation: 'zip-backup', output: input.stdout });
+    return 0;
+  } catch (error) {
+    if (responseStarted)
+      writeDiagnostic(input.stderr, 'SyncNos Native Host could not finish its backup export stream.');
+    else await writeHostFailure(input.stdout, input.stderr, request, error, true);
+    return 1;
+  } finally {
+    closeHandle(handle);
+  }
+}
+
+async function runBackupImportSession(
+  request: HostBackupImportRequest,
+  messages: AsyncIterator<unknown>,
+  input: Readonly<{
+    openReadWriteForHost: DatabaseOpener;
+    signal: AbortSignal;
+    stderr: NativeHostErrorOutput;
+    stdout: NativeMessagingOutput;
+  }>,
+): Promise<number> {
+  let handle: SyncNosSqliteHandle | null = null;
+  let session: Awaited<ReturnType<typeof createNativeHostBackupUploadSession>> | null = null;
+  let responseStarted = false;
+  try {
+    session = await createNativeHostBackupUploadSession({ request });
+    for (;;) {
+      if (input.signal.aborted) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      const next = await nextMessageOrAbort(messages, input.signal);
+      if (next.done) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      const event = await session.accept(next.value);
+      if (event.kind !== 'complete') continue;
+      // Decode and validate the entire portable facts document before any writable SQLite handle exists.
+      const facts = decodeBackupPortableFacts(event.bytes);
+      handle = await input.openReadWriteForHost();
+      const stats = importBackupPortableFacts(handle.database, facts);
+      const bytes = encodeNativeHostJson(stats);
+      const stream = parseNativeHostStreamResponseData({
+        stream: { operation: 'host-json', declaredTotalBytes: bytes.byteLength },
+      });
+      await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, stream));
+      responseStarted = true;
+      await writeNativeHostByteStream({ bytes, operation: 'host-json', output: input.stdout });
+      return 0;
+    }
+  } catch (error) {
+    if (responseStarted)
+      writeDiagnostic(input.stderr, 'SyncNos Native Host could not finish its backup import response.');
+    else await writeHostFailure(input.stdout, input.stderr, request, error, true);
+    return 1;
+  } finally {
+    session?.cleanup();
+    closeHandle(handle);
+  }
+}
+
 async function runConnectedMutationCommand(
   request: HostFactsRequest,
   input: Readonly<{
@@ -429,6 +510,21 @@ async function runConnectedCommand(
     stdout: NativeMessagingOutput;
   }>,
 ): Promise<number> {
+  if (request.command === 'EXPORT_BACKUP') {
+    return await runBackupExportCommand(request, {
+      openReadOnly: input.openReadOnly,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    });
+  }
+  if (request.command === 'IMPORT_BACKUP') {
+    return await runBackupImportSession(request, messages, {
+      openReadWriteForHost: input.openReadWriteForHost,
+      signal: input.signal,
+      stderr: input.stderr,
+      stdout: input.stdout,
+    });
+  }
   if (isHostCaptureSnapshotStreamRequest(request)) {
     return await runCaptureSnapshotUploadSession(request, messages, {
       openReadWriteForHost: input.openReadWriteForHost,

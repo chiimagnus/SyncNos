@@ -1,6 +1,8 @@
 import {
+  readNativePortBackupBytes,
   readNativePortImageAsset,
   readNativePortJson,
+  writeNativePortBackupBytes,
   writeNativePortCaptureSnapshot,
   writeNativePortFactsImport,
   writeNativePortImageAsset,
@@ -126,6 +128,26 @@ function captureSnapshotUpload(request: ReturnType<typeof createRequest>) {
   });
 }
 
+function backupUpload(
+  input: NativeHostRequest,
+  request: ReturnType<typeof createRequest>,
+): Readonly<{
+  bytes: Uint8Array;
+  request: HostFactsRequest;
+  stream: HostFactsPayloadByCommand['IMPORT_BACKUP']['transfer'];
+}> | null {
+  if (request.command !== 'IMPORT_BACKUP') return null;
+  const bytes = input.uploadBytes;
+  if (!(bytes instanceof Uint8Array)) throw new LocalDataContractError('INVALID_ARGUMENT');
+  if (
+    request.payload.transfer.operation !== 'zip-backup' ||
+    bytes.byteLength !== request.payload.transfer.declaredTotalBytes
+  ) {
+    throw new LocalDataContractError('PROTOCOL_MISMATCH');
+  }
+  return Object.freeze({ bytes, request, stream: request.payload.transfer });
+}
+
 function imageAssetUpload(
   input: NativeHostRequest,
   request: ReturnType<typeof createRequest>,
@@ -249,6 +271,23 @@ export async function connectNative<TData = unknown, TCommand extends HostFactsC
         port,
         request: upload.request,
         stream: upload.stream,
+      })) as TData;
+    }
+    const backupBytes = backupUpload(input, request);
+    if (backupBytes) {
+      return (await writeNativePortBackupBytes({
+        bytes: backupBytes.bytes,
+        digestProvider: input.dependencies?.digestProvider,
+        port,
+        request: backupBytes.request,
+        stream: backupBytes.stream,
+      })) as TData;
+    }
+    if (request.command === 'EXPORT_BACKUP') {
+      return (await readNativePortBackupBytes({
+        digestProvider: input.dependencies?.digestProvider,
+        port,
+        request,
       })) as TData;
     }
     const imageUpload = imageAssetUpload(input, request);

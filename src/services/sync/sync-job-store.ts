@@ -1,13 +1,10 @@
 import { storageGet, storageSet } from '@platform/storage/local';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-keys';
 import type { SyncConversationReference, SyncJobSnapshot, SyncProvider } from '@services/sync/models';
 
-const DEFAULT_STALE_MS = 5 * 60 * 1000;
+export { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-keys';
 
-export const SYNC_JOB_STORAGE_KEYS: Record<SyncProvider, string> = {
-  notion: 'notion_sync_job_v1',
-  obsidian: 'obsidian_sync_job_v1',
-  feishu: 'feishu_sync_job_v1',
-};
+const DEFAULT_STALE_MS = 5 * 60 * 1000;
 
 function normalizeSyncReference(value: unknown): SyncConversationReference | null {
   const source = String((value as any)?.source || '').trim();

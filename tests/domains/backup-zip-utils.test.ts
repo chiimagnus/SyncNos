@@ -1,6 +1,7 @@
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
+import { MAX_ZIP_STREAM_BYTES } from '@services/local-data/contracts';
 import { createZipBlob, extractZipEntries } from '@services/sync/backup/zip-utils';
 
 function u16(n: number) {
@@ -125,6 +126,25 @@ describe('backup zip-utils', () => {
     const blob = new Blob([bytes], { type: 'application/zip' });
     const entries = await extractZipEntries(blob);
     expect(new TextDecoder().decode(entries.get('sources/chatgpt/c1.json'))).toBe(JSON.stringify({ ok: true, big }));
+  });
+
+  it('rejects a ZIP whose central directory declares an oversized decompressed payload before inflate', async () => {
+    const blob = await createZipBlob([{ name: 'manifest.json', data: '{}' }]);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let centralOffset = -1;
+    for (let offset = 0; offset <= bytes.byteLength - 4; offset += 1) {
+      if (view.getUint32(offset, true) === 0x02014b50) {
+        centralOffset = offset;
+        break;
+      }
+    }
+    expect(centralOffset).toBeGreaterThanOrEqual(0);
+    view.setUint32(centralOffset + 24, MAX_ZIP_STREAM_BYTES + 1, true);
+
+    await expect(extractZipEntries(new Blob([bytes], { type: 'application/zip' }))).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
   });
 
   it('extractZipEntries strips a single top-level folder prefix (rezipped backups)', async () => {

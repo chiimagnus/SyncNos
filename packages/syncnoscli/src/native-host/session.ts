@@ -248,6 +248,69 @@ export async function createNativeHostCaptureSnapshotSession(
   });
 }
 
+export type NativeHostBackupUploadSession = Readonly<{
+  accept: (value: unknown) => Promise<NativeHostBackupUploadSessionEvent>;
+  cleanup: () => void;
+}>;
+
+export type NativeHostBackupUploadSessionEvent =
+  | Readonly<{ kind: 'continue' }>
+  | Readonly<{ bytes: Uint8Array; kind: 'complete' }>;
+
+/** Receives one bounded portable backup payload before SQLite is opened. */
+export async function createNativeHostBackupUploadSession(
+  input: Readonly<{ request: HostFactsRequest }>,
+): Promise<NativeHostBackupUploadSession> {
+  if (input.request.command !== 'IMPORT_BACKUP' || input.request.payload.transfer.operation !== 'zip-backup') {
+    throw new LocalDataContractError('INVALID_ARGUMENT');
+  }
+  const stream = input.request.payload.transfer;
+  let receiver: NativeWireSessionReceiver | null = null;
+  let bytes: Uint8Array | null = null;
+  let closed = false;
+  const cleanup = () => {
+    closed = true;
+    bytes = null;
+    receiver = null;
+  };
+  return Object.freeze({
+    accept: async (value) => {
+      if (closed) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+      try {
+        let frame: ReturnType<typeof parseNativeWireFrame> | null = null;
+        if (!receiver) {
+          frame = parseNativeWireFrame(value);
+          if (
+            frame.type !== 'begin' ||
+            frame.operation !== 'zip-backup' ||
+            frame.declaredTotalBytes !== stream.declaredTotalBytes
+          ) {
+            throw new LocalDataContractError('PROTOCOL_MISMATCH');
+          }
+          receiver = await NativeWireSessionReceiver.create(frame.sessionId, nodeDigestProvider);
+          bytes = new Uint8Array(stream.declaredTotalBytes);
+        }
+        const event = await receiver.accept(frame ?? value);
+        if (event?.kind === 'data') {
+          bytes!.set(event.bytes, event.frame.offset);
+          return Object.freeze({ kind: 'continue' as const });
+        }
+        if (event?.kind !== 'terminal') return Object.freeze({ kind: 'continue' as const });
+        if (event.terminalFrame.status !== 'ok' || !bytes) {
+          throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+        }
+        const completedBytes = bytes;
+        cleanup();
+        return Object.freeze({ kind: 'complete' as const, bytes: completedBytes });
+      } catch (error) {
+        cleanup();
+        throw error;
+      }
+    },
+    cleanup,
+  });
+}
+
 export type NativeHostImageAssetSession = Readonly<{
   accept: (value: unknown) => Promise<NativeHostImageAssetSessionEvent>;
   cleanup: () => void;

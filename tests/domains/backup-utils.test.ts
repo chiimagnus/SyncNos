@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { MIGRATION_JOURNAL_STORAGE_KEY } from '@platform/local-data/migration-journal';
+import { AUTO_SYNC_QUEUE_STORAGE_KEYS } from '@services/sync/auto-sync/auto-sync-keys';
+import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-keys';
 import {
   filterStorageForBackup,
+  filterStorageForBackupImport,
   mergeConversationRecord,
   mergeMessageRecord,
   mergeSyncMappingRecord,
@@ -41,6 +45,13 @@ describe('backup backup-utils', () => {
       notion_oauth_token_v1: { accessToken: 'secret' },
       obsidian_api_base_url: 'http://127.0.0.1:27123',
       obsidian_api_key: 'obsidian-key',
+      [MIGRATION_JOURNAL_STORAGE_KEY]: { version: 1, stage: 'active' },
+      [AUTO_SYNC_QUEUE_STORAGE_KEYS.notion]: { version: 2, entries: [] },
+      [AUTO_SYNC_QUEUE_STORAGE_KEYS.obsidian]: { version: 2, entries: [] },
+      [AUTO_SYNC_QUEUE_STORAGE_KEYS.feishu]: { version: 2, entries: [] },
+      [SYNC_JOB_STORAGE_KEYS.notion]: { id: 'job-notion' },
+      [SYNC_JOB_STORAGE_KEYS.obsidian]: { id: 'job-obsidian' },
+      [SYNC_JOB_STORAGE_KEYS.feishu]: { id: 'job-feishu' },
     });
     expect(filtered).toEqual({
       notion_oauth_client_id: 'abc',
@@ -52,7 +63,9 @@ describe('backup backup-utils', () => {
       chat_with_prompt_template_v1: 'talk',
       chat_with_ai_platforms_v1: [{ id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', enabled: true }],
       obsidian_api_base_url: 'http://127.0.0.1:27123',
+      [MIGRATION_JOURNAL_STORAGE_KEY]: { version: 1, stage: 'active' },
     });
+    expect(filterStorageForBackupImport(filtered)).not.toHaveProperty(MIGRATION_JOURNAL_STORAGE_KEY);
   });
 
   it('validateBackupDocument rejects unsupported version', () => {

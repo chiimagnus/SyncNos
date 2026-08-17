@@ -16,6 +16,12 @@ import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import { createFactsManifest, type FactsManifest } from '@services/local-data/facts-manifest';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 import { createNativeWireDataFrame } from '@services/local-data/native-wire';
+import {
+  createEmptyImportStats,
+  emptyPortableBackupFacts,
+  encodeBackupPortableExport,
+  encodeBackupPortableFacts,
+} from '@services/sync/backup/local-data';
 
 const digestProvider = {
   async sha256(bytes: Uint8Array) {
@@ -83,6 +89,44 @@ async function hostJsonFrames(value: unknown) {
   await digest.append({ sequence: data.sequence, byteLength: data.byteLength, digest: data.sliceDigest });
   return [
     begin,
+    data,
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId,
+      sequence: 2,
+      type: 'end' as const,
+      digest: digest.finalize(),
+    },
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId,
+      sequence: 3,
+      type: 'terminal' as const,
+      status: 'ok' as const,
+    },
+  ];
+}
+
+async function backupFrames(bytes: Uint8Array) {
+  const sessionId = '750e8400-e29b-41d4-a716-446655440000';
+  const digest = await OrderedFrameDigestAccumulator.create(digestProvider);
+  const data = await createNativeWireDataFrame({
+    bytes,
+    offset: 0,
+    provider: digestProvider,
+    sequence: 1,
+    sessionId,
+  });
+  await digest.append({ sequence: data.sequence, byteLength: data.byteLength, digest: data.sliceDigest });
+  return [
+    {
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      sessionId,
+      sequence: 0,
+      type: 'begin' as const,
+      operation: 'zip-backup' as const,
+      declaredTotalBytes: bytes.byteLength,
+    },
     data,
     {
       protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
@@ -427,6 +471,76 @@ describe('Native Messaging client', () => {
     expect(harness.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ command: 'GET_IMAGE_ASSET', requestId: 'image-read' }),
     );
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('downloads portable backup facts through the dedicated zip-backup NativeWire operation', async () => {
+    const harness = createPortHarness();
+    const bytes = encodeBackupPortableExport({ facts: emptyPortableBackupFacts(), warnings: [] });
+    const frames = await backupFrames(bytes);
+    const operation = connectNative<Uint8Array>({
+      command: 'EXPORT_BACKUP',
+      payload: { transfer: { operation: 'zip-backup', declaredTotalBytes: 0 } },
+      dependencies: {
+        createRequestId: () => 'backup-export',
+        digestProvider,
+        runtime: { connectNative: vi.fn(() => harness.port) },
+      },
+    });
+
+    harness.emitMessage(
+      createHostFactsSuccess('backup-export', {
+        stream: { operation: 'zip-backup', declaredTotalBytes: bytes.byteLength },
+      }),
+    );
+    for (const frame of frames) harness.emitMessage(frame);
+
+    await expect(operation).resolves.toEqual(bytes);
+    expect(harness.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'EXPORT_BACKUP', requestId: 'backup-export' }),
+    );
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads portable backup facts as zip-backup bytes before reading compact Host stats', async () => {
+    const harness = createPortHarness();
+    const bytes = encodeBackupPortableFacts(emptyPortableBackupFacts());
+    const stats = createEmptyImportStats();
+    const responseFrames = await hostJsonFrames(stats);
+    harness.postMessage.mockImplementation((message: unknown) => {
+      if ((message as { type?: unknown })?.type !== 'terminal') return;
+      queueMicrotask(() => {
+        const statsBytes = new TextEncoder().encode(JSON.stringify(stats));
+        harness.emitMessage(
+          createHostFactsSuccess('backup-import', {
+            stream: { operation: 'host-json', declaredTotalBytes: statsBytes.byteLength },
+          }),
+        );
+        for (const frame of responseFrames) harness.emitMessage(frame);
+      });
+    });
+
+    await expect(
+      connectNative({
+        command: 'IMPORT_BACKUP',
+        payload: { transfer: { operation: 'zip-backup', declaredTotalBytes: bytes.byteLength } },
+        uploadBytes: bytes,
+        dependencies: {
+          createRequestId: () => 'backup-import',
+          digestProvider,
+          runtime: { connectNative: vi.fn(() => harness.port) },
+        },
+      }),
+    ).resolves.toEqual(stats);
+
+    const sent = harness.postMessage.mock.calls.map(([message]) => message as Record<string, unknown>);
+    expect(sent[0]).toMatchObject({
+      command: 'IMPORT_BACKUP',
+      payload: { transfer: { operation: 'zip-backup', declaredTotalBytes: bytes.byteLength } },
+    });
+    expect(JSON.stringify(sent[0])).not.toContain('uploadBytes');
+    expect(sent[1]).toMatchObject({ type: 'begin', operation: 'zip-backup' });
+    expect(sent.filter((message) => message.type === 'data')).not.toHaveLength(0);
     expect(harness.disconnect).toHaveBeenCalledTimes(1);
   });
 

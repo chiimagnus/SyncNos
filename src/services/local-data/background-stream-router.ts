@@ -193,6 +193,10 @@ export class BackgroundStreamRouter {
       requestId = message.requestId;
       receiver = new RuntimeStreamReceiver(message.requestId, message.stream);
       upload = deferred<Uint8Array>();
+      // Admission can fail before the gate callback ever awaits this deferred. Attach a
+      // rejection observer immediately so cleanup can reject it without leaking an
+      // unhandled Promise; an admitted callback still observes the same rejection.
+      void upload.promise.catch(() => undefined);
       void this.gate
         .runFactsOperation(`stream:${message.stream.operation}`, async (lease) => {
           const bytes = await upload!.promise;

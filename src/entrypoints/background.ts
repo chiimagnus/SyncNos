@@ -1,6 +1,7 @@
 import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { registerConversationSearchHandlers } from '@services/conversations/background/search-handlers';
+import { registerBackupHandlers } from '@services/sync/backup/background-handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
@@ -75,6 +76,7 @@ export default defineBackground(async () => {
     },
   });
   registerMigrationCoordinatorHandlers(router, migrationCoordinator);
+  registerBackupHandlers(router, { streamRouter });
   registerConversationHandlers(router, {
     conversationReadRunner,
     onConversationChanged: (reference, reason, lease) =>
