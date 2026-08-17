@@ -17,11 +17,6 @@ export type ChatWithSettings = {
   platforms: ChatWithAiPlatform[];
 };
 
-/** The caller owns the facts lease or runtime stream used to inspect one internal image. */
-export type ExternalOutputImageAssetResolver = (
-  assetId: number,
-) => Promise<Readonly<{ contentType?: string; url?: string }> | null>;
-
 export const CHAT_WITH_PROMPT_TEMPLATE_STORAGE_KEY = 'chat_with_prompt_template_v1';
 export const CHAT_WITH_PLATFORMS_STORAGE_KEY = 'chat_with_ai_platforms_v1';
 
@@ -168,57 +163,6 @@ function parseSyncnosAssetId(url: unknown): number | null {
   return id;
 }
 
-function normalizeImageExt(raw: unknown): string {
-  const text = String(raw || '')
-    .trim()
-    .toLowerCase();
-  if (!text) return 'png';
-  if (text === 'jpeg') return 'jpg';
-  if (text === 'svg+xml') return 'svg';
-  if (text === 'x-icon' || text === 'vnd.microsoft.icon') return 'ico';
-  return /^[a-z0-9]+$/.test(text) ? text : 'png';
-}
-
-function inferImageExtFromSource(input: { contentType?: string; url?: string }): string {
-  const contentType = String(input.contentType || '')
-    .trim()
-    .toLowerCase();
-  if (contentType.startsWith('image/')) {
-    return normalizeImageExt(contentType.slice('image/'.length));
-  }
-
-  const text = String(input.url || '').trim();
-  if (!text) return 'png';
-  if (isDataImageUrl(text)) {
-    const matched = /^data:image\/([a-z0-9.+-]+)/i.exec(text);
-    return normalizeImageExt(matched?.[1] || '');
-  }
-  try {
-    const u = new URL(text);
-    const pathname = String(u.pathname || '');
-    const last = pathname.split('/').filter(Boolean).pop() || '';
-    const dot = last.lastIndexOf('.');
-    if (dot >= 0 && dot < last.length - 1) return normalizeImageExt(last.slice(dot + 1));
-  } catch (_e) {
-    // ignore parse failure, fallback below
-  }
-  return 'png';
-}
-
-async function inferMaterializedImageExt(
-  url: string,
-  resolveImageAsset: ExternalOutputImageAssetResolver,
-): Promise<string> {
-  const text = String(url || '').trim();
-  const assetId = parseSyncnosAssetId(text);
-  if (!assetId) {
-    return inferImageExtFromSource({ url: text });
-  }
-  const asset = await resolveImageAsset(assetId);
-  if (!asset) return 'png';
-  return inferImageExtFromSource({ contentType: asset.contentType, url: asset.url });
-}
-
 export function materializeMarkdownAssetPlaceholders(input: { markdown: string }): string {
   const markdown = String(input.markdown || '');
   if (!markdown) return '';
@@ -233,56 +177,6 @@ export function materializeMarkdownAssetPlaceholders(input: { markdown: string }
 
     const label = alt && alt.trim() ? `Image: ${alt.trim()}` : 'Image omitted';
     return `[${label}]`;
-  });
-}
-
-export async function materializeMarkdownAssetPaths(input: {
-  markdown: string;
-  markdownBasename: string;
-  resolveImageAsset: ExternalOutputImageAssetResolver;
-}): Promise<string> {
-  const markdown = String(input.markdown || '');
-  if (!markdown) return '';
-  if (typeof input.resolveImageAsset !== 'function') throw new Error('image asset resolver unavailable');
-
-  const basename = String(input.markdownBasename || '').trim() || 'conversation';
-  const orderedUrls: string[] = [];
-  const seenUrls = new Set<string>();
-
-  INTERNAL_IMAGE_REF_RE.lastIndex = 0;
-  let match: RegExpExecArray | null = null;
-  while ((match = INTERNAL_IMAGE_REF_RE.exec(markdown)) != null) {
-    const urlPart = match[2] ? String(match[2]) : '';
-    const url = stripAngleBrackets(urlPart);
-    const shouldMaterialize = isDataImageUrl(url) || parseSyncnosAssetId(url) != null;
-    if (!shouldMaterialize) continue;
-    if (seenUrls.has(url)) continue;
-    seenUrls.add(url);
-    orderedUrls.push(url);
-  }
-  if (!orderedUrls.length) return markdown;
-
-  const replacements = new Map<string, string>();
-  for (let i = 0; i < orderedUrls.length; i += 1) {
-    const url = orderedUrls[i]!;
-
-    const ext = await inferMaterializedImageExt(url, input.resolveImageAsset);
-    replacements.set(url, `${basename}-${i + 1}.${ext}`);
-  }
-
-  INTERNAL_IMAGE_REF_RE.lastIndex = 0;
-  return markdown.replace(INTERNAL_IMAGE_REF_RE, (_full, altRaw, urlPartRaw, titleRaw) => {
-    const alt = altRaw ? String(altRaw) : '';
-    const urlPart = urlPartRaw ? String(urlPartRaw) : '';
-    const title = titleRaw ? String(titleRaw) : '';
-    const url = stripAngleBrackets(urlPart);
-    const shouldMaterialize = isDataImageUrl(url) || parseSyncnosAssetId(url) != null;
-    if (!shouldMaterialize) return _full;
-
-    const materialized = replacements.get(url);
-    if (!materialized) return _full;
-    const nextPart = urlPart.trim().startsWith('<') ? `<${materialized}>` : materialized;
-    return `![${alt}](${nextPart}${title})`;
   });
 }
 
