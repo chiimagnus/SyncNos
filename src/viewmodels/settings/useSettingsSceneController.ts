@@ -44,6 +44,12 @@ import { storageGet, storageOnChanged, storageRemove, storageSet } from '@servic
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import {
+  getLocalDataMigrationStatus,
+  resumeLocalDataMigration,
+  startLocalDataMigration,
+} from '@services/local-data/client';
+import type { LocalDataMigrationStatus } from '@services/local-data/migration-status';
+import {
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
   FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY,
@@ -258,6 +264,18 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
+  const [localDataStatus, setLocalDataStatus] = useState<LocalDataMigrationStatus | null>(null);
+  const [localDataStatusLoading, setLocalDataStatusLoading] = useState(false);
+  const [localDataStatusError, setLocalDataStatusError] = useState('');
+  const [localDataActionBusy, setLocalDataActionBusy] = useState(false);
+  const [localDataMigrationDialogMode, setLocalDataMigrationDialogMode] = useState<'start' | 'join' | null>(null);
+  const localDataMountedRef = useRef(false);
+  const localDataActiveSectionRef = useRef(activeSection);
+  const localDataStatusLoadedRef = useRef(false);
+  const localDataStatusDirtyRef = useRef(false);
+  const localDataStatusRequestSeqRef = useRef(0);
+  const localDataActionBusyRef = useRef(false);
+  localDataActiveSectionRef.current = activeSection;
   const chatDbSpec = useMemo(() => getKindDbSpec('chat', FALLBACK_CHAT_DB_SPEC), []);
   const articleDbSpec = useMemo(() => getKindDbSpec('article', FALLBACK_ARTICLE_DB_SPEC), []);
   const videoDbSpec = useMemo(() => getKindDbSpec('video', FALLBACK_VIDEO_DB_SPEC), []);
@@ -302,6 +320,62 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
 
+  const loadLocalDataStatus = useCallback(async () => {
+    const requestSeq = localDataStatusRequestSeqRef.current + 1;
+    localDataStatusRequestSeqRef.current = requestSeq;
+    setLocalDataStatusLoading(true);
+    setLocalDataStatusError('');
+    try {
+      const status = await getLocalDataMigrationStatus();
+      if (
+        !localDataMountedRef.current ||
+        requestSeq !== localDataStatusRequestSeqRef.current ||
+        localDataActiveSectionRef.current !== 'backup'
+      ) {
+        return null;
+      }
+      localDataStatusLoadedRef.current = true;
+      localDataStatusDirtyRef.current = false;
+      setLocalDataStatus(status);
+      return status;
+    } catch (error) {
+      if (
+        localDataMountedRef.current &&
+        requestSeq === localDataStatusRequestSeqRef.current &&
+        localDataActiveSectionRef.current === 'backup'
+      ) {
+        setLocalDataStatusError(toErrorMessage(error, t('localDatabaseStatusLoadFailed')));
+      }
+      return null;
+    } finally {
+      if (
+        localDataMountedRef.current &&
+        requestSeq === localDataStatusRequestSeqRef.current &&
+        localDataActiveSectionRef.current === 'backup'
+      ) {
+        setLocalDataStatusLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localDataMountedRef.current = true;
+    return () => {
+      localDataMountedRef.current = false;
+      localDataStatusRequestSeqRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'backup') {
+      localDataStatusRequestSeqRef.current += 1;
+      setLocalDataStatusLoading(false);
+      return;
+    }
+    if (localDataStatusLoadedRef.current && !localDataStatusDirtyRef.current) return;
+    void loadLocalDataStatus();
+  }, [activeSection, loadLocalDataStatus]);
+
   useEffect(() => {
     let port: any = null;
     const onMessage = (message: any) => {
@@ -313,6 +387,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setInsightError('');
       setInsightLoading(false);
       setHasLoadedInsight(false);
+      localDataStatusDirtyRef.current = true;
+      if (localDataActionBusyRef.current) return;
+      if (localDataActiveSectionRef.current === 'backup') void loadLocalDataStatus();
     };
     try {
       port = connectPort(UI_PORT_NAMES.POPUP_EVENTS);
@@ -328,7 +405,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         // Settings may unmount after the extension context has already been invalidated.
       }
     };
-  }, []);
+  }, [loadLocalDataStatus]);
 
   const runTask = useCallback(async (task: () => Promise<void>, options: RunTaskOptions = {}) => {
     const run = taskQueueRef.current.then(async () => {
@@ -1474,6 +1551,65 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     backupImportRef.current?.scrollIntoView({ block: 'start' });
   }, [activeSection, focusKey]);
 
+  const onLocalDataRequestMigration = useCallback(() => {
+    if (localDataActionBusyRef.current || localDataStatusLoading) return;
+    if (!localDataStatus?.actions.canStart) return;
+    if (localDataStatus.profileState === 'join_existing_required') {
+      setLocalDataMigrationDialogMode('join');
+      return;
+    }
+    if (localDataStatus.profileState === 'setup_required') setLocalDataMigrationDialogMode('start');
+  }, [localDataStatus, localDataStatusLoading]);
+
+  const onLocalDataCancelMigration = useCallback(() => {
+    if (localDataActionBusyRef.current) return;
+    setLocalDataMigrationDialogMode(null);
+  }, []);
+
+  const runLocalDataAction = useCallback(
+    async (action: 'start' | 'resume') => {
+      if (localDataActionBusyRef.current) return;
+      localDataActionBusyRef.current = true;
+      setLocalDataActionBusy(true);
+      setLocalDataStatusError('');
+      let actionError = '';
+      try {
+        if (action === 'start') await startLocalDataMigration();
+        else await resumeLocalDataMigration();
+      } catch (error) {
+        actionError = toErrorMessage(error, t('localDatabaseActionFailed'));
+      } finally {
+        localDataStatusDirtyRef.current = true;
+        setLocalDataMigrationDialogMode(null);
+        if (localDataMountedRef.current && localDataActiveSectionRef.current === 'backup') {
+          await loadLocalDataStatus();
+          if (actionError && localDataMountedRef.current && localDataActiveSectionRef.current === 'backup') {
+            setLocalDataStatusError(actionError);
+          }
+        }
+        localDataActionBusyRef.current = false;
+        if (localDataMountedRef.current) setLocalDataActionBusy(false);
+      }
+    },
+    [loadLocalDataStatus],
+  );
+
+  const onLocalDataConfirmMigration = useCallback(async () => {
+    if (!localDataMigrationDialogMode) return;
+    await runLocalDataAction('start');
+  }, [localDataMigrationDialogMode, runLocalDataAction]);
+
+  const onLocalDataResumeMigration = useCallback(async () => {
+    if (!localDataStatus?.actions.canResume) return;
+    await runLocalDataAction('resume');
+  }, [localDataStatus, runLocalDataAction]);
+
+  const onLocalDataRetryStatus = useCallback(async () => {
+    if (localDataActionBusyRef.current || localDataStatusLoading) return;
+    localDataStatusDirtyRef.current = true;
+    await loadLocalDataStatus();
+  }, [loadLocalDataStatus, localDataStatusLoading]);
+
   const onChangeAboutYouUserName = useCallback((next: string) => {
     setAboutYouUserName(normalizeUserName(next));
   }, []);
@@ -1573,6 +1709,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onSaveObsidianSettings,
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
+
+    localDataStatus,
+    localDataStatusLoading,
+    localDataStatusError,
+    localDataActionBusy,
+    localDataMigrationDialogMode,
+    onLocalDataRequestMigration,
+    onLocalDataCancelMigration,
+    onLocalDataConfirmMigration,
+    onLocalDataResumeMigration,
+    onLocalDataRetryStatus,
 
     exportStatus,
     importStatus,

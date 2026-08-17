@@ -259,6 +259,18 @@ describe('backup feedback', () => {
   function renderBackup(props: Partial<Parameters<typeof BackupSection>[0]> = {}) {
     const baseProps: Parameters<typeof BackupSection>[0] = {
       busy: false,
+      localDatabase: {
+        status: null,
+        loading: false,
+        error: '',
+        actionBusy: false,
+        dialogMode: null,
+        onRequestMigration: () => {},
+        onCancelMigration: () => {},
+        onConfirmMigration: () => {},
+        onResumeMigration: () => {},
+        onRetryStatus: () => {},
+      },
       exportStatus: '',
       importStatus: '',
       importStats: null,
@@ -273,6 +285,15 @@ describe('backup feedback', () => {
       root!.render(createElement(BackupSection, { ...baseProps, ...props }));
     });
   }
+
+  it('mounts the Local Database card before the existing backup controls', () => {
+    renderBackup();
+    const localCard = document.querySelector('[data-local-database-state]');
+    const backupCard = document.querySelector('[aria-label="Database Backup"]');
+    expect(localCard).not.toBeNull();
+    expect(backupCard).not.toBeNull();
+    expect(localCard!.compareDocumentPosition(backupCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 
   it('hides empty feedback and shows completed backup feedback', () => {
     renderBackup();

@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import { t } from '@i18n';
 import { formatTime } from '@viewmodels/settings/utils';
 import { buttonClassName, cardClassName } from '@ui/settings/ui';
+import { LocalDatabaseCard, type LocalDatabaseCardProps } from './LocalDatabaseCard';
 
 function ImportStatsList(props: { stats: any }) {
   const stats = props.stats;
@@ -35,6 +36,7 @@ function ImportStatsList(props: { stats: any }) {
 
 export function BackupSection(props: {
   busy: boolean;
+  localDatabase: LocalDatabaseCardProps;
   exportStatus: string;
   importStatus: string;
   importStats: any;
@@ -48,6 +50,7 @@ export function BackupSection(props: {
 }) {
   const {
     busy,
+    localDatabase,
     exportStatus,
     importStatus,
     importStats,
@@ -61,57 +64,60 @@ export function BackupSection(props: {
   } = props;
 
   return (
-    <section className={cardClassName} aria-label={t('databaseBackup')}>
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('databaseBackup')}</h2>
+    <>
+      <LocalDatabaseCard {...localDatabase} />
+      <section className={cardClassName} aria-label={t('databaseBackup')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('databaseBackup')}</h2>
 
-      <div
-        ref={backupImportRef}
-        id="settings-backup-import"
-        className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5"
-      >
-        <button className={buttonClassName} onClick={onExport} disabled={busy}>
-          {t('exportZip')}
-        </button>
-        <button
-          className={buttonClassName}
-          disabled={busy}
-          onClick={() => {
-            if (busy) return;
-            if (onImportClick) onImportClick();
-            else fileInputRef.current?.click();
-          }}
+        <div
+          ref={backupImportRef}
+          id="settings-backup-import"
+          className="tw-mt-2.5 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5"
         >
-          {importLabel || t('importDots')}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip,application/zip,application/json,.json"
-          className="tw-hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onImportFile(file);
-          }}
-        />
-      </div>
-      {exportStatus ? (
-        <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {exportStatus}
+          <button className={buttonClassName} onClick={onExport} disabled={busy}>
+            {t('exportZip')}
+          </button>
+          <button
+            className={buttonClassName}
+            disabled={busy}
+            onClick={() => {
+              if (busy) return;
+              if (onImportClick) onImportClick();
+              else fileInputRef.current?.click();
+            }}
+          >
+            {importLabel || t('importDots')}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip,application/zip,application/json,.json"
+            className="tw-hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImportFile(file);
+            }}
+          />
         </div>
-      ) : null}
-      {lastBackupExportAt ? (
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('lastExport')} {formatTime(lastBackupExportAt)}
+        {exportStatus ? (
+          <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {exportStatus}
+          </div>
+        ) : null}
+        {lastBackupExportAt ? (
+          <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {t('lastExport')} {formatTime(lastBackupExportAt)}
+          </div>
+        ) : null}
+        {importStatus ? (
+          <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {importStatus}
+          </div>
+        ) : null}
+        <div className="tw-mt-2.5">
+          <ImportStatsList stats={importStats} />
         </div>
-      ) : null}
-      {importStatus ? (
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {importStatus}
-        </div>
-      ) : null}
-      <div className="tw-mt-2.5">
-        <ImportStatsList stats={importStats} />
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

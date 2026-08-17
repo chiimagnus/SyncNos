@@ -128,6 +128,17 @@ export function SettingsScene(props: SettingsSceneProps) {
     onTestObsidianConnection,
     onOpenObsidianSetupGuide,
 
+    localDataStatus,
+    localDataStatusLoading,
+    localDataStatusError,
+    localDataActionBusy,
+    localDataMigrationDialogMode,
+    onLocalDataRequestMigration,
+    onLocalDataCancelMigration,
+    onLocalDataConfirmMigration,
+    onLocalDataResumeMigration,
+    onLocalDataRetryStatus,
+
     exportStatus,
     importStatus,
     importStats,
@@ -351,6 +362,24 @@ export function SettingsScene(props: SettingsSceneProps) {
       {activeSection === 'backup' ? (
         <BackupSection
           busy={busy}
+          localDatabase={{
+            status: localDataStatus,
+            loading: localDataStatusLoading,
+            error: localDataStatusError,
+            actionBusy: localDataActionBusy,
+            dialogMode: localDataMigrationDialogMode,
+            onRequestMigration: onLocalDataRequestMigration,
+            onCancelMigration: onLocalDataCancelMigration,
+            onConfirmMigration: () => {
+              void onLocalDataConfirmMigration();
+            },
+            onResumeMigration: () => {
+              void onLocalDataResumeMigration();
+            },
+            onRetryStatus: () => {
+              void onLocalDataRetryStatus();
+            },
+          }}
           exportStatus={exportStatus}
           importStatus={importStatus}
           importStats={importStats}
