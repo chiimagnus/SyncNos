@@ -307,4 +307,86 @@ describe('background local-data stream router', () => {
     expect(handler).not.toHaveBeenCalled();
     expect(incomplete.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
   });
+
+  it('expires a live upload that stops sending frames so migration drain can finish', async () => {
+    vi.useFakeTimers();
+    try {
+      const gate = new FactsOperationGate({ readJournal: async () => notStarted });
+      await gate.initializeFromJournal();
+      const router = new BackgroundStreamRouter(gate, { inactivityTimeoutMs: 25 });
+      const handler = vi.fn(async () => {});
+      router.register('capture-snapshot', { upload: handler });
+      const stream = createStreamPort();
+      router.registerPort(stream.port);
+
+      stream.emit({
+        type: 'open',
+        requestId: 'stalled-upload',
+        direction: 'upload',
+        stream: { operation: 'capture-snapshot', declaredTotalBytes: 1 },
+      });
+      await Promise.resolve();
+      gate.closeAdmissions();
+      let drained = false;
+      const drain = gate.waitForDrained().then(() => {
+        drained = true;
+      });
+      await Promise.resolve();
+      expect(drained).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(25);
+      await drain;
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(stream.posted).toContainEqual(
+        expect.objectContaining({
+          type: 'error',
+          requestId: 'stalled-upload',
+          error: expect.objectContaining({ code: 'HOST_UNAVAILABLE' }),
+        }),
+      );
+      expect(stream.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('expires a live download that stops acknowledging data so migration drain can finish', async () => {
+    vi.useFakeTimers();
+    try {
+      const gate = new FactsOperationGate({ readJournal: async () => notStarted });
+      await gate.initializeFromJournal();
+      const router = new BackgroundStreamRouter(gate, { inactivityTimeoutMs: 25 });
+      const stream = createStreamPort();
+      router.register('host-json', {
+        download: async ({ send }) => await send(new TextEncoder().encode('payload')),
+      });
+      router.registerPort(stream.port);
+
+      stream.emit({ type: 'open', requestId: 'stalled-download', direction: 'download', operation: 'host-json' });
+      await Promise.resolve();
+      await Promise.resolve();
+      gate.closeAdmissions();
+      let drained = false;
+      const drain = gate.waitForDrained().then(() => {
+        drained = true;
+      });
+      await Promise.resolve();
+      expect(drained).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(25);
+      await drain;
+
+      expect(stream.posted).toContainEqual(
+        expect.objectContaining({
+          type: 'error',
+          requestId: 'stalled-download',
+          error: expect.objectContaining({ code: 'HOST_UNAVAILABLE' }),
+        }),
+      );
+      expect(stream.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

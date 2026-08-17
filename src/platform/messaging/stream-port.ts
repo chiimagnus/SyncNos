@@ -414,7 +414,15 @@ export class RuntimeStreamSender {
         });
         await digest.append({ sequence: frame.sequence, byteLength: frame.byteLength, digest: frame.sliceDigest });
         const acknowledgement = this.waitForAck(frame.sequence);
-        this.post({ type: LOCAL_DATA_STREAM_MESSAGE_TYPES.FRAME, requestId: this.input.requestId, frame });
+        try {
+          this.post({ type: LOCAL_DATA_STREAM_MESSAGE_TYPES.FRAME, requestId: this.input.requestId, frame });
+        } catch (error) {
+          // ponytail: registering the waiter before post is required for synchronous test/runtime ACKs;
+          // if post itself fails, consume the waiter rejection before propagating the transport failure.
+          this.dispose(error);
+          await acknowledgement.catch(() => undefined);
+          throw error;
+        }
         await acknowledgement;
       }
       this.post({
@@ -452,9 +460,9 @@ export class RuntimeStreamSender {
     this.input.port.postMessage(message);
   }
 
-  private async waitForAck(sequence: number): Promise<void> {
+  private waitForAck(sequence: number): Promise<void> {
     if (this.#closed) throw new LocalDataContractError('HOST_UNAVAILABLE');
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.#waiter = { sequence, resolve, reject };
     });
   }

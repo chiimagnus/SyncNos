@@ -20,6 +20,8 @@ import { type FactsOperationGate, type FactsOperationLease } from './facts-opera
 
 type PortListener = (message?: unknown) => void;
 
+export const BACKGROUND_STREAM_INACTIVITY_TIMEOUT_MS = 60_000;
+
 export type BackgroundStreamPort = RuntimeStreamPort &
   Readonly<{
     onDisconnect?: Readonly<{
@@ -125,8 +127,18 @@ function asBackgroundStreamPort(value: unknown): ConnectedBackgroundStreamPort |
  */
 export class BackgroundStreamRouter {
   #handlers = new Map<LocalDataStreamOperation, BackgroundStreamHandler>();
+  #inactivityTimeoutMs: number;
 
-  constructor(private readonly gate: FactsOperationGate) {}
+  constructor(
+    private readonly gate: FactsOperationGate,
+    dependencies: Readonly<{ inactivityTimeoutMs?: number }> = {},
+  ) {
+    const inactivityTimeoutMs = dependencies.inactivityTimeoutMs ?? BACKGROUND_STREAM_INACTIVITY_TIMEOUT_MS;
+    if (!Number.isSafeInteger(inactivityTimeoutMs) || inactivityTimeoutMs <= 0 || inactivityTimeoutMs > 10 * 60_000) {
+      throw new LocalDataContractError('INVALID_ARGUMENT');
+    }
+    this.#inactivityTimeoutMs = inactivityTimeoutMs;
+  }
 
   register(operation: LocalDataStreamOperation, handler: BackgroundStreamHandler): void {
     const parsedOperation = parseStreamDescriptor({ operation, declaredTotalBytes: 0 }).operation;
@@ -157,7 +169,13 @@ export class BackgroundStreamRouter {
     let receiver: RuntimeStreamReceiver | null = null;
     let sender: RuntimeStreamSender | null = null;
     let upload: Deferred<Uint8Array> | null = null;
+    let inactivityTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
+    const clearInactivityTimeout = () => {
+      if (inactivityTimer === null) return;
+      globalThis.clearTimeout(inactivityTimer);
+      inactivityTimer = null;
+    };
     const cleanup = () => {
       port.onMessage?.removeListener?.(onMessage);
       port.onDisconnect?.removeListener?.(onDisconnect);
@@ -165,6 +183,7 @@ export class BackgroundStreamRouter {
     const close = () => {
       if (closed) return;
       closed = true;
+      clearInactivityTimeout();
       receiver?.dispose();
       sender?.dispose();
       cleanup();
@@ -180,6 +199,13 @@ export class BackgroundStreamRouter {
       }
       upload?.reject(error);
       close();
+    };
+    const armInactivityTimeout = () => {
+      clearInactivityTimeout();
+      inactivityTimer = globalThis.setTimeout(
+        () => fail(new LocalDataContractError('HOST_UNAVAILABLE'), requestId ?? undefined),
+        this.#inactivityTimeoutMs,
+      );
     };
 
     const startUpload = (message: Extract<RuntimeStreamMessage, { type: 'open'; direction: 'upload' }>) => {
@@ -197,6 +223,7 @@ export class BackgroundStreamRouter {
       // rejection observer immediately so cleanup can reject it without leaking an
       // unhandled Promise; an admitted callback still observes the same rejection.
       void upload.promise.catch(() => undefined);
+      armInactivityTimeout();
       void this.gate
         .runFactsOperation(`stream:${message.stream.operation}`, async (lease) => {
           const bytes = await upload!.promise;
@@ -235,7 +262,12 @@ export class BackgroundStreamRouter {
             send: async (bytes) => {
               if (sent) throw new LocalDataContractError('INVALID_ARGUMENT');
               sent = true;
-              await sender!.send(bytes, { operation: message.operation, declaredTotalBytes: bytes.byteLength });
+              armInactivityTimeout();
+              try {
+                await sender!.send(bytes, { operation: message.operation, declaredTotalBytes: bytes.byteLength });
+              } finally {
+                clearInactivityTimeout();
+              }
             },
           });
           if (!sent) throw new LocalDataContractError('INVALID_ARGUMENT');
@@ -258,6 +290,7 @@ export class BackgroundStreamRouter {
       }
       if (receiver) {
         if (message.type !== 'frame') throw new LocalDataContractError('PROTOCOL_MISMATCH');
+        armInactivityTimeout();
         const event = await receiver.accept(message);
         if (event?.kind === 'ack') {
           port.postMessage({
@@ -267,13 +300,18 @@ export class BackgroundStreamRouter {
           });
           return;
         }
-        if (event?.kind === 'complete') upload?.resolve(event.bytes);
+        if (event?.kind === 'complete') {
+          clearInactivityTimeout();
+          upload?.resolve(event.bytes);
+        }
         if (event?.kind === 'cancelled' || event?.kind === 'failed') {
+          clearInactivityTimeout();
           upload?.reject(new LocalDataContractError('MIGRATION_VALIDATION_FAILED'));
         }
         return;
       }
       if (sender) {
+        if (message.type === 'ack') armInactivityTimeout();
         sender.accept(message);
         return;
       }
