@@ -143,6 +143,45 @@ describe('SQLite search repository', () => {
     }
   });
 
+  it('weights title matches above shorter body-only matches in best ranking', async () => {
+    const { conversations, handle, messages, search: repository } = await fixture.open();
+    try {
+      const titleMatch = conversations.upsertConversation({
+        conversationKey: 'weighted-title',
+        lastCapturedAt: 100,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        title: 'weightedneedle',
+      });
+      messages.syncConversationMessages(titleMatch.id, [
+        {
+          contentText: 'neutral neutral neutral neutral neutral neutral neutral neutral neutral neutral',
+          messageKey: 'title-body',
+          role: 'assistant',
+          sequence: 1,
+        },
+      ]);
+
+      const bodyMatch = conversations.upsertConversation({
+        conversationKey: 'weighted-body',
+        lastCapturedAt: 200,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        title: 'neutral',
+      });
+      messages.syncConversationMessages(bodyMatch.id, [
+        { contentText: 'weightedneedle', messageKey: 'body-only', role: 'assistant', sequence: 1 },
+      ]);
+
+      expect(search(repository, 'weightedneedle', { sort: 'best' }).items.map((item) => item.conversationKey)).toEqual([
+        'weighted-title',
+        'weighted-body',
+      ]);
+    } finally {
+      handle.close();
+    }
+  });
+
   it('rebuilds FTS from facts to the same incremental search result', async () => {
     const { conversations, database, handle, messages, search: repository } = await fixture.open();
     try {

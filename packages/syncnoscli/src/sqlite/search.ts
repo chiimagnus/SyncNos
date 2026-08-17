@@ -565,7 +565,9 @@ function ftsResultRows(
 ): FtsResultRow[] {
   const filters = filtersForScope(request.scope, 'c');
   const after = ftsAfterClause(cursor?.after ?? null, request.sort);
-  const score = request.sort === 'best' ? `bm25(${SQLITE_FTS_TABLE_NAME}, 8.0, 1.0)` : 'NULL';
+  // FTS5 weights follow the declared column order, including UNINDEXED columns:
+  // conversation_id=0, title=8, body=1.
+  const score = request.sort === 'best' ? `bm25(${SQLITE_FTS_TABLE_NAME}, 0.0, 8.0, 1.0)` : 'NULL';
   const order =
     request.sort === 'best' ? 'score ASC, last_captured_at DESC, id DESC' : 'last_captured_at DESC, id DESC';
   const rows = database
