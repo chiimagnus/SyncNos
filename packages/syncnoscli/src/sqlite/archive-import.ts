@@ -3,10 +3,13 @@ import { Buffer } from 'node:buffer';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MAX_MIGRATION_RECEIPT_COMMENT_DIAGNOSTICS,
   LocalDataContractError,
+  parseFactsMigrationReceipt,
   parseMigrationId,
   parseMigrationStreamRequestPayload,
   parseOrderedFrameDigest,
+  type FactsMigrationReceipt,
   type MigrationId,
   type MigrationStreamRequestPayload,
 } from '@services/local-data/contracts';
@@ -50,7 +53,6 @@ import {
   type SyncNosSqliteDatabase,
 } from './schema';
 
-const MAX_RECEIPT_COMMENT_DIAGNOSTICS = 32;
 const ASSET_URL_PATTERN = /syncnos-asset:\/\/(\d+)/gi;
 
 type FactCounts = Record<FactStreamKind, number>;
@@ -122,10 +124,7 @@ type ImportStagedFactsOutcome = Readonly<{
   result: StoredImportResult;
 }>;
 
-export type FactsArchiveImportResult = StoredImportResult &
-  Readonly<{
-    alreadyCommitted: boolean;
-  }>;
+export type FactsArchiveImportResult = FactsMigrationReceipt;
 
 export type StagedFactsImporter = Readonly<{
   abort: () => void;
@@ -339,7 +338,8 @@ function receiptResult(value: unknown): StoredImportResult {
     const groupCount = ambiguityRecord.groupCount;
     const samples = ambiguityRecord.samples;
     if (!Number.isSafeInteger(groupCount) || Number(groupCount) < 0 || !Array.isArray(samples)) schemaMismatch();
-    if (samples.length > MAX_RECEIPT_COMMENT_DIAGNOSTICS || samples.length > Number(groupCount)) schemaMismatch();
+    if (samples.length > MAX_MIGRATION_RECEIPT_COMMENT_DIAGNOSTICS || samples.length > Number(groupCount))
+      schemaMismatch();
     const parsedSamples = samples.map((sample) => {
       if (!sample || typeof sample !== 'object' || Array.isArray(sample)) schemaMismatch();
       const entry = sample as Record<string, unknown>;
@@ -373,6 +373,16 @@ function receiptResult(value: unknown): StoredImportResult {
   }
 }
 
+function externalReceipt(result: StoredImportResult, alreadyCommitted: boolean): FactsArchiveImportResult {
+  return parseFactsMigrationReceipt({
+    ...result,
+    alreadyCommitted,
+    complete: true,
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+  });
+}
+
 /** Reads the compact receipt only; it never probes, recreates, or mutates staging. */
 export function getFactsMigrationReceipt(
   database: SyncNosSqliteDatabase,
@@ -403,7 +413,7 @@ export function getFactsMigrationReceipt(
     }
     const result = receiptResult(receipt.result_json);
     if (result.migrationId !== parsedMigrationId || result.manifestDigest !== receipt.manifest_digest) schemaMismatch();
-    return Object.freeze({ ...result, alreadyCommitted: true });
+    return externalReceipt(result, true);
   } catch (error) {
     if (error instanceof LocalDataContractError) throw error;
     throw mapSqliteError(error, { readOnly: true });
@@ -709,7 +719,7 @@ function prepareCommentGroups(
     const targetGroupCount = safeCount(group.target_count);
     if (incomingGroupCount > 1 || targetGroupCount > 1) {
       groupCount += 1;
-      if (samples.length < MAX_RECEIPT_COMMENT_DIAGNOSTICS) {
+      if (samples.length < MAX_MIGRATION_RECEIPT_COMMENT_DIAGNOSTICS) {
         samples.push({ code: 'ambiguous_comment_signature', incomingGroupCount, targetGroupCount });
       }
     }
@@ -1120,7 +1130,7 @@ class FactsImporter {
       manifestDigest,
       migrationId: this.request.migrationId,
     });
-    this.#completed = Object.freeze({ ...outcome.result, alreadyCommitted: outcome.alreadyCommitted });
+    this.#completed = externalReceipt(outcome.result, outcome.alreadyCommitted);
     return this.#completed;
   }
 

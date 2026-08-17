@@ -320,6 +320,9 @@ describe('SQLite staged facts import', () => {
       const result = await importer.complete(emission.finalize());
       expect(result).toMatchObject({
         alreadyCommitted: false,
+        complete: true,
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
         factCounts: {
           article_comments: 2,
           conversations: 1,
@@ -331,8 +334,12 @@ describe('SQLite staged facts import', () => {
       });
       expect(getFactsMigrationReceipt(handle.database, migrationId)).toMatchObject({
         alreadyCommitted: true,
+        complete: true,
         factsRevision: 1,
+        manifestDigest: result.manifestDigest,
         migrationId,
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
       });
       expect(getFactsMigrationReceipt(handle.database, randomUUID())).toBeNull();
       const imageRow = handle.database.prepare('SELECT id FROM image_cache').get() as { id: number };

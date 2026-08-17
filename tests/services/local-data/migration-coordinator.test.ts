@@ -11,11 +11,63 @@ import {
   type MigrationRuntimeEnvironment,
 } from '@services/local-data/migration-coordinator';
 import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
-import { LocalDataContractError } from '@services/local-data/contracts';
+import {
+  LOCAL_DATA_PROTOCOL_VERSION,
+  LOCAL_DATA_SCHEMA_VERSION,
+  LocalDataContractError,
+} from '@services/local-data/contracts';
+import { sha256Hex } from '@services/local-data/digest';
+import { encodeCanonicalJson } from '@services/local-data/facts-archive';
+import { createFactsManifest, type FactsManifest } from '@services/local-data/facts-manifest';
+import { nodeDigestProvider } from '../../../packages/syncnoscli/src/runtime/node-digest';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 import { LOCAL_DATA_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
 const MIGRATION_ID = '11111111-1111-4111-8111-111111111111';
+const EMPTY_COUNTS = Object.freeze({
+  conversations: 0,
+  sync_mappings: 0,
+  messages: 0,
+  image_cache: 0,
+  article_comments: 0,
+});
+
+function emptyManifest(): FactsManifest {
+  return createFactsManifest({
+    migrationId: MIGRATION_ID,
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    factCounts: EMPTY_COUNTS,
+    streamBytes: EMPTY_COUNTS,
+    orderedFrameDigest: '0'.repeat(64),
+  });
+}
+
+async function receiptFor(manifest: FactsManifest) {
+  return {
+    alreadyCommitted: false,
+    commentAmbiguity: { groupCount: 0, samples: [] },
+    complete: true,
+    factCounts: manifest.factCounts,
+    factsRevision: 1,
+    manifestDigest: await sha256Hex(nodeDigestProvider, encodeCanonicalJson(manifest).bytes),
+    migrationId: manifest.migrationId,
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+  };
+}
+
+function successfulMigrationIo() {
+  const manifest = emptyManifest();
+  return {
+    digestProvider: nodeDigestProvider,
+    transferFacts: vi.fn(async () => manifest),
+    nativeImport: vi.fn(async ({ produce }: any) => {
+      const produced = await produce({ onFrame: async () => {}, signal: new AbortController().signal });
+      return await receiptFor(produced);
+    }),
+  };
+}
 
 function supportedEnvironment(): MigrationRuntimeEnvironment {
   return { browser: 'chrome', officialIdentity: true, supported: true };
@@ -184,7 +236,7 @@ describe('local data migration coordinator', () => {
     expect(journal.readRaw()).toEqual({});
   });
 
-  it('persists staging before closing admissions, then drains accepted facts work', async () => {
+  it('persists staging before closing admissions, drains accepted facts work, then commits only after transfer receipt', async () => {
     const events: string[] = [];
     const journal = createJournalRuntime(events);
     const gate = createGate(events);
@@ -193,6 +245,7 @@ describe('local data migration coordinator', () => {
       journalRuntime: journal.runtime,
       nativeRequest: nativeStatusRequest(),
       readEnvironment: supportedEnvironment,
+      ...successfulMigrationIo(),
     });
 
     const status = await coordinator.start();
@@ -200,10 +253,12 @@ describe('local data migration coordinator', () => {
     expect(events.indexOf('journal:set:staging')).toBeGreaterThanOrEqual(0);
     expect(events.indexOf('journal:set:staging')).toBeLessThan(events.indexOf('gate:close'));
     expect(events).toContain('gate:drain');
-    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'staging' });
+    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'remote_committed' });
     const snapshot = await readMigrationJournal(journal.runtime);
     expect(snapshot.mode).toBe('transitional');
-    if (snapshot.mode === 'transitional') expect(snapshot.journal.migrationId).toBe(MIGRATION_ID);
+    if (snapshot.mode === 'transitional') {
+      expect(snapshot.journal).toMatchObject({ migrationId: MIGRATION_ID, stage: 'remote_committed' });
+    }
   });
 
   it('rejects a concurrent start deterministically and creates only one migration UUID', async () => {
@@ -218,6 +273,7 @@ describe('local data migration coordinator', () => {
       journalRuntime: journal.runtime,
       nativeRequest: nativeStatusRequest(),
       readEnvironment: supportedEnvironment,
+      ...successfulMigrationIo(),
     });
 
     const first = coordinator.start();
@@ -264,20 +320,22 @@ describe('local data migration coordinator', () => {
       journalRuntime: journal.runtime,
       nativeRequest: nativeStatusRequest(),
       readEnvironment: supportedEnvironment,
+      ...successfulMigrationIo(),
     });
 
     const status = await coordinator.resume();
 
-    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'staging' });
+    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'remote_committed' });
     expect(gate.allowsFactsOperations).toBe(false);
   });
 
   it('reports only whether the current transitional migration has a matching Host receipt', async () => {
     const journal = createJournalRuntime();
     await beginMigrationJournal(journal.runtime);
+    const receipt = await receiptFor(emptyManifest());
     const nativeRequest = vi.fn(async (command: string) => {
       if (command === 'GET_STATUS') return hostStatus();
-      if (command === 'GET_MIGRATION_RECEIPT') return { migrationId: MIGRATION_ID, privateReceiptData: 'not exposed' };
+      if (command === 'GET_MIGRATION_RECEIPT') return receipt;
       throw new Error('unexpected command');
     });
     const coordinator = createMigrationCoordinator({
@@ -290,7 +348,7 @@ describe('local data migration coordinator', () => {
     const status = await coordinator.getStatus();
 
     expect(status.resumeReceipt).toBe('matching');
-    expect(JSON.stringify(status)).not.toContain('privateReceiptData');
+    expect(JSON.stringify(status)).not.toContain(receipt.manifestDigest);
     expect(nativeRequest.mock.calls.map((call) => call[0])).toEqual(['GET_STATUS', 'GET_MIGRATION_RECEIPT']);
   });
 

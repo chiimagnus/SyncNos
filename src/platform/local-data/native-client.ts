@@ -2,7 +2,9 @@ import {
   readNativePortImageAsset,
   readNativePortJson,
   writeNativePortCaptureSnapshot,
+  writeNativePortFactsImport,
   writeNativePortImageAsset,
+  type NativeFactsImportProducer,
   type NativeMessagingPort,
 } from './native-port';
 
@@ -15,9 +17,11 @@ import {
   LocalDataContractError,
   parseHostFactsRequest,
   parseHostFactsResponse,
+  type FactsMigrationReceipt,
   type HostFactsCommand,
   type HostFactsPayloadByCommand,
   type HostFactsRequest,
+  type MigrationId,
 } from '@services/local-data/contracts';
 import type { DigestProvider } from '@services/local-data/digest';
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
@@ -196,11 +200,40 @@ export async function sendNativeMessage<
   }
 }
 
+export async function importNativeFacts(
+  input: Readonly<{
+    dependencies?: NativeClientDependencies;
+    migrationId: MigrationId;
+    produce: NativeFactsImportProducer;
+  }>,
+): Promise<FactsMigrationReceipt> {
+  const request = createRequest({
+    command: 'IMPORT_FACTS',
+    dependencies: input.dependencies,
+    payload: {
+      migrationId: input.migrationId,
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    },
+  });
+  try {
+    const runtime = resolveRuntime(input.dependencies, 'connectNative').runtime;
+    const port = runtime.connectNative?.(nativeHostContract.host.name);
+    if (!port) throw new LocalDataContractError('HOST_UNAVAILABLE');
+    return await writeNativePortFactsImport({ port, produce: input.produce, request });
+  } catch (error) {
+    throw runtimeError(error);
+  }
+}
+
 /** Opens one Native Host port for one typed operation and releases it after its terminal frame. */
 export async function connectNative<TData = unknown, TCommand extends HostFactsCommand = HostFactsCommand>(
   input: NativeHostRequest<TCommand>,
 ): Promise<TData> {
-  if ((NATIVE_HOST_SINGLE_MESSAGE_COMMANDS as readonly string[]).includes(input.command)) {
+  if (
+    (NATIVE_HOST_SINGLE_MESSAGE_COMMANDS as readonly string[]).includes(input.command) ||
+    input.command === 'IMPORT_FACTS'
+  ) {
     throw new LocalDataContractError('INVALID_ARGUMENT');
   }
   const request = createRequest(input);

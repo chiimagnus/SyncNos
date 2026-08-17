@@ -1,5 +1,7 @@
 import { LOCAL_DATA_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { browserDigestProvider } from '@platform/local-data/browser-digest';
 import {
+  advanceMigrationJournal,
   beginMigrationJournal,
   readMigrationJournal,
   recordMigrationJournalFailure,
@@ -7,18 +9,27 @@ import {
   type MigrationJournalRuntime,
   type MigrationJournalSnapshot,
 } from '@platform/local-data/migration-journal';
-import { sendNativeMessage } from '@platform/local-data/native-client';
+import { importNativeFacts, sendNativeMessage } from '@platform/local-data/native-client';
+import type { NativeFactsImportProducer } from '@platform/local-data/native-port';
+import { transferIndexedDbFacts, type IndexedDbFactsTransferInput } from '@platform/idb/facts-transfer';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MIGRATION_FACT_KINDS,
   LocalDataContractError,
   createLocalDataError,
   parseBrowserRuntimeFactsRequest,
+  parseFactsMigrationReceipt,
   parseMigrationId,
   type BrowserRuntimeFactsCommand,
+  type FactsMigrationReceipt,
   type LocalDataError,
   type LocalDataErrorCode,
+  type MigrationId,
 } from './contracts';
+import { sha256Hex, type DigestProvider } from './digest';
+import { encodeCanonicalJson } from './facts-archive';
+import { parseFactsManifest, type FactsManifest } from './facts-manifest';
 import type { FactsOperationGate } from './facts-operation-gate';
 import {
   safeMigrationDiagnostic,
@@ -42,11 +53,23 @@ export type MigrationNativeRequest = (
   payload: Readonly<Record<string, unknown>>,
 ) => Promise<unknown>;
 
+export type MigrationNativeImport = (
+  input: Readonly<{
+    migrationId: MigrationId;
+    produce: NativeFactsImportProducer;
+  }>,
+) => Promise<unknown>;
+
+export type MigrationFactsTransfer = (input: IndexedDbFactsTransferInput) => Promise<FactsManifest>;
+
 export type MigrationCoordinatorDependencies = Readonly<{
+  digestProvider?: DigestProvider;
   gate: Pick<FactsOperationGate, 'closeAdmissions' | 'reopenForJournalState' | 'waitForDrained'>;
   journalRuntime?: MigrationJournalRuntime;
+  nativeImport?: MigrationNativeImport;
   nativeRequest?: MigrationNativeRequest;
   readEnvironment?: () => Promise<MigrationRuntimeEnvironment> | MigrationRuntimeEnvironment;
+  transferFacts?: MigrationFactsTransfer;
 }>;
 
 export type MigrationCoordinator = Readonly<{
@@ -100,6 +123,46 @@ async function defaultNativeRequest(
     command: 'GET_MIGRATION_RECEIPT',
     payload: { migrationId: parseMigrationId(payload.migrationId) },
   });
+}
+
+async function defaultNativeImport(
+  input: Readonly<{
+    migrationId: MigrationId;
+    produce: NativeFactsImportProducer;
+  }>,
+): Promise<FactsMigrationReceipt> {
+  return await importNativeFacts(input);
+}
+
+function parseReceipt(value: unknown): FactsMigrationReceipt {
+  try {
+    return parseFactsMigrationReceipt(value);
+  } catch (error) {
+    if (error instanceof LocalDataContractError) {
+      if (error.code === 'PROTOCOL_MISMATCH' || error.code === 'SCHEMA_MISMATCH') throw error;
+    }
+    throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
+  }
+}
+
+async function requireMatchingReceipt(
+  value: unknown,
+  manifestValue: unknown,
+  digestProvider: DigestProvider,
+): Promise<FactsMigrationReceipt> {
+  const manifest = parseFactsManifest(manifestValue);
+  const receipt = parseReceipt(value);
+  const manifestDigest = await sha256Hex(digestProvider, encodeCanonicalJson(manifest).bytes);
+  if (
+    receipt.migrationId !== manifest.migrationId ||
+    receipt.protocolVersion !== manifest.protocolVersion ||
+    receipt.schemaVersion !== manifest.schemaVersion ||
+    receipt.manifestDigest !== manifestDigest ||
+    MIGRATION_FACT_KINDS.some((kind) => receipt.factCounts[kind] !== manifest.factCounts[kind])
+  ) {
+    throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
+  }
+  return receipt;
 }
 
 function assertEnvironment(environment: MigrationRuntimeEnvironment): void {
@@ -239,23 +302,31 @@ async function probeReceipt(
   database: LocalDataMigrationDatabaseStatus,
   nativeRequest: MigrationNativeRequest,
   diagnostics: LocalDataError[],
+  digestProvider: DigestProvider,
 ): Promise<LocalDataMigrationStatus['resumeReceipt']> {
   if (snapshot.mode !== 'transitional') return 'not_applicable';
   if (host.registration !== 'available' || host.compatibility !== 'compatible') return 'unknown';
   if (database.presence === 'missing') return 'absent';
   if (database.presence !== 'present') return 'unknown';
   try {
-    const receipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId: snapshot.journal.migrationId });
-    if (receipt == null) return 'absent';
-    const input = record(receipt);
-    if (String(input.migrationId || '').trim() !== snapshot.journal.migrationId) {
-      diagnostics.push(createLocalDataError('MIGRATION_RECEIPT_MISMATCH'));
-      return 'mismatch';
+    const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId: snapshot.journal.migrationId });
+    if (rawReceipt == null) return 'absent';
+    const receipt =
+      'manifest' in snapshot.journal
+        ? await requireMatchingReceipt(rawReceipt, snapshot.journal.manifest, digestProvider)
+        : parseReceipt(rawReceipt);
+    if (receipt.migrationId !== snapshot.journal.migrationId) {
+      throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
     }
     return 'matching';
   } catch (error) {
-    diagnostics.push(safeMigrationDiagnostic(error, 'HOST_UNAVAILABLE'));
-    return 'unknown';
+    const diagnostic = safeMigrationDiagnostic(error, 'MIGRATION_RECEIPT_MISMATCH');
+    diagnostics.push(diagnostic);
+    return diagnostic.code === 'MIGRATION_RECEIPT_MISMATCH' ||
+      diagnostic.code === 'PROTOCOL_MISMATCH' ||
+      diagnostic.code === 'SCHEMA_MISMATCH'
+      ? 'mismatch'
+      : 'unknown';
   }
 }
 
@@ -265,8 +336,11 @@ function migrationError(error: unknown): LocalDataContractError {
 }
 
 export function createMigrationCoordinator(dependencies: MigrationCoordinatorDependencies): MigrationCoordinator {
+  const digestProvider = dependencies.digestProvider ?? browserDigestProvider;
+  const nativeImport = dependencies.nativeImport ?? defaultNativeImport;
   const nativeRequest = dependencies.nativeRequest ?? defaultNativeRequest;
   const readEnvironment = dependencies.readEnvironment ?? defaultEnvironment;
+  const transferFacts = dependencies.transferFacts ?? transferIndexedDbFacts;
   let transitionRunning = false;
 
   const getStatus = async (): Promise<LocalDataMigrationStatus> => {
@@ -283,7 +357,14 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     if (snapshot.mode === 'transitional' && snapshot.journal.terminalCode) {
       diagnostics.unshift(createLocalDataError(snapshot.journal.terminalCode, { stage: snapshot.journal.stage }));
     }
-    const resumeReceipt = await probeReceipt(snapshot, hostProbe.host, hostProbe.database, nativeRequest, diagnostics);
+    const resumeReceipt = await probeReceipt(
+      snapshot,
+      hostProbe.host,
+      hostProbe.database,
+      nativeRequest,
+      diagnostics,
+      digestProvider,
+    );
     const hostReady = hostProbe.host.registration === 'available' && hostProbe.host.compatibility === 'compatible';
     return Object.freeze({
       actions: Object.freeze({
@@ -297,6 +378,47 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       journal: journalStatus(snapshot),
       resumeReceipt,
     });
+  };
+
+  const produceManifest = async (
+    migrationId: MigrationId,
+    input: Readonly<{
+      onFrame: IndexedDbFactsTransferInput['onFrame'];
+      signal?: AbortSignal;
+    }>,
+  ): Promise<FactsManifest> =>
+    parseFactsManifest(
+      await transferFacts({
+        digestProvider,
+        migrationId,
+        onFrame: input.onFrame,
+        ...(input.signal ? { signal: input.signal } : {}),
+      }),
+    );
+
+  const streamStaging = async (migrationId: MigrationId): Promise<FactsManifest> => {
+    let producedManifest: FactsManifest | null = null;
+    const rawReceipt = await nativeImport({
+      migrationId,
+      produce: async ({ onFrame, signal }) => {
+        producedManifest = await produceManifest(migrationId, { onFrame, signal });
+        return producedManifest;
+      },
+    });
+    if (!producedManifest) throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+    await requireMatchingReceipt(rawReceipt, producedManifest, digestProvider);
+    return producedManifest;
+  };
+
+  const resumeStaging = async (migrationId: MigrationId): Promise<FactsManifest> => {
+    const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId });
+    if (rawReceipt == null) return await streamStaging(migrationId);
+
+    const receipt = parseReceipt(rawReceipt);
+    if (receipt.migrationId !== migrationId) throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
+    const manifest = await produceManifest(migrationId, { onFrame: async () => {} });
+    await requireMatchingReceipt(receipt, manifest, digestProvider);
+    return manifest;
   };
 
   const runTransition = async (kind: 'start' | 'resume'): Promise<LocalDataMigrationStatus> => {
@@ -323,6 +445,25 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       }
       dependencies.gate.reopenForJournalState(persisted);
       await dependencies.gate.waitForDrained();
+
+      if (journal.stage === 'staging') {
+        const manifest =
+          kind === 'resume' ? await resumeStaging(journal.migrationId) : await streamStaging(journal.migrationId);
+        journal = (await advanceMigrationJournal(
+          { expected: journal, stage: 'remote_committed', manifest },
+          dependencies.journalRuntime,
+        )) as Exclude<MigrationJournal, { stage: 'active' }>;
+        const committed = await readMigrationJournal(dependencies.journalRuntime);
+        if (
+          committed.mode !== 'transitional' ||
+          committed.journal.stage !== 'remote_committed' ||
+          committed.journal.migrationId !== journal.migrationId
+        ) {
+          throw new LocalDataContractError('JOURNAL_CORRUPT');
+        }
+        dependencies.gate.reopenForJournalState(committed);
+      }
+
       return await getStatus();
     } catch (error) {
       const safeError = migrationError(error);

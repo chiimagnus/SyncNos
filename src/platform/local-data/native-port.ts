@@ -4,18 +4,23 @@ import {
   LOCAL_DATA_PROTOCOL_VERSION,
   MAX_NATIVE_IMAGE_SLICE_BYTES,
   LocalDataContractError,
+  parseFactsMigrationReceipt,
   parseHostFactsResponse,
   parseMigrationId,
   parseNativeHostImageAssetResponseData,
+  parseNativeHostImportAcceptedData,
   parseNativeHostStreamResponseData,
+  type FactsMigrationReceipt,
   type HostFactsRequest,
   type StreamDescriptor,
 } from '@services/local-data/contracts';
 import { OrderedFrameDigestAccumulator, type DigestProvider } from '@services/local-data/digest';
+import { parseFactsManifest, type FactsManifest } from '@services/local-data/facts-manifest';
 import {
   NativeWireSessionReceiver,
   createNativeWireDataFrame,
   parseNativeWireFrame,
+  type NativeWireFrame,
 } from '@services/local-data/native-wire';
 
 type NativePortListener = (message?: unknown) => void;
@@ -251,6 +256,100 @@ export function readNativePortImageAsset(
         ...header.asset,
         bytes: Uint8Array.from(bytes),
       }),
+  });
+}
+
+export type NativeFactsImportProducer = (
+  input: Readonly<{
+    onFrame: (frame: NativeWireFrame) => Promise<void>;
+    signal: AbortSignal;
+  }>,
+) => Promise<FactsManifest>;
+
+/**
+ * Opens one Host staging session before the IndexedDB producer is allowed to read facts.
+ * The same Native port carries every self-declared P1 record/asset session and the final manifest.
+ */
+export function writeNativePortFactsImport(
+  input: Readonly<{
+    port: NativeMessagingPort;
+    produce: NativeFactsImportProducer;
+    request: HostFactsRequest;
+  }>,
+): Promise<FactsMigrationReceipt> {
+  if (input.request.command !== 'IMPORT_FACTS') return Promise.reject(protocolFailure());
+
+  return new Promise((resolve, reject) => {
+    const abortController = new AbortController();
+    let accepted = false;
+    let completeSent = false;
+    let processing = Promise.resolve();
+    let settled = false;
+
+    const cleanup = () => {
+      input.port.onMessage.removeListener?.(onMessage);
+      input.port.onDisconnect.removeListener?.(onDisconnect);
+    };
+    const finish = (outcome: () => void) => {
+      if (settled) return;
+      settled = true;
+      abortController.abort();
+      cleanup();
+      closePort(input.port);
+      outcome();
+    };
+    const fail = (error: unknown) => {
+      const safeError = error instanceof LocalDataContractError ? error : protocolFailure();
+      finish(() => reject(safeError));
+    };
+    const post = (message: unknown) => {
+      if (settled || abortController.signal.aborted) throw new LocalDataContractError('HOST_UNAVAILABLE');
+      input.port.postMessage(message);
+    };
+
+    const produce = async () => {
+      const manifest = parseFactsManifest(
+        await input.produce({
+          signal: abortController.signal,
+          onFrame: async (frame) => {
+            post(parseNativeWireFrame(frame));
+          },
+        }),
+      );
+      if (settled || abortController.signal.aborted) return;
+      completeSent = true;
+      post({ type: 'complete', manifest });
+    };
+
+    const onMessage: NativePortListener = (message) => {
+      processing = processing
+        .then(async () => {
+          if (settled) return;
+          const response = parseHostFactsResponse(message);
+          if (response.requestId !== input.request.requestId) throw protocolFailure();
+          if (!response.ok) throw new LocalDataContractError(response.error.code, response.error.diagnostics);
+
+          if (!accepted) {
+            parseNativeHostImportAcceptedData(response.data);
+            accepted = true;
+            void produce().catch(fail);
+            return;
+          }
+          if (!completeSent) throw protocolFailure();
+          const receipt = parseFactsMigrationReceipt(response.data);
+          finish(() => resolve(receipt));
+        })
+        .catch(fail);
+    };
+    const onDisconnect: NativePortListener = () => fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+
+    input.port.onMessage.addListener(onMessage);
+    input.port.onDisconnect.addListener(onDisconnect);
+    try {
+      post(input.request);
+    } catch (error) {
+      fail(error);
+    }
   });
 }
 

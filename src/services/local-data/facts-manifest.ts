@@ -1,22 +1,17 @@
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MIGRATION_FACT_KINDS,
   LocalDataContractError,
   parseMigrationId,
   parseOrderedFrameDigest,
+  type MigrationFactKind,
   type MigrationId,
 } from './contracts';
 import { OrderedFrameDigestAccumulator, type DigestProvider } from './digest';
 
-export const FACT_STREAM_KINDS = Object.freeze([
-  'conversations',
-  'sync_mappings',
-  'messages',
-  'image_cache',
-  'article_comments',
-] as const);
-
-export type FactStreamKind = (typeof FACT_STREAM_KINDS)[number];
+export const FACT_STREAM_KINDS = MIGRATION_FACT_KINDS;
+export type FactStreamKind = MigrationFactKind;
 
 export type FactsManifest = Readonly<{
   factCounts: Readonly<Record<FactStreamKind, number>>;

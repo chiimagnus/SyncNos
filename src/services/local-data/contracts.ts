@@ -962,11 +962,45 @@ export type HostImageAssetLookupRequestPayload = Readonly<{
   url: string;
 }>;
 
+export const MIGRATION_FACT_KINDS = Object.freeze([
+  'conversations',
+  'sync_mappings',
+  'messages',
+  'image_cache',
+  'article_comments',
+] as const);
+
+export type MigrationFactKind = (typeof MIGRATION_FACT_KINDS)[number];
+export type MigrationFactCounts = Readonly<Record<MigrationFactKind, number>>;
+
 export type MigrationStreamRequestPayload = Readonly<{
   migrationId: MigrationId;
   protocolVersion: typeof LOCAL_DATA_PROTOCOL_VERSION;
   schemaVersion: typeof LOCAL_DATA_SCHEMA_VERSION;
 }>;
+
+export const MAX_MIGRATION_RECEIPT_COMMENT_DIAGNOSTICS = 32;
+
+export type FactsMigrationReceipt = Readonly<{
+  alreadyCommitted: boolean;
+  commentAmbiguity: Readonly<{
+    groupCount: number;
+    samples: readonly Readonly<{
+      code: 'ambiguous_comment_signature';
+      incomingGroupCount: number;
+      targetGroupCount: number;
+    }>[];
+  }>;
+  complete: true;
+  factCounts: MigrationFactCounts;
+  factsRevision: number;
+  manifestDigest: string;
+  migrationId: MigrationId;
+  protocolVersion: typeof LOCAL_DATA_PROTOCOL_VERSION;
+  schemaVersion: typeof LOCAL_DATA_SCHEMA_VERSION;
+}>;
+
+export type NativeHostImportAcceptedData = Readonly<{ accepted: true }>;
 
 /** The final small control message for an inbound Native Host facts import. */
 export type NativeHostSessionCompleteControl = Readonly<{
@@ -1772,6 +1806,86 @@ export function parseMigrationStreamRequestPayload(value: unknown): MigrationStr
     protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
     schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
   };
+}
+
+function parseMigrationFactCounts(value: unknown): MigrationFactCounts {
+  const input = record(value);
+  exactKeys(input, MIGRATION_FACT_KINDS);
+  return Object.freeze(
+    Object.fromEntries(MIGRATION_FACT_KINDS.map((kind) => [kind, parseNonNegativeSafeInteger(input[kind])])) as Record<
+      MigrationFactKind,
+      number
+    >,
+  );
+}
+
+function parseMigrationReceiptCommentAmbiguity(value: unknown): FactsMigrationReceipt['commentAmbiguity'] {
+  const input = record(value);
+  exactKeys(input, ['groupCount', 'samples']);
+  const groupCount = parseNonNegativeSafeInteger(input.groupCount);
+  if (!Array.isArray(input.samples) || input.samples.length > MAX_MIGRATION_RECEIPT_COMMENT_DIAGNOSTICS) fail();
+  const samples = input.samples.map((sample) => {
+    const entry = record(sample);
+    exactKeys(entry, ['code', 'incomingGroupCount', 'targetGroupCount']);
+    const incomingGroupCount = parseNonNegativeSafeInteger(entry.incomingGroupCount);
+    if (entry.code !== 'ambiguous_comment_signature' || incomingGroupCount <= 1) fail();
+    return Object.freeze({
+      code: 'ambiguous_comment_signature' as const,
+      incomingGroupCount,
+      targetGroupCount: parseNonNegativeSafeInteger(entry.targetGroupCount),
+    });
+  });
+  if (samples.length > groupCount) fail();
+  return Object.freeze({ groupCount, samples: Object.freeze(samples) });
+}
+
+export function parseFactsMigrationReceipt(value: unknown): FactsMigrationReceipt {
+  try {
+    const input = record(value);
+    exactKeys(input, [
+      'alreadyCommitted',
+      'commentAmbiguity',
+      'complete',
+      'factCounts',
+      'factsRevision',
+      'manifestDigest',
+      'migrationId',
+      'protocolVersion',
+      'schemaVersion',
+    ]);
+    if (typeof input.alreadyCommitted !== 'boolean' || input.complete !== true) fail('MIGRATION_RECEIPT_MISMATCH');
+    if (input.protocolVersion !== LOCAL_DATA_PROTOCOL_VERSION) fail('PROTOCOL_MISMATCH');
+    if (input.schemaVersion !== LOCAL_DATA_SCHEMA_VERSION) fail('SCHEMA_MISMATCH');
+    return Object.freeze({
+      alreadyCommitted: input.alreadyCommitted,
+      commentAmbiguity: parseMigrationReceiptCommentAmbiguity(input.commentAmbiguity),
+      complete: true,
+      factCounts: parseMigrationFactCounts(input.factCounts),
+      factsRevision: parseNonNegativeSafeInteger(input.factsRevision),
+      manifestDigest: parseOrderedFrameDigest(input.manifestDigest),
+      migrationId: parseMigrationId(input.migrationId),
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    });
+  } catch (error) {
+    if (error instanceof LocalDataContractError) {
+      if (
+        error.code === 'MIGRATION_RECEIPT_MISMATCH' ||
+        error.code === 'PROTOCOL_MISMATCH' ||
+        error.code === 'SCHEMA_MISMATCH'
+      ) {
+        throw error;
+      }
+    }
+    throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
+  }
+}
+
+export function parseNativeHostImportAcceptedData(value: unknown): NativeHostImportAcceptedData {
+  const input = record(value);
+  exactKeys(input, ['accepted']);
+  if (input.accepted !== true) fail('PROTOCOL_MISMATCH');
+  return Object.freeze({ accepted: true });
 }
 
 /** Lets the Host distinguish the final import control from a strict NativeWire frame. */

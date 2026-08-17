@@ -659,11 +659,20 @@ describe('local data contracts', () => {
       ...sourceFiles('src/ui'),
       ...sourceFiles('src/viewmodels'),
       ...sourceFiles('src/services/local-data'),
-    ].filter((path) => /(?:@platform\/idb|src\/platform\/idb|\/platform\/idb)/.test(readSource(path)));
+    ].filter(
+      (path) =>
+        path !== 'src/services/local-data/migration-coordinator.ts' &&
+        /(?:@platform\/idb|src\/platform\/idb|\/platform\/idb)/.test(readSource(path)),
+    );
     expect(forbiddenIdbConsumers).toEqual([]);
 
     const productionFiles = sourceFiles('src');
-    for (const symbol of ['transferIndexedDbFacts', 'clearFacts', 'verifyFactsEmpty']) {
+    const transferCallers = productionFiles.filter((path) => /\btransferIndexedDbFacts\b/.test(readSource(path)));
+    expect(transferCallers).toEqual([
+      'src/platform/idb/facts-transfer.ts',
+      'src/services/local-data/migration-coordinator.ts',
+    ]);
+    for (const symbol of ['clearFacts', 'verifyFactsEmpty']) {
       const callers = productionFiles.filter((path) => new RegExp(`\\b${symbol}\\s*\\(`).test(readSource(path)));
       expect(callers).toEqual(['src/platform/idb/facts-transfer.ts']);
     }

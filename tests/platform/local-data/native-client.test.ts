@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { connectNative, sendNativeMessage } from '@platform/local-data/native-client';
+import { connectNative, importNativeFacts, sendNativeMessage } from '@platform/local-data/native-client';
 import type { NativeMessagingPort } from '@platform/local-data/native-port';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
@@ -11,8 +11,9 @@ import {
   createHostFactsFailure,
   createHostFactsSuccess,
 } from '@services/local-data/contracts';
-import { OrderedFrameDigestAccumulator } from '@services/local-data/digest';
+import { OrderedFrameDigestAccumulator, sha256Hex } from '@services/local-data/digest';
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
+import { createFactsManifest, type FactsManifest } from '@services/local-data/facts-manifest';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 import { createNativeWireDataFrame } from '@services/local-data/native-wire';
 
@@ -138,6 +139,39 @@ async function imageAssetFrames(bytes: Uint8Array) {
   ];
 }
 
+const EMPTY_MIGRATION_COUNTS = Object.freeze({
+  conversations: 0,
+  sync_mappings: 0,
+  messages: 0,
+  image_cache: 0,
+  article_comments: 0,
+});
+
+function emptyMigrationManifest(): FactsManifest {
+  return createFactsManifest({
+    migrationId: '11111111-1111-4111-8111-111111111111',
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+    factCounts: EMPTY_MIGRATION_COUNTS,
+    streamBytes: EMPTY_MIGRATION_COUNTS,
+    orderedFrameDigest: '0'.repeat(64),
+  });
+}
+
+async function migrationReceipt(manifest: FactsManifest) {
+  return {
+    alreadyCommitted: false,
+    commentAmbiguity: { groupCount: 0, samples: [] },
+    complete: true,
+    factCounts: manifest.factCounts,
+    factsRevision: 1,
+    manifestDigest: await sha256Hex(digestProvider, encodeCanonicalJson(manifest).bytes),
+    migrationId: manifest.migrationId,
+    protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+    schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+  };
+}
+
 function captureSnapshotPayload(contentText: string) {
   const snapshot = {
     conversation: { source: 'chatgpt', conversationKey: 'native-large', sourceType: 'chat' },
@@ -202,6 +236,85 @@ describe('Native Messaging client', () => {
         },
       }),
     ).rejects.toMatchObject({ code: 'ORIGIN_DENIED' });
+  });
+
+  it('opens migration staging before starting the producer and returns only a full receipt', async () => {
+    const harness = createPortHarness();
+    const manifest = emptyMigrationManifest();
+    const produce = vi.fn(async () => manifest);
+    const operation = importNativeFacts({
+      migrationId: manifest.migrationId,
+      produce,
+      dependencies: {
+        createRequestId: () => 'migration-import',
+        runtime: { connectNative: vi.fn(() => harness.port) },
+      },
+    });
+
+    expect(produce).not.toHaveBeenCalled();
+    expect(harness.postMessage).toHaveBeenCalledTimes(1);
+    expect(harness.postMessage.mock.calls[0]?.[0]).toMatchObject({
+      command: 'IMPORT_FACTS',
+      requestId: 'migration-import',
+      payload: {
+        migrationId: manifest.migrationId,
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      },
+    });
+
+    harness.emitMessage(createHostFactsSuccess('migration-import', { accepted: true }));
+    await vi.waitFor(() => expect(produce).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(harness.postMessage).toHaveBeenCalledTimes(2));
+    expect(harness.postMessage.mock.calls[1]?.[0]).toEqual({ type: 'complete', manifest });
+
+    const receipt = await migrationReceipt(manifest);
+    harness.emitMessage(createHostFactsSuccess('migration-import', receipt));
+    await expect(operation).resolves.toEqual(receipt);
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts an accepted migration producer when the one-shot Native port disconnects', async () => {
+    const harness = createPortHarness();
+    let observedSignal: AbortSignal | null = null;
+    const operation = importNativeFacts({
+      migrationId: emptyMigrationManifest().migrationId,
+      produce: async ({ signal }) => {
+        observedSignal = signal;
+        await new Promise<void>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('aborted'))),
+        );
+        return emptyMigrationManifest();
+      },
+      dependencies: {
+        createRequestId: () => 'migration-disconnect',
+        runtime: { connectNative: vi.fn(() => harness.port) },
+      },
+    });
+    harness.emitMessage(createHostFactsSuccess('migration-disconnect', { accepted: true }));
+    await vi.waitFor(() => expect(observedSignal).not.toBeNull());
+
+    harness.emitDisconnect();
+
+    await expect(operation).rejects.toMatchObject({ code: 'HOST_UNAVAILABLE' });
+    expect(observedSignal!.aborted).toBe(true);
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects generic IMPORT_FACTS connected calls so migration cannot fall through the host-json protocol', async () => {
+    const connectNativeRuntime = vi.fn(() => createPortHarness().port);
+    await expect(
+      connectNative({
+        command: 'IMPORT_FACTS',
+        payload: {
+          migrationId: emptyMigrationManifest().migrationId,
+          protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+          schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+        },
+        dependencies: { runtime: { connectNative: connectNativeRuntime } },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(connectNativeRuntime).not.toHaveBeenCalled();
   });
 
   it('requires the stream header before P1 wire frames and decodes only a completed terminal stream', async () => {
