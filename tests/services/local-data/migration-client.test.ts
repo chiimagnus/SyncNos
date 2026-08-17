@@ -6,7 +6,7 @@ import { createLocalDataMigrationClient } from '@services/local-data/client';
 function status() {
   return {
     actions: { canStart: true, canResume: false },
-    capability: { browser: 'chrome', officialIdentity: true, supported: true },
+    capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
     database: { presence: 'missing', factsHealth: 'missing' },
     diagnostics: [],
     host: { registration: 'available', compatibility: 'compatible' },

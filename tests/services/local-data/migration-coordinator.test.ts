@@ -91,7 +91,7 @@ function successfulMigrationIo() {
 }
 
 function supportedEnvironment(): MigrationRuntimeEnvironment {
-  return { browser: 'chrome', officialIdentity: true, supported: true };
+  return { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true };
 }
 
 function hostStatus(factsRevision = 7) {
@@ -229,7 +229,7 @@ describe('local data migration coordinator', () => {
     const status = await coordinator.getStatus();
 
     expect(status).toMatchObject({
-      capability: { browser: 'chrome', officialIdentity: true, supported: true },
+      capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
       host: { registration: 'available', compatibility: 'compatible' },
       database: { presence: 'present', factsHealth: 'healthy', factsRevision: 19, ftsAvailable: true },
       actions: { canStart: true },
@@ -379,6 +379,7 @@ describe('local data migration coordinator', () => {
       runtime: {
         id: 'safari-runtime',
         getURL: () => 'safari-web-extension://com.syncnos.webclipper/',
+        getPlatformInfo: (callback: (info: unknown) => void) => callback({ os: 'mac' }),
       },
     };
     const journal = createJournalRuntime();
@@ -390,7 +391,12 @@ describe('local data migration coordinator', () => {
     });
 
     const status = await coordinator.getStatus();
-    expect(status.capability).toMatchObject({ browser: 'safari', officialIdentity: false, supported: false });
+    expect(status.capability).toMatchObject({
+      browser: 'safari',
+      officialIdentity: false,
+      platform: 'mac',
+      supported: false,
+    });
     expect(nativeRequest).not.toHaveBeenCalled();
     await expect(coordinator.start()).rejects.toMatchObject({ code: 'UNSUPPORTED_PLATFORM' });
     expect((await readMigrationJournal(journal.runtime)).mode).toBe('not_started');
@@ -402,6 +408,7 @@ describe('local data migration coordinator', () => {
       runtime: {
         id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         getURL: () => 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/',
+        getPlatformInfo: (callback: (info: unknown) => void) => callback({ os: 'linux' }),
       },
     };
     expect((globalThis as any).chrome.runtime.id).not.toBe(nativeHostContract.browsers.chrome.runtimeId);
@@ -415,7 +422,12 @@ describe('local data migration coordinator', () => {
     });
 
     const status = await coordinator.getStatus();
-    expect(status.capability).toMatchObject({ browser: 'development', officialIdentity: false, supported: false });
+    expect(status.capability).toMatchObject({
+      browser: 'development',
+      officialIdentity: false,
+      platform: 'linux',
+      supported: false,
+    });
     expect(nativeRequest).not.toHaveBeenCalled();
     await expect(coordinator.start()).rejects.toMatchObject({ code: 'ORIGIN_DENIED' });
     expect((await readMigrationJournal(journal.runtime)).mode).toBe('not_started');

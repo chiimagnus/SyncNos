@@ -252,6 +252,33 @@ export const en = {
   localDatabaseConfirmEnable: 'Enable Local Database',
   localDatabaseConfirmJoin: 'Join Existing Database',
   localDatabaseCloseDialog: 'Close Local Database confirmation',
+  localDatabaseInstallHelpTitle: 'Local Database setup help',
+  localDatabaseHostMissingHelp:
+    'SyncNos cannot reach the Native Host. Install the CLI if it is missing; if it is already installed, repair the supported browser registration.',
+  localDatabaseHostMismatchHelp:
+    'The installed Native Host does not match this extension protocol/schema. Update the CLI, repair its owned registration, then check again.',
+  localDatabaseUnsupportedRuntimeHelp:
+    'The installed CLI/runtime is not supported by this Local Database contract. Update the CLI under a supported Node/runtime; doctor cannot add support for an unsupported platform.',
+  localDatabaseBusyHelp:
+    'The Local Database is busy. Let the other SyncNos operation finish, then check again; do not delete or rewrite the database to clear the lock.',
+  localDatabaseIntegrityHelp:
+    'SyncNos rejected the local database or runtime files because their ownership, permissions, or integrity could not be proven. doctor may repair supported owner-only permission drift, but it refuses unknown or conflicting ownership and does not delete the database.',
+  localDatabaseInstallCommandLabel: 'Install/update command',
+  localDatabaseAiPromptLabel: 'Prompt for an AI assistant',
+  localDatabaseDoctorCommandLabel: 'Registration repair command',
+  localDatabaseDoctorScopeHelp:
+    'doctor --fix only repairs proven SyncNos-owned registration and supported owner-only file permissions. It refuses unproven ownership, does not delete the database, and does not bypass browser allowlists or operating-system sandbox boundaries.',
+  localDatabaseNodeRequirementHelp:
+    'SyncNos CLI requires Node.js 22 or newer. A missing or stale recorded Node runtime can make the Native Host unreachable; reinstall/update the CLI under a supported Node runtime before running doctor.',
+  localDatabaseLinuxSandboxHelp:
+    'Linux: if Chrome/Chromium is installed as a strict Snap or Flatpak, Native Messaging paths may be blocked by the sandbox. doctor --fix cannot break that sandbox; use a supported non-sandboxed browser package when registration remains unreachable.',
+  localDatabaseSafariNoInstallHelp:
+    'Safari has no Local Database action. Installing or repairing the CLI does not enable Local Database in Safari.',
+  localDatabaseDevelopmentIdentityHelp:
+    'This extension identity is not on the official Native Host allowlist. Development or sideloaded identities cannot create a registration bypass.',
+  localDatabaseCopyAction: 'Copy',
+  localDatabaseCopied: 'Copied',
+  localDatabaseCopyFailed: 'Could not copy Local Database setup text.',
 
   // NotionOAuthSection
   notionOAuth: 'Notion OAuth',

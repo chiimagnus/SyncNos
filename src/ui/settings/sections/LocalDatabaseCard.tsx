@@ -1,16 +1,19 @@
 import { t } from '@i18n';
 import type { LocalDataMigrationStatus } from '@services/local-data/migration-status';
 import { buttonClassName, cardClassName, primaryButtonClassName } from '@ui/settings/ui';
+import { LocalDatabaseInstallHelp } from './LocalDatabaseInstallHelp';
 import { LocalDatabaseMigrationDialog } from './LocalDatabaseMigrationDialog';
 
 export type LocalDatabaseCardProps = Readonly<{
   actionBusy: boolean;
+  copiedHelpText: string;
   dialogMode: 'start' | 'join' | null;
   error: string;
   loading: boolean;
   status: LocalDataMigrationStatus | null;
   onCancelMigration: () => void;
   onConfirmMigration: () => void;
+  onCopyHelpText: (text: string) => void;
   onRequestMigration: () => void;
   onResumeMigration: () => void;
   onRetryStatus: () => void;
@@ -57,12 +60,14 @@ function statusBody(status: LocalDataMigrationStatus): string {
 export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
   const {
     actionBusy,
+    copiedHelpText,
     dialogMode,
     error,
     loading,
     status,
     onCancelMigration,
     onConfirmMigration,
+    onCopyHelpText,
     onRequestMigration,
     onResumeMigration,
     onRetryStatus,
@@ -123,6 +128,10 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
             {error}
           </div>
         ) : null}
+        {status ? (
+          <LocalDatabaseInstallHelp status={status} copiedText={copiedHelpText} onCopyText={onCopyHelpText} />
+        ) : null}
+
         {status?.diagnostics?.length ? (
           <div className="tw-mt-2 tw-space-y-1" aria-label={t('localDatabaseDiagnostics')}>
             {status.diagnostics.map((diagnostic, index) => (

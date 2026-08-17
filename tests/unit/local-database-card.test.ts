@@ -62,7 +62,7 @@ function status(
       canStart: profileState === 'setup_required' || profileState === 'join_existing_required',
       canResume: profileState === 'migration_in_progress',
     },
-    capability: { browser: 'chrome', officialIdentity: true, supported: true },
+    capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
     database: {
       presence: profileState === 'setup_required' ? 'missing' : 'present',
       factsHealth: profileState === 'setup_required' ? 'unknown' : 'healthy',
@@ -89,6 +89,7 @@ describe('LocalDatabaseCard', () => {
   const callbacks = {
     onCancelMigration: vi.fn(),
     onConfirmMigration: vi.fn(),
+    onCopyHelpText: vi.fn(),
     onRequestMigration: vi.fn(),
     onResumeMigration: vi.fn(),
     onRetryStatus: vi.fn(),
@@ -123,6 +124,7 @@ describe('LocalDatabaseCard', () => {
           loading: false,
           error: '',
           actionBusy: input.actionBusy ?? false,
+          copiedHelpText: '',
           dialogMode: input.dialogMode ?? null,
           ...callbacks,
         }),
@@ -159,7 +161,7 @@ describe('LocalDatabaseCard', () => {
     render({
       state: 'unavailable',
       statusOverride: {
-        capability: { browser: 'safari', officialIdentity: false, supported: false },
+        capability: { browser: 'safari', officialIdentity: false, platform: 'unknown', supported: false },
         host: { registration: 'unsupported', compatibility: 'unknown' },
       },
     });

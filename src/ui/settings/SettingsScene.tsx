@@ -133,11 +133,13 @@ export function SettingsScene(props: SettingsSceneProps) {
     localDataStatusError,
     localDataActionBusy,
     localDataMigrationDialogMode,
+    localDataCopiedHelpText,
     onLocalDataRequestMigration,
     onLocalDataCancelMigration,
     onLocalDataConfirmMigration,
     onLocalDataResumeMigration,
     onLocalDataRetryStatus,
+    onLocalDataCopyHelpText,
 
     exportStatus,
     importStatus,
@@ -367,11 +369,15 @@ export function SettingsScene(props: SettingsSceneProps) {
             loading: localDataStatusLoading,
             error: localDataStatusError,
             actionBusy: localDataActionBusy,
+            copiedHelpText: localDataCopiedHelpText,
             dialogMode: localDataMigrationDialogMode,
             onRequestMigration: onLocalDataRequestMigration,
             onCancelMigration: onLocalDataCancelMigration,
             onConfirmMigration: () => {
               void onLocalDataConfirmMigration();
+            },
+            onCopyHelpText: (text) => {
+              void onLocalDataCopyHelpText(text);
             },
             onResumeMigration: () => {
               void onLocalDataResumeMigration();

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   storageRemove: vi.fn(),
   storageListener: null as ((changes: any, areaName: string) => void) | null,
   portListener: null as ((message: any) => void) | null,
+  clipboardWrite: vi.fn(),
 }));
 
 vi.mock('@services/local-data/client', () => ({
@@ -103,7 +104,7 @@ function setupStatus(
       canStart: profileState === 'setup_required' || profileState === 'join_existing_required',
       canResume: profileState === 'migration_in_progress',
     },
-    capability: { browser: 'chrome', officialIdentity: true, supported: true },
+    capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
     database: {
       presence: profileState === 'setup_required' ? 'missing' : 'present',
       factsHealth: profileState === 'setup_required' ? 'unknown' : 'healthy',
@@ -135,6 +136,10 @@ function setupDom() {
   });
   Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
+  Object.defineProperty(dom.window.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: mocks.clipboardWrite },
+  });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   Object.defineProperty(globalThis, 'location', { configurable: true, value: dom.window.location });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
@@ -190,6 +195,8 @@ describe('settings Local Database status controller', () => {
     mocks.storageRemove.mockReset();
     mocks.storageListener = null;
     mocks.portListener = null;
+    mocks.clipboardWrite.mockReset();
+    mocks.clipboardWrite.mockResolvedValue(undefined);
     mocks.getStatus.mockResolvedValue(setupStatus());
     mocks.startMigration.mockResolvedValue(setupStatus('active'));
     mocks.resumeMigration.mockResolvedValue(setupStatus('active'));
@@ -359,6 +366,19 @@ describe('settings Local Database status controller', () => {
     expect(mocks.resumeMigration).toHaveBeenCalledTimes(1);
     expect(mocks.getStatus).toHaveBeenCalledTimes(2);
     expect(latest.localDataMigrationDialogMode).toBeNull();
+  });
+
+  it('copies fixed setup help through the Clipboard API without any command execution surface', async () => {
+    await renderSection('backup');
+    const text = 'syncnoscli doctor --fix';
+
+    await act(async () => {
+      await latest.onLocalDataCopyHelpText(text);
+    });
+
+    expect(mocks.clipboardWrite).toHaveBeenCalledTimes(1);
+    expect(mocks.clipboardWrite).toHaveBeenCalledWith(text);
+    expect(latest.localDataCopiedHelpText).toBe(text);
   });
 
   it('marks status dirty on a coordinator event outside Backup without probing Native until Backup is entered', async () => {

@@ -41,7 +41,7 @@ const FACT_COUNTS = Object.freeze({
 });
 
 function environment(): MigrationRuntimeEnvironment {
-  return { browser: 'chrome', officialIdentity: true, supported: true };
+  return { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true };
 }
 
 function manifest(): FactsManifest {

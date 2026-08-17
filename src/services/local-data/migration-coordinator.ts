@@ -48,6 +48,7 @@ import {
   type LocalDataMigrationJournalStatus,
   type LocalDataMigrationStatus,
   type LocalDataProfileState,
+  type LocalDataMigrationPlatform,
 } from './migration-status';
 import { nativeHostContract } from './native-host-contract';
 import { createProfileReferenceRebase, type ProfileReferenceRebase } from './profile-reference-rebase';
@@ -55,6 +56,7 @@ import { createProfileReferenceRebase, type ProfileReferenceRebase } from './pro
 export type MigrationRuntimeEnvironment = Readonly<{
   browser: LocalDataMigrationBrowser;
   officialIdentity: boolean;
+  platform: LocalDataMigrationPlatform;
   supported: boolean;
 }>;
 
@@ -106,8 +108,39 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function defaultEnvironment(): MigrationRuntimeEnvironment {
+async function readRuntimePlatform(runtime: any): Promise<LocalDataMigrationPlatform> {
+  if (typeof runtime?.getPlatformInfo !== 'function') return 'unknown';
+  try {
+    const info = await new Promise<any>((resolve, reject) => {
+      const browserRuntime = (globalThis as any).browser?.runtime;
+      if (browserRuntime === runtime) {
+        Promise.resolve(runtime.getPlatformInfo()).then(resolve, reject);
+        return;
+      }
+      runtime.getPlatformInfo((value: unknown) => {
+        const lastError = runtime?.lastError;
+        if (lastError) reject(lastError);
+        else resolve(value);
+      });
+    });
+    switch (String(info?.os || '')) {
+      case 'mac':
+        return 'mac';
+      case 'win':
+        return 'windows';
+      case 'linux':
+        return 'linux';
+      default:
+        return 'unknown';
+    }
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function defaultEnvironment(): Promise<MigrationRuntimeEnvironment> {
   const runtime = (globalThis as any).browser?.runtime ?? (globalThis as any).chrome?.runtime;
+  const platform = await readRuntimePlatform(runtime);
   const runtimeId = String(runtime?.id || '').trim();
   let rootUrl = '';
   try {
@@ -116,18 +149,18 @@ function defaultEnvironment(): MigrationRuntimeEnvironment {
     rootUrl = '';
   }
   if (runtimeId === nativeHostContract.browsers.chrome.runtimeId) {
-    return { browser: 'chrome', officialIdentity: true, supported: true };
+    return { browser: 'chrome', officialIdentity: true, platform, supported: true };
   }
   if (runtimeId === nativeHostContract.browsers.edge.runtimeId) {
-    return { browser: 'edge', officialIdentity: true, supported: true };
+    return { browser: 'edge', officialIdentity: true, platform, supported: true };
   }
   if (runtimeId === nativeHostContract.browsers.firefox.geckoId) {
-    return { browser: 'firefox', officialIdentity: true, supported: true };
+    return { browser: 'firefox', officialIdentity: true, platform, supported: true };
   }
   if (rootUrl.startsWith('safari-web-extension://')) {
-    return { browser: 'safari', officialIdentity: false, supported: false };
+    return { browser: 'safari', officialIdentity: false, platform, supported: false };
   }
-  return { browser: 'development', officialIdentity: false, supported: false };
+  return { browser: 'development', officialIdentity: false, platform, supported: false };
 }
 
 async function defaultNativeRequest(
@@ -417,6 +450,7 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     const capability: LocalDataMigrationCapability = Object.freeze({
       browser: environment.browser,
       officialIdentity: environment.officialIdentity,
+      platform: environment.platform,
       supported: environment.supported,
     });
     const hostProbe = await probeHost(environment, nativeRequest);

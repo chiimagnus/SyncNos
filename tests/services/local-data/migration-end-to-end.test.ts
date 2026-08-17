@@ -28,7 +28,7 @@ const MIGRATION_ID = '11111111-1111-4111-8111-111111111111';
 let openedDatabases: IDBDatabase[] = [];
 
 function environment(): MigrationRuntimeEnvironment {
-  return { browser: 'chrome', officialIdentity: true, supported: true };
+  return { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true };
 }
 
 function browserLocalStorage(initial: Record<string, unknown>) {

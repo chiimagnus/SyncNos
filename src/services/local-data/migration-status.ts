@@ -17,9 +17,12 @@ export const LOCAL_DATA_MIGRATION_BROWSERS = Object.freeze([
 ] as const);
 export type LocalDataMigrationBrowser = (typeof LOCAL_DATA_MIGRATION_BROWSERS)[number];
 
+export type LocalDataMigrationPlatform = 'mac' | 'windows' | 'linux' | 'unknown';
+
 export type LocalDataMigrationCapability = Readonly<{
   browser: LocalDataMigrationBrowser;
   officialIdentity: boolean;
+  platform: LocalDataMigrationPlatform;
   supported: boolean;
 }>;
 
@@ -97,10 +100,11 @@ function optionalNonNegativeInteger(value: unknown): number | undefined {
 
 function capability(value: unknown): LocalDataMigrationCapability {
   const input = record(value);
-  exactKeys(input, ['browser', 'officialIdentity', 'supported']);
+  exactKeys(input, ['browser', 'officialIdentity', 'platform', 'supported']);
   return Object.freeze({
     browser: enumeration(input.browser, LOCAL_DATA_MIGRATION_BROWSERS),
     officialIdentity: boolean(input.officialIdentity),
+    platform: enumeration(input.platform, ['mac', 'windows', 'linux', 'unknown'] as const),
     supported: boolean(input.supported),
   });
 }

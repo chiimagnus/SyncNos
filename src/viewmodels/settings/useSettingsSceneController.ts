@@ -269,6 +269,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [localDataStatusError, setLocalDataStatusError] = useState('');
   const [localDataActionBusy, setLocalDataActionBusy] = useState(false);
   const [localDataMigrationDialogMode, setLocalDataMigrationDialogMode] = useState<'start' | 'join' | null>(null);
+  const [localDataCopiedHelpText, setLocalDataCopiedHelpText] = useState('');
   const localDataMountedRef = useRef(false);
   const localDataActiveSectionRef = useRef(activeSection);
   const localDataStatusLoadedRef = useRef(false);
@@ -1610,6 +1611,22 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     await loadLocalDataStatus();
   }, [loadLocalDataStatus, localDataStatusLoading]);
 
+  const onLocalDataCopyHelpText = useCallback(async (text: string) => {
+    const value = String(text || '');
+    if (!value) return;
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(value);
+      if (localDataMountedRef.current) setLocalDataCopiedHelpText(value);
+    } catch (error) {
+      if (localDataMountedRef.current) {
+        setLocalDataStatusError(toErrorMessage(error, t('localDatabaseCopyFailed')));
+      }
+    }
+  }, []);
+
   const onChangeAboutYouUserName = useCallback((next: string) => {
     setAboutYouUserName(normalizeUserName(next));
   }, []);
@@ -1715,11 +1732,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     localDataStatusError,
     localDataActionBusy,
     localDataMigrationDialogMode,
+    localDataCopiedHelpText,
     onLocalDataRequestMigration,
     onLocalDataCancelMigration,
     onLocalDataConfirmMigration,
     onLocalDataResumeMigration,
     onLocalDataRetryStatus,
+    onLocalDataCopyHelpText,
 
     exportStatus,
     importStatus,
