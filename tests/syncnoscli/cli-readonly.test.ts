@@ -243,6 +243,53 @@ describe('SyncNos read-only CLI', () => {
     expect(tableOutput.chunks.join('')).toContain('7 | chatgpt | all |  | 5 | Needle | 😀 needle');
   });
 
+  it('escapes page-controlled terminal control characters only in table rendering', async () => {
+    const hostileTitle = 'title\u001b]52;c;clipboard\u0007\u007f\u009b31m\tline\nnext';
+    const hostileSnippet = 'snippet\u0000\u001f\u0085|\\tail';
+    const page = Object.freeze({
+      cursor: null,
+      factsRevision: 4,
+      facets: Object.freeze({ sites: [], sources: [] }),
+      hasMore: false,
+      items: Object.freeze([
+        Object.freeze({
+          backendConversationId: 7,
+          conversationKey: 'hostile',
+          highlights: [],
+          lastCapturedAt: 5,
+          score: null,
+          siteKey: 'all',
+          snippet: hostileSnippet,
+          source: 'chatgpt',
+          sourceType: 'chat',
+          title: hostileTitle,
+          url: '',
+        }),
+      ]),
+      truncatedByScanLimit: false,
+    });
+    const runSearch = vi.fn(async () => page);
+
+    const jsonOutput = output();
+    await expect(runCli(['search', 'needle'], { runSearch, stdout: jsonOutput.stdout })).resolves.toBe(0);
+    expect(JSON.parse(jsonOutput.chunks.join('')).data.items[0]).toMatchObject({
+      title: hostileTitle,
+      snippet: hostileSnippet,
+    });
+    expect(jsonOutput.chunks.join('')).not.toContain('\u001b');
+
+    const tableOutput = output();
+    await expect(
+      runCli(['search', 'needle', '--format', 'table'], { runSearch, stdout: tableOutput.stdout }),
+    ).resolves.toBe(0);
+    const rendered = tableOutput.chunks.join('');
+    expect(rendered).toContain('title\\x1b]52;c;clipboard\\x07\\x7f\\x9b31m\\tline\\nnext');
+    expect(rendered).toContain('snippet\\x00\\x1f\\x85\\|\\\\tail');
+    for (const control of ['\u001b', '\u0007', '\u007f', '\u009b', '\u0000', '\u001f', '\u0085', '\t', '\r']) {
+      expect(rendered).not.toContain(control);
+    }
+  });
+
   it('returns structured parser failures and refuses a malformed list cursor before opening SQLite', async () => {
     const runConversationsCommand = vi.fn(async () => null);
     const runSearchCommand = vi.fn(async () => null);

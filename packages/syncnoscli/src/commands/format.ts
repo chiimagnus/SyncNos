@@ -12,12 +12,36 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 function cell(value: unknown): string {
-  return String(value ?? '')
-    .replaceAll('\\', '\\\\')
-    .replaceAll('\t', '\\t')
-    .replaceAll('\r', '\\r')
-    .replaceAll('\n', '\\n')
-    .replaceAll('|', '\\|');
+  let rendered = '';
+  for (const character of String(value ?? '')) {
+    if (character === '\\') {
+      rendered += '\\\\';
+      continue;
+    }
+    if (character === '\t') {
+      rendered += '\\t';
+      continue;
+    }
+    if (character === '\r') {
+      rendered += '\\r';
+      continue;
+    }
+    if (character === '\n') {
+      rendered += '\\n';
+      continue;
+    }
+    if (character === '|') {
+      rendered += '\\|';
+      continue;
+    }
+    const codePoint = character.codePointAt(0)!;
+    if (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)) {
+      rendered += `\\x${codePoint.toString(16).padStart(2, '0')}`;
+      continue;
+    }
+    rendered += character;
+  }
+  return rendered;
 }
 
 function table(headers: readonly string[], rows: readonly (readonly unknown[])[]): string {
