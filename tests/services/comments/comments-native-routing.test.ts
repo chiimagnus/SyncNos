@@ -259,6 +259,7 @@ describe('article comments background handlers', () => {
     });
 
     expect(response).toMatchObject({ ok: true, data: { ok: true } });
+    expect(commentStorageMocks.create).toHaveBeenCalledWith(expect.objectContaining({ mode: 'native' }));
     expect(factsRepository.getConversationByReference).toHaveBeenCalledWith({
       source: article.source,
       conversationKey: article.conversationKey,
@@ -303,6 +304,64 @@ describe('article comments background handlers', () => {
 });
 
 describe('Native Host article comments commands', () => {
+  it('rejects a stale comment handle when the old numeric conversation id now belongs to a replacement row', async () => {
+    const { comments, conversations, database } = await fixture.open();
+    const oldArticle = conversations.upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'article:old-owner',
+      title: 'Old owner',
+      url: articleUrl,
+      lastCapturedAt: 1,
+    });
+    const oldContext = {
+      canonicalUrl: articleUrl,
+      conversation: {
+        source: 'web',
+        conversationKey: oldArticle.conversationKey,
+        backendConversationId: oldArticle.id,
+      },
+    };
+    const root = writeNativeHostConnectedCommand(
+      database,
+      hostRequest('ADD_ARTICLE_COMMENT', {
+        context: oldContext,
+        authorName: 'Alice',
+        quoteText: '',
+        commentText: 'old comment',
+      }),
+    ) as { id: number };
+
+    expect(conversations.deleteConversationsByIds([oldArticle.id])).toMatchObject({ deletedConversations: 1 });
+    database
+      .prepare(
+        `INSERT INTO conversations (
+          id, source, conversation_key, source_type, title, url, last_captured_at, payload_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        oldArticle.id,
+        'gemini',
+        'replacement-row',
+        'chat',
+        'Replacement row',
+        'https://example.com/replacement',
+        2,
+        JSON.stringify({ source: 'gemini', conversationKey: 'replacement-row', title: 'Replacement row' }),
+      );
+
+    expect(() =>
+      writeNativeHostConnectedCommand(
+        database,
+        hostRequest('DELETE_ARTICLE_COMMENT', {
+          context: oldContext,
+          backendCommentId: root.id,
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'STALE_REFERENCE' }));
+    expect(comments.listArticleCommentsByCanonicalUrl(articleUrl).map((item) => item.id)).toContain(root.id);
+  });
+
   it('resolves context before delete and attaches orphan comments through the typed Host command', async () => {
     const { comments, conversations, database } = await fixture.open();
     const storedArticle = conversations.upsertConversation({

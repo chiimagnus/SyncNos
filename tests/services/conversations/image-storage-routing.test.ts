@@ -106,6 +106,9 @@ describe('lease-bound image storage', () => {
   });
 
   it('maps Native find/read/write to typed Host commands without opening IDB', async () => {
+    const idbOpen = vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+      throw new Error('IDB must not be opened in active image mode');
+    });
     const calls: Array<{ command: string; payload: unknown; uploadBytes?: Uint8Array }> = [];
     const connectNative = vi.fn(async (input: any) => {
       calls.push(input);
@@ -147,6 +150,7 @@ describe('lease-bound image storage', () => {
       });
     });
 
+    expect(idbOpen).not.toHaveBeenCalled();
     expect(calls.map((call) => call.command)).toEqual([
       'FIND_IMAGE_ASSET_BY_URL',
       'PUT_IMAGE_ASSET',
@@ -174,7 +178,7 @@ describe('lease-bound image storage', () => {
   });
 
   it('enforces the Host owner before finding, writing, or streaming image bytes', async () => {
-    const { conversations, database } = await sqliteFixture.open();
+    const { conversations, database, images } = await sqliteFixture.open();
     const conversation = conversations.upsertConversation({
       sourceType: 'chat',
       source: owner.source,
@@ -226,5 +230,54 @@ describe('lease-bound image storage', () => {
         bytes,
       ),
     ).rejects.toMatchObject({ code: 'STALE_REFERENCE' });
+
+    expect(conversations.deleteConversationsByIds([conversation.id])).toMatchObject({ deletedConversations: 1 });
+    database
+      .prepare(
+        `INSERT INTO conversations (
+          id, source, conversation_key, source_type, title, url, last_captured_at, payload_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        conversation.id,
+        'gemini',
+        'replacement-row',
+        'chat',
+        'Replacement row',
+        'https://example.com/replacement',
+        2,
+        JSON.stringify({ source: 'gemini', conversationKey: 'replacement-row', title: 'Replacement row' }),
+      );
+    const replacementAsset = await images.putImageAsset({
+      bytes: Uint8Array.from([3, 2, 1]),
+      contentType: 'image/png',
+      conversationId: conversation.id,
+      url: 'https://example.com/replacement.png',
+    });
+
+    expect(() =>
+      readNativeHostImageAsset(
+        database,
+        hostRequest('GET_IMAGE_ASSET', {
+          owner: hostOwner,
+          backendAssetId: replacementAsset.id,
+          transfer: { operation: 'image-asset', declaredTotalBytes: 0 },
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'STALE_REFERENCE' }));
+    expect(
+      readNativeHostImageAsset(
+        database,
+        hostRequest('GET_IMAGE_ASSET', {
+          owner: {
+            source: 'gemini',
+            conversationKey: 'replacement-row',
+            backendConversationId: conversation.id,
+          },
+          backendAssetId: replacementAsset.id,
+          transfer: { operation: 'image-asset', declaredTotalBytes: 0 },
+        }),
+      ),
+    ).toMatchObject({ metadata: { backendAssetId: replacementAsset.id } });
   });
 });

@@ -1,5 +1,7 @@
-export const DB_NAME = 'webclipper';
-export const DB_VERSION = 8;
+import { IDB_DATABASE_NAME, IDB_DATABASE_VERSION } from './contract';
+
+export const DB_NAME = IDB_DATABASE_NAME;
+export const DB_VERSION = IDB_DATABASE_VERSION;
 export const FACTS_IDB_STORE_NAMES = Object.freeze([
   'conversations',
   'sync_mappings',

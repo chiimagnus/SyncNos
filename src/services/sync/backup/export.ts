@@ -1,4 +1,4 @@
-import { DB_NAME, DB_VERSION } from '@platform/idb/schema';
+import { IDB_DATABASE_NAME, IDB_DATABASE_VERSION } from '@platform/idb/contract';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import type { CommentArchiveSerializationWarning } from '@services/comments/domain/comment-archive';
 import { LocalDataContractError, MAX_ZIP_STREAM_BYTES } from '@services/local-data/contracts';
@@ -221,7 +221,7 @@ export async function buildBackupZipV2(
   const manifest = {
     backupSchemaVersion: BACKUP_ZIP_SCHEMA_VERSION,
     exportedAt,
-    db: { name: DB_NAME, version: DB_VERSION },
+    db: { name: IDB_DATABASE_NAME, version: IDB_DATABASE_VERSION },
     counts,
     config: { storageLocalPath: 'config/storage-local.json' },
     index: { conversationsCsvPath: 'sources/conversations.csv' },
