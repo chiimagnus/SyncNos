@@ -144,6 +144,29 @@ describe('native conversation read repository', () => {
           return { conversationId: 8, messages: [message] };
         case 'GET_INSIGHT_STATS':
           return insightSnapshot;
+        case 'SEARCH_CONVERSATIONS':
+          return {
+            cursor: null,
+            factsRevision: 4,
+            facets: { sources: [], sites: [] },
+            hasMore: false,
+            items: [
+              {
+                backendConversationId: 8,
+                source: 'chatgpt',
+                conversationKey: 'thread-8',
+                sourceType: 'chat',
+                title: 'A thread',
+                url: 'https://chatgpt.com/c/thread-8',
+                siteKey: 'unknown',
+                score: null,
+                lastCapturedAt: 42,
+                snippet: 'hello',
+                highlights: [{ start: 0, end: 5 }],
+              },
+            ],
+            truncatedByScanLimit: false,
+          };
         default:
           throw new Error(`unexpected command ${command}`);
       }
@@ -184,6 +207,12 @@ describe('native conversation read repository', () => {
         totalMessages: 1,
         topConversations: [{ source: 'chatgpt', conversationKey: 'thread-8', messageCount: 1 }],
       });
+      await expect(
+        repository.searchConversations?.({
+          query: { literal: 'hello', scalarCount: 5, mode: 'fts-phrase', ftsPhrase: '"hello"' },
+          sort: 'best',
+        }),
+      ).resolves.toMatchObject({ factsRevision: 4, items: [{ source: 'chatgpt', conversationKey: 'thread-8' }] });
       await expect(repository.searchConversationMentionCandidates({ maxScan: 1 })).resolves.toMatchObject({
         candidates: [expect.objectContaining({ source: 'chatgpt', conversationKey: 'thread-8' })],
       });
@@ -196,6 +225,7 @@ describe('native conversation read repository', () => {
       'CONVERSATION_DETAIL',
       'CONVERSATION_TAIL',
       'GET_INSIGHT_STATS',
+      'SEARCH_CONVERSATIONS',
       'CONVERSATION_BOOTSTRAP',
     ]);
     expect(calls).toContainEqual({
@@ -203,6 +233,13 @@ describe('native conversation read repository', () => {
       payload: { source: 'chatgpt', conversationKey: 'thread-8' },
     });
     expect(calls).toContainEqual({ command: 'GET_INSIGHT_STATS', payload: { timeZone: 'UTC' } });
+    expect(calls).toContainEqual({
+      command: 'SEARCH_CONVERSATIONS',
+      payload: {
+        query: { literal: 'hello', scalarCount: 5, mode: 'fts-phrase', ftsPhrase: '"hello"' },
+        sort: 'best',
+      },
+    });
     expect(calls.some((call) => Object.prototype.hasOwnProperty.call(call.payload as object, 'factsEpoch'))).toBe(
       false,
     );

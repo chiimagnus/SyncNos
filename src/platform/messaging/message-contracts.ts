@@ -18,6 +18,8 @@ export const CORE_MESSAGE_TYPES = {
   GET_CONVERSATION_IMAGE_ASSET: 'getConversationImageAsset',
   GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY: 'getConversationTailWindowBySourceAndKey',
   GET_INSIGHT_STATS: 'getInsightStats',
+  GET_LOCAL_SEARCH_CAPABILITY: 'getLocalSearchCapability',
+  SEARCH_CONVERSATIONS: 'searchConversations',
   DELETE_CONVERSATIONS: 'deleteConversations',
 } as const;
 

@@ -433,6 +433,23 @@ describe('local data contracts', () => {
     expectErrorCode(() => normalizeSearchQuery('sync\ud800'), 'INVALID_ARGUMENT');
     expectErrorCode(() => normalizeSearchQuery('😀'.repeat(MAX_SEARCH_QUERY_SCALARS + 1)), 'INVALID_ARGUMENT');
 
+    const browserSearch = parseBrowserRuntimeFactsRequest(
+      envelope('SEARCH_CONVERSATIONS', { query: '  Cafe\u0301\u00a0你好  ', sort: 'best' }),
+    );
+    expect(browserSearch.payload).toMatchObject({
+      query: { literal: 'Café 你好', scalarCount: 7, mode: 'fts-phrase', ftsPhrase: '"Café 你好"' },
+      sort: 'best',
+    });
+    expectErrorCode(
+      () =>
+        parseBrowserRuntimeFactsRequest(
+          envelope('SEARCH_CONVERSATIONS', {
+            query: { literal: 'Café 你好', scalarCount: 7, mode: 'fts-phrase', ftsPhrase: '"Café 你好"' },
+          }),
+        ),
+      'INVALID_ARGUMENT',
+    );
+
     const query = normalizeSearchQuery('SyncNos search');
     const cursor = createSearchCursorBinding(query, 'cursor-token');
     expect(

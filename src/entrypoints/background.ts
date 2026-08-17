@@ -1,5 +1,6 @@
 import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { registerConversationSearchHandlers } from '@services/conversations/background/search-handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
@@ -80,6 +81,7 @@ export default defineBackground(async () => {
       services.autoSync.onConversationChanged(reference, reason, lease),
     streamRouter,
   });
+  registerConversationSearchHandlers(router, { conversationReadRunner, factsGate });
   registerItemMentionHandlers(router, { conversationReadRunner });
   registerChatWithBackgroundHandlers(router);
   registerArticleCommentsHandlers(router, {

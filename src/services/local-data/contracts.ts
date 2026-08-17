@@ -707,6 +707,89 @@ export type LocalDataSearchPage = Readonly<{
   truncatedByScanLimit: boolean;
 }>;
 
+function parseSearchDisplayText(value: unknown, maximum = MAX_PROTOCOL_TEXT_LENGTH): string {
+  if (typeof value !== 'string' || value.length > maximum || hasC0OrC1Control(value) || hasUnpairedSurrogate(value))
+    fail('PROTOCOL_MISMATCH');
+  return value;
+}
+
+function parseSearchFacet(value: unknown): LocalDataSearchFacet {
+  const input = record(value);
+  exactKeys(input, ['count', 'key', 'label']);
+  return Object.freeze({
+    count: parseNonNegativeSafeInteger(input.count),
+    key: parseText(input.key),
+    label: parseSearchDisplayText(input.label),
+  });
+}
+
+function parseSearchResult(value: unknown): LocalDataSearchResult {
+  const input = record(value);
+  exactKeys(input, [
+    'backendConversationId',
+    'conversationKey',
+    'highlights',
+    'lastCapturedAt',
+    'score',
+    'siteKey',
+    'snippet',
+    'source',
+    'sourceType',
+    'title',
+    'url',
+  ]);
+  const snippet = parseSearchDisplayText(input.snippet, 16 * 1024);
+  const score = input.score === null ? null : Number(input.score);
+  if (score !== null && !Number.isFinite(score)) fail('PROTOCOL_MISMATCH');
+  return Object.freeze({
+    backendConversationId: parsePositiveSafeInteger(input.backendConversationId),
+    conversationKey: parseText(input.conversationKey),
+    highlights: Object.freeze(parsePlainSnippetHighlights(snippet, input.highlights)),
+    lastCapturedAt: parseNonNegativeSafeInteger(input.lastCapturedAt),
+    score,
+    siteKey: parseSearchDisplayText(input.siteKey),
+    snippet,
+    source: parseText(input.source),
+    sourceType: parseSearchDisplayText(input.sourceType),
+    title: parseSearchDisplayText(input.title),
+    url: parseSearchDisplayText(input.url),
+  });
+}
+
+/** Strictly validates the bounded JSON returned by Host search before browser consumers see it. */
+export function parseLocalDataSearchPage(value: unknown): LocalDataSearchPage {
+  const input = record(value);
+  exactKeys(input, ['cursor', 'factsRevision', 'facets', 'hasMore', 'items', 'truncatedByScanLimit']);
+  const factsRevision = parseNonNegativeSafeInteger(input.factsRevision);
+  const facets = record(input.facets);
+  exactKeys(facets, ['sites', 'sources']);
+  if (!Array.isArray(facets.sites) || !Array.isArray(facets.sources) || !Array.isArray(input.items)) {
+    fail('PROTOCOL_MISMATCH');
+  }
+  if (typeof input.hasMore !== 'boolean' || typeof input.truncatedByScanLimit !== 'boolean') fail('PROTOCOL_MISMATCH');
+  let cursor: SearchCursorBinding | null = null;
+  if (input.cursor !== null) {
+    const rawCursor = record(input.cursor);
+    exactKeys(rawCursor, ['literal', 'token']);
+    cursor = Object.freeze({
+      literal: parseText(rawCursor.literal),
+      token: parseText(rawCursor.token, MAX_CURSOR_LENGTH),
+    });
+  }
+  if (input.hasMore && !cursor) fail('PROTOCOL_MISMATCH');
+  return Object.freeze({
+    cursor,
+    factsRevision,
+    facets: Object.freeze({
+      sites: Object.freeze(facets.sites.map(parseSearchFacet)),
+      sources: Object.freeze(facets.sources.map(parseSearchFacet)),
+    }),
+    hasMore: input.hasMore,
+    items: Object.freeze(input.items.map(parseSearchResult)),
+    truncatedByScanLimit: input.truncatedByScanLimit,
+  });
+}
+
 export const STREAM_OPERATION_LIMITS: Readonly<Record<LocalDataStreamOperation, number>> = Object.freeze({
   'capture-snapshot': MAX_CAPTURE_SNAPSHOT_BYTES,
   'conversation-detail': MAX_DETAIL_PREVIEW_BYTES,
@@ -2012,6 +2095,25 @@ function parseSearchRequestPayload(value: unknown): SearchRequestPayload {
   };
 }
 
+function parseBrowserSearchRequestPayload(value: unknown): SearchRequestPayload {
+  const input = record(value);
+  allowedKeys(input, ['query', 'cursor', 'limit', 'siteKey', 'sort', 'sourceKey']);
+  const query = normalizeSearchQuery(input.query);
+  const cursor = hasOwn(input, 'cursor') ? parseSearchCursorBinding(input.cursor, query) : undefined;
+  const limit = hasOwn(input, 'limit') ? parsePositiveSafeInteger(input.limit, MAX_PAGE_LIMIT) : undefined;
+  const siteKey = parseOptionalText(input, 'siteKey');
+  const sort = hasOwn(input, 'sort') ? parseEnum(input.sort, ['best', 'recent'] as const) : undefined;
+  const sourceKey = parseOptionalText(input, 'sourceKey');
+  return Object.freeze({
+    query,
+    ...(cursor ? { cursor } : {}),
+    ...(limit ? { limit } : {}),
+    ...(siteKey ? { siteKey } : {}),
+    ...(sort ? { sort } : {}),
+    ...(sourceKey ? { sourceKey } : {}),
+  });
+}
+
 export function parseInsightStatsRequestPayload(value: unknown): InsightStatsRequestPayload {
   const input = record(value);
   allowedKeys(input, ['since', 'timeZone', 'until']);
@@ -2219,7 +2321,7 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
     case 'BACKUP_EXPORT':
       return parseBackupStreamPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'SEARCH_CONVERSATIONS':
-      return parseSearchRequestPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
+      return parseBrowserSearchRequestPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'GET_MIGRATION_RECEIPT':
       return parseMigrationReceiptPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
   }

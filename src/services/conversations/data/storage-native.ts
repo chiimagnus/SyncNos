@@ -2,6 +2,7 @@ import { connectNative, type NativeHostRequest } from '@platform/local-data/nati
 import {
   LocalDataContractError,
   parseInsightFactsSnapshot,
+  parseLocalDataSearchPage,
   serializedJsonUtf8ByteLength,
   type ConversationCaptureSnapshot,
   type ConversationMessageSyncMode,
@@ -9,6 +10,8 @@ import {
   type HostFactsCommand,
   type InsightFactsSnapshot,
   type InsightStatsRequestPayload,
+  type LocalDataSearchPage,
+  type SearchRequestPayload,
   type JsonObject,
   type JsonValue,
   type StableConversationReference,
@@ -37,6 +40,7 @@ type NativeConnectedCommand = Extract<
   | 'SYNC_CONVERSATION_MESSAGES'
   | 'GET_SYNC_MAPPING'
   | 'GET_INSIGHT_STATS'
+  | 'SEARCH_CONVERSATIONS'
   | 'PATCH_SYNC_MAPPING'
   | 'SET_SYNC_CURSOR'
   | 'SET_CONVERSATION_NOTION_PAGE_ID'
@@ -64,6 +68,8 @@ export type ConversationReadRepository = Readonly<{
   ) => Promise<ConversationListPage<Conversation>>;
   getConversationTailWindow: (reference: StableConversationReference, limit: number) => Promise<ConversationTailWindow>;
   getInsightStats: (input: InsightStatsRequestPayload) => Promise<InsightFactsSnapshot>;
+  /** Native-only full-text capability. IDB repositories intentionally omit it. */
+  searchConversations?: (input: SearchRequestPayload) => Promise<LocalDataSearchPage>;
   searchConversationMentionCandidates: (input?: {
     limit?: unknown;
     maxDurationMs?: number;
@@ -401,6 +407,9 @@ export function createNativeConversationReadRepository(
     },
     async getInsightStats(input) {
       return parseInsightFactsSnapshot(await request('GET_INSIGHT_STATS', input));
+    },
+    async searchConversations(input) {
+      return parseLocalDataSearchPage(await request('SEARCH_CONVERSATIONS', input));
     },
     async searchConversationMentionCandidates(input = {}) {
       const maxScan = Math.min(2000, Math.max(1, Math.floor(Number(input.maxScan) || 2000)));
