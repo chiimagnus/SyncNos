@@ -26,6 +26,10 @@ import { onAlarm } from '@platform/alarms/alarms';
 import { initializeLocale } from '@i18n';
 import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
 import { BackgroundStreamRouter } from '@services/local-data/background-stream-router';
+import {
+  createMigrationCoordinator,
+  registerMigrationCoordinatorHandlers,
+} from '@services/local-data/migration-coordinator';
 import { createConversationReadRunner } from '@services/conversations/data/storage';
 
 let backgroundInstanceId: string | null = null;
@@ -43,6 +47,7 @@ export default defineBackground(async () => {
   const factsGate = new FactsOperationGate();
   await factsGate.initializeFromJournal();
   const conversationReadRunner = createConversationReadRunner(factsGate);
+  const migrationCoordinator = createMigrationCoordinator({ gate: factsGate });
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId, factsOperations: factsGate });
   const streamRouter = new BackgroundStreamRouter(factsGate);
 
@@ -55,6 +60,7 @@ export default defineBackground(async () => {
     localDataStreamRouter: streamRouter,
   });
 
+  registerMigrationCoordinatorHandlers(router, migrationCoordinator);
   registerConversationHandlers(router, {
     conversationReadRunner,
     onConversationChanged: (reference, reason, lease) =>

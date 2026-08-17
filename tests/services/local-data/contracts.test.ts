@@ -632,7 +632,7 @@ describe('local data contracts', () => {
     expect(MAX_MIGRATION_PROFILE_REFERENCE_PATCH_BYTES).toBe(2 * 1024 * 1024);
   });
 
-  it('keeps P1 local-data pure and leaves transfer, cleanup, and local-mode admission disconnected from production callers', () => {
+  it('keeps P1 local-data pure, leaves transfer and cleanup disconnected, and centralizes migration admission in the coordinator', () => {
     const pureLocalDataFiles = [
       'src/services/local-data/contracts.ts',
       'src/services/local-data/digest.ts',
@@ -668,7 +668,23 @@ describe('local data contracts', () => {
       expect(callers).toEqual(['src/platform/idb/facts-transfer.ts']);
     }
     const journalEntrypoints = productionFiles.filter((path) => /\bbeginMigrationJournal\s*\(/.test(readSource(path)));
-    expect(journalEntrypoints).toEqual(['src/platform/local-data/migration-journal.ts']);
+    expect(journalEntrypoints).toEqual([
+      'src/platform/local-data/migration-journal.ts',
+      'src/services/local-data/migration-coordinator.ts',
+    ]);
+
+    const journalFailureEntrypoints = productionFiles.filter((path) =>
+      /\brecordMigrationJournalFailure\s*\(/.test(readSource(path)),
+    );
+    expect(journalFailureEntrypoints).toEqual([
+      'src/platform/local-data/migration-journal.ts',
+      'src/services/local-data/migration-coordinator.ts',
+    ]);
+
+    for (const symbol of ['closeAdmissions', 'waitForDrained']) {
+      const callers = productionFiles.filter((path) => new RegExp(`\\.${symbol}\\s*\\(`).test(readSource(path)));
+      expect(callers).toEqual(['src/services/local-data/migration-coordinator.ts']);
+    }
   });
 
   it('keeps the migration manifest compact, ordered, and receipt-verifiable', () => {

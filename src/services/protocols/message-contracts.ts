@@ -1,4 +1,5 @@
 export {
+  LOCAL_DATA_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
@@ -17,6 +18,7 @@ export {
 } from '@platform/messaging/message-contracts';
 
 export type {
+  LocalDataMessageType,
   CoreMessageType,
   NotionMessageType,
   ObsidianMessageType,

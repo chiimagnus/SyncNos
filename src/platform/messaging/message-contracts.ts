@@ -1,3 +1,9 @@
+export const LOCAL_DATA_MESSAGE_TYPES = {
+  GET_STATUS: 'getLocalDataMigrationStatus',
+  START_MIGRATION: 'startLocalDataMigration',
+  RESUME_MIGRATION: 'resumeLocalDataMigration',
+} as const;
+
 export const CORE_MESSAGE_TYPES = {
   SAVE_CONVERSATION_SNAPSHOT: 'saveConversationSnapshot',
   UPDATE_ARTICLE_URL: 'updateArticleUrl',
@@ -105,6 +111,7 @@ export const LOCAL_DATA_STREAM_MESSAGE_TYPES = {
 } as const;
 
 export const messageContracts = {
+  LOCAL_DATA_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
@@ -121,6 +128,7 @@ export const messageContracts = {
   LOCAL_DATA_STREAM_MESSAGE_TYPES,
 } as const;
 
+export type LocalDataMessageType = (typeof LOCAL_DATA_MESSAGE_TYPES)[keyof typeof LOCAL_DATA_MESSAGE_TYPES];
 export type CoreMessageType = (typeof CORE_MESSAGE_TYPES)[keyof typeof CORE_MESSAGE_TYPES];
 export type NotionMessageType = (typeof NOTION_MESSAGE_TYPES)[keyof typeof NOTION_MESSAGE_TYPES];
 export type ObsidianMessageType = (typeof OBSIDIAN_MESSAGE_TYPES)[keyof typeof OBSIDIAN_MESSAGE_TYPES];
@@ -138,6 +146,7 @@ export type LocalDataStreamMessageType =
   (typeof LOCAL_DATA_STREAM_MESSAGE_TYPES)[keyof typeof LOCAL_DATA_STREAM_MESSAGE_TYPES];
 
 export type MessageType =
+  | LocalDataMessageType
   | CoreMessageType
   | NotionMessageType
   | ObsidianMessageType
