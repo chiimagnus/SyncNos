@@ -1058,6 +1058,49 @@ export type SearchRequestPayload = Readonly<{
   sourceKey?: string;
 }>;
 
+export type InsightStatsRequestPayload = Readonly<{
+  since?: number;
+  timeZone: string;
+  until?: number;
+}>;
+
+export type InsightFactsDailyCount = Readonly<{
+  count: number;
+  day: string;
+}>;
+
+export type InsightFactsKeyCount = Readonly<{
+  count: number;
+  key: string;
+}>;
+
+export type InsightFactsTopConversation = Readonly<{
+  conversationId: number;
+  conversationKey: string;
+  messageCount: number;
+  source: string;
+  title: string;
+}>;
+
+export const INSIGHT_FACTS_CHAT_SOURCE_BUCKET_LIMIT = 4;
+export const INSIGHT_FACTS_ARTICLE_DOMAIN_BUCKET_LIMIT = 8;
+export const INSIGHT_FACTS_DAILY_BUCKET_LIMIT = 20_000;
+
+export type InsightFactsSnapshot = Readonly<{
+  articleCount: number;
+  articleDailyCounts: readonly InsightFactsDailyCount[];
+  articleDomainCounts: readonly InsightFactsKeyCount[];
+  articleOtherDomainCount: number;
+  articleUnknownDateCount: number;
+  chatCount: number;
+  chatDailyCounts: readonly InsightFactsDailyCount[];
+  chatOtherSourceCount: number;
+  chatSourceCounts: readonly InsightFactsKeyCount[];
+  chatUnknownDateCount: number;
+  topConversations: readonly InsightFactsTopConversation[];
+  totalMessages: number;
+}>;
+
 export const BROWSER_RUNTIME_FACTS_COMMANDS = Object.freeze([
   'GET_LOCAL_DATA_STATUS',
   'START_LOCAL_DATA_MIGRATION',
@@ -1090,7 +1133,6 @@ export const BROWSER_RUNTIME_FACTS_COMMANDS = Object.freeze([
   'FACTS_EXPORT',
   'BACKUP_IMPORT',
   'BACKUP_EXPORT',
-  'GET_INSIGHT_STATS',
   'SEARCH_CONVERSATIONS',
   'GET_MIGRATION_RECEIPT',
 ] as const);
@@ -1129,7 +1171,6 @@ export type BrowserRuntimeFactsPayloadByCommand = {
   FACTS_EXPORT: MigrationStreamRequestPayload;
   BACKUP_IMPORT: BackupStreamRequestPayload;
   BACKUP_EXPORT: BackupStreamRequestPayload;
-  GET_INSIGHT_STATS: EmptyPayload;
   SEARCH_CONVERSATIONS: SearchRequestPayload;
   GET_MIGRATION_RECEIPT: Readonly<{ migrationId: MigrationId }>;
 };
@@ -1223,7 +1264,7 @@ export type HostFactsPayloadByCommand = {
   EXPORT_FACTS: MigrationStreamRequestPayload;
   IMPORT_BACKUP: BackupStreamRequestPayload;
   EXPORT_BACKUP: BackupStreamRequestPayload;
-  GET_INSIGHT_STATS: EmptyPayload;
+  GET_INSIGHT_STATS: InsightStatsRequestPayload;
   SEARCH_CONVERSATIONS: SearchRequestPayload;
   GET_MIGRATION_RECEIPT: Readonly<{ migrationId: MigrationId }>;
 };
@@ -1971,6 +2012,108 @@ function parseSearchRequestPayload(value: unknown): SearchRequestPayload {
   };
 }
 
+export function parseInsightStatsRequestPayload(value: unknown): InsightStatsRequestPayload {
+  const input = record(value);
+  allowedKeys(input, ['since', 'timeZone', 'until']);
+  const timeZone = parseText(input.timeZone, 128);
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(0);
+  } catch (_error) {
+    fail('INVALID_ARGUMENT');
+  }
+  const hasSince = hasOwn(input, 'since');
+  const hasUntil = hasOwn(input, 'until');
+  if (hasSince !== hasUntil) fail('INVALID_ARGUMENT');
+  const since = hasSince ? parsePositiveSafeInteger(input.since) : undefined;
+  const until = hasUntil ? parsePositiveSafeInteger(input.until) : undefined;
+  if (since !== undefined && until !== undefined && until < since) fail('INVALID_ARGUMENT');
+  return Object.freeze({
+    timeZone,
+    ...(since === undefined ? {} : { since }),
+    ...(until === undefined ? {} : { until }),
+  });
+}
+
+function parseInsightDailyCount(value: unknown): InsightFactsDailyCount {
+  const input = record(value);
+  exactKeys(input, ['count', 'day']);
+  const day = parseText(input.day, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) fail('PROTOCOL_MISMATCH');
+  return Object.freeze({ count: parseNonNegativeSafeInteger(input.count), day });
+}
+
+function parseInsightOptionalDisplayText(value: unknown, maximum = MAX_PROTOCOL_TEXT_LENGTH): string {
+  if (typeof value !== 'string' || value.length > maximum || hasC0OrC1Control(value)) fail('PROTOCOL_MISMATCH');
+  return value;
+}
+
+function parseInsightKeyCount(value: unknown): InsightFactsKeyCount {
+  const input = record(value);
+  exactKeys(input, ['count', 'key']);
+  return Object.freeze({
+    count: parseNonNegativeSafeInteger(input.count),
+    key: parseInsightOptionalDisplayText(input.key, 2048),
+  });
+}
+
+function parseInsightTopConversation(value: unknown): InsightFactsTopConversation {
+  const input = record(value);
+  exactKeys(input, ['conversationId', 'conversationKey', 'messageCount', 'source', 'title']);
+  return Object.freeze({
+    conversationId: parsePositiveSafeInteger(input.conversationId),
+    conversationKey: parseText(input.conversationKey),
+    messageCount: parseNonNegativeSafeInteger(input.messageCount),
+    source: parseText(input.source),
+    title: parseInsightOptionalDisplayText(input.title),
+  });
+}
+
+export function parseInsightFactsSnapshot(value: unknown): InsightFactsSnapshot {
+  const input = record(value);
+  exactKeys(input, [
+    'articleCount',
+    'articleDailyCounts',
+    'articleDomainCounts',
+    'articleOtherDomainCount',
+    'articleUnknownDateCount',
+    'chatCount',
+    'chatDailyCounts',
+    'chatOtherSourceCount',
+    'chatSourceCounts',
+    'chatUnknownDateCount',
+    'topConversations',
+    'totalMessages',
+  ]);
+  if (
+    !Array.isArray(input.articleDailyCounts) ||
+    !Array.isArray(input.articleDomainCounts) ||
+    !Array.isArray(input.chatDailyCounts) ||
+    !Array.isArray(input.chatSourceCounts) ||
+    !Array.isArray(input.topConversations) ||
+    input.articleDomainCounts.length > INSIGHT_FACTS_ARTICLE_DOMAIN_BUCKET_LIMIT ||
+    input.chatSourceCounts.length > INSIGHT_FACTS_CHAT_SOURCE_BUCKET_LIMIT ||
+    input.articleDailyCounts.length > INSIGHT_FACTS_DAILY_BUCKET_LIMIT ||
+    input.chatDailyCounts.length > INSIGHT_FACTS_DAILY_BUCKET_LIMIT ||
+    input.topConversations.length > 3
+  ) {
+    fail('PROTOCOL_MISMATCH');
+  }
+  return Object.freeze({
+    articleCount: parseNonNegativeSafeInteger(input.articleCount),
+    articleDailyCounts: Object.freeze(input.articleDailyCounts.map(parseInsightDailyCount)),
+    articleDomainCounts: Object.freeze(input.articleDomainCounts.map(parseInsightKeyCount)),
+    articleOtherDomainCount: parseNonNegativeSafeInteger(input.articleOtherDomainCount),
+    articleUnknownDateCount: parseNonNegativeSafeInteger(input.articleUnknownDateCount),
+    chatCount: parseNonNegativeSafeInteger(input.chatCount),
+    chatDailyCounts: Object.freeze(input.chatDailyCounts.map(parseInsightDailyCount)),
+    chatOtherSourceCount: parseNonNegativeSafeInteger(input.chatOtherSourceCount),
+    chatSourceCounts: Object.freeze(input.chatSourceCounts.map(parseInsightKeyCount)),
+    chatUnknownDateCount: parseNonNegativeSafeInteger(input.chatUnknownDateCount),
+    topConversations: Object.freeze(input.topConversations.map(parseInsightTopConversation)),
+    totalMessages: parseNonNegativeSafeInteger(input.totalMessages),
+  });
+}
+
 function parseMigrationReceiptPayload(value: unknown): Readonly<{ migrationId: MigrationId }> {
   const input = record(value);
   exactKeys(input, ['migrationId']);
@@ -1986,7 +2129,6 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
     case 'START_LOCAL_DATA_MIGRATION':
     case 'RESUME_LOCAL_DATA_MIGRATION':
     case 'GET_FACTS_REVISION':
-    case 'GET_INSIGHT_STATS':
       return parseEmptyPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'CONVERSATION_BOOTSTRAP':
     case 'CONVERSATION_LOAD_MORE':
@@ -2081,6 +2223,7 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
     case 'GET_MIGRATION_RECEIPT':
       return parseMigrationReceiptPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
   }
+  return fail('INVALID_ARGUMENT');
 }
 
 function parseHostFactsPayload<TCommand extends HostFactsCommand>(
@@ -2090,8 +2233,9 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
   switch (command) {
     case 'GET_STATUS':
     case 'GET_FACTS_REVISION':
-    case 'GET_INSIGHT_STATS':
       return parseEmptyPayload(value) as HostFactsPayloadByCommand[TCommand];
+    case 'GET_INSIGHT_STATS':
+      return parseInsightStatsRequestPayload(value) as HostFactsPayloadByCommand[TCommand];
     case 'CONVERSATION_BOOTSTRAP':
     case 'CONVERSATION_LOAD_MORE':
       return parseConversationListPayload(value) as HostFactsPayloadByCommand[TCommand];
@@ -2160,6 +2304,7 @@ function parseHostFactsPayload<TCommand extends HostFactsCommand>(
     case 'GET_MIGRATION_RECEIPT':
       return parseMigrationReceiptPayload(value) as HostFactsPayloadByCommand[TCommand];
   }
+  return fail('INVALID_ARGUMENT');
 }
 
 function parseCliFactsPayload<TCommand extends CliFactsCommand>(
@@ -2185,6 +2330,7 @@ function parseCliFactsPayload<TCommand extends CliFactsCommand>(
     case 'SEARCH_CONVERSATIONS':
       return parseSearchRequestPayload(value) as CliFactsPayloadByCommand[TCommand];
   }
+  return fail('INVALID_ARGUMENT');
 }
 
 function browserPayloadCarriesNumericFactId(command: BrowserRuntimeFactsCommand, payload: unknown): boolean {

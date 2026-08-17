@@ -9,6 +9,7 @@ import {
   type ConversationReadRepository,
 } from '@services/conversations/data/storage-native';
 import {
+  getInsightFactsSnapshot,
   resolveConversationDetailResponse,
   resolveConversationTailWindowResponse,
 } from '@services/conversations/client/repo';
@@ -46,6 +47,23 @@ const message = {
   role: 'user',
   contentText: 'hello',
 };
+
+const insightSnapshot = {
+  articleCount: 0,
+  articleDailyCounts: [],
+  articleDomainCounts: [],
+  articleOtherDomainCount: 0,
+  articleUnknownDateCount: 0,
+  chatCount: 1,
+  chatDailyCounts: [{ day: '2026-08-17', count: 1 }],
+  chatOtherSourceCount: 0,
+  chatSourceCounts: [{ key: 'chatgpt', count: 1 }],
+  chatUnknownDateCount: 0,
+  topConversations: [
+    { conversationId: 8, source: 'chatgpt', conversationKey: 'thread-8', title: 'A thread', messageCount: 1 },
+  ],
+  totalMessages: 1,
+} as const;
 
 const digestProvider = {
   async sha256(bytes: Uint8Array) {
@@ -124,6 +142,8 @@ describe('native conversation read repository', () => {
           return { conversationId: 8, messages: [message] };
         case 'CONVERSATION_TAIL':
           return { conversationId: 8, messages: [message] };
+        case 'GET_INSIGHT_STATS':
+          return insightSnapshot;
         default:
           throw new Error(`unexpected command ${command}`);
       }
@@ -159,6 +179,11 @@ describe('native conversation read repository', () => {
         conversationId: 8,
         messages: [message],
       });
+      await expect(repository.getInsightStats({ timeZone: 'UTC' })).resolves.toMatchObject({
+        chatCount: 1,
+        totalMessages: 1,
+        topConversations: [{ source: 'chatgpt', conversationKey: 'thread-8', messageCount: 1 }],
+      });
       await expect(repository.searchConversationMentionCandidates({ maxScan: 1 })).resolves.toMatchObject({
         candidates: [expect.objectContaining({ source: 'chatgpt', conversationKey: 'thread-8' })],
       });
@@ -170,15 +195,42 @@ describe('native conversation read repository', () => {
       'CONVERSATION_LOOKUP',
       'CONVERSATION_DETAIL',
       'CONVERSATION_TAIL',
+      'GET_INSIGHT_STATS',
       'CONVERSATION_BOOTSTRAP',
     ]);
     expect(calls).toContainEqual({
       command: 'CONVERSATION_DETAIL',
       payload: { source: 'chatgpt', conversationKey: 'thread-8' },
     });
+    expect(calls).toContainEqual({ command: 'GET_INSIGHT_STATS', payload: { timeZone: 'UTC' } });
     expect(calls.some((call) => Object.prototype.hasOwnProperty.call(call.payload as object, 'factsEpoch'))).toBe(
       false,
     );
+  });
+
+  it('routes compact Insight stats through the browser client and background read runner without a browser numeric-id epoch', async () => {
+    const sendMessage = vi.fn(async (_request: any) => ({ ok: true, data: insightSnapshot, error: null }));
+    vi.stubGlobal('browser', { runtime: { id: 'hmgjflllphdffeocddjjcfllifhejpok', sendMessage } });
+
+    await expect(getInsightFactsSnapshot({ timeZone: 'UTC' })).resolves.toEqual(insightSnapshot);
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'getInsightStats', timeZone: 'UTC' });
+
+    const repository = { getInsightStats: vi.fn(async () => insightSnapshot) };
+    const router = createBackgroundRouter({ fallback: () => ({ ok: false, data: null, error: null }) });
+    registerConversationHandlers(router as any, {
+      conversationReadRunner: {
+        run: async ({ read }: any) => await read({ factsEpoch: 'idb-v1', mode: 'idb', repository }),
+      },
+      onConversationChanged: async () => {},
+      streamRouter: { register: () => {} },
+    });
+
+    await expect(router.__handleMessageForTests({ type: 'getInsightStats', timeZone: 'UTC' })).resolves.toEqual({
+      ok: true,
+      data: insightSnapshot,
+      error: null,
+    });
+    expect(repository.getInsightStats).toHaveBeenCalledWith({ timeZone: 'UTC' });
   });
 
   it('rejects malformed Host pagination before exposing it to the caller', async () => {

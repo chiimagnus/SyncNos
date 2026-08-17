@@ -1,11 +1,14 @@
 import { connectNative, type NativeHostRequest } from '@platform/local-data/native-client';
 import {
   LocalDataContractError,
+  parseInsightFactsSnapshot,
   serializedJsonUtf8ByteLength,
   type ConversationCaptureSnapshot,
   type ConversationMessageSyncMode,
   type HostConversationReference,
   type HostFactsCommand,
+  type InsightFactsSnapshot,
+  type InsightStatsRequestPayload,
   type JsonObject,
   type JsonValue,
   type StableConversationReference,
@@ -33,6 +36,7 @@ type NativeConnectedCommand = Extract<
   | 'DELETE_CONVERSATIONS'
   | 'SYNC_CONVERSATION_MESSAGES'
   | 'GET_SYNC_MAPPING'
+  | 'GET_INSIGHT_STATS'
   | 'PATCH_SYNC_MAPPING'
   | 'SET_SYNC_CURSOR'
   | 'SET_CONVERSATION_NOTION_PAGE_ID'
@@ -59,6 +63,7 @@ export type ConversationReadRepository = Readonly<{
     limit?: number | null,
   ) => Promise<ConversationListPage<Conversation>>;
   getConversationTailWindow: (reference: StableConversationReference, limit: number) => Promise<ConversationTailWindow>;
+  getInsightStats: (input: InsightStatsRequestPayload) => Promise<InsightFactsSnapshot>;
   searchConversationMentionCandidates: (input?: {
     limit?: unknown;
     maxDurationMs?: number;
@@ -393,6 +398,9 @@ export function createNativeConversationReadRepository(
           ...(Number.isFinite(Number(limit)) && Number(limit) > 0 ? { limit: Number(limit) } : {}),
         }),
       );
+    },
+    async getInsightStats(input) {
+      return parseInsightFactsSnapshot(await request('GET_INSIGHT_STATS', input));
     },
     async searchConversationMentionCandidates(input = {}) {
       const maxScan = Math.min(2000, Math.max(1, Math.floor(Number(input.maxScan) || 2000)));

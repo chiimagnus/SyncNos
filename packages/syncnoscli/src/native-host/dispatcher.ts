@@ -31,6 +31,7 @@ const NATIVE_HOST_CONNECTED_READ_COMMANDS = Object.freeze([
   'CONVERSATION_DETAIL',
   'CONVERSATION_TAIL',
   'GET_SYNC_MAPPING',
+  'GET_INSIGHT_STATS',
   'LIST_ARTICLE_COMMENTS',
   'FIND_IMAGE_ASSET_BY_URL',
   'SEARCH_CONVERSATIONS',
@@ -236,6 +237,8 @@ export function readNativeHostConnectedCommand(database: SyncNosSqliteDatabase, 
       const conversationId = resolveConversationId(database, request.payload.conversation);
       return createMappingsRepository(database).getSyncMappingByConversation(conversationId);
     }
+    case 'GET_INSIGHT_STATS':
+      return createConversationsRepository(database).getInsightStats(request.payload);
     case 'LIST_ARTICLE_COMMENTS':
       return readComments(database, request);
     case 'FIND_IMAGE_ASSET_BY_URL': {

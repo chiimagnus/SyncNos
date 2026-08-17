@@ -1,4 +1,6 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import { buildInsightFactsSnapshot } from '@services/conversations/domain/insight-facts';
+import type { InsightFactsSnapshot, InsightStatsRequestPayload } from '@services/local-data/contracts';
 import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -937,6 +939,38 @@ async function readConversationListPage(input: {
     summary: summaryData.summary,
     facets: summaryData.facets,
   };
+}
+
+export async function getInsightStats(input: InsightStatsRequestPayload): Promise<InsightFactsSnapshot> {
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'messages'], 'readonly');
+  const conversationsPromise = reqToPromise<any[]>(stores.conversations.getAll() as any);
+  const messageCountsPromise = new Promise<Map<number, number>>((resolve, reject) => {
+    const counts = new Map<number, number>();
+    const request = stores.messages.openCursor();
+    request.onerror = () => reject(request.error || new Error('cursor failed'));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(counts);
+        return;
+      }
+      const conversationId = Number((cursor.value as { conversationId?: unknown } | undefined)?.conversationId);
+      if (Number.isSafeInteger(conversationId) && conversationId > 0) {
+        counts.set(conversationId, (counts.get(conversationId) ?? 0) + 1);
+      }
+      cursor.continue();
+    };
+  });
+  const [conversations, messageCounts] = await Promise.all([conversationsPromise, messageCountsPromise]);
+  await txDone(t);
+  return buildInsightFactsSnapshot(
+    {
+      conversations: conversations.map((row) => normalizeConversationListRecord(row)) as Conversation[],
+      messageCounts,
+    },
+    input,
+  );
 }
 
 export async function getConversationListBootstrap(

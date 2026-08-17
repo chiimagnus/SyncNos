@@ -169,6 +169,26 @@ describe('LocalDatabaseCard', () => {
     expect(document.body.textContent).not.toContain('Enable Local Database');
   });
 
+  it('keeps active mode irreversible while exposing a single recheck path when the Host becomes unhealthy', () => {
+    render({
+      state: 'active',
+      statusOverride: {
+        host: { registration: 'unavailable', compatibility: 'unknown' },
+        database: { presence: 'unknown', factsHealth: 'unknown' },
+      },
+    });
+
+    expect(document.body.textContent).toContain('Local Database enabled');
+    expect(document.body.textContent).toContain('Check again');
+    expect(document.body.textContent?.toLowerCase()).not.toContain('disable');
+    expect(document.body.textContent?.toLowerCase()).not.toContain('rollback');
+    expect(document.body.textContent).not.toContain('Enable Local Database');
+    expect(document.body.textContent).not.toContain('Resume Migration');
+
+    clickByText('Check again');
+    expect(callbacks.onRetryStatus).toHaveBeenCalledTimes(1);
+  });
+
   it('maps primary actions to request or resume callbacks and disables duplicate actions while busy', () => {
     render({ state: 'join_existing_required' });
     clickByText('Join Existing Database');

@@ -80,6 +80,15 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
     : status?.actions.canResume
       ? t('localDatabaseResumeAction')
       : null;
+  const shouldShowRecheck =
+    !status ||
+    status.profileState !== 'active' ||
+    !!error ||
+    status.host.registration !== 'available' ||
+    status.host.compatibility !== 'compatible' ||
+    status.database.presence !== 'present' ||
+    status.database.factsHealth !== 'healthy' ||
+    status.diagnostics.length > 0;
 
   return (
     <>
@@ -153,7 +162,7 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
               {actionBusy ? t('localDatabaseMigrationWorking') : primaryAction}
             </button>
           ) : null}
-          {status?.profileState !== 'active' || error ? (
+          {shouldShowRecheck ? (
             <button type="button" className={buttonClassName} disabled={disabled} onClick={onRetryStatus}>
               {t('localDatabaseRecheckAction')}
             </button>

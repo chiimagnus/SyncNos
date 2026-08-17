@@ -1,7 +1,12 @@
 import { Buffer } from 'node:buffer';
 
 import { mergeMigrationConversationPayload } from '@services/local-data/facts-archive';
-import { LocalDataContractError, type ConversationCaptureSnapshot } from '@services/local-data/contracts';
+import {
+  LocalDataContractError,
+  type ConversationCaptureSnapshot,
+  type InsightFactsSnapshot,
+  type InsightStatsRequestPayload,
+} from '@services/local-data/contracts';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { parseArticleCommentDtos } from '@services/comments/domain/comment-dto';
 import {
@@ -11,6 +16,7 @@ import {
   type ConversationListQueryInput,
 } from '@services/conversations/domain/list-query';
 import type { Conversation } from '@services/conversations/domain/models';
+import { buildInsightFactsSnapshot } from '@services/conversations/domain/insight-facts';
 import type {
   ConversationListCursor,
   ConversationListFacets,
@@ -68,6 +74,17 @@ type ArticleCommentProjectionRow = Readonly<{
   parent_comment_id: number | null;
   canonical_url: string;
   payload_json: string;
+}>;
+
+type InsightConversationProjectionRow = Readonly<{
+  id: number;
+  source: string;
+  conversation_key: string;
+  source_type: string;
+  title: string;
+  url: string;
+  last_captured_at: number;
+  insight_message_count: unknown;
 }>;
 
 type SqliteConversationMergeResult = Readonly<{
@@ -913,6 +930,37 @@ function articleCommentThreadCount(database: SyncNosSqliteDatabase, conversation
   return computeArticleCommentThreadCount(parseArticleCommentDtos(comments));
 }
 
+function readInsightStats(database: SyncNosSqliteDatabase, input: InsightStatsRequestPayload): InsightFactsSnapshot {
+  const rows = database
+    .prepare(
+      `SELECT c.id, c.source, c.conversation_key, c.source_type, c.title, c.url, c.last_captured_at,
+              COALESCE(mc.message_count, 0) AS insight_message_count
+         FROM conversations c
+         LEFT JOIN (
+           SELECT conversation_id, COUNT(*) AS message_count
+             FROM messages
+            GROUP BY conversation_id
+         ) mc ON mc.conversation_id = c.id`,
+    )
+    .all() as InsightConversationProjectionRow[];
+  const messageCounts = new Map<number, number>();
+  const conversations: Conversation[] = [];
+  for (const row of rows) {
+    const count = Number(row.insight_message_count);
+    messageCounts.set(row.id, Number.isSafeInteger(count) && count > 0 ? count : 0);
+    conversations.push({
+      id: row.id,
+      source: row.source,
+      conversationKey: row.conversation_key,
+      sourceType: row.source_type,
+      title: row.title,
+      url: row.url,
+      lastCapturedAt: row.last_captured_at,
+    });
+  }
+  return buildInsightFactsSnapshot({ conversations, messageCounts }, input);
+}
+
 function readConversationListPage(
   database: SyncNosSqliteDatabase,
   input: Readonly<{
@@ -1107,6 +1155,7 @@ export function createConversationsRepository(database: SyncNosSqliteDatabase) {
       cursor: SqliteConversationListCursor,
       limit?: number | null,
     ) => execute(() => readConversationListPage(database, { queryInput, limit, cursor })),
+    getInsightStats: (input: InsightStatsRequestPayload) => execute(() => readInsightStats(database, input)),
     syncConversationMessagesByReference: (
       reference: SqliteConversationReference,
       messages: unknown,

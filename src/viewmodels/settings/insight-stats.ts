@@ -1,10 +1,12 @@
 import { formatConversationTitle, t } from '@i18n';
-import { openDb } from '@services/shared/idb';
-import type { Conversation } from '@services/conversations/domain/models';
-import { parseHostnameFromUrl } from '@services/url-cleaning/hostname';
+import {
+  INSIGHT_FACTS_ARTICLE_DOMAIN_BUCKET_LIMIT,
+  INSIGHT_FACTS_CHAT_SOURCE_BUCKET_LIMIT,
+  type InsightFactsDailyCount,
+  type InsightFactsKeyCount,
+  type InsightFactsSnapshot,
+} from '@services/local-data/contracts';
 import { encodeConversationLoc } from '@services/shared/conversation-loc';
-
-type MessageCountByConversation = Map<number, number>;
 
 export type InsightTimeRange = 'all' | 'today' | '7d' | '30d';
 
@@ -40,13 +42,8 @@ export type InsightStats = {
   articleDomainDistribution: InsightDistributionItem[];
 };
 
-export type InsightStatsSourceData = {
-  conversations: Conversation[];
-  messageCounts: MessageCountByConversation;
-};
-
-export const INSIGHT_CHAT_SOURCE_LIMIT = 4;
-export const INSIGHT_ARTICLE_DOMAIN_LIMIT = 8;
+export const INSIGHT_CHAT_SOURCE_LIMIT = INSIGHT_FACTS_CHAT_SOURCE_BUCKET_LIMIT;
+export const INSIGHT_ARTICLE_DOMAIN_LIMIT = INSIGHT_FACTS_ARTICLE_DOMAIN_BUCKET_LIMIT;
 export const INSIGHT_TOP_CONVERSATION_LIMIT = 3;
 export const INSIGHT_OTHER_LABEL = t('insightOtherLabel');
 export const INSIGHT_UNKNOWN_DOMAIN_LABEL = t('insightUnknownLabel');
@@ -54,27 +51,8 @@ export const INSIGHT_UNKNOWN_SOURCE_LABEL = t('insightUnknownLabel');
 export const INSIGHT_UNKNOWN_DATE_LABEL = t('insightUnknownLabel');
 export const INSIGHT_UNTITLED_CONVERSATION = t('untitled');
 
-function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('indexedDB request failed'));
-  });
-}
-
-function txDone(t: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error || new Error('transaction failed'));
-    t.onabort = () => reject(t.error || new Error('transaction aborted'));
-  });
-}
-
 function safeString(value: unknown): string {
   return String(value || '').trim();
-}
-
-function normalizeSourceType(value: unknown): string {
-  return safeString(value).toLowerCase();
 }
 
 function normalizeSourceLabel(value: unknown): string {
@@ -85,110 +63,76 @@ function normalizeConversationTitle(value: unknown): string {
   return formatConversationTitle(safeString(value));
 }
 
-function compareDistributionItems(a: InsightDistributionItem, b: InsightDistributionItem): number {
-  if (b.count !== a.count) return b.count - a.count;
-  return a.label.localeCompare(b.label);
+function dayKeyFromDate(date: Date): string {
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-function buildDistribution(counts: Map<string, number>, limit: number): InsightDistributionItem[] {
-  const sorted = Array.from(counts.entries())
-    .map(([label, count]) => ({ label, count }))
-    .filter((item) => item.count > 0)
-    .sort(compareDistributionItems);
-
-  if (sorted.length <= limit) return sorted;
-
-  const head = sorted.slice(0, limit);
-  const otherCount = sorted.slice(limit).reduce((sum, item) => sum + item.count, 0);
-  if (otherCount <= 0) return head;
-  return [...head, { label: INSIGHT_OTHER_LABEL, count: otherCount }];
-}
-
-function parseHostname(value: unknown): string {
-  const hostname = parseHostnameFromUrl(value);
-  return hostname || INSIGHT_UNKNOWN_DOMAIN_LABEL;
-}
-
-function getStartOfLocalDay(ts: number): number {
-  if (!Number.isFinite(ts) || ts <= 0) return Number.NaN;
-  const date = new Date(ts);
-  if (!Number.isFinite(date.getTime())) return Number.NaN;
+function dateFromDayKey(day: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
   date.setHours(0, 0, 0, 0);
-  return date.getTime();
+  return Number.isFinite(date.getTime()) ? date : null;
 }
 
-function buildDailyTrend(options: {
-  counts: Map<number, number>;
-  unknownCount: number;
-  since?: number;
-  until?: number;
-}): InsightDailyTrendPoint[] {
-  const since = Number(options.since);
-  const until = Number(options.until);
+function dailyTrendFromFacts(
+  counts: readonly InsightFactsDailyCount[],
+  unknownCount: number,
+  options?: { since?: number; until?: number },
+): InsightDailyTrendPoint[] {
+  const byDay = new Map(counts.map((item) => [item.day, item.count] as const));
+  const since = Number(options?.since);
+  const until = Number(options?.until);
   const hasRange = Number.isFinite(since) && Number.isFinite(until) && since > 0 && until > 0 && until >= since;
-  const dayMs = 24 * 60 * 60 * 1000;
   const out: InsightDailyTrendPoint[] = [];
 
-  const unknownCount = Math.max(0, Math.floor(options.unknownCount || 0));
-  const counts = options.counts;
-
   if (hasRange) {
-    const start = getStartOfLocalDay(since);
-    const end = getStartOfLocalDay(until);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return out;
-
-    for (let cursor = start; cursor <= end; cursor += dayMs) {
-      out.push({ dayStart: cursor, count: counts.get(cursor) || 0 });
+    const cursor = new Date(since);
+    const end = new Date(until);
+    cursor.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    while (cursor.getTime() <= end.getTime()) {
+      out.push({ dayStart: cursor.getTime(), count: byDay.get(dayKeyFromDate(cursor)) ?? 0 });
+      cursor.setDate(cursor.getDate() + 1);
     }
     return out;
   }
 
-  const keys = Array.from(counts.keys())
-    .filter((key) => Number.isFinite(key))
-    .sort((a, b) => a - b);
-  if (!keys.length) {
-    if (unknownCount > 0) out.push({ dayStart: -1, count: unknownCount });
-    return out;
-  }
-
-  const minDay = keys[0];
-  const maxDay = keys[keys.length - 1];
+  const knownDates = counts
+    .map((item) => dateFromDayKey(item.day))
+    .filter((value): value is Date => value !== null)
+    .sort((left, right) => left.getTime() - right.getTime());
   if (unknownCount > 0) out.push({ dayStart: -1, count: unknownCount });
+  if (!knownDates.length) return out;
 
-  for (let cursor = minDay; cursor <= maxDay; cursor += dayMs) {
-    out.push({ dayStart: cursor, count: counts.get(cursor) || 0 });
+  const cursor = new Date(knownDates[0]);
+  const end = knownDates.at(-1)!;
+  while (cursor.getTime() <= end.getTime()) {
+    out.push({ dayStart: cursor.getTime(), count: byDay.get(dayKeyFromDate(cursor)) ?? 0 });
+    cursor.setDate(cursor.getDate() + 1);
   }
-
   return out;
 }
 
-async function readAllConversations(conversationsStore: IDBObjectStore): Promise<Conversation[]> {
-  return ((await reqToPromise(conversationsStore.getAll())) as Conversation[]) || [];
-}
-
-async function readMessageCounts(messagesStore: IDBObjectStore): Promise<MessageCountByConversation> {
-  const counts: MessageCountByConversation = new Map();
-
-  await new Promise<void>((resolve, reject) => {
-    const request = messagesStore.openCursor();
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (!cursor) {
-        resolve();
-        return;
-      }
-
-      const conversationId = Number((cursor.value as { conversationId?: unknown } | undefined)?.conversationId);
-      if (Number.isFinite(conversationId) && conversationId > 0) {
-        counts.set(conversationId, (counts.get(conversationId) || 0) + 1);
-      }
-
-      cursor.continue();
-    };
-    request.onerror = () => reject(request.error || new Error('indexedDB request failed'));
-  });
-
-  return counts;
+function distributionFromFacts(
+  counts: readonly InsightFactsKeyCount[],
+  otherCount: number,
+  normalizeLabel: (value: string) => string,
+): InsightDistributionItem[] {
+  const merged = new Map<string, number>();
+  for (const item of counts) {
+    const label = normalizeLabel(item.key);
+    merged.set(label, (merged.get(label) ?? 0) + item.count);
+  }
+  const out = [...merged.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .filter((item) => item.count > 0)
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+  if (otherCount > 0) out.push({ label: INSIGHT_OTHER_LABEL, count: otherCount });
+  return out;
 }
 
 export function createEmptyInsightStats(): InsightStats {
@@ -210,10 +154,14 @@ export function hasInsightData(stats: InsightStats | null | undefined): boolean 
   return stats.totalClips > 0;
 }
 
-function isWithinRange(value: unknown, since: number, until: number): boolean {
-  const ts = Number(value) || 0;
-  if (!Number.isFinite(ts) || ts <= 0) return false;
-  return ts >= since && ts <= until;
+export function getInsightTimeZone(): string {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (typeof timeZone === 'string' && timeZone.trim()) return timeZone;
+  } catch (_error) {
+    // Browsers with no resolved IANA zone use UTC rather than inventing an offset.
+  }
+  return 'UTC';
 }
 
 export function getInsightTimeRangeWindow(range: InsightTimeRange, now = Date.now()): { since: number; until: number } {
@@ -221,128 +169,47 @@ export function getInsightTimeRangeWindow(range: InsightTimeRange, now = Date.no
   const until = Number.isFinite(now) ? now : Date.now();
   const start = new Date(until);
   start.setHours(0, 0, 0, 0);
-  const startOfToday = start.getTime();
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  if (range === 'today') return { since: startOfToday, until };
-  if (range === '7d') return { since: startOfToday - dayMs * 6, until };
-  return { since: startOfToday - dayMs * 29, until };
+  if (range === '7d') start.setDate(start.getDate() - 6);
+  if (range === '30d') start.setDate(start.getDate() - 29);
+  return { since: start.getTime(), until };
 }
 
-export function buildInsightStats(
-  data: InsightStatsSourceData,
+export function buildInsightStatsFromFactsSnapshot(
+  snapshot: InsightFactsSnapshot,
   options?: { since?: number; until?: number },
 ): InsightStats {
   const stats = createEmptyInsightStats();
-  const since = Number(options?.since);
-  const until = Number(options?.until);
-  const hasRange = Number.isFinite(since) && Number.isFinite(until) && since > 0 && until > 0 && until >= since;
-
-  const chatSources = new Map<string, number>();
-  const articleDomains = new Map<string, number>();
-  const topConversations: InsightTopConversation[] = [];
-  const chatDailyCounts = new Map<number, number>();
-  const articleDailyCounts = new Map<number, number>();
-  let chatUnknownDateCount = 0;
-  let articleUnknownDateCount = 0;
-
-  for (const conversation of data.conversations) {
-    if (hasRange && !isWithinRange(conversation.lastCapturedAt, since, until)) {
-      continue;
-    }
-
-    const sourceType = normalizeSourceType(conversation.sourceType);
-    const dayStart = getStartOfLocalDay(Number(conversation.lastCapturedAt) || 0);
-
-    if (sourceType === 'chat') {
-      stats.chatCount += 1;
-      const sourceLabel = normalizeSourceLabel(conversation.source);
-      chatSources.set(sourceLabel, (chatSources.get(sourceLabel) || 0) + 1);
-
-      if (Number.isFinite(dayStart)) {
-        chatDailyCounts.set(dayStart, (chatDailyCounts.get(dayStart) || 0) + 1);
-      } else if (!hasRange) {
-        chatUnknownDateCount += 1;
-      }
-
-      const conversationId = Number(conversation.id);
-      const messageCount = Number(data.messageCounts.get(conversationId) || 0);
-      const openSource = safeString(conversation.source).toLowerCase();
-      const openConversationKey = safeString(conversation.conversationKey);
-      stats.totalMessages += messageCount;
-      topConversations.push({
-        conversationId,
-        title: normalizeConversationTitle(conversation.title),
-        messageCount,
-        source: sourceLabel,
-        openSource,
-        openConversationKey,
-        loc:
-          openSource && openConversationKey
-            ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey })
-            : '',
-      });
-      continue;
-    }
-
-    if (sourceType === 'article') {
-      stats.articleCount += 1;
-      const domain = parseHostname(conversation.url);
-      articleDomains.set(domain, (articleDomains.get(domain) || 0) + 1);
-
-      if (Number.isFinite(dayStart)) {
-        articleDailyCounts.set(dayStart, (articleDailyCounts.get(dayStart) || 0) + 1);
-      } else if (!hasRange) {
-        articleUnknownDateCount += 1;
-      }
-    }
-  }
-
-  stats.chatDailyTrend = buildDailyTrend({
-    counts: chatDailyCounts,
-    unknownCount: chatUnknownDateCount,
-    since: hasRange ? since : undefined,
-    until: hasRange ? until : undefined,
+  stats.chatCount = snapshot.chatCount;
+  stats.articleCount = snapshot.articleCount;
+  stats.totalClips = snapshot.chatCount + snapshot.articleCount;
+  stats.totalMessages = snapshot.totalMessages;
+  stats.chatDailyTrend = dailyTrendFromFacts(snapshot.chatDailyCounts, snapshot.chatUnknownDateCount, options);
+  stats.articleDailyTrend = dailyTrendFromFacts(snapshot.articleDailyCounts, snapshot.articleUnknownDateCount, options);
+  stats.chatSourceDistribution = distributionFromFacts(
+    snapshot.chatSourceCounts,
+    snapshot.chatOtherSourceCount,
+    normalizeSourceLabel,
+  );
+  stats.articleDomainDistribution = distributionFromFacts(
+    snapshot.articleDomainCounts,
+    snapshot.articleOtherDomainCount,
+    (value) => safeString(value) || INSIGHT_UNKNOWN_DOMAIN_LABEL,
+  );
+  stats.topConversations = snapshot.topConversations.map((conversation) => {
+    const openSource = safeString(conversation.source).toLowerCase();
+    const openConversationKey = safeString(conversation.conversationKey);
+    return {
+      conversationId: conversation.conversationId,
+      title: normalizeConversationTitle(conversation.title),
+      messageCount: conversation.messageCount,
+      source: normalizeSourceLabel(conversation.source),
+      openSource,
+      openConversationKey,
+      loc:
+        openSource && openConversationKey
+          ? encodeConversationLoc({ source: openSource, conversationKey: openConversationKey })
+          : '',
+    };
   });
-  stats.chatSourceDistribution = buildDistribution(chatSources, INSIGHT_CHAT_SOURCE_LIMIT);
-  stats.articleDomainDistribution = buildDistribution(articleDomains, INSIGHT_ARTICLE_DOMAIN_LIMIT);
-  stats.topConversations = topConversations
-    .sort((a, b) => {
-      if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
-      return b.conversationId - a.conversationId;
-    })
-    .slice(0, INSIGHT_TOP_CONVERSATION_LIMIT);
-  stats.totalClips = stats.chatCount + stats.articleCount;
-  stats.articleDailyTrend = buildDailyTrend({
-    counts: articleDailyCounts,
-    unknownCount: articleUnknownDateCount,
-    since: hasRange ? since : undefined,
-    until: hasRange ? until : undefined,
-  });
-
   return stats;
-}
-
-export async function getInsightStatsSourceData(): Promise<InsightStatsSourceData> {
-  const db = await openDb();
-  try {
-    const t = db.transaction(['conversations', 'messages'], 'readonly');
-    const conversationsStore = t.objectStore('conversations');
-    const messagesStore = t.objectStore('messages');
-
-    const [conversations, messageCounts] = await Promise.all([
-      readAllConversations(conversationsStore),
-      readMessageCounts(messagesStore),
-    ]);
-    await txDone(t);
-
-    return { conversations, messageCounts };
-  } finally {
-    db.close();
-  }
-}
-
-export async function getInsightStats(options?: { since?: number; until?: number }): Promise<InsightStats> {
-  const data = await getInsightStatsSourceData();
-  return buildInsightStats(data, options);
 }

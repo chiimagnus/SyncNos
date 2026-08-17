@@ -4,11 +4,13 @@ import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
 import {
   __closeDbForTests,
+  getInsightStats as getInsightFactsSnapshotFromIdb,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
 import {
-  getInsightStats,
+  buildInsightStatsFromFactsSnapshot,
+  getInsightTimeZone,
   INSIGHT_ARTICLE_DOMAIN_LIMIT,
   INSIGHT_CHAT_SOURCE_LIMIT,
   INSIGHT_OTHER_LABEL,
@@ -16,6 +18,10 @@ import {
   INSIGHT_UNTITLED_CONVERSATION,
 } from '../../src/viewmodels/settings/insight-stats';
 import { encodeConversationLoc } from '../../src/services/shared/conversation-loc';
+
+async function getInsightStats() {
+  return buildInsightStatsFromFactsSnapshot(await getInsightFactsSnapshotFromIdb({ timeZone: getInsightTimeZone() }));
+}
 
 async function deleteDb(name: string) {
   await new Promise<void>((resolve, reject) => {

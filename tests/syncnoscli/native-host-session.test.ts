@@ -432,6 +432,36 @@ describe('Native Host session', () => {
       conversationId,
       messages: [{ messageKey: 'm2' }],
     });
+
+    const insightOutput = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: openReadOnlyConnection,
+        openReadWriteForHost: openReadWriteConnection,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([
+          {
+            protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+            schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+            requestId: 'insight-1',
+            command: 'GET_INSIGHT_STATS',
+            payload: { timeZone: 'UTC' },
+          },
+        ]),
+        stdout: insightOutput.output,
+      }),
+    ).resolves.toBe(0);
+    const insight = await decodeHostJsonStream(await decodedMessages(insightOutput.frames));
+    expect(insight).toMatchObject({ chatCount: 2, articleCount: 0, totalMessages: 2 });
+    expect((insight as any).topConversations[0]).toMatchObject({
+      conversationId,
+      source: 'chatgpt',
+      conversationKey: 'newer',
+      messageCount: 2,
+    });
+    expect(openReadWriteConnection).not.toHaveBeenCalled();
   });
 
   it('routes typed conversation mutations through one read-write Host session', async () => {

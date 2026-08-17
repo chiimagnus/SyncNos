@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom';
 
 const mocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
+  getInsightFactsSnapshot: vi.fn(),
   startMigration: vi.fn(),
   resumeMigration: vi.fn(),
   send: vi.fn(),
@@ -20,6 +21,10 @@ vi.mock('@services/local-data/client', () => ({
   getLocalDataMigrationStatus: mocks.getStatus,
   startLocalDataMigration: mocks.startMigration,
   resumeLocalDataMigration: mocks.resumeMigration,
+}));
+
+vi.mock('@services/conversations/client/repo', () => ({
+  getInsightFactsSnapshot: mocks.getInsightFactsSnapshot,
 }));
 
 vi.mock('@services/shared/runtime', () => ({
@@ -187,6 +192,7 @@ describe('settings Local Database status controller', () => {
     setupDom();
     root = ReactDOM.createRoot(document.getElementById('root')!);
     mocks.getStatus.mockReset();
+    mocks.getInsightFactsSnapshot.mockReset();
     mocks.startMigration.mockReset();
     mocks.resumeMigration.mockReset();
     mocks.send.mockReset();
@@ -198,6 +204,28 @@ describe('settings Local Database status controller', () => {
     mocks.clipboardWrite.mockReset();
     mocks.clipboardWrite.mockResolvedValue(undefined);
     mocks.getStatus.mockResolvedValue(setupStatus());
+    mocks.getInsightFactsSnapshot.mockResolvedValue({
+      articleCount: 0,
+      articleDailyCounts: [],
+      articleDomainCounts: [],
+      articleOtherDomainCount: 0,
+      articleUnknownDateCount: 0,
+      chatCount: 1,
+      chatDailyCounts: [],
+      chatOtherSourceCount: 0,
+      chatSourceCounts: [{ key: 'chatgpt', count: 1 }],
+      chatUnknownDateCount: 0,
+      topConversations: [
+        {
+          conversationId: 91,
+          source: 'chatgpt',
+          conversationKey: 'native-thread',
+          title: 'Native thread',
+          messageCount: 3,
+        },
+      ],
+      totalMessages: 3,
+    });
     mocks.startMigration.mockResolvedValue(setupStatus('active'));
     mocks.resumeMigration.mockResolvedValue(setupStatus('active'));
     mocks.storageGet.mockResolvedValue({});
@@ -235,6 +263,28 @@ describe('settings Local Database status controller', () => {
       await latest.onLocalDataRetryStatus();
     });
     expect(mocks.getStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it('rechecks an active profile exactly once after Host repair without changing active ownership', async () => {
+    const unhealthy = {
+      ...setupStatus('active'),
+      host: { registration: 'unavailable', compatibility: 'unknown' } as const,
+      database: { presence: 'unknown', factsHealth: 'unknown' } as const,
+    } as LocalDataMigrationStatus;
+    mocks.getStatus.mockResolvedValueOnce(unhealthy).mockResolvedValueOnce(setupStatus('active'));
+
+    await renderSection('backup');
+    expect(mocks.getStatus).toHaveBeenCalledTimes(1);
+    expect(latest.localDataStatus?.profileState).toBe('active');
+    expect(latest.localDataStatus?.host.registration).toBe('unavailable');
+
+    await act(async () => {
+      await latest.onLocalDataRetryStatus();
+      await flush();
+    });
+    expect(mocks.getStatus).toHaveBeenCalledTimes(2);
+    expect(latest.localDataStatus?.profileState).toBe('active');
+    expect(latest.localDataStatus?.host).toEqual({ registration: 'available', compatibility: 'compatible' });
   });
 
   it('keeps Feishu OAuth polling on provider refreshInternal without probing Local Database status', async () => {
@@ -379,6 +429,73 @@ describe('settings Local Database status controller', () => {
     expect(mocks.clipboardWrite).toHaveBeenCalledTimes(1);
     expect(mocks.clipboardWrite).toHaveBeenCalledWith(text);
     expect(latest.localDataCopiedHelpText).toBe(text);
+  });
+
+  it('reloads About You through the backend-neutral Insight service after migration and ignores the stale pre-activation read', async () => {
+    const stale = deferred<any>();
+    const freshSnapshot = {
+      articleCount: 0,
+      articleDailyCounts: [],
+      articleDomainCounts: [],
+      articleOtherDomainCount: 0,
+      articleUnknownDateCount: 0,
+      chatCount: 1,
+      chatDailyCounts: [],
+      chatOtherSourceCount: 0,
+      chatSourceCounts: [{ key: 'gemini', count: 1 }],
+      chatUnknownDateCount: 0,
+      topConversations: [
+        {
+          conversationId: 92,
+          source: 'gemini',
+          conversationKey: 'native-after-migration',
+          title: 'Native after migration',
+          messageCount: 9,
+        },
+      ],
+      totalMessages: 9,
+    };
+    mocks.getInsightFactsSnapshot.mockImplementationOnce(() => stale.promise).mockResolvedValueOnce(freshSnapshot);
+
+    await renderSection('aboutyou');
+    expect(mocks.getInsightFactsSnapshot).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mocks.portListener?.({
+        type: UI_EVENT_TYPES.CONVERSATIONS_CHANGED,
+        payload: { reason: 'localDataMigrationActivated' },
+      });
+    });
+    await act(async () => {
+      await flush();
+      await flush();
+    });
+
+    expect(mocks.getInsightFactsSnapshot).toHaveBeenCalledTimes(2);
+    expect(latest.insightStats?.totalMessages).toBe(9);
+    expect(latest.insightStats?.topConversations[0]).toMatchObject({
+      openSource: 'gemini',
+      openConversationKey: 'native-after-migration',
+    });
+    expect(mocks.getInsightFactsSnapshot.mock.calls[1]?.[0]).toMatchObject({
+      timeZone: expect.any(String),
+      since: expect.any(Number),
+      until: expect.any(Number),
+    });
+
+    stale.resolve({
+      ...freshSnapshot,
+      chatSourceCounts: [{ key: 'chatgpt', count: 1 }],
+      topConversations: [
+        { conversationId: 1, source: 'chatgpt', conversationKey: 'stale-idb', title: 'Stale IDB', messageCount: 1 },
+      ],
+      totalMessages: 1,
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(latest.insightStats?.totalMessages).toBe(9);
+    expect(latest.insightStats?.topConversations[0]?.openConversationKey).toBe('native-after-migration');
   });
 
   it('marks status dirty on a coordinator event outside Backup without probing Native until Backup is entered', async () => {

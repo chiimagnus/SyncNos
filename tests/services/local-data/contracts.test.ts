@@ -138,7 +138,6 @@ describe('local data contracts', () => {
       'FACTS_EXPORT',
       'BACKUP_IMPORT',
       'BACKUP_EXPORT',
-      'GET_INSIGHT_STATS',
       'SEARCH_CONVERSATIONS',
       'GET_MIGRATION_RECEIPT',
     ]);
@@ -155,6 +154,24 @@ describe('local data contracts', () => {
       'STATS',
       'SEARCH_CONVERSATIONS',
     ]);
+  });
+
+  it('keeps Insight aggregation Host-only and requires an explicit valid IANA timezone', () => {
+    const request = parseHostFactsRequest(envelope('GET_INSIGHT_STATS', { timeZone: 'Asia/Tokyo' }));
+    expect(request).toMatchObject({ command: 'GET_INSIGHT_STATS', payload: { timeZone: 'Asia/Tokyo' } });
+
+    expectErrorCode(
+      () => parseHostFactsRequest(envelope('GET_INSIGHT_STATS', { timeZone: 'Not/A_Real_Zone' })),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () => parseHostFactsRequest(envelope('GET_INSIGHT_STATS', { timeZone: 'UTC', since: 100 })),
+      'INVALID_ARGUMENT',
+    );
+    expectErrorCode(
+      () => parseBrowserRuntimeFactsRequest(envelope('GET_INSIGHT_STATS', { timeZone: 'UTC' })),
+      'INVALID_ARGUMENT',
+    );
   });
 
   it('keeps browser profile epochs outside Host and CLI envelopes', () => {

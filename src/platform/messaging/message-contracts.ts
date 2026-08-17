@@ -17,6 +17,7 @@ export const CORE_MESSAGE_TYPES = {
   GET_CONVERSATION_SYNC_MAPPING: 'getConversationSyncMapping',
   GET_CONVERSATION_IMAGE_ASSET: 'getConversationImageAsset',
   GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY: 'getConversationTailWindowBySourceAndKey',
+  GET_INSIGHT_STATS: 'getInsightStats',
   DELETE_CONVERSATIONS: 'deleteConversations',
 } as const;
 

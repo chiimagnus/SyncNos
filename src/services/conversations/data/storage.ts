@@ -111,6 +111,10 @@ function createIdbConversationReadRepository(lease: FactsOperationLease): Conver
         messages: Array.isArray(result.messages) ? result.messages : [],
       };
     },
+    async getInsightStats(input) {
+      assertLease();
+      return await idb.getInsightStats(input);
+    },
     async searchConversationMentionCandidates(input) {
       assertLease();
       return await idb.searchConversationMentionCandidates(input);

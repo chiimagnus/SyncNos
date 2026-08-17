@@ -49,6 +49,7 @@ import {
   startLocalDataMigration,
 } from '@services/local-data/client';
 import type { LocalDataMigrationStatus } from '@services/local-data/migration-status';
+import { getInsightFactsSnapshot } from '@services/conversations/client/repo';
 import {
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,
@@ -71,11 +72,10 @@ import {
 } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
 import type { AntiHotlinkRuleValidationIssue } from '@services/integrations/anti-hotlink/anti-hotlink-settings';
 import {
-  buildInsightStats,
-  getInsightStatsSourceData,
+  buildInsightStatsFromFactsSnapshot,
   getInsightTimeRangeWindow,
+  getInsightTimeZone,
   type InsightStats,
-  type InsightStatsSourceData,
   type InsightTimeRange,
 } from '@viewmodels/settings/insight-stats';
 
@@ -313,8 +313,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [insightLoading, setInsightLoading] = useState(false);
   const [insightError, setInsightError] = useState('');
   const [hasLoadedInsight, setHasLoadedInsight] = useState(false);
-  const [insightRange, setInsightRange] = useState<InsightTimeRange>('7d');
-  const insightSourceDataRef = useRef<InsightStatsSourceData | null>(null);
+  const [insightRange, setInsightRangeState] = useState<InsightTimeRange>('7d');
   const insightRequestSeqRef = useRef(0);
   const [aboutYouUserName, setAboutYouUserName] = useState<string>('');
 
@@ -383,7 +382,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (message?.type !== UI_EVENT_TYPES.CONVERSATIONS_CHANGED) return;
       if (String(message?.payload?.reason || '') !== 'localDataMigrationActivated') return;
       insightRequestSeqRef.current += 1;
-      insightSourceDataRef.current = null;
       setInsightStats(null);
       setInsightError('');
       setInsightLoading(false);
@@ -1354,13 +1352,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     insightRequestSeqRef.current = requestSeq;
     setInsightLoading(true);
     setInsightError('');
+    const window = getInsightTimeRangeWindow(insightRange);
+    const ranged = window.since > 0 && window.until >= window.since;
 
-    void getInsightStatsSourceData()
-      .then((data) => {
+    void getInsightFactsSnapshot({
+      timeZone: getInsightTimeZone(),
+      ...(ranged ? window : {}),
+    })
+      .then((snapshot) => {
         if (requestSeq !== insightRequestSeqRef.current) return;
-        insightSourceDataRef.current = data;
-        const window = getInsightTimeRangeWindow(insightRange);
-        setInsightStats(buildInsightStats(data, window));
+        setInsightStats(buildInsightStatsFromFactsSnapshot(snapshot, ranged ? window : undefined));
       })
       .catch((error) => {
         if (requestSeq !== insightRequestSeqRef.current) return;
@@ -1373,14 +1374,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       });
   }, [activeSection, hasLoadedInsight, insightLoading, insightRange]);
 
-  useEffect(() => {
-    if (activeSection !== 'aboutyou') return;
-    const data = insightSourceDataRef.current;
-    if (!data) return;
-
-    const window = getInsightTimeRangeWindow(insightRange);
-    setInsightStats(buildInsightStats(data, window));
-  }, [activeSection, insightRange]);
+  const setInsightRange = useCallback((next: InsightTimeRange) => {
+    insightRequestSeqRef.current += 1;
+    setInsightStats(null);
+    setInsightError('');
+    setInsightLoading(false);
+    setHasLoadedInsight(false);
+    setInsightRangeState(next);
+  }, []);
 
   const onResetChatWithPlatforms = useCallback(async () => {
     await runTask(async () => {
