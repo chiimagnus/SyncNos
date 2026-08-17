@@ -1,4 +1,4 @@
-import { access, chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -267,6 +267,75 @@ describe('SyncNos doctor', () => {
     expect(repairDatabasePermissions).toHaveBeenCalledWith(paths);
     expect(report.actions).toContainEqual({ name: 'database_permissions', status: 'repaired', reason: null });
     expect(report.database).toMatchObject({ state: 'ready', filePermissions: 'private', factsRevision: 0 });
+  });
+
+  it('detects and repairs insecure WAL/SHM permissions even when the main database is already private', async () => {
+    const paths = await temporaryPaths();
+    const writable = await openReadWriteForHost({ paths });
+    try {
+      await access(paths.databaseWalPath);
+      await access(paths.databaseShmPath);
+      await chmod(paths.databasePath, 0o600);
+      await chmod(paths.databaseWalPath, 0o644);
+      await chmod(paths.databaseShmPath, 0o644);
+
+      const before = await runDoctor(
+        doctorInput(paths, {
+          inspectLauncher: async () => ownedLauncher(paths),
+          inspectRegistrations: async () => ownedRegistrations(),
+          openReadOnly: vi.fn(async () => {
+            throw new Error('must not open an insecure database set');
+          }),
+        }),
+      );
+      expect(before.database).toMatchObject({ state: 'invalid', filePermissions: 'insecure' });
+
+      const report = await runDoctor({
+        ...doctorInput(paths, {
+          inspectGlobalInstall: async () => globalInstall(packageRoot),
+          inspectLauncher: async () => ownedLauncher(paths),
+          inspectRegistrations: async () => ownedRegistrations(),
+        }),
+        fix: true,
+      });
+
+      expect(report.actions).toContainEqual({ name: 'database_permissions', status: 'repaired', reason: null });
+      expect(report.database).toMatchObject({ state: 'ready', filePermissions: 'private' });
+      expect((await lstat(paths.databasePath)).mode & 0o777).toBe(0o600);
+      expect((await lstat(paths.databaseWalPath)).mode & 0o777).toBe(0o600);
+      expect((await lstat(paths.databaseShmPath)).mode & 0o777).toBe(0o600);
+    } finally {
+      writable.close();
+    }
+  });
+
+  it('treats a WAL sidecar symlink as invalid instead of attempting an owner-permission repair', async () => {
+    const paths = await temporaryPaths();
+    const writable = await openReadWriteForHost({ paths });
+    writable.close();
+    await rm(paths.databaseWalPath, { force: true });
+    const foreignWal = join(paths.homeDirectory, 'foreign-wal');
+    await writeFile(foreignWal, 'foreign');
+    await symlink(foreignWal, paths.databaseWalPath);
+    const repairDatabasePermissions = vi.fn(async () => undefined);
+
+    const report = await runDoctor({
+      ...doctorInput(paths, {
+        inspectGlobalInstall: async () => globalInstall(packageRoot),
+        inspectLauncher: async () => ownedLauncher(paths),
+        inspectRegistrations: async () => ownedRegistrations(),
+        repairDatabasePermissions,
+      }),
+      fix: true,
+    });
+
+    expect(report.database).toMatchObject({ state: 'invalid', filePermissions: 'invalid' });
+    expect(report.actions).toContainEqual({
+      name: 'database_permissions',
+      status: 'not_needed',
+      reason: 'database_permissions_invalid',
+    });
+    expect(repairDatabasePermissions).not.toHaveBeenCalled();
   });
 
   it('emits the versioned JSON envelope for doctor and rejects unknown doctor flags without text-only errors', async () => {

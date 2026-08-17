@@ -167,6 +167,25 @@ describe('SyncNos SQLite open policy', () => {
     expect((await lstat(paths.databasePath)).mode & 0o777).toBe(0o600);
   });
 
+  it('rejects insecure WAL/SHM sidecars before loading the native addon on read-only opens', async () => {
+    const paths = await temporaryPaths();
+    const writable = await openReadWriteForHost({ paths });
+    writable.close();
+    await writeFile(paths.databaseWalPath, 'sidecar');
+    await writeFile(paths.databaseShmPath, 'sidecar');
+    await chmod(paths.databaseWalPath, 0o644);
+    await chmod(paths.databaseShmPath, 0o644);
+    const loadNativeAddon = vi.fn(() => {
+      throw new NativeAddonError();
+    });
+
+    await expect(openReadOnly({ paths, dependencies: { loadNativeAddon } })).rejects.toSatisfy((error: unknown) => {
+      expectLocalError(error, 'JOURNAL_CORRUPT');
+      return true;
+    });
+    expect(loadNativeAddon).not.toHaveBeenCalled();
+  });
+
   it('maps SQLite operational failures to public structured codes', () => {
     expect(mapSqliteError({ code: 'SQLITE_BUSY' }).code).toBe('BUSY');
     expect(mapSqliteError({ code: 'SQLITE_LOCKED' }).code).toBe('BUSY');

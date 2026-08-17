@@ -218,6 +218,26 @@ function databaseStateForError(
   }
 }
 
+async function databaseFilePermissions(
+  paths: SyncNosRuntimePaths,
+  dependencies: ResolvedDoctorDependencies,
+): Promise<CliDoctorFilePermission> {
+  const database = await lstatIfPresent(dependencies, paths.databasePath);
+  const primary = filePermission(paths, database, dependencies, 'database');
+  if (primary !== 'private' && primary !== 'platform_managed') return primary;
+
+  const sidecars = await Promise.all(
+    [paths.databaseWalPath, paths.databaseShmPath].map(async (path) =>
+      filePermission(paths, await lstatIfPresent(dependencies, path), dependencies, 'database'),
+    ),
+  );
+  const present = sidecars.filter((permission) => permission !== 'not_present');
+  if (present.includes('invalid')) return 'invalid';
+  if (present.includes('unavailable')) return 'unavailable';
+  if (present.includes('insecure')) return 'insecure';
+  return primary;
+}
+
 async function inspectDatabase(
   paths: SyncNosRuntimePaths,
   runtime: RuntimeSnapshot,
@@ -253,12 +273,7 @@ async function inspectDatabase(
       fts: null,
     });
   }
-  const filePermissions = filePermission(
-    paths,
-    await lstatIfPresent(dependencies, paths.databasePath),
-    dependencies,
-    'database',
-  );
+  const filePermissions = await databaseFilePermissions(paths, dependencies);
   if (filePermissions === 'not_present') {
     return Object.freeze({
       state: 'not_initialized',
