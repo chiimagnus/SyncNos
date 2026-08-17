@@ -93,6 +93,7 @@ export function useConversationSearchSheet(
   const [result, setResult] = useState<ConversationSearchResultState | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchErrorCode, setSearchErrorCode] = useState<string | null>(null);
   const [capabilityLoading, setCapabilityLoading] = useState(false);
   const [cursorStale, setCursorStale] = useState(false);
   const [preview, setPreview] = useState<ConversationSearchPreviewState>(EMPTY_PREVIEW);
@@ -112,6 +113,7 @@ export function useConversationSearchSheet(
     searchGenerationRef.current += 1;
     setSearchLoading(false);
     setSearchError(null);
+    setSearchErrorCode(null);
     setCursorStale(false);
     setResult((current) => (current ? Object.freeze({ ...current, cursor: null, hasMore: false }) : current));
   }, []);
@@ -124,6 +126,7 @@ export function useConversationSearchSheet(
     setDraft(createDraft(input.listSourceFilterKey, input.listSiteFilterKey));
     setResult(null);
     setSearchError(null);
+    setSearchErrorCode(null);
     setCursorStale(false);
   }, [input.listSiteFilterKey, input.listSourceFilterKey, invalidateSearch]);
 
@@ -134,6 +137,7 @@ export function useConversationSearchSheet(
     setDraft(createDraft(input.listSourceFilterKey, input.listSiteFilterKey));
     setResult(null);
     setSearchError(null);
+    setSearchErrorCode(null);
     setCursorStale(false);
     setCapabilityLoading(true);
     try {
@@ -207,6 +211,7 @@ export function useConversationSearchSheet(
     const requestId = nextRequestId();
     setSearchLoading(true);
     setSearchError(null);
+    setSearchErrorCode(null);
     setCursorStale(false);
     setPreview(EMPTY_PREVIEW);
     try {
@@ -227,6 +232,7 @@ export function useConversationSearchSheet(
     } catch (error) {
       if (generation !== searchGenerationRef.current) return;
       setSearchError(errorMessage(error));
+      setSearchErrorCode(errorCode(error) || null);
       setResult(null);
     } finally {
       if (generation === searchGenerationRef.current) setSearchLoading(false);
@@ -241,6 +247,7 @@ export function useConversationSearchSheet(
     const requestId = nextRequestId();
     setSearchLoading(true);
     setSearchError(null);
+    setSearchErrorCode(null);
     setCursorStale(false);
     const request: ConversationSearchRequest = {
       requestId,
@@ -272,6 +279,7 @@ export function useConversationSearchSheet(
         setCursorStale(true);
       } else {
         setSearchError(errorMessage(error));
+        setSearchErrorCode(errorCode(error) || null);
       }
     } finally {
       if (generation === searchGenerationRef.current) setSearchLoading(false);
@@ -322,6 +330,7 @@ export function useConversationSearchSheet(
     draft,
     result,
     searchError,
+    searchErrorCode,
     searchLoading,
     capabilityLoading,
     cursorStale,

@@ -37,6 +37,7 @@ export type ConversationSearchSheetController = Readonly<{
   draft: ConversationSearchDraft;
   result: ConversationSearchResultState | null;
   searchError: string | null;
+  searchErrorCode: string | null;
   searchLoading: boolean;
   capabilityLoading: boolean;
   cursorStale: boolean;

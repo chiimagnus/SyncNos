@@ -34,6 +34,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     },
     openConversationExternalBySourceKey: vi.fn(),
     openConversationExternalById: vi.fn(),
+    listFacets: { sources: [], sites: [] },
+    localSearchSheet: { mode: 'closed', capabilityLoading: false, close: vi.fn() },
   }),
 }));
 

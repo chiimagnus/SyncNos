@@ -165,6 +165,7 @@ function buildState(overrides: Record<string, unknown> = {}) {
     listSiteFilterKey: 'all',
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
+    openLocalSearch: vi.fn(async () => {}),
     pendingListLocateId: null,
     requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),
@@ -217,6 +218,32 @@ describe('ConversationListPane pagination behaviors', () => {
       await flushMicrotasks();
     });
   }
+
+  it('opens local search without mutating persistent filters and hides the entry during batch selection', async () => {
+    const openLocalSearch = vi.fn(async () => {});
+    const setSource = vi.fn();
+    const setSite = vi.fn();
+    currentState = buildState({
+      openLocalSearch,
+      setListSourceFilterKeyPersistent: setSource,
+      setListSiteFilterKeyPersistent: setSite,
+    });
+    await renderPane();
+
+    const search = document.querySelector('button[aria-label="localSearchOpenAria"]') as HTMLButtonElement | null;
+    expect(search).toBeTruthy();
+    await act(async () => {
+      search!.click();
+      await flushMicrotasks();
+    });
+    expect(openLocalSearch).toHaveBeenCalledTimes(1);
+    expect(setSource).not.toHaveBeenCalled();
+    expect(setSite).not.toHaveBeenCalled();
+
+    currentState = { ...currentState, selectedIds: [11] };
+    await renderPane();
+    expect(document.querySelector('button[aria-label="localSearchOpenAria"]')?.className).toContain('tw-hidden');
+  });
 
   it('triggers auto pagination near bottom and respects gate conditions', async () => {
     const loadMoreList = vi.fn(async () => {});

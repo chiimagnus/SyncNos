@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 
 import type { Conversation, ConversationFactsReference } from '@services/conversations/domain/models';
 import { getConversationDetail } from '@services/conversations/client/repo';
@@ -161,6 +162,7 @@ export function ConversationListPane({
     loadingMoreList,
     setListSourceFilterKeyPersistent,
     setListSiteFilterKeyPersistent,
+    openLocalSearch,
     pendingListLocateId,
     consumeListLocate,
     loadMoreList,
@@ -919,6 +921,20 @@ export function ConversationListPane({
                 options={siteOptions.map((opt) => ({ value: opt.key, label: opt.label }))}
               />
             ) : null}
+
+            <button
+              type="button"
+              className={[
+                buttonTintClassName(),
+                hasSelection ? 'tw-hidden' : 'tw-inline-flex tw-shrink-0 tw-items-center tw-gap-1.5',
+              ].join(' ')}
+              aria-label={t('localSearchOpenAria')}
+              onClick={() => void openLocalSearch()}
+              {...tooltipAttrs(t('localSearchOpenAria'))}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden="true" />
+              <span>{t('localSearchOpen')}</span>
+            </button>
 
             <div
               id="chatActionButtons"

@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
@@ -10,6 +7,8 @@ const sceneState = vi.hoisted(() => ({
   isNarrow: true,
   route: 'list' as 'list' | 'detail' | 'comments',
   listRestoreKey: 0,
+  searchMode: 'closed' as 'closed' | 'disabled' | 'search',
+  closeSearch: vi.fn(),
   openDetail: vi.fn(),
   openComments: vi.fn(),
   returnToDetail: vi.fn(),
@@ -58,6 +57,28 @@ vi.mock('@viewmodels/conversations/conversations-context', () => ({
     },
     openConversationExternalBySourceKey: vi.fn(),
     openConversationExternalById: vi.fn(),
+    listFacets: { sources: [], sites: [] },
+    localSearchSheet: {
+      mode: sceneState.searchMode,
+      draft: { query: '', sourceKey: 'all', siteKey: 'all', sort: 'best' },
+      result: null,
+      searchError: null,
+      searchErrorCode: null,
+      searchLoading: false,
+      capabilityLoading: false,
+      cursorStale: false,
+      preview: { detail: null, error: null, loading: false, reference: null },
+      close: sceneState.closeSearch,
+      openLocalSearch: vi.fn(),
+      setQuery: vi.fn(),
+      setSourceKey: vi.fn(),
+      setSiteKey: vi.fn(),
+      setSort: vi.fn(),
+      submit: vi.fn(),
+      loadMore: vi.fn(),
+      selectResult: vi.fn(),
+      clearPreview: vi.fn(),
+    },
   }),
 }));
 
@@ -94,6 +115,8 @@ describe('ConversationsScene search overlay host', () => {
     sceneState.isNarrow = true;
     sceneState.route = 'list';
     sceneState.listRestoreKey = 0;
+    sceneState.searchMode = 'closed';
+    sceneState.closeSearch.mockReset();
     sceneState.openDetail.mockReset();
     sceneState.openComments.mockReset();
     sceneState.returnToDetail.mockReset();
@@ -145,9 +168,25 @@ describe('ConversationsScene search overlay host', () => {
     expect(document.querySelector('[data-scene-detail]')).toBeTruthy();
   });
 
-  it('does not couple the host refactor to the future search sheet implementation', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/ui/conversations/ConversationsScene.tsx'), 'utf8');
-    expect(source).not.toContain('ConversationSearchSheet');
-    expect(source).toContain('data-conversations-scene-overlay-host');
+  it('makes the stable underlay inert while the same-root search modal is open and restores it on close', () => {
+    renderScene();
+    const sceneRoot = document.querySelector('[data-conversations-scene-root]');
+    const underlay = document.querySelector('[data-conversations-scene-underlay]');
+    const overlayHost = document.querySelector('[data-conversations-scene-overlay-host]');
+
+    sceneState.searchMode = 'disabled';
+    renderScene();
+    expect(document.querySelector('[data-conversations-scene-root]')).toBe(sceneRoot);
+    expect(document.querySelector('[data-conversations-scene-underlay]')).toBe(underlay);
+    expect(document.querySelector('[data-conversations-scene-overlay-host]')).toBe(overlayHost);
+    expect(underlay?.getAttribute('inert')).toBe('');
+    expect(underlay?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).toHaveLength(1);
+
+    sceneState.searchMode = 'closed';
+    renderScene();
+    expect(underlay?.hasAttribute('inert')).toBe(false);
+    expect(underlay?.hasAttribute('aria-hidden')).toBe(false);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 });

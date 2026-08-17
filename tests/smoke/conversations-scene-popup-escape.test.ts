@@ -69,6 +69,8 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     loadingMoreList: false,
     setListSourceFilterKeyPersistent: vi.fn(),
     setListSiteFilterKeyPersistent: vi.fn(),
+    openLocalSearch: vi.fn(async () => {}),
+    localSearchSheet: { mode: 'closed', capabilityLoading: false, close: vi.fn() },
     pendingListLocateId: null,
     requestListLocate: vi.fn(),
     consumeListLocate: vi.fn(() => null),

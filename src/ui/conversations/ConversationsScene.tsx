@@ -13,6 +13,7 @@ import type {
 } from '@ui/comments';
 import { ConversationDetailPane } from '@ui/conversations/ConversationDetailPane';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
+import { ConversationSearchSheet } from '@ui/conversations/ConversationSearchSheet';
 import { ArticleCommentsSection } from '@ui/conversations/ArticleCommentsSection';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
@@ -71,8 +72,13 @@ export function ConversationsScene({
   wideChrome = 'card',
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { selectedConversation, openConversationExternalBySourceKey, openConversationExternalById } =
-    useConversationsApp();
+  const {
+    selectedConversation,
+    openConversationExternalBySourceKey,
+    openConversationExternalById,
+    localSearchSheet,
+    listFacets,
+  } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,
@@ -92,6 +98,7 @@ export function ConversationsScene({
     (typeof onOpenCommentsExternally === 'function' || Boolean(commentsSidebarRuntime)) &&
     commentsSidebarEnabled &&
     Boolean(selectedConversationCanonicalUrl);
+  const searchSheetVisible = localSearchSheet.capabilityLoading || localSearchSheet.mode !== 'closed';
 
   useEffect(() => {
     if (!isNarrow) return;
@@ -220,12 +227,38 @@ export function ConversationsScene({
     );
   }
 
+  const openSearchResultAsConversation = async (result: { source: string; conversationKey: string }) => {
+    localSearchSheet.close();
+    await openConversationExternalBySourceKey(result.source, result.conversationKey);
+    if (isNarrow) openDetail();
+  };
+
+  const openLocalDatabaseSettings = () => {
+    localSearchSheet.close();
+    onOpenSettingsSection?.('backup');
+  };
+
   return (
     <div data-conversations-scene-root="" className={sceneRootClassName}>
-      <div data-conversations-scene-underlay="" className="tw-contents">
+      <div
+        data-conversations-scene-underlay=""
+        className="tw-contents"
+        inert={searchSheetVisible ? true : undefined}
+        aria-hidden={searchSheetVisible ? true : undefined}
+      >
         {underlyingScene}
       </div>
-      <div data-conversations-scene-overlay-host="" className="tw-pointer-events-none tw-absolute tw-inset-0" />
+      <div data-conversations-scene-overlay-host="" className="tw-contents">
+        {searchSheetVisible ? (
+          <ConversationSearchSheet
+            controller={localSearchSheet}
+            initialFacets={listFacets}
+            onClose={localSearchSheet.close}
+            onOpenFullConversation={(result) => void openSearchResultAsConversation(result)}
+            onOpenSettings={openLocalDatabaseSettings}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
