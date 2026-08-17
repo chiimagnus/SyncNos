@@ -241,6 +241,27 @@ describe('conversation search sheet viewmodel', () => {
     expect(client.search).toHaveBeenCalledTimes(2);
   });
 
+  it('marks focus-refreshed results stale without auto-searching and only clears the notice on explicit resubmit', async () => {
+    await act(async () => latest.openLocalSearch());
+    act(() => latest.setQuery('hello'));
+    await act(async () => latest.submit());
+    await act(async () => latest.selectResult(firstPage.items[0] as any));
+    expect(latest.preview.detail).not.toBeNull();
+
+    act(() => latest.markResultsStale());
+    expect(latest.cursorStale).toBe(true);
+    expect(latest.result?.items).toEqual(firstPage.items);
+    expect(latest.result?.cursor).toBeNull();
+    expect(latest.result?.hasMore).toBe(false);
+    expect(latest.preview).toMatchObject({ loading: false, detail: null, reference: null });
+    expect(client.search).toHaveBeenCalledTimes(1);
+
+    client.search.mockResolvedValueOnce({ requestId: 'req-2', page: { ...firstPage, cursor: null, hasMore: false } });
+    await act(async () => latest.submit());
+    expect(client.search).toHaveBeenCalledTimes(2);
+    expect(latest.cursorStale).toBe(false);
+  });
+
   it('lets a newer explicit submit supersede an older response', async () => {
     await act(async () => latest.openLocalSearch());
     const first = deferred<any>();

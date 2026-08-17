@@ -312,6 +312,18 @@ export function useConversationSearchSheet(
     setPreview(EMPTY_PREVIEW);
   }, []);
 
+  const markResultsStale = useCallback(() => {
+    if (mode !== 'search' || (!result && !searchLoading)) return;
+    searchGenerationRef.current += 1;
+    previewGenerationRef.current += 1;
+    setSearchLoading(false);
+    setSearchError(null);
+    setSearchErrorCode(null);
+    setResult((current) => (current ? Object.freeze({ ...current, cursor: null, hasMore: false }) : current));
+    setCursorStale(true);
+    setPreview(EMPTY_PREVIEW);
+  }, [mode, result, searchLoading]);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -346,5 +358,6 @@ export function useConversationSearchSheet(
     loadMore,
     selectResult,
     clearPreview,
+    markResultsStale,
   });
 }

@@ -4,6 +4,8 @@ import { Buffer } from 'node:buffer';
 import {
   createSearchCursorBinding,
   LocalDataContractError,
+  MAX_SEARCH_PAGE_LIMIT,
+  MAX_SEARCH_SNIPPET_BYTES,
   parseNormalizedSearchQuery,
   parsePlainSnippetHighlights,
   type LocalDataSearchFacet,
@@ -191,7 +193,7 @@ function normalizeRequest(input: SearchRequestPayload): NormalizedSearchRequest 
   const sort = input.sort ?? 'best';
   if (sort !== 'best' && sort !== 'recent') invalidArgument();
   return Object.freeze({
-    limit: listQuery.limit,
+    limit: Math.min(listQuery.limit, MAX_SEARCH_PAGE_LIMIT),
     query,
     scope: Object.freeze({ siteKey, sourceKey }),
     sort,
@@ -415,7 +417,83 @@ function parseMarkedSnippet(
     if (snippet.length > start) highlights.push({ end: snippet.length, start });
     cursor = markerEnd + markers.end.length;
   }
-  return Object.freeze({ highlights: parsePlainSnippetHighlights(snippet, highlights), snippet });
+  return boundSearchSnippet(snippet, parsePlainSnippetHighlights(snippet, highlights));
+}
+
+function utf8PrefixEnd(value: string, maxBytes: number): number {
+  let bytes = 0;
+  let offset = 0;
+  for (const scalar of value) {
+    const nextBytes = Buffer.byteLength(scalar, 'utf8');
+    if (bytes + nextBytes > maxBytes) break;
+    bytes += nextBytes;
+    offset += scalar.length;
+  }
+  return offset;
+}
+
+function utf8SuffixStart(value: string, maxBytes: number): number {
+  let bytes = 0;
+  let offset = value.length;
+  while (offset > 0) {
+    let start = offset - 1;
+    const current = value.charCodeAt(start);
+    if (current >= 0xdc00 && current <= 0xdfff && start > 0) {
+      const previous = value.charCodeAt(start - 1);
+      if (previous >= 0xd800 && previous <= 0xdbff) start -= 1;
+    }
+    const nextBytes = Buffer.byteLength(value.slice(start, offset), 'utf8');
+    if (bytes + nextBytes > maxBytes) break;
+    bytes += nextBytes;
+    offset = start;
+  }
+  return offset;
+}
+
+function boundSearchSnippet(
+  snippet: string,
+  highlights: readonly { end: number; start: number }[],
+): Readonly<{ highlights: readonly { end: number; start: number }[]; snippet: string }> {
+  if (Buffer.byteLength(snippet, 'utf8') <= MAX_SEARCH_SNIPPET_BYTES) {
+    return Object.freeze({ highlights, snippet });
+  }
+
+  const ellipsis = '…';
+  const ellipsisBytes = Buffer.byteLength(ellipsis, 'utf8');
+  const anchor = highlights[0];
+  if (!anchor) {
+    const end = utf8PrefixEnd(snippet, MAX_SEARCH_SNIPPET_BYTES - ellipsisBytes);
+    return Object.freeze({ highlights: Object.freeze([]), snippet: `${snippet.slice(0, end)}${ellipsis}` });
+  }
+
+  const core = snippet.slice(anchor.start, anchor.end);
+  const coreBytes = Buffer.byteLength(core, 'utf8');
+  const contextBudget = MAX_SEARCH_SNIPPET_BYTES - coreBytes - ellipsisBytes * 2;
+  if (contextBudget < 0) throw new LocalDataContractError('PAYLOAD_TOO_LARGE');
+
+  const left = snippet.slice(0, anchor.start);
+  const right = snippet.slice(anchor.end);
+  const leftBudget = Math.floor(contextBudget / 2);
+  const rightBudget = contextBudget - leftBudget;
+  const leftStart = utf8SuffixStart(left, leftBudget);
+  const rightEnd = utf8PrefixEnd(right, rightBudget);
+  const cutLeft = leftStart > 0;
+  const cutRight = rightEnd < right.length;
+  const prefix = cutLeft ? ellipsis : '';
+  const suffix = cutRight ? ellipsis : '';
+  const windowStart = leftStart;
+  const windowEnd = anchor.end + rightEnd;
+  const bounded = `${prefix}${snippet.slice(windowStart, windowEnd)}${suffix}`;
+  const boundedHighlights = highlights
+    .filter((range) => range.end > windowStart && range.start < windowEnd)
+    .map((range) => ({
+      start: prefix.length + Math.max(range.start, windowStart) - windowStart,
+      end: prefix.length + Math.min(range.end, windowEnd) - windowStart,
+    }));
+  return Object.freeze({
+    highlights: Object.freeze(parsePlainSnippetHighlights(bounded, boundedHighlights)),
+    snippet: bounded,
+  });
 }
 
 function sortFacets(items: LocalDataSearchFacet[]): readonly LocalDataSearchFacet[] {
@@ -741,7 +819,7 @@ function literalSnippet(
   const highlights = parsePlainSnippetHighlights(snippet, [
     { end: highlightStart + literal.length, start: highlightStart },
   ]);
-  return Object.freeze({ highlights, snippet });
+  return boundSearchSnippet(snippet, highlights);
 }
 
 function fallbackResult(match: FallbackMatch, literal: string): LocalDataSearchResult {

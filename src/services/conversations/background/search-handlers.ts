@@ -3,6 +3,7 @@ import type { ConversationReadRunner } from '@services/conversations/data/storag
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
+  MAX_ORDINARY_FACTS_RESPONSE_BYTES,
   LocalDataContractError,
   parseBrowserRuntimeFactsRequest,
   type SearchRequestPayload,
@@ -72,7 +73,17 @@ export function registerConversationSearchHandlers(
           return await repository.searchConversations(request.payload);
         },
       });
-      return router.ok(Object.freeze({ requestId: request.requestId, page }));
+      const response = Object.freeze({ requestId: request.requestId, page });
+      const serialized = JSON.stringify(response);
+      if (typeof serialized !== 'string') throw new LocalDataContractError('PROTOCOL_MISMATCH');
+      const actualBytes = new TextEncoder().encode(serialized).byteLength;
+      if (actualBytes > MAX_ORDINARY_FACTS_RESPONSE_BYTES) {
+        throw new LocalDataContractError('PAYLOAD_TOO_LARGE', {
+          actualBytes,
+          limitBytes: MAX_ORDINARY_FACTS_RESPONSE_BYTES,
+        });
+      }
+      return router.ok(response);
     } catch (error) {
       return errorResponse(router, error);
     }

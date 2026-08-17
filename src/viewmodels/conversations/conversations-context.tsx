@@ -516,6 +516,7 @@ export function ConversationsProvider({
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
   const localSearchSheet = useConversationSearchSheet({ listSourceFilterKey, listSiteFilterKey });
+  const markLocalSearchResultsStale = localSearchSheet.markResultsStale;
   const activeConversationSnapshotRef = useRef<ConversationListOpenTarget | null>(null);
   const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(
     null,
@@ -1160,8 +1161,9 @@ export function ConversationsProvider({
 
   useEffect(() => {
     const monitor = localRevisionMonitorRef.current!;
+    if (!listFactsEpoch) return;
     monitor.setFactsEpoch(listFactsEpoch);
-    if (!String(listFactsEpoch || '').startsWith('native:')) return;
+    if (!String(listFactsEpoch).startsWith('native:')) return;
 
     const refreshStableSnapshot = async () => {
       const active = activeConversationSnapshotRef.current as any;
@@ -1172,9 +1174,14 @@ export function ConversationsProvider({
       await refreshList({ migrationReselect });
     };
     const probeRevision = () => {
-      void monitor.checkForExternalChange(refreshStableSnapshot).catch(() => {
-        // Focus refresh is best-effort; normal facts operations keep their own epoch/lease safety.
-      });
+      void monitor
+        .checkForExternalChange(refreshStableSnapshot)
+        .then((changed) => {
+          if (changed) markLocalSearchResultsStale();
+        })
+        .catch(() => {
+          // Focus refresh is best-effort; normal facts operations keep their own epoch/lease safety.
+        });
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') probeRevision();
@@ -1186,7 +1193,7 @@ export function ConversationsProvider({
       window.removeEventListener('focus', probeRevision);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [listFactsEpoch, refreshList]);
+  }, [listFactsEpoch, markLocalSearchResultsStale, refreshList]);
 
   useEffect(() => {
     let cancelled = false;

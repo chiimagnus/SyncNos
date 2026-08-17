@@ -10,6 +10,8 @@ const MEBIBYTE = KIBIBYTE * KIBIBYTE;
 const MAX_PROTOCOL_TEXT_LENGTH = 4096;
 const MAX_CURSOR_LENGTH = 4096;
 const MAX_PAGE_LIMIT = 200;
+export const MAX_SEARCH_PAGE_LIMIT = 50;
+export const MAX_SEARCH_SNIPPET_BYTES = 4 * KIBIBYTE;
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -723,6 +725,12 @@ function parseSearchFacet(value: unknown): LocalDataSearchFacet {
   });
 }
 
+function parseSearchSnippet(value: unknown): string {
+  const snippet = parseSearchDisplayText(value, 16 * 1024);
+  if (new TextEncoder().encode(snippet).byteLength > MAX_SEARCH_SNIPPET_BYTES) fail('PROTOCOL_MISMATCH');
+  return snippet;
+}
+
 function parseSearchResult(value: unknown): LocalDataSearchResult {
   const input = record(value);
   exactKeys(input, [
@@ -738,7 +746,7 @@ function parseSearchResult(value: unknown): LocalDataSearchResult {
     'title',
     'url',
   ]);
-  const snippet = parseSearchDisplayText(input.snippet, 16 * 1024);
+  const snippet = parseSearchSnippet(input.snippet);
   const score = input.score === null ? null : Number(input.score);
   if (score !== null && !Number.isFinite(score)) fail('PROTOCOL_MISMATCH');
   return Object.freeze({
@@ -766,6 +774,7 @@ export function parseLocalDataSearchPage(value: unknown): LocalDataSearchPage {
   if (!Array.isArray(facets.sites) || !Array.isArray(facets.sources) || !Array.isArray(input.items)) {
     fail('PROTOCOL_MISMATCH');
   }
+  if (input.items.length > MAX_SEARCH_PAGE_LIMIT) fail('PROTOCOL_MISMATCH');
   if (typeof input.hasMore !== 'boolean' || typeof input.truncatedByScanLimit !== 'boolean') fail('PROTOCOL_MISMATCH');
   let cursor: SearchCursorBinding | null = null;
   if (input.cursor !== null) {
@@ -2081,7 +2090,7 @@ function parseSearchRequestPayload(value: unknown): SearchRequestPayload {
   allowedKeys(input, ['query', 'cursor', 'limit', 'siteKey', 'sort', 'sourceKey']);
   const query = parseNormalizedSearchQuery(input.query);
   const cursor = hasOwn(input, 'cursor') ? parseSearchCursorBinding(input.cursor, query) : undefined;
-  const limit = hasOwn(input, 'limit') ? parsePositiveSafeInteger(input.limit, MAX_PAGE_LIMIT) : undefined;
+  const limit = hasOwn(input, 'limit') ? parsePositiveSafeInteger(input.limit, MAX_SEARCH_PAGE_LIMIT) : undefined;
   const siteKey = parseOptionalText(input, 'siteKey');
   const sort = hasOwn(input, 'sort') ? parseEnum(input.sort, ['best', 'recent'] as const) : undefined;
   const sourceKey = parseOptionalText(input, 'sourceKey');
@@ -2100,7 +2109,7 @@ function parseBrowserSearchRequestPayload(value: unknown): SearchRequestPayload 
   allowedKeys(input, ['query', 'cursor', 'limit', 'siteKey', 'sort', 'sourceKey']);
   const query = normalizeSearchQuery(input.query);
   const cursor = hasOwn(input, 'cursor') ? parseSearchCursorBinding(input.cursor, query) : undefined;
-  const limit = hasOwn(input, 'limit') ? parsePositiveSafeInteger(input.limit, MAX_PAGE_LIMIT) : undefined;
+  const limit = hasOwn(input, 'limit') ? parsePositiveSafeInteger(input.limit, MAX_SEARCH_PAGE_LIMIT) : undefined;
   const siteKey = parseOptionalText(input, 'siteKey');
   const sort = hasOwn(input, 'sort') ? parseEnum(input.sort, ['best', 'recent'] as const) : undefined;
   const sourceKey = parseOptionalText(input, 'sourceKey');

@@ -52,4 +52,5 @@ export type ConversationSearchSheetController = Readonly<{
   loadMore: () => Promise<void>;
   selectResult: (result: LocalDataSearchResult) => Promise<void>;
   clearPreview: () => void;
+  markResultsStale: () => void;
 }>;
