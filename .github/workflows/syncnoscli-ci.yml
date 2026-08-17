@@ -6,6 +6,7 @@ on:
     paths:
       - packages/syncnoscli/**
       - tests/syncnoscli/**
+      - tests/e2e/**
       - src/services/local-data/**
       - src/services/conversations/domain/**
       - src/services/comments/domain/**
@@ -70,6 +71,9 @@ jobs:
 
       - name: Test CLI workspace contracts
         run: npm run test:syncnoscli
+
+      - name: Validate release evidence schema
+        run: npm run test -- tests/e2e/local-data-release-evidence.test.ts
 
       - name: Inspect npm pack contents
         run: npm run pack:syncnoscli

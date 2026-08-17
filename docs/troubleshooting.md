@@ -42,6 +42,12 @@ Safari 的 canonical contract 明确 `localDataSupported: false`，没有 Local 
 
 如果 Trusted Publisher/OIDC 尚未配置，发布必须失败关闭；不要临时向 workflow 填长期 publish credential，也不要从 normal CI、browser release/prerelease 或 Chrome/Edge/AMO store workflow 调用 npm publish。
 
+### Local Data release evidence（maintainer）
+
+正式 release readiness 还要求 [`tests/e2e/local-data-release-matrix.md`](../tests/e2e/local-data-release-matrix.md) 的人工证据完成。CI 只验证 schema、三 OS packed CLI、final browser artifact contract 等自动部分，不能用 unpacked/dev extension ID、fake Host 或 repository variable 冒充 Chrome/Edge/Firefox 真机连接。Edge 必须额外由 owner 确认 Partner Center product GUID 对应实际公开 runtime ID；Windows 必须确认 Host 是 PE shim 且 one-shot/disconnect 后 shim 与 Node child 都退出。
+
+matrix 中任何正式 desktop、Safari regression 或 recovery regression 仍为 `pending`/`fail` 时，`releaseReady` 必须保持 `false`。严格 Snap/Flatpak 只能记录为 `unsupported_strict_sandbox` observation，不能作为正式 Linux browser pass。release evidence 完成也不是 npm publish 授权；真实 npm publish 仍受上面的 manual dispatch + environment approval 边界约束。
+
 ## 评论精确定位
 
 在 App DevTools Console 设置 `localStorage.setItem('__SYNCNOS_DEBUG_COMMENTS_SELECTION__', '1')` 后重载，复现时检查 `[CommentsSelection][app]` 和 `[CommentsLocate]`。依次确认 surface root、exact/context、context generation，以及是否属于 iframe、closed shadow root 或跨 root 歧义。失败必须保留明确 reason；不要用模糊匹配或滚动兜底。
