@@ -34,6 +34,14 @@ Safari 的 canonical contract 明确 `localDataSupported: false`，没有 Local 
 
 不要直接编辑 SyncNos SQLite schema/SQL、Windows registry、Native Host manifest/allowlist、`.syncnoscli` 固定路径或 migration journal；这些都会绕过 ownership/identity 校验，并可能把可恢复状态变成冲突状态。
 
+### npm 发布（repository owner）
+
+首次公开发布 `@chiimagnus/syncnoscli` 前，owner 需要在 npm 外部确认 `@chiimagnus` scope/registry 状态，并为 GitHub repository 配置 npm Trusted Publisher：workflow filename 必须是 `syncnoscli-publish.yml`，environment 必须与 `syncnoscli-npm-publish` 精确一致，并只授权 `npm publish`。仓库不保存长期 publish credential。
+
+`.github/workflows/syncnoscli-publish.yml` 只能手工 `workflow_dispatch`，要求输入 package version 和精确 confirmation，先验证 Windows PE provenance、tarball install 与 `npm publish --dry-run --access public`，最后在受保护 repository environment 审批后才允许 `npm publish --provenance --access public`。这份 workflow 的存在不是发布授权；每次真实 publish 都需要 owner 当次显式触发和 environment approval。
+
+如果 Trusted Publisher/OIDC 尚未配置，发布必须失败关闭；不要临时向 workflow 填长期 publish credential，也不要从 normal CI、browser release/prerelease 或 Chrome/Edge/AMO store workflow 调用 npm publish。
+
 ## 评论精确定位
 
 在 App DevTools Console 设置 `localStorage.setItem('__SYNCNOS_DEBUG_COMMENTS_SELECTION__', '1')` 后重载，复现时检查 `[CommentsSelection][app]` 和 `[CommentsLocate]`。依次确认 surface root、exact/context、context generation，以及是否属于 iframe、closed shadow root 或跨 root 歧义。失败必须保留明确 reason；不要用模糊匹配或滚动兜底。

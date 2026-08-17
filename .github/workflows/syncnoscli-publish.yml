@@ -1,0 +1,179 @@
+name: SyncNos CLI Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: Exact packages/syncnoscli package version
+        required: true
+        type: string
+      confirmation:
+        description: Exact confirmation, for example PUBLISH @chiimagnus/syncnoscli@0.1.0
+        required: true
+        type: string
+
+concurrency:
+  group: syncnoscli-npm-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  windows-prebuilds:
+    name: Rebuild Windows Native Host PE
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Require default branch dispatch
+        run: node -e "if(process.env.GITHUB_REF!=='refs/heads/main') process.exit(1)"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Install
+        run: npm ci
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+
+      - name: Build CLI and Native Host entrypoints
+        run: npm run build:syncnoscli
+
+      - name: Rebuild x64 and arm64 PE shims
+        shell: pwsh
+        run: npm run build:windows-host-shim --workspace=@chiimagnus/syncnoscli
+
+      - name: Verify source hash, artifact hashes, PE architecture, and runtime exit
+        run: npm run test -- tests/syncnoscli/windows-host-shim.test.ts tests/syncnoscli/windows-native-host-runtime.test.ts
+
+      - name: Upload verified Windows prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: syncnoscli-windows-prebuilds
+          path: packages/syncnoscli/prebuilds
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-package:
+    name: Verify exact publish tarball
+    needs: windows-prebuilds
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Use Trusted Publishing-capable npm CLI
+        run: npm install --global npm@11.18.0
+
+      - name: Install
+        run: npm ci
+
+      - name: Download verified Windows prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          name: syncnoscli-windows-prebuilds
+          path: packages/syncnoscli/prebuilds
+
+      - name: Verify requested version and repository-local publish invariants
+        run: node .github/scripts/syncnoscli/check-publish-readiness.mjs --offline --expected-version="$EXPECTED_VERSION" --confirmation="$PUBLISH_CONFIRMATION"
+        env:
+          EXPECTED_VERSION: ${{ inputs.package_version }}
+          PUBLISH_CONFIRMATION: ${{ inputs.confirmation }}
+
+      - name: Verify rebuilt PE artifacts still match this checkout source
+        run: npm run test -- tests/syncnoscli/windows-host-shim.test.ts
+
+      - name: Compile and test CLI
+        run: npm run compile:syncnoscli && npm run build:syncnoscli && npm run test:syncnoscli
+
+      - name: Exercise disposable packed global lifecycle
+        run: npm run test -- tests/syncnoscli/packed-install.test.ts
+        env:
+          SYNCNOSCLI_DISPOSABLE_RUNNER: '1'
+          SYNCNOSCLI_PACKED_INSTALL_E2E: '1'
+
+      - name: Prepare isolated tarball directory
+        run: node -e "require('node:fs').mkdirSync('.artifacts',{recursive:true})"
+
+      - name: Pack exact tarball
+        run: npm pack --workspace=@chiimagnus/syncnoscli --json --pack-destination .artifacts
+
+      - name: Resolve exact tarball path
+        id: tarball
+        run: node -e "const fs=require('node:fs'); const p=require('node:path'); const files=fs.readdirSync('.artifacts').filter((v)=>v.endsWith('.tgz')); const expected='chiimagnus-syncnoscli-'+process.env.EXPECTED_VERSION+'.tgz'; if(files.length!==1||files[0]!==expected) process.exit(1); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'path='+p.join('.artifacts',files[0])+'\n');"
+        env:
+          EXPECTED_VERSION: ${{ inputs.package_version }}
+
+      - name: Dry-run public npm publish
+        run: npm publish "$TARBALL" --dry-run --access public --tag latest
+        env:
+          TARBALL: ${{ steps.tarball.outputs.path }}
+
+      - name: Upload exact verified tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: syncnoscli-verified-package
+          path: ${{ steps.tarball.outputs.path }}
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish approved tarball to npm
+    needs: verify-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: syncnoscli-npm-publish
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Use Trusted Publishing-capable npm CLI
+        run: npm install --global npm@11.18.0
+
+      - name: Reconfirm version and manual authorization boundary
+        run: node .github/scripts/syncnoscli/check-publish-readiness.mjs --expected-version="$EXPECTED_VERSION" --confirmation="$PUBLISH_CONFIRMATION"
+        env:
+          EXPECTED_VERSION: ${{ inputs.package_version }}
+          PUBLISH_CONFIRMATION: ${{ inputs.confirmation }}
+
+      - name: Download exact verified tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: syncnoscli-verified-package
+          path: .artifacts
+
+      - name: Resolve exact tarball path
+        id: tarball
+        run: node -e "const fs=require('node:fs'); const p=require('node:path'); const files=fs.readdirSync('.artifacts').filter((v)=>v.endsWith('.tgz')); const expected='chiimagnus-syncnoscli-'+process.env.EXPECTED_VERSION+'.tgz'; if(files.length!==1||files[0]!==expected) process.exit(1); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'path='+p.join('.artifacts',files[0])+'\n');"
+        env:
+          EXPECTED_VERSION: ${{ inputs.package_version }}
+
+      - name: Publish with npm Trusted Publishing OIDC
+        run: npm publish "$TARBALL" --provenance --access public --tag latest
+        env:
+          TARBALL: ${{ steps.tarball.outputs.path }}

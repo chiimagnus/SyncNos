@@ -3,12 +3,22 @@
   "version": "0.1.0",
   "description": "Local, on-demand SyncNos SQLite CLI and Native Host.",
   "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SyncNos/SyncNos-Webclipper.git"
+  },
   "type": "commonjs",
   "bin": {
     "syncnoscli": "dist/cli.cjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/",
+    "tag": "latest"
   },
   "files": [
     "dist/**",

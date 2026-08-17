@@ -24,4 +24,6 @@ Successful data commands print a versioned JSON envelope by default. `--format t
 
 The CLI package has its own semantic version; it is not required to equal the WebClipper/WXT version. Compatibility is defined by the canonical Native Host protocol/schema contract shipped from the same source commit.
 
+Publishing is deliberately separate from browser releases. A repository owner must manually dispatch the protected npm publish workflow with the exact package version and confirmation string; the final publish job requires repository environment approval and npm Trusted Publishing/OIDC. Normal CI, installation, browser release/prerelease, and store workflows never publish this package.
+
 Architecture and storage authority: [`docs/storage.md`](../../docs/storage.md). Installation, Native Host, sandbox, and recovery guidance: [`docs/troubleshooting.md`](../../docs/troubleshooting.md#local-database).
