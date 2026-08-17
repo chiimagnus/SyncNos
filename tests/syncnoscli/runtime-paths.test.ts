@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { nativeHostContract } from '../../src/services/local-data/native-host-contract';
 import {
   assertRuntimeOwnedFilePath,
   classifySyncNosRuntimePath,
@@ -44,7 +45,8 @@ function expectPathError(callback: () => unknown, code: SyncNosRuntimePathError[
 }
 
 describe('SyncNos CLI runtime paths', () => {
-  it('uses one fixed hidden path on every supported operating system', () => {
+  it('uses the canonical contract database name in one fixed hidden path on every supported operating system', () => {
+    expect(nativeHostContract.host.databaseRelativePath).toBe('syncnos.sqlite');
     expect(resolveSyncNosRuntimePaths({ platform: 'darwin', homeDirectory: '/Users/chii' })).toMatchObject({
       runtimeDirectory: '/Users/chii/.syncnoscli',
       databasePath: '/Users/chii/.syncnoscli/syncnos.sqlite',
