@@ -73,6 +73,11 @@ jobs:
             --zip \
             --zip-name="SyncNos-WebClipper-firefox.xpi"
 
+      - name: Verify Firefox runtime identity
+        run: node .github/scripts/webclipper/check-store-identity.mjs --browser=firefox
+        env:
+          STORE_EXTENSION_ID: ${{ secrets.AMO_ADDON_ID }}
+
       - name: Build AMO source zip
         run: node .github/scripts/webclipper/package-amo-source.mjs
 

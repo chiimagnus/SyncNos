@@ -46,6 +46,9 @@ jobs:
       - name: WebClipper gate (lint/format/compile/test)
         run: npm run gate:ci
 
+      - name: Verify CLI release package integrity
+        run: npm run build:syncnoscli && npm run pack:syncnoscli
+
       - name: Build WebClipper Chrome zip
         run: |
           set -euo pipefail

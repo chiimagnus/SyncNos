@@ -100,6 +100,11 @@ jobs:
             --zip \
             --zip-name="SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip"
 
+      - name: Verify Chrome runtime identity
+        run: node .github/scripts/webclipper/check-store-identity.mjs --browser=chrome
+        env:
+          STORE_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+
       # Required secrets:
       # - CWS_EXTENSION_ID
       # - CWS_CLIENT_ID

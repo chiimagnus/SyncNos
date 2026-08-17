@@ -13,7 +13,7 @@ function stringLen(value) {
 }
 
 function parseArgs(argv) {
-  const args = { root: null, manifest: null };
+  const args = { root: null, manifest: null, target: null };
   for (let i = 0; i < argv.length; i += 1) {
     const raw = argv[i];
     if (raw === '--root') {
@@ -34,6 +34,15 @@ function parseArgs(argv) {
       args.manifest = raw.slice('--manifest='.length) || args.manifest;
       continue;
     }
+    if (raw === '--target') {
+      args.target = argv[i + 1] || args.target;
+      i += 1;
+      continue;
+    }
+    if (raw.startsWith('--target=')) {
+      args.target = raw.slice('--target='.length) || args.target;
+      continue;
+    }
   }
   return args;
 }
@@ -49,6 +58,9 @@ const webclipperRoot = resolveWebclipperRoot(repoRoot);
 const root = cli.root ? join(repoRoot, cli.root) : join(webclipperRoot, '.output', 'chrome-mv3');
 
 const manifestPath = cli.manifest ? join(root, cli.manifest) : join(root, 'manifest.json');
+const contract = JSON.parse(
+  readFileSync(join(webclipperRoot, 'src', 'services', 'local-data', 'native-host-contract.json'), 'utf8'),
+);
 if (!existsSync(manifestPath)) {
   fail(`manifest.json missing: ${manifestPath} (run \`npm run build\` first)`);
 }
@@ -60,10 +72,20 @@ try {
   fail(`manifest.json parse error: ${e?.message || e}`);
 }
 
-const isSafariBuild = String(root).includes('safari-mv3');
+const inferredTarget = String(root).includes('safari-mv3')
+  ? 'safari'
+  : String(root).includes('firefox')
+    ? 'firefox'
+    : String(root).includes('edge')
+      ? 'edge'
+      : 'chrome';
+const target = cli.target || inferredTarget;
+if (!['chrome', 'edge', 'firefox', 'safari'].includes(target)) fail(`unknown target: ${target}`);
+const isSafariBuild = target === 'safari';
 const hasNativeMessaging = Array.isArray(manifest.permissions) && manifest.permissions.includes('nativeMessaging');
 
 if (manifest.manifest_version !== 3) fail('manifest_version must be 3');
+if (manifest.key !== undefined) fail('release manifest must not contain a Chromium key');
 if (
   !manifest.background?.service_worker &&
   !(Array.isArray(manifest.background?.scripts) && manifest.background.scripts.length > 0)
@@ -75,6 +97,17 @@ if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length 
 if (!manifest.icons?.['16'] || !manifest.icons?.['48'] || !manifest.icons?.['128']) fail('icons 16/48/128 missing');
 if (isSafariBuild ? hasNativeMessaging : !hasNativeMessaging) {
   fail(isSafariBuild ? 'Safari manifest must not request nativeMessaging' : 'nativeMessaging permission missing');
+}
+if (target === 'firefox') {
+  const gecko = manifest.browser_specific_settings?.gecko;
+  if (
+    gecko?.id !== contract?.browsers?.firefox?.geckoId ||
+    gecko?.strict_min_version !== contract?.browsers?.firefox?.strictMinVersion
+  ) {
+    fail('Firefox manifest identity does not match the native host contract');
+  }
+} else if (manifest.browser_specific_settings?.gecko !== undefined) {
+  fail('non-Firefox release manifest must not contain Gecko identity');
 }
 
 for (const size of [16, 48, 128]) {

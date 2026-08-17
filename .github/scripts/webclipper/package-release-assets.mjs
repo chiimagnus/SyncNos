@@ -6,10 +6,15 @@ function parseArgs(argv) {
   const args = {
     target: 'chrome',
     outDir: null,
+    fixture: false,
     zip: false,
     zipName: null,
   };
   for (const raw of argv) {
+    if (raw === '--fixture') {
+      args.fixture = true;
+      continue;
+    }
     if (raw === '--zip') {
       args.zip = true;
       continue;
@@ -117,10 +122,15 @@ const webclipperRoot = resolveWebclipperRoot(repoRoot);
 const cli = parseArgs(process.argv.slice(2));
 const target = String(cli.target || 'chrome');
 if (!['chrome', 'edge', 'firefox'].includes(target)) throw new Error(`Unknown release target: ${target}`);
+if (cli.fixture && (cli.outDir || cli.zip || cli.zipName)) {
+  throw new Error('--fixture cannot be combined with --out, --zip, or --zip-name');
+}
 if (target === 'firefox') assertNoReleaseIdentityOverride();
 const firefoxContract = target === 'firefox' ? readNativeHostContract(webclipperRoot) : null;
 const distDirName = cli.outDir || (target === 'firefox' ? 'dist-firefox' : target === 'edge' ? 'dist-edge' : 'dist');
-const dist = join(webclipperRoot, distDirName);
+const dist = cli.fixture
+  ? join(webclipperRoot, '.output', 'release-contract', target)
+  : join(webclipperRoot, distDirName);
 
 const wxtScript = target === 'firefox' ? 'build:firefox' : 'build';
 run('npm', ['run', wxtScript], webclipperRoot);

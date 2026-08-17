@@ -90,10 +90,17 @@ jobs:
             --zip \
             --zip-name="SyncNos-WebClipper-edge-${{ steps.tag.outputs.name }}.zip"
 
+      - name: Verify Edge runtime identity
+        run: node .github/scripts/webclipper/check-store-identity.mjs --browser=edge
+        env:
+          STORE_EXTENSION_ID: ${{ vars.EDGE_EXTENSION_ID }}
+
+      # Required repository variable:
+      # - EDGE_EXTENSION_ID (public Edge runtime extension ID)
       # Required secrets:
       # - EDGE_ADDONS_CLIENT_ID
       # - EDGE_ADDONS_API_KEY
-      # - EDGE_ADDONS_PRODUCT_ID
+      # - EDGE_ADDONS_PRODUCT_ID (Partner Center product GUID; upload only)
       - name: Upload/Publish to Edge Add-ons
         run: node .github/scripts/webclipper/publish-edge.mjs
         env:
