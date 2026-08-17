@@ -254,8 +254,27 @@ describe('backup backup-utils', () => {
     expect(merged.lastSyncedMessageUpdatedAt).toBe(456);
   });
 
-  it('mergeSyncMappingRecord never turns a cleared null cursor field into a synthetic zero timestamp', () => {
-    const merged = mergeSyncMappingRecord(
+  it('mergeSyncMappingRecord preserves legacy numeric-string cursor metadata without turning cleared null into zero', () => {
+    const legacy = mergeSyncMappingRecord(
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+      },
+      {
+        source: 'chatgpt',
+        conversationKey: 'c1',
+        lastSyncedMessageKey: 'm2',
+        lastSyncedSequence: '2',
+        lastSyncedAt: '200',
+        lastSyncedMessageUpdatedAt: '456',
+      },
+    );
+
+    expect(legacy.lastSyncedSequence).toBe(2);
+    expect(legacy.lastSyncedAt).toBe(200);
+    expect(legacy.lastSyncedMessageUpdatedAt).toBe(456);
+
+    const cleared = mergeSyncMappingRecord(
       {
         source: 'chatgpt',
         conversationKey: 'c1',
@@ -274,7 +293,7 @@ describe('backup backup-utils', () => {
       },
     );
 
-    expect(merged.lastSyncedMessageKey).toBe('m1');
-    expect(merged.lastSyncedMessageUpdatedAt).toBeNull();
+    expect(cleared.lastSyncedMessageKey).toBe('m1');
+    expect(cleared.lastSyncedMessageUpdatedAt).toBeNull();
   });
 });

@@ -707,7 +707,9 @@ function pickStringPreferExisting(existing: unknown, incoming: unknown): string 
 }
 
 function safeFiniteNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
