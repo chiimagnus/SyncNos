@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 
 import { t } from '@i18n';
@@ -10,6 +10,7 @@ import { ConversationSearchDisabledPrompt } from '@ui/conversations/Conversation
 import { ConversationSearchPreview } from '@ui/conversations/ConversationSearchPreview';
 import { ConversationSearchResults } from '@ui/conversations/ConversationSearchResults';
 import { SelectMenu } from '@ui/shared/SelectMenu';
+import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { buttonFilledClassName, buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 
 const FOCUSABLE_SELECTOR = [
@@ -88,10 +89,13 @@ export function ConversationSearchSheet({
   onOpenFullConversation,
   onOpenSettings,
 }: ConversationSearchSheetProps) {
+  const isNarrow = useIsNarrowScreen();
+  const [narrowPane, setNarrowPane] = useState<'results' | 'preview'>('results');
   const panelRef = useRef<HTMLDivElement | null>(null);
   const queryRef = useRef<HTMLInputElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const restoreSelectedResultFocusRef = useRef(false);
   const resultFacets = controller.result?.facets;
   const sourceOptions = useMemo(
     () =>
@@ -138,6 +142,27 @@ export function ConversationSearchSheet({
     return () => window.clearTimeout(timer);
   }, [controller.capabilityLoading, controller.mode]);
 
+  useLayoutEffect(() => {
+    if (!isNarrow) return;
+    if (narrowPane === 'preview') {
+      panelRef.current?.querySelector<HTMLElement>('[data-conversation-search-preview-back]')?.focus();
+      return;
+    }
+    if (!restoreSelectedResultFocusRef.current) return;
+    restoreSelectedResultFocusRef.current = false;
+    panelRef.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')?.focus();
+  }, [isNarrow, narrowPane]);
+
+  const returnToNarrowResults = () => {
+    restoreSelectedResultFocusRef.current = true;
+    setNarrowPane('results');
+  };
+
+  const selectResult = (result: LocalDataSearchResult) => {
+    if (isNarrow) setNarrowPane('preview');
+    void controller.selectResult(result);
+  };
+
   const trapFocus = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -146,7 +171,9 @@ export function ConversationSearchSheet({
       return;
     }
     if (event.key !== 'Tab') return;
-    const focusable = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []);
+    const focusable = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
+      (element) => !element.closest('[hidden], [inert]'),
+    );
     if (!focusable.length) {
       event.preventDefault();
       panelRef.current?.focus();
@@ -166,7 +193,10 @@ export function ConversationSearchSheet({
 
   return (
     <div
-      className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4"
+      className={[
+        'tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center',
+        isNarrow ? 'tw-p-0' : 'tw-p-4',
+      ].join(' ')}
       role="dialog"
       aria-modal="true"
       aria-label={t('localSearchDialogAria')}
@@ -185,7 +215,12 @@ export function ConversationSearchSheet({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="tw-relative tw-z-10 tw-flex tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1120px,calc(100vw-40px))] tw-min-w-0 tw-flex-col tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-shadow-2xl"
+        className={[
+          'tw-relative tw-z-10 tw-flex tw-min-w-0 tw-flex-col tw-overflow-hidden tw-bg-[var(--bg-card)] tw-shadow-2xl',
+          isNarrow
+            ? 'tw-h-full tw-w-full tw-rounded-none tw-border-0'
+            : 'tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1120px,calc(100vw-40px))] tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)]',
+        ].join(' ')}
         onPointerDown={(event) => event.stopPropagation()}
       >
         <button
@@ -209,81 +244,120 @@ export function ConversationSearchSheet({
           <ConversationSearchDisabledPrompt onOpenSettings={onOpenSettings} />
         ) : (
           <>
-            <form
-              className="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-p-3 tw-pr-12"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (canSubmit) void controller.submit();
-              }}
-            >
-              <label className="tw-relative tw-min-w-[220px] tw-flex-1">
-                <span className="tw-sr-only">{t('localSearchQueryAria')}</span>
-                <Search
-                  size={15}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                  className="tw-pointer-events-none tw-absolute tw-left-3 tw-top-1/2 -tw-translate-y-1/2 tw-text-[var(--text-secondary)]"
-                />
-                <input
-                  ref={queryRef}
-                  value={controller.draft.query}
-                  onChange={(event) => controller.setQuery(event.target.value)}
-                  placeholder={t('localSearchQueryPlaceholder')}
-                  aria-label={t('localSearchQueryAria')}
-                  className="tw-h-9 tw-w-full tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pl-9 tw-pr-3 tw-text-sm tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]"
-                />
-              </label>
-              <SelectMenu<string>
-                value={controller.draft.sourceKey}
-                onChange={controller.setSourceKey}
-                ariaLabel={t('localSearchSourceFilterAria')}
-                minWidth={150}
-                options={sourceOptions}
-              />
-              {showSiteFilter ? (
+            {!isNarrow || narrowPane === 'results' ? (
+              <form
+                className="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-primary)] tw-p-3 tw-pr-12"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (canSubmit) void controller.submit();
+                }}
+              >
+                <label className="tw-relative tw-min-w-[220px] tw-flex-1">
+                  <span className="tw-sr-only">{t('localSearchQueryAria')}</span>
+                  <Search
+                    size={15}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                    className="tw-pointer-events-none tw-absolute tw-left-3 tw-top-1/2 -tw-translate-y-1/2 tw-text-[var(--text-secondary)]"
+                  />
+                  <input
+                    ref={queryRef}
+                    value={controller.draft.query}
+                    onChange={(event) => controller.setQuery(event.target.value)}
+                    placeholder={t('localSearchQueryPlaceholder')}
+                    aria-label={t('localSearchQueryAria')}
+                    className="tw-h-9 tw-w-full tw-rounded-[var(--radius-control)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-pl-9 tw-pr-3 tw-text-sm tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                  />
+                </label>
                 <SelectMenu<string>
-                  value={controller.draft.siteKey}
-                  onChange={controller.setSiteKey}
-                  ariaLabel={t('localSearchSiteFilterAria')}
-                  minWidth={160}
-                  options={siteOptions}
+                  value={controller.draft.sourceKey}
+                  onChange={controller.setSourceKey}
+                  ariaLabel={t('localSearchSourceFilterAria')}
+                  minWidth={150}
+                  options={sourceOptions}
                 />
-              ) : null}
-              <SelectMenu<'best' | 'recent'>
-                value={controller.draft.sort}
-                onChange={controller.setSort}
-                ariaLabel={t('localSearchSortAria')}
-                minWidth={140}
-                options={[
-                  { value: 'best', label: t('localSearchSortBest') },
-                  { value: 'recent', label: t('localSearchSortRecent') },
-                ]}
-              />
-              <button type="submit" className={buttonFilledClassName()} disabled={!canSubmit}>
-                {t('localSearchSearchAction')}
-              </button>
-            </form>
+                {showSiteFilter ? (
+                  <SelectMenu<string>
+                    value={controller.draft.siteKey}
+                    onChange={controller.setSiteKey}
+                    ariaLabel={t('localSearchSiteFilterAria')}
+                    minWidth={160}
+                    options={siteOptions}
+                  />
+                ) : null}
+                <SelectMenu<'best' | 'recent'>
+                  value={controller.draft.sort}
+                  onChange={controller.setSort}
+                  ariaLabel={t('localSearchSortAria')}
+                  minWidth={140}
+                  options={[
+                    { value: 'best', label: t('localSearchSortBest') },
+                    { value: 'recent', label: t('localSearchSortRecent') },
+                  ]}
+                />
+                <button type="submit" className={buttonFilledClassName()} disabled={!canSubmit}>
+                  {t('localSearchSearchAction')}
+                </button>
+              </form>
+            ) : null}
 
-            <div
-              className="tw-grid tw-min-h-0 tw-flex-1 tw-grid-cols-[minmax(280px,0.9fr)_minmax(0,1.1fr)]"
-              aria-busy={controller.searchLoading}
-            >
-              <ConversationSearchResults
-                query={controller.draft.query}
-                result={controller.result}
-                loading={controller.searchLoading}
-                errorMessage={errorMessage}
-                cursorStale={controller.cursorStale}
-                selectedReference={controller.preview.reference}
-                onSelect={(result) => void controller.selectResult(result)}
-                onLoadMore={() => void controller.loadMore()}
-              />
-              <ConversationSearchPreview
-                preview={controller.preview}
-                selectedResult={selectedResult}
-                onOpenFullConversation={onOpenFullConversation}
-              />
-            </div>
+            {isNarrow ? (
+              <div className="tw-relative tw-min-h-0 tw-flex-1" aria-busy={controller.searchLoading}>
+                <div
+                  data-conversation-search-narrow-results=""
+                  className="tw-h-full"
+                  hidden={narrowPane !== 'results'}
+                  inert={narrowPane !== 'results' ? true : undefined}
+                  aria-hidden={narrowPane !== 'results' ? true : undefined}
+                >
+                  <ConversationSearchResults
+                    query={controller.draft.query}
+                    result={controller.result}
+                    loading={controller.searchLoading}
+                    errorMessage={errorMessage}
+                    cursorStale={controller.cursorStale}
+                    selectedReference={controller.preview.reference}
+                    onSelect={selectResult}
+                    onLoadMore={() => void controller.loadMore()}
+                  />
+                </div>
+                <div
+                  data-conversation-search-narrow-preview=""
+                  className="tw-h-full"
+                  hidden={narrowPane !== 'preview'}
+                  inert={narrowPane !== 'preview' ? true : undefined}
+                  aria-hidden={narrowPane !== 'preview' ? true : undefined}
+                >
+                  <ConversationSearchPreview
+                    preview={controller.preview}
+                    selectedResult={selectedResult}
+                    onBack={returnToNarrowResults}
+                    onOpenFullConversation={onOpenFullConversation}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                className="tw-grid tw-min-h-0 tw-flex-1 tw-grid-cols-[minmax(280px,0.9fr)_minmax(0,1.1fr)]"
+                aria-busy={controller.searchLoading}
+              >
+                <ConversationSearchResults
+                  query={controller.draft.query}
+                  result={controller.result}
+                  loading={controller.searchLoading}
+                  errorMessage={errorMessage}
+                  cursorStale={controller.cursorStale}
+                  selectedReference={controller.preview.reference}
+                  onSelect={selectResult}
+                  onLoadMore={() => void controller.loadMore()}
+                />
+                <ConversationSearchPreview
+                  preview={controller.preview}
+                  selectedResult={selectedResult}
+                  onOpenFullConversation={onOpenFullConversation}
+                />
+              </div>
+            )}
           </>
         )}
       </div>

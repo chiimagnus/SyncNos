@@ -315,6 +315,7 @@ export function useConversationSearchSheet(
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (mode !== 'closed' || capabilityLoading) return;
       if (event.defaultPrevented || event.isComposing || event.key.toLowerCase() !== 'k') return;
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
       if (isEditableTarget(event.target)) return;
@@ -323,7 +324,7 @@ export function useConversationSearchSheet(
     };
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [openLocalSearch]);
+  }, [capabilityLoading, mode, openLocalSearch]);
 
   return Object.freeze({
     mode,

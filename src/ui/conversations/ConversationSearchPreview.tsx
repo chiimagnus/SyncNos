@@ -1,23 +1,41 @@
+import { ChevronLeft } from 'lucide-react';
+
 import { t } from '@i18n';
 import type { LocalDataSearchResult } from '@services/local-data/contracts';
 import type { ConversationSearchPreviewState } from '@viewmodels/conversations/search-sheet-types';
-import { buttonFilledClassName } from '@ui/shared/button-styles';
+import { buttonFilledClassName, buttonIconCircleGhostClassName } from '@ui/shared/button-styles';
 
 export type ConversationSearchPreviewProps = Readonly<{
   preview: ConversationSearchPreviewState;
   selectedResult: LocalDataSearchResult | null;
+  onBack?: () => void;
   onOpenFullConversation: (result: LocalDataSearchResult) => void;
 }>;
 
 export function ConversationSearchPreview({
   preview,
   selectedResult,
+  onBack,
   onOpenFullConversation,
 }: ConversationSearchPreviewProps) {
   return (
-    <section aria-label={t('localSearchPreviewAria')} className="tw-flex tw-min-h-0 tw-flex-col tw-bg-[var(--bg-card)]">
+    <section
+      aria-label={t('localSearchPreviewAria')}
+      className="tw-flex tw-h-full tw-min-h-0 tw-flex-col tw-bg-[var(--bg-card)]"
+    >
       <div className="tw-flex tw-min-h-14 tw-items-center tw-justify-between tw-gap-3 tw-border-b tw-border-[var(--border)] tw-px-4 tw-py-2">
-        <div className="tw-min-w-0">
+        {onBack ? (
+          <button
+            type="button"
+            data-conversation-search-preview-back=""
+            className={buttonIconCircleGhostClassName()}
+            aria-label={t('backButton')}
+            onClick={onBack}
+          >
+            <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
+          </button>
+        ) : null}
+        <div className="tw-min-w-0 tw-flex-1">
           <div className="tw-truncate tw-text-sm tw-font-extrabold tw-text-[var(--text-primary)]">
             {selectedResult?.title || selectedResult?.conversationKey || t('localSearchPreviewAria')}
           </div>

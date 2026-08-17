@@ -297,5 +297,9 @@ describe('conversation search sheet viewmodel', () => {
     await dispatch(document.body, { ctrlKey: true });
     expect(client.getCapability).toHaveBeenCalledTimes(1);
     expect(latest.mode).toBe('search');
+
+    await dispatch(document.body, { metaKey: true });
+    expect(client.getCapability).toHaveBeenCalledTimes(1);
+    expect(client.search).not.toHaveBeenCalled();
   });
 });

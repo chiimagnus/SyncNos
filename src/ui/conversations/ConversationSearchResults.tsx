@@ -56,7 +56,7 @@ export function ConversationSearchResults(props: ConversationSearchResultsProps)
   return (
     <section
       aria-label={t('localSearchResultsAria')}
-      className="tw-flex tw-min-h-0 tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-primary)]"
+      className="tw-flex tw-h-full tw-min-h-0 tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-primary)]"
     >
       <div className="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-p-3">
         <div className="tw-sr-only" aria-live="polite">
