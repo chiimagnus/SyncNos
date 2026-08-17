@@ -9,6 +9,7 @@ import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
   LocalDataContractError,
+  parseMigrationProfileReferencePatch,
   type FactsMigrationReceipt,
 } from '@services/local-data/contracts';
 import { sha256Hex } from '@services/local-data/digest';
@@ -28,6 +29,13 @@ const FACT_COUNTS = Object.freeze({
   messages: 3,
   image_cache: 1,
   article_comments: 2,
+});
+const ZERO_COUNTS = Object.freeze({
+  conversations: 0,
+  sync_mappings: 0,
+  messages: 0,
+  image_cache: 0,
+  article_comments: 0,
 });
 const STREAM_BYTES = Object.freeze({
   conversations: 101,
@@ -108,6 +116,24 @@ function hostStatus() {
   return { databaseUuid: 'private', factsRevision: 9, fts: { available: true, reason: null } };
 }
 
+function completionDependencies() {
+  const referencePatch = parseMigrationProfileReferencePatch({
+    version: 1,
+    diagnostics: { staleQueueEntriesDropped: { notion: 0, obsidian: 0, feishu: 0 } },
+    queues: { notion: [], obsidian: [], feishu: [] },
+    syncJobs: { notion: null, obsidian: null, feishu: null },
+  });
+  return {
+    profileReferences: {
+      buildPatch: vi.fn(async () => referencePatch),
+      applyAndVerify: vi.fn(async () => {}),
+      verifyApplied: vi.fn(async () => {}),
+    },
+    clearSourceFacts: vi.fn(async () => {}),
+    verifySourceFactsEmpty: vi.fn(async () => ({ counts: ZERO_COUNTS, empty: true })),
+  };
+}
+
 function hostRequest(receipt: FactsMigrationReceipt | null) {
   return vi.fn(async (command: string) => {
     if (command === 'GET_STATUS') return hostStatus();
@@ -151,6 +177,7 @@ describe('local data migration transfer', () => {
       nativeRequest: hostRequest(receipt),
       readEnvironment: supportedEnvironment,
       transferFacts,
+      ...completionDependencies(),
     });
 
     const status = await coordinator.start();
@@ -160,8 +187,9 @@ describe('local data migration transfer', () => {
     expect(events.indexOf('host:accepted')).toBeLessThan(events.indexOf('facts:read'));
     expect(events.indexOf('facts:read')).toBeLessThan(events.indexOf('host:receipt'));
     expect(events.indexOf('host:receipt')).toBeLessThan(events.indexOf('journal:remote_committed'));
-    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'remote_committed' });
-    expect((await stagingSnapshot(runtime)).stage).toBe('remote_committed');
+    expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
+    const active = await readMigrationJournal(runtime);
+    expect(active.mode).toBe('active');
     expect(nativeImport).toHaveBeenCalledTimes(1);
     expect(transferFacts).toHaveBeenCalledTimes(1);
   });
@@ -319,11 +347,12 @@ describe('local data migration transfer', () => {
       nativeRequest: hostRequest(receipt),
       readEnvironment: supportedEnvironment,
       transferFacts,
+      ...completionDependencies(),
     });
 
     const status = await coordinator.resume();
 
-    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'remote_committed' });
+    expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
     expect(nativeImport).not.toHaveBeenCalled();
     expect(transferFacts).toHaveBeenCalledTimes(1);
   });
@@ -351,12 +380,13 @@ describe('local data migration transfer', () => {
       nativeRequest,
       readEnvironment: supportedEnvironment,
       transferFacts: async () => expectedManifest,
+      ...completionDependencies(),
     });
 
     await coordinator.resume();
 
     expect(nativeImport).toHaveBeenCalledTimes(1);
-    expect((await stagingSnapshot(runtime)).stage).toBe('remote_committed');
+    expect((await readMigrationJournal(runtime)).mode).toBe('active');
   });
 
   it('blocks a conflicting durable receipt on resume instead of opening another import session', async () => {

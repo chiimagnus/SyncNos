@@ -421,9 +421,14 @@ export type MigrationReferenceFreeSyncJob =
       updatedAt: number;
     }>;
 
+export type MigrationProfileReferenceDiagnostics = Readonly<{
+  staleQueueEntriesDropped: Readonly<Record<MigrationProfileProvider, number>>;
+}>;
+
 export type MigrationProfileReferencePatch = Readonly<{
+  diagnostics: MigrationProfileReferenceDiagnostics;
   queues: Readonly<Record<MigrationProfileProvider, readonly MigrationProfileQueueEntry[]>>;
-  syncJobs: Readonly<Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob>>;
+  syncJobs: Readonly<Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob | null>>;
   version: typeof MIGRATION_PROFILE_REFERENCE_PATCH_VERSION;
 }>;
 
@@ -520,22 +525,37 @@ function parseMigrationReferenceFreeSyncJob(
 
 function parseMigrationReferenceFreeSyncJobs(
   value: unknown,
-): Readonly<Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob>> {
+): Readonly<Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob | null>> {
   const input = record(value);
   exactKeys(input, MIGRATION_PROFILE_PROVIDERS);
-  const jobs = {} as Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob>;
+  const jobs = {} as Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob | null>;
   for (const provider of MIGRATION_PROFILE_PROVIDERS) {
-    jobs[provider] = parseMigrationReferenceFreeSyncJob(input[provider], provider);
+    jobs[provider] = input[provider] == null ? null : parseMigrationReferenceFreeSyncJob(input[provider], provider);
   }
   return Object.freeze(jobs);
 }
 
+function parseMigrationProfileReferenceDiagnostics(value: unknown): MigrationProfileReferenceDiagnostics {
+  const input = record(value);
+  exactKeys(input, ['staleQueueEntriesDropped']);
+  const counts = record(input.staleQueueEntriesDropped);
+  exactKeys(counts, MIGRATION_PROFILE_PROVIDERS);
+  return Object.freeze({
+    staleQueueEntriesDropped: Object.freeze(
+      Object.fromEntries(
+        MIGRATION_PROFILE_PROVIDERS.map((provider) => [provider, parseNonNegativeSafeInteger(counts[provider])]),
+      ) as Record<MigrationProfileProvider, number>,
+    ),
+  });
+}
+
 function parseMigrationProfileReferencePatchInternal(value: unknown): MigrationProfileReferencePatch {
   const input = record(value);
-  exactKeys(input, ['version', 'queues', 'syncJobs']);
+  exactKeys(input, ['version', 'diagnostics', 'queues', 'syncJobs']);
   if (input.version !== MIGRATION_PROFILE_REFERENCE_PATCH_VERSION) fail();
   return Object.freeze({
     version: MIGRATION_PROFILE_REFERENCE_PATCH_VERSION,
+    diagnostics: parseMigrationProfileReferenceDiagnostics(input.diagnostics),
     queues: parseMigrationProfileQueues(input.queues),
     syncJobs: parseMigrationReferenceFreeSyncJobs(input.syncJobs),
   });

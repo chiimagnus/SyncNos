@@ -238,9 +238,9 @@ function assertManifestMatchesJournal(
   }
 }
 
-async function referencePatchDigest(
+export async function migrationProfileReferencePatchDigest(
   patch: MigrationProfileReferencePatch,
-  digestProvider: DigestProvider,
+  digestProvider: DigestProvider = browserDigestProvider,
 ): Promise<string> {
   try {
     return await sha256Hex(digestProvider, textEncoder.encode(serializeMigrationProfileReferencePatch(patch)));
@@ -281,7 +281,8 @@ async function parseMigrationJournal(value: unknown, digestProvider: DigestProvi
         assertManifestMatchesJournal(base, manifest);
         const referencePatch = parseMigrationProfileReferencePatch(input.referencePatch);
         const expectedDigest = parseOrderedFrameDigest(input.referencePatchDigest);
-        if ((await referencePatchDigest(referencePatch, digestProvider)) !== expectedDigest) journalFailure();
+        if ((await migrationProfileReferencePatchDigest(referencePatch, digestProvider)) !== expectedDigest)
+          journalFailure();
         return Object.freeze({ ...base, manifest, referencePatch, referencePatchDigest: expectedDigest }) as
           | ProfileReferencesPendingMigrationJournal
           | CleanupPendingMigrationJournal;
@@ -483,7 +484,7 @@ async function finalizeTransitionJournal(
   runtime: ResolvedMigrationJournalRuntime,
 ): Promise<MigrationJournal> {
   if (journal.stage !== 'profile_refs_pending') return journal;
-  const digest = await referencePatchDigest(journal.referencePatch, runtime.digestProvider);
+  const digest = await migrationProfileReferencePatchDigest(journal.referencePatch, runtime.digestProvider);
   return Object.freeze({ ...journal, referencePatchDigest: digest });
 }
 

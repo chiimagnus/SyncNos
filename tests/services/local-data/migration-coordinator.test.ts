@@ -15,6 +15,7 @@ import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
   LocalDataContractError,
+  parseMigrationProfileReferencePatch,
 } from '@services/local-data/contracts';
 import { sha256Hex } from '@services/local-data/digest';
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
@@ -59,13 +60,33 @@ async function receiptFor(manifest: FactsManifest) {
 
 function successfulMigrationIo() {
   const manifest = emptyManifest();
+  let committedReceipt: Awaited<ReturnType<typeof receiptFor>> | null = null;
+  const referencePatch = parseMigrationProfileReferencePatch({
+    version: 1,
+    diagnostics: { staleQueueEntriesDropped: { notion: 0, obsidian: 0, feishu: 0 } },
+    queues: { notion: [], obsidian: [], feishu: [] },
+    syncJobs: { notion: null, obsidian: null, feishu: null },
+  });
   return {
     digestProvider: nodeDigestProvider,
     transferFacts: vi.fn(async () => manifest),
     nativeImport: vi.fn(async ({ produce }: any) => {
       const produced = await produce({ onFrame: async () => {}, signal: new AbortController().signal });
-      return await receiptFor(produced);
+      committedReceipt = await receiptFor(produced);
+      return committedReceipt;
     }),
+    nativeRequest: vi.fn(async (command: string) => {
+      if (command === 'GET_STATUS') return hostStatus();
+      if (command === 'GET_MIGRATION_RECEIPT') return committedReceipt;
+      throw new Error(`unexpected command ${command}`);
+    }),
+    profileReferences: {
+      buildPatch: vi.fn(async () => referencePatch),
+      applyAndVerify: vi.fn(async () => {}),
+      verifyApplied: vi.fn(async () => {}),
+    },
+    clearSourceFacts: vi.fn(async () => {}),
+    verifySourceFactsEmpty: vi.fn(async () => ({ counts: EMPTY_COUNTS, empty: true })),
   };
 }
 
@@ -253,11 +274,11 @@ describe('local data migration coordinator', () => {
     expect(events.indexOf('journal:set:staging')).toBeGreaterThanOrEqual(0);
     expect(events.indexOf('journal:set:staging')).toBeLessThan(events.indexOf('gate:close'));
     expect(events).toContain('gate:drain');
-    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'remote_committed' });
+    expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
     const snapshot = await readMigrationJournal(journal.runtime);
-    expect(snapshot.mode).toBe('transitional');
-    if (snapshot.mode === 'transitional') {
-      expect(snapshot.journal).toMatchObject({ migrationId: MIGRATION_ID, stage: 'remote_committed' });
+    expect(snapshot.mode).toBe('active');
+    if (snapshot.mode === 'active') {
+      expect(snapshot.journal).toMatchObject({ migrationId: MIGRATION_ID, stage: 'active' });
     }
   });
 
@@ -282,8 +303,8 @@ describe('local data migration coordinator', () => {
     await first;
 
     const snapshot = await readMigrationJournal(journal.runtime);
-    expect(snapshot.mode).toBe('transitional');
-    if (snapshot.mode === 'transitional') expect(snapshot.journal.migrationId).toBe(MIGRATION_ID);
+    expect(snapshot.mode).toBe('active');
+    if (snapshot.mode === 'active') expect(snapshot.journal.migrationId).toBe(MIGRATION_ID);
   });
 
   it('records a drain failure on staging and never reopens admissions', async () => {
@@ -308,7 +329,7 @@ describe('local data migration coordinator', () => {
     expect(gate.isClosed()).toBe(true);
   });
 
-  it('restores a transitional journal after service-worker restart and resumes with admissions still closed', async () => {
+  it('restores a transitional journal after service-worker restart and reopens admissions only after full activation', async () => {
     const journal = createJournalRuntime();
     await beginMigrationJournal(journal.runtime);
     const gate = new FactsOperationGate({ readJournal: async () => await readMigrationJournal(journal.runtime) });
@@ -325,8 +346,8 @@ describe('local data migration coordinator', () => {
 
     const status = await coordinator.resume();
 
-    expect(status.journal).toMatchObject({ mode: 'transitional', stage: 'remote_committed' });
-    expect(gate.allowsFactsOperations).toBe(false);
+    expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
+    expect(gate.allowsFactsOperations).toBe(true);
   });
 
   it('reports only whether the current transitional migration has a matching Host receipt', async () => {

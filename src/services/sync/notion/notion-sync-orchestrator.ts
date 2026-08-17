@@ -235,10 +235,12 @@ function normalizeJob(job: any) {
   const perConversation = toPerConversationSnapshot(Array.isArray(job.perConversation) ? job.perConversation : []);
   const okCount = Number(job.okCount);
   const failCount = Number(job.failCount);
+  const status = String(job.status || '');
+  if (status !== 'running' && status !== 'done' && status !== 'aborted') return null;
   return {
     ...job,
     provider: SYNC_PROVIDER,
-    status: job.status === 'finished' ? 'done' : String(job.status || 'done'),
+    status,
     startedAt: Number(job.startedAt) || 0,
     updatedAt: Number(job.updatedAt) || Date.now(),
     finishedAt: job.finishedAt == null ? null : Number(job.finishedAt) || null,

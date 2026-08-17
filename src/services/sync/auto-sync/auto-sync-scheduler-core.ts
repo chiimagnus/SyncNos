@@ -1,5 +1,6 @@
 import type { StableConversationReference } from '@services/local-data/contracts';
 import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
+import { AUTO_SYNC_STABLE_QUEUE_VERSION } from './auto-sync-keys';
 
 export type AutoSyncSchedulerInfra = {
   now: () => number;
@@ -23,8 +24,8 @@ export type AutoSyncScheduler = {
   rearm: () => Promise<void>;
 };
 
-type StoredQueueV2 = Readonly<{
-  version: 2;
+type StoredStableQueue = Readonly<{
+  version: typeof AUTO_SYNC_STABLE_QUEUE_VERSION;
   entries: AutoSyncQueueEntry[];
 }>;
 
@@ -43,8 +44,14 @@ function entryKey(reference: StableConversationReference): string {
   return `${reference.source}\u0000${reference.conversationKey}`;
 }
 
-function normalizeV2Queue(value: unknown): AutoSyncQueueEntry[] | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Number((value as any).version) !== 2) return null;
+function normalizeStableQueue(value: unknown): AutoSyncQueueEntry[] | null {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Number((value as any).version) !== AUTO_SYNC_STABLE_QUEUE_VERSION
+  )
+    return null;
   const rows = Array.isArray((value as any).entries) ? (value as any).entries : [];
   const byKey = new Map<string, AutoSyncQueueEntry>();
   for (const row of rows) {
@@ -146,7 +153,7 @@ export function createAutoSyncSchedulerCore(config: {
   };
 
   const writeQueue = async (entries: AutoSyncQueueEntry[]): Promise<void> => {
-    const stored: StoredQueueV2 = { version: 2, entries };
+    const stored: StoredStableQueue = { version: AUTO_SYNC_STABLE_QUEUE_VERSION, entries };
     await infra.storage.set({ [queueStorageKey]: stored });
   };
 
@@ -154,8 +161,8 @@ export function createAutoSyncSchedulerCore(config: {
     assertFactsOperationLease(lease);
     const raw = await readRawQueue();
     assertFactsOperationLease(lease);
-    const v2 = normalizeV2Queue(raw);
-    if (v2) return v2;
+    const stable = normalizeStableQueue(raw);
+    if (stable) return stable;
     if (!resolveLegacyConversationId) return [];
     if (canConvertLegacyQueue && !(await canConvertLegacyQueue(lease))) return [];
 
@@ -294,7 +301,7 @@ export function createAutoSyncSchedulerCore(config: {
 
   const rearm = async () => {
     const raw = await readRawQueue();
-    const queue = normalizeV2Queue(raw) ?? [];
+    const queue = normalizeStableQueue(raw) ?? [];
     await scheduleNextAlarm(queue);
   };
 

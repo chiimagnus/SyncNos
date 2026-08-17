@@ -95,6 +95,9 @@ function manifest(): FactsManifest {
 function referencePatch(): MigrationProfileReferencePatch {
   return parseMigrationProfileReferencePatch({
     version: 1,
+    diagnostics: {
+      staleQueueEntriesDropped: { notion: 0, obsidian: 1, feishu: 0 },
+    },
     queues: {
       notion: [
         { source: 'chatgpt', conversationKey: 'conversation-z', dueAt: 40 },
@@ -123,15 +126,7 @@ function referencePatch(): MigrationProfileReferencePatch {
         okCount: 4,
         failCount: 5,
       },
-      feishu: {
-        provider: 'feishu',
-        status: 'done',
-        startedAt: 1,
-        updatedAt: 2,
-        finishedAt: 3,
-        okCount: 4,
-        failCount: 5,
-      },
+      feishu: null,
     },
   });
 }

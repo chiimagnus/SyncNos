@@ -9,9 +9,16 @@ import {
   type MigrationJournalRuntime,
   type MigrationJournalSnapshot,
 } from '@platform/local-data/migration-journal';
-import { importNativeFacts, sendNativeMessage } from '@platform/local-data/native-client';
+import { connectNative, importNativeFacts, sendNativeMessage } from '@platform/local-data/native-client';
 import type { NativeFactsImportProducer } from '@platform/local-data/native-port';
-import { transferIndexedDbFacts, type IndexedDbFactsTransferInput } from '@platform/idb/facts-transfer';
+import {
+  clearFacts,
+  readLegacyFactConversationReferences,
+  transferIndexedDbFacts,
+  verifyFactsEmpty,
+  type FactsEmptyVerification,
+  type IndexedDbFactsTransferInput,
+} from '@platform/idb/facts-transfer';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   LOCAL_DATA_SCHEMA_VERSION,
@@ -26,6 +33,7 @@ import {
   type LocalDataError,
   type LocalDataErrorCode,
   type MigrationId,
+  type StableConversationReference,
 } from './contracts';
 import { sha256Hex, type DigestProvider } from './digest';
 import { encodeCanonicalJson } from './facts-archive';
@@ -41,6 +49,7 @@ import {
   type LocalDataMigrationStatus,
 } from './migration-status';
 import { nativeHostContract } from './native-host-contract';
+import { createProfileReferenceRebase, type ProfileReferenceRebase } from './profile-reference-rebase';
 
 export type MigrationRuntimeEnvironment = Readonly<{
   browser: LocalDataMigrationBrowser;
@@ -63,13 +72,18 @@ export type MigrationNativeImport = (
 export type MigrationFactsTransfer = (input: IndexedDbFactsTransferInput) => Promise<FactsManifest>;
 
 export type MigrationCoordinatorDependencies = Readonly<{
+  clearSourceFacts?: () => Promise<void>;
   digestProvider?: DigestProvider;
   gate: Pick<FactsOperationGate, 'closeAdmissions' | 'reopenForJournalState' | 'waitForDrained'>;
   journalRuntime?: MigrationJournalRuntime;
   nativeImport?: MigrationNativeImport;
   nativeRequest?: MigrationNativeRequest;
+  onActivated?: () => void | Promise<void>;
+  profileReferences?: ProfileReferenceRebase;
   readEnvironment?: () => Promise<MigrationRuntimeEnvironment> | MigrationRuntimeEnvironment;
+  rearmSchedulers?: () => Promise<void>;
   transferFacts?: MigrationFactsTransfer;
+  verifySourceFactsEmpty?: () => Promise<FactsEmptyVerification>;
 }>;
 
 export type MigrationCoordinator = Readonly<{
@@ -132,6 +146,27 @@ async function defaultNativeImport(
   }>,
 ): Promise<FactsMigrationReceipt> {
   return await importNativeFacts(input);
+}
+
+async function defaultValidateNativeReference(reference: StableConversationReference): Promise<boolean> {
+  try {
+    const value = record(
+      await connectNative({
+        command: 'CONVERSATION_LOOKUP',
+        payload: { source: reference.source, conversationKey: reference.conversationKey },
+      }),
+    );
+    if (
+      String(value.source || '').trim() !== reference.source ||
+      String(value.conversationKey || '').trim() !== reference.conversationKey
+    ) {
+      throw new LocalDataContractError('PROTOCOL_MISMATCH');
+    }
+    return true;
+  } catch (error) {
+    if (error instanceof LocalDataContractError && error.code === 'STALE_REFERENCE') return false;
+    throw error;
+  }
 }
 
 function parseReceipt(value: unknown): FactsMigrationReceipt {
@@ -341,6 +376,18 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
   const nativeRequest = dependencies.nativeRequest ?? defaultNativeRequest;
   const readEnvironment = dependencies.readEnvironment ?? defaultEnvironment;
   const transferFacts = dependencies.transferFacts ?? transferIndexedDbFacts;
+  const clearSourceFacts = dependencies.clearSourceFacts ?? (async () => await clearFacts());
+  const verifySourceFactsEmpty = dependencies.verifySourceFactsEmpty ?? (async () => await verifyFactsEmpty());
+  const profileReferences =
+    dependencies.profileReferences ??
+    createProfileReferenceRebase({
+      digestProvider,
+      resolveLegacyConversationReferences: async (conversationIds) =>
+        await readLegacyFactConversationReferences(conversationIds),
+      validateNativeReference: defaultValidateNativeReference,
+    });
+  const rearmSchedulers = dependencies.rearmSchedulers ?? (async () => {});
+  const onActivated = dependencies.onActivated ?? (async () => {});
   let transitionRunning = false;
 
   const getStatus = async (): Promise<LocalDataMigrationStatus> => {
@@ -421,6 +468,28 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     return manifest;
   };
 
+  const requireDurableReceipt = async (manifest: FactsManifest): Promise<FactsMigrationReceipt> => {
+    const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId: manifest.migrationId });
+    if (rawReceipt == null) throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
+    return await requireMatchingReceipt(rawReceipt, manifest, digestProvider);
+  };
+
+  const requireTransitionalJournal = async (
+    migrationId: MigrationId,
+    stage?: Exclude<MigrationJournal['stage'], 'active'>,
+  ): Promise<Exclude<MigrationJournal, { stage: 'active' }>> => {
+    const snapshot = await readMigrationJournal(dependencies.journalRuntime);
+    if (
+      snapshot.mode !== 'transitional' ||
+      snapshot.journal.migrationId !== migrationId ||
+      (stage !== undefined && snapshot.journal.stage !== stage)
+    ) {
+      throw new LocalDataContractError('JOURNAL_CORRUPT');
+    }
+    dependencies.gate.reopenForJournalState(snapshot);
+    return snapshot.journal;
+  };
+
   const runTransition = async (kind: 'start' | 'resume'): Promise<LocalDataMigrationStatus> => {
     if (transitionRunning) throw new LocalDataContractError('MIGRATION_IN_PROGRESS');
     transitionRunning = true;
@@ -449,19 +518,51 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       if (journal.stage === 'staging') {
         const manifest =
           kind === 'resume' ? await resumeStaging(journal.migrationId) : await streamStaging(journal.migrationId);
-        journal = (await advanceMigrationJournal(
+        const migrationId = journal.migrationId;
+        await advanceMigrationJournal(
           { expected: journal, stage: 'remote_committed', manifest },
           dependencies.journalRuntime,
-        )) as Exclude<MigrationJournal, { stage: 'active' }>;
-        const committed = await readMigrationJournal(dependencies.journalRuntime);
-        if (
-          committed.mode !== 'transitional' ||
-          committed.journal.stage !== 'remote_committed' ||
-          committed.journal.migrationId !== journal.migrationId
-        ) {
+        );
+        journal = await requireTransitionalJournal(migrationId, 'remote_committed');
+      }
+
+      if (journal.stage === 'remote_committed') {
+        await requireDurableReceipt(journal.manifest);
+        const referencePatch = await profileReferences.buildPatch();
+        const migrationId = journal.migrationId;
+        await advanceMigrationJournal(
+          { expected: journal, stage: 'profile_refs_pending', referencePatch },
+          dependencies.journalRuntime,
+        );
+        journal = await requireTransitionalJournal(migrationId, 'profile_refs_pending');
+      }
+
+      if (journal.stage === 'profile_refs_pending') {
+        await profileReferences.applyAndVerify(journal.referencePatch, journal.referencePatchDigest);
+        const migrationId = journal.migrationId;
+        await advanceMigrationJournal({ expected: journal, stage: 'cleanup_pending' }, dependencies.journalRuntime);
+        journal = await requireTransitionalJournal(migrationId, 'cleanup_pending');
+      }
+
+      if (journal.stage === 'cleanup_pending') {
+        await requireDurableReceipt(journal.manifest);
+        await profileReferences.verifyApplied(journal.referencePatch, journal.referencePatchDigest);
+        await clearSourceFacts();
+        const verification = await verifySourceFactsEmpty();
+        if (!verification.empty || MIGRATION_FACT_KINDS.some((kind) => verification.counts[kind] !== 0)) {
+          throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+        }
+
+        const migrationId = journal.migrationId;
+        await advanceMigrationJournal({ expected: journal, stage: 'active' }, dependencies.journalRuntime);
+        journal = null;
+        const active = await readMigrationJournal(dependencies.journalRuntime);
+        if (active.mode !== 'active' || active.journal.migrationId !== migrationId) {
           throw new LocalDataContractError('JOURNAL_CORRUPT');
         }
-        dependencies.gate.reopenForJournalState(committed);
+        dependencies.gate.reopenForJournalState(active);
+        await rearmSchedulers().catch(() => {});
+        await Promise.resolve(onActivated()).catch(() => {});
       }
 
       return await getStatus();

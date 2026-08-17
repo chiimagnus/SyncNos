@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { act, createElement } from 'react';
 
 import { ConversationsProvider, useConversationsApp } from '../../src/viewmodels/conversations/conversations-context';
+import { UI_EVENT_TYPES } from '@services/protocols/message-contracts';
 
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
@@ -64,11 +65,16 @@ vi.mock('@services/integrations/detail-header-actions', () => ({
   resolveDetailHeaderActions: vi.fn(async () => []),
 }));
 
+let eventsPortMessageListener: ((message: any) => void) | null = null;
 vi.mock('@services/shared/ports', () => ({
   connectPort: () => ({
     onMessage: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
+      addListener: vi.fn((listener: (message: any) => void) => {
+        eventsPortMessageListener = listener;
+      }),
+      removeListener: vi.fn((listener: (message: any) => void) => {
+        if (eventsPortMessageListener === listener) eventsPortMessageListener = null;
+      }),
     },
     onDisconnect: {
       addListener: vi.fn(),
@@ -180,6 +186,7 @@ describe('ConversationsProvider pagination state', () => {
     updateArticleUrl.mockReset();
     backfillConversationImages.mockReset();
     getConversationImageAsset.mockReset();
+    eventsPortMessageListener = null;
 
     getConversationListPage.mockResolvedValue(makePage([]));
     findConversationById.mockResolvedValue(null);
@@ -480,6 +487,49 @@ describe('ConversationsProvider pagination state', () => {
         factsEpoch: TEST_FACTS_EPOCH,
       },
     });
+  });
+
+  it('reselects the active conversation by stable identity when local data migration changes numeric backend ids', async () => {
+    const beforeMigration = makeConversation(1, 'web', 'article-1');
+    const afterMigration = makeConversation(91, 'web', 'article-1');
+    getConversationListBootstrap
+      .mockResolvedValueOnce(makePage([beforeMigration]))
+      .mockResolvedValue(makePage([afterMigration]));
+    getConversationDetail.mockImplementation(async (reference: any) => ({
+      conversationId: Number(reference?.conversationId),
+      source: String(reference?.source || ''),
+      conversationKey: String(reference?.conversationKey || ''),
+      factsEpoch: TEST_FACTS_EPOCH,
+      messages: [],
+    }));
+    await renderProvider();
+    await act(async () => {
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+    expect(eventsPortMessageListener).toBeTypeOf('function');
+    const listCallsBefore = getConversationListBootstrap.mock.calls.length;
+    const detailCallsBefore = getConversationDetail.mock.calls.length;
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        eventsPortMessageListener?.({
+          type: UI_EVENT_TYPES.CONVERSATIONS_CHANGED,
+          payload: { reason: 'localDataMigrationActivated' },
+        });
+        await vi.advanceTimersByTimeAsync(300);
+        await flushMicrotasks();
+        await flushMicrotasks();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(getConversationListBootstrap.mock.calls.length).toBeGreaterThan(listCallsBefore);
+    expect(getConversationDetail.mock.calls.length).toBeGreaterThan(detailCallsBefore);
+    expect(Number(latestState.activeId)).toBe(91);
+    expect(Number(latestState.detail?.conversationId)).toBe(91);
   });
 
   it('provides cache-images tools action for article conversations', async () => {

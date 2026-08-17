@@ -25,6 +25,8 @@ import {
   FEISHU_MESSAGE_TYPES,
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
+  UI_EVENT_TYPES,
+  UI_PORT_NAMES,
 } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract';
@@ -36,6 +38,7 @@ import {
   buildReaderPrefsStoragePatch,
   type ReaderPrefs,
 } from '@services/protocols/reader-prefs';
+import { connectPort } from '@services/shared/ports';
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
@@ -293,10 +296,39 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [hasLoadedInsight, setHasLoadedInsight] = useState(false);
   const [insightRange, setInsightRange] = useState<InsightTimeRange>('7d');
   const insightSourceDataRef = useRef<InsightStatsSourceData | null>(null);
+  const insightRequestSeqRef = useRef(0);
   const [aboutYouUserName, setAboutYouUserName] = useState<string>('');
 
   const isPopup = useMemo(() => isPopupUi(), []);
   const useAppImport = useMemo(() => isPopup && isFirefoxFamilyBrowser(), [isPopup]);
+
+  useEffect(() => {
+    let port: any = null;
+    const onMessage = (message: any) => {
+      if (message?.type !== UI_EVENT_TYPES.CONVERSATIONS_CHANGED) return;
+      if (String(message?.payload?.reason || '') !== 'localDataMigrationActivated') return;
+      insightRequestSeqRef.current += 1;
+      insightSourceDataRef.current = null;
+      setInsightStats(null);
+      setInsightError('');
+      setInsightLoading(false);
+      setHasLoadedInsight(false);
+    };
+    try {
+      port = connectPort(UI_PORT_NAMES.POPUP_EVENTS);
+      port?.onMessage?.addListener?.(onMessage);
+    } catch (_error) {
+      port = null;
+    }
+    return () => {
+      try {
+        port?.onMessage?.removeListener?.(onMessage);
+        port?.disconnect?.();
+      } catch (_error) {
+        // Settings may unmount after the extension context has already been invalidated.
+      }
+    };
+  }, []);
 
   const runTask = useCallback(async (task: () => Promise<void>, options: RunTaskOptions = {}) => {
     const run = taskQueueRef.current.then(async () => {
@@ -1240,19 +1272,24 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (activeSection !== 'aboutyou') return;
     if (hasLoadedInsight || insightLoading) return;
 
+    const requestSeq = insightRequestSeqRef.current + 1;
+    insightRequestSeqRef.current = requestSeq;
     setInsightLoading(true);
     setInsightError('');
 
     void getInsightStatsSourceData()
       .then((data) => {
+        if (requestSeq !== insightRequestSeqRef.current) return;
         insightSourceDataRef.current = data;
         const window = getInsightTimeRangeWindow(insightRange);
         setInsightStats(buildInsightStats(data, window));
       })
       .catch((error) => {
+        if (requestSeq !== insightRequestSeqRef.current) return;
         setInsightError(toErrorMessage(error, t('insightLoadFailed')));
       })
       .finally(() => {
+        if (requestSeq !== insightRequestSeqRef.current) return;
         setInsightLoading(false);
         setHasLoadedInsight(true);
       });

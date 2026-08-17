@@ -21,12 +21,12 @@ describe('normalizeSyncJobSnapshot', () => {
     for (const key of Object.keys(storageState)) delete storageState[key];
   });
 
-  it('normalizes feishu job snapshots (finished -> done, ids, counts)', async () => {
+  it('normalizes current feishu done job snapshots and rejects removed legacy statuses', async () => {
     const { normalizeSyncJobSnapshot } = await import('@services/sync/sync-job-store');
 
     const snapshot = normalizeSyncJobSnapshot('feishu', {
       id: 'job_1',
-      status: 'finished',
+      status: 'done',
       startedAt: 1,
       updatedAt: 2,
       finishedAt: 3,
@@ -45,6 +45,12 @@ describe('normalizeSyncJobSnapshot', () => {
     expect(snapshot!.okCount).toBe(1);
     expect(snapshot!.failCount).toBe(1);
     expect(snapshot!.updatedAt).toBe(2);
+    expect(
+      normalizeSyncJobSnapshot('feishu', {
+        ...snapshot,
+        status: 'finished',
+      }),
+    ).toBeNull();
   });
 
   it('aborts a foreign running job immediately when forced', async () => {

@@ -9,7 +9,7 @@ import type {
   ConversationListOpenTarget,
   ConversationListSummary,
 } from '@services/conversations/domain/models';
-import type { FactsEpoch } from '@services/local-data/contracts';
+import type { FactsEpoch, StableConversationReference } from '@services/local-data/contracts';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
@@ -705,83 +705,116 @@ export function ConversationsProvider({
     [applyOpenTarget, items, listFactsEpoch],
   );
 
-  const refreshList = useCallback(async () => {
-    const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
-    const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
-    const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
+  const refreshList = useCallback(
+    async (options?: { migrationReselect?: StableConversationReference | null }) => {
+      const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
+      const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
+      const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
 
-    const requestSeq = listRequestSeqRef.current + 1;
-    listRequestSeqRef.current = requestSeq;
+      const requestSeq = listRequestSeqRef.current + 1;
+      listRequestSeqRef.current = requestSeq;
 
-    setLoadingInitialList(true);
-    setLoadingMoreList(false);
-    setListError(null);
-    setListCursor(null);
-    setListFactsEpoch(null);
-    setListHasMore(false);
-    try {
-      const page = await getConversationListBootstrap(
-        { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
-        LIST_BOOTSTRAP_LIMIT,
-      );
-      if (requestSeq !== listRequestSeqRef.current) return;
-
-      const list = Array.isArray(page?.items) ? page.items : [];
-      const factsEpoch = String(page?.factsEpoch || '').trim();
-      if (!factsEpoch) throw new Error('missing facts epoch');
-      setItems(list);
-      setListFactsEpoch(factsEpoch as FactsEpoch);
-      setListCursor(page?.cursor ?? null);
-      setListHasMore(Boolean(page?.hasMore));
-      setListSummary(normalizeConversationListSummary(page?.summary));
-      setListFacets(normalizeConversationListFacets(page?.facets));
-
-      const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
-      setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
-
-      const currentActiveId = Number(activeIdRef.current);
-      const requestedId = Number(pendingListLocateIdRef.current);
-      const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
-      const preservingRequestedActive =
-        Number.isFinite(currentActiveId) &&
-        currentActiveId > 0 &&
-        Number.isFinite(requestedId) &&
-        requestedId > 0 &&
-        requestedId === currentActiveId;
-      const preservingSnapshotActive =
-        Number.isFinite(currentActiveId) &&
-        currentActiveId > 0 &&
-        Number.isFinite(snapshotId) &&
-        snapshotId > 0 &&
-        snapshotId === currentActiveId;
-      const shouldPreserveActive =
-        Number.isFinite(currentActiveId) &&
-        currentActiveId > 0 &&
-        (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
-
-      const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
-      setActiveId(nextActiveId);
-      if (!shouldPreserveActive) {
-        const nextActiveConversation =
-          nextActiveId == null
-            ? null
-            : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
-        setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
-      }
-    } catch (e) {
-      if (requestSeq !== listRequestSeqRef.current) return;
-      setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+      setLoadingInitialList(true);
+      setLoadingMoreList(false);
+      setListError(null);
       setListCursor(null);
       setListFactsEpoch(null);
       setListHasMore(false);
-      setListSummary(EMPTY_LIST_SUMMARY);
-      setListFacets(EMPTY_LIST_FACETS);
-    } finally {
-      if (requestSeq === listRequestSeqRef.current) {
-        setLoadingInitialList(false);
+      try {
+        const page = await getConversationListBootstrap(
+          { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
+          LIST_BOOTSTRAP_LIMIT,
+        );
+        if (requestSeq !== listRequestSeqRef.current) return;
+
+        const list = Array.isArray(page?.items) ? page.items : [];
+        const factsEpoch = String(page?.factsEpoch || '').trim();
+        if (!factsEpoch) throw new Error('missing facts epoch');
+        setItems(list);
+        setListFactsEpoch(factsEpoch as FactsEpoch);
+        setListCursor(page?.cursor ?? null);
+        setListHasMore(Boolean(page?.hasMore));
+        setListSummary(normalizeConversationListSummary(page?.summary));
+        setListFacets(normalizeConversationListFacets(page?.facets));
+
+        const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
+        const migrationReselectRequested =
+          options && Object.prototype.hasOwnProperty.call(options, 'migrationReselect');
+        if (migrationReselectRequested) {
+          setSelectedIds([]);
+          pendingListLocateIdRef.current = null;
+          setPendingListLocateId(null);
+          const stableReference = options?.migrationReselect ?? null;
+          let target: ConversationListOpenTarget | null = null;
+          if (stableReference) {
+            const loaded = list.find(
+              (conversation) =>
+                String((conversation as any)?.source || '').trim() === stableReference.source &&
+                String((conversation as any)?.conversationKey || '').trim() === stableReference.conversationKey,
+            );
+            target = loaded
+              ? toOpenTargetFromConversation(loaded)
+              : await findConversationBySourceAndKey(
+                  stableReference.source,
+                  stableReference.conversationKey,
+                  factsEpoch as FactsEpoch,
+                ).catch(() => null);
+            if (requestSeq !== listRequestSeqRef.current) return;
+          }
+          if (!target && list.length) target = toOpenTargetFromConversation(list[0]);
+          const targetId = Number((target as any)?.id);
+          setActiveId(Number.isFinite(targetId) && targetId > 0 ? targetId : null);
+          setActiveConversationSnapshot(target);
+          return;
+        }
+
+        setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
+
+        const currentActiveId = Number(activeIdRef.current);
+        const requestedId = Number(pendingListLocateIdRef.current);
+        const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
+        const preservingRequestedActive =
+          Number.isFinite(currentActiveId) &&
+          currentActiveId > 0 &&
+          Number.isFinite(requestedId) &&
+          requestedId > 0 &&
+          requestedId === currentActiveId;
+        const preservingSnapshotActive =
+          Number.isFinite(currentActiveId) &&
+          currentActiveId > 0 &&
+          Number.isFinite(snapshotId) &&
+          snapshotId > 0 &&
+          snapshotId === currentActiveId;
+        const shouldPreserveActive =
+          Number.isFinite(currentActiveId) &&
+          currentActiveId > 0 &&
+          (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
+
+        const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
+        setActiveId(nextActiveId);
+        if (!shouldPreserveActive) {
+          const nextActiveConversation =
+            nextActiveId == null
+              ? null
+              : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
+          setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
+        }
+      } catch (e) {
+        if (requestSeq !== listRequestSeqRef.current) return;
+        setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+        setListCursor(null);
+        setListFactsEpoch(null);
+        setListHasMore(false);
+        setListSummary(EMPTY_LIST_SUMMARY);
+        setListFacets(EMPTY_LIST_FACETS);
+      } finally {
+        if (requestSeq === listRequestSeqRef.current) {
+          setLoadingInitialList(false);
+        }
       }
-    }
-  }, [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId]);
+    },
+    [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId],
+  );
 
   const loadMoreList = useCallback(async () => {
     const cursor = listCursor;
@@ -1008,19 +1041,23 @@ export function ConversationsProvider({
     let refreshTimer: any = null;
     let pendingList = false;
     let pendingDetail = false;
+    let pendingMigrationReselect: StableConversationReference | null | undefined = undefined;
 
     const flush = async () => {
       if (disposed) return;
       const doList = pendingList;
       const doDetail = pendingDetail;
+      const migrationReselect = pendingMigrationReselect;
       pendingList = false;
       pendingDetail = false;
+      pendingMigrationReselect = undefined;
       refreshTimer = null;
 
-      if (doList) await refreshList().catch(() => {});
-      // Only force-refresh detail when the active conversation is known to have changed
-      // (or when sync finishes and metadata such as notionPageId is updated).
-      if (doDetail) await refreshActiveDetail().catch(() => {});
+      if (doList) {
+        await refreshList(migrationReselect === undefined ? undefined : { migrationReselect }).catch(() => {});
+      }
+      // A migration refresh reselects by stable identity and lets the snapshot effect reload detail.
+      if (doDetail && migrationReselect === undefined) await refreshActiveDetail().catch(() => {});
     };
 
     const scheduleFlush = () => {
@@ -1051,6 +1088,12 @@ export function ConversationsProvider({
         const reason = String(payload.reason || '').trim();
         if (reason === 'delete') {
           // Let refreshList() normalize activeId; detail will refresh via the activeId effect.
+        } else if (reason === 'localDataMigrationActivated') {
+          const active = activeConversationSnapshotRef.current as any;
+          const source = String(active?.source || '').trim();
+          const conversationKey = String(active?.conversationKey || '').trim();
+          pendingMigrationReselect = source && conversationKey ? { source, conversationKey } : null;
+          pendingDetail = false;
         } else if (reason === 'syncFinished') {
           pendingDetail = true;
         } else {

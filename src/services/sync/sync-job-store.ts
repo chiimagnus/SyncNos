@@ -63,13 +63,14 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
   const currentConversation = normalizeSyncReference(value.currentConversation);
   const okCount = Number(value.okCount);
   const failCount = Number(value.failCount);
-  const status = String(value.status || 'done');
+  const status = String(value.status || '');
+  if (status !== 'running' && status !== 'done' && status !== 'aborted') return null;
 
   return {
     id: value.id == null ? undefined : String(value.id || ''),
     provider,
     instanceId: value.instanceId == null ? undefined : String(value.instanceId || ''),
-    status: status === 'finished' ? 'done' : (status as SyncJobSnapshot['status']),
+    status,
     startedAt: Number(value.startedAt) || 0,
     updatedAt: Number(value.updatedAt) || Date.now(),
     finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,

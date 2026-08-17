@@ -19,6 +19,7 @@ import {
   LocalDataContractError,
   parseMigrationId,
   type MigrationId,
+  type StableConversationReference,
 } from '@services/local-data/contracts';
 import { OrderedFrameDigestAccumulator, sha256Hex, type DigestProvider } from '@services/local-data/digest';
 import {
@@ -77,6 +78,11 @@ export type FactsStoreCounts = Readonly<Record<FactsIdbStoreName, number>>;
 export type FactsEmptyVerification = Readonly<{
   counts: FactsStoreCounts;
   empty: boolean;
+}>;
+
+export type LegacyFactConversationReference = Readonly<{
+  conversationId: number;
+  reference: StableConversationReference | null;
 }>;
 
 function fail(code: 'MIGRATION_VALIDATION_FAILED' | 'PAYLOAD_TOO_LARGE' = 'MIGRATION_VALIDATION_FAILED'): never {
@@ -544,6 +550,49 @@ export async function transferIndexedDbFacts(input: IndexedDbFactsTransferInput)
     return manifest.finalize();
   } finally {
     if (ownedDb) db.close();
+  }
+}
+
+/** Resolves only legacy numeric queue handles while the drained source conversations store is still intact. */
+export async function readLegacyFactConversationReferences(
+  conversationIds: readonly number[],
+  input: Readonly<{ db?: IDBDatabase }> = {},
+): Promise<readonly LegacyFactConversationReference[]> {
+  if (!Array.isArray(conversationIds)) fail();
+  const ids = conversationIds.map(sourceId);
+  if (new Set(ids).size !== ids.length) fail();
+  if (!ids.length) return Object.freeze([]);
+
+  const ownsDb = input.db == null;
+  const db = input.db ?? (await openDb());
+  try {
+    const transaction = db.transaction(['conversations'], 'readonly');
+    const completed = transactionDone(transaction);
+    try {
+      const store = transaction.objectStore('conversations');
+      const rows = await Promise.all(ids.map(async (id) => await requestToPromise(store.get(id))));
+      await completed;
+      return Object.freeze(
+        rows.map((row, index) => {
+          const conversationId = ids[index]!;
+          if (row == null) return Object.freeze({ conversationId, reference: null });
+          const value = record(row);
+          const source = typeof value.source === 'string' ? value.source.trim() : '';
+          const conversationKey = typeof value.conversationKey === 'string' ? value.conversationKey.trim() : '';
+          if (!source || !conversationKey) fail();
+          return Object.freeze({
+            conversationId,
+            reference: Object.freeze({ source, conversationKey }),
+          });
+        }),
+      );
+    } catch (error) {
+      abortQuietly(transaction);
+      await completed.catch(() => undefined);
+      throw error;
+    }
+  } finally {
+    if (ownsDb) db.close();
   }
 }
 

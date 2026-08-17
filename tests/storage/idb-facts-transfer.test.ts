@@ -15,7 +15,12 @@ import {
   type NativeWireFrame,
 } from '@services/local-data/native-wire';
 import { FACTS_IDB_STORE_NAMES, DB_NAME, openDb } from '../../src/platform/idb/schema';
-import { clearFacts, transferIndexedDbFacts, verifyFactsEmpty } from '../../src/platform/idb/facts-transfer';
+import {
+  clearFacts,
+  readLegacyFactConversationReferences,
+  transferIndexedDbFacts,
+  verifyFactsEmpty,
+} from '../../src/platform/idb/facts-transfer';
 import { requestToPromise, transactionDone } from '../../src/platform/idb/transactions';
 
 const MIGRATION_ID = '1b8c5d79-6607-4f8f-9d7b-c8c3dadf0480';
@@ -421,6 +426,19 @@ describe('IndexedDB migration facts transfer', () => {
       }),
     ).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
     expect(completedManifest).toBe(false);
+  });
+
+  it('resolves only requested legacy numeric conversation handles before cleanup and distinguishes a truly missing source row', async () => {
+    const { db } = await seedCompleteFacts();
+
+    await expect(readLegacyFactConversationReferences([10, 11, 999], { db })).resolves.toEqual([
+      { conversationId: 10, reference: { source: 'chatgpt', conversationKey: 'conversation-a' } },
+      { conversationId: 11, reference: { source: 'web', conversationKey: 'article:https://example.com/a' } },
+      { conversationId: 999, reference: null },
+    ]);
+    await expect(readLegacyFactConversationReferences([10, 10], { db })).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+    });
   });
 
   it('clears exactly the five fact stores in one transaction, then independently verifies every count', async () => {

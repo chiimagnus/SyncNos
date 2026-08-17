@@ -532,6 +532,9 @@ describe('local data contracts', () => {
 
     const patch = {
       version: 1,
+      diagnostics: {
+        staleQueueEntriesDropped: { notion: 1, obsidian: 0, feishu: 0 },
+      },
       queues: {
         notion: [
           { source: 'chatgpt', conversationKey: 'conversation-z', dueAt: 50 },
@@ -560,20 +563,14 @@ describe('local data contracts', () => {
           okCount: 4,
           failCount: 5,
         },
-        feishu: {
-          provider: 'feishu',
-          status: 'done',
-          startedAt: 1,
-          updatedAt: 2,
-          finishedAt: 3,
-          okCount: 4,
-          failCount: 5,
-        },
+        feishu: null,
       },
     };
     const parsed = parseMigrationProfileReferencePatch(patch);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(parsed.queues.notion.map((entry) => entry.conversationKey)).toEqual(['conversation-a', 'conversation-z']);
+    expect(parsed.syncJobs.feishu).toBeNull();
+    expect(parsed.diagnostics.staleQueueEntriesDropped).toEqual({ notion: 1, obsidian: 0, feishu: 0 });
     const serialized = serializeMigrationProfileReferencePatch(patch);
     expect(serialized).toBe(serializeMigrationProfileReferencePatch(parsed));
     expect(serialized).not.toMatch(/conversationId|backendConversationId|title|url|token|oauth|warning|result/i);
@@ -672,9 +669,12 @@ describe('local data contracts', () => {
       'src/platform/idb/facts-transfer.ts',
       'src/services/local-data/migration-coordinator.ts',
     ]);
-    for (const symbol of ['clearFacts', 'verifyFactsEmpty']) {
+    for (const symbol of ['clearFacts', 'verifyFactsEmpty', 'readLegacyFactConversationReferences']) {
       const callers = productionFiles.filter((path) => new RegExp(`\\b${symbol}\\s*\\(`).test(readSource(path)));
-      expect(callers).toEqual(['src/platform/idb/facts-transfer.ts']);
+      expect(callers).toEqual([
+        'src/platform/idb/facts-transfer.ts',
+        'src/services/local-data/migration-coordinator.ts',
+      ]);
     }
     const journalEntrypoints = productionFiles.filter((path) => /\bbeginMigrationJournal\s*\(/.test(readSource(path)));
     expect(journalEntrypoints).toEqual([

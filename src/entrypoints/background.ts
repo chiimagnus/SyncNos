@@ -2,6 +2,7 @@ import { createBackgroundServices } from '@services/bootstrap/background-service
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
+import { UI_EVENT_TYPES } from '@platform/messaging/message-contracts';
 import { registerWebArticleHandlers } from '@collectors/web/article-fetch-background-handlers';
 import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
@@ -47,7 +48,6 @@ export default defineBackground(async () => {
   const factsGate = new FactsOperationGate();
   await factsGate.initializeFromJournal();
   const conversationReadRunner = createConversationReadRunner(factsGate);
-  const migrationCoordinator = createMigrationCoordinator({ gate: factsGate });
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId, factsOperations: factsGate });
   const streamRouter = new BackgroundStreamRouter(factsGate);
 
@@ -60,6 +60,19 @@ export default defineBackground(async () => {
     localDataStreamRouter: streamRouter,
   });
 
+  const migrationCoordinator = createMigrationCoordinator({
+    gate: factsGate,
+    rearmSchedulers: async () => {
+      await Promise.all([
+        services.autoSync.notionScheduler.rearm(),
+        services.autoSync.obsidianScheduler.rearm(),
+        services.autoSync.feishuScheduler.rearm(),
+      ]);
+    },
+    onActivated: () => {
+      router.eventsHub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: 'localDataMigrationActivated' });
+    },
+  });
   registerMigrationCoordinatorHandlers(router, migrationCoordinator);
   registerConversationHandlers(router, {
     conversationReadRunner,
