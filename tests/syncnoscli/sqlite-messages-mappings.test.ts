@@ -129,7 +129,9 @@ describe('SQLite messages repository', () => {
           { messageKey: ' m1 ', role: 'assistant', contentText: 'kept', sequence: 1 },
         ]),
       ).toEqual({ upserted: 1, deleted: 0 });
-      expect(messages.getMessagesByConversationId(conversation.id).map((message) => message.messageKey)).toEqual([' m1 ']);
+      expect(messages.getMessagesByConversationId(conversation.id).map((message) => message.messageKey)).toEqual([
+        ' m1 ',
+      ]);
     } finally {
       handle.close();
     }
