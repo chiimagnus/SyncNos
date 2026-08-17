@@ -32,6 +32,7 @@ describe('SyncNos CLI package contract', () => {
     expect(packageJson.files).not.toContain('src/**');
     expect(packageJson.scripts).toMatchObject({
       postinstall: expect.stringContaining('dist/lifecycle.cjs'),
+      prepack: 'node build.mjs',
       unregister: 'node dist/lifecycle.cjs unregister',
     });
     expect(packageJson.scripts).not.toHaveProperty('preuninstall');

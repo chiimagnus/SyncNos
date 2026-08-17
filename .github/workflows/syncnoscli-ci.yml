@@ -1,0 +1,79 @@
+name: SyncNos CLI CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - packages/syncnoscli/**
+      - tests/syncnoscli/**
+      - src/services/local-data/**
+      - src/services/conversations/domain/**
+      - src/services/comments/domain/**
+      - src/services/url-cleaning/**
+      - package.json
+      - package-lock.json
+      - tsconfig*.json
+      - vitest.config.mts
+      - .github/workflows/syncnoscli-ci.yml
+      - .github/workflows/webclipper-ci.yml
+
+concurrency:
+  group: syncnoscli-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  packed-install:
+    name: packed-install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    if: ${{ !github.event.pull_request.draft }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Setup Zig for Windows PE rebuild
+        if: ${{ runner.os == 'Windows' }}
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+
+      - name: Rebuild Windows Native Host PE artifacts
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: npm run build:windows-host-shim --workspace=@chiimagnus/syncnoscli
+
+      - name: Compile CLI
+        run: npm run compile:syncnoscli
+
+      - name: Build CLI
+        run: npm run build:syncnoscli
+
+      - name: Test CLI workspace contracts
+        run: npm run test:syncnoscli
+
+      - name: Inspect npm pack contents
+        run: npm run pack:syncnoscli
+
+      - name: Exercise packed install lifecycle
+        run: npm run test -- tests/syncnoscli/packed-install.test.ts
+        env:
+          SYNCNOSCLI_DISPOSABLE_RUNNER: '1'
+          SYNCNOSCLI_PACKED_INSTALL_E2E: '1'

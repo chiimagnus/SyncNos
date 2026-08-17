@@ -298,13 +298,10 @@ async function runPostinstall(input: RunLifecycleInput): Promise<LifecycleResult
 async function runUnregister(input: RunLifecycleInput): Promise<LifecycleResult> {
   const paths = runtimePaths(input.paths);
   if (!paths) return Object.freeze({ action: 'unregister', status: 'noop' });
-  const inspection = await inspectGlobalCliLifecycle({
+  const inspection = await inspectGlobalCliInstall({
     dependencies: input.dependencies,
-    environment: input.environment,
     packageRoot: input.packageRoot,
     paths,
-    requireGlobalFlag: false,
-    requireRegistrySource: false,
   });
   if (!inspection.packageRoot) return Object.freeze({ action: 'unregister', status: 'noop' });
   try {

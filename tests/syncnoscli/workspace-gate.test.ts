@@ -9,6 +9,7 @@ const packageJson = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), '
 
 const workspaceWorkflows = [
   'webclipper-ci.yml',
+  'syncnoscli-ci.yml',
   'webclipper-release.yml',
   'webclipper-prerelease.yml',
   'webclipper-cws-publish.yml',
@@ -44,11 +45,17 @@ describe('SyncNos CLI workspace gate', () => {
     expect(ci).toContain('- packages/**');
     expect(ci).toContain('- src/services/local-data/**');
     expect(ci).toContain('- package-lock.json');
+    expect(ci).toContain('- .github/workflows/syncnoscli-ci.yml');
     expect(ci).toContain('run: npm run gate:ci');
-    expect(ci).toContain('windows-native-host:');
-    expect(ci).toContain('runs-on: windows-latest');
-    expect(ci).toContain('run: npm run build:syncnoscli');
-    expect(ci).toContain('tests/syncnoscli/windows-native-host-runtime.test.ts');
+    expect(ci).not.toContain('windows-native-host:');
+
+    const cliCi = readWorkflow('syncnoscli-ci.yml');
+    expect(cliCi).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
+    expect(cliCi).toContain('npm run build:windows-host-shim --workspace=@chiimagnus/syncnoscli');
+    expect(cliCi).toMatch(/SYNCNOSCLI_PACKED_INSTALL_E2E:\s*['"]1['"]/);
+    expect(cliCi).toMatch(/SYNCNOSCLI_DISPOSABLE_RUNNER:\s*['"]1['"]/);
+    expect(cliCi).toContain('tests/syncnoscli/packed-install.test.ts');
+    expect(cliCi).not.toMatch(/rtk|\b(?:bash|sh)\b/);
 
     for (const workflow of workspaceWorkflows) {
       expect(readWorkflow(workflow)).not.toContain('npm publish');

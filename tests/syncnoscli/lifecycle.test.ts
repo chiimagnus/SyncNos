@@ -111,6 +111,8 @@ describe('SyncNos CLI npm lifecycle', () => {
     await mkdir(localRoot, { recursive: true });
     await writeFile(join(localRoot, 'package.json'), '{"name":"@chiimagnus/syncnoscli","version":"0.1.0"}');
     const ensureRegistrations = vi.fn(async () => undefined);
+    const removeRegistrations = vi.fn(async () => ({ canRemoveLauncher: true, conflicts: [] as string[] }));
+    const removeLauncher = vi.fn(async () => ({ removed: true }));
 
     await expect(
       runLifecycle('postinstall', {
@@ -125,6 +127,17 @@ describe('SyncNos CLI npm lifecycle', () => {
       }),
     ).resolves.toEqual({ action: 'postinstall', status: 'noop' });
     expect(ensureRegistrations).not.toHaveBeenCalled();
+
+    await expect(
+      runLifecycle('unregister', {
+        dependencies: { removeLauncher, removeRegistrations },
+        environment: {},
+        packageRoot: localRoot,
+        paths: fixture.paths,
+      }),
+    ).resolves.toEqual({ action: 'unregister', status: 'noop' });
+    expect(removeRegistrations).not.toHaveBeenCalled();
+    expect(removeLauncher).not.toHaveBeenCalled();
 
     await expect(
       runLifecycle('postinstall', {
@@ -167,7 +180,7 @@ describe('SyncNos CLI npm lifecycle', () => {
     await expect(
       runLifecycle('unregister', {
         dependencies: { removeLauncher, removeRegistrations },
-        environment: { npm_config_prefix: fixture.prefix },
+        environment: {},
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
       }),
@@ -190,7 +203,7 @@ describe('SyncNos CLI npm lifecycle', () => {
           removeRegistrations: async () => ({ canRemoveLauncher: false, conflicts: ['firefox-manifest'] }),
           writeDiagnostic,
         },
-        environment: { npm_config_prefix: fixture.prefix },
+        environment: {},
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
       }),
@@ -205,7 +218,7 @@ describe('SyncNos CLI npm lifecycle', () => {
           removeRegistrations: async () => ({ canRemoveLauncher: false, conflicts: [] }),
           writeDiagnostic,
         },
-        environment: { npm_config_prefix: fixture.prefix },
+        environment: {},
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
       }),

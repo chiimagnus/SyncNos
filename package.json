@@ -19,6 +19,7 @@
     "compile:syncnoscli": "tsc -p packages/syncnoscli/tsconfig.json --noEmit",
     "build:syncnoscli": "node packages/syncnoscli/build.mjs",
     "test:syncnoscli": "vitest run tests/syncnoscli",
+    "test:syncnoscli:packed": "vitest run tests/syncnoscli/packed-install.test.ts",
     "pack:syncnoscli": "npm pack --workspace=@chiimagnus/syncnoscli --dry-run --json",
     "check": "npm run build && node .github/scripts/webclipper/check-dist.mjs --root=.output/chrome-mv3",
     "test": "vitest run",

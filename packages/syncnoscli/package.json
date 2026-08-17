@@ -18,6 +18,7 @@
   "scripts": {
     "build": "node build.mjs",
     "build:windows-host-shim": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-host-shim.ps1",
+    "prepack": "node build.mjs",
     "compile": "tsc -p tsconfig.json --noEmit",
     "postinstall": "node -e \"async function run(){try{await require('./dist/lifecycle.cjs').runLifecycle('postinstall')}catch(_){}}run()\"",
     "unregister": "node dist/lifecycle.cjs unregister"
