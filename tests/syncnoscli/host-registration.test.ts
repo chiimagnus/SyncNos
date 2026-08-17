@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +11,7 @@ import {
   getNativeHostRegistrationLocations,
   inspectNativeHostRegistrations,
   isOwnedFirefoxNativeHostManifest,
+  recoverNativeHostRegistrationUpdate,
   removeOwnedNativeHostRegistrations,
   SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
   SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE,
@@ -18,6 +19,7 @@ import {
   type WindowsRegistryAdapter,
 } from '../../packages/syncnoscli/src/install/host-registration';
 import {
+  ensureNativeHostLauncher,
   removeNativeHostLauncher,
   type NativeHostLauncherDependencies,
 } from '../../packages/syncnoscli/src/runtime/launcher';
@@ -126,6 +128,44 @@ function createWindowsFilesystem(files: Map<string, FakeEntry>): {
       unlink,
     },
   };
+}
+
+function createWindowsRegistrationFixture() {
+  const paths = resolveSyncNosRuntimePaths({ platform: 'win32', homeDirectory: 'C:\\Users\\chii' });
+  const packageRoot = 'C:\\Program Files\\node_modules\\@chiimagnus\\syncnoscli';
+  const nodePath = 'C:\\Program Files\\nodejs\\node.exe';
+  const prebuilt = Buffer.from('MZ syncnos native host');
+  const files = new Map<string, FakeEntry>([
+    [packageRoot, { directory: true }],
+    [`${packageRoot}\\package.json`, { bytes: Buffer.from('{"name":"@chiimagnus/syncnoscli","version":"0.1.0"}') }],
+    [`${packageRoot}\\dist`, { directory: true }],
+    [`${packageRoot}\\dist\\native-host.cjs`, { bytes: Buffer.from('native host') }],
+    [nodePath, { bytes: Buffer.from('node') }],
+    [
+      `${packageRoot}\\prebuilds\\manifest.json`,
+      {
+        bytes: Buffer.from(
+          JSON.stringify({
+            version: 1,
+            sourceSha256: 'a'.repeat(64),
+            artifacts: {
+              'win32-arm64': { file: 'win32-arm64/syncnos-native-host.exe', sha256: 'b'.repeat(64) },
+              'win32-x64': { file: 'win32-x64/syncnos-native-host.exe', sha256: sha256(prebuilt) },
+            },
+          }),
+        ),
+      },
+    ],
+    [`${packageRoot}\\prebuilds\\win32-x64`, { directory: true }],
+    [`${packageRoot}\\prebuilds\\win32-x64\\syncnos-native-host.exe`, { bytes: prebuilt }],
+  ]);
+  return Object.freeze({
+    files,
+    nodePath,
+    packageRoot,
+    paths,
+    ...createWindowsFilesystem(files),
+  });
 }
 
 afterEach(async () => {
@@ -329,6 +369,145 @@ describe('SyncNos Native Host registration', () => {
     await expect(access(fixture.paths.stagingDirectory)).resolves.toBeUndefined();
   });
 
+  it('recovers an interrupted registration commit at every manifest and owner boundary without touching user data', async () => {
+    for (const browserIndex of [0, 1, 2]) {
+      for (const kind of ['manifest', 'owner'] as const) {
+        const fixture = await createUnixFixture();
+        const location = getNativeHostRegistrationLocations(fixture.paths)[browserIndex]!;
+        const destination = kind === 'manifest' ? location.manifestPath : location.ownerPath;
+        let injected = false;
+
+        await expect(
+          ensureNativeHostRegistrations({
+            packageRoot: fixture.packageRoot,
+            paths: fixture.paths,
+            registrationDependencies: {
+              rename: async (source, nextDestination) => {
+                if (!injected && nextDestination === destination) {
+                  injected = true;
+                  throw new Error(`injected ${location.browser} ${kind} commit failure`);
+                }
+                await rename(source, nextDestination);
+              },
+            },
+          }),
+        ).rejects.toMatchObject({ code: 'REGISTRATION_UNAVAILABLE' });
+        expect(injected).toBe(true);
+        await expect(access(fixture.paths.registrationUpdateIntentPath)).resolves.toBeUndefined();
+
+        await expect(
+          ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+        ).resolves.toMatchObject({
+          browsers: expect.arrayContaining([expect.objectContaining({ browser: location.browser })]),
+        });
+        await expect(
+          inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+        ).resolves.toMatchObject({
+          browsers: [
+            { browser: 'chrome', manifest: 'owned' },
+            { browser: 'edge', manifest: 'owned' },
+            { browser: 'firefox', manifest: 'owned' },
+          ],
+        });
+        await expect(access(fixture.paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(access(fixture.paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
+      }
+    }
+  });
+
+  it('refuses to overwrite a final registration file changed after the commit intent was published', async () => {
+    const fixture = await createUnixFixture();
+    const edge = getNativeHostRegistrationLocations(fixture.paths)[1]!;
+    let injected = false;
+    await expect(
+      ensureNativeHostRegistrations({
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+        registrationDependencies: {
+          rename: async (source, destination) => {
+            if (!injected && destination === edge.manifestPath) {
+              injected = true;
+              throw new Error('injected edge manifest interruption');
+            }
+            await rename(source, destination);
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'REGISTRATION_UNAVAILABLE' });
+    await expect(access(fixture.paths.registrationUpdateIntentPath)).resolves.toBeUndefined();
+
+    await writeFile(edge.manifestPath, 'foreign manifest bytes');
+    await expect(recoverNativeHostRegistrationUpdate({ paths: fixture.paths })).rejects.toMatchObject({
+      code: 'REGISTRATION_CONFLICT',
+    });
+    await expect(readFile(edge.manifestPath, 'utf8')).resolves.toBe('foreign manifest bytes');
+    await expect(access(fixture.paths.registrationUpdateIntentPath)).resolves.toBeUndefined();
+  });
+
+  it('rolls back only a proven prepared registration and preserves an untracked .next file', async () => {
+    const fixture = await createUnixFixture();
+    const edge = getNativeHostRegistrationLocations(fixture.paths)[1]!;
+    await expect(
+      ensureNativeHostRegistrations({
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+        registrationDependencies: {
+          writeFile: async (path, contents, options) => {
+            if (path === `${edge.ownerPath}.next`) throw new Error('injected registration staging failure');
+            await writeFile(path, contents, options);
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'REGISTRATION_UNAVAILABLE' });
+    await expect(access(fixture.paths.registrationUpdateIntentTemporaryPath)).resolves.toBeUndefined();
+    await expect(recoverNativeHostRegistrationUpdate({ paths: fixture.paths })).resolves.toBe(true);
+
+    for (const location of getNativeHostRegistrationLocations(fixture.paths)) {
+      await expect(access(location.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(access(location.ownerPath)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(access(`${location.manifestPath}.next`)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(access(`${location.ownerPath}.next`)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+
+    const chrome = getNativeHostRegistrationLocations(fixture.paths)[0]!;
+    await mkdir(join(chrome.manifestPath, '..'), { recursive: true });
+    await writeFile(`${chrome.manifestPath}.next`, 'unknown registration bytes');
+    await expect(recoverNativeHostRegistrationUpdate({ paths: fixture.paths })).rejects.toMatchObject({
+      code: 'REGISTRATION_CONFLICT',
+    });
+    await expect(readFile(`${chrome.manifestPath}.next`, 'utf8')).resolves.toBe('unknown registration bytes');
+  });
+
+  it('upgrades provably-owned stale registration sidecars after a launcher-only generation completed', async () => {
+    const fixture = await createUnixFixture();
+    await ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+    await writeFile(join(fixture.packageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 9;');
+    await ensureNativeHostLauncher({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+
+    await expect(
+      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({
+      browsers: [
+        { browser: 'chrome', manifest: 'conflict' },
+        { browser: 'edge', manifest: 'conflict' },
+        { browser: 'firefox', manifest: 'conflict' },
+      ],
+    });
+    await expect(
+      ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({ browsers: expect.arrayContaining([expect.objectContaining({ browser: 'firefox' })]) });
+    await expect(
+      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({
+      packageEntrypoint: 'current',
+      browsers: [
+        { browser: 'chrome', manifest: 'owned' },
+        { browser: 'edge', manifest: 'owned' },
+        { browser: 'firefox', manifest: 'owned' },
+      ],
+    });
+  });
+
   it('uses three browser keys across both Windows registry views and keeps browser manifests distinct', async () => {
     const paths = resolveSyncNosRuntimePaths({ platform: 'win32', homeDirectory: 'C:\\Users\\chii' });
     const packageRoot = 'C:\\Program Files\\node_modules\\@chiimagnus\\syncnoscli';
@@ -426,6 +605,99 @@ describe('SyncNos Native Host registration', () => {
         registrationDependencies: { ...registrationDependencies, windowsRegistry: registry },
       }),
     ).rejects.toMatchObject({ code: 'REGISTRATION_CONFLICT' });
+  });
+
+  it('recovers every Windows registry value interruption and refuses an unknown target value', async () => {
+    const createRegistry = (
+      values: Map<string, string>,
+      failureAt: number | null,
+    ): Readonly<{ registry: WindowsRegistryAdapter; writes: () => number }> => {
+      let writeCount = 0;
+      let injected = false;
+      const keyFor = (view: string, key: string, valueName: string | null) =>
+        `${view}:${key}:${valueName ?? '(Default)'}`;
+      return Object.freeze({
+        writes: () => writeCount,
+        registry: {
+          readKey: async ({ key, view }) => ({
+            state: [...values.keys()].some((entry) => entry.startsWith(`${view}:${key}:`)) ? 'present' : 'absent',
+          }),
+          readValue: async ({ key, valueName, view }) => {
+            const value = values.get(keyFor(view, key, valueName));
+            return value === undefined ? { state: 'absent' } : { state: 'present', value };
+          },
+          writeValue: async ({ key, value, valueName, view }) => {
+            writeCount += 1;
+            if (!injected && failureAt !== null && writeCount === failureAt) {
+              injected = true;
+              throw new Error(`injected registry write ${failureAt}`);
+            }
+            values.set(keyFor(view, key, valueName), value);
+          },
+          deleteValue: async ({ key, valueName, view }) => values.delete(keyFor(view, key, valueName)),
+        },
+      });
+    };
+
+    for (let failureAt = 1; failureAt <= 12; failureAt += 1) {
+      const fixture = createWindowsRegistrationFixture();
+      const values = new Map<string, string>();
+      const injected = createRegistry(values, failureAt);
+      const registrationDependencies = {
+        ...fixture.registrationDependencies,
+        windowsRegistry: injected.registry,
+      };
+      await expect(
+        ensureNativeHostRegistrations({
+          arch: 'x64',
+          launcherDependencies: fixture.launcherDependencies,
+          nodePath: fixture.nodePath,
+          packageRoot: fixture.packageRoot,
+          paths: fixture.paths,
+          registrationDependencies,
+        }),
+      ).rejects.toThrow(`injected registry write ${failureAt}`);
+      expect(injected.writes()).toBe(failureAt);
+      expect(fixture.files.has(fixture.paths.registrationUpdateIntentPath)).toBe(true);
+
+      await expect(
+        ensureNativeHostRegistrations({
+          arch: 'x64',
+          launcherDependencies: fixture.launcherDependencies,
+          nodePath: fixture.nodePath,
+          packageRoot: fixture.packageRoot,
+          paths: fixture.paths,
+          registrationDependencies,
+        }),
+      ).resolves.toMatchObject({ browsers: expect.arrayContaining([expect.objectContaining({ browser: 'firefox' })]) });
+      expect(fixture.files.has(fixture.paths.registrationUpdateIntentPath)).toBe(false);
+      expect(values.size).toBe(12);
+    }
+
+    const tampered = createWindowsRegistrationFixture();
+    const values = new Map<string, string>();
+    const injected = createRegistry(values, 2);
+    const registrationDependencies = {
+      ...tampered.registrationDependencies,
+      windowsRegistry: injected.registry,
+    };
+    await expect(
+      ensureNativeHostRegistrations({
+        arch: 'x64',
+        launcherDependencies: tampered.launcherDependencies,
+        nodePath: tampered.nodePath,
+        packageRoot: tampered.packageRoot,
+        paths: tampered.paths,
+        registrationDependencies,
+      }),
+    ).rejects.toThrow('injected registry write 2');
+    const chromeKey = 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\app.syncnos.localdata';
+    const ownerTarget = `32:${chromeKey}:${SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE}`;
+    values.set(ownerTarget, 'foreign-owner');
+    await expect(
+      recoverNativeHostRegistrationUpdate({ paths: tampered.paths, registrationDependencies }),
+    ).rejects.toMatchObject({ code: 'REGISTRATION_CONFLICT' });
+    expect(values.get(ownerTarget)).toBe('foreign-owner');
   });
 
   it('uses only verified System32 reg.exe and exact separated argv', async () => {

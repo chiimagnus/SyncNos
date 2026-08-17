@@ -8,6 +8,7 @@ export const SYNCNOSCLI_DATABASE_FILE_NAME = nativeHostContract.host.databaseRel
 export const SYNCNOSCLI_RUNTIME_OWNER_MARKER_FILE_NAME = 'runtime-owner-v1.json' as const;
 export const SYNCNOSCLI_NATIVE_HOST_LAUNCHER_CONFIG_FILE_NAME = 'native-host-launcher-v1.json' as const;
 export const SYNCNOSCLI_LAUNCHER_UPDATE_INTENT_FILE_NAME = 'launcher-update-intent-v1.json' as const;
+export const SYNCNOSCLI_REGISTRATION_UPDATE_INTENT_FILE_NAME = 'registration-update-intent-v1.json' as const;
 export const SYNCNOSCLI_STAGING_DIRECTORY_NAME = 'staging' as const;
 export const SYNCNOSCLI_UNIX_LAUNCHER_FILE_NAME = 'syncnos-native-host' as const;
 export const SYNCNOSCLI_WINDOWS_LAUNCHER_FILE_NAME = 'syncnos-native-host.exe' as const;
@@ -25,6 +26,8 @@ export type SyncNosRuntimePaths = Readonly<{
   launcherUpdateIntentPath: string;
   launcherUpdateIntentTemporaryPath: string;
   launcherTemporaryPath: string;
+  registrationUpdateIntentPath: string;
+  registrationUpdateIntentTemporaryPath: string;
   platform: SyncNosRuntimePlatform;
   runtimeDirectory: string;
   runtimeOwnerMarkerPath: string;
@@ -91,6 +94,11 @@ function createSyncNosRuntimePaths(platform: SyncNosRuntimePlatform, homeDirecto
       runtimeDirectory,
       `${platform === 'win32' ? SYNCNOSCLI_WINDOWS_LAUNCHER_FILE_NAME : SYNCNOSCLI_UNIX_LAUNCHER_FILE_NAME}.next`,
     ),
+    registrationUpdateIntentPath: api.join(runtimeDirectory, SYNCNOSCLI_REGISTRATION_UPDATE_INTENT_FILE_NAME),
+    registrationUpdateIntentTemporaryPath: api.join(
+      runtimeDirectory,
+      `${SYNCNOSCLI_REGISTRATION_UPDATE_INTENT_FILE_NAME}.next`,
+    ),
     stagingDirectory: api.join(runtimeDirectory, SYNCNOSCLI_STAGING_DIRECTORY_NAME),
   });
 }
@@ -146,6 +154,8 @@ export function classifySyncNosRuntimePath(pathsValue: unknown, candidate: unkno
     resolved === paths.launcherConfigTemporaryPath ||
     resolved === paths.launcherUpdateIntentPath ||
     resolved === paths.launcherUpdateIntentTemporaryPath ||
+    resolved === paths.registrationUpdateIntentPath ||
+    resolved === paths.registrationUpdateIntentTemporaryPath ||
     resolved === paths.runtimeOwnerMarkerPath ||
     resolved === paths.runtimeOwnerMarkerTemporaryPath
   ) {

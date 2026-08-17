@@ -1,4 +1,4 @@
-import { access, chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -12,7 +12,11 @@ import {
 
 import { runDoctor, type RunDoctorInput } from '../../packages/syncnoscli/src/commands/doctor';
 import { runCli } from '../../packages/syncnoscli/src/cli';
-import type { NativeHostRegistrationInspection } from '../../packages/syncnoscli/src/install/host-registration';
+import {
+  ensureNativeHostRegistrations,
+  getNativeHostRegistrationLocations,
+  type NativeHostRegistrationInspection,
+} from '../../packages/syncnoscli/src/install/host-registration';
 import type { GlobalLifecycleInspection } from '../../packages/syncnoscli/src/install/lifecycle';
 import type { NativeHostLauncherOwnership } from '../../packages/syncnoscli/src/runtime/launcher';
 import { resolveSyncNosRuntimePaths } from '../../packages/syncnoscli/src/runtime/paths';
@@ -211,6 +215,42 @@ describe('SyncNos doctor', () => {
     ]);
     expect(report.database).toMatchObject({ state: 'not_initialized', filePermissions: 'not_present' });
     await expect(access(paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('doctor --fix completes a proven interrupted registration generation instead of treating it as a permanent conflict', async () => {
+    const paths = await temporaryPaths();
+    const globalPackageRoot = join(paths.homeDirectory, 'prefix', 'lib', 'node_modules', '@chiimagnus', 'syncnoscli');
+    await mkdir(join(globalPackageRoot, 'dist'), { recursive: true });
+    await writeFile(join(globalPackageRoot, 'package.json'), '{"name":"@chiimagnus/syncnoscli","version":"0.1.0"}');
+    await writeFile(join(globalPackageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 0;');
+    const edgeOwner = getNativeHostRegistrationLocations(paths)[1]!.ownerPath;
+    let injected = false;
+
+    await expect(
+      ensureNativeHostRegistrations({
+        packageRoot: globalPackageRoot,
+        paths,
+        registrationDependencies: {
+          rename: async (source, destination) => {
+            if (!injected && destination === edgeOwner) {
+              injected = true;
+              throw new Error('injected doctor registration interruption');
+            }
+            await rename(source, destination);
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'REGISTRATION_UNAVAILABLE' });
+    await expect(access(paths.registrationUpdateIntentPath)).resolves.toBeUndefined();
+
+    const report = await runDoctor({ paths, packageRoot: globalPackageRoot, fix: true });
+    expect(report.actions).toContainEqual({ name: 'native_host', status: 'repaired', reason: null });
+    expect(report.registrations).toEqual([
+      { browser: 'chrome', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
+      { browser: 'edge', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
+      { browser: 'firefox', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
+    ]);
+    await expect(access(paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('refuses --fix from an unproven package layout and preserves non-owned state', async () => {

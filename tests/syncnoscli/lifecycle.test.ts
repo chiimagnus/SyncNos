@@ -1,9 +1,13 @@
-import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  getNativeHostRegistrationLocations,
+  inspectNativeHostRegistrations,
+} from '../../packages/syncnoscli/src/install/host-registration';
 import {
   inspectGlobalCliInstall,
   inspectGlobalCliLifecycle,
@@ -189,6 +193,81 @@ describe('SyncNos CLI npm lifecycle', () => {
       expect.objectContaining({ packageRoot: canonicalPackageRoot, paths: fixture.paths }),
     );
     expect(removeLauncher).toHaveBeenCalledWith({ paths: fixture.paths });
+  });
+
+  it('postinstall and unregister recover a proven interrupted registration generation through the real lifecycle path', async () => {
+    const fixture = await createGlobalPackageFixture();
+    await mkdir(join(fixture.packageRoot, 'dist'));
+    await writeFile(join(fixture.packageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 0;');
+    const environment = {
+      npm_config_global: 'true',
+      npm_config_prefix: fixture.prefix,
+      npm_package_resolved: REGISTRY_RESOLUTION,
+    };
+
+    await expect(
+      runLifecycle('postinstall', {
+        environment,
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+      }),
+    ).resolves.toEqual({ action: 'postinstall', status: 'completed' });
+    await writeFile(join(fixture.packageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 9;');
+    const edgeOwner = getNativeHostRegistrationLocations(fixture.paths)[1]!.ownerPath;
+    let injected = false;
+    const writeDiagnostic = vi.fn();
+    await expect(
+      runLifecycle('postinstall', {
+        dependencies: { writeDiagnostic },
+        environment,
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+        registrationDependencies: {
+          rename: async (source, destination) => {
+            if (!injected && destination === edgeOwner) {
+              injected = true;
+              throw new Error('injected lifecycle registration interruption');
+            }
+            await rename(source, destination);
+          },
+        },
+      }),
+    ).resolves.toEqual({ action: 'postinstall', status: 'completed' });
+    expect(writeDiagnostic).toHaveBeenCalledWith(
+      'SyncNos CLI installed, but Native Host registration needs doctor --fix.',
+    );
+    await expect(access(fixture.paths.registrationUpdateIntentPath)).resolves.toBeUndefined();
+
+    await expect(
+      runLifecycle('postinstall', {
+        environment,
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+      }),
+    ).resolves.toEqual({ action: 'postinstall', status: 'completed' });
+    await expect(
+      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({
+      packageEntrypoint: 'current',
+      browsers: [
+        { browser: 'chrome', manifest: 'owned' },
+        { browser: 'edge', manifest: 'owned' },
+        { browser: 'firefox', manifest: 'owned' },
+      ],
+    });
+    await expect(access(fixture.paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
+
+    await expect(
+      runLifecycle('unregister', {
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+      }),
+    ).resolves.toEqual({ action: 'unregister', status: 'completed' });
+    for (const location of getNativeHostRegistrationLocations(fixture.paths)) {
+      await expect(access(location.manifestPath)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(access(location.ownerPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+    await expect(access(fixture.paths.launcherPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('leaves launcher and database cleanup alone when an owned registration cannot be proven', async () => {

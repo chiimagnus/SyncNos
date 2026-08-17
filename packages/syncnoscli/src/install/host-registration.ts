@@ -22,12 +22,19 @@ import {
 import {
   ensureNativeHostLauncher,
   inspectNativeHostLauncher,
+  recoverNativeHostLauncherUpdate,
   type NativeHostLauncherDependencies,
   type NativeHostLauncherOwnership,
 } from '../runtime/launcher';
-import { assertSyncNosRuntimePaths, resolveSyncNosRuntimePaths, type SyncNosRuntimePaths } from '../runtime/paths';
+import {
+  assertRuntimeOwnedFilePath,
+  assertSyncNosRuntimePaths,
+  resolveSyncNosRuntimePaths,
+  type SyncNosRuntimePaths,
+} from '../runtime/paths';
 
 export const SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER = 'syncnoscli-native-host-registration-v1' as const;
+export const SYNCNOSCLI_REGISTRATION_UPDATE_INTENT = 'syncnoscli-registration-update-v1' as const;
 export const SYNCNOSCLI_PACKAGE_NAME = '@chiimagnus/syncnoscli' as const;
 export const SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE = 'SyncNosCliOwnerV1' as const;
 
@@ -78,6 +85,38 @@ type ExistingRegistration = Readonly<{
 }>;
 
 type ExistingRegistrationState = ExistingRegistration | Readonly<{ state: 'absent' | 'conflict' }>;
+
+type RegistrationUpdateFileTarget = Readonly<{
+  newDigest: string;
+  oldDigest: string | null;
+}>;
+
+type RegistrationUpdateRegistryTarget = Readonly<{
+  newValue: string;
+  oldValue: string | null;
+  valueName: string | null;
+  view: NativeHostRegistryView;
+}>;
+
+type RegistrationUpdateBrowserTarget = Readonly<{
+  browser: NativeHostBrowser;
+  manifest: RegistrationUpdateFileTarget;
+  owner: RegistrationUpdateFileTarget;
+  registry: readonly RegistrationUpdateRegistryTarget[];
+}>;
+
+type RegistrationUpdateIntent = Readonly<{
+  browsers: readonly RegistrationUpdateBrowserTarget[];
+  ownerMarker: typeof SYNCNOSCLI_REGISTRATION_UPDATE_INTENT;
+  platform: SyncNosRuntimePaths['platform'];
+  version: 1;
+}>;
+
+type PreparedRegistrationWrite = Readonly<{
+  location: NativeHostManifestLocation;
+  manifest: Buffer;
+  owner: Buffer;
+}>;
 
 export type WindowsRegistryReadResult =
   | Readonly<{ state: 'absent' }>
@@ -286,6 +325,62 @@ function parseOwnerRecord(bytes: Uint8Array): RegistrationOwnerRecord {
     packageDigest: digest(input.packageDigest),
     prebuiltDigest: input.prebuiltDigest === null ? null : digest(input.prebuiltDigest),
   });
+}
+
+function parseRegistrationUpdateIntent(bytes: Uint8Array): RegistrationUpdateIntent {
+  try {
+    const input = strictRecord(JSON.parse(UTF8_DECODER.decode(bytes)));
+    exactKeys(input, ['version', 'ownerMarker', 'platform', 'browsers']);
+    if (
+      input.version !== 1 ||
+      input.ownerMarker !== SYNCNOSCLI_REGISTRATION_UPDATE_INTENT ||
+      (input.platform !== 'darwin' && input.platform !== 'linux' && input.platform !== 'win32') ||
+      !Array.isArray(input.browsers)
+    ) {
+      registrationFailure('REGISTRATION_CONFLICT');
+    }
+    const fileTarget = (value: unknown): RegistrationUpdateFileTarget => {
+      const target = strictRecord(value);
+      exactKeys(target, ['newDigest', 'oldDigest']);
+      return Object.freeze({
+        newDigest: digest(target.newDigest),
+        oldDigest: target.oldDigest === null ? null : digest(target.oldDigest),
+      });
+    };
+    const registryTarget = (value: unknown): RegistrationUpdateRegistryTarget => {
+      const target = strictRecord(value);
+      exactKeys(target, ['view', 'valueName', 'oldValue', 'newValue']);
+      if (target.view !== '32' && target.view !== '64') registrationFailure('REGISTRATION_CONFLICT');
+      if (target.valueName !== null && target.valueName !== SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE) {
+        registrationFailure('REGISTRATION_CONFLICT');
+      }
+      return Object.freeze({
+        view: target.view,
+        valueName: target.valueName,
+        oldValue: target.oldValue === null ? null : nonEmptyString(target.oldValue),
+        newValue: nonEmptyString(target.newValue),
+      });
+    };
+    const browsers = input.browsers.map((value): RegistrationUpdateBrowserTarget => {
+      const browser = strictRecord(value);
+      exactKeys(browser, ['browser', 'manifest', 'owner', 'registry']);
+      if (!Array.isArray(browser.registry)) registrationFailure('REGISTRATION_CONFLICT');
+      return Object.freeze({
+        browser: parseBrowser(browser.browser),
+        manifest: fileTarget(browser.manifest),
+        owner: fileTarget(browser.owner),
+        registry: Object.freeze(browser.registry.map(registryTarget)),
+      });
+    });
+    return Object.freeze({
+      version: 1,
+      ownerMarker: SYNCNOSCLI_REGISTRATION_UPDATE_INTENT,
+      platform: input.platform,
+      browsers: Object.freeze(browsers),
+    });
+  } catch (_error) {
+    registrationFailure('REGISTRATION_CONFLICT');
+  }
 }
 
 export function resolveSyncNosCliPackageRoot(): string {
@@ -648,7 +743,34 @@ async function ensureManifestDirectory(
   assertDirectory(await lstatIfPresent(dependencies, directory));
 }
 
-async function replaceOwnedFile(
+async function readOptionalRegistrationFile(path: string, dependencies: ResolvedDependencies): Promise<Buffer | null> {
+  const status = await lstatIfPresent(dependencies, path);
+  if (!status) return null;
+  assertRegularFile(status);
+  return await readVerifiedFile(dependencies, path);
+}
+
+async function unlinkRegistrationFile(path: string, dependencies: ResolvedDependencies): Promise<void> {
+  const status = await lstatIfPresent(dependencies, path);
+  if (!status) return;
+  assertRegularFile(status);
+  try {
+    await dependencies.unlink(path);
+  } catch (_error) {
+    registrationFailure('REGISTRATION_UNAVAILABLE');
+  }
+}
+
+async function readOptionalRegistrationIntent(
+  paths: SyncNosRuntimePaths,
+  path: string,
+  dependencies: ResolvedDependencies,
+): Promise<Buffer | null> {
+  assertRuntimeOwnedFilePath(paths, path);
+  return await readOptionalRegistrationFile(path, dependencies);
+}
+
+async function stageRegistrationFile(
   destination: string,
   contents: Buffer,
   mode: number,
@@ -663,13 +785,59 @@ async function replaceOwnedFile(
   }
   const written = await readVerifiedFile(dependencies, temporary);
   if (!written.equals(contents)) registrationFailure('REGISTRATION_UNAVAILABLE');
+}
+
+async function commitRegistrationFile(
+  destination: string,
+  expectedDigest: string,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  const temporary = `${destination}.next`;
+  const staged = await readOptionalRegistrationFile(temporary, dependencies);
+  if (!staged || sha256(staged) !== expectedDigest) registrationFailure('REGISTRATION_CONFLICT');
   try {
     await dependencies.rename(temporary, destination);
   } catch (_error) {
     registrationFailure('REGISTRATION_UNAVAILABLE');
   }
-  const replaced = await readVerifiedFile(dependencies, destination);
-  if (!replaced.equals(contents)) registrationFailure('REGISTRATION_UNAVAILABLE');
+  const committed = await readVerifiedFile(dependencies, destination);
+  if (sha256(committed) !== expectedDigest) registrationFailure('REGISTRATION_UNAVAILABLE');
+}
+
+async function rollbackPreparedRegistrationFile(
+  destination: string,
+  target: RegistrationUpdateFileTarget,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  const current = await readOptionalRegistrationFile(destination, dependencies);
+  const currentDigest = current ? sha256(current) : null;
+  if (currentDigest !== target.oldDigest) registrationFailure('REGISTRATION_CONFLICT');
+  const temporary = `${destination}.next`;
+  const staged = await readOptionalRegistrationFile(temporary, dependencies);
+  if (!staged) return;
+  if (sha256(staged) !== target.newDigest) registrationFailure('REGISTRATION_CONFLICT');
+  await unlinkRegistrationFile(temporary, dependencies);
+}
+
+async function recoverCommittedRegistrationFile(
+  destination: string,
+  target: RegistrationUpdateFileTarget,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  const current = await readOptionalRegistrationFile(destination, dependencies);
+  const currentDigest = current ? sha256(current) : null;
+  const temporary = `${destination}.next`;
+  const staged = await readOptionalRegistrationFile(temporary, dependencies);
+  const stagedDigest = staged ? sha256(staged) : null;
+  if (currentDigest === target.newDigest) {
+    if (stagedDigest !== null && stagedDigest !== target.newDigest) registrationFailure('REGISTRATION_CONFLICT');
+    if (stagedDigest !== null) await unlinkRegistrationFile(temporary, dependencies);
+    return;
+  }
+  if (currentDigest !== target.oldDigest || stagedDigest !== target.newDigest) {
+    registrationFailure('REGISTRATION_CONFLICT');
+  }
+  await commitRegistrationFile(destination, target.newDigest, dependencies);
 }
 
 function registryOutputValue(result: SpawnFileResult): string | null {
@@ -839,6 +1007,41 @@ async function inspectRegistryRegistration(
   return Object.freeze({ state: registration.state === 'owned' ? ('owned' as const) : ('absent' as const) });
 }
 
+async function readRegistryTargetValue(
+  registry: WindowsRegistryAdapter,
+  location: NativeHostManifestLocation,
+  target: RegistrationUpdateRegistryTarget,
+): Promise<string | null> {
+  if (!location.registryKey) registrationFailure('WINDOWS_REGISTRY_UNAVAILABLE');
+  const current = await registry.readValue({
+    key: location.registryKey,
+    valueName: target.valueName,
+    view: target.view,
+  });
+  if (current.state === 'unavailable') registrationFailure('WINDOWS_REGISTRY_UNAVAILABLE');
+  return current.state === 'absent' ? null : current.value;
+}
+
+async function recoverCommittedRegistryTarget(
+  registry: WindowsRegistryAdapter,
+  location: NativeHostManifestLocation,
+  target: RegistrationUpdateRegistryTarget,
+): Promise<void> {
+  if (!location.registryKey) registrationFailure('WINDOWS_REGISTRY_UNAVAILABLE');
+  const current = await readRegistryTargetValue(registry, location, target);
+  if (current === target.newValue) return;
+  if (current !== target.oldValue) registrationFailure('REGISTRATION_CONFLICT');
+  await registry.writeValue({
+    key: location.registryKey,
+    valueName: target.valueName,
+    value: target.newValue,
+    view: target.view,
+  });
+  if ((await readRegistryTargetValue(registry, location, target)) !== target.newValue) {
+    registrationFailure('WINDOWS_REGISTRY_UNAVAILABLE');
+  }
+}
+
 function inspectionState(state: ExistingRegistrationState): NativeHostRegistrationInspectionState {
   return state.state;
 }
@@ -942,34 +1145,216 @@ export async function inspectNativeHostRegistrations(
   });
 }
 
-async function writeRegistryRegistration(
+function preparedRegistrationWrites(
+  locations: readonly NativeHostManifestLocation[],
+  packageIdentity: PackageIdentity,
+  launcher: NativeHostLauncherOwnership,
+): readonly PreparedRegistrationWrite[] {
+  return Object.freeze(
+    locations.map((location) => {
+      const manifest = manifestBytes(location, launcher.launcherPath);
+      return Object.freeze({
+        location,
+        manifest,
+        owner: Buffer.from(JSON.stringify(ownerRecord(location, manifest, launcher, packageIdentity)), 'utf8'),
+      });
+    }),
+  );
+}
+
+function registrationRegistryTargets(
+  paths: SyncNosRuntimePaths,
   location: NativeHostManifestLocation,
-  registry: WindowsRegistryAdapter,
-): Promise<void> {
+  existing: ExistingRegistrationState,
+): readonly RegistrationUpdateRegistryTarget[] {
+  if (paths.platform !== 'win32') return Object.freeze([]);
   if (!location.registryKey) registrationFailure('WINDOWS_REGISTRY_UNAVAILABLE');
-  for (const view of ['32', '64'] as const) {
-    await registry.writeValue({ key: location.registryKey, valueName: null, value: location.manifestPath, view });
-    await registry.writeValue({
-      key: location.registryKey,
-      valueName: SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE,
-      value: SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
-      view,
-    });
+  const previousDefault = existing.state === 'owned' ? location.manifestPath : null;
+  const previousOwner = existing.state === 'owned' ? SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER : null;
+  return Object.freeze(
+    WINDOWS_REGISTRY_VIEWS.flatMap((view) => [
+      Object.freeze({
+        view,
+        valueName: null,
+        oldValue: previousDefault,
+        newValue: location.manifestPath,
+      }),
+      Object.freeze({
+        view,
+        valueName: SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE,
+        oldValue: previousOwner,
+        newValue: SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
+      }),
+    ]),
+  );
+}
+
+function registrationUpdateIntent(
+  paths: SyncNosRuntimePaths,
+  writes: readonly PreparedRegistrationWrite[],
+  existing: readonly ExistingRegistrationState[],
+): RegistrationUpdateIntent {
+  return Object.freeze({
+    version: 1,
+    ownerMarker: SYNCNOSCLI_REGISTRATION_UPDATE_INTENT,
+    platform: paths.platform,
+    browsers: Object.freeze(
+      writes.map((write, index) => {
+        const previous = existing[index]!;
+        return Object.freeze({
+          browser: write.location.browser,
+          manifest: Object.freeze({
+            oldDigest: previous.state === 'owned' ? previous.record.manifestDigest : null,
+            newDigest: sha256(write.manifest),
+          }),
+          owner: Object.freeze({
+            oldDigest: previous.state === 'owned' ? previous.ownerDigest : null,
+            newDigest: sha256(write.owner),
+          }),
+          registry: registrationRegistryTargets(paths, write.location, previous),
+        });
+      }),
+    ),
+  });
+}
+
+function validateRegistrationUpdateIntent(
+  paths: SyncNosRuntimePaths,
+  intent: RegistrationUpdateIntent,
+  locations: readonly NativeHostManifestLocation[],
+): void {
+  if (intent.platform !== paths.platform || intent.browsers.length !== locations.length) {
+    registrationFailure('REGISTRATION_CONFLICT');
+  }
+  for (let index = 0; index < locations.length; index += 1) {
+    const location = locations[index]!;
+    const browser = intent.browsers[index]!;
+    if (browser.browser !== location.browser) registrationFailure('REGISTRATION_CONFLICT');
+    const expectedRegistry =
+      paths.platform === 'win32'
+        ? WINDOWS_REGISTRY_VIEWS.flatMap((view) => [
+            { view, valueName: null, newValue: location.manifestPath },
+            {
+              view,
+              valueName: SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE,
+              newValue: SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
+            },
+          ])
+        : [];
+    if (browser.registry.length !== expectedRegistry.length) registrationFailure('REGISTRATION_CONFLICT');
+    for (let targetIndex = 0; targetIndex < expectedRegistry.length; targetIndex += 1) {
+      const target = browser.registry[targetIndex]!;
+      const expected = expectedRegistry[targetIndex]!;
+      if (
+        target.view !== expected.view ||
+        target.valueName !== expected.valueName ||
+        target.newValue !== expected.newValue ||
+        (target.oldValue !== null && target.oldValue !== target.newValue)
+      ) {
+        registrationFailure('REGISTRATION_CONFLICT');
+      }
+    }
   }
 }
 
-async function writeManifestRegistration(
-  paths: SyncNosRuntimePaths,
-  location: NativeHostManifestLocation,
-  packageIdentity: PackageIdentity,
-  launcher: NativeHostLauncherOwnership,
+async function assertNoUntrackedRegistrationStages(
+  locations: readonly NativeHostManifestLocation[],
   dependencies: ResolvedDependencies,
 ): Promise<void> {
-  await ensureManifestDirectory(paths, location, dependencies);
-  const manifest = manifestBytes(location, launcher.launcherPath);
-  const owner = Buffer.from(JSON.stringify(ownerRecord(location, manifest, launcher, packageIdentity)), 'utf8');
-  await replaceOwnedFile(location.manifestPath, manifest, 0o644, dependencies);
-  await replaceOwnedFile(location.ownerPath, owner, 0o600, dependencies);
+  for (const location of locations) {
+    for (const path of [`${location.manifestPath}.next`, `${location.ownerPath}.next`]) {
+      if (await readOptionalRegistrationFile(path, dependencies)) registrationFailure('REGISTRATION_CONFLICT');
+    }
+  }
+}
+
+async function prepareRegistrationUpdateIntent(
+  paths: SyncNosRuntimePaths,
+  intent: RegistrationUpdateIntent,
+  dependencies: ResolvedDependencies,
+): Promise<Buffer> {
+  assertRuntimeOwnedFilePath(paths, paths.registrationUpdateIntentPath);
+  assertRuntimeOwnedFilePath(paths, paths.registrationUpdateIntentTemporaryPath);
+  if (await readOptionalRegistrationIntent(paths, paths.registrationUpdateIntentPath, dependencies)) {
+    registrationFailure('REGISTRATION_CONFLICT');
+  }
+  const bytes = Buffer.from(JSON.stringify(intent), 'utf8');
+  await stageRegistrationFile(paths.registrationUpdateIntentPath, bytes, 0o600, dependencies);
+  return bytes;
+}
+
+async function commitRegistrationUpdateIntent(
+  paths: SyncNosRuntimePaths,
+  bytes: Buffer,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  assertRuntimeOwnedFilePath(paths, paths.registrationUpdateIntentPath);
+  await commitRegistrationFile(paths.registrationUpdateIntentPath, sha256(bytes), dependencies);
+  const committed = await readVerifiedFile(dependencies, paths.registrationUpdateIntentPath);
+  if (!committed.equals(bytes)) registrationFailure('REGISTRATION_UNAVAILABLE');
+}
+
+async function removeRegistrationIntent(
+  paths: SyncNosRuntimePaths,
+  path: string,
+  dependencies: ResolvedDependencies,
+): Promise<void> {
+  assertRuntimeOwnedFilePath(paths, path);
+  await unlinkRegistrationFile(path, dependencies);
+}
+
+/** Recovers only the fixed registration generation proven by the runtime intent file. */
+export async function recoverNativeHostRegistrationUpdate(
+  input: Pick<EnsureNativeHostRegistrationsInput, 'paths' | 'registrationDependencies'> = {},
+): Promise<boolean> {
+  const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
+  const dependencies = resolveDependencies(input.registrationDependencies);
+  const locations = nativeHostManifestLocations(paths);
+  const [committedIntentBytes, preparedIntentBytes] = await Promise.all([
+    readOptionalRegistrationIntent(paths, paths.registrationUpdateIntentPath, dependencies),
+    readOptionalRegistrationIntent(paths, paths.registrationUpdateIntentTemporaryPath, dependencies),
+  ]);
+  if (!committedIntentBytes && !preparedIntentBytes) {
+    await assertNoUntrackedRegistrationStages(locations, dependencies);
+    return false;
+  }
+  if (committedIntentBytes && preparedIntentBytes) registrationFailure('REGISTRATION_CONFLICT');
+  const intentBytes = committedIntentBytes ?? preparedIntentBytes!;
+  const intent = parseRegistrationUpdateIntent(intentBytes);
+  validateRegistrationUpdateIntent(paths, intent, locations);
+
+  if (preparedIntentBytes) {
+    for (let index = 0; index < locations.length; index += 1) {
+      const location = locations[index]!;
+      const target = intent.browsers[index]!;
+      await rollbackPreparedRegistrationFile(location.manifestPath, target.manifest, dependencies);
+      await rollbackPreparedRegistrationFile(location.ownerPath, target.owner, dependencies);
+    }
+    const rechecked = await readVerifiedFile(dependencies, paths.registrationUpdateIntentTemporaryPath);
+    if (!rechecked.equals(intentBytes)) registrationFailure('REGISTRATION_CONFLICT');
+    await removeRegistrationIntent(paths, paths.registrationUpdateIntentTemporaryPath, dependencies);
+    return true;
+  }
+
+  for (let index = 0; index < locations.length; index += 1) {
+    const location = locations[index]!;
+    const target = intent.browsers[index]!;
+    await recoverCommittedRegistrationFile(location.manifestPath, target.manifest, dependencies);
+    await recoverCommittedRegistrationFile(location.ownerPath, target.owner, dependencies);
+  }
+  if (paths.platform === 'win32') {
+    const registry = dependencies.windowsRegistry ?? createWindowsRegistryAdapter();
+    for (let index = 0; index < locations.length; index += 1) {
+      const location = locations[index]!;
+      for (const target of intent.browsers[index]!.registry) {
+        await recoverCommittedRegistryTarget(registry, location, target);
+      }
+    }
+  }
+  const rechecked = await readVerifiedFile(dependencies, paths.registrationUpdateIntentPath);
+  if (!rechecked.equals(intentBytes)) registrationFailure('REGISTRATION_CONFLICT');
+  await removeRegistrationIntent(paths, paths.registrationUpdateIntentPath, dependencies);
+  return true;
 }
 
 /**
@@ -981,11 +1366,16 @@ export async function ensureNativeHostRegistrations(
 ): Promise<NativeHostRegistrationResult> {
   const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
   const dependencies = resolveDependencies(input.registrationDependencies);
+  await recoverNativeHostLauncherUpdate({ paths, dependencies: input.launcherDependencies });
+  await recoverNativeHostRegistrationUpdate({ paths, registrationDependencies: input.registrationDependencies });
+
   const packageIdentity = await readPackageIdentity(paths, input.packageRoot, dependencies);
   const locations = nativeHostManifestLocations(paths);
   const previousLauncher = await inspectNativeHostLauncher({ paths, dependencies: input.launcherDependencies });
+  // Upgrade preflight proves the old manifest/sidecar pair itself. It deliberately does not
+  // require that pair to already bind the current launcher generation; runtime authorization still does.
   const existing = await Promise.all(
-    locations.map((location) => inspectRegistration(paths, location, packageIdentity, previousLauncher, dependencies)),
+    locations.map((location) => inspectRegistration(paths, location, packageIdentity, null, dependencies)),
   );
   if (
     existing.some((state) => state.state === 'conflict') ||
@@ -1012,14 +1402,17 @@ export async function ensureNativeHostRegistrations(
   const launcher = await inspectNativeHostLauncher({ paths, dependencies: input.launcherDependencies });
   if (!launcher) registrationFailure('REGISTRATION_UNAVAILABLE');
 
-  await Promise.all(
-    locations.map((location) => writeManifestRegistration(paths, location, packageIdentity, launcher, dependencies)),
-  );
-  if (registry) {
-    for (const location of locations) {
-      await writeRegistryRegistration(location, registry);
-    }
+  const writes = preparedRegistrationWrites(locations, packageIdentity, launcher);
+  for (const write of writes) await ensureManifestDirectory(paths, write.location, dependencies);
+  const intent = registrationUpdateIntent(paths, writes, existing);
+  const intentBytes = await prepareRegistrationUpdateIntent(paths, intent, dependencies);
+  for (const write of writes) {
+    await stageRegistrationFile(write.location.manifestPath, write.manifest, 0o644, dependencies);
+    await stageRegistrationFile(write.location.ownerPath, write.owner, 0o600, dependencies);
   }
+  await commitRegistrationUpdateIntent(paths, intentBytes, dependencies);
+  await recoverNativeHostRegistrationUpdate({ paths, registrationDependencies: input.registrationDependencies });
+
   return Object.freeze({
     browsers: Object.freeze(
       locations.map((location) =>
@@ -1071,6 +1464,8 @@ export async function removeOwnedNativeHostRegistrations(
 ): Promise<RemoveNativeHostRegistrationsResult> {
   const paths = assertSyncNosRuntimePaths(input.paths ?? resolveSyncNosRuntimePaths());
   const dependencies = resolveDependencies(input.registrationDependencies);
+  await recoverNativeHostLauncherUpdate({ paths, dependencies: input.launcherDependencies });
+  await recoverNativeHostRegistrationUpdate({ paths, registrationDependencies: input.registrationDependencies });
   const packageIdentity = await readPackageIdentity(paths, input.packageRoot, dependencies);
   const launcher = await inspectNativeHostLauncher({ paths, dependencies: input.launcherDependencies });
   const locations = nativeHostManifestLocations(paths);
