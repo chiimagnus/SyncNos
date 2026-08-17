@@ -18,7 +18,7 @@ import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
   deleteConversations,
-  findConversationById,
+  findLegacyIdbConversationById,
   findConversationBySourceAndKey,
   getConversationListBootstrap,
   getConversationListPage,
@@ -713,7 +713,7 @@ export function ConversationsProvider({
       }
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
-      const target = await findConversationById(id, 'idb-v1').catch(() => null);
+      const target = await findLegacyIdbConversationById(id).catch(() => null);
       if (requestSeq !== openTargetRequestSeqRef.current || !target) return false;
       applyOpenTarget(target, { preserveListScope: false });
       return true;

@@ -479,15 +479,17 @@ export async function findConversationBySourceAndKey(
   return unwrap(res);
 }
 
-export async function findConversationById(
+export async function findLegacyIdbConversationById(
   conversationId: number,
-  factsEpoch?: FactsEpoch,
 ): Promise<ConversationListOpenTarget | null> {
   const id = Number(conversationId);
-  const res = await send<ApiResponse<ConversationListOpenTarget | null>>(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, {
-    conversationId: id,
-    factsEpoch,
-  });
+  const res = await send<ApiResponse<ConversationListOpenTarget | null>>(
+    CORE_MESSAGE_TYPES.FIND_LEGACY_IDB_CONVERSATION_BY_ID,
+    {
+      conversationId: id,
+      factsEpoch: 'idb-v1',
+    },
+  );
   return unwrap(res);
 }
 

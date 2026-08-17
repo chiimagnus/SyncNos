@@ -13,7 +13,7 @@ export const CORE_MESSAGE_TYPES = {
   GET_CONVERSATION_LIST_PAGE: 'getConversationListPage',
   GET_CONVERSATION_LOCAL_DATA_REVISION: 'getConversationLocalDataRevision',
   FIND_CONVERSATION_BY_SOURCE_AND_KEY: 'findConversationBySourceAndKey',
-  FIND_CONVERSATION_BY_ID: 'findConversationById',
+  FIND_LEGACY_IDB_CONVERSATION_BY_ID: 'findLegacyIdbConversationById',
   GET_CONVERSATION_DETAIL: 'getConversationDetail',
   GET_CONVERSATION_SYNC_MAPPING: 'getConversationSyncMapping',
   GET_CONVERSATION_IMAGE_ASSET: 'getConversationImageAsset',

@@ -18,7 +18,7 @@ const readMocks = vi.hoisted(() => ({
 
 const streamRouterMocks = vi.hoisted(() => ({ register: vi.fn() }));
 
-function createRouter() {
+function createRouter(factsEpoch = 'epoch-idb') {
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
       ok: false,
@@ -29,10 +29,10 @@ function createRouter() {
   registerConversationHandlers(router as any, {
     conversationReadRunner: {
       run: async ({ expectedFactsEpoch, read }: any) => {
-        if (expectedFactsEpoch !== undefined && expectedFactsEpoch !== 'epoch-idb') {
+        if (expectedFactsEpoch !== undefined && expectedFactsEpoch !== factsEpoch) {
           throw new LocalDataContractError('STALE_BACKEND_EPOCH');
         }
-        return await read({ factsEpoch: 'epoch-idb', mode: 'idb', repository: readMocks });
+        return await read({ factsEpoch, mode: 'idb', repository: readMocks });
       },
     },
     onConversationChanged: async () => {},
@@ -125,23 +125,40 @@ describe('conversations pagination handlers', () => {
     expect((noKey.error?.extra as any)?.field).toBe('conversationKey');
   });
 
-  it('returns open target on by-id lookup', async () => {
+  it('returns an open target only through the explicit legacy IDB-v1 by-id path', async () => {
     readMocks.findConversationById.mockResolvedValue({
       id: 99,
       source: 'chatgpt',
       conversationKey: 'k-99',
       lastCapturedAt: 123,
     });
-    const router = createRouter();
+    const router = createRouter('idb-v1');
 
     const res = await router.__handleMessageForTests({
-      type: 'findConversationById',
+      type: 'findLegacyIdbConversationById',
       conversationId: 99,
+      factsEpoch: 'idb-v1',
     });
 
     expect(res.ok).toBe(true);
     expect(readMocks.findConversationById).toHaveBeenCalledWith(99);
-    expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99', factsEpoch: 'epoch-idb' });
+    expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99', factsEpoch: 'idb-v1' });
+  });
+
+  it('rejects missing or native epoch on legacy numeric by-id lookup before repository access', async () => {
+    const router = createRouter('native:11111111-1111-4111-8111-111111111111');
+
+    for (const factsEpoch of [undefined, 'native:11111111-1111-4111-8111-111111111111']) {
+      const res = await router.__handleMessageForTests({
+        type: 'findLegacyIdbConversationById',
+        conversationId: 99,
+        ...(factsEpoch ? { factsEpoch } : {}),
+      });
+
+      expect(res.ok).toBe(false);
+      expect((res.error?.extra as any)?.code).toBe('STALE_BACKEND_EPOCH');
+    }
+    expect(readMocks.findConversationById).not.toHaveBeenCalled();
   });
 
   it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {

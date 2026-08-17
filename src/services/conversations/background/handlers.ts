@@ -707,15 +707,16 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
   });
 
-  router.register(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, async (msg) => {
+  router.register(CORE_MESSAGE_TYPES.FIND_LEGACY_IDB_CONVERSATION_BY_ID, async (msg) => {
     const conversationId = Number(msg?.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) {
       return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
     }
     try {
+      if (msg?.factsEpoch !== 'idb-v1') throw new LocalDataContractError('STALE_BACKEND_EPOCH');
       const target = await deps.conversationReadRunner.run({
-        kind: 'conversation-find-by-id',
-        expectedFactsEpoch: msg?.factsEpoch,
+        kind: 'legacy-idb-conversation-find-by-id',
+        expectedFactsEpoch: 'idb-v1',
         read: async ({ factsEpoch, repository }) => {
           if (!repository.findConversationById) throw new LocalDataContractError('STALE_REFERENCE');
           return withFactsEpochTarget(await repository.findConversationById(conversationId), factsEpoch);
