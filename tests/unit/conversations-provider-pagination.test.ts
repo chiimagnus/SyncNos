@@ -9,7 +9,6 @@ import { UI_EVENT_TYPES } from '@services/protocols/message-contracts';
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
 const findConversationBySourceAndKey = vi.fn();
-const findLegacyIdbConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const updateArticleUrl = vi.fn();
@@ -22,7 +21,6 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
   getConversationListPage: (...args: any[]) => getConversationListPage(...args),
   findConversationBySourceAndKey: (...args: any[]) => findConversationBySourceAndKey(...args),
-  findLegacyIdbConversationById: (...args: any[]) => findLegacyIdbConversationById(...args),
   getConversationDetail: (...args: any[]) => getConversationDetail(...args),
   deleteConversations: (...args: any[]) => deleteConversations(...args),
   updateArticleUrl: (...args: any[]) => updateArticleUrl(...args),
@@ -187,7 +185,6 @@ describe('ConversationsProvider pagination state', () => {
     getConversationListBootstrap.mockReset();
     getConversationListPage.mockReset();
     findConversationBySourceAndKey.mockReset();
-    findLegacyIdbConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
     updateArticleUrl.mockReset();
@@ -196,7 +193,6 @@ describe('ConversationsProvider pagination state', () => {
     eventsPortMessageListener = null;
 
     getConversationListPage.mockResolvedValue(makePage([]));
-    findLegacyIdbConversationById.mockResolvedValue(null);
     getConversationDetail.mockResolvedValue({ conversationId: 0, messages: [] });
     deleteConversations.mockResolvedValue(null);
     updateArticleUrl.mockResolvedValue({

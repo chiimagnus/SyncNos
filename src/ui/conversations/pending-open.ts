@@ -1,14 +1,6 @@
-const PENDING_OPEN_CONVERSATION_KEY = 'webclipper_pending_open_conversation_id';
+const PENDING_OPEN_CONVERSATION_KEY = 'webclipper_pending_open_conversation_v2';
 
-export type PendingOpenConversation =
-  | Readonly<{ source: string; conversationKey: string }>
-  | Readonly<{ legacyIdbConversationId: number }>;
-
-function normalizeLegacyConversationId(value: unknown): number | null {
-  const safeId = Number(value);
-  if (!Number.isSafeInteger(safeId) || safeId <= 0) return null;
-  return safeId;
-}
+export type PendingOpenConversation = Readonly<{ source: string; conversationKey: string }>;
 
 function normalizePendingOpenTarget(target: unknown): { source: string; conversationKey: string } | null {
   const source = String((target as any)?.source || '')
@@ -19,7 +11,7 @@ function normalizePendingOpenTarget(target: unknown): { source: string; conversa
   return { source, conversationKey };
 }
 
-/** New pending-open state is stable-identity only; numeric IDs are read-only legacy IDB-v1 state. */
+/** Pending-open navigation is stable-identity only. */
 export function setPendingOpenConversation(target: { source: string; conversationKey: string }): void {
   const normalizedTarget = normalizePendingOpenTarget(target);
   if (!normalizedTarget) return;
@@ -36,16 +28,8 @@ export function consumePendingOpenConversation(): PendingOpenConversation | null
     if (!raw) return null;
     sessionStorage.removeItem(PENDING_OPEN_CONVERSATION_KEY);
 
-    if (raw.startsWith('{')) {
-      const parsed = JSON.parse(raw);
-      const target = normalizePendingOpenTarget(parsed);
-      if (target) return target;
-      const legacyIdbConversationId = normalizeLegacyConversationId((parsed as any)?.conversationId);
-      return legacyIdbConversationId == null ? null : { legacyIdbConversationId };
-    }
-
-    const legacyIdbConversationId = normalizeLegacyConversationId(raw);
-    return legacyIdbConversationId == null ? null : { legacyIdbConversationId };
+    if (!raw.startsWith('{')) return null;
+    return normalizePendingOpenTarget(JSON.parse(raw));
   } catch (_error) {
     return null;
   }

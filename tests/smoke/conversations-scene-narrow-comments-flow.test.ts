@@ -10,12 +10,8 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
-const openLegacyIdbConversationById = vi.fn(async () => false);
 const openConversationExternalBySourceKey = vi.fn(async () => true);
-type PendingOpenConversationMockPayload =
-  | { source: string; conversationKey: string }
-  | { legacyIdbConversationId: number }
-  | null;
+type PendingOpenConversationMockPayload = { source: string; conversationKey: string } | null;
 const consumePendingOpenConversation = vi.fn<() => PendingOpenConversationMockPayload>(() => null);
 const sidebarOpen = vi.fn(async () => {});
 const subscribeSidebarClose = vi.fn((listener: () => void) => {
@@ -100,7 +96,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
-    openLegacyIdbConversationById,
     loadMoreList: vi.fn(async () => {}),
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
@@ -173,7 +168,6 @@ describe('ConversationsScene narrow comments flow', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
-    openLegacyIdbConversationById.mockReset().mockResolvedValue(false);
     openConversationExternalBySourceKey.mockReset().mockResolvedValue(true);
     consumePendingOpenConversation.mockReset();
     consumePendingOpenConversation.mockReturnValue(null);

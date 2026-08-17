@@ -18,7 +18,6 @@ import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { buildLocalTimestampForFilename } from '@services/shared/file-timestamp';
 import {
   deleteConversations,
-  findLegacyIdbConversationById,
   findConversationBySourceAndKey,
   getConversationListBootstrap,
   getConversationListPage,
@@ -461,7 +460,6 @@ type ConversationsAppState = {
   consumeListLocate: () => number | null;
   openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<boolean>;
-  openLegacyIdbConversationById: (conversationId: number) => Promise<boolean>;
   openConversationInListScopeByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationInListScopeBySourceKey: (source: string, conversationKey: string) => Promise<void>;
   loadMoreList: () => Promise<void>;
@@ -697,28 +695,6 @@ export function ConversationsProvider({
       await openConversationInListScopeBySourceKey(input?.source, input?.conversationKey);
     },
     [openConversationInListScopeBySourceKey],
-  );
-
-  const openLegacyIdbConversationById = useCallback(
-    async (conversationId: number): Promise<boolean> => {
-      // Numeric pending-open values are historical IDB-v1 state only. They are never
-      // resolved against SQLite, transitional, blocked, or unknown epochs.
-      if (listFactsEpoch !== 'idb-v1') return false;
-      const id = Number(conversationId);
-      if (!Number.isSafeInteger(id) || id <= 0) return false;
-      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
-      if (loaded) {
-        applyOpenTarget(toOpenTargetFromConversation(loaded), { preserveListScope: false });
-        return true;
-      }
-      const requestSeq = openTargetRequestSeqRef.current + 1;
-      openTargetRequestSeqRef.current = requestSeq;
-      const target = await findLegacyIdbConversationById(id).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current || !target) return false;
-      applyOpenTarget(target, { preserveListScope: false });
-      return true;
-    },
-    [applyOpenTarget, items, listFactsEpoch],
   );
 
   const refreshList = useCallback(
@@ -1522,7 +1498,6 @@ export function ConversationsProvider({
     consumeListLocate,
     openConversationExternalByLoc,
     openConversationExternalBySourceKey,
-    openLegacyIdbConversationById,
     openConversationInListScopeByLoc,
     openConversationInListScopeBySourceKey,
     loadMoreList,

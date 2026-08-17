@@ -5,7 +5,6 @@ import { registerConversationHandlers } from '@services/conversations/background
 import { LocalDataContractError } from '@services/local-data/contracts';
 
 const readMocks = vi.hoisted(() => ({
-  findConversationById: vi.fn(),
   findConversationBySourceAndKey: vi.fn(),
   getConversationByReference: vi.fn(),
   getConversationDetail: vi.fn(),
@@ -43,7 +42,6 @@ function createRouter(factsEpoch = 'epoch-idb') {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  readMocks.findConversationById.mockReset();
   readMocks.findConversationBySourceAndKey.mockReset();
   readMocks.getConversationByReference.mockReset();
   readMocks.getConversationDetail.mockReset();
@@ -123,42 +121,6 @@ describe('conversations pagination handlers', () => {
     expect(noKey.ok).toBe(false);
     expect(noKey.error?.message).toBe('invalid conversationKey');
     expect((noKey.error?.extra as any)?.field).toBe('conversationKey');
-  });
-
-  it('returns an open target only through the explicit legacy IDB-v1 by-id path', async () => {
-    readMocks.findConversationById.mockResolvedValue({
-      id: 99,
-      source: 'chatgpt',
-      conversationKey: 'k-99',
-      lastCapturedAt: 123,
-    });
-    const router = createRouter('idb-v1');
-
-    const res = await router.__handleMessageForTests({
-      type: 'findLegacyIdbConversationById',
-      conversationId: 99,
-      factsEpoch: 'idb-v1',
-    });
-
-    expect(res.ok).toBe(true);
-    expect(readMocks.findConversationById).toHaveBeenCalledWith(99);
-    expect(res.data).toMatchObject({ id: 99, conversationKey: 'k-99', factsEpoch: 'idb-v1' });
-  });
-
-  it('rejects missing or native epoch on legacy numeric by-id lookup before repository access', async () => {
-    const router = createRouter('native:11111111-1111-4111-8111-111111111111');
-
-    for (const factsEpoch of [undefined, 'native:11111111-1111-4111-8111-111111111111']) {
-      const res = await router.__handleMessageForTests({
-        type: 'findLegacyIdbConversationById',
-        conversationId: 99,
-        ...(factsEpoch ? { factsEpoch } : {}),
-      });
-
-      expect(res.ok).toBe(false);
-      expect((res.error?.extra as any)?.code).toBe('STALE_BACKEND_EPOCH');
-    }
-    expect(readMocks.findConversationById).not.toHaveBeenCalled();
   });
 
   it('rejects tail window lookup when source/conversationKey/limit are invalid', async () => {

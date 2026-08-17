@@ -72,13 +72,8 @@ export function ConversationsScene({
   wideChrome = 'card',
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const {
-    selectedConversation,
-    openConversationExternalBySourceKey,
-    openLegacyIdbConversationById,
-    localSearchSheet,
-    listFacets,
-  } = useConversationsApp();
+  const { selectedConversation, openConversationExternalBySourceKey, localSearchSheet, listFacets } =
+    useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
     route: narrowRoute,
@@ -106,16 +101,13 @@ export function ConversationsScene({
     if (!pending) return;
     let disposed = false;
     void (async () => {
-      const opened =
-        'source' in pending
-          ? await openConversationExternalBySourceKey(pending.source, pending.conversationKey)
-          : await openLegacyIdbConversationById(pending.legacyIdbConversationId);
+      const opened = await openConversationExternalBySourceKey(pending.source, pending.conversationKey);
       if (!disposed && opened) openDetail();
     })();
     return () => {
       disposed = true;
     };
-  }, [isNarrow, openConversationExternalBySourceKey, openDetail, openLegacyIdbConversationById]);
+  }, [isNarrow, openConversationExternalBySourceKey, openDetail]);
 
   useEffect(() => {
     if (!commentsSidebarRuntime) return;

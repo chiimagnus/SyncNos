@@ -10,7 +10,6 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
-const openLegacyIdbConversationById = vi.fn(async () => false);
 const openConversationExternalBySourceKey = vi.fn(async () => true);
 const consumePendingOpenConversation = vi.fn(() => null);
 
@@ -71,7 +70,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
-    openLegacyIdbConversationById,
     loadMoreList: vi.fn(async () => {}),
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
@@ -142,7 +140,6 @@ describe('ConversationsScene popup Escape behavior', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
-    openLegacyIdbConversationById.mockReset().mockResolvedValue(false);
     openConversationExternalBySourceKey.mockReset().mockResolvedValue(true);
     consumePendingOpenConversation.mockReset();
     consumePendingOpenConversation.mockReturnValue(null);
@@ -216,20 +213,6 @@ describe('ConversationsScene popup Escape behavior', () => {
     });
 
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');
-    expect(openLegacyIdbConversationById).not.toHaveBeenCalled();
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
-  });
-
-  it('consumes legacy numeric pending state but does not open detail when the context rejects non-IDB resolution', async () => {
-    consumePendingOpenConversation.mockReturnValueOnce({ legacyIdbConversationId: 99 });
-
-    await act(async () => {
-      root!.render(createElement(ConversationsScene));
-      await flushImmediate();
-    });
-
-    expect(openLegacyIdbConversationById).toHaveBeenCalledWith(99);
-    expect(openConversationExternalBySourceKey).not.toHaveBeenCalled();
-    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeFalsy();
   });
 });

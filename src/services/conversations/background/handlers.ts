@@ -707,27 +707,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
   });
 
-  router.register(CORE_MESSAGE_TYPES.FIND_LEGACY_IDB_CONVERSATION_BY_ID, async (msg) => {
-    const conversationId = Number(msg?.conversationId);
-    if (!Number.isFinite(conversationId) || conversationId <= 0) {
-      return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
-    }
-    try {
-      if (msg?.factsEpoch !== 'idb-v1') throw new LocalDataContractError('STALE_BACKEND_EPOCH');
-      const target = await deps.conversationReadRunner.run({
-        kind: 'legacy-idb-conversation-find-by-id',
-        expectedFactsEpoch: 'idb-v1',
-        read: async ({ factsEpoch, repository }) => {
-          if (!repository.findConversationById) throw new LocalDataContractError('STALE_REFERENCE');
-          return withFactsEpochTarget(await repository.findConversationById(conversationId), factsEpoch);
-        },
-      });
-      return router.ok(target);
-    } catch (error) {
-      return factsError(router, error);
-    }
-  });
-
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, async (msg) => {
     const reference = stableReference(msg);
     if (!reference) return invalidArgument('reference', 'invalid conversation reference', msg);

@@ -9,7 +9,6 @@ const TEST_FACTS_EPOCH = 'idb-v1';
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
 const findConversationBySourceAndKey = vi.fn();
-const findLegacyIdbConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
 const updateArticleUrl = vi.fn();
@@ -20,7 +19,6 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: unknown[]) => getConversationListBootstrap(...args),
   getConversationListPage: (...args: unknown[]) => getConversationListPage(...args),
   findConversationBySourceAndKey: (...args: unknown[]) => findConversationBySourceAndKey(...args),
-  findLegacyIdbConversationById: (...args: unknown[]) => findLegacyIdbConversationById(...args),
   getConversationDetail: (...args: unknown[]) => getConversationDetail(...args),
   deleteConversations: (...args: unknown[]) => deleteConversations(...args),
   updateArticleUrl: (...args: unknown[]) => updateArticleUrl(...args),
@@ -139,7 +137,6 @@ describe('ConversationsProvider article URL editing', () => {
       getConversationListBootstrap,
       getConversationListPage,
       findConversationBySourceAndKey,
-      findLegacyIdbConversationById,
       getConversationDetail,
       deleteConversations,
       updateArticleUrl,
@@ -150,7 +147,6 @@ describe('ConversationsProvider article URL editing', () => {
     }
     getConversationListPage.mockResolvedValue(page([]));
     findConversationBySourceAndKey.mockResolvedValue(null);
-    findLegacyIdbConversationById.mockResolvedValue(null);
     getConversationDetail.mockResolvedValue({ conversationId: 1, messages: [] });
     deleteConversations.mockResolvedValue(null);
     backfillConversationImages.mockResolvedValue({

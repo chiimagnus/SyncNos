@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { consumePendingOpenConversation, setPendingOpenConversation } from '@ui/conversations/pending-open';
 
-const KEY = 'webclipper_pending_open_conversation_id';
+const KEY = 'webclipper_pending_open_conversation_v2';
 
 class SessionStorageStub {
   private readonly values = new Map<string, string>();
@@ -38,15 +38,13 @@ describe('pending-open stable identity', () => {
     expect(storage.getItem(KEY)).toBe(null);
   });
 
-  it('consumes legacy plain numeric state as an explicit IDB-only candidate', () => {
+  it('drops numeric or partial state instead of reviving a legacy IDB handle', () => {
     storage.setItem(KEY, '42');
-    expect(consumePendingOpenConversation()).toEqual({ legacyIdbConversationId: 42 });
+    expect(consumePendingOpenConversation()).toBe(null);
     expect(storage.getItem(KEY)).toBe(null);
-  });
 
-  it('consumes legacy partial JSON state without promoting it to a stable identity', () => {
     storage.setItem(KEY, JSON.stringify({ conversationId: 43 }));
-    expect(consumePendingOpenConversation()).toEqual({ legacyIdbConversationId: 43 });
+    expect(consumePendingOpenConversation()).toBe(null);
     expect(storage.getItem(KEY)).toBe(null);
   });
 

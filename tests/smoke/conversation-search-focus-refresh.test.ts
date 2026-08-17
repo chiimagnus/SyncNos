@@ -59,7 +59,6 @@ vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
   getConversationListPage: (...args: any[]) => getConversationListPage(...args),
   findConversationBySourceAndKey: vi.fn(async () => null),
-  findLegacyIdbConversationById: vi.fn(async () => null),
   getConversationDetail: vi.fn(async () => ({ id: 1, messages: [] })),
   deleteConversations: vi.fn(async () => ({ deleted: 0 })),
   updateArticleUrl: vi.fn(async () => null),
