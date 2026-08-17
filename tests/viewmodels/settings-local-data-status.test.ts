@@ -23,7 +23,7 @@ vi.mock('@services/local-data/client', () => ({
   resumeLocalDataMigration: mocks.resumeMigration,
 }));
 
-vi.mock('@services/conversations/client/repo', () => ({
+vi.mock('@services/insight/client', () => ({
   getInsightFactsSnapshot: mocks.getInsightFactsSnapshot,
 }));
 

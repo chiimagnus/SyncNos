@@ -42,7 +42,7 @@ import {
   startLocalDataMigration,
 } from '@services/local-data/client';
 import type { LocalDataMigrationStatus } from '@services/local-data/migration-status';
-import { getInsightFactsSnapshot } from '@services/conversations/client/repo';
+import { getInsightFactsSnapshot } from '@services/insight/client';
 import {
   NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY,
   OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY,

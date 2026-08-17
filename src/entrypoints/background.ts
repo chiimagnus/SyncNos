@@ -10,6 +10,7 @@ import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
 import { registerItemMentionHandlers } from '@services/integrations/item-mention/background-handlers';
+import { registerInsightHandlers } from '@services/insight/background-handlers';
 import { registerChatWithBackgroundHandlers } from '@services/integrations/chatwith/chatwith-background-handlers';
 import { ensureDefaultNotionOAuthClientId, setupNotionOAuthNavigationListener } from '@services/sync/notion/auth/oauth';
 import {
@@ -84,6 +85,7 @@ export default defineBackground(async () => {
     streamRouter,
   });
   registerConversationSearchHandlers(router, { conversationReadRunner, factsGate });
+  registerInsightHandlers(router, { conversationReadRunner });
   registerItemMentionHandlers(router, { conversationReadRunner });
   registerChatWithBackgroundHandlers(router);
   registerArticleCommentsHandlers(router, {

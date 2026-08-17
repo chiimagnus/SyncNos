@@ -33,13 +33,9 @@ import {
   MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES,
   parseConversationCaptureSnapshot,
   parseFactsEpoch,
-  parseInsightFactsSnapshot,
-  parseInsightStatsRequestPayload,
   parseStreamDescriptor,
   type ConversationCaptureSnapshot,
   type FactsEpoch,
-  type InsightFactsSnapshot,
-  type InsightStatsRequestPayload,
   type StreamDescriptor,
 } from '@services/local-data/contracts';
 
@@ -426,12 +422,6 @@ export async function resolveConversationTailWindowResponse(
 ): Promise<ConversationTailWindowResponse> {
   const preflight = parseReadPreflight(response);
   return asConversationTailWindow(preflight ? await receiveConversationReadStream(preflight) : response);
-}
-
-export async function getInsightFactsSnapshot(input: InsightStatsRequestPayload): Promise<InsightFactsSnapshot> {
-  const request = parseInsightStatsRequestPayload(input);
-  const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.GET_INSIGHT_STATS, request);
-  return parseInsightFactsSnapshot(unwrap(res));
 }
 
 export async function getConversationListBootstrap(

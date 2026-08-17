@@ -4,15 +4,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { registerInsightHandlers } from '@services/insight/background-handlers';
 import {
   createNativeConversationReadRepository,
   type ConversationReadRepository,
 } from '@services/conversations/data/storage-native';
 import {
-  getInsightFactsSnapshot,
   resolveConversationDetailResponse,
   resolveConversationTailWindowResponse,
 } from '@services/conversations/client/repo';
+import { getInsightFactsSnapshot } from '@services/insight/client';
 import {
   LOCAL_DATA_PROTOCOL_VERSION,
   MAX_DETAIL_PREVIEW_BYTES,
@@ -254,12 +255,10 @@ describe('native conversation read repository', () => {
 
     const repository = { getInsightStats: vi.fn(async () => insightSnapshot) };
     const router = createBackgroundRouter({ fallback: () => ({ ok: false, data: null, error: null }) });
-    registerConversationHandlers(router as any, {
+    registerInsightHandlers(router as any, {
       conversationReadRunner: {
         run: async ({ read }: any) => await read({ factsEpoch: 'idb-v1', mode: 'idb', repository }),
       },
-      onConversationChanged: async () => {},
-      streamRouter: { register: () => {} },
     });
 
     await expect(router.__handleMessageForTests({ type: 'getInsightStats', timeZone: 'UTC' })).resolves.toEqual({

@@ -27,7 +27,6 @@ import {
   LocalDataContractError,
   parseBrowserRuntimeFactsRequest,
   parseConversationCaptureSnapshot,
-  parseInsightStatsRequestPayload,
   MAX_DETAIL_PREVIEW_BYTES,
   MAX_IMAGE_ASSET_BYTES,
   MAX_ORDINARY_FACTS_RESPONSE_BYTES,
@@ -625,28 +624,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         conversationId: result.conversationId,
       });
       return router.ok(result);
-    } catch (error) {
-      return factsError(router, error);
-    }
-  });
-
-  router.register(CORE_MESSAGE_TYPES.GET_INSIGHT_STATS, async (msg) => {
-    let request;
-    try {
-      request = parseInsightStatsRequestPayload({
-        timeZone: msg?.timeZone,
-        ...(msg?.since === undefined ? {} : { since: msg.since }),
-        ...(msg?.until === undefined ? {} : { until: msg.until }),
-      });
-    } catch (error) {
-      return factsError(router, error);
-    }
-    try {
-      const snapshot = await deps.conversationReadRunner.run({
-        kind: 'insight-stats',
-        read: async ({ repository }) => await repository.getInsightStats(request),
-      });
-      return router.ok(snapshot);
     } catch (error) {
       return factsError(router, error);
     }
