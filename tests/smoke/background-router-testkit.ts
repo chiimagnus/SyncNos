@@ -1,5 +1,9 @@
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
 import { FactsOperationGate } from '@services/local-data/facts-operation-gate';
+import {
+  registerMigrationCoordinatorHandlers,
+  type MigrationCoordinator,
+} from '@services/local-data/migration-coordinator';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
@@ -11,7 +15,11 @@ import { createBackgroundServices } from '@services/bootstrap/background-service
 import { registerNotionSettingsHandlers } from '@services/sync/notion/settings-background-handlers';
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 
-export function createTestBackgroundRouter() {
+export type TestBackgroundRouterOptions = Readonly<{
+  migrationCoordinator?: MigrationCoordinator;
+}>;
+
+export function createTestBackgroundRouter(options: TestBackgroundRouterOptions = {}) {
   const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const gate = new FactsOperationGate({
     readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
@@ -90,6 +98,10 @@ export function createTestBackgroundRouter() {
     testObsidianConnection: services.obsidianSyncOrchestrator.testConnection,
   });
   registerUiMessageHandlers(router);
+  if (options.migrationCoordinator) {
+    registerMigrationCoordinatorHandlers(router, options.migrationCoordinator);
+  }
+
   registerSyncHandlers(router, {
     getInstanceId: () => instanceId,
     factsOperations: gate,

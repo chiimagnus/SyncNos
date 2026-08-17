@@ -19,6 +19,8 @@ CLI 缺失或 Native Host 注册损坏时，先安装/更新：`npm install -g @
 
 已安装但 Host 仍不可达、注册/owner-only 权限异常时运行 `syncnoscli doctor --fix`。它只修复可证明属于 SyncNos 的注册与受支持权限，不会删除数据库、绕过浏览器 allowlist 或突破操作系统沙盒；数据库 busy 时先等其他 SyncNos 操作结束。Linux 严格 Snap/Flatpak 可能阻断 Native Messaging 路径，此时 doctor 也不能突破隔离。Safari 与非正式扩展身份没有 Local Database 启用/注册绕过路径。
 
+迁移若被浏览器关闭、崩溃或 Host 临时错误中断，请重新打开 **Settings → Backup → Local Database** 并先点“重新检测”；只有界面明确提供 Resume 时才继续恢复。不要删除 SQLite、不要手工清 IndexedDB、不要改数据库路径，也不要尝试回退到旧 IDB 模式。扩展重装会丢失该 browser profile 的迁移 journal：即使共享 SQLite 仍存在，也必须再次显式确认加入，绝不会自动认领为 active。
+
 ## 评论精确定位
 
 在 App DevTools Console 设置 `localStorage.setItem('__SYNCNOS_DEBUG_COMMENTS_SELECTION__', '1')` 后重载，复现时检查 `[CommentsSelection][app]` 和 `[CommentsLocate]`。依次确认 surface root、exact/context、context generation，以及是否属于 iframe、closed shadow root 或跨 root 歧义。失败必须保留明确 reason；不要用模糊匹配或滚动兜底。

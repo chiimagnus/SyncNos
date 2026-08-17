@@ -16,7 +16,7 @@ import {
 import { sha256Hex } from '@services/local-data/digest';
 import { encodeCanonicalJson } from '@services/local-data/facts-archive';
 import { readMigrationJournal, type MigrationJournalRuntime } from '@platform/local-data/migration-journal';
-import { readLegacyFactConversationReferences, verifyFactsEmpty } from '@platform/idb/facts-transfer';
+import { clearFacts, readLegacyFactConversationReferences, verifyFactsEmpty } from '@platform/idb/facts-transfer';
 import { FACTS_IDB_STORE_NAMES, DB_NAME, openDb } from '@platform/idb/schema';
 import { requestToPromise, transactionDone } from '@platform/idb/transactions';
 import { AUTO_SYNC_QUEUE_STORAGE_KEYS, AUTO_SYNC_STABLE_QUEUE_VERSION } from '@services/sync/auto-sync/auto-sync-keys';
@@ -159,10 +159,13 @@ describe('local data migration end to end', () => {
       validateNativeReference: async (reference) =>
         importedReferences.has(`${reference.source}\u0000${reference.conversationKey}`),
     });
+    const transitionOrder: string[] = [];
     let committedReceipt: FactsMigrationReceipt | null = null;
     const nativeImport = vi.fn(async ({ produce }: any) => {
       const manifest = await produce({ onFrame: async () => {}, signal: new AbortController().signal });
+      expect((await verifyFactsEmpty()).empty).toBe(false);
       committedReceipt = await receiptFor(manifest);
+      transitionOrder.push('receipt');
       return committedReceipt;
     });
     const nativeRequest = vi.fn(async (command: string) => {
@@ -173,8 +176,15 @@ describe('local data migration end to end', () => {
       throw new Error(`unexpected command ${command}`);
     });
     const rearmSchedulers = vi.fn(async () => {});
-    const onActivated = vi.fn(async () => {});
+    const onActivated = vi.fn(async () => {
+      transitionOrder.push('active');
+    });
     const coordinator = createMigrationCoordinator({
+      clearSourceFacts: async () => {
+        expect(committedReceipt).not.toBeNull();
+        transitionOrder.push('clear');
+        await clearFacts();
+      },
       digestProvider: nodeDigestProvider,
       gate,
       journalRuntime,
@@ -184,6 +194,10 @@ describe('local data migration end to end', () => {
       readEnvironment: environment,
       rearmSchedulers,
       onActivated,
+      verifySourceFactsEmpty: async () => {
+        transitionOrder.push('verify');
+        return await verifyFactsEmpty();
+      },
     });
 
     const status = await coordinator.start();
@@ -245,6 +259,7 @@ describe('local data migration end to end', () => {
     expect(local.state.backup_history).toEqual([{ file: 'untouched.zip' }]);
     expect(rearmSchedulers).toHaveBeenCalledTimes(1);
     expect(onActivated).toHaveBeenCalledTimes(1);
+    expect(transitionOrder).toEqual(['receipt', 'clear', 'verify', 'active']);
 
     const createIdbRepository = vi.fn(() => ({ backend: 'idb' }));
     const createNativeRepository = vi.fn(() => ({ backend: 'native' }));
