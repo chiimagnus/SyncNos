@@ -20,7 +20,7 @@ import type { DatabaseOpenInput } from './sqlite/database';
 
 declare const __SYNCNOSCLI_VERSION__: string;
 
-const HELP = `SyncNos CLI\n\nUsage:\n  syncnoscli --help\n  syncnoscli --version\n  syncnoscli doctor [--fix]\n  syncnoscli conversations list [--cursor <cursor>] [--source <source>] [--site <site>] [--page-size <1-200>] [--format json|table]\n  syncnoscli conversations get <id>\n  syncnoscli stats\n  syncnoscli search <query> [--cursor <cursor>] [--source <source>] [--site <site>] [--sort best|recent] [--page-size <1-200>] [--format json|table]\n\nData commands are read-only and on-demand. Protocol envelope: v${LOCAL_DATA_PROTOCOL_VERSION}\n`;
+const HELP = `SyncNos CLI\n\nUsage:\n  syncnoscli --help\n  syncnoscli --version\n  syncnoscli doctor [--fix]\n  syncnoscli conversations list [--cursor <cursor>] [--source <source>] [--site <site>] [--page-size <1-200>] [--format json|table]\n  syncnoscli conversations get <id>\n  syncnoscli stats\n  syncnoscli search <query> [--cursor <cursor>] [--source <source>] [--site <site>] [--sort best|recent] [--page-size <1-50>] [--format json|table]\n\nData commands are read-only and on-demand. Protocol envelope: v${LOCAL_DATA_PROTOCOL_VERSION}\n`;
 
 type CliOutput = Readonly<{ write: (chunk: string) => boolean }>;
 

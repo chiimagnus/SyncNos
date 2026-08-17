@@ -6,10 +6,12 @@ SyncNos 将 AI 对话、网页文章和已加载的视频字幕统一为浏览�
 
 | 目标 | 页面 |
 | --- | --- |
-| 本地数据、备份和安全边界 | [storage.md](storage.md) |
+| Local Database 的事实模型、迁移、搜索与安全边界 | [storage.md](storage.md) |
+| Local Database / Native Host / CLI 安装与恢复排障 | [troubleshooting.md](troubleshooting.md#local-database) |
+| SyncNos CLI 命令与 JSON 输出 | [packages/syncnoscli/README.md](../packages/syncnoscli/README.md) |
 | 设置、构建与环境变量 | [configuration.md](configuration.md) |
 | 部署或维护 Feishu OAuth | [feishu-setup.md](feishu-setup.md) |
-| 构建、采集和评论定位排障 | [troubleshooting.md](troubleshooting.md) |
+| 其他构建、采集和评论定位排障 | [troubleshooting.md](troubleshooting.md) |
 
 代码结构、符号和调用关系以 CodeGraph 为准；不可违反的分层和交互规则在根 [AGENTS.md](../AGENTS.md)。
 
