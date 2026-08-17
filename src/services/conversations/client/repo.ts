@@ -72,7 +72,14 @@ function unwrap<T>(res: ApiResponse<T>): T {
   if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
   if (res.ok) return res.data as T;
   const message = res.error?.message ?? 'unknown error';
-  throw new Error(message);
+  const error = new Error(message) as Error & { code?: string; diagnostics?: unknown };
+  const extra =
+    res.error?.extra && typeof res.error.extra === 'object' && !Array.isArray(res.error.extra)
+      ? (res.error.extra as Record<string, unknown>)
+      : null;
+  if (typeof extra?.code === 'string') error.code = extra.code;
+  if (extra && Object.hasOwn(extra, 'diagnostics')) error.diagnostics = extra.diagnostics;
+  throw error;
 }
 
 function protocolFailure(): never {

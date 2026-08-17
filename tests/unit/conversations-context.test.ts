@@ -171,6 +171,7 @@ describe('ConversationsProvider article URL editing', () => {
       await flush();
     });
     root = null;
+    vi.unstubAllGlobals();
     cleanupDom();
   });
 
@@ -254,5 +255,49 @@ describe('ConversationsProvider article URL editing', () => {
       fromCanonicalUrl: source.url,
       toCanonicalUrl: 'https://example.com/new',
     });
+  });
+
+  it('refreshes stable handles after a stale URL mutation rejection without retrying the write', async () => {
+    const source = article(1, 'https://example.com/source', 'Source');
+    await renderWith([source]);
+    const stale = Object.assign(new Error('stale facts epoch'), { code: 'STALE_BACKEND_EPOCH' });
+    updateArticleUrl.mockRejectedValue(stale);
+    const bootstrapCallsBefore = getConversationListBootstrap.mock.calls.length;
+
+    let caught: unknown;
+    await act(async () => {
+      try {
+        await latestState!.updateSelectedConversationUrl('https://example.com/new');
+      } catch (error) {
+        caught = error;
+      }
+      await flush();
+      await flush();
+    });
+    expect(caught).toBe(stale);
+
+    expect(updateArticleUrl).toHaveBeenCalledTimes(1);
+    expect(getConversationListBootstrap.mock.calls.length).toBeGreaterThan(bootstrapCallsBefore);
+  });
+
+  it('alerts and refreshes after a stale delete rejection without retrying the destructive command', async () => {
+    const source = article(1, 'https://example.com/source', 'Source');
+    await renderWith([source]);
+    act(() => latestState!.toggleSelected(1));
+    const stale = Object.assign(new Error('stale reference'), { code: 'STALE_REFERENCE' });
+    deleteConversations.mockRejectedValue(stale);
+    const alertSpy = vi.fn();
+    vi.stubGlobal('alert', alertSpy);
+    const bootstrapCallsBefore = getConversationListBootstrap.mock.calls.length;
+
+    await act(async () => {
+      await latestState!.deleteSelected();
+      await flush();
+      await flush();
+    });
+
+    expect(deleteConversations).toHaveBeenCalledTimes(1);
+    expect(alertSpy).toHaveBeenCalledWith('stale reference');
+    expect(getConversationListBootstrap.mock.calls.length).toBeGreaterThan(bootstrapCallsBefore);
   });
 });

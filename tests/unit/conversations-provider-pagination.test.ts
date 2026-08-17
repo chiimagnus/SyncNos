@@ -16,6 +16,7 @@ const updateArticleUrl = vi.fn();
 const backfillConversationImages = vi.fn();
 const getConversationImageAsset = vi.fn();
 const TEST_FACTS_EPOCH = 'idb-v1';
+const NATIVE_FACTS_EPOCH = 'native:11111111-1111-4111-8111-111111111111';
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
@@ -147,10 +148,16 @@ function makeConversation(id: number, source: string, conversationKey: string) {
   };
 }
 
-function makePage(items: any[], facets?: { sources?: any[]; sites?: any[] }) {
+function makePage(
+  items: any[],
+  facets?: { sources?: any[]; sites?: any[] },
+  factsEpoch: string = TEST_FACTS_EPOCH,
+  factsRevision: number | null = factsEpoch === 'idb-v1' ? null : 1,
+) {
   return {
-    factsEpoch: TEST_FACTS_EPOCH,
-    items: items.map((item) => ({ ...item, factsEpoch: item.factsEpoch || TEST_FACTS_EPOCH })),
+    factsEpoch,
+    factsRevision,
+    items: items.map((item) => ({ ...item, factsEpoch })),
     cursor: null,
     hasMore: false,
     summary: { totalCount: items.length, todayCount: items.length },
@@ -489,27 +496,71 @@ describe('ConversationsProvider pagination state', () => {
     });
   });
 
-  it('reselects the active conversation by stable identity when local data migration changes numeric backend ids', async () => {
-    const beforeMigration = makeConversation(1, 'web', 'article-1');
-    const afterMigration = makeConversation(91, 'web', 'article-1');
+  it('discards a load-more page from a newer revision and reconciles through a fresh bootstrap', async () => {
+    const before = makeConversation(1, 'web', 'article-a');
+    const after = { ...makeConversation(91, 'web', 'article-a'), factsEpoch: NATIVE_FACTS_EPOCH };
+    const firstPage = {
+      ...makePage([before], undefined, NATIVE_FACTS_EPOCH, 5),
+      cursor: { nativeCursor: 'page-2' },
+      hasMore: true,
+    };
     getConversationListBootstrap
-      .mockResolvedValueOnce(makePage([beforeMigration]))
-      .mockResolvedValue(makePage([afterMigration]));
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValue(makePage([after], undefined, NATIVE_FACTS_EPOCH, 6));
+    getConversationListPage.mockResolvedValue({
+      ...makePage([makeConversation(2, 'web', 'different-row')], undefined, NATIVE_FACTS_EPOCH, 6),
+      cursor: null,
+      hasMore: false,
+    });
+
+    await renderProvider();
+    expect(Number(latestState.activeId)).toBe(1);
+
+    await act(async () => {
+      await latestState.loadMoreList();
+      await flushMicrotasks();
+      await flushMicrotasks();
+    });
+
+    expect(getConversationListPage).toHaveBeenCalledTimes(1);
+    expect(getConversationListBootstrap).toHaveBeenCalledTimes(2);
+    expect((latestState.items as any[]).map((item) => Number(item.id))).toEqual([91]);
+    expect(Number(latestState.activeId)).toBe(91);
+    expect((latestState.items as any[]).some((item) => item.conversationKey === 'different-row')).toBe(false);
+  });
+
+  it('re-resolves active, multi-selection, and pending locate by stable identity when backend ids are reused', async () => {
+    const beforeA = makeConversation(1, 'web', 'article-a');
+    const beforeB = makeConversation(2, 'web', 'article-b');
+    const replacement = { ...makeConversation(1, 'web', 'replacement'), title: 'replacement row' };
+    const afterA = { ...makeConversation(91, 'web', 'article-a'), factsEpoch: NATIVE_FACTS_EPOCH };
+    const afterB = { ...makeConversation(92, 'web', 'article-b'), factsEpoch: NATIVE_FACTS_EPOCH };
+
+    getConversationListBootstrap
+      .mockResolvedValueOnce(makePage([beforeA, beforeB]))
+      .mockResolvedValue(makePage([replacement, afterA], undefined, NATIVE_FACTS_EPOCH, 3));
+    findConversationBySourceAndKey.mockImplementation(async (source: string, conversationKey: string) => {
+      if (source === 'web' && conversationKey === 'article-b') return afterB;
+      return null;
+    });
     getConversationDetail.mockImplementation(async (reference: any) => ({
       conversationId: Number(reference?.conversationId),
       source: String(reference?.source || ''),
       conversationKey: String(reference?.conversationKey || ''),
-      factsEpoch: TEST_FACTS_EPOCH,
+      factsEpoch: String(reference?.factsEpoch || TEST_FACTS_EPOCH),
       messages: [],
     }));
+
     await renderProvider();
     await act(async () => {
-      await flushMicrotasks();
+      latestState.toggleSelected(1);
+      latestState.toggleSelected(2);
+      latestState.requestListLocate(2);
       await flushMicrotasks();
     });
-    expect(eventsPortMessageListener).toBeTypeOf('function');
-    const listCallsBefore = getConversationListBootstrap.mock.calls.length;
-    const detailCallsBefore = getConversationDetail.mock.calls.length;
+    expect(latestState.selectedIds).toEqual([1, 2]);
+    expect(Number(latestState.activeId)).toBe(1);
+    expect(Number(latestState.pendingListLocateId)).toBe(2);
 
     vi.useFakeTimers();
     try {
@@ -526,10 +577,54 @@ describe('ConversationsProvider pagination state', () => {
       vi.useRealTimers();
     }
 
-    expect(getConversationListBootstrap.mock.calls.length).toBeGreaterThan(listCallsBefore);
-    expect(getConversationDetail.mock.calls.length).toBeGreaterThan(detailCallsBefore);
     expect(Number(latestState.activeId)).toBe(91);
-    expect(Number(latestState.detail?.conversationId)).toBe(91);
+    expect(latestState.selectedIds).toEqual([91, 92]);
+    expect(Number(latestState.pendingListLocateId)).toBe(92);
+    expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('article-a');
+    expect((latestState.items as any[]).find((item) => Number(item.id) === 1)?.conversationKey).toBe('replacement');
+    expect(findConversationBySourceAndKey).toHaveBeenCalledWith('web', 'article-b', NATIVE_FACTS_EPOCH);
+    expect(latestState.stableIdentityNotice).toBe(false);
+  });
+
+  it('drops missing stable selections instead of reusing a replacement numeric id', async () => {
+    const beforeA = makeConversation(1, 'web', 'article-a');
+    const beforeB = makeConversation(2, 'web', 'article-b');
+    const replacement = { ...makeConversation(2, 'web', 'replacement-b'), factsEpoch: NATIVE_FACTS_EPOCH };
+    const afterA = { ...makeConversation(91, 'web', 'article-a'), factsEpoch: NATIVE_FACTS_EPOCH };
+
+    getConversationListBootstrap
+      .mockResolvedValueOnce(makePage([beforeA, beforeB]))
+      .mockResolvedValue(makePage([replacement, afterA], undefined, NATIVE_FACTS_EPOCH, 4));
+    findConversationBySourceAndKey.mockResolvedValue(null);
+
+    await renderProvider();
+    await act(async () => {
+      latestState.toggleSelected(1);
+      latestState.toggleSelected(2);
+      latestState.requestListLocate(2);
+      await flushMicrotasks();
+    });
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        eventsPortMessageListener?.({
+          type: UI_EVENT_TYPES.CONVERSATIONS_CHANGED,
+          payload: { reason: 'localDataMigrationActivated' },
+        });
+        await vi.advanceTimersByTimeAsync(300);
+        await flushMicrotasks();
+        await flushMicrotasks();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(Number(latestState.activeId)).toBe(91);
+    expect(latestState.selectedIds).toEqual([91]);
+    expect(latestState.pendingListLocateId).toBe(null);
+    expect(latestState.stableIdentityNotice).toBe(true);
+    expect(latestState.selectedIds).not.toContain(2);
   });
 
   it('provides cache-images tools action for article conversations', async () => {

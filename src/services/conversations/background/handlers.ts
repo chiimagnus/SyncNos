@@ -629,6 +629,21 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
   });
 
+  router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LOCAL_DATA_REVISION, async () => {
+    try {
+      const snapshot = await deps.conversationReadRunner.run({
+        kind: 'local-data-revision',
+        read: async ({ factsEpoch, repository }) => ({
+          factsEpoch,
+          factsRevision: await repository.getFactsRevision(),
+        }),
+      });
+      return router.ok(snapshot);
+    } catch (error) {
+      return factsError(router, error);
+    }
+  });
+
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_BOOTSTRAP, async (msg) => {
     const parsed = parseListQueryPayload(msg);
     if (parsed.errorField === 'query') return invalidArgument('query', 'invalid query', msg?.query);

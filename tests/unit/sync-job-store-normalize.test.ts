@@ -30,10 +30,26 @@ describe('normalizeSyncJobSnapshot', () => {
       startedAt: 1,
       updatedAt: 2,
       finishedAt: 3,
-      conversationIds: [1, '2', -1, 0, 2],
+      conversations: [
+        { source: 'web', conversationKey: 'article-1', conversationId: 1 },
+        { source: 'chatgpt', conversationKey: 'thread-2', conversationId: 2 },
+      ],
+      conversationIds: [99],
       perConversation: [
-        { conversationId: '1', ok: true, appended: 1, at: 10 },
-        { conversationId: 2, ok: false, error: 'no permission', at: 11 },
+        {
+          conversationId: 1,
+          reference: { source: 'web', conversationKey: 'article-1', conversationId: 1 },
+          ok: true,
+          appended: 1,
+          at: 10,
+        },
+        {
+          conversationId: 2,
+          reference: { source: 'chatgpt', conversationKey: 'thread-2', conversationId: 2 },
+          ok: false,
+          error: 'no permission',
+          at: 11,
+        },
       ],
     });
 

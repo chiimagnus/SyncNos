@@ -10,13 +10,12 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
-const openConversationExternalById = vi.fn();
-const openConversationExternalBySourceKey = vi.fn();
-type PendingOpenConversationMockPayload = {
-  conversationId: number;
-  source: string;
-  conversationKey: string;
-} | null;
+const openLegacyIdbConversationById = vi.fn(async () => false);
+const openConversationExternalBySourceKey = vi.fn(async () => true);
+type PendingOpenConversationMockPayload =
+  | { source: string; conversationKey: string }
+  | { legacyIdbConversationId: number }
+  | null;
 const consumePendingOpenConversation = vi.fn<() => PendingOpenConversationMockPayload>(() => null);
 const sidebarOpen = vi.fn(async () => {});
 const subscribeSidebarClose = vi.fn((listener: () => void) => {
@@ -45,11 +44,6 @@ const getSessionSnapshot = vi.fn(() => ({
 
 vi.mock('../../src/ui/conversations/pending-open', () => ({
   consumePendingOpenConversation: () => consumePendingOpenConversation(),
-  consumePendingOpenConversationId: () => {
-    const pending = consumePendingOpenConversation();
-    const id = Number((pending as any)?.conversationId || 0);
-    return Number.isFinite(id) && id > 0 ? id : null;
-  },
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -106,7 +100,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
-    openConversationExternalById,
+    openLegacyIdbConversationById,
     loadMoreList: vi.fn(async () => {}),
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
@@ -179,8 +173,8 @@ describe('ConversationsScene narrow comments flow', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
-    openConversationExternalById.mockReset();
-    openConversationExternalBySourceKey.mockReset();
+    openLegacyIdbConversationById.mockReset().mockResolvedValue(false);
+    openConversationExternalBySourceKey.mockReset().mockResolvedValue(true);
     consumePendingOpenConversation.mockReset();
     consumePendingOpenConversation.mockReturnValue(null);
     sidebarOpen.mockReset();
@@ -307,12 +301,8 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
   });
 
-  it('opens detail via pending source/key and then enters comments route', () => {
-    consumePendingOpenConversation.mockReturnValueOnce({
-      conversationId: 99,
-      source: 'chatgpt',
-      conversationKey: 'conv-99',
-    });
+  it('opens detail via pending source/key and then enters comments route', async () => {
+    consumePendingOpenConversation.mockReturnValueOnce({ source: 'chatgpt', conversationKey: 'conv-99' });
 
     const commentsSidebarRuntime = {
       sidebarSession: {
@@ -328,13 +318,14 @@ describe('ConversationsScene narrow comments flow', () => {
       subscribeSidebarClose,
     };
 
-    act(() => {
+    await act(async () => {
       root!.render(
         createElement(ConversationsScene, {
           commentsSidebarRuntime,
           narrowCommentsOpenSource: 'popup',
         }),
       );
+      await flushImmediate();
     });
 
     expect(setContext).not.toHaveBeenCalled();

@@ -410,6 +410,7 @@ export const zh: { [K in TranslationKey]: string } = {
   currentPrefix: '当前：',
   syncDetails: '同步详情',
   dismissSyncFeedback: '关闭同步反馈',
+  localDataIdentityRefreshNotice: '共享本地数据库已在其他位置更新，部分选择已按当前数据重新定位。',
   warningsHeading: '警告',
   conversationLabel: '对话',
 

@@ -65,7 +65,6 @@ vi.mock('@viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => ({
     selectedConversation,
     openConversationExternalBySourceKey: scene.openBySourceKey,
-    openConversationExternalById: scene.openById,
     listFacets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 3 }], sites: [] },
     localSearchSheet: {
       mode: scene.searchMode,

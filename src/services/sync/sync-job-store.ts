@@ -29,11 +29,6 @@ function normalizeConversationReferences(value: unknown): SyncConversationRefere
   return [...byKey.values()];
 }
 
-function normalizeConversationIds(ids: unknown): number[] {
-  if (!Array.isArray(ids)) return [];
-  return Array.from(new Set(ids.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)));
-}
-
 function normalizePerConversation(rows: unknown) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
@@ -72,13 +67,9 @@ export function normalizeSyncJobSnapshot(provider: SyncProvider, job: unknown): 
     updatedAt: Number(value.updatedAt) || Date.now(),
     finishedAt: value.finishedAt == null ? null : Number(value.finishedAt) || null,
     conversations,
-    conversationIds: conversations.length
-      ? conversations.flatMap((reference) => (reference.conversationId ? [reference.conversationId] : []))
-      : normalizeConversationIds(value.conversationIds),
+    conversationIds: conversations.flatMap((reference) => (reference.conversationId ? [reference.conversationId] : [])),
     ...(currentConversation ? { currentConversation } : {}),
-    currentConversationId:
-      currentConversation?.conversationId ??
-      (Number.isFinite(Number(value.currentConversationId)) ? Number(value.currentConversationId) : undefined),
+    currentConversationId: currentConversation?.conversationId,
     currentConversationTitle:
       value.currentConversationTitle == null ? undefined : String(value.currentConversationTitle || ''),
     currentStage: value.currentStage == null ? undefined : String(value.currentStage || ''),

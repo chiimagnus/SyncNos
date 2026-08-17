@@ -9,7 +9,7 @@ const markResultsStale = vi.fn();
 const runRevisionStaleGuard = vi.fn();
 const captureRevisionStaleGuard = vi.fn(() => runRevisionStaleGuard);
 const submitSearch = vi.fn();
-const monitorSetFactsEpoch = vi.fn();
+const monitorSetSnapshot = vi.fn();
 const monitorCheckForExternalChange = vi.fn();
 
 const searchController = {
@@ -48,9 +48,9 @@ vi.mock('@viewmodels/conversations/useConversationSearchSheet', () => ({
   useConversationSearchSheet: () => searchController,
 }));
 
-vi.mock('@viewmodels/conversations/local-revision-refresh', () => ({
+vi.mock('@services/conversations/client/local-data-revision', () => ({
   createLocalFactsRevisionMonitor: () => ({
-    setFactsEpoch: monitorSetFactsEpoch,
+    setSnapshot: monitorSetSnapshot,
     checkForExternalChange: monitorCheckForExternalChange,
   }),
 }));
@@ -119,6 +119,7 @@ const NATIVE_EPOCH = 'native:11111111-1111-4111-8111-111111111111';
 function page() {
   return {
     factsEpoch: NATIVE_EPOCH,
+    factsRevision: 7,
     items: [],
     cursor: null,
     hasMore: false,
@@ -169,10 +170,10 @@ describe('conversation search focus revision refresh', () => {
     runRevisionStaleGuard.mockReset();
     captureRevisionStaleGuard.mockClear();
     submitSearch.mockReset();
-    monitorSetFactsEpoch.mockReset();
+    monitorSetSnapshot.mockReset();
     monitorCheckForExternalChange.mockReset().mockImplementation(async (refresh: () => Promise<void>) => {
       await refresh();
-      return { factsRevision: 8, refreshed: true, revisionChanged: true };
+      return { factsEpoch: NATIVE_EPOCH, factsRevision: 8, refreshed: true, revisionChanged: true };
     });
   });
 
@@ -187,8 +188,7 @@ describe('conversation search focus revision refresh', () => {
       root!.render(createElement(ConversationsProvider, null, null));
       await flush();
     });
-    expect(monitorSetFactsEpoch).toHaveBeenCalledWith(NATIVE_EPOCH);
-    expect(monitorSetFactsEpoch).not.toHaveBeenCalledWith(null);
+    expect(monitorSetSnapshot).toHaveBeenCalledWith({ factsEpoch: NATIVE_EPOCH, factsRevision: 7 });
 
     await act(async () => {
       window.dispatchEvent(new window.Event('focus'));
@@ -201,13 +201,12 @@ describe('conversation search focus revision refresh', () => {
     expect(runRevisionStaleGuard).toHaveBeenCalledTimes(1);
     expect(markResultsStale).not.toHaveBeenCalled();
     expect(submitSearch).not.toHaveBeenCalled();
-    expect(monitorSetFactsEpoch).not.toHaveBeenCalledWith(null);
   });
 
   it('keeps a same-revision search valid during the first conservative native baseline refresh', async () => {
     monitorCheckForExternalChange.mockImplementation(async (refresh: () => Promise<void>) => {
       await refresh();
-      return { factsRevision: 7, refreshed: true, revisionChanged: false };
+      return { factsEpoch: NATIVE_EPOCH, factsRevision: 7, refreshed: true, revisionChanged: false };
     });
     await act(async () => {
       root!.render(createElement(ConversationsProvider, null, null));

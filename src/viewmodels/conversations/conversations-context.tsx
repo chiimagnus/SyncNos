@@ -32,7 +32,7 @@ import { UI_EVENT_TYPES, UI_PORT_NAMES } from '@services/protocols/message-contr
 import { connectPort } from '@services/shared/ports';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { t } from '@i18n';
-import { createLocalFactsRevisionMonitor } from '@viewmodels/conversations/local-revision-refresh';
+import { createLocalFactsRevisionMonitor } from '@services/conversations/client/local-data-revision';
 import { useConversationSearchSheet } from '@viewmodels/conversations/useConversationSearchSheet';
 import type { ConversationSearchSheetController } from '@viewmodels/conversations/search-sheet-types';
 import {
@@ -164,6 +164,14 @@ function toConversationFactsReference(
     factsEpoch: factsEpoch as FactsEpoch,
     ...(Number.isFinite(conversationId) && conversationId > 0 ? { conversationId } : {}),
   };
+}
+
+function toStableConversationReference(
+  conversation: Readonly<{ conversationKey?: string; source?: string }> | null | undefined,
+): StableConversationReference | null {
+  const source = String(conversation?.source || '').trim();
+  const conversationKey = String(conversation?.conversationKey || '').trim();
+  return source && conversationKey ? { source, conversationKey } : null;
 }
 
 function sameConversationFactsReference(
@@ -377,6 +385,11 @@ function sameOpenTarget(a: ConversationListOpenTarget | null, b: ConversationLis
   );
 }
 
+function isStaleFactsError(error: unknown): boolean {
+  const code = String((error as { code?: unknown } | null)?.code || '').trim();
+  return code === 'STALE_BACKEND_EPOCH' || code === 'STALE_REFERENCE';
+}
+
 function mergeConversationPageItems(prev: Conversation[], next: Conversation[]): Conversation[] {
   if (!Array.isArray(prev) || !prev.length) return Array.isArray(next) ? next : [];
   if (!Array.isArray(next) || !next.length) return prev;
@@ -442,14 +455,15 @@ type ConversationsAppState = {
   openLocalSearch: () => Promise<void>;
 
   pendingListLocateId: number | null;
+  stableIdentityNotice: boolean;
+  clearStableIdentityNotice: () => void;
   requestListLocate: (conversationId: number) => void;
   consumeListLocate: () => number | null;
   openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<boolean>;
-  openConversationExternalById: (conversationId: number) => Promise<void>;
+  openLegacyIdbConversationById: (conversationId: number) => Promise<boolean>;
   openConversationInListScopeByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationInListScopeBySourceKey: (source: string, conversationKey: string) => Promise<void>;
-  openConversationInListScopeById: (conversationId: number) => Promise<void>;
   loadMoreList: () => Promise<void>;
 
   refreshList: () => Promise<void>;
@@ -488,12 +502,17 @@ export function ConversationsProvider({
   const [listError, setListError] = useState<string | null>(null);
   const [listCursor, setListCursor] = useState<ConversationListCursor | null>(null);
   const [listFactsEpoch, setListFactsEpoch] = useState<FactsEpoch | null>(null);
+  const listFactsEpochRef = useRef<FactsEpoch | null>(null);
+  const listFactsRevisionRef = useRef<number | null>(null);
+  listFactsEpochRef.current = listFactsEpoch;
   const localRevisionMonitorRef = useRef<ReturnType<typeof createLocalFactsRevisionMonitor> | null>(null);
   if (!localRevisionMonitorRef.current) localRevisionMonitorRef.current = createLocalFactsRevisionMonitor();
   const [listHasMore, setListHasMore] = useState(false);
   const [listSummary, setListSummary] = useState<ConversationListSummary>(EMPTY_LIST_SUMMARY);
   const [listFacets, setListFacets] = useState<ConversationListFacets>(EMPTY_LIST_FACETS);
   const [items, setItems] = useState<Conversation[]>([]);
+  const itemsRef = useRef<Conversation[]>([]);
+  itemsRef.current = items;
 
   const [bootstrapped, setBootstrapped] = useState(false);
   const didBootstrapRef = useRef(false);
@@ -508,6 +527,10 @@ export function ConversationsProvider({
   const detailRequestSeqRef = useRef(0);
   const openTargetRequestSeqRef = useRef(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const selectedIdsRef = useRef<number[]>([]);
+  selectedIdsRef.current = selectedIds;
+  const [stableIdentityNotice, setStableIdentityNotice] = useState(false);
+  const clearStableIdentityNotice = useCallback(() => setStableIdentityNotice(false), []);
 
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -676,51 +699,60 @@ export function ConversationsProvider({
     [openConversationInListScopeBySourceKey],
   );
 
-  const openConversationExternalById = useCallback(
-    async (conversationId: number) => {
+  const openLegacyIdbConversationById = useCallback(
+    async (conversationId: number): Promise<boolean> => {
+      // Numeric pending-open values are historical IDB-v1 state only. They are never
+      // resolved against SQLite, transitional, blocked, or unknown epochs.
+      if (listFactsEpoch !== 'idb-v1') return false;
       const id = Number(conversationId);
-      if (!Number.isFinite(id) || id <= 0) return;
+      if (!Number.isSafeInteger(id) || id <= 0) return false;
       const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
       if (loaded) {
         applyOpenTarget(toOpenTargetFromConversation(loaded), { preserveListScope: false });
-        return;
+        return true;
       }
-
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
-
-      const target = await findConversationById(id, listFactsEpoch ?? undefined).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
+      const target = await findConversationById(id, 'idb-v1').catch(() => null);
+      if (requestSeq !== openTargetRequestSeqRef.current || !target) return false;
       applyOpenTarget(target, { preserveListScope: false });
-    },
-    [applyOpenTarget, items, listFactsEpoch],
-  );
-
-  const openConversationInListScopeById = useCallback(
-    async (conversationId: number) => {
-      const id = Number(conversationId);
-      if (!Number.isFinite(id) || id <= 0) return;
-      const loaded = items.find((conversation) => Number((conversation as any)?.id) === id) || null;
-      if (loaded) {
-        applyOpenTarget(toOpenTargetFromConversation(loaded), { preserveListScope: true });
-        return;
-      }
-
-      const requestSeq = openTargetRequestSeqRef.current + 1;
-      openTargetRequestSeqRef.current = requestSeq;
-
-      const target = await findConversationById(id, listFactsEpoch ?? undefined).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
-      applyOpenTarget(target, { preserveListScope: true });
+      return true;
     },
     [applyOpenTarget, items, listFactsEpoch],
   );
 
   const refreshList = useCallback(
-    async (options?: { migrationReselect?: StableConversationReference | null }) => {
+    async (options?: {
+      migrationReselect?: StableConversationReference | null;
+      reconcileStableReferences?: boolean;
+    }) => {
       const sourceKey = normalizeListSourceFilterKey(listSourceFilterKey);
       const rawSiteKey = normalizeListSiteFilterKey(listSiteFilterKey);
       const siteKey = resolveEffectiveListSiteFilterKey(sourceKey, rawSiteKey);
+      const previousEpoch = listFactsEpochRef.current;
+      const previousItems = itemsRef.current;
+      const stableForId = (rawId: unknown): StableConversationReference | null => {
+        const id = Number(rawId);
+        if (!Number.isSafeInteger(id) || id <= 0) return null;
+        const loaded = previousItems.find((conversation) => Number(conversation.id) === id) ?? null;
+        return (
+          toStableConversationReference(loaded) ??
+          (Number(activeConversationSnapshotRef.current?.id) === id
+            ? toStableConversationReference(activeConversationSnapshotRef.current)
+            : null)
+        );
+      };
+      const migrationReselectRequested = Boolean(
+        options && Object.prototype.hasOwnProperty.call(options, 'migrationReselect'),
+      );
+      const activeStableReference = migrationReselectRequested
+        ? (options?.migrationReselect ?? null)
+        : stableForId(activeIdRef.current);
+      const selectedStableReferences = selectedIdsRef.current
+        .map(stableForId)
+        .filter(Boolean) as StableConversationReference[];
+      const selectedStableReferenceCount = selectedIdsRef.current.length;
+      const pendingLocateStableReference = stableForId(pendingListLocateIdRef.current);
 
       const requestSeq = listRequestSeqRef.current + 1;
       listRequestSeqRef.current = requestSeq;
@@ -729,7 +761,6 @@ export function ConversationsProvider({
       setLoadingMoreList(false);
       setListError(null);
       setListCursor(null);
-      setListFactsEpoch(null);
       setListHasMore(false);
       try {
         const page = await getConversationListBootstrap(
@@ -739,89 +770,126 @@ export function ConversationsProvider({
         if (requestSeq !== listRequestSeqRef.current) return;
 
         const list = Array.isArray(page?.items) ? page.items : [];
-        const factsEpoch = String(page?.factsEpoch || '').trim();
+        const factsEpoch = String(page?.factsEpoch || '').trim() as FactsEpoch;
         if (!factsEpoch) throw new Error('missing facts epoch');
-        setItems(list);
-        setListFactsEpoch(factsEpoch as FactsEpoch);
-        setListCursor(page?.cursor ?? null);
-        setListHasMore(Boolean(page?.hasMore));
-        setListSummary(normalizeConversationListSummary(page?.summary));
-        setListFacets(normalizeConversationListFacets(page?.facets));
+        const factsRevision = factsEpoch === 'idb-v1' ? null : Number(page?.factsRevision);
+        if (factsEpoch !== 'idb-v1' && (!Number.isSafeInteger(factsRevision) || Number(factsRevision) < 0)) {
+          throw new Error('missing facts revision');
+        }
+        const epochChanged = previousEpoch !== null && previousEpoch !== factsEpoch;
+        const reconcileStableReferences = Boolean(
+          options?.reconcileStableReferences || migrationReselectRequested || epochChanged,
+        );
 
-        const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
-        const migrationReselectRequested =
-          options && Object.prototype.hasOwnProperty.call(options, 'migrationReselect');
-        if (migrationReselectRequested) {
-          setSelectedIds([]);
-          pendingListLocateIdRef.current = null;
-          setPendingListLocateId(null);
-          const stableReference = options?.migrationReselect ?? null;
-          let target: ConversationListOpenTarget | null = null;
-          if (stableReference) {
-            const loaded = list.find(
-              (conversation) =>
-                String((conversation as any)?.source || '').trim() === stableReference.source &&
-                String((conversation as any)?.conversationKey || '').trim() === stableReference.conversationKey,
-            );
-            target = loaded
-              ? toOpenTargetFromConversation(loaded)
-              : await findConversationBySourceAndKey(
-                  stableReference.source,
-                  stableReference.conversationKey,
-                  factsEpoch as FactsEpoch,
-                ).catch(() => null);
-            if (requestSeq !== listRequestSeqRef.current) return;
+        const commitListSnapshot = () => {
+          setItems(list);
+          itemsRef.current = list;
+          setListFactsEpoch(factsEpoch);
+          listFactsEpochRef.current = factsEpoch;
+          listFactsRevisionRef.current = factsRevision;
+          setListCursor(page?.cursor ?? null);
+          setListHasMore(Boolean(page?.hasMore));
+          setListSummary(normalizeConversationListSummary(page?.summary));
+          setListFacets(normalizeConversationListFacets(page?.facets));
+          localRevisionMonitorRef.current?.setSnapshot({ factsEpoch, factsRevision });
+        };
+
+        const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isSafeInteger(x) && x > 0));
+        if (reconcileStableReferences) {
+          const loadedTargets = new Map<string, ConversationListOpenTarget>();
+          for (const conversation of list) {
+            const reference = toStableConversationReference(conversation);
+            if (reference)
+              loadedTargets.set(
+                `${reference.source}\u0000${reference.conversationKey}`,
+                toOpenTargetFromConversation(conversation)!,
+              );
           }
-          if (!target && list.length) target = toOpenTargetFromConversation(list[0]);
-          const targetId = Number((target as any)?.id);
-          setActiveId(Number.isFinite(targetId) && targetId > 0 ? targetId : null);
-          setActiveConversationSnapshot(target);
+          const resolvedTargets = new Map<string, Promise<ConversationListOpenTarget | null>>();
+          const resolveStable = async (
+            reference: StableConversationReference | null,
+          ): Promise<ConversationListOpenTarget | null> => {
+            if (!reference) return null;
+            const key = `${reference.source}\u0000${reference.conversationKey}`;
+            const loaded = loadedTargets.get(key);
+            if (loaded) return loaded;
+            let pending = resolvedTargets.get(key);
+            if (!pending) {
+              pending = findConversationBySourceAndKey(reference.source, reference.conversationKey, factsEpoch).catch(
+                () => null,
+              );
+              resolvedTargets.set(key, pending);
+            }
+            return await pending;
+          };
+
+          const [activeTarget, pendingLocateTarget, ...selectedTargets] = await Promise.all([
+            resolveStable(activeStableReference),
+            resolveStable(pendingLocateStableReference),
+            ...selectedStableReferences.map(resolveStable),
+          ]);
+          if (requestSeq !== listRequestSeqRef.current) return;
+
+          const nextSelectedIds = Array.from(
+            new Set(
+              selectedTargets.map((target) => Number(target?.id)).filter((id) => Number.isSafeInteger(id) && id > 0),
+            ),
+          );
+          const nextPendingLocateId = Number(pendingLocateTarget?.id);
+          const safePendingLocateId =
+            Number.isSafeInteger(nextPendingLocateId) && nextPendingLocateId > 0 ? nextPendingLocateId : null;
+
+          const fallbackTarget = list.length ? toOpenTargetFromConversation(list[0]) : null;
+          const nextActiveTarget = activeTarget ?? fallbackTarget;
+          const nextActiveId = Number(nextActiveTarget?.id);
+          const safeActiveId = Number.isSafeInteger(nextActiveId) && nextActiveId > 0 ? nextActiveId : null;
+
+          // Publish the new list only after every old numeric handle has been translated or dropped.
+          commitListSnapshot();
+          selectedIdsRef.current = nextSelectedIds;
+          setSelectedIds(nextSelectedIds);
+          pendingListLocateIdRef.current = safePendingLocateId;
+          setPendingListLocateId(safePendingLocateId);
+          setActiveId(safeActiveId);
+          setActiveConversationSnapshot(nextActiveTarget);
+
+          const identityLost =
+            selectedStableReferences.length !== selectedStableReferenceCount ||
+            nextSelectedIds.length !== selectedStableReferences.length ||
+            Boolean(activeStableReference && !activeTarget) ||
+            Boolean(pendingLocateStableReference && !pendingLocateTarget);
+          if (identityLost) setStableIdentityNotice(true);
           return;
         }
 
-        setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
-
+        commitListSnapshot();
+        setSelectedIds((prev) => {
+          const next = prev.filter((id) => ids.has(Number(id)));
+          selectedIdsRef.current = next;
+          return next;
+        });
         const currentActiveId = Number(activeIdRef.current);
         const requestedId = Number(pendingListLocateIdRef.current);
-        const snapshotId = Number((activeConversationSnapshotRef.current as any)?.id);
-        const preservingRequestedActive =
-          Number.isFinite(currentActiveId) &&
-          currentActiveId > 0 &&
-          Number.isFinite(requestedId) &&
-          requestedId > 0 &&
-          requestedId === currentActiveId;
-        const preservingSnapshotActive =
-          Number.isFinite(currentActiveId) &&
-          currentActiveId > 0 &&
-          Number.isFinite(snapshotId) &&
-          snapshotId > 0 &&
-          snapshotId === currentActiveId;
+        const snapshotId = Number(activeConversationSnapshotRef.current?.id);
         const shouldPreserveActive =
-          Number.isFinite(currentActiveId) &&
+          Number.isSafeInteger(currentActiveId) &&
           currentActiveId > 0 &&
-          (ids.has(currentActiveId) || preservingSnapshotActive || preservingRequestedActive);
-
-        const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number((list[0] as any).id) : null;
-        setActiveId(nextActiveId);
+          (ids.has(currentActiveId) || snapshotId === currentActiveId || requestedId === currentActiveId);
+        const nextActiveId = shouldPreserveActive ? currentActiveId : list.length ? Number(list[0]?.id) : null;
+        setActiveId(Number.isSafeInteger(nextActiveId) && Number(nextActiveId) > 0 ? Number(nextActiveId) : null);
         if (!shouldPreserveActive) {
           const nextActiveConversation =
             nextActiveId == null
               ? null
-              : list.find((conversation) => Number((conversation as any)?.id) === Number(nextActiveId)) || null;
+              : (list.find((conversation) => Number(conversation.id) === Number(nextActiveId)) ?? null);
           setActiveConversationSnapshot(toOpenTargetFromConversation(nextActiveConversation));
         }
       } catch (e) {
         if (requestSeq !== listRequestSeqRef.current) return;
+        // A missing/blocked Host is status-only: keep the last safe list and its epoch visible.
         setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
-        setListCursor(null);
-        setListFactsEpoch(null);
-        setListHasMore(false);
-        setListSummary(EMPTY_LIST_SUMMARY);
-        setListFacets(EMPTY_LIST_FACETS);
       } finally {
-        if (requestSeq === listRequestSeqRef.current) {
-          setLoadingInitialList(false);
-        }
+        if (requestSeq === listRequestSeqRef.current) setLoadingInitialList(false);
       }
     },
     [listSiteFilterKey, listSourceFilterKey, setActiveConversationSnapshot, setActiveId],
@@ -853,8 +921,26 @@ export function ConversationsProvider({
       );
       if (requestSeq !== listRequestSeqRef.current) return;
 
+      const pageFactsEpoch = String(page?.factsEpoch || '').trim() as FactsEpoch;
+      const pageFactsRevision = pageFactsEpoch === 'idb-v1' ? null : Number(page?.factsRevision);
+      const validPageRevision =
+        pageFactsEpoch === 'idb-v1' || (Number.isSafeInteger(pageFactsRevision) && Number(pageFactsRevision) >= 0);
+      if (
+        !pageFactsEpoch ||
+        !validPageRevision ||
+        pageFactsEpoch !== factsEpoch ||
+        pageFactsRevision !== listFactsRevisionRef.current
+      ) {
+        await refreshList({ reconcileStableReferences: true });
+        return;
+      }
+
       const pageItems = Array.isArray(page?.items) ? page.items : [];
-      setItems((prev) => mergeConversationPageItems(prev, pageItems));
+      setItems((prev) => {
+        const merged = mergeConversationPageItems(prev, pageItems);
+        itemsRef.current = merged;
+        return merged;
+      });
       setListCursor(page?.cursor ?? null);
       setListHasMore(Boolean(page?.hasMore));
       setListSummary(normalizeConversationListSummary(page?.summary));
@@ -875,6 +961,7 @@ export function ConversationsProvider({
     listSourceFilterKey,
     loadingInitialList,
     loadingMoreList,
+    refreshList,
   ]);
 
   const updateSelectedConversationUrl = useCallback(
@@ -925,14 +1012,19 @@ export function ConversationsProvider({
         }
       }
 
-      await updateArticleUrl({
-        conversation: conversationReference,
-        ...(confirmedConflict ? { confirmedConflict } : {}),
-        fromCanonicalUrl,
-        toCanonicalUrl,
-      });
+      try {
+        await updateArticleUrl({
+          conversation: conversationReference,
+          ...(confirmedConflict ? { confirmedConflict } : {}),
+          fromCanonicalUrl,
+          toCanonicalUrl,
+        });
+      } catch (error) {
+        if (isStaleFactsError(error)) await refreshList({ reconcileStableReferences: true }).catch(() => {});
+        throw error;
+      }
     },
-    [items, selectedConversation],
+    [items, refreshList, selectedConversation],
   );
 
   const cleanUrlDraft = useCallback(async (rawUrl: string) => {
@@ -1162,17 +1254,10 @@ export function ConversationsProvider({
 
   useEffect(() => {
     const monitor = localRevisionMonitorRef.current!;
-    if (!listFactsEpoch) return;
-    monitor.setFactsEpoch(listFactsEpoch);
-    if (!String(listFactsEpoch).startsWith('native:')) return;
+    if (!String(listFactsEpoch || '').startsWith('native:')) return;
 
     const refreshStableSnapshot = async () => {
-      const active = activeConversationSnapshotRef.current as any;
-      const source = String(active?.source || '').trim();
-      const conversationKey = String(active?.conversationKey || '').trim();
-      const migrationReselect: StableConversationReference | null =
-        source && conversationKey ? { source, conversationKey } : null;
-      await refreshList({ migrationReselect });
+      await refreshList({ reconcileStableReferences: true });
     };
     const probeRevision = () => {
       const staleGuard = captureLocalSearchRevisionStaleGuard();
@@ -1356,20 +1441,24 @@ export function ConversationsProvider({
     [items, selectedIds],
   );
 
-  const syncSelectedNotion = useCallback(async () => {
-    if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
-    await startSync('notion', selectedSyncReferences);
-  }, [selectedIds.length, selectedSyncReferences, startSync]);
+  const runSelectedSync = useCallback(
+    async (provider: 'notion' | 'obsidian' | 'feishu') => {
+      if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
+      try {
+        await startSync(provider, selectedSyncReferences);
+      } catch (error) {
+        // The sync feedback hook already surfaces the failure. Refresh stable handles, but never
+        // automatically retry a provider side effect after a stale epoch/reference rejection.
+        if (isStaleFactsError(error)) await refreshList({ reconcileStableReferences: true }).catch(() => {});
+        throw error;
+      }
+    },
+    [refreshList, selectedIds.length, selectedSyncReferences, startSync],
+  );
 
-  const syncSelectedObsidian = useCallback(async () => {
-    if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
-    await startSync('obsidian', selectedSyncReferences);
-  }, [selectedIds.length, selectedSyncReferences, startSync]);
-
-  const syncSelectedFeishu = useCallback(async () => {
-    if (selectedSyncReferences.length !== selectedIds.length || !selectedSyncReferences.length) return;
-    await startSync('feishu', selectedSyncReferences);
-  }, [selectedIds.length, selectedSyncReferences, startSync]);
+  const syncSelectedNotion = useCallback(async () => await runSelectedSync('notion'), [runSelectedSync]);
+  const syncSelectedObsidian = useCallback(async () => await runSelectedSync('obsidian'), [runSelectedSync]);
+  const syncSelectedFeishu = useCallback(async () => await runSelectedSync('feishu'), [runSelectedSync]);
 
   const deleteSelected = useCallback(async () => {
     const ids = selectedIds.slice();
@@ -1390,6 +1479,7 @@ export function ConversationsProvider({
       await refreshActiveDetail();
     } catch (e) {
       alert((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+      if (isStaleFactsError(e)) await refreshList({ reconcileStableReferences: true }).catch(() => {});
     } finally {
       setDeleting(false);
     }
@@ -1426,14 +1516,15 @@ export function ConversationsProvider({
     localSearchSheet,
     openLocalSearch: localSearchSheet.openLocalSearch,
     pendingListLocateId,
+    stableIdentityNotice,
+    clearStableIdentityNotice,
     requestListLocate,
     consumeListLocate,
     openConversationExternalByLoc,
     openConversationExternalBySourceKey,
-    openConversationExternalById,
+    openLegacyIdbConversationById,
     openConversationInListScopeByLoc,
     openConversationInListScopeBySourceKey,
-    openConversationInListScopeById,
     loadMoreList,
     refreshList,
     refreshActiveDetail,

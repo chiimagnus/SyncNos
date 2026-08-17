@@ -44,7 +44,7 @@ import {
   type MessagePersistenceOptions,
 } from './messages-repository';
 import { deleteImagesForConversationIds, moveImagesForConversationMerge } from './images-repository';
-import { runFactsTransaction } from './revision';
+import { readFactsRevision, runFactsTransaction } from './revision';
 import {
   deleteConversationFtsDocumentWithinFactsTransaction,
   refreshConversationFtsDocumentWithinFactsTransaction,
@@ -1104,6 +1104,7 @@ function readConversationListPageInSnapshot(
     hasMore,
     summary: summaryData.summary,
     facets: summaryData.facets,
+    factsRevision: readFactsRevision(database),
   };
 }
 

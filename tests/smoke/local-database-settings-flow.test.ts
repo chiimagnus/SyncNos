@@ -85,7 +85,7 @@ import {
 } from '@services/local-data/migration-coordinator';
 import type { ProfileReferenceRebase } from '@services/local-data/profile-reference-rebase';
 import { readMigrationJournal, type MigrationJournalRuntime } from '@platform/local-data/migration-journal';
-import { createLocalFactsRevisionMonitor } from '@viewmodels/conversations/local-revision-refresh';
+import { createLocalFactsRevisionMonitor } from '@services/conversations/client/local-data-revision';
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 import { LocalDatabaseCard } from '@ui/settings/sections/LocalDatabaseCard';
 import { createTestBackgroundRouter } from './background-router-testkit';
@@ -488,15 +488,19 @@ describe('Local Database settings flow', () => {
 
     const revisionRefresh = vi.fn(async () => {});
     const revisionMonitor = createLocalFactsRevisionMonitor({
-      getFactsRevision: async () => await profileA.coordinator.getFactsRevision(),
+      getSnapshot: async () => ({
+        factsEpoch: `native:${PROFILE_A_ID}`,
+        factsRevision: (await profileA.coordinator.getFactsRevision())!,
+      }),
     });
-    revisionMonitor.setFactsEpoch(`native:${PROFILE_A_ID}`);
+    revisionMonitor.setSnapshot({ factsEpoch: `native:${PROFILE_A_ID}`, factsRevision: 1 });
     await expect(revisionMonitor.checkForExternalChange(revisionRefresh)).resolves.toEqual({
+      factsEpoch: `native:${PROFILE_A_ID}`,
       factsRevision: 1,
-      refreshed: true,
+      refreshed: false,
       revisionChanged: false,
     });
-    expect(revisionRefresh).toHaveBeenCalledTimes(1);
+    expect(revisionRefresh).not.toHaveBeenCalled();
 
     await mount(routerB);
     expect(latest.localDataStatus?.profileState).toBe('join_existing_required');
@@ -516,11 +520,12 @@ describe('Local Database settings flow', () => {
     expect(host.factsRevision).toBe(2);
 
     await expect(revisionMonitor.checkForExternalChange(revisionRefresh)).resolves.toEqual({
+      factsEpoch: `native:${PROFILE_A_ID}`,
       factsRevision: 2,
       refreshed: true,
       revisionChanged: true,
     });
-    expect(revisionRefresh).toHaveBeenCalledTimes(2);
+    expect(revisionRefresh).toHaveBeenCalledTimes(1);
 
     await mount(routerA);
     expect(latest.localDataStatus?.profileState).toBe('active');

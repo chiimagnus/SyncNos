@@ -9,6 +9,7 @@ const readMocks = vi.hoisted(() => ({
   findConversationBySourceAndKey: vi.fn(),
   getConversationByReference: vi.fn(),
   getConversationDetail: vi.fn(),
+  getFactsRevision: vi.fn(),
   getConversationListBootstrap: vi.fn(),
   getConversationListPage: vi.fn(),
   getConversationTailWindow: vi.fn(),
@@ -46,6 +47,7 @@ afterEach(() => {
   readMocks.findConversationBySourceAndKey.mockReset();
   readMocks.getConversationByReference.mockReset();
   readMocks.getConversationDetail.mockReset();
+  readMocks.getFactsRevision.mockReset();
   readMocks.getConversationListBootstrap.mockReset();
   readMocks.getConversationListPage.mockReset();
   readMocks.getConversationTailWindow.mockReset();
@@ -54,6 +56,17 @@ afterEach(() => {
 });
 
 describe('conversations pagination handlers', () => {
+  it('returns the lease-bound epoch and revision from one background read operation', async () => {
+    readMocks.getFactsRevision.mockResolvedValue(12);
+    const router = createRouter();
+
+    const res = await router.__handleMessageForTests({ type: 'getConversationLocalDataRevision' });
+
+    expect(res.ok).toBe(true);
+    expect(res.data).toEqual({ factsEpoch: 'epoch-idb', factsRevision: 12 });
+    expect(readMocks.getFactsRevision).toHaveBeenCalledTimes(1);
+  });
+
   it('routes bootstrap query to storage with normalized payload', async () => {
     readMocks.getConversationListBootstrap.mockResolvedValue({
       items: [],

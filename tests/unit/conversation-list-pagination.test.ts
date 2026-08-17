@@ -134,7 +134,6 @@ function buildState(overrides: Record<string, unknown> = {}) {
     clearSelected: vi.fn(),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey: vi.fn(),
-    openConversationExternalById: vi.fn(),
     loadMoreList: vi.fn(async () => {}),
     exporting: false,
     syncFeedback: {

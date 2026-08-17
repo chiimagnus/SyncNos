@@ -145,7 +145,7 @@ export function ConversationListPane({
     toggleSelected,
     setActiveId,
     clearSelected,
-    openConversationInListScopeById,
+    openConversationInListScopeByLoc,
     exporting,
     listError,
     syncFeedback,
@@ -164,6 +164,8 @@ export function ConversationListPane({
     setListSiteFilterKeyPersistent,
     openLocalSearch,
     pendingListLocateId,
+    stableIdentityNotice,
+    clearStableIdentityNotice,
     consumeListLocate,
     loadMoreList,
     exportSelectedMarkdown,
@@ -591,7 +593,7 @@ export function ConversationListPane({
   const onNoticeJumpToConversation = (reference: SyncConversationReference) => {
     const id = resolveNoticeConversationId(reference);
     if (id == null) return;
-    openConversationInListScopeById(id);
+    void openConversationInListScopeByLoc(reference);
     onOpenConversation?.(id);
   };
 
@@ -1210,6 +1212,23 @@ export function ConversationListPane({
               </div>
             )}
           </div>
+
+          {stableIdentityNotice ? (
+            <div
+              role="status"
+              className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-2 tw-rounded-xl tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]"
+            >
+              <span>{t('localDataIdentityRefreshNotice')}</span>
+              <button
+                type="button"
+                className={buttonTintClassName()}
+                onClick={clearStableIdentityNotice}
+                aria-label={t('dismissSyncFeedback')}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
 
           <ConversationSyncFeedbackNotice
             feedback={syncFeedback}

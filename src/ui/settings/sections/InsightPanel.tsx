@@ -17,8 +17,7 @@ import { buttonClassName, cardClassName } from '@ui/settings/ui';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
-import { setPendingOpenConversationId } from '@ui/conversations/pending-open';
+import { setPendingOpenConversation } from '@ui/conversations/pending-open';
 import { buildConversationRouteFromLoc } from '@services/shared/conversation-loc';
 
 const CHART_BASE_COLOR = 'var(--accent)';
@@ -324,7 +323,7 @@ export function InsightPanel(props: {
   onChangeRange: (next: InsightTimeRange) => void;
 }) {
   const { stats, range, onChangeRange } = props;
-  const { openConversationInListScopeByLoc, openConversationInListScopeById } = useConversationsApp();
+  const { openConversationInListScopeByLoc } = useConversationsApp();
   const isNarrow = useIsNarrowScreen();
   const routerLocation = useLocation();
   const fallbackTo = useMemo(() => {
@@ -342,22 +341,9 @@ export function InsightPanel(props: {
   const onOpenConversation = (item: InsightTopConversation) => {
     const source = String(item?.openSource || '').trim();
     const conversationKey = String(item?.openConversationKey || '').trim();
-    const conversationId = Number(item?.conversationId);
-
-    const openedId = openConversationInApp(conversationId, {
-      isNarrow,
-      setActiveId: (id) => {
-        if (source && conversationKey) {
-          void openConversationInListScopeByLoc({ source, conversationKey });
-          return;
-        }
-        void openConversationInListScopeById(Number(id));
-      },
-    });
-
-    if (isNarrow && openedId && source && conversationKey) {
-      setPendingOpenConversationId(openedId, { source, conversationKey });
-    }
+    if (!source || !conversationKey) return;
+    void openConversationInListScopeByLoc({ source, conversationKey });
+    if (isNarrow) setPendingOpenConversation({ source, conversationKey });
   };
 
   return (

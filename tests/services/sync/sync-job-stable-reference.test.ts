@@ -42,6 +42,7 @@ describe('sync job stable references', () => {
     expect(job?.conversations).toEqual([]);
     expect(job?.currentConversation).toBeUndefined();
     expect(job?.perConversation[0].reference).toBeUndefined();
-    expect(job?.conversationIds).toEqual([7]);
+    expect(job?.conversationIds).toEqual([]);
+    expect(job?.currentConversationId).toBeUndefined();
   });
 });

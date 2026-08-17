@@ -32,7 +32,6 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     toggleSelected: vi.fn(),
     setActiveId: vi.fn(),
     clearSelected: vi.fn(),
-    openConversationExternalById: vi.fn(),
     exporting: false,
     syncFeedback: {
       provider: null,

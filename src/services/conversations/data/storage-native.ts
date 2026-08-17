@@ -1,4 +1,4 @@
-import { connectNative, type NativeHostRequest } from '@platform/local-data/native-client';
+import { connectNative, sendNativeMessage, type NativeHostRequest } from '@platform/local-data/native-client';
 import {
   LocalDataContractError,
   parseInsightFactsSnapshot,
@@ -11,6 +11,7 @@ import {
   type InsightFactsSnapshot,
   type InsightStatsRequestPayload,
   type LocalDataSearchPage,
+  type NativeHostSingleMessageCommand,
   type SearchRequestPayload,
   type JsonObject,
   type JsonValue,
@@ -48,6 +49,7 @@ type NativeConnectedCommand = Extract<
 >;
 
 type NativeConnect = <TData>(input: NativeHostRequest<NativeConnectedCommand>) => Promise<TData>;
+type NativeSingleMessage = <TData>(input: NativeHostRequest<NativeHostSingleMessageCommand>) => Promise<TData>;
 
 export type ConversationReadRepository = Readonly<{
   findConversationById?: (conversationId: number) => Promise<ConversationListOpenTarget | null>;
@@ -67,6 +69,7 @@ export type ConversationReadRepository = Readonly<{
     limit?: number | null,
   ) => Promise<ConversationListPage<Conversation>>;
   getConversationTailWindow: (reference: StableConversationReference, limit: number) => Promise<ConversationTailWindow>;
+  getFactsRevision: () => Promise<number | null>;
   getInsightStats: (input: InsightStatsRequestPayload) => Promise<InsightFactsSnapshot>;
   /** Native-only full-text capability. IDB repositories intentionally omit it. */
   searchConversations?: (input: SearchRequestPayload) => Promise<LocalDataSearchPage>;
@@ -139,6 +142,7 @@ export type ConversationFactsRepository = ConversationReadRepository & Conversat
 
 export type NativeConversationReadDependencies = Readonly<{
   connectNative?: NativeConnect;
+  sendNativeMessage?: NativeSingleMessage;
 }>;
 
 function protocolFailure(): never {
@@ -242,6 +246,8 @@ function asPage(value: unknown): ConversationListPage<Conversation> {
   };
   const nativeCursor = cursor === null ? null : text(cursor, true);
   if (input.hasMore && !nativeCursor) protocolFailure();
+  const factsRevision = Number(input.factsRevision);
+  if (!Number.isSafeInteger(factsRevision) || factsRevision < 0) protocolFailure();
   return {
     items: input.items.map(asConversation),
     cursor: nativeCursor ? { nativeCursor } : null,
@@ -251,6 +257,7 @@ function asPage(value: unknown): ConversationListPage<Conversation> {
       sources: facets.sources.map(parseFacet),
       sites: facets.sites.map(parseFacet),
     },
+    factsRevision,
   };
 }
 
@@ -369,6 +376,7 @@ export function createNativeConversationReadRepository(
   dependencies: NativeConversationReadDependencies = {},
 ): ConversationFactsRepository {
   const nativeConnect = (dependencies.connectNative ?? connectNative) as NativeConnect;
+  const nativeSingleMessage = (dependencies.sendNativeMessage ?? sendNativeMessage) as NativeSingleMessage;
   const request = async <TData>(command: NativeConnectedCommand, payload: unknown): Promise<TData> => {
     assertFactsOperationLease(lease);
     const result = await nativeConnect<TData>({ command, payload } as NativeHostRequest<NativeConnectedCommand>);
@@ -377,6 +385,17 @@ export function createNativeConversationReadRepository(
   };
 
   const repository: ConversationFactsRepository = {
+    async getFactsRevision() {
+      assertFactsOperationLease(lease);
+      const value = record(await nativeSingleMessage<unknown>({ command: 'GET_FACTS_REVISION', payload: {} }));
+      assertFactsOperationLease(lease);
+      if (Object.keys(value).sort().join(',') !== 'factsRevision') {
+        throw new LocalDataContractError('PROTOCOL_MISMATCH');
+      }
+      const revision = Number(value.factsRevision);
+      if (!Number.isSafeInteger(revision) || revision < 0) throw new LocalDataContractError('PROTOCOL_MISMATCH');
+      return revision;
+    },
     async getConversationListBootstrap(queryInput, limit) {
       return asPage(await request('CONVERSATION_BOOTSTRAP', listPayload(queryInput, limit)));
     },

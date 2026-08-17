@@ -938,6 +938,7 @@ async function readConversationListPage(input: {
     hasMore: page.hasMore,
     summary: summaryData.summary,
     facets: summaryData.facets,
+    factsRevision: null,
   };
 }
 

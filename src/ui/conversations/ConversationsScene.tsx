@@ -75,7 +75,7 @@ export function ConversationsScene({
   const {
     selectedConversation,
     openConversationExternalBySourceKey,
-    openConversationExternalById,
+    openLegacyIdbConversationById,
     localSearchSheet,
     listFacets,
   } = useConversationsApp();
@@ -104,18 +104,18 @@ export function ConversationsScene({
     if (!isNarrow) return;
     const pending = consumePendingOpenConversation();
     if (!pending) return;
-    const id = Number(pending.conversationId);
-    const source = String(pending.source || '').trim();
-    const conversationKey = String(pending.conversationKey || '').trim();
-    if (source && conversationKey) {
-      void openConversationExternalBySourceKey(source, conversationKey);
-    } else if (Number.isFinite(id) && id > 0) {
-      void openConversationExternalById(id);
-    } else {
-      return;
-    }
-    openDetail();
-  }, [isNarrow, openConversationExternalById, openConversationExternalBySourceKey, openDetail]);
+    let disposed = false;
+    void (async () => {
+      const opened =
+        'source' in pending
+          ? await openConversationExternalBySourceKey(pending.source, pending.conversationKey)
+          : await openLegacyIdbConversationById(pending.legacyIdbConversationId);
+      if (!disposed && opened) openDetail();
+    })();
+    return () => {
+      disposed = true;
+    };
+  }, [isNarrow, openConversationExternalBySourceKey, openDetail, openLegacyIdbConversationById]);
 
   useEffect(() => {
     if (!commentsSidebarRuntime) return;

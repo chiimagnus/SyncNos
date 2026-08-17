@@ -425,6 +425,7 @@ export const en = {
   currentPrefix: 'Current:',
   syncDetails: 'sync details',
   dismissSyncFeedback: 'Dismiss sync feedback',
+  localDataIdentityRefreshNotice: 'Some selections changed because the shared local database was updated elsewhere.',
   warningsHeading: 'Warnings',
   conversationLabel: 'Conversation',
 

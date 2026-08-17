@@ -39,6 +39,8 @@ export type ConversationListOpenTarget = {
 
 export type ConversationListPage<TItem = Conversation> = {
   factsEpoch?: FactsEpoch;
+  /** SQLite-only monotonic revision captured from the same list snapshot; IDB is null. */
+  factsRevision?: number | null;
   items: TItem[];
   cursor: ConversationListCursor | null;
   hasMore: boolean;

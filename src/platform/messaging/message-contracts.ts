@@ -11,6 +11,7 @@ export const CORE_MESSAGE_TYPES = {
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
   GET_CONVERSATION_LIST_BOOTSTRAP: 'getConversationListBootstrap',
   GET_CONVERSATION_LIST_PAGE: 'getConversationListPage',
+  GET_CONVERSATION_LOCAL_DATA_REVISION: 'getConversationLocalDataRevision',
   FIND_CONVERSATION_BY_SOURCE_AND_KEY: 'findConversationBySourceAndKey',
   FIND_CONVERSATION_BY_ID: 'findConversationById',
   GET_CONVERSATION_DETAIL: 'getConversationDetail',

@@ -125,6 +125,7 @@ describe('native conversation read repository', () => {
           return {
             items: [conversation],
             cursor: 'opaque-page-2',
+            factsRevision: 4,
             hasMore: true,
             summary: { totalCount: 2, todayCount: 1 },
             facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 2 }], sites: [] },
@@ -133,6 +134,7 @@ describe('native conversation read repository', () => {
           return {
             items: [],
             cursor: null,
+            factsRevision: 4,
             hasMore: false,
             summary: { totalCount: 2, todayCount: 1 },
             facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: 2 }], sites: [] },
@@ -172,11 +174,19 @@ describe('native conversation read repository', () => {
           throw new Error(`unexpected command ${command}`);
       }
     });
+    const sendNativeMessage = vi.fn(async ({ command }: any) => {
+      if (command !== 'GET_FACTS_REVISION') throw new Error(`unexpected single-message command ${command}`);
+      return { factsRevision: 4 };
+    });
     const gate = new FactsOperationGate({ readJournal: async () => notStarted });
     await gate.initializeFromJournal();
 
     await gate.runFactsOperation('native-read', async (lease) => {
-      const repository = createNativeConversationReadRepository(lease, { connectNative }) as ConversationReadRepository;
+      const repository = createNativeConversationReadRepository(lease, {
+        connectNative,
+        sendNativeMessage,
+      }) as ConversationReadRepository;
+      await expect(repository.getFactsRevision()).resolves.toBe(4);
       const bootstrap = await repository.getConversationListBootstrap({ sourceKey: 'chatgpt', siteKey: 'all' }, 20);
       expect(bootstrap.cursor).toEqual({ nativeCursor: 'opaque-page-2' });
       expect(bootstrap.items).toEqual([conversation]);
@@ -219,6 +229,7 @@ describe('native conversation read repository', () => {
       });
     });
 
+    expect(sendNativeMessage).toHaveBeenCalledWith({ command: 'GET_FACTS_REVISION', payload: {} });
     expect(calls.map((call) => call.command)).toEqual([
       'CONVERSATION_BOOTSTRAP',
       'CONVERSATION_LOAD_MORE',
@@ -278,6 +289,7 @@ describe('native conversation read repository', () => {
         connectNative: async () => ({
           items: [],
           cursor: 'opaque',
+          factsRevision: 4,
           hasMore: true,
           summary: { totalCount: 1, todayCount: 0 },
           facets: { sources: [{ key: 'chatgpt', label: 'ChatGPT', count: -1 }], sites: [] },

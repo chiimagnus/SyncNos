@@ -50,6 +50,10 @@ function assertResolvedReference(reference: ResolvedConversationReference): Reso
 function createIdbConversationReadRepository(lease: FactsOperationLease): ConversationFactsRepository {
   const assertLease = () => assertFactsOperationLease(lease);
   return Object.freeze({
+    async getFactsRevision() {
+      assertLease();
+      return null;
+    },
     async getConversationListBootstrap(queryInput?: ConversationListQueryInput | null, limit?: number | null) {
       assertLease();
       return await idb.getConversationListBootstrap(queryInput, limit);

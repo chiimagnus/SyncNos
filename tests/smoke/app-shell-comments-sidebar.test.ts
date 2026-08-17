@@ -92,7 +92,6 @@ const currentState = {
   clearSelected: vi.fn(),
   openConversationExternalByLoc: vi.fn(),
   openConversationExternalBySourceKey: vi.fn(),
-  openConversationExternalById: vi.fn(),
   exporting: false,
   syncFeedback: {
     provider: null,

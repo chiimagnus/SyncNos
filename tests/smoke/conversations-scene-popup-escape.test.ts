@@ -10,17 +10,12 @@ vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
 }));
 
 const setActiveId = vi.fn();
-const openConversationExternalById = vi.fn();
-const openConversationExternalBySourceKey = vi.fn();
+const openLegacyIdbConversationById = vi.fn(async () => false);
+const openConversationExternalBySourceKey = vi.fn(async () => true);
 const consumePendingOpenConversation = vi.fn(() => null);
 
 vi.mock('../../src/ui/conversations/pending-open', () => ({
   consumePendingOpenConversation: () => consumePendingOpenConversation(),
-  consumePendingOpenConversationId: () => {
-    const pending = consumePendingOpenConversation();
-    const id = Number((pending as any)?.conversationId || 0);
-    return Number.isFinite(id) && id > 0 ? id : null;
-  },
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -76,7 +71,7 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
     consumeListLocate: vi.fn(() => null),
     openConversationExternalByLoc: vi.fn(),
     openConversationExternalBySourceKey,
-    openConversationExternalById,
+    openLegacyIdbConversationById,
     loadMoreList: vi.fn(async () => {}),
     exportSelectedMarkdown: vi.fn(),
     syncSelectedNotion: vi.fn(),
@@ -147,8 +142,8 @@ describe('ConversationsScene popup Escape behavior', () => {
   beforeEach(() => {
     setupDom();
     setActiveId.mockReset();
-    openConversationExternalById.mockReset();
-    openConversationExternalBySourceKey.mockReset();
+    openLegacyIdbConversationById.mockReset().mockResolvedValue(false);
+    openConversationExternalBySourceKey.mockReset().mockResolvedValue(true);
     consumePendingOpenConversation.mockReset();
     consumePendingOpenConversation.mockReturnValue(null);
     root = ReactDOM.createRoot(document.getElementById('root')!);
@@ -212,19 +207,29 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(secondEscape.defaultPrevented).toBe(false);
   });
 
-  it('consumes pending-open source/key target and opens detail via precise API', () => {
-    consumePendingOpenConversation.mockReturnValueOnce({
-      conversationId: 99,
-      source: 'chatgpt',
-      conversationKey: 'conv-99',
-    });
+  it('consumes a stable pending-open target and opens detail via precise identity', async () => {
+    consumePendingOpenConversation.mockReturnValueOnce({ source: 'chatgpt', conversationKey: 'conv-99' });
 
-    act(() => {
+    await act(async () => {
       root!.render(createElement(ConversationsScene));
+      await flushImmediate();
     });
 
     expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'conv-99');
-    expect(openConversationExternalById).not.toHaveBeenCalled();
+    expect(openLegacyIdbConversationById).not.toHaveBeenCalled();
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+  });
+
+  it('consumes legacy numeric pending state but does not open detail when the context rejects non-IDB resolution', async () => {
+    consumePendingOpenConversation.mockReturnValueOnce({ legacyIdbConversationId: 99 });
+
+    await act(async () => {
+      root!.render(createElement(ConversationsScene));
+      await flushImmediate();
+    });
+
+    expect(openLegacyIdbConversationById).toHaveBeenCalledWith(99);
+    expect(openConversationExternalBySourceKey).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeFalsy();
   });
 });
