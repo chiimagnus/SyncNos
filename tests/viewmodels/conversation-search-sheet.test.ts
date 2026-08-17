@@ -262,6 +262,26 @@ describe('conversation search sheet viewmodel', () => {
     expect(latest.cursorStale).toBe(false);
   });
 
+  it('does not let a late focus-revision guard stale a newer explicit submit', async () => {
+    await act(async () => latest.openLocalSearch());
+    act(() => latest.setQuery('hello'));
+    await act(async () => latest.submit());
+    const lateFocusGuard = latest.captureRevisionStaleGuard();
+
+    client.search.mockResolvedValueOnce({
+      requestId: 'req-2',
+      page: { ...firstPage, factsRevision: 8, cursor: null, hasMore: false },
+    });
+    await act(async () => latest.submit());
+    expect(latest.result?.factsRevision).toBe(8);
+    expect(latest.cursorStale).toBe(false);
+
+    act(() => lateFocusGuard());
+    expect(latest.result?.factsRevision).toBe(8);
+    expect(latest.cursorStale).toBe(false);
+    expect(client.search).toHaveBeenCalledTimes(2);
+  });
+
   it('lets a newer explicit submit supersede an older response', async () => {
     await act(async () => latest.openLocalSearch());
     const first = deferred<any>();

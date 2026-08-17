@@ -504,7 +504,11 @@ describe('Local Database settings flow', () => {
       getFactsRevision: async () => await profileA.coordinator.getFactsRevision(),
     });
     revisionMonitor.setFactsEpoch(`native:${PROFILE_A_ID}`);
-    await expect(revisionMonitor.checkForExternalChange(revisionRefresh)).resolves.toBe(true);
+    await expect(revisionMonitor.checkForExternalChange(revisionRefresh)).resolves.toEqual({
+      factsRevision: 1,
+      refreshed: true,
+      revisionChanged: false,
+    });
     expect(revisionRefresh).toHaveBeenCalledTimes(1);
 
     await mount(routerB);
@@ -524,7 +528,11 @@ describe('Local Database settings flow', () => {
     expect(profileB.clearSourceFacts).toHaveBeenCalledTimes(1);
     expect(host.factsRevision).toBe(2);
 
-    await expect(revisionMonitor.checkForExternalChange(revisionRefresh)).resolves.toBe(true);
+    await expect(revisionMonitor.checkForExternalChange(revisionRefresh)).resolves.toEqual({
+      factsRevision: 2,
+      refreshed: true,
+      revisionChanged: true,
+    });
     expect(revisionRefresh).toHaveBeenCalledTimes(2);
 
     await mount(routerA);

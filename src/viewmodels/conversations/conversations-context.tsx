@@ -445,7 +445,7 @@ type ConversationsAppState = {
   requestListLocate: (conversationId: number) => void;
   consumeListLocate: () => number | null;
   openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
-  openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<void>;
+  openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<boolean>;
   openConversationExternalById: (conversationId: number) => Promise<void>;
   openConversationInListScopeByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationInListScopeBySourceKey: (source: string, conversationKey: string) => Promise<void>;
@@ -516,7 +516,8 @@ export function ConversationsProvider({
   const [listSourceFilterKey, setListSourceFilterKey] = useState<string>(() => readInitialListSourceFilterKey());
   const [listSiteFilterKey, setListSiteFilterKey] = useState<string>(() => readInitialListSiteFilterKey());
   const localSearchSheet = useConversationSearchSheet({ listSourceFilterKey, listSiteFilterKey });
-  const markLocalSearchResultsStale = localSearchSheet.markResultsStale;
+  const captureLocalSearchRevisionStaleGuard = localSearchSheet.captureRevisionStaleGuard;
+  const localSearchFactsRevision = localSearchSheet.result?.factsRevision ?? null;
   const activeConversationSnapshotRef = useRef<ConversationListOpenTarget | null>(null);
   const [activeConversationSnapshot, setActiveConversationSnapshotState] = useState<ConversationListOpenTarget | null>(
     null,
@@ -628,10 +629,10 @@ export function ConversationsProvider({
   );
 
   const openConversationBySourceKey = useCallback(
-    async (source: string, conversationKey: string, options?: { preserveListScope?: boolean }) => {
+    async (source: string, conversationKey: string, options?: { preserveListScope?: boolean }): Promise<boolean> => {
       const safeSource = String(source || '').trim();
       const safeConversationKey = String(conversationKey || '').trim();
-      if (!safeSource || !safeConversationKey) return;
+      if (!safeSource || !safeConversationKey) return false;
 
       const requestSeq = openTargetRequestSeqRef.current + 1;
       openTargetRequestSeqRef.current = requestSeq;
@@ -641,16 +642,16 @@ export function ConversationsProvider({
           ? findConversationBySourceAndKey(safeSource, safeConversationKey, listFactsEpoch)
           : findConversationBySourceAndKey(safeSource, safeConversationKey)
       ).catch(() => null);
-      if (requestSeq !== openTargetRequestSeqRef.current) return;
+      if (requestSeq !== openTargetRequestSeqRef.current || !target) return false;
       applyOpenTarget(target, options);
+      return true;
     },
     [applyOpenTarget, listFactsEpoch],
   );
 
   const openConversationExternalBySourceKey = useCallback(
-    async (source: string, conversationKey: string) => {
-      await openConversationBySourceKey(source, conversationKey, { preserveListScope: false });
-    },
+    async (source: string, conversationKey: string): Promise<boolean> =>
+      await openConversationBySourceKey(source, conversationKey, { preserveListScope: false }),
     [openConversationBySourceKey],
   );
 
@@ -1174,10 +1175,16 @@ export function ConversationsProvider({
       await refreshList({ migrationReselect });
     };
     const probeRevision = () => {
+      const staleGuard = captureLocalSearchRevisionStaleGuard();
+      const searchFactsRevisionAtProbe = localSearchFactsRevision;
       void monitor
         .checkForExternalChange(refreshStableSnapshot)
-        .then((changed) => {
-          if (changed) markLocalSearchResultsStale();
+        .then((outcome) => {
+          const searchRevisionChanged =
+            searchFactsRevisionAtProbe !== null &&
+            outcome.factsRevision !== null &&
+            searchFactsRevisionAtProbe !== outcome.factsRevision;
+          if (outcome.revisionChanged || searchRevisionChanged) staleGuard();
         })
         .catch(() => {
           // Focus refresh is best-effort; normal facts operations keep their own epoch/lease safety.
@@ -1193,7 +1200,7 @@ export function ConversationsProvider({
       window.removeEventListener('focus', probeRevision);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [listFactsEpoch, markLocalSearchResultsStale, refreshList]);
+  }, [captureLocalSearchRevisionStaleGuard, listFactsEpoch, localSearchFactsRevision, refreshList]);
 
   useEffect(() => {
     let cancelled = false;

@@ -229,8 +229,8 @@ export function ConversationsScene({
 
   const openSearchResultAsConversation = async (result: { source: string; conversationKey: string }) => {
     localSearchSheet.close();
-    await openConversationExternalBySourceKey(result.source, result.conversationKey);
-    if (isNarrow) openDetail();
+    const opened = await openConversationExternalBySourceKey(result.source, result.conversationKey);
+    if (opened && isNarrow) openDetail();
   };
 
   const openLocalDatabaseSettings = () => {

@@ -158,6 +158,16 @@ export function ConversationSearchSheet({
     setNarrowPane('results');
   };
 
+  const leaveForSettings = () => {
+    restoreFocusRef.current = null;
+    onOpenSettings();
+  };
+
+  const leaveForFullConversation = (result: LocalDataSearchResult) => {
+    restoreFocusRef.current = null;
+    onOpenFullConversation(result);
+  };
+
   const selectResult = (result: LocalDataSearchResult) => {
     if (isNarrow) setNarrowPane('preview');
     void controller.selectResult(result);
@@ -241,7 +251,7 @@ export function ConversationSearchSheet({
             {t('localSearchCapabilityLoading')}
           </div>
         ) : controller.mode === 'disabled' ? (
-          <ConversationSearchDisabledPrompt onOpenSettings={onOpenSettings} />
+          <ConversationSearchDisabledPrompt onOpenSettings={leaveForSettings} />
         ) : (
           <>
             {!isNarrow || narrowPane === 'results' ? (
@@ -332,7 +342,7 @@ export function ConversationSearchSheet({
                     preview={controller.preview}
                     selectedResult={selectedResult}
                     onBack={returnToNarrowResults}
-                    onOpenFullConversation={onOpenFullConversation}
+                    onOpenFullConversation={leaveForFullConversation}
                   />
                 </div>
               </div>
@@ -354,7 +364,7 @@ export function ConversationSearchSheet({
                 <ConversationSearchPreview
                   preview={controller.preview}
                   selectedResult={selectedResult}
-                  onOpenFullConversation={onOpenFullConversation}
+                  onOpenFullConversation={leaveForFullConversation}
                 />
               </div>
             )}

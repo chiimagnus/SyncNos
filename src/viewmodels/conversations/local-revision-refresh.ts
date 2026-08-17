@@ -1,8 +1,14 @@
 import { getLocalDataFactsRevision } from '@services/local-data/client';
 import type { FactsEpoch } from '@services/local-data/contracts';
 
+export type LocalFactsRevisionCheck = Readonly<{
+  factsRevision: number | null;
+  refreshed: boolean;
+  revisionChanged: boolean;
+}>;
+
 export type LocalFactsRevisionMonitor = Readonly<{
-  checkForExternalChange: (refresh: () => Promise<void>) => Promise<boolean>;
+  checkForExternalChange: (refresh: () => Promise<void>) => Promise<LocalFactsRevisionCheck>;
   setFactsEpoch: (factsEpoch: FactsEpoch | null) => void;
 }>;
 
@@ -25,7 +31,7 @@ export function createLocalFactsRevisionMonitor(
   }
 
   let factsEpoch: FactsEpoch | null = null;
-  let inFlight: Promise<boolean> | null = null;
+  let inFlight: Promise<LocalFactsRevisionCheck> | null = null;
   let lastObservedRevision: number | null = null;
 
   const setFactsEpoch = (nextFactsEpoch: FactsEpoch | null) => {
@@ -34,35 +40,44 @@ export function createLocalFactsRevisionMonitor(
     lastObservedRevision = null;
   };
 
-  const runCheck = async (refresh: () => Promise<void>): Promise<boolean> => {
-    if (!isNativeEpoch(factsEpoch)) return false;
+  const runCheck = async (refresh: () => Promise<void>): Promise<LocalFactsRevisionCheck> => {
+    if (!isNativeEpoch(factsEpoch)) return { factsRevision: null, refreshed: false, revisionChanged: false };
     const firstRevision = await getFactsRevision();
-    if (firstRevision === null) return false;
-    if (lastObservedRevision === firstRevision) return false;
+    if (firstRevision === null) return { factsRevision: null, refreshed: false, revisionChanged: false };
+    if (lastObservedRevision === firstRevision) {
+      return { factsRevision: firstRevision, refreshed: false, revisionChanged: false };
+    }
 
+    const hadBaseline = lastObservedRevision !== null;
+    let revisionChanged = hadBaseline;
     let observedRevision = firstRevision;
     for (let attempt = 0; attempt < maxRefreshAttempts; attempt += 1) {
       await refresh();
-      if (!isNativeEpoch(factsEpoch)) return true;
+      if (!isNativeEpoch(factsEpoch)) {
+        return { factsRevision: null, refreshed: true, revisionChanged: true };
+      }
       const afterRefresh = await getFactsRevision();
-      if (afterRefresh === null) return true;
+      if (afterRefresh === null) {
+        return { factsRevision: null, refreshed: true, revisionChanged };
+      }
       if (afterRefresh === observedRevision) {
         lastObservedRevision = afterRefresh;
-        return true;
+        return { factsRevision: afterRefresh, refreshed: true, revisionChanged };
       }
+      revisionChanged = true;
       observedRevision = afterRefresh;
     }
 
     // Another profile kept committing during our bounded refresh window. Keep the baseline unknown
     // so the next focus/visibility event rechecks instead of blessing a possibly stale snapshot.
     lastObservedRevision = null;
-    return true;
+    return { factsRevision: null, refreshed: true, revisionChanged: true };
   };
 
   return Object.freeze({
     checkForExternalChange: async (refresh) => {
       if (typeof refresh !== 'function') throw new Error('refresh callback is required');
-      if (!isNativeEpoch(factsEpoch)) return false;
+      if (!isNativeEpoch(factsEpoch)) return { factsRevision: null, refreshed: false, revisionChanged: false };
       if (inFlight) return await inFlight;
       inFlight = runCheck(refresh).finally(() => {
         inFlight = null;

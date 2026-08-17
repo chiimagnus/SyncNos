@@ -52,13 +52,15 @@ function makeController(overrides: Partial<ConversationSearchSheetController> = 
     loadMore: vi.fn(async () => {}),
     selectResult: vi.fn(async () => {}),
     clearPreview: vi.fn(),
+    markResultsStale: vi.fn(),
+    captureRevisionStaleGuard: vi.fn(() => vi.fn()),
     ...overrides,
   };
 }
 
 function setupDom() {
   const dom = new JSDOM(
-    '<!doctype html><html><body><button id="trigger">Search trigger</button><div id="root"></div></body></html>',
+    '<!doctype html><html><body><button id="trigger">Search trigger</button><button id="destination">Destination</button><div id="root"></div></body></html>',
     {
       url: 'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/app.html',
       pretendToBeVisual: true,
@@ -213,7 +215,9 @@ describe('ConversationSearchSheet', () => {
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  it('keeps the disabled state actionable and routes setup through the supplied Backup-settings callback', async () => {
+  it('keeps the disabled state actionable and leaves navigation focus owned by Backup settings', async () => {
+    const destination = document.getElementById('destination') as HTMLButtonElement;
+    onOpenSettings.mockImplementationOnce(() => destination.focus());
     renderSheet(makeController({ mode: 'disabled', result: null }));
     await act(async () => flush());
     expect(document.body.textContent).toContain('Local search requires Local Database');
@@ -222,9 +226,15 @@ describe('ConversationSearchSheet', () => {
     )!;
     act(() => (button as HTMLButtonElement).click());
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    await act(async () => flush());
+    expect(document.activeElement).toBe(destination);
+    root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  it('shows typed FTS/busy errors and opens a selected full conversation from stable result identity', async () => {
+  it('shows typed FTS/busy errors and leaves full-conversation navigation focus with the destination', async () => {
+    const destination = document.getElementById('destination') as HTMLButtonElement;
+    onOpenFullConversation.mockImplementationOnce(() => destination.focus());
     renderSheet(
       makeController({
         searchError: 'raw host error',
@@ -251,6 +261,10 @@ describe('ConversationSearchSheet', () => {
     )!;
     act(() => (open as HTMLButtonElement).click());
     expect(onOpenFullConversation).toHaveBeenCalledWith(resultItem);
+    act(() => root.unmount());
+    await act(async () => flush());
+    expect(document.activeElement).toBe(destination);
+    root = ReactDOM.createRoot(document.getElementById('root')!);
 
     renderSheet(makeController({ searchError: 'busy', searchErrorCode: 'MIGRATION_IN_PROGRESS' }));
     expect(document.body.textContent).toContain('migration is in progress');

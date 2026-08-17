@@ -172,7 +172,7 @@ describe('conversation search sheet underlying-state restoration', () => {
     scene.returnToDetail.mockReset();
     scene.returnToList.mockReset();
     scene.closeSearch.mockReset();
-    scene.openBySourceKey.mockReset().mockResolvedValue(undefined);
+    scene.openBySourceKey.mockReset().mockResolvedValue(true);
     scene.openById.mockReset().mockResolvedValue(undefined);
   });
 
@@ -235,5 +235,29 @@ describe('conversation search sheet underlying-state restoration', () => {
     expect(scene.openById).not.toHaveBeenCalled();
     expect(scene.openDetail).toHaveBeenCalledTimes(1);
     expect(scene.openComments).not.toHaveBeenCalled();
+  });
+
+  it('does not enter the old narrow detail when a stale search result no longer resolves', async () => {
+    scene.openBySourceKey.mockResolvedValueOnce(false);
+    scene.searchMode = 'search';
+    renderScene();
+    await act(async () => flush());
+    const option = document.querySelector('[role="option"]') as HTMLButtonElement;
+    await act(async () => {
+      option.click();
+      await flush();
+    });
+    const open = [...document.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Open full conversation'),
+    )!;
+    await act(async () => {
+      (open as HTMLButtonElement).click();
+      await flush();
+    });
+
+    expect(scene.closeSearch).toHaveBeenCalledTimes(1);
+    expect(scene.openBySourceKey).toHaveBeenCalledWith('chatgpt', 'search-key');
+    expect(scene.openDetail).not.toHaveBeenCalled();
+    expect(selectedConversation.conversationKey).toBe('underlying-selected');
   });
 });

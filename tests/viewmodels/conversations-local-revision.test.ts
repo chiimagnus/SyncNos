@@ -9,7 +9,11 @@ describe('conversations local facts revision refresh', () => {
     const monitor = createLocalFactsRevisionMonitor({ getFactsRevision });
     monitor.setFactsEpoch('idb-v1');
 
-    await expect(monitor.checkForExternalChange(refresh)).resolves.toBe(false);
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: null,
+      refreshed: false,
+      revisionChanged: false,
+    });
 
     expect(getFactsRevision).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
@@ -21,8 +25,16 @@ describe('conversations local facts revision refresh', () => {
     const monitor = createLocalFactsRevisionMonitor({ getFactsRevision });
     monitor.setFactsEpoch('native:11111111-1111-4111-8111-111111111111');
 
-    await expect(monitor.checkForExternalChange(refresh)).resolves.toBe(true);
-    await expect(monitor.checkForExternalChange(refresh)).resolves.toBe(false);
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: 4,
+      refreshed: true,
+      revisionChanged: false,
+    });
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: 4,
+      refreshed: false,
+      revisionChanged: false,
+    });
 
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(getFactsRevision).toHaveBeenCalledTimes(3);
@@ -37,7 +49,11 @@ describe('conversations local facts revision refresh', () => {
 
     await monitor.checkForExternalChange(refresh);
     revision = 8;
-    await expect(monitor.checkForExternalChange(refresh)).resolves.toBe(true);
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: 8,
+      refreshed: true,
+      revisionChanged: true,
+    });
 
     expect(refresh).toHaveBeenCalledTimes(2);
   });
@@ -49,7 +65,11 @@ describe('conversations local facts revision refresh', () => {
     const monitor = createLocalFactsRevisionMonitor({ getFactsRevision, maxRefreshAttempts: 2 });
     monitor.setFactsEpoch('native:11111111-1111-4111-8111-111111111111');
 
-    await expect(monitor.checkForExternalChange(refresh)).resolves.toBe(true);
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: 11,
+      refreshed: true,
+      revisionChanged: true,
+    });
 
     expect(refresh).toHaveBeenCalledTimes(2);
     expect(getFactsRevision).toHaveBeenCalledTimes(3);
@@ -62,8 +82,16 @@ describe('conversations local facts revision refresh', () => {
     const monitor = createLocalFactsRevisionMonitor({ getFactsRevision, maxRefreshAttempts: 2 });
     monitor.setFactsEpoch('native:11111111-1111-4111-8111-111111111111');
 
-    await monitor.checkForExternalChange(refresh);
-    await monitor.checkForExternalChange(refresh);
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: null,
+      refreshed: true,
+      revisionChanged: true,
+    });
+    await expect(monitor.checkForExternalChange(refresh)).resolves.toEqual({
+      factsRevision: null,
+      refreshed: true,
+      revisionChanged: true,
+    });
 
     expect(refresh).toHaveBeenCalledTimes(4);
   });
@@ -89,7 +117,10 @@ describe('conversations local facts revision refresh', () => {
     expect(getFactsRevision).toHaveBeenCalledTimes(2);
     resolveRevision(3);
 
-    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { factsRevision: 3, refreshed: true, revisionChanged: false },
+      { factsRevision: 3, refreshed: true, revisionChanged: false },
+    ]);
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

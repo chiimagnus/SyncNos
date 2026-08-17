@@ -324,6 +324,14 @@ export function useConversationSearchSheet(
     setPreview(EMPTY_PREVIEW);
   }, [mode, result, searchLoading]);
 
+  const captureRevisionStaleGuard = useCallback(() => {
+    const generation = searchGenerationRef.current;
+    return () => {
+      if (generation !== searchGenerationRef.current) return;
+      markResultsStale();
+    };
+  }, [markResultsStale]);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -359,5 +367,6 @@ export function useConversationSearchSheet(
     selectResult,
     clearPreview,
     markResultsStale,
+    captureRevisionStaleGuard,
   });
 }

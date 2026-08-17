@@ -6,6 +6,8 @@ import { act, createElement } from 'react';
 const getConversationListBootstrap = vi.fn();
 const getConversationListPage = vi.fn();
 const markResultsStale = vi.fn();
+const runRevisionStaleGuard = vi.fn();
+const captureRevisionStaleGuard = vi.fn(() => runRevisionStaleGuard);
 const submitSearch = vi.fn();
 const monitorSetFactsEpoch = vi.fn();
 const monitorCheckForExternalChange = vi.fn();
@@ -13,7 +15,15 @@ const monitorCheckForExternalChange = vi.fn();
 const searchController = {
   mode: 'search' as const,
   draft: { query: 'needle', siteKey: 'all', sort: 'best' as const, sourceKey: 'all' },
-  result: null,
+  result: {
+    cursor: null,
+    factsRevision: 7,
+    facets: { sites: [], sources: [] },
+    hasMore: false,
+    items: [],
+    submitted: { query: 'needle', siteKey: 'all', sort: 'best' as const, sourceKey: 'all' },
+    truncatedByScanLimit: false,
+  },
   searchError: null,
   searchErrorCode: null,
   searchLoading: false,
@@ -31,6 +41,7 @@ const searchController = {
   selectResult: vi.fn(async () => {}),
   clearPreview: vi.fn(),
   markResultsStale,
+  captureRevisionStaleGuard,
 };
 
 vi.mock('@viewmodels/conversations/useConversationSearchSheet', () => ({
@@ -155,11 +166,13 @@ describe('conversation search focus revision refresh', () => {
     getConversationListBootstrap.mockReset().mockResolvedValue(page());
     getConversationListPage.mockReset();
     markResultsStale.mockReset();
+    runRevisionStaleGuard.mockReset();
+    captureRevisionStaleGuard.mockClear();
     submitSearch.mockReset();
     monitorSetFactsEpoch.mockReset();
     monitorCheckForExternalChange.mockReset().mockImplementation(async (refresh: () => Promise<void>) => {
       await refresh();
-      return true;
+      return { factsRevision: 8, refreshed: true, revisionChanged: true };
     });
   });
 
@@ -169,7 +182,7 @@ describe('conversation search focus revision refresh', () => {
     cleanupDom();
   });
 
-  it('marks the current search stale after a native focus refresh and never auto-resubmits it', async () => {
+  it('marks the current search stale after a confirmed native revision change and never auto-resubmits it', async () => {
     await act(async () => {
       root!.render(createElement(ConversationsProvider, null, null));
       await flush();
@@ -184,13 +197,18 @@ describe('conversation search focus revision refresh', () => {
 
     expect(monitorCheckForExternalChange).toHaveBeenCalledTimes(1);
     expect(getConversationListBootstrap).toHaveBeenCalledTimes(2);
-    expect(markResultsStale).toHaveBeenCalledTimes(1);
+    expect(captureRevisionStaleGuard).toHaveBeenCalledTimes(1);
+    expect(runRevisionStaleGuard).toHaveBeenCalledTimes(1);
+    expect(markResultsStale).not.toHaveBeenCalled();
     expect(submitSearch).not.toHaveBeenCalled();
     expect(monitorSetFactsEpoch).not.toHaveBeenCalledWith(null);
   });
 
-  it('does not stale or resubmit search when the revision monitor reports no refresh', async () => {
-    monitorCheckForExternalChange.mockResolvedValue(false);
+  it('keeps a same-revision search valid during the first conservative native baseline refresh', async () => {
+    monitorCheckForExternalChange.mockImplementation(async (refresh: () => Promise<void>) => {
+      await refresh();
+      return { factsRevision: 7, refreshed: true, revisionChanged: false };
+    });
     await act(async () => {
       root!.render(createElement(ConversationsProvider, null, null));
       await flush();
@@ -201,6 +219,9 @@ describe('conversation search focus revision refresh', () => {
       await flush();
     });
 
+    expect(getConversationListBootstrap).toHaveBeenCalledTimes(2);
+    expect(captureRevisionStaleGuard).toHaveBeenCalledTimes(1);
+    expect(runRevisionStaleGuard).not.toHaveBeenCalled();
     expect(markResultsStale).not.toHaveBeenCalled();
     expect(submitSearch).not.toHaveBeenCalled();
   });
