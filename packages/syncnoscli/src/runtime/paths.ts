@@ -4,6 +4,7 @@ import { posix, win32 } from 'node:path';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 
 export const SYNCNOSCLI_RUNTIME_DIRECTORY_NAME = '.syncnoscli' as const;
+export const SYNCNOSCLI_DATABASE_FILE_NAME = nativeHostContract.host.databaseRelativePath;
 export const SYNCNOSCLI_RUNTIME_OWNER_MARKER_FILE_NAME = 'runtime-owner-v1.json' as const;
 export const SYNCNOSCLI_NATIVE_HOST_LAUNCHER_CONFIG_FILE_NAME = 'native-host-launcher-v1.json' as const;
 export const SYNCNOSCLI_STAGING_DIRECTORY_NAME = 'staging' as const;
@@ -62,7 +63,7 @@ function parseHomeDirectory(value: unknown, api: RuntimePathApi): string {
 function createSyncNosRuntimePaths(platform: SyncNosRuntimePlatform, homeDirectory: string): SyncNosRuntimePaths {
   const api = pathApi(platform);
   const runtimeDirectory = api.join(homeDirectory, SYNCNOSCLI_RUNTIME_DIRECTORY_NAME);
-  const databasePath = api.join(runtimeDirectory, nativeHostContract.host.databaseRelativePath);
+  const databasePath = api.join(runtimeDirectory, SYNCNOSCLI_DATABASE_FILE_NAME);
   return Object.freeze({
     platform,
     homeDirectory,
