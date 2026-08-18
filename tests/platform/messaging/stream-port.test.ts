@@ -163,6 +163,53 @@ describe('local data stream port protocol', () => {
     expect(oversizedFrameError).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
   });
 
+  it('rejects accumulated data beyond the declared total before exposing or retaining a completed payload', async () => {
+    const requestId = 'accumulated-overflow';
+    const sessionId = '550e8400-e29b-41d4-a716-446655440000';
+    const receiver = new RuntimeStreamReceiver(
+      requestId,
+      { operation: 'capture-snapshot', declaredTotalBytes: 3 },
+      digestProvider,
+    );
+    const first = await createNativeWireDataFrame({
+      bytes: Uint8Array.from([1, 2]),
+      offset: 0,
+      provider: digestProvider,
+      sequence: 1,
+      sessionId,
+    });
+    const second = await createNativeWireDataFrame({
+      bytes: Uint8Array.from([3, 4]),
+      offset: 2,
+      provider: digestProvider,
+      sequence: 2,
+      sessionId,
+    });
+
+    await expect(
+      receiver.accept(
+        frame(requestId, {
+          protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+          sessionId,
+          sequence: 0,
+          type: 'begin',
+          operation: 'capture-snapshot',
+          declaredTotalBytes: 3,
+        }),
+      ),
+    ).resolves.toBeNull();
+    await expect(receiver.accept(frame(requestId, first))).resolves.toEqual({
+      kind: 'ack',
+      acknowledgedSequence: 1,
+    });
+    await expect(receiver.accept(frame(requestId, second))).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+    });
+    await expect(receiver.accept(frame(requestId, second))).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+  });
+
   it('clears an incomplete stream on cancel without exposing a partial payload', async () => {
     const requestId = 'cancel-request';
     const receiver = new RuntimeStreamReceiver(requestId, {
