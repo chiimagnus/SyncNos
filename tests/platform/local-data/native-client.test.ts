@@ -314,7 +314,29 @@ describe('Native Messaging client', () => {
 
     const receipt = await migrationReceipt(manifest);
     harness.emitMessage(createHostFactsSuccess('migration-import', receipt));
+    harness.emitDisconnect();
     await expect(operation).resolves.toEqual(receipt);
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails after queued import work drains when the Host disconnects without the final receipt', async () => {
+    const harness = createPortHarness();
+    const manifest = emptyMigrationManifest();
+    const operation = importNativeFacts({
+      migrationId: manifest.migrationId,
+      produce: async () => manifest,
+      dependencies: {
+        createRequestId: () => 'migration-missing-receipt',
+        runtime: { connectNative: vi.fn(() => harness.port) },
+      },
+    });
+
+    harness.emitMessage(createHostFactsSuccess('migration-missing-receipt', { accepted: true }));
+    await vi.waitFor(() => expect(harness.postMessage).toHaveBeenCalledTimes(2));
+    expect(harness.postMessage.mock.calls[1]?.[0]).toEqual({ type: 'complete', manifest });
+
+    harness.emitDisconnect();
+    await expect(operation).rejects.toMatchObject({ code: 'HOST_UNAVAILABLE' });
     expect(harness.disconnect).toHaveBeenCalledTimes(1);
   });
 

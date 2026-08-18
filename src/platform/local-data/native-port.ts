@@ -324,6 +324,7 @@ export function writeNativePortFactsImport(
     let accepted = false;
     let completeSent = false;
     let processing = Promise.resolve();
+    let disconnectObserved = false;
     let settled = false;
     let operationTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
@@ -367,6 +368,7 @@ export function writeNativePortFactsImport(
     };
 
     const onMessage: NativePortListener = (message) => {
+      if (disconnectObserved) return;
       processing = processing
         .then(async () => {
           if (settled) return;
@@ -386,7 +388,15 @@ export function writeNativePortFactsImport(
         })
         .catch(fail);
     };
-    const onDisconnect: NativePortListener = () => fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+    const onDisconnect: NativePortListener = () => {
+      if (settled || disconnectObserved) return;
+      disconnectObserved = true;
+      processing = processing
+        .then(() => {
+          if (!settled) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+        })
+        .catch(fail);
+    };
 
     input.port.onMessage.addListener(onMessage);
     input.port.onDisconnect.addListener(onDisconnect);
