@@ -44,7 +44,8 @@ describe('SyncNos CLI workspace gate', () => {
   it('wakes pull-request CI for CLI and shared-contract changes without publishing npm', () => {
     const ci = readWorkflow('webclipper-ci.yml');
     expect(ci).toContain('- packages/**');
-    expect(ci).toContain('- src/services/local-data/**');
+    expect(ci).toContain('- src/**');
+    expect(ci).not.toContain('- src/services/local-data/**');
     expect(ci).toContain('- package-lock.json');
     expect(ci).toContain('- .github/workflows/syncnoscli-ci.yml');
     expect(ci).toContain('run: npm run gate:ci');

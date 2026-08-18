@@ -9,7 +9,6 @@ on:
       - public/**
       - cloudflare-workers/**
       - packages/**
-      - src/services/local-data/**
       - package.json
       - package-lock.json
       - wxt.config.ts
