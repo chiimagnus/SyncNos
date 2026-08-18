@@ -1,6 +1,7 @@
 node_modules/
 dist/
 packages/syncnoscli/dist/
+packages/syncnoscli/*.tgz
 dist-firefox/
 dist-edge/
 *.xpi
