@@ -345,7 +345,7 @@ describe('Local Data release evidence schema', () => {
     expect(releaseEvidenceReady(windowsCmd, releaseCommit)).toBe(false);
   });
 
-  it('keeps structured automatic readiness evidence and CI validation wired without treating it as publish authorization', () => {
+  it('keeps release evidence on the main gate and three-OS packed install on the CLI matrix without publish authorization', () => {
     const evidence = parseEvidence();
     expect(Object.keys(evidence.automatic).sort()).toEqual(
       ['gate', 'safariCheck', 'threeOsCliPackedInstall', 'finalBrowserArtifactContract'].sort(),
@@ -360,10 +360,19 @@ describe('Local Data release evidence schema', () => {
       [...THREE_OS_CLI_CHECKS].sort(),
     );
 
-    const ci = readFileSync(resolve(repoRoot, '.github/workflows/syncnoscli-ci.yml'), 'utf8');
-    expect(ci).toContain('- tests/e2e/**');
-    expect(ci).toContain('tests/e2e/local-data-release-evidence.test.ts');
-    expect(ci).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
+    const cliCi = readFileSync(resolve(repoRoot, '.github/workflows/syncnoscli-ci.yml'), 'utf8');
+    expect(cliCi).not.toContain('- tests/e2e/**');
+    expect(cliCi).not.toContain('tests/e2e/local-data-release-evidence.test.ts');
+    expect(cliCi).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
+    expect(cliCi).toContain('run: npm run test:syncnoscli:packed');
+
+    const webclipperCi = readFileSync(resolve(repoRoot, '.github/workflows/webclipper-ci.yml'), 'utf8');
+    expect(webclipperCi).toContain('run: npm run gate:ci');
+    const rootPackage = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(rootPackage.scripts['gate:ci']).toContain('npm run test');
+
     const markdown = readFileSync(matrixPath, 'utf8');
     expect(markdown).toMatch(/local run, repository variable, or single-platform result is not equivalent evidence/i);
     expect(markdown).toMatch(/not npm publish authorization/i);
