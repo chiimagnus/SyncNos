@@ -44,7 +44,7 @@ const conversation = {
 const message = {
   id: 11,
   conversationId: 8,
-  messageKey: 'm-11',
+  messageKey: ' m-11 ',
   role: 'user',
   contentText: 'hello',
 };
@@ -278,6 +278,27 @@ describe('native conversation read repository', () => {
       error: null,
     });
     expect(repository.getInsightStats).toHaveBeenCalledWith({ timeZone: 'UTC' });
+  });
+
+  it('rejects an invalid surrogate in a Native message identity instead of normalizing it', async () => {
+    const gate = new FactsOperationGate({ readJournal: async () => notStarted });
+    await gate.initializeFromJournal();
+
+    await gate.runFactsOperation('native-read', async (lease) => {
+      const repository = createNativeConversationReadRepository(lease, {
+        connectNative: async ({ command }: any) => {
+          if (command !== 'CONVERSATION_DETAIL') throw new Error(`unexpected command ${command}`);
+          return {
+            conversationId: 8,
+            messages: [{ ...message, messageKey: '\ud800' }],
+          };
+        },
+      }) as ConversationReadRepository;
+
+      await expect(
+        repository.getConversationDetail({ source: 'chatgpt', conversationKey: 'thread-8' }),
+      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    });
   });
 
   it('rejects malformed Host pagination before exposing it to the caller', async () => {

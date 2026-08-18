@@ -1,6 +1,7 @@
 import { connectNative, sendNativeMessage, type NativeHostRequest } from '@platform/local-data/native-client';
 import {
   LocalDataContractError,
+  parseExactMessageKey,
   parseInsightFactsSnapshot,
   parseLocalDataSearchPage,
   serializedJsonUtf8ByteLength,
@@ -212,7 +213,7 @@ function asMessages(value: unknown): ConversationDetail['messages'] {
       ...(input as ConversationDetail['messages'][number]),
       id: positiveId(input.id),
       conversationId: positiveId(input.conversationId),
-      messageKey: text(input.messageKey, true),
+      messageKey: parseExactMessageKey(input.messageKey),
       role: text(input.role, true),
     };
   });
