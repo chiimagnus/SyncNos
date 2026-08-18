@@ -5,7 +5,7 @@ import type {
   ConversationMessageSyncOptions,
   ResolvedConversationReference,
 } from '@services/conversations/data/storage';
-import { LocalDataContractError, type JsonValue } from '@services/local-data/contracts';
+import { LocalDataContractError, parseExactMessageKey, type JsonValue } from '@services/local-data/contracts';
 
 export type BackfillConversationImagesResult = {
   scannedMessages: number;
@@ -63,8 +63,8 @@ export async function backfillConversationImages(input: {
     messages,
     onMessageUpdated: progressCallback
       ? async (update) => {
-          const key = String(update?.messageKey || '').trim();
-          if (!key || persistedUpdatedKeys.has(key)) return;
+          const key = parseExactMessageKey(update?.messageKey);
+          if (persistedUpdatedKeys.has(key)) return;
           const options: ConversationMessageSyncOptions = {
             mode: 'incremental',
             diff: { added: [], updated: [key], removed: [] },

@@ -137,6 +137,47 @@ describe('SQLite messages repository', () => {
     }
   });
 
+  it('uses exact message keys for incremental updates and removals', async () => {
+    const { conversations, handle, messages } = await fixture.open();
+    try {
+      const conversation = conversations.upsertConversation({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'exact-incremental',
+        title: 'Exact incremental',
+        lastCapturedAt: 1,
+      });
+      messages.syncConversationMessages(conversation.id, [
+        { messageKey: ' m1 ', role: 'assistant', contentText: 'old', sequence: 1 },
+        { messageKey: 'm1', role: 'assistant', contentText: 'plain', sequence: 2 },
+      ]);
+
+      expect(
+        messages.syncConversationMessages(
+          conversation.id,
+          [{ messageKey: ' m1 ', role: 'assistant', contentText: 'updated exact', sequence: 1 }],
+          { mode: 'incremental', diff: { added: [], updated: [' m1 '], removed: [] } },
+        ),
+      ).toEqual({ upserted: 1, deleted: 0 });
+      expect(messages.getMessagesByConversationId(conversation.id)).toMatchObject([
+        { messageKey: ' m1 ', contentText: 'updated exact' },
+        { messageKey: 'm1', contentText: 'plain' },
+      ]);
+
+      expect(
+        messages.syncConversationMessages(conversation.id, [], {
+          mode: 'incremental',
+          diff: { added: [], updated: [], removed: [' m1 '] },
+        }),
+      ).toEqual({ upserted: 0, deleted: 1 });
+      expect(messages.getMessagesByConversationId(conversation.id).map((message) => message.messageKey)).toEqual([
+        'm1',
+      ]);
+    } finally {
+      handle.close();
+    }
+  });
+
   it('rolls back a failed facts write without publishing a revision', async () => {
     const { conversations, database, handle, messages } = await fixture.open();
     try {

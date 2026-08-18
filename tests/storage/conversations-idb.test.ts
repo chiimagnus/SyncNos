@@ -672,6 +672,41 @@ describe('conversations storage-idb', () => {
     ]);
   });
 
+  it('uses exact message keys for incremental updates and removals', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'exact_incremental',
+      title: 'Exact incremental',
+      lastCapturedAt: 1,
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, [
+      { messageKey: ' m1 ', role: 'assistant', contentText: 'old', sequence: 1 },
+      { messageKey: 'm1', role: 'assistant', contentText: 'plain', sequence: 2 },
+    ]);
+
+    expect(
+      await syncConversationMessages(
+        id,
+        [{ messageKey: ' m1 ', role: 'assistant', contentText: 'updated exact', sequence: 1 }],
+        { mode: 'incremental', diff: { added: [], updated: [' m1 '], removed: [] } },
+      ),
+    ).toEqual({ upserted: 1, deleted: 0 });
+    expect(await getMessagesByConversationId(id)).toMatchObject([
+      { messageKey: ' m1 ', contentText: 'updated exact' },
+      { messageKey: 'm1', contentText: 'plain' },
+    ]);
+
+    expect(
+      await syncConversationMessages(id, [], {
+        mode: 'incremental',
+        diff: { added: [], updated: [], removed: [' m1 '] },
+      }),
+    ).toEqual({ upserted: 0, deleted: 1 });
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual(['m1']);
+  });
+
   it('reads message tails by conversation id with ascending sequence order', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

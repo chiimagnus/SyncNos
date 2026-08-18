@@ -1,5 +1,5 @@
 import { mergeMigrationMessagePayload, rewriteSyncnosAssetUrlsInMarkdown } from '@services/local-data/facts-archive';
-import { LocalDataContractError } from '@services/local-data/contracts';
+import { LocalDataContractError, parseExactMessageKey } from '@services/local-data/contracts';
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 
@@ -86,9 +86,14 @@ function normalizedSequence(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-function normalizeKeys(value: unknown): string[] {
+function exactKeys(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item || '').trim()).filter(Boolean);
+  const keys: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string' || !item.trim()) continue;
+    keys.push(parseExactMessageKey(item));
+  }
+  return keys;
 }
 
 function asMessage(row: MessageRow): ConversationMessage {
@@ -258,8 +263,7 @@ export function upsertMigrationMessageWithinTransaction(
   const conversationId = positiveId(input.conversationId);
   if (!conversationId || !conversationExists(database, conversationId)) invalidArgument();
   const incoming = messagePayload(input.payload) as Record<string, unknown>;
-  const messageKey = typeof incoming.messageKey === 'string' ? incoming.messageKey : '';
-  if (!messageKey || !messageKey.trim()) invalidArgument();
+  const messageKey = parseExactMessageKey(incoming.messageKey);
   const existing = selectMessageByConversationAndKey(database, conversationId, messageKey);
   const merged = mergeMigrationMessagePayload(existing ? readCanonicalJsonRecord(existing.payload_json) : {}, incoming);
   const row = upsertMessageWithinTransaction(database, {
@@ -327,13 +331,13 @@ export function syncMessagesWithinTransaction(
     const byKey = new Map<string, Record<string, unknown>>();
     for (const raw of messages) {
       const message = assertRawMessage(raw);
-      const key = message?.messageKey ? String(message.messageKey).trim() : '';
-      if (!key || !message) continue;
+      if (!message || typeof message.messageKey !== 'string' || !message.messageKey.trim()) continue;
+      const key = parseExactMessageKey(message.messageKey);
       byKey.set(key, message);
     }
-    const requestedKeys = [...new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)])];
+    const requestedKeys = [...new Set([...exactKeys(diff?.added), ...exactKeys(diff?.updated)])];
     const requestedKeySet = new Set(requestedKeys);
-    const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
+    const removedKeys = mode === 'incremental' ? exactKeys(diff?.removed) : [];
     const hasEffectiveDiff =
       Boolean(diff) &&
       (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
@@ -381,8 +385,8 @@ export function syncMessagesWithinTransaction(
   let upserted = 0;
   for (const raw of messages) {
     const message = assertRawMessage(raw);
-    if (!message || !message.messageKey) continue;
-    const key = String(message.messageKey);
+    if (!message || typeof message.messageKey !== 'string' || !message.messageKey.trim()) continue;
+    const key = parseExactMessageKey(message.messageKey);
     presentKeys.add(key);
     const existing = selectMessageByConversationAndKey(database, conversationId, key);
     upsertMessageWithinTransaction(database, {
@@ -537,8 +541,8 @@ function syncConversationMessages(
   const mode = requestedMode ?? 'snapshot';
   if (mode !== 'snapshot') {
     const diff = options?.diff ?? null;
-    const requestedKeys = [...new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)])];
-    const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
+    const requestedKeys = [...new Set([...exactKeys(diff?.added), ...exactKeys(diff?.updated)])];
+    const removedKeys = mode === 'incremental' ? exactKeys(diff?.removed) : [];
     const hasEffectiveDiff =
       Boolean(diff) &&
       (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);

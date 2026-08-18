@@ -34,6 +34,7 @@ import {
   parseCliFactsRequest,
   parseMigrationJournalStage,
   parseMigrationProfileReferencePatch,
+  parseExactMessageKey,
   parseMigrationStreamRequestPayload,
   parseLocalDataError,
   parseNativeHostSessionCompleteControl,
@@ -474,6 +475,13 @@ describe('local data contracts', () => {
         ),
       'INVALID_ARGUMENT',
     );
+  });
+
+  it('validates message keys without normalizing their exact identity', () => {
+    expect(parseExactMessageKey(' m1 ')).toBe(' m1 ');
+    expect(parseExactMessageKey('m😀')).toBe('m😀');
+    expectErrorCode(() => parseExactMessageKey('   '), 'INVALID_ARGUMENT');
+    expectErrorCode(() => parseExactMessageKey('\ud800'), 'INVALID_ARGUMENT');
   });
 
   it('fixes plain-snippet highlights to UTF-16 half-open ranges without splitting surrogates', () => {

@@ -1,6 +1,10 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import { buildInsightFactsSnapshot } from '@services/conversations/domain/insight-facts';
-import type { InsightFactsSnapshot, InsightStatsRequestPayload } from '@services/local-data/contracts';
+import {
+  parseExactMessageKey,
+  type InsightFactsSnapshot,
+  type InsightStatsRequestPayload,
+} from '@services/local-data/contracts';
 import type { CaptureMessageMergePolicy } from '@services/shared/capture-integrity';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import {
@@ -512,22 +516,27 @@ export async function syncConversationMessages(
 
   const diff = options?.diff || null;
 
-  const normalizeKeys = (value: unknown): string[] => {
+  const exactKeys = (value: unknown): string[] => {
     if (!Array.isArray(value)) return [];
-    return value.map((x) => String(x || '').trim()).filter(Boolean);
+    const keys: string[] = [];
+    for (const item of value) {
+      if (typeof item !== 'string' || !item.trim()) continue;
+      keys.push(parseExactMessageKey(item));
+    }
+    return keys;
   };
 
   if (mode !== 'snapshot') {
     const byKey = new Map<string, any>();
     for (const m of messages || []) {
-      const key = m && m.messageKey ? String(m.messageKey).trim() : '';
-      if (!key) continue;
+      if (!m || typeof m.messageKey !== 'string' || !m.messageKey.trim()) continue;
+      const key = parseExactMessageKey(m.messageKey);
       byKey.set(key, m);
     }
 
-    const requestedKeys = Array.from(new Set([...normalizeKeys(diff?.added), ...normalizeKeys(diff?.updated)]));
+    const requestedKeys = Array.from(new Set([...exactKeys(diff?.added), ...exactKeys(diff?.updated)]));
     const requestedKeySet = new Set(requestedKeys);
-    const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
+    const removedKeys = mode === 'incremental' ? exactKeys(diff?.removed) : [];
     const hasEffectiveDiff =
       !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
     if (!hasEffectiveDiff) {
@@ -613,15 +622,16 @@ export async function syncConversationMessages(
   let upserted = 0;
 
   for (const m of messages || []) {
-    if (!m || !m.messageKey) continue;
-    presentKeys.add(String(m.messageKey));
+    if (!m || typeof m.messageKey !== 'string' || !m.messageKey.trim()) continue;
+    const messageKey = parseExactMessageKey(m.messageKey);
+    presentKeys.add(messageKey);
 
-    const existing: any = await reqToPromise(idx.get([conversationId, m.messageKey]) as any);
+    const existing: any = await reqToPromise(idx.get([conversationId, messageKey]) as any);
     const incomingMarkdown = m.contentMarkdown && String(m.contentMarkdown).trim() ? String(m.contentMarkdown) : '';
     const incomingAuthorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : '';
     const baseRecord = {
       conversationId,
-      messageKey: m.messageKey,
+      messageKey,
       role: m.role || 'assistant',
       authorName: incomingAuthorName || (existing ? existing.authorName || '' : ''),
       contentText: m.contentText || '',

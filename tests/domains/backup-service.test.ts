@@ -627,6 +627,53 @@ describe('backup service', () => {
     expect(stats.messagesAdded).toBe(1);
   });
 
+  it('preserves exact messageKey identity when importing legacy facts through the IDB adapter', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const stats = await importLegacyViaIdbAdapter({
+      schemaVersion: 1,
+      stores: {
+        conversations: [
+          {
+            id: 10,
+            sourceType: 'chat',
+            source: 'chatgpt',
+            conversationKey: 'exact-backup',
+            title: 'Exact backup',
+            url: 'https://example.com/exact-backup',
+            warningFlags: [],
+            lastCapturedAt: 1,
+          },
+        ],
+        messages: [
+          {
+            id: 1,
+            conversationId: 10,
+            messageKey: ' m1 ',
+            role: 'assistant',
+            contentText: 'exact',
+            contentMarkdown: '',
+            sequence: 1,
+            updatedAt: 1,
+          },
+        ],
+        sync_mappings: [],
+      },
+      storageLocal: {},
+    });
+    expect(stats.messagesAdded).toBe(1);
+
+    const db = await openDb();
+    const transaction = db.transaction(['messages'], 'readonly');
+    const messages = await reqToPromise<any[]>(transaction.objectStore('messages').getAll() as any);
+    db.close();
+    expect(messages).toMatchObject([{ messageKey: ' m1 ' }]);
+  });
+
   it('keeps legacy comments orphaned when the same canonical URL maps to multiple conversations', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

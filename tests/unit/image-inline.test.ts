@@ -116,6 +116,33 @@ describe('image-inline', () => {
     expect(String(messages2[1].contentMarkdown)).toMatch(/^!\[\]\(syncnos-asset:\/\/\d+\)$/);
   });
 
+  it('reports image updates with the exact persisted message key', async () => {
+    const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([1, 5, 9])).toString('base64')}`;
+    const onMessageUpdated = vi.fn();
+    const messages = [
+      {
+        messageKey: ' m1 ',
+        role: 'assistant',
+        sequence: 1,
+        contentMarkdown: `![](${dataImageUrl})`,
+      },
+    ];
+
+    const result = await withIdbImages(
+      async (imageStorage) =>
+        await inlineChatImagesInMessages({
+          imageStorage,
+          owner: { ...owner, conversationId: 4, conversationKey: 'image-exact-key' },
+          messages,
+          enableHttpImages: false,
+          onMessageUpdated,
+        }),
+    );
+
+    expect(result.updatedMessageKeys).toEqual([' m1 ']);
+    expect(onMessageUpdated).toHaveBeenCalledWith(expect.objectContaining({ messageKey: ' m1 ' }));
+  });
+
   it('preserves transient capture policies while converting data images', async () => {
     const dataImageUrl = `data:image/png;base64,${Buffer.from(Uint8Array.from([3, 1, 4])).toString('base64')}`;
     const messages = [

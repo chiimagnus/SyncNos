@@ -1,3 +1,5 @@
+import { parseExactMessageKey } from '@services/local-data/contracts';
+
 import type { ImageAssetOwner, ImageStorage } from './image-storage';
 
 const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
@@ -374,10 +376,11 @@ export async function inlineChatImagesInMessages(input: {
     const nextMarkdown = replaceMarkdownImageUrls(markdown, replacements);
     if (nextMarkdown !== markdown) {
       msg.contentMarkdown = nextMarkdown;
-      updatedMessageKeys.add(String(msg.messageKey || '').trim());
+      const messageKey = parseExactMessageKey(msg.messageKey);
+      updatedMessageKeys.add(messageKey);
       if (typeof input.onMessageUpdated === 'function') {
         await input.onMessageUpdated({
-          messageKey: String(msg.messageKey || '').trim(),
+          messageKey,
           message: msg,
           inlinedCount,
           fromCacheCount,

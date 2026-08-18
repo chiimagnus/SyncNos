@@ -6,6 +6,7 @@ import {
   prepareArticleCommentArchiveImport,
 } from '@services/comments/domain/comment-archive';
 import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
+import { parseExactMessageKey } from '@services/local-data/contracts';
 import {
   mergeConversationRecord,
   mergeMessageRecord,
@@ -419,12 +420,13 @@ async function importFacts(
         const uniqueKey = uniqueConversationKey(bundle.conversation);
         const localConversationId = uniqueToLocalId.get(uniqueKey);
         for (const incoming of bundle.messages) {
-          const messageKey = String(incoming?.messageKey || '').trim();
-          if (!localConversationId || !messageKey) {
+          const rawMessageKey = typeof incoming?.messageKey === 'string' ? incoming.messageKey : '';
+          if (!localConversationId || !rawMessageKey.trim()) {
             stats.messagesSkipped += 1;
             reportProgress(onProgress, progress, 1, 'Messages');
             continue;
           }
+          const messageKey = parseExactMessageKey(rawMessageKey);
           const existing = (await requestToPromise(index.get([localConversationId, messageKey]) as any)) as
             | BackupRecord
             | undefined;

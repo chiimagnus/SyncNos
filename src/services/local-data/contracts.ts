@@ -262,6 +262,12 @@ function hasUnpairedSurrogate(value: string): boolean {
   return false;
 }
 
+/** Validates a persisted message identity without normalizing or trimming the key itself. */
+export function parseExactMessageKey(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim() || hasUnpairedSurrogate(value)) fail();
+  return value;
+}
+
 export function parseJsonValue(value: unknown): JsonValue {
   const stack: unknown[] = [value];
   const seen = new Set<object>();
