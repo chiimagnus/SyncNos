@@ -57,21 +57,25 @@ export function LocalDatabaseInstallHelp(props: LocalDatabaseInstallHelpProps) {
     status.host.compatibility === 'protocol_mismatch' || status.host.compatibility === 'schema_mismatch';
   const unsupportedRuntime =
     status.host.compatibility === 'unsupported' || hasDiagnostic(status, 'UNSUPPORTED_PLATFORM');
+  const permissionDenied = hasDiagnostic(status, 'ORIGIN_DENIED');
   const busy = hasDiagnostic(status, 'BUSY');
   const integrityFailure = hasDiagnostic(status, 'JOURNAL_CORRUPT');
-  if (!hostUnavailable && !hostMismatch && !unsupportedRuntime && !busy && !integrityFailure) return null;
+  if (!hostUnavailable && !hostMismatch && !unsupportedRuntime && !permissionDenied && !busy && !integrityFailure)
+    return null;
 
   const showInstall = hostUnavailable || hostMismatch || unsupportedRuntime;
-  const showDoctor = hostUnavailable || hostMismatch || unsupportedRuntime || integrityFailure;
+  const showDoctor = hostUnavailable || hostMismatch || unsupportedRuntime || permissionDenied || integrityFailure;
   const summary = hostUnavailable
     ? t('localDatabaseHostMissingHelp')
     : hostMismatch
       ? t('localDatabaseHostMismatchHelp')
       : unsupportedRuntime
         ? t('localDatabaseUnsupportedRuntimeHelp')
-        : busy
-          ? t('localDatabaseBusyHelp')
-          : t('localDatabaseIntegrityHelp');
+        : permissionDenied
+          ? t('localDatabasePermissionHelp')
+          : busy
+            ? t('localDatabaseBusyHelp')
+            : t('localDatabaseIntegrityHelp');
 
   return (
     <div className="tw-mt-3 tw-space-y-2.5" aria-label={t('localDatabaseInstallHelpTitle')}>

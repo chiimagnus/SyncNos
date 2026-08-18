@@ -259,6 +259,8 @@ export const en = {
     'The installed Native Host does not match this extension protocol/schema. Update the CLI, repair its owned registration, then check again.',
   localDatabaseUnsupportedRuntimeHelp:
     'The installed CLI/runtime is not supported by this Local Database contract. Update the CLI under a supported Node/runtime; doctor cannot add support for an unsupported platform.',
+  localDatabasePermissionHelp:
+    'The official extension identity is allowed to use Local Database, but the Native Host denied access. Repair only the proven SyncNos-owned browser registration and owner-only permissions with doctor; do not edit allowlists or Host paths by hand.',
   localDatabaseBusyHelp:
     'The Local Database is busy. Let the other SyncNos operation finish, then check again; do not delete or rewrite the database to clear the lock.',
   localDatabaseIntegrityHelp:

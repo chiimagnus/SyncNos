@@ -147,6 +147,24 @@ describe('LocalDatabaseInstallHelp', () => {
     expect(document.body.textContent).toContain(SYNCNOS_CLI_DOCTOR_COMMAND);
   });
 
+  it('guides an official ORIGIN_DENIED permission failure to bounded doctor repair without install or allowlist workarounds', () => {
+    render(
+      unavailableStatus({
+        registration: 'available',
+        compatibility: 'unknown',
+        diagnosticCode: 'ORIGIN_DENIED',
+      }),
+    );
+
+    expect(document.body.textContent).toContain('official extension identity');
+    expect(document.body.textContent).toContain('Native Host denied access');
+    expect(document.body.textContent).toContain(SYNCNOS_CLI_DOCTOR_COMMAND);
+    expect(document.body.textContent).toContain('do not edit allowlists or Host paths by hand');
+    expect(document.body.textContent).toContain('does not bypass browser allowlists');
+    expect(document.body.textContent).not.toContain(SYNCNOS_CLI_INSTALL_COMMAND);
+    expect(document.body.textContent).not.toContain(SYNCNOS_CLI_AI_PROMPT);
+  });
+
   it('keeps BUSY non-destructive and does not pretend doctor can clear a database lock', () => {
     render(
       unavailableStatus({
@@ -218,6 +236,7 @@ describe('LocalDatabaseInstallHelp', () => {
         platform: 'linux',
         registration: 'not_applicable',
         compatibility: 'unsupported',
+        diagnosticCode: 'ORIGIN_DENIED',
       }),
     );
 

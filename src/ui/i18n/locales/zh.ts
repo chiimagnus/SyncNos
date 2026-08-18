@@ -252,6 +252,7 @@ export const zh: { [K in TranslationKey]: string } = {
   localDatabaseHostMissingHelp: 'SyncNos 无法连接 Native Host。若尚未安装 CLI，请先安装；若已安装，请修复受支持浏览器的 Native Host 注册。',
   localDatabaseHostMismatchHelp: '已安装的 Native Host 与当前扩展的协议或 Schema 不匹配。请更新 CLI、修复其自有注册后重新检测。',
   localDatabaseUnsupportedRuntimeHelp: '当前 CLI/运行时不受本地数据库契约支持。请在受支持的 Node/运行时下更新 CLI；doctor 不能让不受支持的平台获得支持。',
+  localDatabasePermissionHelp: '当前是受支持的官方扩展身份，但 Native Host 拒绝访问。请仅使用 doctor 修复可证明属于 SyncNos 的浏览器注册与 owner-only 权限；不要手工修改 allowlist 或 Host 路径。',
   localDatabaseBusyHelp: '本地数据库正忙。请等待其他 SyncNos 操作结束后重新检测；不要通过删除或改写数据库来解除锁。',
   localDatabaseIntegrityHelp: 'SyncNos 无法证明本地数据库或运行时文件的所有权、权限或完整性，因此拒绝使用。doctor 只能在所有权可证明时修复受支持的 owner-only 权限漂移；遇到未知或冲突所有权会拒绝操作，也不会删除数据库。',
   localDatabaseInstallCommandLabel: '安装/更新命令',
