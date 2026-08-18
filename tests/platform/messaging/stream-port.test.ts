@@ -349,10 +349,37 @@ describe('background local-data stream router', () => {
       stream: { operation: 'capture-snapshot', declaredTotalBytes: 1 },
     });
     incomplete.disconnect();
+    await vi.waitFor(() => expect(incomplete.listenerCounts()).toEqual({ message: 0, disconnect: 0 }));
     await gate.waitForDrained();
 
     expect(handler).not.toHaveBeenCalled();
     expect(incomplete.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
+  });
+
+  it('drains a queued upload open before disconnect cleanup instead of dropping the delivered admission', async () => {
+    const gate = new FactsOperationGate({ readJournal: async () => notStarted });
+    await gate.initializeFromJournal();
+    const router = new BackgroundStreamRouter(gate);
+    const authorizeUpload = vi.fn();
+    const handler = vi.fn(async () => {});
+    router.register('capture-snapshot', { authorizeUpload, upload: handler });
+    const stream = createStreamPort();
+    expect(router.registerPort(stream.port)).toBe(true);
+
+    stream.emit({
+      type: 'open',
+      requestId: 'queued-open-disconnect',
+      direction: 'upload',
+      stream: { operation: 'capture-snapshot', declaredTotalBytes: 1 },
+    });
+    stream.disconnect();
+
+    await vi.waitFor(() => expect(authorizeUpload).toHaveBeenCalledOnce());
+    gate.closeAdmissions();
+    await gate.waitForDrained();
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(stream.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
   });
 
   it('expires a live upload that stops sending frames so migration drain can finish', async () => {

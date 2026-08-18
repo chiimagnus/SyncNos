@@ -164,6 +164,7 @@ export class BackgroundStreamRouter {
     }
 
     let closed = false;
+    let disconnectObserved = false;
     let messageQueue = Promise.resolve();
     let requestId: string | null = null;
     let receiver: RuntimeStreamReceiver | null = null;
@@ -319,12 +320,19 @@ export class BackgroundStreamRouter {
     };
 
     const onMessage: PortListener = (raw) => {
+      if (disconnectObserved) return;
       messageQueue = messageQueue.then(() => handleMessage(raw)).catch((error) => fail(error, raw));
     };
     const onDisconnect: PortListener = () => {
-      if (closed) return;
-      upload?.reject(new LocalDataContractError('HOST_UNAVAILABLE'));
-      close();
+      if (closed || disconnectObserved) return;
+      disconnectObserved = true;
+      messageQueue = messageQueue
+        .then(() => {
+          if (closed) return;
+          upload?.reject(new LocalDataContractError('HOST_UNAVAILABLE'));
+          close();
+        })
+        .catch((error) => fail(error, requestId ?? undefined));
     };
 
     port.onMessage.addListener(onMessage);
