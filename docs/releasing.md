@@ -21,11 +21,8 @@ CLI 版本真源是 `packages/syncnoscli/package.json`，**不要求等于 WebCl
 发布前把 CLI `version` 更新为 npm 尚未存在的新 SemVer，并同步 lockfile。然后：
 
 ```bash
-npm run gate
 cd packages/syncnoscli
-npm whoami
 npm publish
-npm view @chiimagnus/syncnoscli version
 ```
 
 npm 登录与 2FA 只保留在 owner 本机，不写入仓库或 GitHub Actions。npm 已发布版本不能覆盖；遇到版本已存在时应更新版本，而不是绕过 registry 保护。
