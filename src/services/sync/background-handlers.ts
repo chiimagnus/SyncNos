@@ -117,6 +117,26 @@ function deferredValidation() {
   return { promise, resolve, reject };
 }
 
+function trackDetachedValidation(
+  run: Promise<unknown>,
+  validation: ReturnType<typeof deferredValidation>,
+  onFinally: () => void,
+): void {
+  // Admission can fail before the operation callback receives a lease. Mirror that outer
+  // rejection into the started-ack validation promise so a closed gate cannot hang the handler.
+  // Keep the original lock-release timing on the source run; the second rejection observer
+  // only mirrors pre-callback admission failures into the started-ack validation promise.
+  void run.catch((error) => {
+    validation.reject(error);
+  });
+  void run.finally(onFinally).catch(() => {});
+}
+
+function obsidianPreflightError(preflight: unknown): Error & { extra: unknown } {
+  const failure = buildObsidianPreflightFailure(preflight);
+  return Object.assign(new Error(failure.message), { extra: failure.extra });
+}
+
 export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
     if (notionDetachedRun) return router.err('sync already in progress', { code: 'sync_already_running' });
@@ -152,11 +172,9 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         }
       });
       notionDetachedRun = run;
-      void run
-        .finally(() => {
-          if (notionDetachedRun === run) notionDetachedRun = null;
-        })
-        .catch(() => {});
+      trackDetachedValidation(run, validation, () => {
+        if (notionDetachedRun === run) notionDetachedRun = null;
+      });
       await validation.promise;
       return router.ok({ started: true, provider: 'notion' });
     } catch (error) {
@@ -208,15 +226,6 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if ((status as any)?.job?.status === 'running') {
         return router.err('sync already in progress', { code: 'sync_already_running' });
       }
-      const preflight = await deps.obsidianSyncOrchestrator.testConnection({ instanceId }).catch((error: any) => ({
-        ok: false,
-        error: { code: 'network_error', message: error?.message ? String(error.message) : 'connection test failed' },
-      }));
-      if (!preflight || (preflight as any).ok !== true) {
-        const failure = buildObsidianPreflightFailure(preflight);
-        return router.err(failure.message, failure.extra);
-      }
-
       const validation = deferredValidation();
       const run = deps.factsOperations.runFactsOperation('obsidian-manual-sync', async (lease) => {
         try {
@@ -224,6 +233,11 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
           const forceFullConversations = forceFullReferences.length
             ? await deps.resolveConversationReferences(factsEpoch, forceFullReferences, lease)
             : [];
+          const preflight = await deps.obsidianSyncOrchestrator.testConnection({ instanceId }).catch((error: any) => ({
+            ok: false,
+            error: { code: 'network_error', message: error?.message ? String(error.message) : 'connection test failed' },
+          }));
+          if (!preflight || (preflight as any).ok !== true) throw obsidianPreflightError(preflight);
           validation.resolve();
           const result = await deps.obsidianSyncOrchestrator.syncConversations({
             conversations,
@@ -242,11 +256,9 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         }
       });
       obsidianDetachedRun = run;
-      void run
-        .finally(() => {
-          if (obsidianDetachedRun === run) obsidianDetachedRun = null;
-        })
-        .catch(() => {});
+      trackDetachedValidation(run, validation, () => {
+        if (obsidianDetachedRun === run) obsidianDetachedRun = null;
+      });
       await validation.promise;
       return router.ok({ started: true, provider: 'obsidian' });
     } catch (error) {
@@ -286,11 +298,9 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
         }
       });
       feishuDetachedRun = run;
-      void run
-        .finally(() => {
-          if (feishuDetachedRun === run) feishuDetachedRun = null;
-        })
-        .catch(() => {});
+      trackDetachedValidation(run, validation, () => {
+        if (feishuDetachedRun === run) feishuDetachedRun = null;
+      });
       await validation.promise;
       return router.ok({ started: true, provider: 'feishu' });
     } catch (error) {

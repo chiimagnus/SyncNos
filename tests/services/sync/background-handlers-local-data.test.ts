@@ -15,7 +15,7 @@ vi.mock('@platform/storage/local', () => ({ storageGet: mocks.storageGet }));
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { FactsOperationGate, assertFactsOperationLease } from '@services/local-data/facts-operation-gate';
 import { LocalDataContractError } from '@services/local-data/contracts';
-import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { FEISHU_MESSAGE_TYPES, NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
 function deferred() {
   let resolve!: () => void;
@@ -69,9 +69,9 @@ function deps(gate: FactsOperationGate, syncConversations = vi.fn(async () => ({
   };
 }
 
-function manualMessage(factsEpoch = 'idb-v1') {
+function manualMessage(factsEpoch = 'idb-v1', type: string = NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS) {
   return {
-    type: NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS,
+    type,
     factsEpoch,
     conversations: [{ source: 'chatgpt', conversationKey: 'thread-1' }],
   };
@@ -92,6 +92,109 @@ describe('sync background facts boundary', () => {
     expect(response).toMatchObject({ ok: false, error: { extra: { code: 'STALE_BACKEND_EPOCH' } } });
     expect(pack.syncConversations).not.toHaveBeenCalled();
     expect(r.eventsHub.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('rejects Obsidian stale references before its remote connection preflight', async () => {
+    const gate = new FactsOperationGate();
+    gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null });
+    const pack = deps(gate);
+    const r = router();
+    registerSyncHandlers(r as any, pack.value as any);
+
+    const response = await r.handlers.get(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS)!({
+      ...manualMessage('idb-v1', OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS),
+      conversations: [{ source: 'chatgpt', conversationKey: 'missing-thread' }],
+    });
+
+    expect(response).toMatchObject({ ok: false, error: { extra: { code: 'STALE_REFERENCE' } } });
+    expect(pack.value.obsidianSyncOrchestrator.testConnection).not.toHaveBeenCalled();
+    expect(pack.value.obsidianSyncOrchestrator.syncConversations).not.toHaveBeenCalled();
+  });
+
+  it('rejects closed-gate manual sync for every provider without hanging or calling Obsidian remotely', async () => {
+    const cases = [
+      NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS,
+      OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS,
+      FEISHU_MESSAGE_TYPES.SYNC_CONVERSATIONS,
+    ] as const;
+
+    for (const type of cases) {
+      const gate = new FactsOperationGate();
+      gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null });
+      gate.closeAdmissions();
+      const pack = deps(gate);
+      const r = router();
+      registerSyncHandlers(r as any, pack.value as any);
+
+      const response = await r.handlers.get(type)!(manualMessage('idb-v1', type));
+
+      expect(response).toMatchObject({ ok: false, error: { extra: { code: 'MIGRATION_IN_PROGRESS' } } });
+      expect(pack.value.notionSyncOrchestrator.syncConversations).not.toHaveBeenCalled();
+      expect(pack.value.obsidianSyncOrchestrator.testConnection).not.toHaveBeenCalled();
+      expect(pack.value.obsidianSyncOrchestrator.syncConversations).not.toHaveBeenCalled();
+      expect(pack.value.feishuSyncOrchestrator.syncConversations).not.toHaveBeenCalled();
+    }
+  });
+
+  it('runs Obsidian stable re-resolution before preflight and does not sync when preflight fails', async () => {
+    const gate = new FactsOperationGate();
+    gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null });
+    const pack = deps(gate);
+    const order: string[] = [];
+    vi.mocked(pack.value.resolveConversationReferences).mockImplementation(async (_epoch, _refs, lease) => {
+      assertFactsOperationLease(lease);
+      order.push('resolve');
+      return [{ source: 'chatgpt', conversationKey: 'thread-1', conversationId: 41 }];
+    });
+    vi.mocked(pack.value.obsidianSyncOrchestrator.testConnection).mockImplementation(async () => {
+      order.push('preflight');
+      return { ok: false, error: { code: 'network_error', message: 'connection refused' } };
+    });
+    vi.mocked(pack.value.obsidianSyncOrchestrator.syncConversations).mockImplementation(async () => {
+      order.push('sync');
+      return {};
+    });
+    const r = router();
+    registerSyncHandlers(r as any, pack.value as any);
+
+    const response = await r.handlers.get(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS)!(
+      manualMessage('idb-v1', OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS),
+    );
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: { extra: { provider: 'obsidian', stage: 'preflight', code: 'network_error' } },
+    });
+    expect(order).toEqual(['resolve', 'preflight']);
+  });
+
+  it('runs Obsidian stable re-resolution before a successful preflight and provider sync', async () => {
+    const gate = new FactsOperationGate();
+    gate.reopenForJournalState({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null });
+    const pack = deps(gate);
+    const order: string[] = [];
+    vi.mocked(pack.value.resolveConversationReferences).mockImplementation(async (_epoch, _refs, lease) => {
+      assertFactsOperationLease(lease);
+      order.push('resolve');
+      return [{ source: 'chatgpt', conversationKey: 'thread-1', conversationId: 41 }];
+    });
+    vi.mocked(pack.value.obsidianSyncOrchestrator.testConnection).mockImplementation(async () => {
+      order.push('preflight');
+      return { ok: true };
+    });
+    vi.mocked(pack.value.obsidianSyncOrchestrator.syncConversations).mockImplementation(async () => {
+      order.push('sync');
+      return {};
+    });
+    const r = router();
+    registerSyncHandlers(r as any, pack.value as any);
+
+    const response = await r.handlers.get(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS)!(
+      manualMessage('idb-v1', OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS),
+    );
+
+    expect(response).toMatchObject({ ok: true, data: { started: true, provider: 'obsidian' } });
+    expect(order).toEqual(['resolve', 'preflight', 'sync']);
   });
 
   it('keeps the detached provider run inside the admitted lease after returning started', async () => {
