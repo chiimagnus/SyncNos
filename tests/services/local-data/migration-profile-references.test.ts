@@ -126,6 +126,55 @@ describe('migration profile reference rebase', () => {
     );
   });
 
+  it('consumes legacy finished provider jobs only at migration time and persists current reference-free done summaries', async () => {
+    const legacyJob = (provider?: string) => ({
+      ...(provider ? { provider } : {}),
+      id: 'legacy-private-job',
+      instanceId: 'legacy-background',
+      status: 'finished',
+      startedAt: 1,
+      updatedAt: 2,
+      finishedAt: 3,
+      conversationIds: [10, 20],
+      currentConversationId: 20,
+      perConversation: [
+        { conversationId: 10, ok: true, warnings: ['private'] },
+        { conversationId: 20, ok: false, error: 'private error' },
+      ],
+    });
+    const storage = memoryStorage({
+      [SYNC_JOB_STORAGE_KEYS.notion]: legacyJob(),
+      [SYNC_JOB_STORAGE_KEYS.obsidian]: legacyJob('obsidian'),
+      [SYNC_JOB_STORAGE_KEYS.feishu]: legacyJob(),
+    });
+    const rebase = createProfileReferenceRebase({
+      digestProvider: nodeDigestProvider,
+      resolveLegacyConversationReferences: async () => [],
+      storage: storage.storage,
+      validateNativeReference: async () => true,
+    });
+
+    const patch = await rebase.buildPatch();
+    for (const provider of ['notion', 'obsidian', 'feishu'] as const) {
+      expect(patch.syncJobs[provider]).toEqual({
+        provider,
+        status: 'done',
+        startedAt: 1,
+        updatedAt: 2,
+        finishedAt: 3,
+        okCount: 1,
+        failCount: 1,
+      });
+    }
+    expect(JSON.stringify(patch.syncJobs)).not.toMatch(/conversationId|instanceId|private/);
+
+    const digest = await migrationProfileReferencePatchDigest(patch, nodeDigestProvider);
+    await rebase.applyAndVerify(patch, digest);
+    for (const provider of ['notion', 'obsidian', 'feishu'] as const) {
+      expect(storage.state[SYNC_JOB_STORAGE_KEYS[provider]]).toEqual(patch.syncJobs[provider]);
+    }
+  });
+
   it('blocks when a source row resolves but the matching imported Host facts do not contain that stable identity', async () => {
     const storage = memoryStorage({ [AUTO_SYNC_QUEUE_STORAGE_KEYS.notion]: { 10: 100 } });
     const rebase = createProfileReferenceRebase({

@@ -136,6 +136,23 @@ function parseStoredQueue(provider: MigrationProfileProvider, value: unknown): P
   return Object.freeze({ kind: 'legacy', entries: Object.freeze(entries) });
 }
 
+function legacyFinishedCounts(input: Record<string, unknown>): Readonly<{ okCount: number; failCount: number }> {
+  const hasCurrentCounts = Number.isSafeInteger(input.okCount) && Number(input.okCount) >= 0 &&
+    Number.isSafeInteger(input.failCount) && Number(input.failCount) >= 0;
+  if (hasCurrentCounts) {
+    return Object.freeze({ okCount: Number(input.okCount), failCount: Number(input.failCount) });
+  }
+  if (!Array.isArray(input.perConversation)) invalid();
+  let okCount = 0;
+  let failCount = 0;
+  for (const row of input.perConversation) {
+    const item = record(row);
+    if (item.ok === true) okCount += 1;
+    else failCount += 1;
+  }
+  return Object.freeze({ okCount, failCount });
+}
+
 function parseCurrentJob(
   provider: MigrationProfileProvider,
   value: unknown,
@@ -143,7 +160,18 @@ function parseCurrentJob(
 ): MigrationReferenceFreeSyncJob | null {
   if (value == null) return null;
   const input = record(value);
-  const status = String(input.status || '');
+  const rawStatus = String(input.status || '');
+  if (rawStatus === 'finished') {
+    if (input.provider != null && input.provider !== provider) invalid();
+    const startedAt = nonNegativeInteger(input.startedAt);
+    const updatedAt = nonNegativeInteger(input.updatedAt);
+    const finishedAt = nonNegativeInteger(input.finishedAt);
+    if (startedAt > updatedAt || updatedAt > finishedAt) invalid();
+    const { okCount, failCount } = legacyFinishedCounts(input);
+    return Object.freeze({ provider, status: 'done', startedAt, updatedAt, finishedAt, okCount, failCount });
+  }
+
+  const status = rawStatus;
   if (status !== 'running' && status !== 'done' && status !== 'aborted') invalid();
   if (input.provider !== provider) invalid();
 
