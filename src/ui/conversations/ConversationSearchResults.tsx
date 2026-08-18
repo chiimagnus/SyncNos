@@ -122,7 +122,7 @@ export function ConversationSearchResults(props: ConversationSearchResultsProps)
                       segment.highlighted ? (
                         <mark
                           key={`${segmentIndex}:${segment.text}`}
-                          className="tw-rounded-sm tw-bg-[color-mix(in_srgb,var(--accent)_20%,transparent)] tw-px-0.5 tw-text-inherit"
+                          className="tw-bg-[color-mix(in_srgb,var(--accent)_20%,transparent)] tw-px-0.5 tw-text-inherit"
                         >
                           {segment.text}
                         </mark>
