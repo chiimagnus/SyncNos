@@ -32,7 +32,7 @@ describe('SyncNos CLI package contract', () => {
     expect(packageJson.files).toEqual(['dist/**', 'prebuilds/**', 'README.md', 'README.zh-CN.md']);
     expect(packageJson.repository).toEqual({
       type: 'git',
-      url: 'https://github.com/SyncNos/SyncNos-Webclipper.git',
+      url: 'git+https://github.com/chiimagnus/SyncNos.git',
     });
     expect(packageJson.publishConfig).toEqual({
       access: 'public',

@@ -5,7 +5,7 @@
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chiimagnus/SyncNos.git"
+    "url": "git+https://github.com/chiimagnus/SyncNos.git"
   },
   "type": "commonjs",
   "bin": {
