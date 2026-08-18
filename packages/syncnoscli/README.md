@@ -1,5 +1,7 @@
 # SyncNos CLI
 
+[简体中文](README.zh-CN.md)
+
 SyncNos CLI is the on-demand local SQLite companion for SyncNos. It does not run as a daemon, sync data remotely, or stay resident after a command/native-host session ends.
 
 ```bash

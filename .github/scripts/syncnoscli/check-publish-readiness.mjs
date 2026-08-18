@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 const PACKAGE_NAME = '@chiimagnus/syncnoscli';
 const EXPECTED_REGISTRY = 'https://registry.npmjs.org/';
 const EXPECTED_ENGINE = '>=22';
-const EXPECTED_FILES = Object.freeze(['dist/**', 'prebuilds/**', 'README.md']);
+const EXPECTED_FILES = Object.freeze(['dist/**', 'prebuilds/**', 'README.md', 'README.zh-CN.md']);
 const EXPECTED_REPOSITORY = 'https://github.com/SyncNos/SyncNos-Webclipper.git';
 const EXPECTED_TAG = 'latest';
 const VERSION_PATTERN =

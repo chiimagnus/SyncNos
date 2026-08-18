@@ -206,6 +206,7 @@ async function scanPublishedPackageForRepositoryPath(installedPackageRoot: strin
   const candidates = [
     'package.json',
     'README.md',
+    'README.zh-CN.md',
     join('dist', 'cli.cjs'),
     join('dist', 'lifecycle.cjs'),
     join('dist', 'native-host.cjs'),

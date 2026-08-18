@@ -29,7 +29,7 @@ describe('SyncNos CLI package contract', () => {
     expect(packageJson.engines).toEqual({ node: '>=22' });
     expect(packageJson.bin).toEqual({ syncnoscli: 'dist/cli.cjs' });
     expect(packageJson.dependencies).toEqual({ 'better-sqlite3': '13.0.3' });
-    expect(packageJson.files).toEqual(['dist/**', 'prebuilds/**', 'README.md']);
+    expect(packageJson.files).toEqual(['dist/**', 'prebuilds/**', 'README.md', 'README.zh-CN.md']);
     expect(packageJson.repository).toEqual({
       type: 'git',
       url: 'https://github.com/SyncNos/SyncNos-Webclipper.git',
@@ -122,6 +122,7 @@ describe('SyncNos CLI package contract', () => {
     expect(files).toContain('dist/cli.cjs');
     expect(files).toContain('dist/lifecycle.cjs');
     expect(files).toContain('README.md');
+    expect(files).toContain('README.zh-CN.md');
     expect(files.some((file) => file.startsWith('src/') || file.startsWith('tests/'))).toBe(false);
     expect(files.some((file) => /(^|\/)([^/]*\.(?:sqlite|db)|\.env)$/i.test(file))).toBe(false);
   });
