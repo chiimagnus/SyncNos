@@ -235,7 +235,10 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
             : [];
           const preflight = await deps.obsidianSyncOrchestrator.testConnection({ instanceId }).catch((error: any) => ({
             ok: false,
-            error: { code: 'network_error', message: error?.message ? String(error.message) : 'connection test failed' },
+            error: {
+              code: 'network_error',
+              message: error?.message ? String(error.message) : 'connection test failed',
+            },
           }));
           if (!preflight || (preflight as any).ok !== true) throw obsidianPreflightError(preflight);
           validation.resolve();

@@ -257,15 +257,16 @@ export class BackgroundStreamRouter {
               }
             })()
           : this.gate.runFactsOperation(`stream:${message.stream.operation}`, execute);
-        void operation.then((data) => {
-          if (closed) return;
-          port.postMessage({
-            type: 'complete',
-            requestId: message.requestId,
-            ...(data === undefined ? {} : { data: parseJsonValue(data) }),
-          });
-          close();
-        })
+        void operation
+          .then((data) => {
+            if (closed) return;
+            port.postMessage({
+              type: 'complete',
+              requestId: message.requestId,
+              ...(data === undefined ? {} : { data: parseJsonValue(data) }),
+            });
+            close();
+          })
           .catch((error) => fail(error, message.requestId));
       } catch (error) {
         reservation?.release();

@@ -15,7 +15,11 @@ vi.mock('@platform/storage/local', () => ({ storageGet: mocks.storageGet }));
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { FactsOperationGate, assertFactsOperationLease } from '@services/local-data/facts-operation-gate';
 import { LocalDataContractError } from '@services/local-data/contracts';
-import { FEISHU_MESSAGE_TYPES, NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import {
+  FEISHU_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+  OBSIDIAN_MESSAGE_TYPES,
+} from '@platform/messaging/message-contracts';
 
 function deferred() {
   let resolve!: () => void;

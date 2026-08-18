@@ -32,14 +32,18 @@ describe('image backfill exact message identity', () => {
     };
     const onProgress = vi.fn();
 
-    await backfillConversationImages({ imageStorage: imageStorage as any, owner, repository: repository as any, onProgress });
+    await backfillConversationImages({
+      imageStorage: imageStorage as any,
+      owner,
+      repository: repository as any,
+      onProgress,
+    });
 
     expect(syncConversationMessages).toHaveBeenCalledTimes(1);
-    expect(syncConversationMessages).toHaveBeenCalledWith(
-      owner,
-      [expect.objectContaining({ messageKey: ' m1 ' })],
-      { mode: 'incremental', diff: { added: [], updated: [' m1 '], removed: [] } },
-    );
+    expect(syncConversationMessages).toHaveBeenCalledWith(owner, [expect.objectContaining({ messageKey: ' m1 ' })], {
+      mode: 'incremental',
+      diff: { added: [], updated: [' m1 '], removed: [] },
+    });
     expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({ latestMessageKey: ' m1 ' }));
   });
 });
