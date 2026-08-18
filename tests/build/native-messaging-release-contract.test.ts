@@ -153,11 +153,11 @@ describe('native messaging release artifact contract', () => {
     for (const gateName of ['gate', 'gate:ci']) {
       const gate = rootPackage.scripts[gateName]!;
       expect(gate).toContain('npm run build:release-contract-fixtures');
-      expect(gate.indexOf('npm run build:release-contract-fixtures')).toBeLessThan(gate.indexOf('npm run test &&'));
+      expect(gate.indexOf('npm run build:release-contract-fixtures')).toBeLessThan(gate.indexOf('npm run test'));
     }
   });
 
-  it('keeps release identity immutable and release/prerelease CLI pack checks non-publishing', () => {
+  it('keeps release identity immutable and browser release workflows CLI-publish-free', () => {
     const packagerSource = readFileSync(packager, 'utf8');
     expect(packagerSource).toMatch(/--gecko-id/);
     expect(packagerSource).toContain('Firefox identity overrides are not allowed for release artifacts');
@@ -166,8 +166,8 @@ describe('native messaging release artifact contract', () => {
 
     for (const name of ['webclipper-release.yml', 'webclipper-prerelease.yml']) {
       const source = workflow(name);
-      expect(source).toContain('npm run build:syncnoscli');
-      expect(source).toContain('npm run pack:syncnoscli');
+      expect(source).not.toContain('npm run build:syncnoscli');
+      expect(source).not.toContain('npm run pack:syncnoscli');
       expect(source).not.toContain('npm publish');
       expect(source).not.toMatch(/syncnoscli.*(?:zip|xpi)|(?:zip|xpi).*syncnoscli/i);
     }

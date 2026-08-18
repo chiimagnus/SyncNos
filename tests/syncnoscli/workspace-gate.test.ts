@@ -22,13 +22,14 @@ function readWorkflow(name: string): string {
 }
 
 describe('SyncNos CLI workspace gate', () => {
-  it('runs the CLI checks inside the protected root gate', () => {
+  it('covers CLI typecheck, build, and tests once inside the protected root gate', () => {
     const gate = packageJson.scripts?.['gate:ci'] || '';
     expect(gate).toContain('npm run compile:syncnoscli');
-    expect(gate).toContain('npm run test:syncnoscli');
     expect(gate).toContain('npm run build:syncnoscli');
-    expect(gate).toContain('npm run pack:syncnoscli');
-    expect(gate.indexOf('npm run build:syncnoscli')).toBeLessThan(gate.indexOf('npm run test:syncnoscli'));
+    expect(gate).toContain('npm run test');
+    expect(gate).not.toContain('npm run test:syncnoscli');
+    expect(gate).not.toContain('npm run pack:syncnoscli');
+    expect(gate.indexOf('npm run build:syncnoscli')).toBeLessThan(gate.indexOf('npm run test'));
   });
 
   it('uses Node 22 for every workflow that installs the workspace', () => {
