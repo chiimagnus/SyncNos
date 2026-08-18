@@ -43,7 +43,7 @@ function setupDom() {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="root"></div><input id="editor" /><textarea id="notes"></textarea><div id="rich-editor" contenteditable="true"><span id="rich-editor-child">draft</span></div></body></html>',
     {
-    url: 'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/app.html',
+      url: 'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/app.html',
       pretendToBeVisual: true,
     },
   );
