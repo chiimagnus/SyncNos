@@ -40,7 +40,7 @@ import {
   type FactsEpoch,
   type StableConversationReference,
 } from '@services/local-data/contracts';
-import type { FactsOperationLease } from '@services/local-data/facts-operation-gate';
+import type { FactsOperationLease, FactsOperationReservation } from '@services/local-data/facts-operation-gate';
 import type {
   Conversation,
   ConversationDetailReadResponse,
@@ -183,35 +183,47 @@ class PendingFactsReadStreams {
 type PendingCaptureSnapshotStream = Readonly<{
   expiresAt: number;
   expirationTimer: ReturnType<typeof setTimeout>;
+  reservation: FactsOperationReservation;
   stream: StreamDescriptor;
 }>;
 
-/** Keeps only a bounded stream descriptor; facts stay untouched until the authenticated Port reaches terminal. */
+/** Keeps one bounded descriptor plus the admission reserved by its successful preflight. */
 class PendingCaptureSnapshotStreams {
   #pending = new Map<string, PendingCaptureSnapshotStream>();
 
-  publish(stream: StreamDescriptor): Readonly<{ kind: 'stream'; requestId: string; stream: StreamDescriptor }> {
-    this.expire();
-    if (this.#pending.size >= MAX_PENDING_CAPTURE_STREAMS) throw new LocalDataContractError('BUSY');
-    const requestId = createReadStreamRequestId();
-    if (this.#pending.has(requestId)) throw new LocalDataContractError('BUSY');
-    const expiresAt = Date.now() + PENDING_CAPTURE_STREAM_TTL_MS;
-    const expirationTimer = globalThis.setTimeout(() => this.drop(requestId), PENDING_CAPTURE_STREAM_TTL_MS);
-    this.#pending.set(requestId, { stream, expiresAt, expirationTimer });
-    return { kind: 'stream', requestId, stream };
+  publish(
+    stream: StreamDescriptor,
+    reservation: FactsOperationReservation,
+  ): Readonly<{ kind: 'stream'; requestId: string; stream: StreamDescriptor }> {
+    try {
+      this.expire();
+      if (this.#pending.size >= MAX_PENDING_CAPTURE_STREAMS) throw new LocalDataContractError('BUSY');
+      const requestId = createReadStreamRequestId();
+      if (this.#pending.has(requestId)) throw new LocalDataContractError('BUSY');
+      const expiresAt = Date.now() + PENDING_CAPTURE_STREAM_TTL_MS;
+      const expirationTimer = globalThis.setTimeout(() => this.drop(requestId), PENDING_CAPTURE_STREAM_TTL_MS);
+      this.#pending.set(requestId, { stream, expiresAt, expirationTimer, reservation });
+      return { kind: 'stream', requestId, stream };
+    } catch (error) {
+      reservation.release();
+      throw error;
+    }
   }
 
-  take(requestId: string, stream: StreamDescriptor): void {
+  take(requestId: string, stream: StreamDescriptor): FactsOperationReservation {
     this.expire();
     const pending = this.#pending.get(requestId);
     if (!pending) throw new LocalDataContractError('STALE_REFERENCE');
-    this.drop(requestId, pending);
     if (
       pending.stream.operation !== stream.operation ||
       pending.stream.declaredTotalBytes !== stream.declaredTotalBytes
     ) {
+      this.drop(requestId, pending);
       throw new LocalDataContractError('PROTOCOL_MISMATCH');
     }
+    this.#pending.delete(requestId);
+    globalThis.clearTimeout(pending.expirationTimer);
+    return pending.reservation;
   }
 
   private expire(now = Date.now()): void {
@@ -225,6 +237,7 @@ class PendingCaptureSnapshotStreams {
     if (!pending) return;
     this.#pending.delete(requestId);
     globalThis.clearTimeout(pending.expirationTimer);
+    pending.reservation.release();
   }
 }
 
@@ -607,7 +620,14 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
   router.register(CORE_MESSAGE_TYPES.SAVE_CONVERSATION_SNAPSHOT, async (msg) => {
     try {
       const payload = parseRuntimeCaptureMessage(msg);
-      if (!('snapshot' in payload)) return router.ok(captureStreams.publish(payload.transfer));
+      if (!('snapshot' in payload)) {
+        return router.ok(
+          captureStreams.publish(
+            payload.transfer,
+            deps.conversationReadRunner.reserve('conversation-capture-snapshot-stream'),
+          ),
+        );
+      }
       const result = await deps.conversationReadRunner.run({
         kind: 'conversation-capture-snapshot',
         read: async ({ lease, mode, repository }) =>

@@ -180,6 +180,7 @@ async function createHarness() {
   streamRepositoryMocks.open.mockResolvedValue({ mode: 'native', repository });
   registerConversationHandlers(router as any, {
     conversationReadRunner: {
+      reserve: (kind: string) => gate.reserveFactsOperation(kind),
       run: async ({ read }: any) =>
         await gate.runFactsOperation(
           'capture-snapshot-test',
@@ -227,6 +228,14 @@ describe('capture snapshot operation', () => {
     const preflight = header.data as any;
     expect(preflight).toMatchObject({ kind: 'stream', stream: { operation: 'capture-snapshot' } });
 
+    harness.gate.closeAdmissions();
+    let drained = false;
+    const drain = harness.gate.waitForDrained().then(() => {
+      drained = true;
+    });
+    await Promise.resolve();
+    expect(drained).toBe(false);
+
     const stream = createStreamPort();
     expect(harness.streamRouter.registerPort(stream.port)).toBe(true);
     stream.emit({
@@ -248,6 +257,8 @@ describe('capture snapshot operation', () => {
         data: { conversationId: 41, isNew: true },
       }),
     );
+    await drain;
+    expect(drained).toBe(true);
   });
 
   it('bounds unopened large capture preflights', async () => {
@@ -266,10 +277,38 @@ describe('capture snapshot operation', () => {
         ok: false,
         error: { extra: { code: 'BUSY' } },
       });
+
+      harness.gate.closeAdmissions();
+      let drained = false;
+      const drain = harness.gate.waitForDrained().then(() => {
+        drained = true;
+      });
+      await Promise.resolve();
+      expect(drained).toBe(false);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await drain;
+      expect(drained).toBe(true);
     } finally {
-      vi.advanceTimersByTime(60_000);
       vi.useRealTimers();
     }
+  });
+
+  it('rejects a large capture preflight when facts admissions are already closed', async () => {
+    const harness = await createHarness();
+    const bytes = encodeCanonicalJson(snapshot('x'.repeat(MAX_ORDINARY_CAPTURE_SNAPSHOT_BYTES))).bytes;
+    harness.gate.closeAdmissions();
+
+    await expect(
+      harness.router.__handleMessageForTests({
+        type: 'saveConversationSnapshot',
+        transfer: { operation: 'capture-snapshot', declaredTotalBytes: bytes.byteLength },
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { extra: { code: 'MIGRATION_IN_PROGRESS' } },
+    });
+    expect(harness.repository.saveConversationSnapshot).not.toHaveBeenCalled();
+    await harness.gate.waitForDrained();
   });
 
   it('rejects oversized, cancelled, disconnected, and oversized-frame streams before facts writes', async () => {

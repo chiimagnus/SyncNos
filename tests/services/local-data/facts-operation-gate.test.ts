@@ -67,6 +67,29 @@ describe('facts operation gate', () => {
     expect(expiredError).toMatchObject({ code: 'MIGRATION_IN_PROGRESS' });
   });
 
+  it('holds an explicit reservation across admission close until its idempotent release', async () => {
+    const gate = new FactsOperationGate({ readJournal: async () => notStarted });
+    await gate.initializeFromJournal();
+    const reservation = gate.reserveFactsOperation('capture-preflight');
+    assertFactsOperationLease(reservation.lease);
+
+    gate.closeAdmissions();
+    let drained = false;
+    const wait = gate.waitForDrained().then(() => {
+      drained = true;
+    });
+    await Promise.resolve();
+    expect(drained).toBe(false);
+
+    reservation.release();
+    reservation.release();
+    await wait;
+    expect(drained).toBe(true);
+    expect(() => assertFactsOperationLease(reservation.lease)).toThrowError(
+      expect.objectContaining({ code: 'MIGRATION_IN_PROGRESS' }),
+    );
+  });
+
   it('closes admissions immediately and waits for every accepted operation to drain', async () => {
     const gate = new FactsOperationGate({ readJournal: async () => notStarted });
     await gate.initializeFromJournal();

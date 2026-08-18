@@ -16,7 +16,12 @@ import {
   type LocalDataStreamOperation,
   type StreamDescriptor,
 } from './contracts';
-import { type FactsOperationGate, type FactsOperationLease } from './facts-operation-gate';
+import {
+  assertFactsOperationLease,
+  type FactsOperationGate,
+  type FactsOperationLease,
+  type FactsOperationReservation,
+} from './facts-operation-gate';
 
 type PortListener = (message?: unknown) => void;
 
@@ -47,7 +52,9 @@ type ConnectedBackgroundStreamPort = BackgroundStreamPort &
   }>;
 
 export type BackgroundStreamHandler = Readonly<{
-  authorizeUpload?: (input: Readonly<{ requestId: string; stream: StreamDescriptor }>) => void;
+  authorizeUpload?: (
+    input: Readonly<{ requestId: string; stream: StreamDescriptor }>,
+  ) => FactsOperationReservation | void;
   download?: (
     input: Readonly<{
       lease: FactsOperationLease;
@@ -212,21 +219,26 @@ export class BackgroundStreamRouter {
     const startUpload = (message: Extract<RuntimeStreamMessage, { type: 'open'; direction: 'upload' }>) => {
       const registered = this.#handlers.get(message.stream.operation);
       if (!registered?.upload) throw new LocalDataContractError('INVALID_ARGUMENT');
-      registered.authorizeUpload?.({
-        requestId: message.requestId,
-        stream: message.stream,
-      });
-      const handler = registered.upload;
-      requestId = message.requestId;
-      receiver = new RuntimeStreamReceiver(message.requestId, message.stream);
-      upload = deferred<Uint8Array>();
-      // Admission can fail before the gate callback ever awaits this deferred. Attach a
-      // rejection observer immediately so cleanup can reject it without leaking an
-      // unhandled Promise; an admitted callback still observes the same rejection.
-      void upload.promise.catch(() => undefined);
-      armInactivityTimeout();
-      void this.gate
-        .runFactsOperation(`stream:${message.stream.operation}`, async (lease) => {
+      let reservation: FactsOperationReservation | void = undefined;
+      try {
+        reservation = registered.authorizeUpload?.({
+          requestId: message.requestId,
+          stream: message.stream,
+        });
+        if (reservation) {
+          if (typeof reservation.release !== 'function') throw new LocalDataContractError('INVALID_ARGUMENT');
+          assertFactsOperationLease(reservation.lease);
+        }
+        const handler = registered.upload;
+        requestId = message.requestId;
+        receiver = new RuntimeStreamReceiver(message.requestId, message.stream);
+        upload = deferred<Uint8Array>();
+        // Admission can fail before the gate callback ever awaits this deferred. Attach a
+        // rejection observer immediately so cleanup can reject it without leaking an
+        // unhandled Promise; an admitted callback still observes the same rejection.
+        void upload.promise.catch(() => undefined);
+        armInactivityTimeout();
+        const execute = async (lease: FactsOperationLease) => {
           const bytes = await upload!.promise;
           return await handler({
             bytes,
@@ -235,8 +247,17 @@ export class BackgroundStreamRouter {
             requestId: message.requestId,
             stream: message.stream,
           });
-        })
-        .then((data) => {
+        };
+        const operation = reservation
+          ? (async () => {
+              try {
+                return await execute(reservation!.lease);
+              } finally {
+                reservation!.release();
+              }
+            })()
+          : this.gate.runFactsOperation(`stream:${message.stream.operation}`, execute);
+        void operation.then((data) => {
           if (closed) return;
           port.postMessage({
             type: 'complete',
@@ -245,7 +266,11 @@ export class BackgroundStreamRouter {
           });
           close();
         })
-        .catch((error) => fail(error, message.requestId));
+          .catch((error) => fail(error, message.requestId));
+      } catch (error) {
+        reservation?.release();
+        throw error;
+      }
     };
 
     const startDownload = (message: Extract<RuntimeStreamMessage, { type: 'open'; direction: 'download' }>) => {

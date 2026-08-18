@@ -7,7 +7,11 @@ import {
   type JsonValue,
   type StableConversationReference,
 } from '@services/local-data/contracts';
-import { assertFactsOperationLease, type FactsOperationLease } from '@services/local-data/facts-operation-gate';
+import {
+  assertFactsOperationLease,
+  type FactsOperationLease,
+  type FactsOperationReservation,
+} from '@services/local-data/facts-operation-gate';
 import type {
   ConversationDetail,
   ConversationListCursor,
@@ -191,6 +195,7 @@ export async function openConversationReadRepository(lease: FactsOperationLease,
 }
 
 export type ConversationReadRunner = Readonly<{
+  reserve: (kind: string) => FactsOperationReservation;
   run: <T>(
     input: Readonly<{
       expectedFactsEpoch?: unknown;
@@ -204,11 +209,13 @@ export type ConversationReadRunner = Readonly<{
 
 export function createConversationReadRunner(
   gate: Readonly<{
+    reserveFactsOperation: (kind: string) => FactsOperationReservation;
     runFactsOperation: <T>(kind: string, fn: (lease: FactsOperationLease) => Promise<T> | T) => Promise<T>;
   }>,
   openRepository: typeof openConversationReadRepository = openConversationReadRepository,
 ): ConversationReadRunner {
   return Object.freeze({
+    reserve: (kind: string) => gate.reserveFactsOperation(kind),
     run: async ({ kind, expectedFactsEpoch, read }) =>
       await gate.runFactsOperation(
         kind,

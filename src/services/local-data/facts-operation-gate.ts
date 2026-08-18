@@ -8,6 +8,11 @@ export type FactsOperationLease = Readonly<{
   readonly [factsOperationLeaseBrand]: true;
 }>;
 
+export type FactsOperationReservation = Readonly<{
+  lease: FactsOperationLease;
+  release: () => void;
+}>;
+
 export type FactsOperationGateDependencies = Readonly<{
   readJournal?: () => Promise<MigrationJournalSnapshot>;
 }>;
@@ -84,23 +89,35 @@ export class FactsOperationGate {
     this.#admissionsClosed = !acceptsAdmissions(snapshot);
   }
 
-  async runFactsOperation<T>(kind: string, fn: (lease: FactsOperationLease) => Promise<T> | T): Promise<T> {
-    if (typeof kind !== 'string' || !kind.trim() || typeof fn !== 'function') {
-      throw new LocalDataContractError('INVALID_ARGUMENT');
-    }
+  reserveFactsOperation(kind: string): FactsOperationReservation {
+    if (typeof kind !== 'string' || !kind.trim()) throw new LocalDataContractError('INVALID_ARGUMENT');
     if (!this.allowsFactsOperations) throw admissionError(this.#snapshot);
 
     this.#inFlight += 1;
     const lease = createLease();
+    let released = false;
+    return Object.freeze({
+      lease,
+      release: () => {
+        if (released) return;
+        released = true;
+        activeLeases.delete(lease);
+        this.#inFlight -= 1;
+        if (this.#inFlight === 0) {
+          for (const resolve of this.#drainWaiters) resolve();
+          this.#drainWaiters.clear();
+        }
+      },
+    });
+  }
+
+  async runFactsOperation<T>(kind: string, fn: (lease: FactsOperationLease) => Promise<T> | T): Promise<T> {
+    if (typeof fn !== 'function') throw new LocalDataContractError('INVALID_ARGUMENT');
+    const reservation = this.reserveFactsOperation(kind);
     try {
-      return await fn(lease);
+      return await fn(reservation.lease);
     } finally {
-      activeLeases.delete(lease);
-      this.#inFlight -= 1;
-      if (this.#inFlight === 0) {
-        for (const resolve of this.#drainWaiters) resolve();
-        this.#drainWaiters.clear();
-      }
+      reservation.release();
     }
   }
 }
