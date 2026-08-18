@@ -130,13 +130,12 @@ async function moveMessages(input: {
     )) || [];
   let moved = 0;
   for (const row of rows) {
-    const messageKey = String(row?.messageKey || '').trim();
-    if (messageKey) {
-      const duplicate = await request<any>(byKey.get([input.keepConversationId, messageKey]));
-      if (duplicate) {
-        await request(input.store.delete(row.id));
-        continue;
-      }
+    const messageKey = typeof row?.messageKey === 'string' ? row.messageKey : '';
+    if (!messageKey.trim()) invalidArgument();
+    const duplicate = await request<any>(byKey.get([input.keepConversationId, messageKey]));
+    if (duplicate) {
+      await request(input.store.delete(row.id));
+      continue;
     }
     await request(input.store.put({ ...row, conversationId: input.keepConversationId }));
     moved += 1;

@@ -371,6 +371,69 @@ describe('IDB article URL compound operation', () => {
     });
   });
 
+  it('keeps the target row when both sides have the same exact whitespace message key', async () => {
+    const from = 'https://example.com/exact-duplicate-source';
+    const to = 'https://example.com/exact-duplicate-target';
+    const source = await conversations.upsertConversation(article(from, 'Source'));
+    const target = await conversations.upsertConversation(article(to, 'Target'));
+    await conversations.syncConversationMessages(source.id, [
+      { messageKey: ' shared ', role: 'assistant', contentText: 'source', sequence: 1 },
+    ]);
+    await conversations.syncConversationMessages(target.id, [
+      { messageKey: ' shared ', role: 'assistant', contentText: 'target', sequence: 1 },
+    ]);
+
+    await runIdbOperation(
+      async (lease) =>
+        await createArticleUrlOperation({ lease, mode: 'idb' }).update({
+          conversation: { source: source.source, conversationKey: source.conversationKey, conversationId: source.id },
+          confirmedConflict: {
+            source: target.source,
+            conversationKey: target.conversationKey,
+            conversationId: target.id,
+          },
+          fromCanonicalUrl: from,
+          toCanonicalUrl: to,
+        }),
+    );
+
+    expect(await conversations.getMessagesByConversationId(target.id)).toMatchObject([
+      { messageKey: ' shared ', contentText: 'target' },
+    ]);
+  });
+
+  it('preserves message keys that differ only by surrounding whitespace during conflict merge', async () => {
+    const from = 'https://example.com/exact-distinct-source';
+    const to = 'https://example.com/exact-distinct-target';
+    const source = await conversations.upsertConversation(article(from, 'Source'));
+    const target = await conversations.upsertConversation(article(to, 'Target'));
+    await conversations.syncConversationMessages(source.id, [
+      { messageKey: ' shared ', role: 'assistant', contentText: 'source', sequence: 1 },
+    ]);
+    await conversations.syncConversationMessages(target.id, [
+      { messageKey: 'shared', role: 'assistant', contentText: 'target', sequence: 1 },
+    ]);
+
+    await runIdbOperation(
+      async (lease) =>
+        await createArticleUrlOperation({ lease, mode: 'idb' }).update({
+          conversation: { source: source.source, conversationKey: source.conversationKey, conversationId: source.id },
+          confirmedConflict: {
+            source: target.source,
+            conversationKey: target.conversationKey,
+            conversationId: target.id,
+          },
+          fromCanonicalUrl: from,
+          toCanonicalUrl: to,
+        }),
+    );
+
+    expect((await conversations.getMessagesByConversationId(target.id)).map((row) => row.messageKey).sort()).toEqual([
+      ' shared ',
+      'shared',
+    ]);
+  });
+
   it('rejects an unconfirmed or stale conflict without changing either article or its comments', async () => {
     const from = 'https://example.com/race-source';
     const to = 'https://example.com/race-target';
