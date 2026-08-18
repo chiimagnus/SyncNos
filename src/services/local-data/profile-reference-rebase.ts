@@ -137,8 +137,11 @@ function parseStoredQueue(provider: MigrationProfileProvider, value: unknown): P
 }
 
 function legacyFinishedCounts(input: Record<string, unknown>): Readonly<{ okCount: number; failCount: number }> {
-  const hasCurrentCounts = Number.isSafeInteger(input.okCount) && Number(input.okCount) >= 0 &&
-    Number.isSafeInteger(input.failCount) && Number(input.failCount) >= 0;
+  const hasCurrentCounts =
+    Number.isSafeInteger(input.okCount) &&
+    Number(input.okCount) >= 0 &&
+    Number.isSafeInteger(input.failCount) &&
+    Number(input.failCount) >= 0;
   if (hasCurrentCounts) {
     return Object.freeze({ okCount: Number(input.okCount), failCount: Number(input.failCount) });
   }
