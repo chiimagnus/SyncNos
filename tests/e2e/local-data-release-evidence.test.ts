@@ -59,7 +59,8 @@ function expectedIdentity(browser: 'chrome' | 'edge' | 'firefox'): string {
 
 function validObservedAt(value: unknown): boolean {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return false;
-  return Number.isFinite(Date.parse(value));
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === `${value.slice(0, -1)}.000Z`;
 }
 
 function allPass(record: Record<string, unknown>, keys: readonly string[]): boolean {
@@ -169,6 +170,15 @@ function releaseEvidenceReady(evidence: Evidence, expectedCommit: string): boole
 }
 
 describe('Local Data release evidence schema', () => {
+  it('accepts only real second-precision UTC calendar timestamps', () => {
+    expect(validObservedAt('2026-08-17T23:59:59Z')).toBe(true);
+    expect(validObservedAt('2024-02-29T00:00:00Z')).toBe(true);
+    expect(validObservedAt('2026-02-31T00:00:00Z')).toBe(false);
+    expect(validObservedAt('2026-13-01T00:00:00Z')).toBe(false);
+    expect(validObservedAt('2026-08-17T24:00:00Z')).toBe(false);
+    expect(validObservedAt('2026-08-17T00:00:00.000Z')).toBe(false);
+  });
+
   it('defines exactly nine formal desktop rows and never accepts dev/synthetic identity as a pass', () => {
     const evidence = parseEvidence();
     expect(evidence.schemaVersion).toBe(1);
