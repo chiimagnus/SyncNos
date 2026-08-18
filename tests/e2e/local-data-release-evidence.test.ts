@@ -82,10 +82,7 @@ function currentRepositoryCommit(): string {
   return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
 }
 
-function automaticCommandPasses(
-  entry: Evidence,
-  input: Readonly<{ command: string; releaseCommit: string }>,
-): boolean {
+function automaticCommandPasses(entry: Evidence, input: Readonly<{ command: string; releaseCommit: string }>): boolean {
   return (
     entry?.command === input.command &&
     entry?.outcome === 'pass' &&
@@ -355,7 +352,9 @@ describe('Local Data release evidence schema', () => {
     );
     expect(evidence.automatic.gate.command).toBe(AUTOMATIC_COMMANDS.gate);
     expect(evidence.automatic.safariCheck.command).toBe(AUTOMATIC_COMMANDS.safariCheck);
-    expect(evidence.automatic.finalBrowserArtifactContract.command).toBe(AUTOMATIC_COMMANDS.finalBrowserArtifactContract);
+    expect(evidence.automatic.finalBrowserArtifactContract.command).toBe(
+      AUTOMATIC_COMMANDS.finalBrowserArtifactContract,
+    );
     expect(evidence.automatic.threeOsCliPackedInstall.workflow).toBe(CLI_MATRIX_WORKFLOW);
     expect(Object.keys(evidence.automatic.threeOsCliPackedInstall.checks).sort()).toEqual(
       [...THREE_OS_CLI_CHECKS].sort(),
