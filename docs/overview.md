@@ -1,6 +1,6 @@
 # SyncNos WebClipper 文档
 
-SyncNos 将 AI 对话、网页文章和已加载的视频字幕统一为浏览器本地 conversation；同步和导出都是派生产物。
+SyncNos 将 AI 对话、网页文章和已加载的视频字幕统一为本地 conversation；事实 authority 默认是浏览器 IndexedDB，用户显式启用 Local Database 后切换到当前用户的 SQLite。同步和导出始终只是派生产物，具体迁移与 authority 规则见 [storage.md](storage.md)。
 
 ## 入口
 

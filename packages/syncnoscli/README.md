@@ -26,6 +26,4 @@ Successful data commands print a versioned JSON envelope by default. `--format t
 
 The CLI package has its own semantic version; it is not required to equal the WebClipper/WXT version. Compatibility is defined by the canonical Native Host protocol/schema contract shipped from the same source commit.
 
-Publishing is local-only and deliberately separate from browser releases. Update this package's `version`, run the repository gate, then publish from `packages/syncnoscli` with `npm publish`. GitHub Actions only build and test the CLI; no workflow publishes this package.
-
 Architecture and storage authority: [`docs/storage.md`](../../docs/storage.md). Installation, Native Host, sandbox, and recovery guidance: [`docs/troubleshooting.md`](../../docs/troubleshooting.md#local-database).

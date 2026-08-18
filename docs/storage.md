@@ -28,7 +28,7 @@ SQLite 只使用固定的 per-user hidden directory：macOS/Linux 为 `~/.syncno
 
 Local mode 的全文搜索是 SQLite facts 上的**可重建关键词索引**：每个 conversation 的 title 与稳定 message 顺序合成 FTS document。它不是 vector database，不生成 embedding，也不会为了查询调用 OAuth provider、Notion、Feishu、Obsidian 或网络搜索服务。FTS index 丢失或不可用时，facts 本身仍可继续按既有事务语义保存；search 返回结构化 `FTS_UNAVAILABLE`，后续授权的 facts/schema/import transaction 才能重建派生索引，不能偷偷切换 tokenizer、`LIKE` 全表扫描或 IDB fallback。
 
-搜索输入只接受共享 normalizer 产生的 NFC literal，最多 512 Unicode scalar。三字符及以上使用由 Host 生成的 quoted FTS phrase；浏览器不能提交 raw `MATCH` grammar、SQL、数据库路径或 HTML snippet。一到两个 scalar 的查询不走 FTS，而是在最近排序的固定 500 个 candidate 内做参数化 `instr()` literal 检查；如果 candidate cap 截断了范围，结果显式返回 `truncatedByScanLimit`。
+搜索输入只接受共享 normalizer 产生的 NFC literal，最多 512 Unicode scalar。三字符及以上使用由 Host 生成的 quoted FTS phrase；浏览器不能提交 raw `MATCH` grammar、SQL、数据库路径或 HTML snippet。一到两个 scalar 的查询不走 FTS，而是在按更新时间倒序的固定 500 个 candidate 内做参数化 `instr()` literal 检查；如果 candidate cap 截断了范围，结果显式返回 `truncatedByScanLimit`。
 
 搜索分页与 excerpt 使用独立安全预算，代码真源在 `src/services/local-data/contracts.ts` 与 `packages/syncnoscli/src/sqlite/search.ts`：
 

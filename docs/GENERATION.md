@@ -4,16 +4,18 @@
 
 | Field | Value |
 | --- | --- |
-| Repository | `SyncNos/SyncNos-Webclipper` |
-| Commit hash | 6abecf9c5ffd49f30656a6c742d6cfb20dbfd9fa |
-| Generated at | `2026-08-10` |
+| Repository | `chiimagnus/SyncNos` |
+| Commit hash | `651b054addf5c0471c0bfb46faa24757bd69d08d` |
+| Generated at | `2026-08-18` |
 | Canonical entry | `docs/overview.md` |
-| Scope | `AGENTS.md`, `README.md`, `docs/**/*.md` |
+| Scope | `AGENTS.md`, `README*.md`, `PRIVACY.md`, `docs/**/*.md`, `packages/syncnoscli/README*.md` |
 
 ## Page Set
 
+- Entries: `README.md`, `README.zh-CN.md`, `PRIVACY.md`
 - Core: overview, configuration, storage
 - Operations: troubleshooting, feishu-setup
+- Package: `packages/syncnoscli/README.md`, `packages/syncnoscli/README.zh-CN.md`
 
 ## Policy
 
@@ -21,4 +23,4 @@ Feature plans, audit logs, screenshots and one-time acceptance evidence belong i
 
 ## Coverage gap
 
-The previous source commit (`86f0cc514533b8c06d626a275ccd912295c797ea`) is unavailable locally, so this audit was verified against the current codebase rather than a historical diff.
+No known coverage gap in the maintained page set. Feature plans, audit logs, and release-evidence Markdown remain historical/verification artifacts and are not rewritten as canonical documentation.

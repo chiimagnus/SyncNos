@@ -52,9 +52,19 @@ Native Host 注册按**浏览器实际读取的物理位置**维护，而不是�
 
 ### npm 发布（repository owner）
 
-`@chiimagnus/syncnoscli` 仅由 repository owner 在本地发布。先更新 `packages/syncnoscli/package.json` 的 `version`，运行 `npm run gate`，确认打包契约通过，然后进入 `packages/syncnoscli` 执行 `npm publish`。npm 登录与 2FA 只留在 owner 本机，不写入仓库或 GitHub Actions。
+`@chiimagnus/syncnoscli` 只从 repository owner 本机发布；GitHub Actions 只做跨平台构建与测试，不执行 `npm publish`。CLI 与浏览器插件各自维护自己的版本字段，发布生命周期互不耦合。
 
-GitHub Actions 只负责 CLI 的跨平台构建与测试，不执行 `npm publish`；browser release/prerelease 与 Chrome/Edge/AMO store workflow 也不得发布 CLI。CLI 与浏览器插件各自保留自己的版本字段，发布生命周期互不耦合。
+发布前先把 `packages/syncnoscli/package.json` 更新为 npm 尚未存在的新 SemVer，并让 lockfile 同步。然后从仓库根目录执行完整 gate，再从 CLI 包目录发布并核对 registry：
+
+```bash
+npm run gate
+cd packages/syncnoscli
+npm whoami
+npm publish
+npm view @chiimagnus/syncnoscli version
+```
+
+npm 登录与 2FA 只保留在 owner 本机，不写入仓库或 GitHub Actions。已经发布过的版本不能覆盖；若 `npm publish --dry-run` 或真实发布只报告该版本已存在，应先更新版本，而不是绕过 registry 保护。
 
 ### Local Data release evidence（maintainer）
 

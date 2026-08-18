@@ -13,13 +13,13 @@ One-click sync to Notion / Obsidian / Feishu(Lark), or export as Markdown / Zip.
 [![Edge Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Fijkpghlfmkbjcgafapjcjahaikmnjncl&query=%24.version&label=Edge%20Add-ons&color=blue)](https://microsoftedge.microsoft.com/addons/detail/syncnosaiweb-clipper/ijkpghlfmkbjcgafapjcjahaikmnjncl)
 [![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
 ![Safari](https://img.shields.io/badge/Safari-blue?logo=safari)
-[![Release Downloads](https://img.shields.io/github/downloads/SyncNos/SyncNos-Webclipper/total)](https://github.com/SyncNos/SyncNos-Webclipper/releases)
+[![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total)](https://github.com/chiimagnus/SyncNos/releases)
 
 </div>
 
 ## What it does
 
-SyncNos saves captured content to local IndexedDB before it is optionally synced to Notion, Obsidian, or Feishu, or exported as Markdown / Zip. External targets are derived copies, not the source of truth.
+SyncNos keeps captured facts local first. IndexedDB is the default authority; on supported desktop browsers, you can explicitly enable [Local Database](docs/storage.md) to migrate conversation facts to a fixed per-user SQLite database through the optional SyncNos CLI. Notion, Obsidian, Feishu, Markdown, and Zip are derived outputs, not the source of truth.
 
 ## Download & Install
 
