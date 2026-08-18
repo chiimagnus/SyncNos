@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -12,6 +14,8 @@ import {
   createHostFactsSuccess,
   parseHostFactsRequest,
 } from '@services/local-data/contracts';
+import { OrderedFrameDigestAccumulator } from '@services/local-data/digest';
+import { createNativeWireDataFrame } from '@services/local-data/native-wire';
 
 function createPortHarness() {
   const messageListeners = new Set<(message?: unknown) => void>();
@@ -40,6 +44,9 @@ function createPortHarness() {
   };
   return {
     disconnect,
+    emitDisconnect() {
+      for (const listener of disconnectListeners) listener();
+    },
     emitMessage(message: unknown) {
       for (const listener of messageListeners) listener(message);
     },
@@ -51,8 +58,134 @@ function createPortHarness() {
   };
 }
 
+const digestProvider = {
+  async sha256(bytes: Uint8Array) {
+    return createHash('sha256').update(bytes).digest('hex');
+  },
+};
+
+async function hostJsonFrames(value: unknown) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const sessionId = '550e8400-e29b-41d4-a716-446655440000';
+  const digest = await OrderedFrameDigestAccumulator.create(digestProvider);
+  const data = await createNativeWireDataFrame({
+    bytes,
+    offset: 0,
+    provider: digestProvider,
+    sequence: 1,
+    sessionId,
+  });
+  await digest.append({ sequence: data.sequence, byteLength: data.byteLength, digest: data.sliceDigest });
+  return {
+    bytes,
+    frames: [
+      {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        sessionId,
+        sequence: 0,
+        type: 'begin' as const,
+        operation: 'host-json' as const,
+        declaredTotalBytes: bytes.byteLength,
+      },
+      data,
+      {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        sessionId,
+        sequence: 2,
+        type: 'end' as const,
+        digest: digest.finalize(),
+      },
+      {
+        protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+        sessionId,
+        sequence: 3,
+        type: 'terminal' as const,
+        status: 'ok' as const,
+      },
+    ],
+  };
+}
+
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('Native Messaging port EOF ordering', () => {
+  it('drains already-delivered terminal frames before classifying a Host disconnect', async () => {
+    const harness = createPortHarness();
+    const request = parseHostFactsRequest({
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      requestId: 'queued-terminal',
+      command: 'CONVERSATION_BOOTSTRAP',
+      payload: {},
+    });
+    const payload = { rows: [1, 2, 3] };
+    const { bytes, frames } = await hostJsonFrames(payload);
+    let releaseDigest!: () => void;
+    const digestBlocked = new Promise<void>((resolve) => {
+      releaseDigest = resolve;
+    });
+    let digestCalls = 0;
+    const delayedDigestProvider = {
+      async sha256(input: Uint8Array) {
+        digestCalls += 1;
+        if (digestCalls === 1) await digestBlocked;
+        return createHash('sha256').update(input).digest('hex');
+      },
+    };
+
+    const operation = readNativePortJson({
+      port: harness.port,
+      request,
+      digestProvider: delayedDigestProvider,
+    });
+    harness.emitMessage(
+      createHostFactsSuccess(request.requestId, {
+        stream: { operation: 'host-json', declaredTotalBytes: bytes.byteLength },
+      }),
+    );
+    for (const frame of frames) harness.emitMessage(frame);
+    harness.emitDisconnect();
+
+    let settled = false;
+    void operation.finally(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    releaseDigest();
+    await expect(operation).resolves.toEqual(payload);
+    expect(harness.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
+  });
+
+  it('fails after queued frames drain when disconnect arrives without a terminal frame', async () => {
+    const harness = createPortHarness();
+    const request = parseHostFactsRequest({
+      protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+      schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+      requestId: 'missing-terminal',
+      command: 'CONVERSATION_BOOTSTRAP',
+      payload: {},
+    });
+    const payload = { rows: [1] };
+    const { bytes, frames } = await hostJsonFrames(payload);
+    const operation = readNativePortJson({ port: harness.port, request, digestProvider });
+    const rejected = expect(operation).rejects.toMatchObject({ code: 'HOST_UNAVAILABLE' });
+
+    harness.emitMessage(
+      createHostFactsSuccess(request.requestId, {
+        stream: { operation: 'host-json', declaredTotalBytes: bytes.byteLength },
+      }),
+    );
+    for (const frame of frames.slice(0, -1)) harness.emitMessage(frame);
+    harness.emitDisconnect();
+
+    await rejected;
+    expect(harness.listenerCounts()).toEqual({ message: 0, disconnect: 0 });
+  });
 });
 
 describe('Native Messaging port operation deadline', () => {

@@ -131,6 +131,7 @@ function readNativePortStream<THeader extends NativePortStreamHeader, TResult>(
     let receiver: NativeWireSessionReceiver | null = null;
     let bytes: Uint8Array | null = null;
     let processing = Promise.resolve();
+    let disconnectObserved = false;
     let operationTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
     const cleanup = () => {
@@ -182,6 +183,9 @@ function readNativePortStream<THeader extends NativePortStreamHeader, TResult>(
     };
 
     const onMessage: NativePortListener = (message) => {
+      // Native Messaging EOF means no new messages can arrive. Frames whose listeners already ran
+      // before EOF remain authoritative and must drain before EOF is classified as a failure.
+      if (disconnectObserved) return;
       processing = processing
         .then(async () => {
           if (settled) return;
@@ -200,7 +204,15 @@ function readNativePortStream<THeader extends NativePortStreamHeader, TResult>(
         })
         .catch(fail);
     };
-    const onDisconnect: NativePortListener = () => fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+    const onDisconnect: NativePortListener = () => {
+      if (settled || disconnectObserved) return;
+      disconnectObserved = true;
+      processing = processing
+        .then(() => {
+          if (!settled) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+        })
+        .catch(fail);
+    };
 
     input.port.onMessage.addListener(onMessage);
     input.port.onDisconnect.addListener(onDisconnect);
