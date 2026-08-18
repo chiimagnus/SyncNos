@@ -19,6 +19,11 @@ function runtimePortHarness(onClientMessage: (message: unknown, emit: (message: 
     for (const listener of messageListeners) listener(message);
   };
   return {
+    disconnectFromRemote() {
+      if (disconnected) return;
+      disconnected = true;
+      for (const listener of disconnectListeners) listener();
+    },
     port: {
       postMessage(message: unknown) {
         if (disconnected) throw new Error('disconnected');
@@ -59,6 +64,7 @@ describe('backup runtime-stream client', () => {
   it('downloads ZIP bytes through the announced zip-backup header and ACK flow', async () => {
     const expected = new TextEncoder().encode('PK\u0003\u0004portable-backup');
     let sender: RuntimeStreamSender | null = null;
+    let disconnectFromRemote: (() => void) | null = null;
     const clientMessages: unknown[] = [];
     const harness = runtimePortHarness((message, emit) => {
       clientMessages.push(message);
@@ -67,7 +73,15 @@ describe('backup runtime-stream client', () => {
         expect(parsed).toMatchObject({ direction: 'download', operation: 'zip-backup' });
         sender = new RuntimeStreamSender({
           announceHeader: true,
-          port: { postMessage: emit },
+          port: {
+            postMessage(value) {
+              emit(value);
+              const outgoing = parseRuntimeStreamMessage(value);
+              if (outgoing.type === 'frame' && (outgoing.frame as { type?: unknown }).type === 'terminal') {
+                disconnectFromRemote?.();
+              }
+            },
+          },
           requestId: parsed.requestId,
         });
         void sender.send(expected, { operation: 'zip-backup', declaredTotalBytes: expected.byteLength });
@@ -75,6 +89,7 @@ describe('backup runtime-stream client', () => {
       }
       if (parsed.type === 'ack') sender?.accept(parsed);
     });
+    disconnectFromRemote = harness.disconnectFromRemote;
     vi.mocked(connectPort).mockReturnValue(harness.port as any);
 
     const result = await exportBackupZip();
@@ -90,6 +105,7 @@ describe('backup runtime-stream client', () => {
     );
     const stats = { ...createEmptyImportStats(), settingsApplied: 2 };
     let receiver: RuntimeStreamReceiver | null = null;
+    let disconnectFromRemote: (() => void) | null = null;
     let queue = Promise.resolve();
     const harness = runtimePortHarness((message, emit) => {
       queue = queue.then(async () => {
@@ -108,9 +124,11 @@ describe('backup runtime-stream client', () => {
         if (event?.kind === 'complete') {
           expect(event.bytes).toEqual(expected);
           emit({ type: 'complete', requestId: parsed.requestId, data: stats });
+          disconnectFromRemote?.();
         }
       });
     });
+    disconnectFromRemote = harness.disconnectFromRemote;
     vi.mocked(connectPort).mockReturnValue(harness.port as any);
 
     await expect(importBackupFile(new Blob([expected]))).resolves.toEqual(stats);

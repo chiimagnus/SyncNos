@@ -127,6 +127,7 @@ describe('conversation image client', () => {
         stream: { operation: 'image-asset', declaredTotalBytes: bytes.byteLength },
       });
       for (const frame of frames) emit({ type: 'frame', requestId: 'image-stream', frame });
+      stream.port.disconnect();
     });
     runtimeMocks.connectPort.mockReturnValue(stream.port);
     runtimeMocks.send.mockResolvedValue({
@@ -155,6 +156,38 @@ describe('conversation image client', () => {
       requestId: 'image-stream',
       direction: 'download',
       operation: 'image-asset',
+    });
+  });
+
+  it('rejects a disconnect after queued frames drain when the terminal frame never arrived', async () => {
+    vi.stubGlobal('crypto', webcrypto);
+    const bytes = Uint8Array.from([1, 2, 3]);
+    const frames = await imageFrames(bytes);
+    const stream = createPort((emit) => {
+      emit({
+        type: 'header',
+        requestId: 'missing-terminal',
+        stream: { operation: 'image-asset', declaredTotalBytes: bytes.byteLength },
+      });
+      for (const frame of frames.slice(0, -1)) {
+        emit({ type: 'frame', requestId: 'missing-terminal', frame });
+      }
+      stream.port.disconnect();
+    });
+    runtimeMocks.connectPort.mockReturnValue(stream.port);
+    runtimeMocks.send.mockResolvedValue({
+      ok: true,
+      data: {
+        kind: 'stream',
+        requestId: 'missing-terminal',
+        contentType: 'image/png',
+        stream: { operation: 'image-asset', declaredTotalBytes: bytes.byteLength },
+      },
+      error: null,
+    });
+
+    await expect(getConversationImageAsset({ reference, assetId: 7 })).rejects.toMatchObject({
+      code: 'HOST_UNAVAILABLE',
     });
   });
 

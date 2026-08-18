@@ -241,6 +241,7 @@ export async function receiveLocalDataDownloadStream(
   return await new Promise<Uint8Array>((resolve, reject) => {
     let closed = false;
     let headerReceived = false;
+    let disconnectObserved = false;
     let queue = Promise.resolve();
     const timeout = globalThis.setTimeout(
       () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
@@ -298,9 +299,18 @@ export async function receiveLocalDataDownloadStream(
       }
     };
     const onMessage: RuntimePortListener = (raw) => {
+      if (disconnectObserved) return;
       queue = queue.then(() => accept(raw)).catch(fail);
     };
-    const onDisconnect: RuntimePortListener = () => fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+    const onDisconnect: RuntimePortListener = () => {
+      if (closed || disconnectObserved) return;
+      disconnectObserved = true;
+      queue = queue
+        .then(() => {
+          if (!closed) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+        })
+        .catch(fail);
+    };
 
     try {
       port.onMessage?.addListener?.(onMessage);
@@ -335,6 +345,7 @@ async function uploadConversationCaptureSnapshot(
 
   return await new Promise<ConversationCaptureSnapshotResult>((resolve, reject) => {
     let closed = false;
+    let disconnectObserved = false;
     let queue = Promise.resolve();
     const timeout = globalThis.setTimeout(
       () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
@@ -376,9 +387,18 @@ async function uploadConversationCaptureSnapshot(
       sender.accept(message);
     };
     const onMessage: RuntimePortListener = (raw) => {
+      if (disconnectObserved) return;
       queue = queue.then(() => accept(raw)).catch(fail);
     };
-    const onDisconnect: RuntimePortListener = () => fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+    const onDisconnect: RuntimePortListener = () => {
+      if (closed || disconnectObserved) return;
+      disconnectObserved = true;
+      queue = queue
+        .then(() => {
+          if (!closed) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+        })
+        .catch(fail);
+    };
 
     try {
       port.onMessage?.addListener?.(onMessage);

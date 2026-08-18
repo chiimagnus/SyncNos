@@ -76,6 +76,7 @@ export async function exportBackupZip(): Promise<BackupExportDownload> {
     let closed = false;
     let receiver: RuntimeStreamReceiver | null = null;
     let stream: StreamDescriptor | null = null;
+    let disconnectObserved = false;
     let queue = Promise.resolve();
     const timeout = globalThis.setTimeout(
       () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
@@ -134,10 +135,17 @@ export async function exportBackupZip(): Promise<BackupExportDownload> {
       }
     };
     const onMessage: RuntimePortListener = (raw) => {
+      if (disconnectObserved) return;
       queue = queue.then(() => accept(raw)).catch(fail);
     };
     const onDisconnect: RuntimePortListener = () => {
-      if (!closed) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+      if (closed || disconnectObserved) return;
+      disconnectObserved = true;
+      queue = queue
+        .then(() => {
+          if (!closed) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+        })
+        .catch(fail);
     };
 
     try {
@@ -167,6 +175,7 @@ export async function importBackupFile(file: Blob): Promise<ImportStats> {
   const sender = new RuntimeStreamSender({ announceHeader: false, port, requestId: id });
   return await new Promise<ImportStats>((resolve, reject) => {
     let closed = false;
+    let disconnectObserved = false;
     let queue = Promise.resolve();
     const timeout = globalThis.setTimeout(
       () => fail(new LocalDataContractError('HOST_UNAVAILABLE')),
@@ -204,10 +213,17 @@ export async function importBackupFile(file: Blob): Promise<ImportStats> {
       sender.accept(message);
     };
     const onMessage: RuntimePortListener = (raw) => {
+      if (disconnectObserved) return;
       queue = queue.then(() => accept(raw)).catch(fail);
     };
     const onDisconnect: RuntimePortListener = () => {
-      if (!closed) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+      if (closed || disconnectObserved) return;
+      disconnectObserved = true;
+      queue = queue
+        .then(() => {
+          if (!closed) fail(new LocalDataContractError('HOST_UNAVAILABLE'));
+        })
+        .catch(fail);
     };
 
     try {
