@@ -21,7 +21,7 @@
 
 Feature plans, audit logs, screenshots and one-time acceptance evidence belong in `.github/features/**`, not `docs/`.
 
-`.github/guide/**` is a separate user-guide surface consumed directly by production Settings links. It may be linked from `docs/overview.md`, but it is outside neat-freak merge/delete scope unless a task explicitly targets those guides.
+`docs/guide/**` is a separate user-guide surface consumed directly by production Settings links. It may be linked from `docs/overview.md`, but it is outside neat-freak merge/delete scope unless a task explicitly targets those guides.
 
 ## Coverage gap
 

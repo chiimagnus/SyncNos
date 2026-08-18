@@ -1459,7 +1459,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   }, [busy, openExtensionAppSettings, useAppImport]);
 
   const onOpenObsidianSetupGuide = useCallback(() => {
-    openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md');
+    openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.zh.md');
   }, []);
 
   const feishuSetupGuideUrl = useMemo(() => {
@@ -1467,10 +1467,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const lang = String(globalThis.navigator?.language || '').toLowerCase();
       const useZh = lang.startsWith('zh');
       return useZh
-        ? 'https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/feishu/DocxSync.zh.md'
-        : 'https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/feishu/DocxSync.en.md';
+        ? 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.zh.md'
+        : 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.en.md';
     } catch (_e) {
-      return 'https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/feishu/DocxSync.en.md';
+      return 'https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/feishu/DocxSync.en.md';
     }
   }, []);
 

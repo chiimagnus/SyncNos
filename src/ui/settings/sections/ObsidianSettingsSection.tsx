@@ -168,7 +168,7 @@ export function ObsidianSettingsSection(props: {
               {t('obsidianInstallNote')}{' '}
               <a
                 className="tw-underline hover:tw-opacity-80"
-                href="https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md"
+                href="https://github.com/chiimagnus/SyncNos/blob/main/docs/guide/obsidian/LocalRestAPI.zh.md"
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => {
