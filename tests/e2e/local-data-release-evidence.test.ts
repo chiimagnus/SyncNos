@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -32,6 +33,14 @@ const SAFARI_CHECKS = [
   'localDatabaseActionAbsent',
   'installHelpAbsent',
 ] as const;
+const THREE_OS_CLI_CHECKS = ['ubuntu', 'macos', 'windows'] as const;
+const AUTOMATIC_COMMANDS = Object.freeze({
+  gate: 'npm run gate',
+  safariCheck: 'npm run check:safari',
+  finalBrowserArtifactContract:
+    'npm run build:release-contract-fixtures && npm run test -- tests/build/native-messaging-release-contract.test.ts',
+});
+const CLI_MATRIX_WORKFLOW = 'syncnoscli-ci.yml' as const;
 
 type Outcome = 'fail' | 'pass' | 'pending';
 type Evidence = Record<string, any>;
@@ -55,6 +64,64 @@ function validObservedAt(value: unknown): boolean {
 
 function allPass(record: Record<string, unknown>, keys: readonly string[]): boolean {
   return keys.every((key) => record?.[key] === 'pass');
+}
+
+function validCommitSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+}
+
+function validActionsRunUrl(value: unknown): boolean {
+  return (
+    typeof value === 'string' &&
+    /^https:\/\/github\.com\/SyncNos\/SyncNos-Webclipper\/actions\/runs\/[1-9]\d*$/.test(value)
+  );
+}
+
+function currentRepositoryCommit(): string {
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
+}
+
+function automaticCommandPasses(
+  entry: Evidence,
+  input: Readonly<{ command: string; releaseCommit: string }>,
+): boolean {
+  return (
+    entry?.command === input.command &&
+    entry?.outcome === 'pass' &&
+    entry?.commitSha === input.releaseCommit &&
+    validObservedAt(entry?.observedAt)
+  );
+}
+
+function automaticEvidenceReady(evidence: Evidence, expectedCommit: string): boolean {
+  if (!validCommitSha(expectedCommit) || evidence.releaseCommit !== expectedCommit) return false;
+  const automatic = evidence.automatic;
+  if (!automatic || typeof automatic !== 'object') return false;
+  if (
+    !automaticCommandPasses(automatic.gate, {
+      command: AUTOMATIC_COMMANDS.gate,
+      releaseCommit: expectedCommit,
+    }) ||
+    !automaticCommandPasses(automatic.safariCheck, {
+      command: AUTOMATIC_COMMANDS.safariCheck,
+      releaseCommit: expectedCommit,
+    }) ||
+    !automaticCommandPasses(automatic.finalBrowserArtifactContract, {
+      command: AUTOMATIC_COMMANDS.finalBrowserArtifactContract,
+      releaseCommit: expectedCommit,
+    })
+  ) {
+    return false;
+  }
+  const cli = automatic.threeOsCliPackedInstall;
+  return (
+    cli?.workflow === CLI_MATRIX_WORKFLOW &&
+    cli?.outcome === 'pass' &&
+    cli?.commitSha === expectedCommit &&
+    validObservedAt(cli?.observedAt) &&
+    validActionsRunUrl(cli?.runUrl) &&
+    allPass(cli?.checks, THREE_OS_CLI_CHECKS)
+  );
 }
 
 function desktopEntryPasses(entry: Evidence): boolean {
@@ -95,6 +162,10 @@ function manualEvidenceReady(evidence: Evidence): boolean {
     safariPasses(evidence.safari) &&
     evidence.regressions.every(regressionPasses)
   );
+}
+
+function releaseEvidenceReady(evidence: Evidence, expectedCommit: string): boolean {
+  return automaticEvidenceReady(evidence, expectedCommit) && manualEvidenceReady(evidence);
 }
 
 describe('Local Data release evidence schema', () => {
@@ -158,10 +229,13 @@ describe('Local Data release evidence schema', () => {
     expect(evidence.strictSandboxLinux.outcome).not.toBe('pass');
   });
 
-  it('derives releaseReady only from complete manual evidence and keeps the checked-in pending matrix not ready', () => {
+  it('derives releaseReady from automatic plus manual evidence and keeps the checked-in pending matrix not ready', () => {
     const evidence = parseEvidence();
-    const computed = manualEvidenceReady(evidence);
-    expect(evidence.releaseReady).toBe(computed);
+    const currentCommit = currentRepositoryCommit();
+    expect(evidence.releaseCommit).toBeNull();
+    expect(automaticEvidenceReady(evidence, currentCommit)).toBe(false);
+    expect(manualEvidenceReady(evidence)).toBe(false);
+    expect(evidence.releaseReady).toBe(releaseEvidenceReady(evidence, currentCommit));
     expect(evidence.releaseReady).toBe(false);
   });
 
@@ -198,34 +272,91 @@ describe('Local Data release evidence schema', () => {
       notes: 'verified',
     }));
     expect(manualEvidenceReady(complete)).toBe(true);
+    expect(releaseEvidenceReady(complete, 'a'.repeat(40))).toBe(false);
+
+    const releaseCommit = 'a'.repeat(40);
+    complete.releaseCommit = releaseCommit;
+    complete.automatic.gate = {
+      command: AUTOMATIC_COMMANDS.gate,
+      outcome: 'pass',
+      observedAt: '2026-08-17T00:00:00Z',
+      commitSha: releaseCommit,
+    };
+    complete.automatic.safariCheck = {
+      command: AUTOMATIC_COMMANDS.safariCheck,
+      outcome: 'pass',
+      observedAt: '2026-08-17T00:00:00Z',
+      commitSha: releaseCommit,
+    };
+    complete.automatic.finalBrowserArtifactContract = {
+      command: AUTOMATIC_COMMANDS.finalBrowserArtifactContract,
+      outcome: 'pass',
+      observedAt: '2026-08-17T00:00:00Z',
+      commitSha: releaseCommit,
+    };
+    complete.automatic.threeOsCliPackedInstall = {
+      workflow: CLI_MATRIX_WORKFLOW,
+      outcome: 'pass',
+      observedAt: '2026-08-17T00:00:00Z',
+      commitSha: releaseCommit,
+      runUrl: 'https://github.com/SyncNos/SyncNos-Webclipper/actions/runs/123456789',
+      checks: Object.fromEntries(THREE_OS_CLI_CHECKS.map((key) => [key, 'pass'])),
+    };
+    expect(automaticEvidenceReady(complete, releaseCommit)).toBe(true);
+    expect(releaseEvidenceReady(complete, releaseCommit)).toBe(true);
+
+    for (const automaticKey of ['gate', 'safariCheck', 'finalBrowserArtifactContract'] as const) {
+      const blocked = structuredClone(complete);
+      blocked.automatic[automaticKey].outcome = 'pending';
+      expect(releaseEvidenceReady(blocked, releaseCommit), automaticKey).toBe(false);
+    }
+
+    const onePlatformOnly = structuredClone(complete);
+    onePlatformOnly.automatic.threeOsCliPackedInstall.checks.windows = 'pending';
+    expect(releaseEvidenceReady(onePlatformOnly, releaseCommit)).toBe(false);
+
+    const fakeWorkflowEvidence = structuredClone(complete);
+    fakeWorkflowEvidence.automatic.threeOsCliPackedInstall.runUrl = 'repo-variable:SYNCNOSCLI_CI_PASSED';
+    expect(releaseEvidenceReady(fakeWorkflowEvidence, releaseCommit)).toBe(false);
+
+    const staleAutomaticCommit = structuredClone(complete);
+    staleAutomaticCommit.automatic.gate.commitSha = 'b'.repeat(40);
+    expect(releaseEvidenceReady(staleAutomaticCommit, releaseCommit)).toBe(false);
 
     const devId = structuredClone(complete);
     devId.desktop[0].extensionIdentity = 'development-extension-id';
-    expect(manualEvidenceReady(devId)).toBe(false);
+    expect(releaseEvidenceReady(devId, releaseCommit)).toBe(false);
 
     const edgeGuidConfusion = structuredClone(complete);
     const edge = edgeGuidConfusion.desktop.find((entry: Evidence) => entry.browser === 'edge')!;
     edge.extensionIdentity = '00000000-0000-0000-0000-000000000000';
-    expect(manualEvidenceReady(edgeGuidConfusion)).toBe(false);
+    expect(releaseEvidenceReady(edgeGuidConfusion, releaseCommit)).toBe(false);
 
     const windowsCmd = structuredClone(complete);
     const windows = windowsCmd.desktop.find((entry: Evidence) => entry.os === 'windows')!;
     windows.windowsHost.launcherKind = '.cmd';
-    expect(manualEvidenceReady(windowsCmd)).toBe(false);
+    expect(releaseEvidenceReady(windowsCmd, releaseCommit)).toBe(false);
   });
 
-  it('keeps automatic readiness requirements and CI validation wired without treating the matrix as publish authorization', () => {
+  it('keeps structured automatic readiness evidence and CI validation wired without treating it as publish authorization', () => {
     const evidence = parseEvidence();
-    expect(evidence.automaticRequirements).toEqual([
-      'npm run gate',
-      'npm run check:safari',
-      'three-os-cli-packed-install',
-      'final-browser-artifact-contract',
-    ]);
+    expect(Object.keys(evidence.automatic).sort()).toEqual(
+      ['gate', 'safariCheck', 'threeOsCliPackedInstall', 'finalBrowserArtifactContract'].sort(),
+    );
+    expect(evidence.automatic.gate.command).toBe(AUTOMATIC_COMMANDS.gate);
+    expect(evidence.automatic.safariCheck.command).toBe(AUTOMATIC_COMMANDS.safariCheck);
+    expect(evidence.automatic.finalBrowserArtifactContract.command).toBe(AUTOMATIC_COMMANDS.finalBrowserArtifactContract);
+    expect(evidence.automatic.threeOsCliPackedInstall.workflow).toBe(CLI_MATRIX_WORKFLOW);
+    expect(Object.keys(evidence.automatic.threeOsCliPackedInstall.checks).sort()).toEqual(
+      [...THREE_OS_CLI_CHECKS].sort(),
+    );
+
     const ci = readFileSync(resolve(repoRoot, '.github/workflows/syncnoscli-ci.yml'), 'utf8');
     expect(ci).toContain('- tests/e2e/**');
     expect(ci).toContain('tests/e2e/local-data-release-evidence.test.ts');
+    expect(ci).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
     const markdown = readFileSync(matrixPath, 'utf8');
+    expect(markdown).toMatch(/local run, repository variable, or single-platform result is not equivalent evidence/i);
     expect(markdown).toMatch(/not npm publish authorization/i);
   });
 });

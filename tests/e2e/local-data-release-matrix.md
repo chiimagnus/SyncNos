@@ -11,12 +11,39 @@ Strict Snap/Flatpak observations belong only in `strictSandboxLinux`; `unsupport
 {
   "schemaVersion": 1,
   "releaseReady": false,
-  "automaticRequirements": [
-    "npm run gate",
-    "npm run check:safari",
-    "three-os-cli-packed-install",
-    "final-browser-artifact-contract"
-  ],
+  "releaseCommit": null,
+  "automatic": {
+    "gate": {
+      "command": "npm run gate",
+      "outcome": "pending",
+      "observedAt": null,
+      "commitSha": null
+    },
+    "safariCheck": {
+      "command": "npm run check:safari",
+      "outcome": "pending",
+      "observedAt": null,
+      "commitSha": null
+    },
+    "threeOsCliPackedInstall": {
+      "workflow": "syncnoscli-ci.yml",
+      "outcome": "pending",
+      "observedAt": null,
+      "commitSha": null,
+      "runUrl": null,
+      "checks": {
+        "ubuntu": "pending",
+        "macos": "pending",
+        "windows": "pending"
+      }
+    },
+    "finalBrowserArtifactContract": {
+      "command": "npm run build:release-contract-fixtures && npm run test -- tests/build/native-messaging-release-contract.test.ts",
+      "outcome": "pending",
+      "observedAt": null,
+      "commitSha": null
+    }
+  },
   "desktop": [
     {
       "os": "macos",
@@ -248,4 +275,4 @@ Strict Snap/Flatpak observations belong only in `strictSandboxLinux`; `unsupport
 ```
 <!-- syncnos-local-data-release-evidence:end -->
 
-`releaseReady` must stay `false` while any formal desktop, Safari, or regression evidence is pending/failed. Automatic CI success alone does not authorize changing it to `true`, and changing it to `true` is not npm publish authorization.
+`releaseReady` must stay `false` while any automatic requirement, formal desktop, Safari, or regression evidence is pending/failed. Before setting automatic evidence to `pass`, set `releaseCommit` to the exact audited commit and bind every automatic record to that same commit. `threeOsCliPackedInstall` may only be marked pass from the canonical `syncnoscli-ci.yml` GitHub Actions run for that commit, with Ubuntu, macOS, and Windows all passing; a local run, repository variable, or single-platform result is not equivalent evidence. Changing `releaseReady` to `true` is not npm publish authorization.
