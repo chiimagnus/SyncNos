@@ -131,6 +131,102 @@ describe('article URL background operation boundary', () => {
     expect(broadcast.mock.calls[0]?.[1]).toMatchObject({ reason: 'articleUrlUpdated', conversationId: saved.id });
   });
 
+  it('keeps an admitted compound URL operation in-flight through awaited auto-sync until migration drain can finish', async () => {
+    const from = 'https://example.com/drain-from';
+    const to = 'https://example.com/drain-to';
+    const saved = await conversations.upsertConversation(article(from, 'Drain'));
+    const gate = new FactsOperationGate({
+      readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
+    });
+    await gate.initializeFromJournal();
+    let releaseAutoSync!: () => void;
+    let enteredAutoSync!: () => void;
+    const autoSyncEntered = new Promise<void>((resolve) => {
+      enteredAutoSync = resolve;
+    });
+    const autoSyncRelease = new Promise<void>((resolve) => {
+      releaseAutoSync = resolve;
+    });
+    const onConversationChanged = vi.fn(async (_reference, _reason, lease) => {
+      assertFactsOperationLease(lease);
+      enteredAutoSync();
+      await autoSyncRelease;
+      assertFactsOperationLease(lease);
+    });
+    const router = createBackgroundRouter({ fallback: () => ({ ok: false, data: null, error: null }) });
+    registerConversationHandlers(router as any, {
+      conversationReadRunner: createRunner(gate),
+      onConversationChanged,
+      streamRouter: { register: () => {} },
+    });
+    const broadcast = vi.fn();
+    router.eventsHub.broadcast = broadcast;
+
+    const responsePromise = router.__handleMessageForTests({
+      type: CORE_MESSAGE_TYPES.UPDATE_ARTICLE_URL,
+      factsEpoch: 'idb-v1',
+      conversation: { source: saved.source, conversationKey: saved.conversationKey },
+      fromCanonicalUrl: from,
+      toCanonicalUrl: to,
+    });
+    await autoSyncEntered;
+
+    gate.closeAdmissions();
+    let drained = false;
+    const drain = gate.waitForDrained().then(() => {
+      drained = true;
+    });
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    expect(broadcast).not.toHaveBeenCalled();
+
+    releaseAutoSync();
+    const response = await responsePromise;
+    await drain;
+
+    expect(response).toMatchObject({ ok: true, data: { conversationId: saved.id, merged: false } });
+    expect(drained).toBe(true);
+    expect(onConversationChanged).toHaveBeenCalledTimes(1);
+    expect(broadcast).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a compound URL operation before any facts write when admissions are already closed', async () => {
+    const from = 'https://example.com/closed-from';
+    const to = 'https://example.com/closed-to';
+    const saved = await conversations.upsertConversation(article(from, 'Closed'));
+    const gate = new FactsOperationGate({
+      readJournal: async () => ({ mode: 'not_started', journal: null, factsEpoch: 'idb-v1', error: null }),
+    });
+    await gate.initializeFromJournal();
+    gate.closeAdmissions();
+    const onConversationChanged = vi.fn();
+    const router = createBackgroundRouter({ fallback: () => ({ ok: false, data: null, error: null }) });
+    registerConversationHandlers(router as any, {
+      conversationReadRunner: createRunner(gate),
+      onConversationChanged,
+      streamRouter: { register: () => {} },
+    });
+    const broadcast = vi.fn();
+    router.eventsHub.broadcast = broadcast;
+
+    const response = await router.__handleMessageForTests({
+      type: CORE_MESSAGE_TYPES.UPDATE_ARTICLE_URL,
+      factsEpoch: 'idb-v1',
+      conversation: { source: saved.source, conversationKey: saved.conversationKey },
+      fromCanonicalUrl: from,
+      toCanonicalUrl: to,
+    });
+
+    expect(response).toMatchObject({ ok: false, error: { extra: { code: 'MIGRATION_IN_PROGRESS' } } });
+    expect(onConversationChanged).not.toHaveBeenCalled();
+    expect(broadcast).not.toHaveBeenCalled();
+    expect(await conversations.findConversationBySourceAndKey(saved.source, saved.conversationKey)).toMatchObject({
+      id: saved.id,
+      url: from,
+    });
+    expect(await conversations.findConversationBySourceAndKey(saved.source, `article:${to}`)).toBeNull();
+  });
+
   it('rejects browser numeric handles before opening the compound operation', async () => {
     const from = 'https://example.com/numeric-from';
     const to = 'https://example.com/numeric-to';
