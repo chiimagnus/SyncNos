@@ -17,6 +17,7 @@ import {
 
 import {
   ensureNativeHostRegistrations,
+  getNativeHostRegistrationLocations,
   inspectNativeHostRegistrations,
   NativeHostRegistrationError,
   resolveSyncNosCliPackageRoot,
@@ -422,7 +423,7 @@ function unavailableRegistrations(paths: SyncNosRuntimePaths): NativeHostRegistr
     package: 'unavailable',
     packageEntrypoint: 'not_checked',
     browsers: Object.freeze(
-      (['chrome', 'edge', 'firefox'] as const).map((browser) =>
+      getNativeHostRegistrationLocations(paths).map(({ browser }) =>
         Object.freeze({
           browser,
           manifest: 'unavailable' as const,

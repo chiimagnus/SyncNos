@@ -10,6 +10,7 @@ import {
 } from 'node:fs/promises';
 import { basename, posix, resolve as nodeResolve, win32 } from 'node:path';
 
+import { CLI_DOCTOR_BROWSER_TARGETS } from '@services/local-data/contracts';
 import { nativeHostContract } from '@services/local-data/native-host-contract';
 
 import {
@@ -44,7 +45,8 @@ const NATIVE_HOST_DESCRIPTION = 'SyncNos local data Native Host';
 const WINDOWS_REGISTRY_VIEWS: readonly NativeHostRegistryView[] = Object.freeze(['32', '64']);
 const NO_REGISTRY_VIEWS: readonly NativeHostRegistryView[] = Object.freeze([]);
 
-export type NativeHostBrowser = 'chrome' | 'edge' | 'firefox';
+export const NATIVE_HOST_BROWSERS = CLI_DOCTOR_BROWSER_TARGETS;
+export type NativeHostBrowser = (typeof NATIVE_HOST_BROWSERS)[number];
 type NativeHostRegistryView = '32' | '64';
 type PathApi = typeof posix;
 
@@ -277,8 +279,14 @@ function digest(value: unknown): string {
 }
 
 function parseBrowser(value: unknown): NativeHostBrowser {
-  if (value === 'chrome' || value === 'edge' || value === 'firefox') return value;
+  if (typeof value === 'string' && (NATIVE_HOST_BROWSERS as readonly string[]).includes(value)) {
+    return value as NativeHostBrowser;
+  }
   registrationFailure('REGISTRATION_CONFLICT');
+}
+
+function isFirefoxFamily(browser: NativeHostBrowser): boolean {
+  return browser === 'firefox' || browser === 'librewolf' || browser === 'waterfox' || browser === 'tor-browser';
 }
 
 function parseOwnerRecord(bytes: Uint8Array): RegistrationOwnerRecord {
@@ -492,107 +500,66 @@ function nativeHostManifestLocations(pathsValue: unknown): readonly NativeHostMa
   const api = pathApi(paths.platform);
   const hostFileName = `${nativeHostContract.host.name}.json`;
   const ownerFileName = `${nativeHostContract.host.name}.owner-v1.json`;
+  const userLocation = (browser: NativeHostBrowser, ...directory: string[]): NativeHostManifestLocation => {
+    const base = api.join(paths.homeDirectory, ...directory);
+    return Object.freeze({
+      browser,
+      manifestPath: api.join(base, hostFileName),
+      ownerPath: api.join(base, ownerFileName),
+    });
+  };
   if (paths.platform === 'darwin') {
+    const appSupport = ['Library', 'Application Support'] as const;
     return Object.freeze([
-      {
-        browser: 'chrome',
-        manifestPath: api.join(
-          paths.homeDirectory,
-          'Library',
-          'Application Support',
-          'Google',
-          'Chrome',
-          'NativeMessagingHosts',
-          hostFileName,
-        ),
-        ownerPath: api.join(
-          paths.homeDirectory,
-          'Library',
-          'Application Support',
-          'Google',
-          'Chrome',
-          'NativeMessagingHosts',
-          ownerFileName,
-        ),
-      },
-      {
-        browser: 'edge',
-        manifestPath: api.join(
-          paths.homeDirectory,
-          'Library',
-          'Application Support',
-          'Microsoft Edge',
-          'NativeMessagingHosts',
-          hostFileName,
-        ),
-        ownerPath: api.join(
-          paths.homeDirectory,
-          'Library',
-          'Application Support',
-          'Microsoft Edge',
-          'NativeMessagingHosts',
-          ownerFileName,
-        ),
-      },
-      {
-        browser: 'firefox',
-        manifestPath: api.join(
-          paths.homeDirectory,
-          'Library',
-          'Application Support',
-          'Mozilla',
-          'NativeMessagingHosts',
-          hostFileName,
-        ),
-        ownerPath: api.join(
-          paths.homeDirectory,
-          'Library',
-          'Application Support',
-          'Mozilla',
-          'NativeMessagingHosts',
-          ownerFileName,
-        ),
-      },
+      userLocation('chrome', ...appSupport, 'Google', 'Chrome', 'NativeMessagingHosts'),
+      userLocation('chrome-beta', ...appSupport, 'Google', 'Chrome Beta', 'NativeMessagingHosts'),
+      userLocation('chrome-dev', ...appSupport, 'Google', 'Chrome Dev', 'NativeMessagingHosts'),
+      userLocation('chrome-canary', ...appSupport, 'Google', 'Chrome Canary', 'NativeMessagingHosts'),
+      userLocation('chrome-for-testing', ...appSupport, 'Google', 'ChromeForTesting', 'NativeMessagingHosts'),
+      userLocation('chromium', ...appSupport, 'Chromium', 'NativeMessagingHosts'),
+      userLocation('edge', ...appSupport, 'Microsoft Edge', 'NativeMessagingHosts'),
+      userLocation('edge-beta', ...appSupport, 'Microsoft Edge Beta', 'NativeMessagingHosts'),
+      userLocation('edge-dev', ...appSupport, 'Microsoft Edge Dev', 'NativeMessagingHosts'),
+      userLocation('edge-canary', ...appSupport, 'Microsoft Edge Canary', 'NativeMessagingHosts'),
+      userLocation('vivaldi', ...appSupport, 'Vivaldi', 'NativeMessagingHosts'),
+      userLocation('arc', ...appSupport, 'Arc', 'User Data', 'NativeMessagingHosts'),
+      userLocation('helium', ...appSupport, 'net.imput.helium', 'NativeMessagingHosts'),
+      userLocation('firefox', ...appSupport, 'Mozilla', 'NativeMessagingHosts'),
+      userLocation('tor-browser', ...appSupport, 'TorBrowser-Data', 'Browser', 'Mozilla', 'NativeMessagingHosts'),
     ]);
   }
   if (paths.platform === 'linux') {
     return Object.freeze([
-      {
-        browser: 'chrome',
-        manifestPath: api.join(paths.homeDirectory, '.config', 'google-chrome', 'NativeMessagingHosts', hostFileName),
-        ownerPath: api.join(paths.homeDirectory, '.config', 'google-chrome', 'NativeMessagingHosts', ownerFileName),
-      },
-      {
-        browser: 'edge',
-        manifestPath: api.join(paths.homeDirectory, '.config', 'microsoft-edge', 'NativeMessagingHosts', hostFileName),
-        ownerPath: api.join(paths.homeDirectory, '.config', 'microsoft-edge', 'NativeMessagingHosts', ownerFileName),
-      },
-      {
-        browser: 'firefox',
-        manifestPath: api.join(paths.homeDirectory, '.mozilla', 'native-messaging-hosts', hostFileName),
-        ownerPath: api.join(paths.homeDirectory, '.mozilla', 'native-messaging-hosts', ownerFileName),
-      },
+      userLocation('chrome', '.config', 'google-chrome', 'NativeMessagingHosts'),
+      userLocation('chrome-beta', '.config', 'google-chrome-beta', 'NativeMessagingHosts'),
+      userLocation('chrome-dev', '.config', 'google-chrome-unstable', 'NativeMessagingHosts'),
+      userLocation('chrome-canary', '.config', 'google-chrome-canary', 'NativeMessagingHosts'),
+      userLocation('chrome-for-testing', '.config', 'google-chrome-for-testing', 'NativeMessagingHosts'),
+      userLocation('chromium', '.config', 'chromium', 'NativeMessagingHosts'),
+      userLocation('edge', '.config', 'microsoft-edge', 'NativeMessagingHosts'),
+      userLocation('edge-beta', '.config', 'microsoft-edge-beta', 'NativeMessagingHosts'),
+      userLocation('edge-dev', '.config', 'microsoft-edge-dev', 'NativeMessagingHosts'),
+      userLocation('brave', '.config', 'BraveSoftware', 'Brave-Browser', 'NativeMessagingHosts'),
+      userLocation('vivaldi', '.config', 'vivaldi', 'NativeMessagingHosts'),
+      userLocation('iridium', '.config', 'iridium', 'NativeMessagingHosts'),
+      userLocation('helium', '.config', 'net.imput.helium', 'NativeMessagingHosts'),
+      userLocation('firefox', '.mozilla', 'native-messaging-hosts'),
+      userLocation('librewolf', '.librewolf', 'native-messaging-hosts'),
+      userLocation('waterfox', '.waterfox', 'native-messaging-hosts'),
     ]);
   }
+  const registryLocation = (browser: NativeHostBrowser, registryProduct: string): NativeHostManifestLocation =>
+    Object.freeze({
+      browser,
+      manifestPath: api.join(paths.runtimeDirectory, `native-host-${browser}-v1.json`),
+      ownerPath: api.join(paths.runtimeDirectory, `native-host-${browser}-owner-v1.json`),
+      registryKey: `HKCU\\Software\\${registryProduct}\\NativeMessagingHosts\\${nativeHostContract.host.name}`,
+    });
   return Object.freeze([
-    {
-      browser: 'chrome',
-      manifestPath: api.join(paths.runtimeDirectory, 'native-host-chrome-v1.json'),
-      ownerPath: api.join(paths.runtimeDirectory, 'native-host-chrome-owner-v1.json'),
-      registryKey: `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${nativeHostContract.host.name}`,
-    },
-    {
-      browser: 'edge',
-      manifestPath: api.join(paths.runtimeDirectory, 'native-host-edge-v1.json'),
-      ownerPath: api.join(paths.runtimeDirectory, 'native-host-edge-owner-v1.json'),
-      registryKey: `HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\${nativeHostContract.host.name}`,
-    },
-    {
-      browser: 'firefox',
-      manifestPath: api.join(paths.runtimeDirectory, 'native-host-firefox-v1.json'),
-      ownerPath: api.join(paths.runtimeDirectory, 'native-host-firefox-owner-v1.json'),
-      registryKey: `HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${nativeHostContract.host.name}`,
-    },
+    registryLocation('chrome', 'Google\\Chrome'),
+    registryLocation('chromium', 'Chromium'),
+    registryLocation('edge', 'Microsoft\\Edge'),
+    registryLocation('firefox', 'Mozilla'),
   ]);
 }
 
@@ -623,14 +590,21 @@ function manifestBytes(location: NativeHostManifestLocation, launcherPath: strin
     path: launcherPath,
     type: 'stdio' as const,
   };
-  const manifest =
-    location.browser === 'firefox'
-      ? { ...base, allowed_extensions: [nativeHostContract.browsers.firefox.allowedExtension] }
-      : { ...base, allowed_origins: [nativeHostContract.browsers[location.browser].origin] };
+  const manifest = isFirefoxFamily(location.browser)
+    ? { ...base, allowed_extensions: [nativeHostContract.browsers.firefox.allowedExtension] }
+    : {
+        ...base,
+        allowed_origins: [nativeHostContract.browsers.chrome.origin, nativeHostContract.browsers.edge.origin],
+      };
   return Buffer.from(JSON.stringify(manifest), 'utf8');
 }
 
-function parseManifest(bytes: Uint8Array, location: NativeHostManifestLocation, launcherPath: string): void {
+function parseManifest(
+  bytes: Uint8Array,
+  location: NativeHostManifestLocation,
+  launcherPath: string,
+  acceptLegacyOfficialOrigin = false,
+): void {
   let parsed: unknown;
   try {
     parsed = JSON.parse(UTF8_DECODER.decode(bytes));
@@ -638,24 +612,30 @@ function parseManifest(bytes: Uint8Array, location: NativeHostManifestLocation, 
     registrationFailure('REGISTRATION_CONFLICT');
   }
   const input = strictRecord(parsed);
-  const allowedKey = location.browser === 'firefox' ? 'allowed_extensions' : 'allowed_origins';
+  const allowedKey = isFirefoxFamily(location.browser) ? 'allowed_extensions' : 'allowed_origins';
   exactKeys(input, ['name', 'description', 'path', 'type', allowedKey]);
   if (
     input.name !== nativeHostContract.host.name ||
     input.description !== NATIVE_HOST_DESCRIPTION ||
     input.path !== launcherPath ||
     input.type !== 'stdio' ||
-    !Array.isArray(input[allowedKey]) ||
-    input[allowedKey].length !== 1
+    !Array.isArray(input[allowedKey])
   ) {
     registrationFailure('REGISTRATION_CONFLICT');
   }
-  const allowed = input[allowedKey][0];
-  const expected =
-    location.browser === 'firefox'
-      ? nativeHostContract.browsers.firefox.allowedExtension
-      : nativeHostContract.browsers[location.browser].origin;
-  if (allowed !== expected) registrationFailure('REGISTRATION_CONFLICT');
+  const allowed = input[allowedKey];
+  const expected = isFirefoxFamily(location.browser)
+    ? [nativeHostContract.browsers.firefox.allowedExtension]
+    : [nativeHostContract.browsers.chrome.origin, nativeHostContract.browsers.edge.origin];
+  if (JSON.stringify(allowed) === JSON.stringify(expected)) return;
+  if (
+    acceptLegacyOfficialOrigin &&
+    (location.browser === 'chrome' || location.browser === 'edge') &&
+    JSON.stringify(allowed) === JSON.stringify([nativeHostContract.browsers[location.browser].origin])
+  ) {
+    return;
+  }
+  registrationFailure('REGISTRATION_CONFLICT');
 }
 
 function ownerRecord(
@@ -696,6 +676,7 @@ async function inspectRegistration(
   packageIdentity: PackageIdentity,
   launcher: NativeHostLauncherOwnership | null,
   dependencies: ResolvedDependencies,
+  acceptLegacyOfficialOrigin = false,
 ): Promise<ExistingRegistrationState> {
   const [manifestStatus, ownerStatus] = await Promise.all([
     lstatIfPresent(dependencies, location.manifestPath),
@@ -719,7 +700,7 @@ async function inspectRegistration(
     ) {
       return Object.freeze({ state: 'conflict' as const });
     }
-    parseManifest(manifest, location, paths.launcherPath);
+    parseManifest(manifest, location, paths.launcherPath, acceptLegacyOfficialOrigin);
     if (launcher && !sameLauncherBinding(record, launcher)) return Object.freeze({ state: 'conflict' as const });
     return Object.freeze({ state: 'owned' as const, ownerDigest: sha256(owner), record });
   } catch (error) {
@@ -1358,8 +1339,9 @@ export async function recoverNativeHostRegistrationUpdate(
 }
 
 /**
- * Creates exactly the stable per-user Chrome, Edge, and Firefox registrations. It never
- * probes a browser and reports registration only, not a verified browser connection.
+ * Creates only the fixed per-user Native Messaging locations supported by this registrar.
+ * Shared Chrome/Mozilla locations intentionally cover compatible browser families; this
+ * reports registration only, never a verified browser connection.
  */
 export async function ensureNativeHostRegistrations(
   input: EnsureNativeHostRegistrationsInput = {},
@@ -1375,7 +1357,7 @@ export async function ensureNativeHostRegistrations(
   // Upgrade preflight proves the old manifest/sidecar pair itself. It deliberately does not
   // require that pair to already bind the current launcher generation; runtime authorization still does.
   const existing = await Promise.all(
-    locations.map((location) => inspectRegistration(paths, location, packageIdentity, null, dependencies)),
+    locations.map((location) => inspectRegistration(paths, location, packageIdentity, null, dependencies, true)),
   );
   if (
     existing.some((state) => state.state === 'conflict') ||
@@ -1434,7 +1416,7 @@ async function removeVerifiedFile(
   launcher: NativeHostLauncherOwnership,
   dependencies: ResolvedDependencies,
 ): Promise<void> {
-  const current = await inspectRegistration(paths, location, packageIdentity, launcher, dependencies);
+  const current = await inspectRegistration(paths, location, packageIdentity, launcher, dependencies, true);
   if (current.state !== 'owned' || current.ownerDigest !== registration.ownerDigest)
     registrationFailure('REGISTRATION_CONFLICT');
   try {
@@ -1483,7 +1465,7 @@ export async function removeOwnedNativeHostRegistrations(
     });
   }
   const states = await Promise.all(
-    locations.map((location) => inspectRegistration(paths, location, packageIdentity, launcher, dependencies)),
+    locations.map((location) => inspectRegistration(paths, location, packageIdentity, launcher, dependencies, true)),
   );
   const conflicts = locations
     .filter((_, index) => states[index]?.state === 'conflict')
@@ -1535,8 +1517,11 @@ export async function isOwnedFirefoxNativeHostManifest(
     const launcher = await inspectNativeHostLauncher({ paths });
     if (!launcher) return false;
     if (!(await packageEntrypointMatchesLauncher(paths, packageIdentity, launcher, dependencies))) return false;
-    const location = nativeHostManifestLocations(paths).find((candidate) => candidate.browser === 'firefox');
-    if (!location || !samePath(paths.platform, manifestPath, location.manifestPath)) return false;
+    const location = nativeHostManifestLocations(paths).find(
+      (candidate) =>
+        isFirefoxFamily(candidate.browser) && samePath(paths.platform, manifestPath, candidate.manifestPath),
+    );
+    if (!location) return false;
     const state = await inspectRegistration(paths, location, packageIdentity, launcher, dependencies);
     return state.state === 'owned' && state.record.packageVersion === packageIdentity.version;
   } catch (_error) {

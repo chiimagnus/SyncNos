@@ -28,9 +28,25 @@ SyncNos CLI 需要 Node.js 22 或更高版本。安装/更新命令只有：`npm
 | migration interrupted | 重新打开 **Settings → Backup → Local Database** 并“重新检测”；只有 UI 明确提供 Resume 时继续。不要手工清 IDB/SQLite 或伪造 journal。 |
 | CLI/扩展卸载后重装 | 数据库不是 profile 授权。browser profile 的 journal 丢失或换 profile 后，即使固定 SQLite 仍存在，也必须重新显式 join，绝不自动认领 active。 |
 
-Linux 只承诺 stable desktop Chrome/Edge/Firefox 能读取各自官方的 **per-user NativeMessagingHosts** 位置。严格 Snap/Flatpak sandbox 若隔离了 Host，需要的是尚未实现的 portal integration；`doctor`、手写 wrapper/path 或 `flatpak-spawn` 都不能把这条未实现边界变成受支持方案。
+Native Host 注册按**浏览器实际读取的物理位置**维护，而不是按品牌重复造一份协议。Chromium family 的 manifest 始终只允许 SyncNos 的 Chrome Web Store ID 与 Edge Add-ons ID；Firefox family 始终只允许 canonical Gecko ID。development/unpacked/custom ID 不进入 allowlist。
 
-Safari 的 canonical contract 明确 `localDataSupported: false`，没有 Local Database action，也没有 Native Messaging permission。development/custom extension ID 同样没有 Local Database 注册绕过路径。
+| 浏览器 / family | Local Database 注册策略 |
+| --- | --- |
+| Chrome Stable/Beta/Dev/Canary、Chrome for Testing、Chromium | 注册各自已知的 per-user `NativeMessagingHosts` 位置；Windows 使用 Chrome/Chromium registry。 |
+| Edge Stable/Beta/Dev，macOS Edge Canary | 注册 Edge 的 per-user 位置；Windows 使用 Edge registry。Chromium manifest 同时包含 Chrome Web Store 与 Edge Add-ons 两个正式 ID。 |
+| Brave | macOS 复用 Brave 自身指向的 Chrome Native Messaging 位置；Linux 另覆盖 `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts`；Windows 由 Chrome-compatible registration 覆盖。 |
+| Vivaldi | macOS/Linux 注册 Vivaldi 的用户级位置；Windows 保留 Chrome-compatible registration，不额外制造未经证明的 key。Snap/Flatpak 版 NativeMessaging API 不可用。 |
+| Arc | macOS 覆盖 `~/Library/Application Support/Arc/User Data/NativeMessagingHosts`；其他平台只有在其实际读取已注册 Chromium位置时才算可用，不伪报已验证。 |
+| Helium | macOS/Linux 覆盖 `net.imput.helium` 用户数据目录下的 `NativeMessagingHosts`；Windows 只有实际读取现有 Chromium/Chrome registry 时才算可用。 |
+| Opera / Opera GX | Opera 官方 Native Messaging 使用 Chrome host registration，因此 macOS/Windows 由 Chrome registration 覆盖；Linux 官方位置是 system-wide `/etc/opt/chrome/native-messaging-hosts`，当前 user-level CLI 不用 sudo 写入该目录。 |
+| Firefox（含 ESR/Developer/Nightly 等共享 Mozilla 注册的 channel）、Zen | 使用 Mozilla 标准 Native Messaging 位置和 canonical Gecko ID；Zen 在 Linux 也实际读取 `~/.mozilla/native-messaging-hosts`。 |
+| LibreWolf、Waterfox | Linux 额外覆盖各自的 `~/.librewolf/native-messaging-hosts`、`~/.waterfox/native-messaging-hosts`；其他平台只有在读取 Mozilla 标准位置时才由 Firefox registration 覆盖。 |
+| Tor Browser | macOS 覆盖固定 Tor Browser 用户位置；Windows 可由 Mozilla registry 覆盖；Linux 安装布局随安装器/locale 变化，不硬编码一个会误导用户的伪路径。 |
+| Iridium | Linux 覆盖 `~/.config/iridium/NativeMessagingHosts`；其他平台未验证独立 Host 位置。 |
+| Safari | canonical contract 明确 `localDataSupported: false`，不提供 Local Database action。 |
+| Orion | 虽支持大量 Chrome/Firefox WebExtensions API，但官方当前没有 `nativeMessaging` 支持/Host 位置证据，因此不宣称 Local Database 可用。 |
+
+“能安装 Chrome/Firefox 扩展”不等于已经证明 Native Messaging 可用。Floorp、Mullvad Browser、Thorium、ungoogled-chromium 等其他派生浏览器，只要实际保留 Chrome/Chromium/Mozilla 已注册位置并使用 SyncNos 的正式商店 ID，就可以复用对应 family；若它们改了 Host 查找位置，则在完成该产品的路径验证之前不列为正式支持。严格 Snap/Flatpak sandbox 若隔离了 Host，需要的是尚未实现的 portal integration；`doctor`、手写 wrapper/path 或 `flatpak-spawn` 都不能把这条未实现边界变成受支持方案。
 
 不要直接编辑 SyncNos SQLite schema/SQL、Windows registry、Native Host manifest/allowlist、`.syncnoscli` 固定路径或 migration journal；这些都会绕过 ownership/identity 校验，并可能把可恢复状态变成冲突状态。
 

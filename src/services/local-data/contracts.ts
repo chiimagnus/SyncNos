@@ -1406,6 +1406,29 @@ export type CliDoctorRegistrationState = 'absent' | 'conflict' | 'owned' | 'unav
 
 export type CliDoctorRegistryState = CliDoctorRegistrationState | 'not_applicable';
 
+export const CLI_DOCTOR_BROWSER_TARGETS = Object.freeze([
+  'chrome',
+  'chrome-beta',
+  'chrome-dev',
+  'chrome-canary',
+  'chrome-for-testing',
+  'chromium',
+  'edge',
+  'edge-beta',
+  'edge-dev',
+  'edge-canary',
+  'brave',
+  'vivaldi',
+  'iridium',
+  'arc',
+  'helium',
+  'firefox',
+  'librewolf',
+  'waterfox',
+  'tor-browser',
+] as const);
+export type CliDoctorBrowserTarget = (typeof CLI_DOCTOR_BROWSER_TARGETS)[number];
+
 export type CliDoctorDatabaseState = 'busy' | 'invalid' | 'not_initialized' | 'ready' | 'unavailable' | 'unsupported';
 
 export type CliDoctorActionName = 'database_permissions' | 'native_host';
@@ -1456,7 +1479,7 @@ export type CliDoctorReport = Readonly<{
     state: CliDoctorLauncherState;
   }>;
   registrations: readonly Readonly<{
-    browser: 'chrome' | 'edge' | 'firefox';
+    browser: CliDoctorBrowserTarget;
     browserConnection: 'not_verified';
     manifest: CliDoctorRegistrationState;
     registry: CliDoctorRegistryState;

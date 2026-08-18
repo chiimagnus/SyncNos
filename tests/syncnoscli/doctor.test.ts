@@ -50,13 +50,28 @@ function ownedLauncher(
   });
 }
 
-function ownedRegistrations(): NativeHostRegistrationInspection {
+function expectedDoctorRegistrations(
+  paths: ReturnType<typeof resolveSyncNosRuntimePaths>,
+  manifest: 'absent' | 'owned',
+) {
+  return getNativeHostRegistrationLocations(paths).map((location) => ({
+    browser: location.browser,
+    manifest,
+    registry: 'not_applicable' as const,
+    browserConnection: 'not_verified' as const,
+  }));
+}
+
+function registrationInspection(
+  paths: ReturnType<typeof resolveSyncNosRuntimePaths>,
+  manifest: 'conflict' | 'owned',
+): NativeHostRegistrationInspection {
   return Object.freeze({
     package: 'verified',
     packageEntrypoint: 'current',
     browsers: Object.freeze(
-      (['chrome', 'edge', 'firefox'] as const).map((browser) =>
-        Object.freeze({ browser, manifest: 'owned' as const, registry: 'not_applicable' as const }),
+      getNativeHostRegistrationLocations(paths).map(({ browser }) =>
+        Object.freeze({ browser, manifest, registry: 'not_applicable' as const }),
       ),
     ),
   });
@@ -94,11 +109,7 @@ describe('SyncNos doctor', () => {
       },
       launcher: { state: 'absent', configDigest: null, prebuiltDigest: null },
     });
-    expect(report.registrations).toEqual([
-      { browser: 'chrome', manifest: 'absent', registry: 'not_applicable', browserConnection: 'not_verified' },
-      { browser: 'edge', manifest: 'absent', registry: 'not_applicable', browserConnection: 'not_verified' },
-      { browser: 'firefox', manifest: 'absent', registry: 'not_applicable', browserConnection: 'not_verified' },
-    ]);
+    expect(report.registrations).toEqual(expectedDoctorRegistrations(paths, 'absent'));
     await expect(access(paths.runtimeDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(access(paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
@@ -135,7 +146,7 @@ describe('SyncNos doctor', () => {
     const report = await runDoctor(
       doctorInput(paths, {
         inspectLauncher: async () => null,
-        inspectRegistrations: async () => ownedRegistrations(),
+        inspectRegistrations: async () => registrationInspection(paths, 'owned'),
         openReadOnly,
       }),
     );
@@ -155,7 +166,7 @@ describe('SyncNos doctor', () => {
     const report = await runDoctor(
       doctorInput(paths, {
         inspectLauncher: async () => ownedLauncher(paths),
-        inspectRegistrations: async () => ownedRegistrations(),
+        inspectRegistrations: async () => registrationInspection(paths, 'owned'),
         openReadOnly: async () => {
           throw new LocalDataContractError('BUSY');
         },
@@ -181,7 +192,7 @@ describe('SyncNos doctor', () => {
     const report = await runDoctor(
       doctorInput(paths, {
         inspectLauncher: async () => ownedLauncher(paths, staleNodePath),
-        inspectRegistrations: async () => ownedRegistrations(),
+        inspectRegistrations: async () => registrationInspection(paths, 'owned'),
       }),
     );
 
@@ -208,11 +219,7 @@ describe('SyncNos doctor', () => {
 
     expect(report.actions).toContainEqual({ name: 'native_host', status: 'repaired', reason: null });
     expect(report.launcher.state).toBe('ready');
-    expect(report.registrations).toEqual([
-      { browser: 'chrome', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
-      { browser: 'edge', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
-      { browser: 'firefox', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
-    ]);
+    expect(report.registrations).toEqual(expectedDoctorRegistrations(paths, 'owned'));
     expect(report.database).toMatchObject({ state: 'not_initialized', filePermissions: 'not_present' });
     await expect(access(paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
@@ -223,7 +230,9 @@ describe('SyncNos doctor', () => {
     await mkdir(join(globalPackageRoot, 'dist'), { recursive: true });
     await writeFile(join(globalPackageRoot, 'package.json'), '{"name":"@chiimagnus/syncnoscli","version":"0.1.0"}');
     await writeFile(join(globalPackageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 0;');
-    const edgeOwner = getNativeHostRegistrationLocations(paths)[1]!.ownerPath;
+    const edgeOwner = getNativeHostRegistrationLocations(paths).find(
+      (location) => location.browser === 'edge',
+    )!.ownerPath;
     let injected = false;
 
     await expect(
@@ -245,11 +254,7 @@ describe('SyncNos doctor', () => {
 
     const report = await runDoctor({ paths, packageRoot: globalPackageRoot, fix: true });
     expect(report.actions).toContainEqual({ name: 'native_host', status: 'repaired', reason: null });
-    expect(report.registrations).toEqual([
-      { browser: 'chrome', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
-      { browser: 'edge', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
-      { browser: 'firefox', manifest: 'owned', registry: 'not_applicable', browserConnection: 'not_verified' },
-    ]);
+    expect(report.registrations).toEqual(expectedDoctorRegistrations(paths, 'owned'));
     await expect(access(paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -262,16 +267,10 @@ describe('SyncNos doctor', () => {
         ensureRegistrations,
         inspectGlobalInstall: async () => Object.freeze({ packageRoot: null, reason: 'package-path-invalid' }),
         inspectLauncher: async () => null,
-        inspectRegistrations: async () =>
-          Object.freeze({
-            package: 'verified' as const,
-            packageEntrypoint: 'not_checked' as const,
-            browsers: Object.freeze(
-              (['chrome', 'edge', 'firefox'] as const).map((browser) =>
-                Object.freeze({ browser, manifest: 'conflict' as const, registry: 'not_applicable' as const }),
-              ),
-            ),
-          }),
+        inspectRegistrations: async () => ({
+          ...registrationInspection(paths, 'conflict'),
+          packageEntrypoint: 'not_checked' as const,
+        }),
       }),
       fix: true,
     });
@@ -298,7 +297,7 @@ describe('SyncNos doctor', () => {
       ...doctorInput(paths, {
         inspectGlobalInstall: async () => globalInstall(packageRoot),
         inspectLauncher: async () => ownedLauncher(paths),
-        inspectRegistrations: async () => ownedRegistrations(),
+        inspectRegistrations: async () => registrationInspection(paths, 'owned'),
         repairDatabasePermissions,
       }),
       fix: true,
@@ -322,7 +321,7 @@ describe('SyncNos doctor', () => {
       const before = await runDoctor(
         doctorInput(paths, {
           inspectLauncher: async () => ownedLauncher(paths),
-          inspectRegistrations: async () => ownedRegistrations(),
+          inspectRegistrations: async () => registrationInspection(paths, 'owned'),
           openReadOnly: vi.fn(async () => {
             throw new Error('must not open an insecure database set');
           }),
@@ -334,7 +333,7 @@ describe('SyncNos doctor', () => {
         ...doctorInput(paths, {
           inspectGlobalInstall: async () => globalInstall(packageRoot),
           inspectLauncher: async () => ownedLauncher(paths),
-          inspectRegistrations: async () => ownedRegistrations(),
+          inspectRegistrations: async () => registrationInspection(paths, 'owned'),
         }),
         fix: true,
       });
@@ -363,7 +362,7 @@ describe('SyncNos doctor', () => {
       ...doctorInput(paths, {
         inspectGlobalInstall: async () => globalInstall(packageRoot),
         inspectLauncher: async () => ownedLauncher(paths),
-        inspectRegistrations: async () => ownedRegistrations(),
+        inspectRegistrations: async () => registrationInspection(paths, 'owned'),
         repairDatabasePermissions,
       }),
       fix: true,

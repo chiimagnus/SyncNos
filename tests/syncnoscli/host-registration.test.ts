@@ -15,6 +15,7 @@ import {
   removeOwnedNativeHostRegistrations,
   SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
   SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE,
+  type NativeHostBrowser,
   type NativeHostRegistrationDependencies,
   type WindowsRegistryAdapter,
 } from '../../packages/syncnoscli/src/install/host-registration';
@@ -35,7 +36,22 @@ function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-async function createUnixFixture(): Promise<{
+const CHROMIUM_ALLOWED_ORIGINS = [
+  'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/',
+  'chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/',
+] as const;
+const FIREFOX_FAMILY = new Set<NativeHostBrowser>(['firefox', 'librewolf', 'waterfox', 'tor-browser']);
+
+function locationByBrowser(
+  locations: ReturnType<typeof getNativeHostRegistrationLocations>,
+  browser: NativeHostBrowser,
+) {
+  const location = locations.find((candidate) => candidate.browser === browser);
+  expect(location, `missing registration target: ${browser}`).toBeDefined();
+  return location!;
+}
+
+async function createUnixFixture(platform: 'darwin' | 'linux' = 'linux'): Promise<{
   packageRoot: string;
   paths: ReturnType<typeof resolveSyncNosRuntimePaths>;
   root: string;
@@ -49,7 +65,7 @@ async function createUnixFixture(): Promise<{
   await writeFile(join(packageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 0;');
   return {
     packageRoot,
-    paths: resolveSyncNosRuntimePaths({ platform: 'linux', homeDirectory: join(root, 'home') }),
+    paths: resolveSyncNosRuntimePaths({ platform, homeDirectory: join(root, 'home') }),
     root,
   };
 }
@@ -177,75 +193,82 @@ describe('SyncNos Native Host registration', () => {
     const fixture = await createUnixFixture();
     const locations = getNativeHostRegistrationLocations(fixture.paths);
 
-    expect(locations).toMatchObject([
-      {
-        browser: 'chrome',
-        manifestPath: join(
-          fixture.paths.homeDirectory,
-          '.config',
-          'google-chrome',
-          'NativeMessagingHosts',
-          'app.syncnos.localdata.json',
-        ),
-      },
-      {
-        browser: 'edge',
-        manifestPath: join(
-          fixture.paths.homeDirectory,
-          '.config',
-          'microsoft-edge',
-          'NativeMessagingHosts',
-          'app.syncnos.localdata.json',
-        ),
-      },
-      {
-        browser: 'firefox',
-        manifestPath: join(
-          fixture.paths.homeDirectory,
-          '.mozilla',
-          'native-messaging-hosts',
-          'app.syncnos.localdata.json',
-        ),
-      },
+    expect(locations.map((location) => location.browser)).toEqual([
+      'chrome',
+      'chrome-beta',
+      'chrome-dev',
+      'chrome-canary',
+      'chrome-for-testing',
+      'chromium',
+      'edge',
+      'edge-beta',
+      'edge-dev',
+      'brave',
+      'vivaldi',
+      'iridium',
+      'helium',
+      'firefox',
+      'librewolf',
+      'waterfox',
     ]);
+    expect(locationByBrowser(locations, 'chrome').manifestPath).toBe(
+      join(
+        fixture.paths.homeDirectory,
+        '.config',
+        'google-chrome',
+        'NativeMessagingHosts',
+        'app.syncnos.localdata.json',
+      ),
+    );
+    expect(locationByBrowser(locations, 'helium').manifestPath).toBe(
+      join(
+        fixture.paths.homeDirectory,
+        '.config',
+        'net.imput.helium',
+        'NativeMessagingHosts',
+        'app.syncnos.localdata.json',
+      ),
+    );
     expect(locations.every((location) => location.registryViews.length === 0)).toBe(true);
 
-    await expect(
-      ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
-    ).resolves.toMatchObject({
-      browsers: [
-        { browser: 'chrome', status: 'registered', verification: 'registration-written-not-browser-verified' },
-        { browser: 'edge', status: 'registered', verification: 'registration-written-not-browser-verified' },
-        { browser: 'firefox', status: 'registered', verification: 'registration-written-not-browser-verified' },
-      ],
+    const registration = await ensureNativeHostRegistrations({
+      packageRoot: fixture.packageRoot,
+      paths: fixture.paths,
     });
+    expect(registration.browsers.map((browser) => browser.browser)).toEqual(
+      locations.map((location) => location.browser),
+    );
+    expect(
+      registration.browsers.every(
+        (browser) =>
+          browser.status === 'registered' && browser.verification === 'registration-written-not-browser-verified',
+      ),
+    ).toBe(true);
 
-    const manifests = await Promise.all(locations.map((location) => readFile(location.manifestPath, 'utf8')));
-    expect(JSON.parse(manifests[0]!)).toMatchObject({
-      allowed_origins: ['chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/'],
-      path: fixture.paths.launcherPath,
-    });
-    expect(JSON.parse(manifests[1]!)).toMatchObject({
-      allowed_origins: ['chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/'],
-      path: fixture.paths.launcherPath,
-    });
-    expect(JSON.parse(manifests[2]!)).toMatchObject({
-      allowed_extensions: ['syncnos-webclipper@syncnos.app'],
-      path: fixture.paths.launcherPath,
-    });
+    for (const location of locations) {
+      const manifest = JSON.parse(await readFile(location.manifestPath, 'utf8')) as Record<string, unknown>;
+      expect(manifest.path).toBe(fixture.paths.launcherPath);
+      if (FIREFOX_FAMILY.has(location.browser)) {
+        expect(manifest.allowed_extensions).toEqual(['syncnos-webclipper@syncnos.app']);
+        expect(manifest).not.toHaveProperty('allowed_origins');
+      } else {
+        expect(manifest.allowed_origins).toEqual(CHROMIUM_ALLOWED_ORIGINS);
+        expect(manifest).not.toHaveProperty('allowed_extensions');
+      }
+    }
     await expect(Promise.all(locations.map((location) => readFile(location.ownerPath, 'utf8')))).resolves.toHaveLength(
-      3,
+      locations.length,
     );
     await expect(access(fixture.paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
 
     await expect(
-      isOwnedFirefoxNativeHostManifest(locations[2]!.manifestPath, {
+      isOwnedFirefoxNativeHostManifest(locationByBrowser(locations, 'firefox').manifestPath, {
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
       }),
     ).resolves.toBe(true);
     await expect(
-      isOwnedFirefoxNativeHostManifest(`${locations[2]!.manifestPath}.spoofed`, {
+      isOwnedFirefoxNativeHostManifest(`${locationByBrowser(locations, 'firefox').manifestPath}.spoofed`, {
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
       }),
@@ -256,14 +279,14 @@ describe('SyncNos Native Host registration', () => {
     ).resolves.toMatchObject({
       package: 'verified',
       packageEntrypoint: 'stale',
-      browsers: [
-        { browser: 'chrome', manifest: 'owned', registry: 'not_applicable' },
-        { browser: 'edge', manifest: 'owned', registry: 'not_applicable' },
-        { browser: 'firefox', manifest: 'owned', registry: 'not_applicable' },
-      ],
+      browsers: locations.map((location) => ({
+        browser: location.browser,
+        manifest: 'owned',
+        registry: 'not_applicable',
+      })),
     });
     await expect(
-      isOwnedFirefoxNativeHostManifest(locations[2]!.manifestPath, {
+      isOwnedFirefoxNativeHostManifest(locationByBrowser(locations, 'firefox').manifestPath, {
         packageRoot: fixture.packageRoot,
         paths: fixture.paths,
       }),
@@ -276,10 +299,82 @@ describe('SyncNos Native Host registration', () => {
     });
   });
 
+  it('upgrades only provably-owned legacy single-store Chromium manifests to both official store IDs', async () => {
+    const fixture = await createUnixFixture();
+    await ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+    const locations = getNativeHostRegistrationLocations(fixture.paths);
+
+    for (const browser of ['chrome', 'edge'] as const) {
+      const location = locationByBrowser(locations, browser);
+      const legacyManifest = Buffer.from(
+        JSON.stringify({
+          name: 'app.syncnos.localdata',
+          description: 'SyncNos local data Native Host',
+          path: fixture.paths.launcherPath,
+          type: 'stdio',
+          allowed_origins: [
+            browser === 'chrome'
+              ? 'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/'
+              : 'chrome-extension://ijkpghlfmkbjcgafapjcjahaikmnjncl/',
+          ],
+        }),
+        'utf8',
+      );
+      await writeFile(location.manifestPath, legacyManifest);
+      const owner = JSON.parse(await readFile(location.ownerPath, 'utf8')) as Record<string, unknown>;
+      owner.manifestDigest = sha256(legacyManifest);
+      await writeFile(location.ownerPath, JSON.stringify(owner));
+    }
+
+    const before = await inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+    expect(before.browsers.find((entry) => entry.browser === 'chrome')?.manifest).toBe('conflict');
+    expect(before.browsers.find((entry) => entry.browser === 'edge')?.manifest).toBe('conflict');
+
+    await expect(
+      ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
+    ).resolves.toMatchObject({
+      browsers: expect.arrayContaining([
+        expect.objectContaining({ browser: 'chrome', status: 'registered' }),
+        expect.objectContaining({ browser: 'edge', status: 'registered' }),
+      ]),
+    });
+
+    for (const browser of ['chrome', 'edge'] as const) {
+      const location = locationByBrowser(locations, browser);
+      expect(JSON.parse(await readFile(location.manifestPath, 'utf8'))).toMatchObject({
+        allowed_origins: CHROMIUM_ALLOWED_ORIGINS,
+      });
+    }
+  });
+
+  it('uses the Firefox manifest contract for macOS Tor and the Chromium contract for Arc and Helium', async () => {
+    const fixture = await createUnixFixture('darwin');
+    await ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths });
+    const locations = getNativeHostRegistrationLocations(fixture.paths);
+    const tor = locationByBrowser(locations, 'tor-browser');
+    const arc = locationByBrowser(locations, 'arc');
+    const helium = locationByBrowser(locations, 'helium');
+
+    expect(JSON.parse(await readFile(tor.manifestPath, 'utf8'))).toMatchObject({
+      allowed_extensions: ['syncnos-webclipper@syncnos.app'],
+    });
+    for (const location of [arc, helium]) {
+      expect(JSON.parse(await readFile(location.manifestPath, 'utf8'))).toMatchObject({
+        allowed_origins: CHROMIUM_ALLOWED_ORIGINS,
+      });
+    }
+    await expect(
+      isOwnedFirefoxNativeHostManifest(tor.manifestPath, {
+        packageRoot: fixture.packageRoot,
+        paths: fixture.paths,
+      }),
+    ).resolves.toBe(true);
+  });
+
   it('preserves a manifest when its versioned sidecar is missing or the pair was modified', async () => {
     const fixture = await createUnixFixture();
     await ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths });
-    const firefox = getNativeHostRegistrationLocations(fixture.paths)[2]!;
+    const firefox = locationByBrowser(getNativeHostRegistrationLocations(fixture.paths), 'firefox');
     const before = await readFile(firefox.manifestPath, 'utf8');
     await rm(firefox.ownerPath);
 
@@ -317,19 +412,69 @@ describe('SyncNos Native Host registration', () => {
       inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
     ).resolves.toMatchObject({ package: 'verified', packageEntrypoint: 'stale' });
     await expect(
-      isOwnedFirefoxNativeHostManifest(getNativeHostRegistrationLocations(fixture.paths)[2]!.manifestPath, {
-        packageRoot: fixture.packageRoot,
-        paths: fixture.paths,
-      }),
+      isOwnedFirefoxNativeHostManifest(
+        locationByBrowser(getNativeHostRegistrationLocations(fixture.paths), 'firefox').manifestPath,
+        {
+          packageRoot: fixture.packageRoot,
+          paths: fixture.paths,
+        },
+      ),
     ).resolves.toBe(false);
   });
 
-  it('keeps macOS registration strictly within the three stable user manifest folders', () => {
+  it('keeps macOS registration within the explicit supported Native Messaging locations', () => {
     const paths = resolveSyncNosRuntimePaths({ platform: 'darwin', homeDirectory: '/Users/chii' });
-    expect(getNativeHostRegistrationLocations(paths).map((location) => location.manifestPath)).toEqual([
-      '/Users/chii/Library/Application Support/Google/Chrome/NativeMessagingHosts/app.syncnos.localdata.json',
-      '/Users/chii/Library/Application Support/Microsoft Edge/NativeMessagingHosts/app.syncnos.localdata.json',
-      '/Users/chii/Library/Application Support/Mozilla/NativeMessagingHosts/app.syncnos.localdata.json',
+    expect(
+      getNativeHostRegistrationLocations(paths).map((location) => [location.browser, location.manifestPath]),
+    ).toEqual([
+      [
+        'chrome',
+        '/Users/chii/Library/Application Support/Google/Chrome/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'chrome-beta',
+        '/Users/chii/Library/Application Support/Google/Chrome Beta/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'chrome-dev',
+        '/Users/chii/Library/Application Support/Google/Chrome Dev/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'chrome-canary',
+        '/Users/chii/Library/Application Support/Google/Chrome Canary/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'chrome-for-testing',
+        '/Users/chii/Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      ['chromium', '/Users/chii/Library/Application Support/Chromium/NativeMessagingHosts/app.syncnos.localdata.json'],
+      [
+        'edge',
+        '/Users/chii/Library/Application Support/Microsoft Edge/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'edge-beta',
+        '/Users/chii/Library/Application Support/Microsoft Edge Beta/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'edge-dev',
+        '/Users/chii/Library/Application Support/Microsoft Edge Dev/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      [
+        'edge-canary',
+        '/Users/chii/Library/Application Support/Microsoft Edge Canary/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      ['vivaldi', '/Users/chii/Library/Application Support/Vivaldi/NativeMessagingHosts/app.syncnos.localdata.json'],
+      ['arc', '/Users/chii/Library/Application Support/Arc/User Data/NativeMessagingHosts/app.syncnos.localdata.json'],
+      [
+        'helium',
+        '/Users/chii/Library/Application Support/net.imput.helium/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
+      ['firefox', '/Users/chii/Library/Application Support/Mozilla/NativeMessagingHosts/app.syncnos.localdata.json'],
+      [
+        'tor-browser',
+        '/Users/chii/Library/Application Support/TorBrowser-Data/Browser/Mozilla/NativeMessagingHosts/app.syncnos.localdata.json',
+      ],
     ]);
   });
 
@@ -353,7 +498,7 @@ describe('SyncNos Native Host registration', () => {
     await expect(
       ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
     ).resolves.toMatchObject({ browsers: expect.arrayContaining([expect.objectContaining({ browser: 'firefox' })]) });
-    const firefox = getNativeHostRegistrationLocations(fixture.paths)[2]!;
+    const firefox = locationByBrowser(getNativeHostRegistrationLocations(fixture.paths), 'firefox');
     expect(JSON.parse(await readFile(firefox.ownerPath, 'utf8'))).toMatchObject({ packageVersion: '0.2.0' });
 
     await writeFile(fixture.paths.databasePath, 'user facts');
@@ -370,10 +515,29 @@ describe('SyncNos Native Host registration', () => {
   });
 
   it('recovers an interrupted registration commit at every manifest and owner boundary without touching user data', async () => {
-    for (const browserIndex of [0, 1, 2]) {
+    const browsers: readonly NativeHostBrowser[] = [
+      'chrome',
+      'chrome-beta',
+      'chrome-dev',
+      'chrome-canary',
+      'chrome-for-testing',
+      'chromium',
+      'edge',
+      'edge-beta',
+      'edge-dev',
+      'brave',
+      'vivaldi',
+      'iridium',
+      'helium',
+      'firefox',
+      'librewolf',
+      'waterfox',
+    ];
+    for (const browser of browsers) {
       for (const kind of ['manifest', 'owner'] as const) {
         const fixture = await createUnixFixture();
-        const location = getNativeHostRegistrationLocations(fixture.paths)[browserIndex]!;
+        const locations = getNativeHostRegistrationLocations(fixture.paths);
+        const location = locationByBrowser(locations, browser);
         const destination = kind === 'manifest' ? location.manifestPath : location.ownerPath;
         let injected = false;
 
@@ -400,24 +564,21 @@ describe('SyncNos Native Host registration', () => {
         ).resolves.toMatchObject({
           browsers: expect.arrayContaining([expect.objectContaining({ browser: location.browser })]),
         });
-        await expect(
-          inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
-        ).resolves.toMatchObject({
-          browsers: [
-            { browser: 'chrome', manifest: 'owned' },
-            { browser: 'edge', manifest: 'owned' },
-            { browser: 'firefox', manifest: 'owned' },
-          ],
+        const inspection = await inspectNativeHostRegistrations({
+          packageRoot: fixture.packageRoot,
+          paths: fixture.paths,
         });
+        expect(inspection.browsers.map((entry) => entry.browser)).toEqual(locations.map((entry) => entry.browser));
+        expect(inspection.browsers.every((entry) => entry.manifest === 'owned')).toBe(true);
         await expect(access(fixture.paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
         await expect(access(fixture.paths.databasePath)).rejects.toMatchObject({ code: 'ENOENT' });
       }
     }
-  });
+  }, 15_000);
 
   it('refuses to overwrite a final registration file changed after the commit intent was published', async () => {
     const fixture = await createUnixFixture();
-    const edge = getNativeHostRegistrationLocations(fixture.paths)[1]!;
+    const edge = locationByBrowser(getNativeHostRegistrationLocations(fixture.paths), 'edge');
     let injected = false;
     await expect(
       ensureNativeHostRegistrations({
@@ -446,7 +607,7 @@ describe('SyncNos Native Host registration', () => {
 
   it('rolls back only a proven prepared registration and preserves an untracked .next file', async () => {
     const fixture = await createUnixFixture();
-    const edge = getNativeHostRegistrationLocations(fixture.paths)[1]!;
+    const edge = locationByBrowser(getNativeHostRegistrationLocations(fixture.paths), 'edge');
     await expect(
       ensureNativeHostRegistrations({
         packageRoot: fixture.packageRoot,
@@ -469,7 +630,7 @@ describe('SyncNos Native Host registration', () => {
       await expect(access(`${location.ownerPath}.next`)).rejects.toMatchObject({ code: 'ENOENT' });
     }
 
-    const chrome = getNativeHostRegistrationLocations(fixture.paths)[0]!;
+    const chrome = locationByBrowser(getNativeHostRegistrationLocations(fixture.paths), 'chrome');
     await mkdir(join(chrome.manifestPath, '..'), { recursive: true });
     await writeFile(`${chrome.manifestPath}.next`, 'unknown registration bytes');
     await expect(recoverNativeHostRegistrationUpdate({ paths: fixture.paths })).rejects.toMatchObject({
@@ -484,31 +645,23 @@ describe('SyncNos Native Host registration', () => {
     await writeFile(join(fixture.packageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 9;');
     await ensureNativeHostLauncher({ packageRoot: fixture.packageRoot, paths: fixture.paths });
 
-    await expect(
-      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
-    ).resolves.toMatchObject({
-      browsers: [
-        { browser: 'chrome', manifest: 'conflict' },
-        { browser: 'edge', manifest: 'conflict' },
-        { browser: 'firefox', manifest: 'conflict' },
-      ],
+    const staleInspection = await inspectNativeHostRegistrations({
+      packageRoot: fixture.packageRoot,
+      paths: fixture.paths,
     });
+    expect(staleInspection.browsers.every((entry) => entry.manifest === 'conflict')).toBe(true);
     await expect(
       ensureNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
     ).resolves.toMatchObject({ browsers: expect.arrayContaining([expect.objectContaining({ browser: 'firefox' })]) });
-    await expect(
-      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
-    ).resolves.toMatchObject({
-      packageEntrypoint: 'current',
-      browsers: [
-        { browser: 'chrome', manifest: 'owned' },
-        { browser: 'edge', manifest: 'owned' },
-        { browser: 'firefox', manifest: 'owned' },
-      ],
+    const currentInspection = await inspectNativeHostRegistrations({
+      packageRoot: fixture.packageRoot,
+      paths: fixture.paths,
     });
+    expect(currentInspection.packageEntrypoint).toBe('current');
+    expect(currentInspection.browsers.every((entry) => entry.manifest === 'owned')).toBe(true);
   });
 
-  it('uses three browser keys across both Windows registry views and keeps browser manifests distinct', async () => {
+  it('uses the supported browser registry keys across both Windows views and keeps manifests distinct', async () => {
     const paths = resolveSyncNosRuntimePaths({ platform: 'win32', homeDirectory: 'C:\\Users\\chii' });
     const packageRoot = 'C:\\Program Files\\node_modules\\@chiimagnus\\syncnoscli';
     const nodePath = 'C:\\Program Files\\nodejs\\node.exe';
@@ -578,12 +731,20 @@ describe('SyncNos Native Host registration', () => {
     });
 
     const locations = getNativeHostRegistrationLocations(paths);
-    expect(locations).toHaveLength(3);
+    expect(locations.map((location) => location.browser)).toEqual(['chrome', 'chromium', 'edge', 'firefox']);
     expect(locations.every((location) => location.registryViews.join(',') === '32,64')).toBe(true);
-    expect(values).toHaveLength(12);
+    expect(values).toHaveLength(16);
     for (const location of locations) {
       for (const view of location.registryViews) {
-        const key = `HKCU\\Software\\${location.browser === 'chrome' ? 'Google\\Chrome' : location.browser === 'edge' ? 'Microsoft\\Edge' : 'Mozilla'}\\NativeMessagingHosts\\app.syncnos.localdata`;
+        const registryProduct =
+          location.browser === 'chrome'
+            ? 'Google\\Chrome'
+            : location.browser === 'chromium'
+              ? 'Chromium'
+              : location.browser === 'edge'
+                ? 'Microsoft\\Edge'
+                : 'Mozilla';
+        const key = `HKCU\\Software\\${registryProduct}\\NativeMessagingHosts\\app.syncnos.localdata`;
         expect(values.get(`${view}:${key}:(Default)`)).toBe(location.manifestPath);
         expect(values.get(`${view}:${key}:${SYNCNOSCLI_WINDOWS_REGISTRY_OWNER_VALUE}`)).toBe(
           SYNCNOSCLI_NATIVE_HOST_REGISTRATION_OWNER,
@@ -639,7 +800,7 @@ describe('SyncNos Native Host registration', () => {
       });
     };
 
-    for (let failureAt = 1; failureAt <= 12; failureAt += 1) {
+    for (let failureAt = 1; failureAt <= 16; failureAt += 1) {
       const fixture = createWindowsRegistrationFixture();
       const values = new Map<string, string>();
       const injected = createRegistry(values, failureAt);
@@ -671,7 +832,7 @@ describe('SyncNos Native Host registration', () => {
         }),
       ).resolves.toMatchObject({ browsers: expect.arrayContaining([expect.objectContaining({ browser: 'firefox' })]) });
       expect(fixture.files.has(fixture.paths.registrationUpdateIntentPath)).toBe(false);
-      expect(values.size).toBe(12);
+      expect(values.size).toBe(16);
     }
 
     const tampered = createWindowsRegistrationFixture();

@@ -213,7 +213,9 @@ describe('SyncNos CLI npm lifecycle', () => {
       }),
     ).resolves.toEqual({ action: 'postinstall', status: 'completed' });
     await writeFile(join(fixture.packageRoot, 'dist', 'native-host.cjs'), 'process.exitCode = 9;');
-    const edgeOwner = getNativeHostRegistrationLocations(fixture.paths)[1]!.ownerPath;
+    const edgeOwner = getNativeHostRegistrationLocations(fixture.paths).find(
+      (location) => location.browser === 'edge',
+    )!.ownerPath;
     let injected = false;
     const writeDiagnostic = vi.fn();
     await expect(
@@ -245,16 +247,14 @@ describe('SyncNos CLI npm lifecycle', () => {
         paths: fixture.paths,
       }),
     ).resolves.toEqual({ action: 'postinstall', status: 'completed' });
-    await expect(
-      inspectNativeHostRegistrations({ packageRoot: fixture.packageRoot, paths: fixture.paths }),
-    ).resolves.toMatchObject({
-      packageEntrypoint: 'current',
-      browsers: [
-        { browser: 'chrome', manifest: 'owned' },
-        { browser: 'edge', manifest: 'owned' },
-        { browser: 'firefox', manifest: 'owned' },
-      ],
+    const inspection = await inspectNativeHostRegistrations({
+      packageRoot: fixture.packageRoot,
+      paths: fixture.paths,
     });
+    const locations = getNativeHostRegistrationLocations(fixture.paths);
+    expect(inspection.packageEntrypoint).toBe('current');
+    expect(inspection.browsers.map((entry) => entry.browser)).toEqual(locations.map((location) => location.browser));
+    expect(inspection.browsers.every((entry) => entry.manifest === 'owned')).toBe(true);
     await expect(access(fixture.paths.registrationUpdateIntentPath)).rejects.toMatchObject({ code: 'ENOENT' });
 
     await expect(
