@@ -1,11 +1,11 @@
 {
   "name": "@chiimagnus/syncnoscli",
-  "version": "0.1.0",
+  "version": "1.0.0-beta",
   "description": "Local, on-demand SyncNos SQLite CLI and Native Host.",
-  "license": "AGPL-3.0-or-later",
+  "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SyncNos/SyncNos-Webclipper.git"
+    "url": "https://github.com/chiimagnus/SyncNos.git"
   },
   "type": "commonjs",
   "bin": {
