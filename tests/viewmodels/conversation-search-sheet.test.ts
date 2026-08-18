@@ -40,10 +40,13 @@ const firstPage = {
 } as const;
 
 function setupDom() {
-  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div><input id="editor" /></body></html>', {
+  const dom = new JSDOM(
+    '<!doctype html><html><body><div id="root"></div><input id="editor" /><textarea id="notes"></textarea><div id="rich-editor" contenteditable="true"><span id="rich-editor-child">draft</span></div></body></html>',
+    {
     url: 'chrome-extension://hmgjflllphdffeocddjjcfllifhejpok/app.html',
-    pretendToBeVisual: true,
-  });
+      pretendToBeVisual: true,
+    },
+  );
   for (const [key, value] of Object.entries({
     window: dom.window,
     document: dom.window.document,
@@ -333,7 +336,11 @@ describe('conversation search sheet viewmodel', () => {
 
     await dispatch(document.body, { ctrlKey: true, isComposing: true } as any);
     await dispatch(document.getElementById('editor')!, { metaKey: true });
+    await dispatch(document.getElementById('notes')!, { ctrlKey: true });
+    await dispatch(document.getElementById('rich-editor')!, { metaKey: true });
+    await dispatch(document.getElementById('rich-editor-child')!, { ctrlKey: true });
     expect(client.getCapability).not.toHaveBeenCalled();
+    expect(client.search).not.toHaveBeenCalled();
 
     await dispatch(document.body, { ctrlKey: true });
     expect(client.getCapability).toHaveBeenCalledTimes(1);
