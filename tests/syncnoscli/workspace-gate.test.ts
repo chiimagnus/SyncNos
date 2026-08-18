@@ -53,9 +53,17 @@ describe('SyncNos CLI workspace gate', () => {
     const cliCi = readWorkflow('syncnoscli-ci.yml');
     expect(cliCi).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
     expect(cliCi).toContain('npm run build:windows-host-shim --workspace=@chiimagnus/syncnoscli');
+    expect(cliCi).toContain('- src/services/sync/backup/**');
+    expect(cliCi).toContain('- src/services/shared/capture-integrity.ts');
+    expect(cliCi).not.toContain('- tests/e2e/**');
+    expect(cliCi).not.toContain('- .github/workflows/webclipper-ci.yml');
     expect(cliCi).toMatch(/SYNCNOSCLI_PACKED_INSTALL_E2E:\s*['"]1['"]/);
     expect(cliCi).toMatch(/SYNCNOSCLI_DISPOSABLE_RUNNER:\s*['"]1['"]/);
-    expect(cliCi).toContain('tests/syncnoscli/packed-install.test.ts');
+    expect(cliCi).toContain('run: npm run test:syncnoscli:packed');
+    expect(cliCi).not.toContain('run: npm run compile:syncnoscli');
+    expect(cliCi).not.toContain('run: npm run build:syncnoscli');
+    expect(cliCi).not.toContain('run: npm run pack:syncnoscli');
+    expect(cliCi).not.toContain('tests/e2e/local-data-release-evidence.test.ts');
     expect(cliCi).not.toMatch(/rtk|\b(?:bash|sh)\b/);
 
     for (const workflow of workspaceWorkflows) {

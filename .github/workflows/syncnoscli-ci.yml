@@ -6,17 +6,17 @@ on:
     paths:
       - packages/syncnoscli/**
       - tests/syncnoscli/**
-      - tests/e2e/**
       - src/services/local-data/**
       - src/services/conversations/domain/**
       - src/services/comments/domain/**
       - src/services/url-cleaning/**
+      - src/services/sync/backup/**
+      - src/services/shared/capture-integrity.ts
       - package.json
       - package-lock.json
       - tsconfig*.json
       - vitest.config.mts
       - .github/workflows/syncnoscli-ci.yml
-      - .github/workflows/webclipper-ci.yml
 
 concurrency:
   group: syncnoscli-ci-${{ github.event.pull_request.number || github.ref }}
@@ -61,23 +61,8 @@ jobs:
         shell: pwsh
         run: npm run build:windows-host-shim --workspace=@chiimagnus/syncnoscli
 
-      - name: Compile CLI
-        run: npm run compile:syncnoscli
-
-      - name: Build CLI
-        run: npm run build:syncnoscli
-
-      - name: Test CLI workspace contracts
-        run: npm run test:syncnoscli
-
-      - name: Validate release evidence schema
-        run: npm run test -- tests/e2e/local-data-release-evidence.test.ts
-
-      - name: Inspect npm pack contents
-        run: npm run pack:syncnoscli
-
       - name: Exercise packed install lifecycle
-        run: npm run test -- tests/syncnoscli/packed-install.test.ts
+        run: npm run test:syncnoscli:packed
         env:
           SYNCNOSCLI_DISPOSABLE_RUNNER: '1'
           SYNCNOSCLI_PACKED_INSTALL_E2E: '1'
