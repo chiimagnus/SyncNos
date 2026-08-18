@@ -8,9 +8,7 @@ SyncNos CLI is the on-demand local SQLite companion for SyncNos. It does not run
 npm install -g @chiimagnus/syncnoscli
 ```
 
-给 AI 的提示词：`请你安装SyncNos CLI：npm install -g @chiimagnus/syncnoscli`
-
-Requires Node.js 22 or newer. Once Local data is enabled, the database uses the fixed per-user path: `~/.syncnoscli/syncnos.sqlite` on macOS/Linux and `%USERPROFILE%\.syncnoscli\syncnos.sqlite` on Windows.
+Requires Node.js 22 or newer. Local Database paths, migration authority, and recovery rules are maintained in the repository documentation linked below.
 
 Every CLI invocation starts on demand and exits when the command finishes. Browser Native Messaging starts the packaged Host only when needed and the Host exits when its browser pipe closes. Data commands are read-only: they never create, migrate, delete, or modify the database. `doctor` is read-only unless `--fix` is explicitly supplied; `--fix` is limited to proven SyncNos-owned registration/permission repair.
 
@@ -26,4 +24,4 @@ Successful data commands print a versioned JSON envelope by default. `--format t
 
 The CLI package has its own semantic version; it is not required to equal the WebClipper/WXT version. Compatibility is defined by the canonical Native Host protocol/schema contract shipped from the same source commit.
 
-Architecture and storage authority: [`docs/storage.md`](../../docs/storage.md). Installation, Native Host, sandbox, and recovery guidance: [`docs/troubleshooting.md`](../../docs/troubleshooting.md#local-database).
+Architecture and storage authority: [docs/storage.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/storage.md). Installation, Native Host, sandbox, and recovery guidance: [docs/local-database.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/local-database.md).

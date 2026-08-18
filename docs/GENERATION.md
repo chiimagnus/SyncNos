@@ -13,13 +13,15 @@
 ## Page Set
 
 - Entries: `README.md`, `README.zh-CN.md`, `PRIVACY.md`
-- Core: overview, configuration, storage
-- Operations: troubleshooting, feishu-setup
+- Core: overview, storage
+- Operations: local-database, configuration, releasing
 - Package: `packages/syncnoscli/README.md`, `packages/syncnoscli/README.zh-CN.md`
 
 ## Policy
 
 Feature plans, audit logs, screenshots and one-time acceptance evidence belong in `.github/features/**`, not `docs/`.
+
+`.github/guide/**` is a separate user-guide surface consumed directly by production Settings links. It may be linked from `docs/overview.md`, but it is outside neat-freak merge/delete scope unless a task explicitly targets those guides.
 
 ## Coverage gap
 

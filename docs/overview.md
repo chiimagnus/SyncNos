@@ -7,11 +7,12 @@ SyncNos 将 AI 对话、网页文章和已加载的视频字幕统一为本地 c
 | 目标 | 页面 |
 | --- | --- |
 | Local Database 的事实模型、迁移、搜索与安全边界 | [storage.md](storage.md) |
-| Local Database / Native Host / CLI 安装与恢复排障 | [troubleshooting.md](troubleshooting.md#local-database) |
+| Local Database / Native Host / CLI 安装与恢复 | [local-database.md](local-database.md) |
 | SyncNos CLI 命令与 JSON 输出 | [packages/syncnoscli/README.md](../packages/syncnoscli/README.md) |
-| 设置、构建与环境变量 | [configuration.md](configuration.md) |
-| 部署或维护 Feishu OAuth | [feishu-setup.md](feishu-setup.md) |
-| 其他构建、采集和评论定位排障 | [troubleshooting.md](troubleshooting.md) |
+| 开发、构建、环境变量与本地浏览器测试 | [configuration.md](configuration.md) |
+| WebClipper / CLI 发布边界与 release evidence | [releasing.md](releasing.md) |
+| Feishu / Lark DocX 配置指南 | [.github/guide/feishu/DocxSync.zh.md](../.github/guide/feishu/DocxSync.zh.md) |
+| Obsidian Local REST API 用户配置指南 | [.github/guide/obsidian/LocalRestAPI.zh.md](../.github/guide/obsidian/LocalRestAPI.zh.md) |
 
 代码结构、符号和调用关系以 CodeGraph 为准；不可违反的分层和交互规则在根 [AGENTS.md](../AGENTS.md)。
 

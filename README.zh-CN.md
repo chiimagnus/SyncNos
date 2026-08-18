@@ -105,6 +105,16 @@ WebClipper Settings：备份与同步（Notion / Obsidian / 飞书）
 文章讨论侧栏：精确引用、紧凑线程与单 active reply composer
 ![文章讨论侧栏](docs/assets/comments-discussion.png)
 
+## 开发与文档
+
+```bash
+npm ci
+npm run dev
+npm run gate:ci
+```
+
+发布构建或产物相关改动再运行 `npm run gate`。长期文档从 [docs/overview.md](docs/overview.md) 进入；仓库协作规则见 [AGENTS.md](AGENTS.md)。
+
 ## 支持
 
 SyncNos 是一个人用心做的项目。

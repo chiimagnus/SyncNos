@@ -98,7 +98,7 @@ Use `npm run gate` when the change affects production builds, manifests, permiss
 
 ## Documentation
 
-Start at [docs/overview.md](docs/overview.md). It links configuration, local-data/security boundaries, Feishu setup, and troubleshooting. Repository rules are in [AGENTS.md](AGENTS.md).
+Start at [docs/overview.md](docs/overview.md). It links Local Database operations, storage/security contracts, development configuration, release operations, and Feishu setup. Repository rules are in [AGENTS.md](AGENTS.md).
 
 ## Support
 
