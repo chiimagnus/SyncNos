@@ -26,6 +26,6 @@ syncnoscli search <query> [--cursor <cursor>] [--source <source>] [--site <site>
 
 CLI 包拥有独立的语义化版本，不要求与 WebClipper/WXT 版本一致。兼容性由同一源代码 commit 中发布的 canonical Native Host protocol/schema contract 定义。
 
-发布流程与浏览器发布刻意分离。仓库 owner 必须手动 dispatch 受保护的 npm publish workflow，并提供精确的 package version 和 confirmation string；最终 publish job 还需要 repository environment approval，以及 npm Trusted Publishing/OIDC。普通 CI、安装、浏览器 release/prerelease 和应用商店 workflow 都不会发布这个包。
+CLI 仅从本地发布，并与浏览器发布刻意分离。更新本包的 `version`、运行仓库 gate，然后在 `packages/syncnoscli` 目录执行 `npm publish`。GitHub Actions 只负责构建与测试 CLI；没有任何 workflow 会发布这个 npm 包。
 
 架构与存储权威说明：[`docs/storage.md`](../../docs/storage.md)。安装、Native Host、sandbox 与恢复指南：[`docs/troubleshooting.md`](../../docs/troubleshooting.md#local-database)。

@@ -15,9 +15,7 @@ on:
       - package-lock.json
       - tsconfig*.json
       - vitest.config.mts
-      - .github/scripts/syncnoscli/**
       - .github/workflows/syncnoscli-ci.yml
-      - .github/workflows/syncnoscli-publish.yml
       - .github/workflows/webclipper-ci.yml
 
 concurrency:

@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,6 @@ const packageRoot = resolve(repoRoot, 'packages/syncnoscli');
 const sqlitePackageRoot = resolve(repoRoot, 'node_modules/better-sqlite3');
 const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as Record<string, any>;
 const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8')) as Record<string, any>;
-const publishReadinessScript = resolve(repoRoot, '.github/scripts/syncnoscli/check-publish-readiness.mjs');
 
 const SQLITE_PREBUILD_TARGETS = [
   'darwin-arm64',
@@ -36,7 +35,6 @@ describe('SyncNos CLI package contract', () => {
     });
     expect(packageJson.publishConfig).toEqual({
       access: 'public',
-      provenance: true,
       registry: 'https://registry.npmjs.org/',
       tag: 'latest',
     });
@@ -49,36 +47,6 @@ describe('SyncNos CLI package contract', () => {
     expect(packageJson.scripts).not.toHaveProperty('preuninstall');
     expect(rootPackageJson.private).toBe(true);
     expect(rootPackageJson.workspaces).toEqual(['packages/*']);
-  });
-
-  it('keeps offline publish readiness exact and fail-closed for version/confirmation mismatches', () => {
-    const expectedConfirmation = `PUBLISH ${packageJson.name}@${packageJson.version}`;
-    const accepted = execFileSync(
-      process.execPath,
-      [
-        publishReadinessScript,
-        '--offline',
-        `--expected-version=${packageJson.version}`,
-        `--confirmation=${expectedConfirmation}`,
-      ],
-      { cwd: repoRoot, encoding: 'utf8' },
-    );
-    expect(accepted).toContain(`ready ${packageJson.name}@${packageJson.version}`);
-
-    for (const argv of [
-      ['--offline', '--expected-version=999.999.999'],
-      ['--offline', `--expected-version=${packageJson.version}`, '--confirmation=PUBLISH wrong@0.0.0'],
-    ]) {
-      const rejected = spawnSync(process.execPath, [publishReadinessScript, ...argv], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-      });
-      expect(rejected.status).not.toBe(0);
-      expect(`${rejected.stdout}${rejected.stderr}`).not.toMatch(/token|credential|auth/i);
-    }
-
-    const source = readFileSync(publishReadinessScript, 'utf8');
-    expect(source).not.toMatch(/fetch\(|https\.request|NPM_TOKEN|NODE_AUTH_TOKEN|_authToken/);
   });
 
   it('builds a standalone help/version entry without source paths', () => {

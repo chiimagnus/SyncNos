@@ -52,17 +52,15 @@ Native Host 注册按**浏览器实际读取的物理位置**维护，而不是�
 
 ### npm 发布（repository owner）
 
-首次公开发布 `@chiimagnus/syncnoscli` 前，owner 需要在 npm 外部确认 `@chiimagnus` scope/registry 状态，并为 GitHub repository 配置 npm Trusted Publisher：workflow filename 必须是 `syncnoscli-publish.yml`，environment 必须与 `syncnoscli-npm-publish` 精确一致，并只授权 `npm publish`。仓库不保存长期 publish credential。
+`@chiimagnus/syncnoscli` 仅由 repository owner 在本地发布。先更新 `packages/syncnoscli/package.json` 的 `version`，运行 `npm run gate`，确认打包契约通过，然后进入 `packages/syncnoscli` 执行 `npm publish`。npm 登录与 2FA 只留在 owner 本机，不写入仓库或 GitHub Actions。
 
-`.github/workflows/syncnoscli-publish.yml` 只能手工 `workflow_dispatch`，要求输入 package version 和精确 confirmation，先验证 Windows PE provenance、tarball install 与 `npm publish --dry-run --access public`，最后在受保护 repository environment 审批后才允许 `npm publish --provenance --access public`。这份 workflow 的存在不是发布授权；每次真实 publish 都需要 owner 当次显式触发和 environment approval。
-
-如果 Trusted Publisher/OIDC 尚未配置，发布必须失败关闭；不要临时向 workflow 填长期 publish credential，也不要从 normal CI、browser release/prerelease 或 Chrome/Edge/AMO store workflow 调用 npm publish。
+GitHub Actions 只负责 CLI 的跨平台构建与测试，不执行 `npm publish`；browser release/prerelease 与 Chrome/Edge/AMO store workflow 也不得发布 CLI。CLI 与浏览器插件各自保留自己的版本字段，发布生命周期互不耦合。
 
 ### Local Data release evidence（maintainer）
 
 正式 release readiness 还要求 [`tests/e2e/local-data-release-matrix.md`](../tests/e2e/local-data-release-matrix.md) 的人工证据完成。CI 只验证 schema、三 OS packed CLI、final browser artifact contract 等自动部分，不能用 unpacked/dev extension ID、fake Host 或 repository variable 冒充 Chrome/Edge/Firefox 真机连接。Edge 必须额外由 owner 确认 Partner Center product GUID 对应实际公开 runtime ID；Windows 必须确认 Host 是 PE shim 且 one-shot/disconnect 后 shim 与 Node child 都退出。
 
-matrix 中任何正式 desktop、Safari regression 或 recovery regression 仍为 `pending`/`fail` 时，`releaseReady` 必须保持 `false`。严格 Snap/Flatpak 只能记录为 `unsupported_strict_sandbox` observation，不能作为正式 Linux browser pass。release evidence 完成也不是 npm publish 授权；真实 npm publish 仍受上面的 manual dispatch + environment approval 边界约束。
+matrix 中任何正式 desktop、Safari regression 或 recovery regression 仍为 `pending`/`fail` 时，`releaseReady` 必须保持 `false`。严格 Snap/Flatpak 只能记录为 `unsupported_strict_sandbox` observation，不能作为正式 Linux browser pass。release evidence 与 npm 发布是两条独立流程；CLI npm 发布只由 owner 在本地显式执行。
 
 ## 评论精确定位
 
