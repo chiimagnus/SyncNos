@@ -24,4 +24,4 @@ syncnoscli search <query> [--cursor <cursor>] [--source <source>] [--site <site>
 
 CLI 包拥有独立的语义化版本，不要求与 WebClipper/WXT 版本一致。兼容性由同一源代码 commit 中发布的 canonical Native Host protocol/schema contract 定义。
 
-架构与存储权威说明：[docs/storage.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/storage.md)。安装、Native Host、sandbox 与恢复指南：[docs/local-database.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/local-database.md)。
+架构与存储权威说明：[docs/storage.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/storage.md)。本地开发与打包：[docs/cli/development.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/cli/development.md)。安装、Native Host、sandbox 与恢复指南：[docs/cli/local-database.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/cli/local-database.md)。

@@ -24,4 +24,4 @@ Successful data commands print a versioned JSON envelope by default. `--format t
 
 The CLI package has its own semantic version; it is not required to equal the WebClipper/WXT version. Compatibility is defined by the canonical Native Host protocol/schema contract shipped from the same source commit.
 
-Architecture and storage authority: [docs/storage.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/storage.md). Installation, Native Host, sandbox, and recovery guidance: [docs/local-database.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/local-database.md).
+Architecture and storage authority: [docs/storage.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/storage.md). Local development and packaging: [docs/cli/development.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/cli/development.md). Installation, Native Host, sandbox, and recovery guidance: [docs/cli/local-database.md](https://github.com/chiimagnus/SyncNos/blob/main/docs/cli/local-database.md).

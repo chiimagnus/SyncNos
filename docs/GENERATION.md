@@ -5,7 +5,7 @@
 | Field | Value |
 | --- | --- |
 | Repository | `chiimagnus/SyncNos` |
-| Commit hash | `651b054addf5c0471c0bfb46faa24757bd69d08d` |
+| Commit hash | `95ab6156701905d0aa2f0ca01606b7f1f56644e8` |
 | Generated at | `2026-08-18` |
 | Canonical entry | `docs/overview.md` |
 | Scope | `AGENTS.md`, `README*.md`, `PRIVACY.md`, `docs/**/*.md`, `packages/syncnoscli/README*.md` |
@@ -13,8 +13,10 @@
 ## Page Set
 
 - Entries: `README.md`, `README.zh-CN.md`, `PRIVACY.md`
-- Core: overview, storage
-- Operations: local-database, configuration, releasing
+- Core: `overview.md`, `storage.md`
+- CLI: `cli/development.md`, `cli/local-database.md`, `cli/releasing.md`
+- WebClipper: `webclipper/overview.md`, `webclipper/configuration.md`, `webclipper/local-database.md`, `webclipper/releasing.md`
+- User guides: `guide/feishu/**`, `guide/obsidian/**`
 - Package: `packages/syncnoscli/README.md`, `packages/syncnoscli/README.zh-CN.md`
 
 ## Policy

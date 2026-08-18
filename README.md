@@ -51,7 +51,7 @@ SyncNos keeps captured facts local first. IndexedDB is the default authority; on
 | z.ai | Auto |
 | Google AI Studio | Manual only¹ |
 
-¹ ChatGPT and Google AI Studio use virtualized lists and are intentionally excluded from auto-save. Use the inpage save button or popup current-page capture. See [product rules](docs/overview.md#不可破坏的产品规则).
+¹ ChatGPT and Google AI Studio use virtualized lists and are intentionally excluded from auto-save. Use the inpage save button or popup current-page capture. See [product rules](docs/webclipper/overview.md#不可破坏的产品规则).
 
 ### Web Articles
 
