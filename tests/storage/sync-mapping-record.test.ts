@@ -132,6 +132,30 @@ describe('sync mapping persistence record', () => {
     expect(merged.notionSectionDigests).toBeUndefined();
   });
 
+  it('resets the whole Feishu continuity group when feishuDocId changes', () => {
+    const existing = {
+      id: 7,
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      feishuDocId: 'doc-old',
+      feishuLastContentHash: 'hash-old',
+      notionPageId: 'page-1',
+      unknownMetadata: 'keep-me',
+    };
+
+    const merged = mergeSyncMappingPatch(existing, { feishuDocId: 'doc-new' });
+
+    expect(merged).toMatchObject({
+      id: 7,
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      feishuDocId: 'doc-new',
+      notionPageId: 'page-1',
+      unknownMetadata: 'keep-me',
+    });
+    expect(merged.feishuLastContentHash).toBeUndefined();
+  });
+
   it('ignores invalid Notion nested field patches and does not mutate inputs', () => {
     const existing = {
       notionSections: { conversations: { headingBlockId: 'h1' } },

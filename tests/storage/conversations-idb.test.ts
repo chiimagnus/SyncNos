@@ -939,6 +939,44 @@ describe('conversations storage-idb', () => {
     expect(after?.mapping?.notionSectionCursors).toBeUndefined();
   });
 
+  it('resets stale Feishu hash when the destination doc changes and mirrors explicit clears', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'feishu-doc-switch',
+      title: 'Feishu doc switch',
+      feishuDocId: 'doc-old',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    await patchSyncMapping(conversationId, {
+      feishuDocId: 'doc-old',
+      feishuLastContentHash: 'hash-old',
+      notionPageId: 'page-1',
+      unknownMetadata: 'keep-me',
+    });
+    const before = await getSyncMappingByConversation(conversationId);
+    const mappingId = Number(before?.mapping?.id);
+
+    await patchSyncMapping(conversationId, { feishuDocId: 'doc-new' });
+    const changed = await getSyncMappingByConversation(conversationId);
+    expect(changed?.mapping).toMatchObject({
+      id: mappingId,
+      feishuDocId: 'doc-new',
+      notionPageId: 'page-1',
+      unknownMetadata: 'keep-me',
+    });
+    expect(changed?.mapping?.feishuLastContentHash).toBeUndefined();
+    expect(changed?.conversation?.feishuDocId).toBe('doc-new');
+
+    await patchSyncMapping(conversationId, { feishuDocId: '' });
+    const cleared = await getSyncMappingByConversation(conversationId);
+    expect(cleared?.mapping?.feishuDocId).toBe('');
+    expect(cleared?.mapping?.feishuLastContentHash).toBeUndefined();
+    expect(cleared?.conversation?.feishuDocId).toBe('');
+  });
+
   it('deletes conversations, messages, and sync mappings', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

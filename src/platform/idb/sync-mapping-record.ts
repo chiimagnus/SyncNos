@@ -58,9 +58,15 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
   const hasNotionTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'notionPageId');
   const notionTargetChanged =
     hasNotionTargetPatch && safeString(base.notionPageId) !== safeString(incoming.notionPageId);
+  const hasFeishuTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'feishuDocId');
+  const feishuTargetChanged =
+    hasFeishuTargetPatch && safeString(base.feishuDocId) !== safeString(incoming.feishuDocId);
   const next: SyncMappingRecord = { ...base };
   if (notionTargetChanged) {
     for (const field of NOTION_CONTINUITY_FIELDS) delete next[field];
+  }
+  if (feishuTargetChanged) {
+    for (const field of FEISHU_CONTINUITY_FIELDS) delete next[field];
   }
   Object.assign(next, incoming);
 

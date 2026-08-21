@@ -1382,15 +1382,19 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
   const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
   const now = Date.now();
   const previousNotionPageId = safeString(existing?.notionPageId) || safeString(conversation.notionPageId);
-  const existingForPatch =
-    previousNotionPageId && !safeString(existing?.notionPageId)
-      ? { ...(existing && typeof existing === 'object' ? existing : {}), notionPageId: previousNotionPageId }
-      : existing;
+  const previousFeishuDocId = safeString(existing?.feishuDocId) || safeString(conversation.feishuDocId);
+  const existingForPatch = { ...(existing && typeof existing === 'object' ? existing : {}) } as any;
+  if (previousNotionPageId && !safeString(existingForPatch.notionPageId)) existingForPatch.notionPageId = previousNotionPageId;
+  if (previousFeishuDocId && !safeString(existingForPatch.feishuDocId)) existingForPatch.feishuDocId = previousFeishuDocId;
   const merged = mergeSyncMappingPatch(existingForPatch, patch) as any;
   const hasNotionPagePatch = Object.prototype.hasOwnProperty.call(patch, 'notionPageId');
+  const hasFeishuDocPatch = Object.prototype.hasOwnProperty.call(patch, 'feishuDocId');
   const nextNotionPageId = hasNotionPagePatch
     ? safeString(merged.notionPageId)
     : safeString(merged.notionPageId) || previousNotionPageId;
+  const nextFeishuDocId = hasFeishuDocPatch
+    ? safeString(merged.feishuDocId)
+    : safeString(merged.feishuDocId) || previousFeishuDocId;
   const notionTargetChanged = hasNotionPagePatch && previousNotionPageId !== nextNotionPageId;
   const conversationNotionTargetChanged =
     hasNotionPagePatch && safeString(conversation.notionPageId) !== nextNotionPageId;
@@ -1399,7 +1403,7 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
     source,
     conversationKey,
     notionPageId: nextNotionPageId,
-    feishuDocId: safeString(merged.feishuDocId) || safeString(existing?.feishuDocId) || safeString(conversation.feishuDocId),
+    feishuDocId: nextFeishuDocId,
     updatedAt: now,
   } as any;
   const payload: any = withOptionalId(existing && existing.id, next);
@@ -1424,8 +1428,7 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
     conversationChanged = true;
   }
 
-  const nextFeishuDocId = safeString(next.feishuDocId);
-  if (nextFeishuDocId && safeString(conversation.feishuDocId) !== nextFeishuDocId) {
+  if ((hasFeishuDocPatch || nextFeishuDocId) && safeString(conversation.feishuDocId) !== nextFeishuDocId) {
     conversation.feishuDocId = nextFeishuDocId;
     conversationChanged = true;
   }
