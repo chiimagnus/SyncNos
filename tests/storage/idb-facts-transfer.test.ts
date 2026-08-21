@@ -409,43 +409,80 @@ describe('IndexedDB migration facts transfer', () => {
     tracker.restore();
   });
 
-  it('fails closed on an invalid detached row, consumer cancellation, and an oversized asset', async () => {
+  it('skips unreachable historical children and detaches comments whose conversation no longer exists', async () => {
     const db = await openDb();
     openedDatabases.push(db);
     const transaction = db.transaction([...FACTS_IDB_STORE_NAMES], 'readwrite');
     const conversations = transaction.objectStore('conversations');
     const messages = transaction.objectStore('messages');
+    const images = transaction.objectStore('image_cache');
+    const comments = transaction.objectStore('article_comments');
     const conversationId = await requestToPromise<number>(
       conversations.add({ source: 'chatgpt', conversationKey: 'valid', title: 'Valid' }),
     );
     await requestToPromise<number>(messages.add({ conversationId: 999, messageKey: 'missing-owner' }));
+    await requestToPromise<number>(messages.add({ conversationId, messageKey: 'reachable' }));
+    await requestToPromise<number>(
+      images.add({
+        conversationId: 999,
+        url: 'https://example.com/orphan.png',
+        blob: new Blob([Uint8Array.from([1])], { type: 'image/png' }),
+        contentType: 'image/png',
+      }),
+    );
+    await requestToPromise<number>(
+      comments.add({
+        conversationId: 999,
+        canonicalUrl: 'https://example.com/orphan-comment',
+        commentText: 'keep by URL',
+        quoteText: '',
+        authorName: null,
+        locator: null,
+        createdAt: 1,
+        updatedAt: 1,
+        parentId: null,
+      }),
+    );
     await transactionDone(transaction);
 
-    let completedManifest = false;
-    await expect(
-      transferIndexedDbFacts({
-        db,
-        digestProvider: nodeDigestProvider,
-        migrationId: MIGRATION_ID,
-        createSessionId: nextSessionIds(),
-        onFrame: () => undefined,
-      }).then(() => {
-        completedManifest = true;
-      }),
-    ).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
-    expect(completedManifest).toBe(false);
+    const frames: NativeWireFrame[] = [];
+    const manifest = await transferIndexedDbFacts({
+      db,
+      digestProvider: nodeDigestProvider,
+      migrationId: MIGRATION_ID,
+      createSessionId: nextSessionIds(),
+      onFrame: (wireFrame) => frames.push(wireFrame),
+    });
 
-    const repair = db.transaction(['messages', 'image_cache'], 'readwrite');
-    repair.objectStore('messages').clear();
+    expect(manifest.factCounts).toMatchObject({ conversations: 1, messages: 1, image_cache: 0, article_comments: 1 });
+    const facts = (await decodeSessions(frames)).flatMap((session) => (session.record ? [session.record] : []));
+    expect(facts.some((fact) => fact.kind === 'messages' && fact.sourceLocalId === '1')).toBe(false);
+    expect(facts.filter((fact) => fact.kind === 'messages')).toHaveLength(1);
+    expect(facts.filter((fact) => fact.kind === 'image_cache')).toHaveLength(0);
+    const detachedComment = facts.find(
+      (fact): fact is Extract<MigrationFactRecord, { kind: 'article_comments' }> => fact.kind === 'article_comments',
+    );
+    expect(detachedComment?.conversationSourceLocalId).toBeNull();
+    expect(detachedComment?.archiveIdentity.context).toEqual({ canonicalUrl: 'https://example.com/orphan-comment' });
+  });
+
+  it('fails closed on consumer cancellation and an oversized reachable asset', async () => {
+    const db = await openDb();
+    openedDatabases.push(db);
+    const transaction = db.transaction(['conversations', 'image_cache'], 'readwrite');
+    const conversations = transaction.objectStore('conversations');
+    const conversationId = await requestToPromise<number>(
+      conversations.add({ source: 'chatgpt', conversationKey: 'valid', title: 'Valid' }),
+    );
     await requestToPromise<number>(
-      repair.objectStore('image_cache').add({
+      transaction.objectStore('image_cache').add({
         conversationId,
         url: 'https://example.com/oversized.png',
         blob: new Blob([Uint8Array.from([1])], { type: 'image/png' }),
         contentType: 'image/png',
       }),
     );
-    await transactionDone(repair);
+    await transactionDone(transaction);
 
     const oversize = vi.spyOn(Blob.prototype, 'size', 'get').mockReturnValue(MAX_MIGRATION_FACT_RECORD_BYTES + 1);
     await expect(

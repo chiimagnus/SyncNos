@@ -118,6 +118,29 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function referencedConversationId(row: unknown): number | null {
+  const value = record(row).conversationId;
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
+}
+
+function hasReachableConversation(
+  row: unknown,
+  conversations: ReadonlyMap<number, MigrationConversationIdentity>,
+): boolean {
+  const conversationId = referencedConversationId(row);
+  return conversationId != null && conversations.has(conversationId);
+}
+
+function detachMissingConversation(
+  row: unknown,
+  conversations: ReadonlyMap<number, MigrationConversationIdentity>,
+): Record<string, unknown> {
+  const value = record(row);
+  const conversationId = referencedConversationId(value);
+  if (conversationId == null || conversations.has(conversationId)) return value;
+  return { ...value, conversationId: null };
+}
+
 function defaultSessionId(): MigrationId {
   const randomUuid = globalThis.crypto?.randomUUID;
   if (typeof randomUuid !== 'function') fail();
@@ -483,7 +506,7 @@ async function readNormalizedCommentTopology(input: {
         await createMigrationCommentTopologyNode({
           conversations: input.conversations,
           digestProvider: input.digestProvider,
-          row: row.row,
+          row: detachMissingConversation(row.row, input.conversations),
           sourceLocalId: row.id,
         }),
       );
@@ -519,11 +542,13 @@ async function transferDetachedRow(input: {
       return;
     }
     case 'messages': {
+      if (!hasReachableConversation(input.row, input.state.conversations)) return;
       const fact = createMigrationMessageFact({ row: input.row, sourceLocalId: input.id });
       await emitPreparedFact({ emission: input.emission, transfer: input.transfer, state: input.state, record: fact });
       return;
     }
     case 'image_cache': {
+      if (!hasReachableConversation(input.row, input.state.conversations)) return;
       const prepared = prepareMigrationImageFact({ row: input.row, sourceLocalId: input.id });
       await emitPreparedFact({
         emission: input.emission,
@@ -537,12 +562,13 @@ async function transferDetachedRow(input: {
     case 'article_comments': {
       const topology = input.state.commentTopology?.get(input.id);
       if (!topology) fail();
+      const row = detachMissingConversation(input.row, input.state.conversations);
       const fact = await createMigrationCommentFact({
         conversations: input.state.conversations,
         digestProvider: input.transfer.digestProvider,
         occurrenceTracker: input.state.commentOccurrenceTracker,
         parentRootStructuralDigest: topology.parentId == null ? undefined : topology.rootStructuralDigest,
-        row: { ...record(input.row), parentId: topology.parentId },
+        row: { ...row, parentId: topology.parentId },
         sourceLocalId: input.id,
       });
       if (fact.archiveIdentity.rootStructuralDigest !== topology.rootStructuralDigest) fail();
