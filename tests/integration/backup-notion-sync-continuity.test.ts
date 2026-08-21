@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
-import { addArticleComment, listArticleCommentsByConversationId } from '@services/comments/data/storage';
+import {
+  addArticleComment,
+  deleteArticleCommentById,
+  listArticleCommentsByConversationId,
+} from '@services/comments/data/storage';
 import { __closeDbForTests as closeCommentsDbForTests } from '@services/comments/data/storage-idb';
 import { computeNotionCommentsDigest } from '@services/comments/sync/notion-comments-renderer';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
@@ -374,6 +378,27 @@ describe('backup -> Notion sync continuity', () => {
     await txDone(txA);
     dbA.close();
 
+    const discardedA = await addArticleComment({
+      canonicalUrl: articleUrl,
+      conversationId: conversationIdA,
+      authorName: 'Discarded A',
+      quoteText: '',
+      commentText: 'advance local id',
+      createdAt: 280,
+      updatedAt: 280,
+    });
+    const discardedB = await addArticleComment({
+      canonicalUrl: articleUrl,
+      conversationId: conversationIdA,
+      authorName: 'Discarded B',
+      quoteText: '',
+      commentText: 'advance local id again',
+      createdAt: 290,
+      updatedAt: 290,
+    });
+    await deleteArticleCommentById(discardedA.id);
+    await deleteArticleCommentById(discardedB.id);
+
     const rootComment = await addArticleComment({
       canonicalUrl: articleUrl,
       conversationId: conversationIdA,
@@ -395,6 +420,7 @@ describe('backup -> Notion sync continuity', () => {
     });
     const commentsA = await listArticleCommentsByConversationId(conversationIdA);
     expect(commentsA).toHaveLength(2);
+    expect(commentsA.map((comment) => comment.id).sort((a, b) => a - b)).toEqual([3, 4]);
     const commentsSectionDigest = computeNotionCommentsDigest(commentsA);
 
     const dbAMapping = await openDb();
@@ -429,6 +455,7 @@ describe('backup -> Notion sync continuity', () => {
     const conversationIdB = await getOnlyConversationId();
     const importedComments = await listArticleCommentsByConversationId(conversationIdB);
     expect(importedComments).toHaveLength(2);
+    expect(importedComments.map((comment) => comment.id).sort((a, b) => a - b)).toEqual([1, 2]);
     expect(computeNotionCommentsDigest(importedComments)).toBe(commentsSectionDigest);
 
     const imported = await backgroundStorage.getSyncMappingByConversation(conversationIdB);

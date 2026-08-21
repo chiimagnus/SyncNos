@@ -168,6 +168,42 @@ describe('notion article comments blocks', () => {
     expect(renderer.computeNotionCommentsDigest(comments)).toBe(d1);
   });
 
+  it('keeps digest stable when local database ids are remapped but thread content is unchanged', async () => {
+    const renderer = await loadNotionCommentsRenderer();
+    const source = [
+      {
+        id: 41,
+        parentId: null,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        authorName: 'A',
+        quoteText: 'Quoted',
+        commentText: 'Root',
+        locator: null,
+        createdAt: 100,
+        updatedAt: 100,
+      },
+      {
+        id: 57,
+        parentId: 41,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        authorName: 'B',
+        quoteText: '',
+        commentText: 'Reply',
+        locator: null,
+        createdAt: 110,
+        updatedAt: 110,
+      },
+    ];
+    const restored = [
+      { ...source[0], id: 1 },
+      { ...source[1], id: 2, parentId: 1 },
+    ];
+
+    expect(renderer.computeNotionCommentsDigest(restored)).toBe(renderer.computeNotionCommentsDigest(source));
+  });
+
   it('counts root threads even when a root has no quote', async () => {
     const renderer = await loadNotionCommentsRenderer();
     const result = renderer.buildNotionCommentsBlocks([

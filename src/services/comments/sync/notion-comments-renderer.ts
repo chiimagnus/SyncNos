@@ -2,7 +2,7 @@ import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 
 const MAX_TEXT = 1900;
-const NOTION_COMMENTS_DIGEST_VERSION = 6;
+const NOTION_COMMENTS_DIGEST_VERSION = 7;
 const DEFAULT_COMMENT_AUTHOR = 'You';
 
 function pad2(value: number): string {
@@ -165,11 +165,8 @@ function fnv1a32(input: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-export function computeNotionCommentsDigest(comments: ArticleCommentDto[]): string {
-  const graph = normalizeCommentThreadGraph(comments);
-  const normalized = graph.orderedItems.map((comment) => ({
-    id: comment.id,
-    parentId: comment.parentId,
+function normalizeCommentForDigest(comment: ArticleCommentDto) {
+  return {
     authorName: safeString(comment.authorName),
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
@@ -177,12 +174,14 @@ export function computeNotionCommentsDigest(comments: ArticleCommentDto[]): stri
     commentText: safeString(comment.commentText),
     locatorVersion: comment.locator?.v ?? null,
     locator: comment.locator ?? null,
+  };
+}
+
+export function computeNotionCommentsDigest(comments: ArticleCommentDto[]): string {
+  const graph = normalizeCommentThreadGraph(comments);
+  const threads = graph.threads.map((thread) => ({
+    root: normalizeCommentForDigest(thread.root),
+    replies: thread.replies.map(normalizeCommentForDigest),
   }));
-  return fnv1a32(
-    JSON.stringify({
-      v: NOTION_COMMENTS_DIGEST_VERSION,
-      graph: { orphanIds: graph.orphanIds, cycleIds: graph.cycleIds, duplicateIds: graph.duplicateIds },
-      items: normalized,
-    }),
-  );
+  return fnv1a32(JSON.stringify({ v: NOTION_COMMENTS_DIGEST_VERSION, threads }));
 }
