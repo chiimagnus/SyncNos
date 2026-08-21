@@ -35,11 +35,7 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function replaceGroup(
-  target: SyncMappingRecord,
-  source: SyncMappingRecord,
-  fields: readonly string[],
-): void {
+function replaceGroup(target: SyncMappingRecord, source: SyncMappingRecord, fields: readonly string[]): void {
   for (const field of fields) {
     delete target[field];
     if (Object.prototype.hasOwnProperty.call(source, field)) target[field] = source[field];
@@ -59,8 +55,7 @@ export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMa
   const notionTargetChanged =
     hasNotionTargetPatch && safeString(base.notionPageId) !== safeString(incoming.notionPageId);
   const hasFeishuTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'feishuDocId');
-  const feishuTargetChanged =
-    hasFeishuTargetPatch && safeString(base.feishuDocId) !== safeString(incoming.feishuDocId);
+  const feishuTargetChanged = hasFeishuTargetPatch && safeString(base.feishuDocId) !== safeString(incoming.feishuDocId);
   const next: SyncMappingRecord = { ...base };
   if (notionTargetChanged) {
     for (const field of NOTION_CONTINUITY_FIELDS) delete next[field];

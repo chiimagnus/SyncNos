@@ -210,14 +210,28 @@ describe('sync mapping persistence record', () => {
       id: 20,
       source: 'web',
       conversationKey: 'canonical',
-      ...notionState({ pageId: 'page-target', syncedAt: 10, key: 'target', sequence: 1, heading: 'h-target', digest: 'd-target' }),
+      ...notionState({
+        pageId: 'page-target',
+        syncedAt: 10,
+        key: 'target',
+        sequence: 1,
+        heading: 'h-target',
+        digest: 'd-target',
+      }),
       feishuDocId: 'doc-target',
       feishuLastContentHash: 'hash-target',
       shared: 'target',
     };
     const legacy = {
       id: 21,
-      ...notionState({ pageId: 'page-legacy', syncedAt: 999, key: 'legacy', sequence: 9, heading: 'h-legacy', digest: 'd-legacy' }),
+      ...notionState({
+        pageId: 'page-legacy',
+        syncedAt: 999,
+        key: 'legacy',
+        sequence: 9,
+        heading: 'h-legacy',
+        digest: 'd-legacy',
+      }),
       feishuDocId: 'doc-legacy',
       feishuLastContentHash: 'hash-legacy',
       shared: 'legacy',
@@ -246,7 +260,14 @@ describe('sync mapping persistence record', () => {
     const target = { id: 30, source: 'web', conversationKey: 'canonical', targetOnly: true };
     const legacy = {
       id: 31,
-      ...notionState({ pageId: 'page-legacy', syncedAt: 50, key: 'legacy', sequence: 5, heading: 'h-legacy', digest: 'd-legacy' }),
+      ...notionState({
+        pageId: 'page-legacy',
+        syncedAt: 50,
+        key: 'legacy',
+        sequence: 5,
+        heading: 'h-legacy',
+        digest: 'd-legacy',
+      }),
       feishuDocId: 'doc-legacy',
       feishuLastContentHash: 'hash-legacy',
     };
@@ -268,11 +289,11 @@ describe('sync mapping persistence record', () => {
   });
 
   it('uses fallback Notion page only after provider-state selection leaves the page empty', () => {
-    const merged = mergeSyncMappingForIdentityMove(
-      { id: 40, lastSyncedMessageKey: 'target-orphan' },
-      null,
-      { source: 'web', conversationKey: 'canonical', fallbackNotionPageId: 'page-fallback' },
-    );
+    const merged = mergeSyncMappingForIdentityMove({ id: 40, lastSyncedMessageKey: 'target-orphan' }, null, {
+      source: 'web',
+      conversationKey: 'canonical',
+      fallbackNotionPageId: 'page-fallback',
+    });
 
     expect(merged).toMatchObject({
       id: 40,
@@ -317,11 +338,25 @@ describe('sync mapping persistence record', () => {
 
   it('same Notion page uses the later lastSyncedAt as one complete snapshot', () => {
     const local = {
-      ...notionState({ pageId: 'page-a', syncedAt: 300, key: 'local', sequence: 3, heading: 'h-local', digest: 'd-local' }),
+      ...notionState({
+        pageId: 'page-a',
+        syncedAt: 300,
+        key: 'local',
+        sequence: 3,
+        heading: 'h-local',
+        digest: 'd-local',
+      }),
       updatedAt: 1,
     };
     const incoming = {
-      ...notionState({ pageId: 'page-a', syncedAt: 200, key: 'incoming', sequence: 9, heading: 'h-in', digest: 'd-in' }),
+      ...notionState({
+        pageId: 'page-a',
+        syncedAt: 200,
+        key: 'incoming',
+        sequence: 9,
+        heading: 'h-in',
+        digest: 'd-in',
+      }),
       updatedAt: 999,
     };
 
@@ -336,7 +371,14 @@ describe('sync mapping persistence record', () => {
   });
 
   it('same Notion page uses incoming as the stable tie-break when time is equal or missing', () => {
-    const local = notionState({ pageId: 'page-a', syncedAt: 100, key: 'local', sequence: 1, heading: 'h-local', digest: 'd-local' });
+    const local = notionState({
+      pageId: 'page-a',
+      syncedAt: 100,
+      key: 'local',
+      sequence: 1,
+      heading: 'h-local',
+      digest: 'd-local',
+    });
     const incomingEqual = notionState({
       pageId: 'page-a',
       syncedAt: 100,
@@ -364,7 +406,14 @@ describe('sync mapping persistence record', () => {
   });
 
   it('different Notion pages keep the complete local provider state', () => {
-    const local = notionState({ pageId: 'page-local', syncedAt: 100, key: 'local', sequence: 1, heading: 'h-local', digest: 'd-local' });
+    const local = notionState({
+      pageId: 'page-local',
+      syncedAt: 100,
+      key: 'local',
+      sequence: 1,
+      heading: 'h-local',
+      digest: 'd-local',
+    });
     const incoming = notionState({
       pageId: 'page-incoming',
       syncedAt: 999,
@@ -414,7 +463,14 @@ describe('sync mapping persistence record', () => {
   it('does not mutate either input while replacing provider groups', () => {
     const local = {
       id: 1,
-      ...notionState({ pageId: 'page-a', syncedAt: 10, key: 'local', sequence: 1, heading: 'h-local', digest: 'd-local' }),
+      ...notionState({
+        pageId: 'page-a',
+        syncedAt: 10,
+        key: 'local',
+        sequence: 1,
+        heading: 'h-local',
+        digest: 'd-local',
+      }),
     };
     const incoming = {
       id: 2,

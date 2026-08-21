@@ -1384,8 +1384,10 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
   const previousNotionPageId = safeString(existing?.notionPageId) || safeString(conversation.notionPageId);
   const previousFeishuDocId = safeString(existing?.feishuDocId) || safeString(conversation.feishuDocId);
   const existingForPatch = { ...(existing && typeof existing === 'object' ? existing : {}) } as any;
-  if (previousNotionPageId && !safeString(existingForPatch.notionPageId)) existingForPatch.notionPageId = previousNotionPageId;
-  if (previousFeishuDocId && !safeString(existingForPatch.feishuDocId)) existingForPatch.feishuDocId = previousFeishuDocId;
+  if (previousNotionPageId && !safeString(existingForPatch.notionPageId))
+    existingForPatch.notionPageId = previousNotionPageId;
+  if (previousFeishuDocId && !safeString(existingForPatch.feishuDocId))
+    existingForPatch.feishuDocId = previousFeishuDocId;
   const merged = mergeSyncMappingPatch(existingForPatch, patch) as any;
   const hasNotionPagePatch = Object.prototype.hasOwnProperty.call(patch, 'notionPageId');
   const hasFeishuDocPatch = Object.prototype.hasOwnProperty.call(patch, 'feishuDocId');
@@ -1416,11 +1418,7 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
     conversationChanged = true;
   }
   for (const field of ['notionPageUrl', 'notionWorkspaceSlug'] as const) {
-    if (
-      !notionTargetChanged &&
-      !conversationNotionTargetChanged &&
-      !Object.prototype.hasOwnProperty.call(patch, field)
-    )
+    if (!notionTargetChanged && !conversationNotionTargetChanged && !Object.prototype.hasOwnProperty.call(patch, field))
       continue;
     const value = safeString(next[field]);
     if (safeString(conversation[field]) === value) continue;
