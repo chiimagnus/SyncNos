@@ -1381,12 +1381,24 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
   const idx = stores.sync_mappings.index('by_source_conversationKey');
   const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
   const now = Date.now();
-  const merged = mergeSyncMappingPatch(existing, patch) as any;
+  const previousNotionPageId = safeString(existing?.notionPageId) || safeString(conversation.notionPageId);
+  const existingForPatch =
+    previousNotionPageId && !safeString(existing?.notionPageId)
+      ? { ...(existing && typeof existing === 'object' ? existing : {}), notionPageId: previousNotionPageId }
+      : existing;
+  const merged = mergeSyncMappingPatch(existingForPatch, patch) as any;
+  const hasNotionPagePatch = Object.prototype.hasOwnProperty.call(patch, 'notionPageId');
+  const nextNotionPageId = hasNotionPagePatch
+    ? safeString(merged.notionPageId)
+    : safeString(merged.notionPageId) || previousNotionPageId;
+  const notionTargetChanged = hasNotionPagePatch && previousNotionPageId !== nextNotionPageId;
+  const conversationNotionTargetChanged =
+    hasNotionPagePatch && safeString(conversation.notionPageId) !== nextNotionPageId;
   const next = {
     ...merged,
     source,
     conversationKey,
-    notionPageId: safeString(merged.notionPageId) || safeString(existing?.notionPageId) || safeString(conversation.notionPageId),
+    notionPageId: nextNotionPageId,
     feishuDocId: safeString(merged.feishuDocId) || safeString(existing?.feishuDocId) || safeString(conversation.feishuDocId),
     updatedAt: now,
   } as any;
@@ -1394,11 +1406,30 @@ export async function patchSyncMapping(conversationId: number, patch: Record<str
   if (existing) await reqToPromise(stores.sync_mappings.put(payload));
   else await reqToPromise(stores.sync_mappings.add(payload));
 
+  let conversationChanged = false;
+  if (hasNotionPagePatch && safeString(conversation.notionPageId) !== nextNotionPageId) {
+    conversation.notionPageId = nextNotionPageId;
+    conversationChanged = true;
+  }
+  for (const field of ['notionPageUrl', 'notionWorkspaceSlug'] as const) {
+    if (
+      !notionTargetChanged &&
+      !conversationNotionTargetChanged &&
+      !Object.prototype.hasOwnProperty.call(patch, field)
+    )
+      continue;
+    const value = safeString(next[field]);
+    if (safeString(conversation[field]) === value) continue;
+    conversation[field] = value;
+    conversationChanged = true;
+  }
+
   const nextFeishuDocId = safeString(next.feishuDocId);
   if (nextFeishuDocId && safeString(conversation.feishuDocId) !== nextFeishuDocId) {
     conversation.feishuDocId = nextFeishuDocId;
-    await reqToPromise(stores.conversations.put(conversation));
+    conversationChanged = true;
   }
+  if (conversationChanged) await reqToPromise(stores.conversations.put(conversation));
 
   await txDone(t);
   return true;
@@ -1409,47 +1440,13 @@ export async function setConversationNotionPageId(
   notionPageId: string,
   meta?: { notionPageUrl?: string; notionWorkspaceSlug?: string },
 ): Promise<true> {
-  const id = Number(conversationId);
-  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
-
-  const db = await openDb();
-  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
-  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
-  if (!conversation) throw new Error('conversation not found');
-
-  conversation.notionPageId = notionPageId || '';
-  if (meta && typeof meta === 'object') {
-    const url = safeString(meta.notionPageUrl);
-    const slug = safeString(meta.notionWorkspaceSlug);
-    if (url) conversation.notionPageUrl = url;
-    if (slug) conversation.notionWorkspaceSlug = slug;
-  }
-  await reqToPromise(stores.conversations.put(conversation));
-
-  const source = String(conversation.source || '').trim();
-  const conversationKey = String(conversation.conversationKey || '').trim();
-  if (source && conversationKey) {
-    const idx = stores.sync_mappings.index('by_source_conversationKey');
-    const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
-    const preserved: any = existing && typeof existing === 'object' ? { ...existing } : {};
-    if (preserved && typeof preserved === 'object') delete preserved.id;
-    const nextNotionPageUrl = meta && typeof meta === 'object' ? safeString(meta.notionPageUrl) : '';
-    const nextNotionWorkspaceSlug = meta && typeof meta === 'object' ? safeString(meta.notionWorkspaceSlug) : '';
-    const payload: any = withOptionalId(existing && existing.id, {
-      ...preserved,
-      source,
-      conversationKey,
-      notionPageId: notionPageId || '',
-      ...(nextNotionPageUrl ? { notionPageUrl: nextNotionPageUrl } : null),
-      ...(nextNotionWorkspaceSlug ? { notionWorkspaceSlug: nextNotionWorkspaceSlug } : null),
-      updatedAt: Date.now(),
-    });
-    if (existing) await reqToPromise(stores.sync_mappings.put(payload));
-    else await reqToPromise(stores.sync_mappings.add(payload));
-  }
-
-  await txDone(t);
-  return true;
+  const notionPageUrl = meta && typeof meta === 'object' ? safeString(meta.notionPageUrl) : '';
+  const notionWorkspaceSlug = meta && typeof meta === 'object' ? safeString(meta.notionWorkspaceSlug) : '';
+  return patchSyncMapping(conversationId, {
+    notionPageId: safeString(notionPageId),
+    ...(notionPageUrl ? { notionPageUrl } : null),
+    ...(notionWorkspaceSlug ? { notionWorkspaceSlug } : null),
+  });
 }
 
 export async function setSyncCursor(

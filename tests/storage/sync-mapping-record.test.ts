@@ -74,6 +74,64 @@ describe('sync mapping persistence record', () => {
     expect(merged.notionSectionDigests).toEqual(existing.notionSectionDigests);
   });
 
+  it('keeps Notion continuity when notionPageId stays the same', () => {
+    const existing = {
+      id: 7,
+      ...notionState({ pageId: 'page-1', syncedAt: 50, key: 'm5', sequence: 5, heading: 'h-old', digest: 'd-old' }),
+    };
+
+    const merged = mergeSyncMappingPatch(existing, {
+      notionPageId: 'page-1',
+      notionPageUrl: 'https://notion.so/page-1-updated',
+      notionSections: { conversations: { headingBlockId: 'h-new' } },
+    });
+
+    expect(merged).toMatchObject({
+      id: 7,
+      notionPageId: 'page-1',
+      notionPageUrl: 'https://notion.so/page-1-updated',
+      lastSyncedMessageKey: 'm5',
+      lastSyncedSequence: 5,
+      notionSections: { conversations: { headingBlockId: 'h-new' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm5', lastSyncedSequence: 5 } },
+      notionSectionDigests: { article: { digest: 'd-old', lastSyncedAt: 50 } },
+    });
+  });
+
+  it('resets the whole Notion continuity group when notionPageId changes', () => {
+    const existing = {
+      id: 7,
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      ...notionState({ pageId: 'page-old', syncedAt: 50, key: 'm5', sequence: 5, heading: 'h-old', digest: 'd-old' }),
+      feishuDocId: 'doc-1',
+      unknownMetadata: 'keep-me',
+    };
+
+    const merged = mergeSyncMappingPatch(existing, {
+      notionPageId: 'page-new',
+      notionPageUrl: 'https://notion.so/page-new',
+    });
+
+    expect(merged).toMatchObject({
+      id: 7,
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      notionPageId: 'page-new',
+      notionPageUrl: 'https://notion.so/page-new',
+      feishuDocId: 'doc-1',
+      unknownMetadata: 'keep-me',
+    });
+    expect(merged.notionWorkspaceSlug).toBeUndefined();
+    expect(merged.lastSyncedMessageKey).toBeUndefined();
+    expect(merged.lastSyncedSequence).toBeUndefined();
+    expect(merged.lastSyncedAt).toBeUndefined();
+    expect(merged.lastSyncedMessageUpdatedAt).toBeUndefined();
+    expect(merged.notionSections).toBeUndefined();
+    expect(merged.notionSectionCursors).toBeUndefined();
+    expect(merged.notionSectionDigests).toBeUndefined();
+  });
+
   it('ignores invalid Notion nested field patches and does not mutate inputs', () => {
     const existing = {
       notionSections: { conversations: { headingBlockId: 'h1' } },

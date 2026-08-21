@@ -55,18 +55,26 @@ export function stripSyncMappingLocalId(record: unknown): SyncMappingRecord {
 export function mergeSyncMappingPatch(existing: unknown, patch: unknown): SyncMappingRecord {
   const base = asRecord(existing);
   const incoming = stripSyncMappingLocalId(patch);
-  const next: SyncMappingRecord = { ...base, ...incoming };
+  const hasNotionTargetPatch = Object.prototype.hasOwnProperty.call(incoming, 'notionPageId');
+  const notionTargetChanged =
+    hasNotionTargetPatch && safeString(base.notionPageId) !== safeString(incoming.notionPageId);
+  const next: SyncMappingRecord = { ...base };
+  if (notionTargetChanged) {
+    for (const field of NOTION_CONTINUITY_FIELDS) delete next[field];
+  }
+  Object.assign(next, incoming);
 
+  const nestedBase = notionTargetChanged ? {} : base;
   for (const field of NOTION_NESTED_FIELDS) {
     if (!Object.prototype.hasOwnProperty.call(incoming, field)) continue;
     const patchSections = incoming[field];
     if (!isRecord(patchSections)) {
-      if (Object.prototype.hasOwnProperty.call(base, field)) next[field] = base[field];
+      if (Object.prototype.hasOwnProperty.call(nestedBase, field)) next[field] = nestedBase[field];
       else delete next[field];
       continue;
     }
 
-    const baseSections = asRecord(base[field]);
+    const baseSections = asRecord(nestedBase[field]);
     const mergedSections: SyncMappingRecord = { ...baseSections };
     for (const [rawSectionId, sectionPatch] of Object.entries(patchSections)) {
       const sectionId = safeString(rawSectionId);

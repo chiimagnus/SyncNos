@@ -14,6 +14,7 @@ import {
   getSyncMappingByConversation,
   mergeConversationsByIds,
   patchSyncMapping,
+  setConversationNotionPageId,
   setSyncCursor,
   syncConversationMessages,
   upsertConversation,
@@ -823,6 +824,119 @@ describe('conversations storage-idb', () => {
     });
     expect(Number(afterCursor?.mapping?.lastSyncedAt)).toBeGreaterThan(0);
     expect(Number(afterCursor?.mapping?.updatedAt)).toBeGreaterThanOrEqual(beforeCursorUpdatedAt);
+  });
+
+  it('resets stale Notion continuity when the destination page changes and keeps the same mapping identity', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'page-switch',
+      title: 'Page switch',
+      notionPageId: 'page-old',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    await patchSyncMapping(conversationId, {
+      notionPageId: 'page-old',
+      notionPageUrl: 'https://notion.so/page-old',
+      notionWorkspaceSlug: 'old-workspace',
+      lastSyncedMessageKey: 'm5',
+      lastSyncedSequence: 5,
+      lastSyncedAt: 50,
+      lastSyncedMessageUpdatedAt: 55,
+      notionSections: { conversations: { headingBlockId: 'h-old' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm5', lastSyncedSequence: 5 } },
+      notionSectionDigests: { article: { digest: 'd-old' } },
+      feishuDocId: 'doc-1',
+      unknownMetadata: 'keep-me',
+    });
+    const before = await getSyncMappingByConversation(conversationId);
+    const mappingId = Number(before?.mapping?.id);
+
+    await setConversationNotionPageId(conversationId, 'page-old', {
+      notionPageUrl: 'https://notion.so/page-old-refreshed',
+      notionWorkspaceSlug: 'old-workspace-refreshed',
+    });
+    const samePage = await getSyncMappingByConversation(conversationId);
+    expect(samePage?.mapping).toMatchObject({
+      id: mappingId,
+      notionPageId: 'page-old',
+      notionPageUrl: 'https://notion.so/page-old-refreshed',
+      notionWorkspaceSlug: 'old-workspace-refreshed',
+      lastSyncedMessageKey: 'm5',
+      lastSyncedSequence: 5,
+      notionSections: { conversations: { headingBlockId: 'h-old' } },
+    });
+
+    await setConversationNotionPageId(conversationId, 'page-new', {
+      notionPageUrl: 'https://notion.so/page-new',
+      notionWorkspaceSlug: 'new-workspace',
+    });
+
+    const after = await getSyncMappingByConversation(conversationId);
+    expect(after?.mapping).toMatchObject({
+      id: mappingId,
+      source: 'debug',
+      conversationKey: 'page-switch',
+      notionPageId: 'page-new',
+      notionPageUrl: 'https://notion.so/page-new',
+      notionWorkspaceSlug: 'new-workspace',
+      feishuDocId: 'doc-1',
+      unknownMetadata: 'keep-me',
+    });
+    expect(after?.mapping?.lastSyncedMessageKey).toBeUndefined();
+    expect(after?.mapping?.lastSyncedSequence).toBeUndefined();
+    expect(after?.mapping?.lastSyncedAt).toBeUndefined();
+    expect(after?.mapping?.lastSyncedMessageUpdatedAt).toBeUndefined();
+    expect(after?.mapping?.notionSections).toBeUndefined();
+    expect(after?.mapping?.notionSectionCursors).toBeUndefined();
+    expect(after?.mapping?.notionSectionDigests).toBeUndefined();
+    expect(after?.conversation).toMatchObject({
+      notionPageId: 'page-new',
+      notionPageUrl: 'https://notion.so/page-new',
+      notionWorkspaceSlug: 'new-workspace',
+    });
+  });
+
+  it('uses the conversation Notion mirror as the current target when an old mapping is missing notionPageId', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'page-switch-missing-mapping-page',
+      title: 'Page switch legacy state',
+      notionPageId: 'page-old',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    const db = await openDb();
+    const tx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'page-switch-missing-mapping-page',
+        lastSyncedMessageKey: 'm5',
+        lastSyncedSequence: 5,
+        notionSections: { conversations: { headingBlockId: 'h-old' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm5', lastSyncedSequence: 5 } },
+        unknownMetadata: 'keep-me',
+      }),
+    );
+    await txDone(tx);
+    db.close();
+
+    await setConversationNotionPageId(conversationId, 'page-new');
+
+    const after = await getSyncMappingByConversation(conversationId);
+    expect(after?.mapping).toMatchObject({
+      notionPageId: 'page-new',
+      unknownMetadata: 'keep-me',
+    });
+    expect(after?.mapping?.lastSyncedMessageKey).toBeUndefined();
+    expect(after?.mapping?.lastSyncedSequence).toBeUndefined();
+    expect(after?.mapping?.notionSections).toBeUndefined();
+    expect(after?.mapping?.notionSectionCursors).toBeUndefined();
   });
 
   it('deletes conversations, messages, and sync mappings', async () => {
