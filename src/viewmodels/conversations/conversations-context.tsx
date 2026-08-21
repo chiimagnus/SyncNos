@@ -9,7 +9,12 @@ import type {
   ConversationListOpenTarget,
   ConversationListSummary,
 } from '@services/conversations/domain/models';
-import type { FactsEpoch, StableConversationReference } from '@services/local-data/contracts';
+import {
+  LOCAL_DATA_ERROR_CODES,
+  type FactsEpoch,
+  type LocalDataErrorCode,
+  type StableConversationReference,
+} from '@services/local-data/contracts';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
 import { formatConversationMarkdown } from '@services/conversations/domain/markdown';
@@ -416,11 +421,30 @@ function mergeConversationPageItems(prev: Conversation[], next: Conversation[]):
   return out;
 }
 
+type ConversationListFailure = Readonly<{
+  code: LocalDataErrorCode | null;
+  message: string;
+}>;
+
+function conversationListFailure(error: unknown): ConversationListFailure {
+  const message = (error as { message?: unknown } | null)?.message;
+  const rawCode = (error as { code?: unknown } | null)?.code;
+  const code =
+    typeof rawCode === 'string' && (LOCAL_DATA_ERROR_CODES as readonly string[]).includes(rawCode)
+      ? (rawCode as LocalDataErrorCode)
+      : null;
+  return Object.freeze({
+    code,
+    message: typeof message === 'string' && message ? message : String(error ?? t('actionFailedFallback')),
+  });
+}
+
 type ConversationsAppState = {
   loadingList: boolean;
   loadingInitialList: boolean;
   loadingMoreList: boolean;
   listError: string | null;
+  listErrorCode: LocalDataErrorCode | null;
   listCursor: ConversationListCursor | null;
   listHasMore: boolean;
   listSummary: ConversationListSummary;
@@ -497,7 +521,9 @@ export function ConversationsProvider({
 }) {
   const [loadingInitialList, setLoadingInitialList] = useState(false);
   const [loadingMoreList, setLoadingMoreList] = useState(false);
-  const [listError, setListError] = useState<string | null>(null);
+  const [listFailure, setListFailure] = useState<ConversationListFailure | null>(null);
+  const listError = listFailure?.message ?? null;
+  const listErrorCode = listFailure?.code ?? null;
   const [listCursor, setListCursor] = useState<ConversationListCursor | null>(null);
   const [listFactsEpoch, setListFactsEpoch] = useState<FactsEpoch | null>(null);
   const listFactsEpochRef = useRef<FactsEpoch | null>(null);
@@ -735,7 +761,7 @@ export function ConversationsProvider({
 
       setLoadingInitialList(true);
       setLoadingMoreList(false);
-      setListError(null);
+      setListFailure(null);
       setListCursor(null);
       setListHasMore(false);
       try {
@@ -863,7 +889,7 @@ export function ConversationsProvider({
       } catch (e) {
         if (requestSeq !== listRequestSeqRef.current) return;
         // A missing/blocked Host is status-only: keep the last safe list and its epoch visible.
-        setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+        setListFailure(conversationListFailure(e));
       } finally {
         if (requestSeq === listRequestSeqRef.current) setLoadingInitialList(false);
       }
@@ -887,7 +913,7 @@ export function ConversationsProvider({
     listRequestSeqRef.current = requestSeq;
 
     setLoadingMoreList(true);
-    setListError(null);
+    setListFailure(null);
     try {
       const page = await getConversationListPage(
         { sourceKey, siteKey, limit: LIST_BOOTSTRAP_LIMIT },
@@ -923,7 +949,7 @@ export function ConversationsProvider({
       setListFacets(normalizeConversationListFacets(page?.facets));
     } catch (e) {
       if (requestSeq !== listRequestSeqRef.current) return;
-      setListError((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+      setListFailure(conversationListFailure(e));
     } finally {
       if (requestSeq === listRequestSeqRef.current) {
         setLoadingMoreList(false);
@@ -1466,6 +1492,7 @@ export function ConversationsProvider({
     loadingInitialList,
     loadingMoreList,
     listError,
+    listErrorCode,
     listCursor,
     listHasMore,
     listSummary,

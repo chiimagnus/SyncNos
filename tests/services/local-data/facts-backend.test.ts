@@ -28,6 +28,17 @@ const transitional = {
   journal: { stage: 'staging' },
 } as unknown as MigrationJournalSnapshot;
 
+const failed = {
+  mode: 'failed',
+  factsEpoch: null,
+  error: {
+    code: 'DATABASE_NOT_INITIALIZED',
+    message: 'The local data database has not been initialized.',
+    retryable: false,
+  },
+  journal: { stage: 'staging', terminalCode: 'DATABASE_NOT_INITIALIZED' },
+} as unknown as MigrationJournalSnapshot;
+
 function productionSourceFiles(root = join(process.cwd(), 'src')): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
@@ -145,7 +156,7 @@ describe('facts backend', () => {
     });
   });
 
-  it('rejects transitional and unreadable journals before either repository can be created', async () => {
+  it('uses the shared lifecycle errors for transitional, failed, and unreadable journals before either repository can be created', async () => {
     const createIdbRepository = vi.fn(() => ({ kind: 'idb' }));
     const createNativeRepository = vi.fn(() => ({ kind: 'native' }));
     const gate = new FactsOperationGate({ readJournal: async () => notStarted });
@@ -155,6 +166,11 @@ describe('facts backend', () => {
       createIdbRepository,
       createNativeRepository,
       readJournal: async () => transitional,
+    });
+    const failedBackend = new FactsBackend({
+      createIdbRepository,
+      createNativeRepository,
+      readJournal: async () => failed,
     });
     const brokenBackend = new FactsBackend({
       createIdbRepository,
@@ -166,6 +182,7 @@ describe('facts backend', () => {
 
     await gate.runFactsOperation('blocked-read', async (lease) => {
       await expect(transitionalBackend.open(lease)).rejects.toMatchObject({ code: 'MIGRATION_IN_PROGRESS' });
+      await expect(failedBackend.open(lease)).rejects.toMatchObject({ code: 'MIGRATION_FAILED' });
       await expect(brokenBackend.open(lease)).rejects.toMatchObject({ code: 'JOURNAL_CORRUPT' });
     });
 

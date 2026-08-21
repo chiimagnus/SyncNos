@@ -260,7 +260,7 @@ Strict Snap/Flatpak observations belong only in `strictSandboxLinux`; `unsupport
     { "name": "host_missing", "outcome": "pending", "observedAt": null, "notes": null },
     { "name": "damaged_registration", "outcome": "pending", "observedAt": null, "notes": null },
     { "name": "lock_busy", "outcome": "pending", "observedAt": null, "notes": null },
-    { "name": "interrupt_resume", "outcome": "pending", "observedAt": null, "notes": null },
+    { "name": "interrupt_recovery", "outcome": "pending", "observedAt": null, "notes": null },
     { "name": "short_cjk_query", "outcome": "pending", "observedAt": null, "notes": null }
   ],
   "strictSandboxLinux": {

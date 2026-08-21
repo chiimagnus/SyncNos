@@ -15,7 +15,9 @@ SQLite 只使用固定的 per-user hidden directory：macOS/Linux 为 `~/.syncno
 | journal / mode | 会话事实 authority | 规则 |
 | --- | --- | --- |
 | `not_started` / `idb-v1` | IndexedDB | `conversations`、`messages`、`sync_mappings`、`image_cache`、`article_comments` 仍由浏览器 profile 的 IDB 提供。 |
-| transitional | 无可绕过的第二 authority | migration gate 阻止不安全的 facts operation；不能一边迁移一边回退读写另一 backend。 |
+| `transitional` | 无可绕过的第二 authority | migration gate 以 `MIGRATION_IN_PROGRESS` 阻止新的 facts operation；不能一边迁移一边回退读写另一 backend。服务进程中断后由 background 根据 durable journal 自动恢复。 |
+| `failed` | 无可绕过的第二 authority | 已捕获的迁移错误作为 terminal diagnostic 留在 journal；普通 facts operation 统一返回生命周期错误 `MIGRATION_FAILED`，不得把底层 `DATABASE_NOT_INITIALIZED`、validation 等原因冒充当前 facts authority。只有用户显式“重新迁移”才会重新进入迁移状态机。 |
+| `blocked` | 无可用 authority | journal/invariant 无法安全解释时保持 fail-closed，并返回对应的结构化阻断错误；不得猜测 backend 或回退 IDB。 |
 | `active` / `native:*` | `~/.syncnoscli/syncnos.sqlite` 或 `%USERPROFILE%\.syncnoscli\syncnos.sqlite`（通过 SyncNos Native Host） | list/detail/tail/search/comments/mapping/capture 等 facts operation 只走 SQLite；浏览器不得因 Host/FTS 错误回退到旧 IDB facts。验证激活与 profile reference rebase 完成后，旧 IDB facts 才按迁移流程清理。 |
 
 `chrome.storage.local` 保存跨界面设置、OAuth 状态、同步配置和 bounded job/profile snapshot；它不是会话正文。`localStorage` / `sessionStorage` 只保存筛选、导航和布局等 UI 临时状态，也不得承载共享 facts。Notion、Obsidian、Feishu 和导出文件都是本地 facts 的派生结果，不能反向成为 conversation authority。
@@ -23,6 +25,8 @@ SQLite 只使用固定的 per-user hidden directory：macOS/Linux 为 `~/.syncno
 `article_comments` 是 article 的独立注释层；根评论可有 locator，回复必须属于同一 article identity 的根线程。删除 conversation 时必须同时清理其消息、mapping 和所属的派生引用。
 
 迁移 journal、provider/OAuth 设置等仍是 browser-profile-local 状态，因此卸载/重装扩展或换 profile 后，即使固定 SQLite 仍存在，也必须重新显式 join；数据库存在本身不是授权。Local Database 没有“关闭后自动回退 IDB”的兼容模式。
+
+`staging` 恢复时，`GET_MIGRATION_RECEIPT` 的语义是“查询该 migration 是否已经在 SQLite 原子提交”。如果 SQLite 尚不存在，它与“该 migration 没有 receipt”等价：background 会从仍受保护的 IndexedDB 源事实重新完整流式导入，真正的 `IMPORT_FACTS` 写路径负责创建 SQLite。进入 `remote_committed` 之后则必须重新证明 matching receipt；此时数据库/receipt 丢失属于提交边界不一致，不能当作首次迁移重新开始。
 
 ## SQLite 全文搜索
 

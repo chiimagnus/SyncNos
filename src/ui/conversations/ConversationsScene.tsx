@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { t } from '@i18n';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowListDetailCommentsRoute';
 import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
@@ -20,6 +21,7 @@ import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { columnDividerRightClassName } from '@ui/shared/column-styles';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
+import { buttonTintClassName } from '@ui/shared/button-styles';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
@@ -72,7 +74,7 @@ export function ConversationsScene({
   wideChrome = 'card',
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
-  const { selectedConversation, openConversationExternalBySourceKey, localSearchSheet, listFacets } =
+  const { selectedConversation, openConversationExternalBySourceKey, localSearchSheet, listFacets, listErrorCode } =
     useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
   const {
@@ -96,7 +98,7 @@ export function ConversationsScene({
   const searchSheetVisible = localSearchSheet.capabilityLoading || localSearchSheet.mode !== 'closed';
 
   useEffect(() => {
-    if (!isNarrow) return;
+    if (!isNarrow || listErrorCode === 'MIGRATION_FAILED') return;
     const pending = consumePendingOpenConversation();
     if (!pending) return;
     let disposed = false;
@@ -107,7 +109,7 @@ export function ConversationsScene({
     return () => {
       disposed = true;
     };
-  }, [isNarrow, openConversationExternalBySourceKey, openDetail]);
+  }, [isNarrow, listErrorCode, openConversationExternalBySourceKey, openDetail]);
 
   useEffect(() => {
     if (!commentsSidebarRuntime) return;
@@ -115,6 +117,32 @@ export function ConversationsScene({
       if (isNarrow && narrowRoute === 'comments') returnToDetail();
     });
   }, [commentsSidebarRuntime, isNarrow, narrowRoute, returnToDetail]);
+
+  if (listErrorCode === 'MIGRATION_FAILED') {
+    return (
+      <div
+        data-conversations-scene-root=""
+        data-local-data-migration-failed=""
+        className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-items-center tw-justify-center tw-bg-[var(--bg-primary)] tw-p-6 tw-text-[var(--text-primary)]"
+      >
+        <section className="tw-w-full tw-max-w-xl tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-p-5 tw-shadow-sm">
+          <h2 className="tw-m-0 tw-text-lg tw-font-extrabold">{t('localDatabaseMigrationFailedTitle')}</h2>
+          <p className="tw-mt-2 tw-text-sm tw-font-medium tw-leading-6 tw-text-[var(--text-secondary)]">
+            {t('localDatabaseMigrationUnavailableBody')}
+          </p>
+          {onOpenSettingsSection ? (
+            <button
+              type="button"
+              className={[buttonTintClassName(), 'tw-mt-4'].join(' ')}
+              onClick={() => onOpenSettingsSection('backup')}
+            >
+              {t('openSettings')}
+            </button>
+          ) : null}
+        </section>
+      </div>
+    );
+  }
 
   const listPane = (
     <ConversationListPane

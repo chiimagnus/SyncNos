@@ -268,5 +268,8 @@ describe('ConversationSearchSheet', () => {
 
     renderSheet(makeController({ searchError: 'busy', searchErrorCode: 'MIGRATION_IN_PROGRESS' }));
     expect(document.body.textContent).toContain('migration is in progress');
+
+    renderSheet(makeController({ searchError: 'failed', searchErrorCode: 'MIGRATION_FAILED' }));
+    expect(document.body.textContent).toContain('migration has stopped');
   });
 });

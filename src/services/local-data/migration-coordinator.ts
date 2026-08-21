@@ -421,8 +421,10 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       supported: environment.supported,
     });
     const hostProbe = await probeHost(environment, nativeRequest);
-    const diagnostics = [...hostProbe.diagnostics];
-    if (snapshot.mode === 'blocked' || snapshot.mode === 'failed') diagnostics.unshift(snapshot.error);
+    const diagnostics =
+      snapshot.mode === 'blocked' || snapshot.mode === 'failed'
+        ? [snapshot.error, ...hostProbe.diagnostics.filter((diagnostic) => diagnostic.code !== snapshot.error.code)]
+        : [...hostProbe.diagnostics];
     const hostReady = hostProbe.host.registration === 'available' && hostProbe.host.compatibility === 'compatible';
     const profileState: LocalDataProfileState = (() => {
       if (snapshot.mode === 'blocked') return 'blocked';
@@ -481,8 +483,17 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     return producedManifest;
   };
 
+  const readMigrationReceipt = async (migrationId: MigrationId): Promise<unknown | null> => {
+    try {
+      return await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId });
+    } catch (error) {
+      if (error instanceof LocalDataContractError && error.code === 'DATABASE_NOT_INITIALIZED') return null;
+      throw error;
+    }
+  };
+
   const recoverStaging = async (migrationId: MigrationId): Promise<FactsManifest> => {
-    const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId });
+    const rawReceipt = await readMigrationReceipt(migrationId);
     if (rawReceipt == null) return await streamStaging(migrationId);
 
     const receipt = parseReceipt(rawReceipt);
@@ -493,7 +504,7 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
   };
 
   const requireDurableReceipt = async (manifest: FactsManifest): Promise<FactsMigrationReceipt> => {
-    const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId: manifest.migrationId });
+    const rawReceipt = await readMigrationReceipt(manifest.migrationId);
     if (rawReceipt == null) throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
     return await requireMatchingReceipt(rawReceipt, manifest, digestProvider);
   };

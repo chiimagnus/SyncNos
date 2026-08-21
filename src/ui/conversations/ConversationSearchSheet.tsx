@@ -29,6 +29,8 @@ function searchErrorMessage(controller: ConversationSearchSheetController): stri
       return t('localSearchFtsUnavailable');
     case 'MIGRATION_IN_PROGRESS':
       return t('localSearchMigrationBusy');
+    case 'MIGRATION_FAILED':
+      return t('localSearchMigrationFailed');
     case 'HOST_UNAVAILABLE':
     case 'DATABASE_NOT_INITIALIZED':
       return t('localSearchHostUnavailable');

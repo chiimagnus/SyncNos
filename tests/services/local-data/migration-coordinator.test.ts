@@ -376,6 +376,47 @@ describe('local data migration coordinator', () => {
     expect((await coordinator.getStatus()).profileState).toBe('active');
   });
 
+  it('retries a failed first migration from IndexedDB when the receipt probe reports that SQLite does not exist yet', async () => {
+    const journal = createJournalRuntime();
+    const io = successfulMigrationIo();
+    io.nativeImport.mockRejectedValueOnce(new LocalDataContractError('DATABASE_NOT_INITIALIZED'));
+    const coordinator = createMigrationCoordinator({
+      gate: createGate(),
+      journalRuntime: journal.runtime,
+      readEnvironment: supportedEnvironment,
+      ...io,
+    });
+
+    await expect(coordinator.start()).rejects.toMatchObject({ code: 'DATABASE_NOT_INITIALIZED' });
+    expect(await readMigrationJournal(journal.runtime)).toMatchObject({
+      mode: 'failed',
+      journal: { stage: 'staging', terminalCode: 'DATABASE_NOT_INITIALIZED' },
+    });
+
+    io.nativeRequest
+      .mockImplementationOnce(async (command: string) => {
+        expect(command).toBe('GET_STATUS');
+        throw new LocalDataContractError('DATABASE_NOT_INITIALIZED');
+      })
+      .mockImplementationOnce(async (command: string) => {
+        expect(command).toBe('GET_MIGRATION_RECEIPT');
+        throw new LocalDataContractError('DATABASE_NOT_INITIALIZED');
+      });
+
+    const failedStatus = await coordinator.getStatus();
+    expect(failedStatus).toMatchObject({
+      profileState: 'migration_failed',
+      database: { presence: 'missing', factsHealth: 'missing' },
+      diagnostics: [{ code: 'DATABASE_NOT_INITIALIZED' }],
+    });
+    expect(failedStatus.diagnostics).toHaveLength(1);
+
+    await expect(coordinator.start()).resolves.toMatchObject({ profileState: 'active' });
+    expect(io.nativeImport).toHaveBeenCalledTimes(2);
+    expect(io.transferFacts).toHaveBeenCalledTimes(1);
+    expect(await readMigrationJournal(journal.runtime)).toMatchObject({ mode: 'active' });
+  });
+
   it('restores a transitional journal after service-worker restart and reopens admissions only after full activation', async () => {
     const journal = createJournalRuntime();
     await beginMigrationJournal(journal.runtime);

@@ -348,6 +348,63 @@ describe('Native Host session', () => {
     expect(stderr.join('')).toContain('rejected');
   });
 
+  it('treats a missing database as an absent migration receipt without weakening other read-only status commands', async () => {
+    const missingDatabase = vi.fn(async () => {
+      throw new LocalDataContractError('DATABASE_NOT_INITIALIZED');
+    });
+    const openReadWriteForHost = vi.fn();
+
+    const receiptOutput = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: missingDatabase,
+        openReadWriteForHost,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([
+          {
+            protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+            schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+            requestId: 'receipt-missing-db',
+            command: 'GET_MIGRATION_RECEIPT',
+            payload: { migrationId: MIGRATION_ID },
+          },
+        ]),
+        stdout: receiptOutput.output,
+      }),
+    ).resolves.toBe(0);
+    await expect(decodedMessages(receiptOutput.frames)).resolves.toMatchObject([
+      { requestId: 'receipt-missing-db', ok: true, data: null },
+    ]);
+    expect(openReadWriteForHost).not.toHaveBeenCalled();
+
+    const statusOutput = outputCollector();
+    await expect(
+      runNativeHost({
+        argv: [nativeHostContract.browsers.chrome.origin],
+        openReadOnly: missingDatabase,
+        openReadWriteForHost,
+        platform: 'darwin',
+        stderr: { write: () => true },
+        stdin: frames([
+          {
+            protocolVersion: LOCAL_DATA_PROTOCOL_VERSION,
+            schemaVersion: LOCAL_DATA_SCHEMA_VERSION,
+            requestId: 'status-missing-db',
+            command: 'GET_STATUS',
+            payload: {},
+          },
+        ]),
+        stdout: statusOutput.output,
+      }),
+    ).resolves.toBe(1);
+    await expect(decodedMessages(statusOutput.frames)).resolves.toMatchObject([
+      { requestId: 'status-missing-db', ok: false, error: { code: 'DATABASE_NOT_INITIALIZED' } },
+    ]);
+    expect(openReadWriteForHost).not.toHaveBeenCalled();
+  });
+
   it('routes complete connected reads through a read-only repository session and strict JSON wire', async () => {
     const root = await mkdtemp(join(tmpdir(), 'syncnoscli-native-host-read-'));
     temporaryRoots.push(root);

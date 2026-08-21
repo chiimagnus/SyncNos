@@ -1,6 +1,10 @@
 import { readMigrationJournal, type MigrationJournalSnapshot } from '@platform/local-data/migration-journal';
-import { LocalDataContractError, assertFactsEpochMatches, createLocalDataError, type FactsEpoch } from './contracts';
-import { assertFactsOperationLease, type FactsOperationLease } from './facts-operation-gate';
+import { assertFactsEpochMatches, createLocalDataError, type FactsEpoch } from './contracts';
+import {
+  assertFactsOperationLease,
+  factsOperationUnavailableError,
+  type FactsOperationLease,
+} from './facts-operation-gate';
 
 export type FactsBackendMode = 'idb' | 'native';
 
@@ -25,11 +29,6 @@ function blockedJournalSnapshot(): MigrationJournalSnapshot {
   };
 }
 
-function journalError(snapshot: MigrationJournalSnapshot): LocalDataContractError {
-  if (snapshot.mode === 'blocked') return new LocalDataContractError(snapshot.error.code, snapshot.error.diagnostics);
-  return new LocalDataContractError('MIGRATION_IN_PROGRESS');
-}
-
 /** Chooses facts storage only after a live lease and the durable journal agree on one backend. */
 export class FactsBackend<TRepository> {
   constructor(private readonly dependencies: FactsBackendDependencies<TRepository>) {}
@@ -44,7 +43,7 @@ export class FactsBackend<TRepository> {
     }
     assertFactsOperationLease(lease);
 
-    if (snapshot.mode !== 'not_started' && snapshot.mode !== 'active') throw journalError(snapshot);
+    if (snapshot.mode !== 'not_started' && snapshot.mode !== 'active') throw factsOperationUnavailableError(snapshot);
     if (expectedFactsEpoch !== undefined) assertFactsEpochMatches(snapshot.factsEpoch, expectedFactsEpoch);
 
     return Object.freeze({

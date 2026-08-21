@@ -24,7 +24,7 @@ const REGRESSION_NAMES = [
   'host_missing',
   'damaged_registration',
   'lock_busy',
-  'interrupt_resume',
+  'interrupt_recovery',
   'short_cjk_query',
 ] as const;
 const SAFARI_CHECKS = [

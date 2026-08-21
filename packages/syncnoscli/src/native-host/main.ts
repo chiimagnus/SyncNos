@@ -179,6 +179,14 @@ async function runSingleMessageCommand(
     );
     return 0;
   } catch (error) {
+    if (
+      request.command === 'GET_MIGRATION_RECEIPT' &&
+      error instanceof LocalDataContractError &&
+      error.code === 'DATABASE_NOT_INITIALIZED'
+    ) {
+      await writeNativeMessage(input.stdout, createHostFactsSuccess(request.requestId, null));
+      return 0;
+    }
     await writeHostFailure(input.stdout, input.stderr, request, error, false);
     return 1;
   } finally {

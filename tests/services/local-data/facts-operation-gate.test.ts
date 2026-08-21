@@ -147,8 +147,7 @@ describe('facts operation gate', () => {
 
     gate.reopenForJournalState(failed);
     await expect(gate.runFactsOperation('failed-read', async () => 'unsafe')).rejects.toMatchObject({
-      code: 'MIGRATION_VALIDATION_FAILED',
-      diagnostics: { factKind: 'messages', sourceLocalId: 20 },
+      code: 'MIGRATION_FAILED',
     });
 
     gate.reopenForJournalState(blocked);

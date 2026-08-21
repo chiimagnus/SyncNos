@@ -17,8 +17,9 @@ export type FactsOperationGateDependencies = Readonly<{
   readJournal?: () => Promise<MigrationJournalSnapshot>;
 }>;
 
-function admissionError(snapshot: MigrationJournalSnapshot | null): LocalDataContractError {
-  if (snapshot?.mode === 'blocked' || snapshot?.mode === 'failed') {
+export function factsOperationUnavailableError(snapshot: MigrationJournalSnapshot | null): LocalDataContractError {
+  if (snapshot?.mode === 'failed') return new LocalDataContractError('MIGRATION_FAILED');
+  if (snapshot?.mode === 'blocked') {
     return new LocalDataContractError(snapshot.error.code, snapshot.error.diagnostics);
   }
   return new LocalDataContractError('MIGRATION_IN_PROGRESS');
@@ -93,7 +94,7 @@ export class FactsOperationGate {
 
   reserveFactsOperation(kind: string): FactsOperationReservation {
     if (typeof kind !== 'string' || !kind.trim()) throw new LocalDataContractError('INVALID_ARGUMENT');
-    if (!this.allowsFactsOperations) throw admissionError(this.#snapshot);
+    if (!this.allowsFactsOperations) throw factsOperationUnavailableError(this.#snapshot);
 
     this.#inFlight += 1;
     const lease = createLease();
