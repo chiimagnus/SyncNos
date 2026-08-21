@@ -165,6 +165,175 @@ describe('backup service', () => {
     expect(entries.has(imageIndex.assets[0].blobPath)).toBe(true);
   });
 
+  it('round-trips complete provider continuity through a real ZIP transfer into an empty database', async () => {
+    const chromeMock = mockChromeStorage({
+      notion_oauth_client_id: 'client-a',
+      notion_parent_page_id: 'parent-a',
+      notion_oauth_token_v1: { accessToken: 'secret-a' },
+    });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const dbA = await openDb();
+    const txA = dbA.transaction(['conversations', 'messages', 'sync_mappings'], 'readwrite');
+    const conversationIdA = await reqToPromise<number>(
+      txA.objectStore('conversations').add({
+        id: 100,
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'continuity-round-trip',
+        title: 'Continuity',
+        url: 'https://chatgpt.com/c/continuity-round-trip',
+        notionPageId: 'page-1',
+        notionPageUrl: 'https://www.notion.so/workspace/page-1',
+        notionWorkspaceSlug: 'workspace',
+        feishuDocId: 'doc-1',
+        warningFlags: [],
+        lastCapturedAt: 10,
+      }) as any,
+    );
+    await reqToPromise(
+      txA.objectStore('messages').add({
+        id: 300,
+        conversationId: conversationIdA,
+        messageKey: 'm1',
+        role: 'assistant',
+        contentText: 'already synced',
+        contentMarkdown: 'already synced',
+        sequence: 1,
+        updatedAt: 20,
+      }) as any,
+    );
+    const mappingIdA = await reqToPromise<number>(
+      txA.objectStore('sync_mappings').add({
+        id: 200,
+        source: 'chatgpt',
+        conversationKey: 'continuity-round-trip',
+        notionPageId: 'page-1',
+        notionPageUrl: 'https://www.notion.so/workspace/page-1',
+        notionWorkspaceSlug: 'workspace',
+        lastSyncedMessageKey: 'm1',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 100,
+        lastSyncedMessageUpdatedAt: 20,
+        notionSections: {
+          conversations: { headingBlockId: 'heading-conversations', recoveredAt: 90 },
+          comments: { headingBlockId: 'heading-comments' },
+        },
+        notionSectionCursors: {
+          conversations: {
+            lastSyncedMessageKey: 'm1',
+            lastSyncedSequence: 1,
+            lastSyncedMessageUpdatedAt: 20,
+          },
+        },
+        notionSectionDigests: {
+          article: { digest: 'article-digest', lastSyncedAt: 100 },
+          comments: { digest: 'comments-digest', lastSyncedAt: 100 },
+        },
+        feishuDocId: 'doc-1',
+        feishuLastContentHash: 'content-hash-1',
+        futureProviderMetadata: { version: 3, nested: { keep: true } },
+        updatedAt: 101,
+      }) as any,
+    );
+    await new Promise<void>((resolve, reject) => {
+      txA.oncomplete = () => resolve();
+      txA.onerror = () => reject(txA.error);
+      txA.onabort = () => reject(txA.error);
+    });
+    dbA.close();
+
+    expect(conversationIdA).toBe(100);
+    expect(mappingIdA).toBe(200);
+
+    const exported = await exportBackupZipV2();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const bundlePath = String(manifest.sources?.[0]?.files?.[0] || '');
+    const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
+    const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
+
+    expect(bundle.syncMapping.id).toBeUndefined();
+    expect(bundle.syncMapping.futureProviderMetadata).toEqual({ version: 3, nested: { keep: true } });
+    expect(config.storageLocal.notion_oauth_token_v1).toBeUndefined();
+
+    // Browser B keeps its own secret while restoring A's portable, non-secret settings.
+    chromeMock.__store.notion_oauth_token_v1 = { accessToken: 'secret-b' };
+    delete chromeMock.__store.notion_oauth_client_id;
+    delete chromeMock.__store.notion_parent_page_id;
+
+    await __closeDbForTests();
+    await deleteDb('webclipper');
+
+    const stats = await importBackupZipV2Merge(entries);
+    expect(stats.conversationsAdded).toBe(1);
+    expect(stats.messagesAdded).toBe(1);
+    expect(stats.mappingsAdded).toBe(1);
+
+    const dbB = await openDb();
+    const txB = dbB.transaction(['conversations', 'messages', 'sync_mappings'], 'readonly');
+    const conversations = await reqToPromise<any[]>(txB.objectStore('conversations').getAll() as any);
+    const messages = await reqToPromise<any[]>(txB.objectStore('messages').getAll() as any);
+    const mappings = await reqToPromise<any[]>(txB.objectStore('sync_mappings').getAll() as any);
+    await new Promise<void>((resolve, reject) => {
+      txB.oncomplete = () => resolve();
+      txB.onerror = () => reject(txB.error);
+      txB.onabort = () => reject(txB.error);
+    });
+    dbB.close();
+
+    expect(conversations).toHaveLength(1);
+    expect(messages).toHaveLength(1);
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0].id).not.toBe(mappingIdA);
+    expect(mappings[0]).toMatchObject({
+      source: 'chatgpt',
+      conversationKey: 'continuity-round-trip',
+      notionPageId: 'page-1',
+      notionPageUrl: 'https://www.notion.so/workspace/page-1',
+      notionWorkspaceSlug: 'workspace',
+      lastSyncedMessageKey: 'm1',
+      lastSyncedSequence: 1,
+      lastSyncedAt: 100,
+      lastSyncedMessageUpdatedAt: 20,
+      notionSections: {
+        conversations: { headingBlockId: 'heading-conversations', recoveredAt: 90 },
+        comments: { headingBlockId: 'heading-comments' },
+      },
+      notionSectionCursors: {
+        conversations: {
+          lastSyncedMessageKey: 'm1',
+          lastSyncedSequence: 1,
+          lastSyncedMessageUpdatedAt: 20,
+        },
+      },
+      notionSectionDigests: {
+        article: { digest: 'article-digest', lastSyncedAt: 100 },
+        comments: { digest: 'comments-digest', lastSyncedAt: 100 },
+      },
+      feishuDocId: 'doc-1',
+      feishuLastContentHash: 'content-hash-1',
+      futureProviderMetadata: { version: 3, nested: { keep: true } },
+    });
+    expect(conversations[0]).toMatchObject({
+      notionPageId: mappings[0].notionPageId,
+      notionPageUrl: mappings[0].notionPageUrl,
+      notionWorkspaceSlug: mappings[0].notionWorkspaceSlug,
+      feishuDocId: mappings[0].feishuDocId,
+    });
+    expect(messages[0]).toMatchObject({
+      conversationId: conversations[0].id,
+      messageKey: 'm1',
+      contentText: 'already synced',
+    });
+    expect(chromeMock.__store.notion_oauth_token_v1).toEqual({ accessToken: 'secret-b' });
+    expect(chromeMock.__store.notion_oauth_client_id).toBe('client-a');
+    expect(chromeMock.__store.notion_parent_page_id).toBe('parent-a');
+  });
+
   it('importBackupZipV2Merge restores image cache and rewrites syncnos-asset urls', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
