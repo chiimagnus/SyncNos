@@ -219,14 +219,21 @@ async function updateCheckedStates(api: any, state: { mode: InpageDisplayMode; a
 let registered = false;
 let removeStorageListener: (() => void) | null = null;
 
-export function registerClipperContextMenu(): void {
+type ContextMenuRegistrationOptions = {
+  localeReady?: Promise<unknown>;
+};
+
+export function registerClipperContextMenu(options: ContextMenuRegistrationOptions = {}): void {
   if (registered) return;
   registered = true;
 
   const api = getMenusApi();
   if (!api) return;
 
-  void createOrRefreshMenus(api);
+  const localeReady = options.localeReady || Promise.resolve();
+  void localeReady
+    .catch(() => undefined)
+    .then(() => createOrRefreshMenus(api));
 
   try {
     api.onClicked?.addListener?.((info: any, _tab: any) => {
@@ -269,12 +276,16 @@ export function registerClipperContextMenu(): void {
   try {
     api.onShown?.addListener?.((info: any, tab: any) => {
       if (!info) return;
-      void refreshSaveMenuTitle(api, tab || null);
-      try {
-        api.refresh?.();
-      } catch (_e) {
-        // ignore
-      }
+      void localeReady
+        .catch(() => undefined)
+        .then(() => refreshSaveMenuTitle(api, tab || null))
+        .then(() => {
+          try {
+            api.refresh?.();
+          } catch (_e) {
+            // ignore
+          }
+        });
     });
   } catch (_e) {
     // ignore
