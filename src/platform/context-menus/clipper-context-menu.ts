@@ -231,9 +231,7 @@ export function registerClipperContextMenu(options: ContextMenuRegistrationOptio
   if (!api) return;
 
   const localeReady = options.localeReady || Promise.resolve();
-  void localeReady
-    .catch(() => undefined)
-    .then(() => createOrRefreshMenus(api));
+  void localeReady.catch(() => undefined).then(() => createOrRefreshMenus(api));
 
   try {
     api.onClicked?.addListener?.((info: any, _tab: any) => {

@@ -35,8 +35,8 @@ async function openAboutSectionAfterInstall(): Promise<void> {
   await openOrFocusExtensionAppTab({ route: '/settings?section=aboutme' });
 }
 
-export default defineBackground(async () => {
-  await initializeLocale();
+export default defineBackground(() => {
+  const localeReady = initializeLocale();
   const services = createBackgroundServices({ getInstanceId: getBackgroundInstanceId });
 
   const router = createBackgroundRouter({
@@ -68,7 +68,7 @@ export default defineBackground(async () => {
     getInstanceId: getBackgroundInstanceId,
     testObsidianConnection: (input) => services.obsidianSyncOrchestrator.testConnection(input),
   });
-  registerUiMessageHandlers(router);
+  registerUiMessageHandlers(router, { localeReady });
   registerSyncHandlers(router, {
     getInstanceId: getBackgroundInstanceId,
     notionSyncOrchestrator: services.notionSyncOrchestrator,
@@ -76,14 +76,24 @@ export default defineBackground(async () => {
     feishuSyncOrchestrator: services.feishuSyncOrchestrator,
   });
 
-  // Keep legacy "start" side-effects that are not message handlers.
+  router.start();
+
   try {
-    ensureDefaultNotionOAuthClientId().catch(() => {});
-    ensureDefaultFeishuOAuthClientId().catch(() => {});
-    ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
     setupNotionOAuthNavigationListener();
+  } catch (_e) {
+    // optional listener registration must not block sibling listeners
+  }
+  try {
     setupFeishuOAuthNavigationListener();
-    registerClipperContextMenu();
+  } catch (_e) {
+    // optional listener registration must not block sibling listeners
+  }
+  try {
+    registerClipperContextMenu({ localeReady });
+  } catch (_e) {
+    // optional listener registration must not block sibling listeners
+  }
+  try {
     onInstalled((details) => {
       ensureDefaultNotionOAuthClientId().catch(() => {});
       ensureDefaultFeishuOAuthClientId().catch(() => {});
@@ -93,8 +103,19 @@ export default defineBackground(async () => {
       openAboutSectionAfterInstall().catch(() => {});
     });
   } catch (_e) {
-    // ignore
+    // optional listener registration must not block sibling listeners
   }
+  try {
+    onAlarm((alarm) => {
+      void services.autoSync.handleAlarm(String(alarm?.name || ''));
+    });
+  } catch (_e) {
+    // optional listener registration must not block sibling listeners
+  }
+
+  void ensureDefaultNotionOAuthClientId().catch(() => {});
+  void ensureDefaultFeishuOAuthClientId().catch(() => {});
+  void ensureDefaultFeishuOAuthProxyUrl().catch(() => {});
 
   try {
     const id = getBackgroundInstanceId();
@@ -102,15 +123,7 @@ export default defineBackground(async () => {
     obsidianSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }).catch(() => {});
     feishuSyncJobStore.abortRunningJobIfFromOtherInstance(id, { forceAbort: true }).catch(() => {});
   } catch (_e) {
-    // ignore
-  }
-
-  try {
-    onAlarm((alarm) => {
-      void services.autoSync.handleAlarm(String(alarm?.name || ''));
-    });
-  } catch (_e) {
-    // ignore
+    // ignore best-effort startup recovery failures
   }
 
   // Best-effort flush for any overdue auto-sync queue items. This complements
@@ -120,8 +133,6 @@ export default defineBackground(async () => {
     void services.autoSync.obsidianScheduler.flush();
     void services.autoSync.feishuScheduler.flush();
   } catch (_e) {
-    // ignore
+    // ignore best-effort startup flush failures
   }
-
-  router.start();
 });
