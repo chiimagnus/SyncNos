@@ -9,7 +9,6 @@ type MigrationRuntimeClient = Readonly<{
 export type LocalDataMigrationClient = Readonly<{
   getFactsRevision: () => Promise<number | null>;
   getStatus: () => Promise<LocalDataMigrationStatus>;
-  resume: () => Promise<LocalDataMigrationStatus>;
   start: () => Promise<LocalDataMigrationStatus>;
 }>;
 
@@ -55,7 +54,6 @@ export function createLocalDataMigrationClient(
     },
     getStatus: async () => await request(LOCAL_DATA_MESSAGE_TYPES.GET_STATUS),
     start: async () => await request(LOCAL_DATA_MESSAGE_TYPES.START_MIGRATION),
-    resume: async () => await request(LOCAL_DATA_MESSAGE_TYPES.RESUME_MIGRATION),
   });
 }
 
@@ -64,4 +62,3 @@ const defaultClient = createLocalDataMigrationClient();
 export const getLocalDataFactsRevision = defaultClient.getFactsRevision;
 export const getLocalDataMigrationStatus = defaultClient.getStatus;
 export const startLocalDataMigration = defaultClient.start;
-export const resumeLocalDataMigration = defaultClient.resume;

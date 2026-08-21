@@ -39,7 +39,7 @@ export type LocalDataMigrationDatabaseStatus = Readonly<{
 }>;
 
 export type LocalDataMigrationJournalStatus = Readonly<{
-  mode: 'not_started' | 'transitional' | 'active' | 'blocked';
+  mode: 'not_started' | 'transitional' | 'failed' | 'active' | 'blocked';
   stage: MigrationJournalStage | null;
   terminalCode?: LocalDataErrorCode;
 }>;
@@ -48,13 +48,13 @@ export type LocalDataProfileState =
   | 'setup_required'
   | 'join_existing_required'
   | 'migration_in_progress'
+  | 'migration_failed'
   | 'active'
   | 'blocked'
   | 'unavailable';
 
 export type LocalDataMigrationStatus = Readonly<{
   actions: Readonly<{
-    canResume: boolean;
     canStart: boolean;
   }>;
   capability: LocalDataMigrationCapability;
@@ -63,7 +63,6 @@ export type LocalDataMigrationStatus = Readonly<{
   host: LocalDataMigrationHostStatus;
   journal: LocalDataMigrationJournalStatus;
   profileState: LocalDataProfileState;
-  resumeReceipt: 'matching' | 'absent' | 'mismatch' | 'unknown' | 'not_applicable';
 }>;
 
 function record(value: unknown): Record<string, unknown> {
@@ -142,7 +141,7 @@ function journal(value: unknown): LocalDataMigrationJournalStatus {
   const input = record(value);
   const allowed = ['mode', 'stage', 'terminalCode'];
   if (Object.keys(input).some((key) => !allowed.includes(key))) throw new Error('invalid local data migration status');
-  const mode = enumeration(input.mode, ['not_started', 'transitional', 'active', 'blocked'] as const);
+  const mode = enumeration(input.mode, ['not_started', 'transitional', 'failed', 'active', 'blocked'] as const);
   const stage = input.stage === null ? null : parseMigrationJournalStage(input.stage);
   let terminalCode: LocalDataErrorCode | undefined;
   if (input.terminalCode !== undefined) {
@@ -151,26 +150,21 @@ function journal(value: unknown): LocalDataMigrationJournalStatus {
   if ((mode === 'not_started' && stage !== 'not_started') || (mode === 'blocked' && stage !== null)) {
     throw new Error('invalid local data migration status');
   }
-  if ((mode === 'transitional' || mode === 'active') && (stage === null || stage === 'not_started')) {
+  if (
+    (mode === 'transitional' || mode === 'failed' || mode === 'active') &&
+    (stage === null || stage === 'not_started')
+  ) {
     throw new Error('invalid local data migration status');
   }
+  if ((mode === 'failed') !== Boolean(terminalCode)) throw new Error('invalid local data migration status');
   return Object.freeze({ mode, stage, ...(terminalCode ? { terminalCode } : {}) });
 }
 
 export function parseLocalDataMigrationStatus(value: unknown): LocalDataMigrationStatus {
   const input = record(value);
-  exactKeys(input, [
-    'actions',
-    'capability',
-    'database',
-    'diagnostics',
-    'host',
-    'journal',
-    'profileState',
-    'resumeReceipt',
-  ]);
+  exactKeys(input, ['actions', 'capability', 'database', 'diagnostics', 'host', 'journal', 'profileState']);
   const actionsInput = record(input.actions);
-  exactKeys(actionsInput, ['canResume', 'canStart']);
+  exactKeys(actionsInput, ['canStart']);
   if (!Array.isArray(input.diagnostics)) throw new Error('invalid local data migration status');
   const parsedCapability = capability(input.capability);
   const parsedDatabase = database(input.database);
@@ -180,6 +174,7 @@ export function parseLocalDataMigrationStatus(value: unknown): LocalDataMigratio
     'setup_required',
     'join_existing_required',
     'migration_in_progress',
+    'migration_failed',
     'active',
     'blocked',
     'unavailable',
@@ -187,8 +182,10 @@ export function parseLocalDataMigrationStatus(value: unknown): LocalDataMigratio
   if (
     (parsedJournal.mode === 'active' && profileState !== 'active') ||
     (parsedJournal.mode === 'transitional' && profileState !== 'migration_in_progress') ||
+    (parsedJournal.mode === 'failed' && profileState !== 'migration_failed') ||
     (parsedJournal.mode === 'blocked' && profileState !== 'blocked') ||
-    (parsedJournal.mode === 'not_started' && ['active', 'migration_in_progress', 'blocked'].includes(profileState)) ||
+    (parsedJournal.mode === 'not_started' &&
+      ['active', 'migration_in_progress', 'migration_failed', 'blocked'].includes(profileState)) ||
     (profileState === 'join_existing_required' &&
       (parsedJournal.mode !== 'not_started' ||
         parsedDatabase.presence !== 'present' ||
@@ -199,20 +196,13 @@ export function parseLocalDataMigrationStatus(value: unknown): LocalDataMigratio
     throw new Error('invalid local data migration status');
   }
   return Object.freeze({
-    actions: Object.freeze({ canResume: boolean(actionsInput.canResume), canStart: boolean(actionsInput.canStart) }),
+    actions: Object.freeze({ canStart: boolean(actionsInput.canStart) }),
     capability: parsedCapability,
     database: parsedDatabase,
     diagnostics: Object.freeze(input.diagnostics.map((entry) => parseLocalDataError(entry))),
     host: parsedHost,
     journal: parsedJournal,
     profileState,
-    resumeReceipt: enumeration(input.resumeReceipt, [
-      'matching',
-      'absent',
-      'mismatch',
-      'unknown',
-      'not_applicable',
-    ] as const),
   });
 }
 

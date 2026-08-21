@@ -189,7 +189,7 @@ describe('local data migration coordinator', () => {
       journal: { mode: 'not_started', stage: 'not_started' },
       host: { registration: 'unavailable', compatibility: 'unknown' },
       database: { presence: 'unknown', factsHealth: 'unknown' },
-      actions: { canStart: false, canResume: false },
+      actions: { canStart: false },
     });
     expect(status.diagnostics[0]?.code).toBe('HOST_UNAVAILABLE');
     expect(journal.readRaw()).toEqual({});
@@ -322,11 +322,58 @@ describe('local data migration coordinator', () => {
     await expect(coordinator.start()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
 
     const snapshot = await readMigrationJournal(journal.runtime);
-    expect(snapshot.mode).toBe('transitional');
-    if (snapshot.mode === 'transitional') {
+    expect(snapshot.mode).toBe('failed');
+    if (snapshot.mode === 'failed') {
       expect(snapshot.journal).toMatchObject({ stage: 'staging', terminalCode: 'MIGRATION_VALIDATION_FAILED' });
+      expect(snapshot.error.code).toBe('MIGRATION_VALIDATION_FAILED');
     }
     expect(gate.isClosed()).toBe(true);
+  });
+
+  it('persists safe fact diagnostics and reports validation as a terminal retry state instead of in-progress', async () => {
+    const journal = createJournalRuntime();
+    const io = successfulMigrationIo();
+    io.transferFacts.mockRejectedValueOnce(
+      new LocalDataContractError('MIGRATION_VALIDATION_FAILED', {
+        factKind: 'messages',
+        sourceLocalId: 20,
+        stage: 'staging',
+      }),
+    );
+    const coordinator = createMigrationCoordinator({
+      gate: createGate(),
+      journalRuntime: journal.runtime,
+      nativeRequest: io.nativeRequest,
+      readEnvironment: supportedEnvironment,
+      ...io,
+    });
+
+    await expect(coordinator.start()).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+      diagnostics: { factKind: 'messages', sourceLocalId: 20, stage: 'staging' },
+    });
+
+    const status = await coordinator.getStatus();
+    expect(status).toMatchObject({
+      profileState: 'migration_failed',
+      actions: { canStart: true },
+      journal: { mode: 'failed', stage: 'staging', terminalCode: 'MIGRATION_VALIDATION_FAILED' },
+      diagnostics: [
+        {
+          code: 'MIGRATION_VALIDATION_FAILED',
+          diagnostics: { factKind: 'messages', sourceLocalId: 20, stage: 'staging' },
+        },
+      ],
+    });
+    expect(io.transferFacts).toHaveBeenCalledTimes(1);
+
+    await coordinator.recover();
+    expect(io.transferFacts).toHaveBeenCalledTimes(1);
+    expect((await coordinator.getStatus()).profileState).toBe('migration_failed');
+
+    await coordinator.start();
+    expect(io.transferFacts).toHaveBeenCalledTimes(2);
+    expect((await coordinator.getStatus()).profileState).toBe('active');
   });
 
   it('restores a transitional journal after service-worker restart and reopens admissions only after full activation', async () => {
@@ -344,13 +391,14 @@ describe('local data migration coordinator', () => {
       ...successfulMigrationIo(),
     });
 
-    const status = await coordinator.resume();
+    await coordinator.recover();
+    const status = await coordinator.getStatus();
 
     expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
     expect(gate.allowsFactsOperations).toBe(true);
   });
 
-  it('reports only whether the current transitional migration has a matching Host receipt', async () => {
+  it('keeps receipt reconciliation internal instead of exposing it through status', async () => {
     const journal = createJournalRuntime();
     await beginMigrationJournal(journal.runtime);
     const receipt = await receiptFor(emptyManifest());
@@ -368,9 +416,10 @@ describe('local data migration coordinator', () => {
 
     const status = await coordinator.getStatus();
 
-    expect(status.resumeReceipt).toBe('matching');
+    expect(status.profileState).toBe('migration_in_progress');
     expect(JSON.stringify(status)).not.toContain(receipt.manifestDigest);
-    expect(nativeRequest.mock.calls.map((call) => call[0])).toEqual(['GET_STATUS', 'GET_MIGRATION_RECEIPT']);
+    expect(JSON.stringify(status)).not.toContain('resume');
+    expect(nativeRequest.mock.calls.map((call) => call[0])).toEqual(['GET_STATUS']);
   });
 
   it('rejects Safari before journal creation or Native access', async () => {
@@ -433,13 +482,13 @@ describe('local data migration coordinator', () => {
     expect((await readMigrationJournal(journal.runtime)).mode).toBe('not_started');
   });
 
-  it('registers strict empty status/start/resume messages and surfaces typed error codes', async () => {
+  it('registers strict empty status/start messages and surfaces typed error codes', async () => {
     const coordinator = {
       getStatus: vi.fn(async () => ({ ok: 'status' })),
       start: vi.fn(async () => {
         throw new LocalDataContractError('MIGRATION_IN_PROGRESS');
       }),
-      resume: vi.fn(async () => ({ ok: 'resume' })),
+      recover: vi.fn(async () => {}),
     } as any;
     const handlers = new Map<string, (message: unknown) => Promise<unknown>>();
     const router = {

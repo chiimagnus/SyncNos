@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { migrationProfileReferencePatchDigest } from '@platform/local-data/migration-journal';
-import { LocalDataContractError } from '@services/local-data/contracts';
 import {
   createProfileReferenceRebase,
   MIGRATION_PROFILE_SIDECAR_STORAGE_KEYS,
@@ -186,7 +185,10 @@ describe('migration profile reference rebase', () => {
       validateNativeReference: async () => false,
     });
 
-    await expect(rebase.buildPatch()).rejects.toMatchObject({ code: 'MIGRATION_RECEIPT_MISMATCH' });
+    await expect(rebase.buildPatch()).rejects.toMatchObject({
+      code: 'MIGRATION_RECEIPT_MISMATCH',
+      diagnostics: { field: 'profileReferences.nativeReference' },
+    });
     expect(storage.set).not.toHaveBeenCalled();
   });
 
@@ -286,7 +288,10 @@ describe('migration profile reference rebase', () => {
       validateNativeReference: async () => true,
     });
 
-    await expect(rebase.buildPatch()).rejects.toBeInstanceOf(LocalDataContractError);
+    await expect(rebase.buildPatch()).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+      diagnostics: { field: 'profileReferences.notion.queue' },
+    });
     expect(storage.set).not.toHaveBeenCalled();
   });
 });

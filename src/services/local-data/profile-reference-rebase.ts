@@ -60,6 +60,17 @@ function invalid(): never {
   throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
 }
 
+function withDiagnosticField<T>(field: string, callback: () => T): T {
+  try {
+    return callback();
+  } catch (error) {
+    if (error instanceof LocalDataContractError && error.code === 'MIGRATION_VALIDATION_FAILED') {
+      throw new LocalDataContractError(error.code, { ...(error.diagnostics ?? {}), field });
+    }
+    throw error;
+  }
+}
+
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid();
   return value as Record<string, unknown>;
@@ -230,7 +241,9 @@ function patchFromStoredSidecars(
     const queueKey = AUTO_SYNC_QUEUE_STORAGE_KEYS[provider];
     const jobKey = SYNC_JOB_STORAGE_KEYS[provider];
     if (!Object.hasOwn(stored, queueKey) || !Object.hasOwn(stored, jobKey)) invalid();
-    const queue = parseStoredQueue(provider, stored[queueKey]);
+    const queue = withDiagnosticField(`profileReferences.${provider}.queue`, () =>
+      parseStoredQueue(provider, stored[queueKey]),
+    );
     if (queue.kind !== 'stable') invalid();
     queues[provider] = queue.entries;
     syncJobs[provider] = stored[jobKey] as MigrationReferenceFreeSyncJob | null;
@@ -260,7 +273,9 @@ export function createProfileReferenceRebase(dependencies: ProfileReferenceRebas
     const parsedQueues = new Map<MigrationProfileProvider, ParsedQueue>();
     const legacyIds = new Set<number>();
     for (const provider of MIGRATION_PROFILE_PROVIDERS) {
-      const queue = parseStoredQueue(provider, stored[AUTO_SYNC_QUEUE_STORAGE_KEYS[provider]]);
+      const queue = withDiagnosticField(`profileReferences.${provider}.queue`, () =>
+        parseStoredQueue(provider, stored[AUTO_SYNC_QUEUE_STORAGE_KEYS[provider]]),
+      );
       parsedQueues.set(provider, queue);
       if (queue.kind === 'legacy') {
         for (const entry of queue.entries) legacyIds.add(entry.conversationId);
@@ -314,14 +329,16 @@ export function createProfileReferenceRebase(dependencies: ProfileReferenceRebas
 
     for (const reference of referencesToValidate.values()) {
       if (!(await dependencies.validateNativeReference(reference))) {
-        throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
+        throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH', { field: 'profileReferences.nativeReference' });
       }
     }
 
     const currentTime = nonNegativeInteger(now());
     const syncJobs = {} as Record<MigrationProfileProvider, MigrationReferenceFreeSyncJob | null>;
     for (const provider of MIGRATION_PROFILE_PROVIDERS) {
-      syncJobs[provider] = parseCurrentJob(provider, stored[SYNC_JOB_STORAGE_KEYS[provider]], currentTime);
+      syncJobs[provider] = withDiagnosticField(`profileReferences.${provider}.job`, () =>
+        parseCurrentJob(provider, stored[SYNC_JOB_STORAGE_KEYS[provider]], currentTime),
+      );
     }
 
     return parseMigrationProfileReferencePatch({

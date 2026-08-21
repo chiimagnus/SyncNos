@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
   getInsightFactsSnapshot: vi.fn(),
   startMigration: vi.fn(),
-  resumeMigration: vi.fn(),
   send: vi.fn(),
   storageGet: vi.fn(),
   storageSet: vi.fn(),
@@ -20,7 +19,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@services/local-data/client', () => ({
   getLocalDataMigrationStatus: mocks.getStatus,
   startLocalDataMigration: mocks.startMigration,
-  resumeLocalDataMigration: mocks.resumeMigration,
 }));
 
 vi.mock('@services/insight/client', () => ({
@@ -102,12 +100,16 @@ function setupStatus(
     profileState === 'active'
       ? ({ mode: 'active', stage: 'active' } as const)
       : profileState === 'migration_in_progress'
-        ? ({ mode: 'transitional', stage: 'staging', migrationId: '11111111-1111-4111-8111-111111111111' } as const)
-        : ({ mode: 'not_started', stage: 'not_started' } as const);
+        ? ({ mode: 'transitional', stage: 'staging' } as const)
+        : profileState === 'migration_failed'
+          ? ({ mode: 'failed', stage: 'staging', terminalCode: 'MIGRATION_VALIDATION_FAILED' } as const)
+          : ({ mode: 'not_started', stage: 'not_started' } as const);
   return {
     actions: {
-      canStart: profileState === 'setup_required' || profileState === 'join_existing_required',
-      canResume: profileState === 'migration_in_progress',
+      canStart:
+        profileState === 'setup_required' ||
+        profileState === 'join_existing_required' ||
+        profileState === 'migration_failed',
     },
     capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
     database: {
@@ -116,11 +118,19 @@ function setupStatus(
       factsRevision: profileState === 'setup_required' ? null : 1,
       ftsAvailable: profileState === 'setup_required' ? null : true,
     },
-    diagnostics: [],
+    diagnostics:
+      profileState === 'migration_failed'
+        ? [
+            {
+              code: 'MIGRATION_VALIDATION_FAILED',
+              message: 'The migration facts could not be validated.',
+              retryable: false,
+            },
+          ]
+        : [],
     host: { registration: 'available', compatibility: 'compatible' },
     journal,
     profileState,
-    resumeReceipt: profileState === 'migration_in_progress' ? 'absent' : 'not_applicable',
   } as LocalDataMigrationStatus;
 }
 
@@ -194,7 +204,6 @@ describe('settings Local Database status controller', () => {
     mocks.getStatus.mockReset();
     mocks.getInsightFactsSnapshot.mockReset();
     mocks.startMigration.mockReset();
-    mocks.resumeMigration.mockReset();
     mocks.send.mockReset();
     mocks.storageGet.mockReset();
     mocks.storageSet.mockReset();
@@ -227,7 +236,6 @@ describe('settings Local Database status controller', () => {
       totalMessages: 3,
     });
     mocks.startMigration.mockResolvedValue(setupStatus('active'));
-    mocks.resumeMigration.mockResolvedValue(setupStatus('active'));
     mocks.storageGet.mockResolvedValue({});
     mocks.storageSet.mockResolvedValue(undefined);
     mocks.storageRemove.mockResolvedValue(undefined);
@@ -403,19 +411,26 @@ describe('settings Local Database status controller', () => {
     });
   });
 
-  it('performs one status reload after a resume terminal and never reopens the confirmation dialog', async () => {
-    mocks.getStatus.mockResolvedValue(setupStatus('migration_in_progress'));
+  it('retries a terminal failure through start and does not duplicate the same failure outside typed status diagnostics', async () => {
+    const failed = setupStatus('migration_failed');
+    mocks.getStatus.mockResolvedValue(failed);
+    mocks.startMigration.mockRejectedValueOnce(new Error('The migration facts could not be validated.'));
     await renderSection('backup');
     expect(mocks.getStatus).toHaveBeenCalledTimes(1);
 
+    act(() => latest.onLocalDataRequestMigration());
+    expect(latest.localDataMigrationDialogMode).toBe('retry');
+
     await act(async () => {
-      await latest.onLocalDataResumeMigration();
+      await latest.onLocalDataConfirmMigration();
       await flush();
     });
 
-    expect(mocks.resumeMigration).toHaveBeenCalledTimes(1);
+    expect(mocks.startMigration).toHaveBeenCalledTimes(1);
     expect(mocks.getStatus).toHaveBeenCalledTimes(2);
     expect(latest.localDataMigrationDialogMode).toBeNull();
+    expect(latest.localDataStatus?.profileState).toBe('migration_failed');
+    expect(latest.localDataStatusError).toBe('');
   });
 
   it('copies fixed setup help through the Clipboard API without any command execution surface', async () => {

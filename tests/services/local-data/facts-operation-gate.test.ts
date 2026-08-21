@@ -28,6 +28,18 @@ const transitional = {
   journal: { stage: 'staging' },
 } as unknown as MigrationJournalSnapshot;
 
+const failed = {
+  mode: 'failed',
+  factsEpoch: null,
+  journal: { stage: 'staging', terminalCode: 'MIGRATION_VALIDATION_FAILED' },
+  error: {
+    code: 'MIGRATION_VALIDATION_FAILED',
+    message: 'The migration facts could not be validated.',
+    retryable: false,
+    diagnostics: { factKind: 'messages', sourceLocalId: 20, stage: 'staging' },
+  },
+} as unknown as MigrationJournalSnapshot;
+
 const blocked = {
   mode: 'blocked',
   factsEpoch: null,
@@ -132,6 +144,12 @@ describe('facts operation gate', () => {
 
     gate.reopenForJournalState(active);
     await expect(gate.runFactsOperation('native-read', async () => 'safe')).resolves.toBe('safe');
+
+    gate.reopenForJournalState(failed);
+    await expect(gate.runFactsOperation('failed-read', async () => 'unsafe')).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+      diagnostics: { factKind: 'messages', sourceLocalId: 20 },
+    });
 
     gate.reopenForJournalState(blocked);
     await expect(gate.runFactsOperation('corrupt-read', async () => 'unsafe')).rejects.toMatchObject({

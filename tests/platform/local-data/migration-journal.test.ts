@@ -15,7 +15,6 @@ import {
   advanceMigrationJournal,
   beginMigrationJournal,
   factsEpochForMigrationJournal,
-  migrationJournalResumeAction,
   readMigrationJournal,
   recordMigrationJournalFailure,
   type MigrationJournal,
@@ -148,7 +147,6 @@ describe('migration journal', () => {
     const notStarted = await readMigrationJournal(runtime);
     expect(notStarted).toEqual({ mode: 'not_started', journal: null, factsEpoch: IDB_FACTS_EPOCH, error: null });
     expect(factsEpochForMigrationJournal(notStarted)).toBe(IDB_FACTS_EPOCH);
-    expect(migrationJournalResumeAction(notStarted)).toBe('start');
 
     const staging = await beginMigrationJournal(runtime);
     expect(staging).toMatchObject({
@@ -204,7 +202,6 @@ describe('migration journal', () => {
     expect(activeSnapshot.mode).toBe('active');
     expect(activeSnapshot.factsEpoch).toBe(`native:${MIGRATION_ID}`);
     expect(factsEpochForMigrationJournal(activeSnapshot)).toBe(`native:${MIGRATION_ID}`);
-    expect(migrationJournalResumeAction(activeSnapshot)).toBe('active');
 
     const storedActive = JSON.stringify(storage.raw());
     expect(storedActive).not.toContain('conversation-a');
@@ -244,7 +241,6 @@ describe('migration journal', () => {
 
     const restarted = await readMigrationJournal(createRuntime(storage));
     expect(restarted.mode).toBe('transitional');
-    expect(migrationJournalResumeAction(restarted)).toBe('apply-profile-reference-patch');
     expect(restarted.journal).toEqual(profileRefsPending);
 
     const retried = await advanceMigrationJournal(
@@ -264,17 +260,31 @@ describe('migration journal', () => {
     expect((await readMigrationJournal(runtime)).factsEpoch).toBe(`native:${MIGRATION_ID}`);
   });
 
-  it('retains recoverable errors at their stage but never uses an error as a fallback mode', async () => {
+  it('records terminal failures as a distinct failed mode while retaining the durable stage', async () => {
     const storage = new MemoryStorage();
     const runtime = createRuntime(storage);
     const remote = await advanceToRemote(storage, runtime);
-    const failed = await recordMigrationJournalFailure({ expected: remote, terminalCode: 'HOST_UNAVAILABLE' }, runtime);
+    const failed = await recordMigrationJournalFailure(
+      {
+        expected: remote,
+        terminalCode: 'HOST_UNAVAILABLE',
+        terminalDiagnostics: { factKind: 'messages', sourceLocalId: 21, stage: 'remote_committed' },
+      },
+      runtime,
+    );
 
-    expect(failed).toMatchObject({ stage: 'remote_committed', terminalCode: 'HOST_UNAVAILABLE' });
+    expect(failed).toMatchObject({
+      stage: 'remote_committed',
+      terminalCode: 'HOST_UNAVAILABLE',
+      terminalDiagnostics: { factKind: 'messages', sourceLocalId: 21, stage: 'remote_committed' },
+    });
     const snapshot = await readMigrationJournal(runtime);
-    expect(snapshot.mode).toBe('transitional');
+    expect(snapshot.mode).toBe('failed');
     expect(snapshot.factsEpoch).toBeNull();
-    expect(migrationJournalResumeAction(snapshot)).toBe('verify-remote-receipt-and-create-profile-reference-patch');
+    expect(snapshot.error).toMatchObject({
+      code: 'HOST_UNAVAILABLE',
+      diagnostics: { factKind: 'messages', sourceLocalId: 21, stage: 'remote_committed' },
+    });
 
     const resumed = await advanceMigrationJournal({ expected: failed, stage: 'remote_committed' }, runtime);
     expect(resumed.stage).toBe('remote_committed');
@@ -336,9 +346,7 @@ describe('migration journal', () => {
     );
     storage.failSet = false;
     expect(storage.raw()).toEqual(rawRemote);
-    expect(migrationJournalResumeAction(await readMigrationJournal(runtime))).toBe(
-      'verify-remote-receipt-and-create-profile-reference-patch',
-    );
+    expect((await readMigrationJournal(runtime)).mode).toBe('transitional');
 
     storage.rewrite = (items) => ({
       [MIGRATION_JOURNAL_STORAGE_KEY]: {
@@ -357,7 +365,6 @@ describe('migration journal', () => {
     storage.rewrite = null;
     const blocked = await readMigrationJournal(runtime);
     expect(blocked).toMatchObject({ mode: 'blocked', factsEpoch: null, error: { code: 'JOURNAL_CORRUPT' } });
-    expect(migrationJournalResumeAction(blocked)).toBe('blocked');
   });
 
   it('treats a tampered profile patch or digest as blocked and leaves it in place for recovery', async () => {

@@ -24,14 +24,12 @@ import {
   LOCAL_DATA_SCHEMA_VERSION,
   MIGRATION_FACT_KINDS,
   LocalDataContractError,
-  createLocalDataError,
   parseBrowserRuntimeFactsRequest,
   parseFactsMigrationReceipt,
   parseMigrationId,
   type BrowserRuntimeFactsCommand,
   type FactsMigrationReceipt,
   type LocalDataError,
-  type LocalDataErrorCode,
   type MigrationId,
   type StableConversationReference,
 } from './contracts';
@@ -92,7 +90,7 @@ export type MigrationCoordinatorDependencies = Readonly<{
 export type MigrationCoordinator = Readonly<{
   getFactsRevision: () => Promise<number | null>;
   getStatus: () => Promise<LocalDataMigrationStatus>;
-  resume: () => Promise<LocalDataMigrationStatus>;
+  recover: () => Promise<void>;
   start: () => Promise<LocalDataMigrationStatus>;
 }>;
 
@@ -273,20 +271,23 @@ function parseHostStatus(value: unknown): Readonly<{ factsRevision: number; ftsA
   return Object.freeze({ factsRevision, ftsAvailable: fts.available });
 }
 
-function errorCode(error: unknown, fallback: LocalDataErrorCode): LocalDataErrorCode {
-  const diagnostic = safeMigrationDiagnostic(error, fallback);
-  return diagnostic.code;
-}
-
 async function persistFailure(
   journal: Exclude<MigrationJournal, { stage: 'active' }>,
   error: unknown,
   dependencies: MigrationCoordinatorDependencies,
 ): Promise<void> {
-  const terminalCode = errorCode(error, 'MIGRATION_VALIDATION_FAILED');
-  const failed = await recordMigrationJournalFailure({ expected: journal, terminalCode }, dependencies.journalRuntime);
+  const diagnostic = safeMigrationDiagnostic(error, 'MIGRATION_VALIDATION_FAILED');
+  const terminalDiagnostics = { ...(diagnostic.diagnostics ?? {}), stage: journal.stage };
+  const failed = await recordMigrationJournalFailure(
+    {
+      expected: journal,
+      terminalCode: diagnostic.code,
+      terminalDiagnostics,
+    },
+    dependencies.journalRuntime,
+  );
   const snapshot = await readMigrationJournal(dependencies.journalRuntime);
-  if (snapshot.mode === 'transitional' && snapshot.journal.migrationId === failed.migrationId) {
+  if (snapshot.mode === 'failed' && snapshot.journal.migrationId === failed.migrationId) {
     dependencies.gate.reopenForJournalState(snapshot);
   }
 }
@@ -369,40 +370,6 @@ async function probeHost(
   }
 }
 
-async function probeReceipt(
-  snapshot: MigrationJournalSnapshot,
-  host: LocalDataMigrationHostStatus,
-  database: LocalDataMigrationDatabaseStatus,
-  nativeRequest: MigrationNativeRequest,
-  diagnostics: LocalDataError[],
-  digestProvider: DigestProvider,
-): Promise<LocalDataMigrationStatus['resumeReceipt']> {
-  if (snapshot.mode !== 'transitional') return 'not_applicable';
-  if (host.registration !== 'available' || host.compatibility !== 'compatible') return 'unknown';
-  if (database.presence === 'missing') return 'absent';
-  if (database.presence !== 'present') return 'unknown';
-  try {
-    const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId: snapshot.journal.migrationId });
-    if (rawReceipt == null) return 'absent';
-    const receipt =
-      'manifest' in snapshot.journal
-        ? await requireMatchingReceipt(rawReceipt, snapshot.journal.manifest, digestProvider)
-        : parseReceipt(rawReceipt);
-    if (receipt.migrationId !== snapshot.journal.migrationId) {
-      throw new LocalDataContractError('MIGRATION_RECEIPT_MISMATCH');
-    }
-    return 'matching';
-  } catch (error) {
-    const diagnostic = safeMigrationDiagnostic(error, 'MIGRATION_RECEIPT_MISMATCH');
-    diagnostics.push(diagnostic);
-    return diagnostic.code === 'MIGRATION_RECEIPT_MISMATCH' ||
-      diagnostic.code === 'PROTOCOL_MISMATCH' ||
-      diagnostic.code === 'SCHEMA_MISMATCH'
-      ? 'mismatch'
-      : 'unknown';
-  }
-}
-
 function migrationError(error: unknown): LocalDataContractError {
   if (error instanceof LocalDataContractError) return error;
   return new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
@@ -455,21 +422,11 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     });
     const hostProbe = await probeHost(environment, nativeRequest);
     const diagnostics = [...hostProbe.diagnostics];
-    if (snapshot.mode === 'blocked') diagnostics.unshift(snapshot.error);
-    if (snapshot.mode === 'transitional' && snapshot.journal.terminalCode) {
-      diagnostics.unshift(createLocalDataError(snapshot.journal.terminalCode, { stage: snapshot.journal.stage }));
-    }
-    const resumeReceipt = await probeReceipt(
-      snapshot,
-      hostProbe.host,
-      hostProbe.database,
-      nativeRequest,
-      diagnostics,
-      digestProvider,
-    );
+    if (snapshot.mode === 'blocked' || snapshot.mode === 'failed') diagnostics.unshift(snapshot.error);
     const hostReady = hostProbe.host.registration === 'available' && hostProbe.host.compatibility === 'compatible';
     const profileState: LocalDataProfileState = (() => {
       if (snapshot.mode === 'blocked') return 'blocked';
+      if (snapshot.mode === 'failed') return 'migration_failed';
       if (snapshot.mode === 'active') return 'active';
       if (snapshot.mode === 'transitional') return 'migration_in_progress';
       if (!capability.supported || !capability.officialIdentity || !hostReady) return 'unavailable';
@@ -479,8 +436,11 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     })();
     return Object.freeze({
       actions: Object.freeze({
-        canStart: snapshot.mode === 'not_started' && capability.supported && capability.officialIdentity && hostReady,
-        canResume: snapshot.mode === 'transitional' && capability.supported && capability.officialIdentity && hostReady,
+        canStart:
+          (snapshot.mode === 'not_started' || snapshot.mode === 'failed') &&
+          capability.supported &&
+          capability.officialIdentity &&
+          hostReady,
       }),
       capability,
       database: hostProbe.database,
@@ -488,7 +448,6 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       host: hostProbe.host,
       journal: journalStatus(snapshot),
       profileState,
-      resumeReceipt,
     });
   };
 
@@ -522,7 +481,7 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     return producedManifest;
   };
 
-  const resumeStaging = async (migrationId: MigrationId): Promise<FactsManifest> => {
+  const recoverStaging = async (migrationId: MigrationId): Promise<FactsManifest> => {
     const rawReceipt = await nativeRequest('GET_MIGRATION_RECEIPT', { migrationId });
     if (rawReceipt == null) return await streamStaging(migrationId);
 
@@ -555,21 +514,38 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
     return snapshot.journal;
   };
 
-  const runTransition = async (kind: 'start' | 'resume'): Promise<LocalDataMigrationStatus> => {
+  const runTransition = async (kind: 'start' | 'recover'): Promise<LocalDataMigrationStatus> => {
     if (transitionRunning) throw new LocalDataContractError('MIGRATION_IN_PROGRESS');
     transitionRunning = true;
     let journal: Exclude<MigrationJournal, { stage: 'active' }> | null = null;
     try {
       const environment = await readEnvironment();
       assertEnvironment(environment);
+      const initial = await readMigrationJournal(dependencies.journalRuntime);
+      let recoveringExistingJournal = false;
       if (kind === 'start') {
-        journal = await beginMigrationJournal(dependencies.journalRuntime);
+        if (initial.mode === 'blocked') {
+          throw new LocalDataContractError(initial.error.code, initial.error.diagnostics);
+        }
+        if (initial.mode === 'not_started') {
+          journal = await beginMigrationJournal(dependencies.journalRuntime);
+        } else if (initial.mode === 'failed') {
+          journal = initial.journal;
+          recoveringExistingJournal = true;
+        } else {
+          throw new LocalDataContractError('MIGRATION_IN_PROGRESS');
+        }
       } else {
-        const snapshot = await readMigrationJournal(dependencies.journalRuntime);
-        if (snapshot.mode === 'blocked')
-          throw new LocalDataContractError(snapshot.error.code, snapshot.error.diagnostics);
-        if (snapshot.mode !== 'transitional') throw new LocalDataContractError('INVALID_ARGUMENT');
-        journal = snapshot.journal;
+        if (initial.mode !== 'transitional') throw new LocalDataContractError('INVALID_ARGUMENT');
+        journal = initial.journal;
+        recoveringExistingJournal = true;
+      }
+
+      if (initial.mode === 'failed') {
+        journal = (await advanceMigrationJournal(
+          { expected: journal, stage: journal.stage },
+          dependencies.journalRuntime,
+        )) as Exclude<MigrationJournal, { stage: 'active' }>;
       }
 
       dependencies.gate.closeAdmissions();
@@ -581,8 +557,9 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
       await dependencies.gate.waitForDrained();
 
       if (journal.stage === 'staging') {
-        const manifest =
-          kind === 'resume' ? await resumeStaging(journal.migrationId) : await streamStaging(journal.migrationId);
+        const manifest = recoveringExistingJournal
+          ? await recoverStaging(journal.migrationId)
+          : await streamStaging(journal.migrationId);
         const migrationId = journal.migrationId;
         await advanceMigrationJournal(
           { expected: journal, stage: 'remote_committed', manifest },
@@ -649,8 +626,12 @@ export function createMigrationCoordinator(dependencies: MigrationCoordinatorDep
   return Object.freeze({
     getFactsRevision,
     getStatus,
+    recover: async () => {
+      const snapshot = await readMigrationJournal(dependencies.journalRuntime);
+      if (snapshot.mode !== 'transitional') return;
+      await runTransition('recover');
+    },
     start: async () => await runTransition('start'),
-    resume: async () => await runTransition('resume'),
   });
 }
 
@@ -694,14 +675,6 @@ export function registerMigrationCoordinatorHandlers(router: MigrationRouter, co
     try {
       parseEmptyMigrationMessage(message, 'START_LOCAL_DATA_MIGRATION');
       return router.ok(await coordinator.start());
-    } catch (error) {
-      return handlerError(router, error);
-    }
-  });
-  router.register(LOCAL_DATA_MESSAGE_TYPES.RESUME_MIGRATION, async (message) => {
-    try {
-      parseEmptyMigrationMessage(message, 'RESUME_LOCAL_DATA_MIGRATION');
-      return router.ok(await coordinator.resume());
     } catch (error) {
       return handlerError(router, error);
     }

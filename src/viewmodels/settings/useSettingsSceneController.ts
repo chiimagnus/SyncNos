@@ -36,11 +36,7 @@ import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageRemove, storageSet } from '@services/shared/storage';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
-import {
-  getLocalDataMigrationStatus,
-  resumeLocalDataMigration,
-  startLocalDataMigration,
-} from '@services/local-data/client';
+import { getLocalDataMigrationStatus, startLocalDataMigration } from '@services/local-data/client';
 import type { LocalDataMigrationStatus } from '@services/local-data/migration-status';
 import { getInsightFactsSnapshot } from '@services/insight/client';
 import {
@@ -254,7 +250,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [localDataStatusLoading, setLocalDataStatusLoading] = useState(false);
   const [localDataStatusError, setLocalDataStatusError] = useState('');
   const [localDataActionBusy, setLocalDataActionBusy] = useState(false);
-  const [localDataMigrationDialogMode, setLocalDataMigrationDialogMode] = useState<'start' | 'join' | null>(null);
+  const [localDataMigrationDialogMode, setLocalDataMigrationDialogMode] = useState<'start' | 'join' | 'retry' | null>(
+    null,
+  );
   const [localDataCopiedHelpText, setLocalDataCopiedHelpText] = useState('');
   const localDataMountedRef = useRef(false);
   const localDataActiveSectionRef = useRef(activeSection);
@@ -1503,6 +1501,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       return;
     }
     if (localDataStatus.profileState === 'setup_required') setLocalDataMigrationDialogMode('start');
+    else if (localDataStatus.profileState === 'migration_failed') setLocalDataMigrationDialogMode('retry');
   }, [localDataStatus, localDataStatusLoading]);
 
   const onLocalDataCancelMigration = useCallback(() => {
@@ -1510,43 +1509,39 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setLocalDataMigrationDialogMode(null);
   }, []);
 
-  const runLocalDataAction = useCallback(
-    async (action: 'start' | 'resume') => {
-      if (localDataActionBusyRef.current) return;
-      localDataActionBusyRef.current = true;
-      setLocalDataActionBusy(true);
-      setLocalDataStatusError('');
-      let actionError = '';
-      try {
-        if (action === 'start') await startLocalDataMigration();
-        else await resumeLocalDataMigration();
-      } catch (error) {
-        actionError = toErrorMessage(error, t('localDatabaseActionFailed'));
-      } finally {
-        localDataStatusDirtyRef.current = true;
-        setLocalDataMigrationDialogMode(null);
-        if (localDataMountedRef.current && localDataActiveSectionRef.current === 'backup') {
-          await loadLocalDataStatus();
-          if (actionError && localDataMountedRef.current && localDataActiveSectionRef.current === 'backup') {
-            setLocalDataStatusError(actionError);
-          }
+  const runLocalDataAction = useCallback(async () => {
+    if (localDataActionBusyRef.current) return;
+    localDataActionBusyRef.current = true;
+    setLocalDataActionBusy(true);
+    setLocalDataStatusError('');
+    let actionError = '';
+    try {
+      await startLocalDataMigration();
+    } catch (error) {
+      actionError = toErrorMessage(error, t('localDatabaseActionFailed'));
+    } finally {
+      localDataStatusDirtyRef.current = true;
+      setLocalDataMigrationDialogMode(null);
+      if (localDataMountedRef.current && localDataActiveSectionRef.current === 'backup') {
+        const refreshed = await loadLocalDataStatus();
+        if (
+          actionError &&
+          refreshed?.profileState !== 'migration_failed' &&
+          localDataMountedRef.current &&
+          localDataActiveSectionRef.current === 'backup'
+        ) {
+          setLocalDataStatusError(actionError);
         }
-        localDataActionBusyRef.current = false;
-        if (localDataMountedRef.current) setLocalDataActionBusy(false);
       }
-    },
-    [loadLocalDataStatus],
-  );
+      localDataActionBusyRef.current = false;
+      if (localDataMountedRef.current) setLocalDataActionBusy(false);
+    }
+  }, [loadLocalDataStatus]);
 
   const onLocalDataConfirmMigration = useCallback(async () => {
     if (!localDataMigrationDialogMode) return;
-    await runLocalDataAction('start');
+    await runLocalDataAction();
   }, [localDataMigrationDialogMode, runLocalDataAction]);
-
-  const onLocalDataResumeMigration = useCallback(async () => {
-    if (!localDataStatus?.actions.canResume) return;
-    await runLocalDataAction('resume');
-  }, [localDataStatus, runLocalDataAction]);
 
   const onLocalDataRetryStatus = useCallback(async () => {
     if (localDataActionBusyRef.current || localDataStatusLoading) return;
@@ -1679,7 +1674,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onLocalDataRequestMigration,
     onLocalDataCancelMigration,
     onLocalDataConfirmMigration,
-    onLocalDataResumeMigration,
     onLocalDataRetryStatus,
     onLocalDataCopyHelpText,
 

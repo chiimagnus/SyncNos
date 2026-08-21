@@ -369,9 +369,6 @@ describe('Local Database settings flow', () => {
         void latest.onLocalDataCopyHelpText(text);
       },
       onRequestMigration: latest.onLocalDataRequestMigration,
-      onResumeMigration: () => {
-        void latest.onLocalDataResumeMigration();
-      },
       onRetryStatus: () => {
         void latest.onLocalDataRetryStatus();
       },

@@ -44,7 +44,7 @@ function unavailableStatus(
   } = {},
 ): LocalDataMigrationStatus {
   return {
-    actions: { canStart: false, canResume: false },
+    actions: { canStart: false },
     capability: {
       browser: input.browser ?? 'chrome',
       officialIdentity: input.officialIdentity ?? true,
@@ -59,7 +59,6 @@ function unavailableStatus(
     },
     journal: { mode: 'not_started', stage: 'not_started' },
     profileState: 'unavailable',
-    resumeReceipt: 'not_applicable',
   };
 }
 

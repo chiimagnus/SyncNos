@@ -167,4 +167,5 @@ export default defineBackground(async () => {
   }
 
   router.start();
+  await migrationCoordinator.recover().catch(() => {});
 });

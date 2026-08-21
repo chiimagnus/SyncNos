@@ -7,7 +7,7 @@ import { LocalDatabaseMigrationDialog } from './LocalDatabaseMigrationDialog';
 export type LocalDatabaseCardProps = Readonly<{
   actionBusy: boolean;
   copiedHelpText: string;
-  dialogMode: 'start' | 'join' | null;
+  dialogMode: 'start' | 'join' | 'retry' | null;
   error: string;
   loading: boolean;
   status: LocalDataMigrationStatus | null;
@@ -15,7 +15,6 @@ export type LocalDatabaseCardProps = Readonly<{
   onConfirmMigration: () => void;
   onCopyHelpText: (text: string) => void;
   onRequestMigration: () => void;
-  onResumeMigration: () => void;
   onRetryStatus: () => void;
 }>;
 
@@ -27,6 +26,8 @@ function statusTitle(status: LocalDataMigrationStatus): string {
       return t('localDatabaseJoinRequiredTitle');
     case 'migration_in_progress':
       return t('localDatabaseMigrationInProgressTitle');
+    case 'migration_failed':
+      return t('localDatabaseMigrationFailedTitle');
     case 'active':
       return t('localDatabaseActiveTitle');
     case 'blocked':
@@ -45,7 +46,9 @@ function statusBody(status: LocalDataMigrationStatus): string {
     case 'join_existing_required':
       return t('localDatabaseJoinRequiredBody');
     case 'migration_in_progress':
-      return status.actions.canResume ? t('localDatabaseResumeBody') : t('localDatabaseMigrationInProgressBody');
+      return t('localDatabaseMigrationInProgressBody');
+    case 'migration_failed':
+      return t('localDatabaseMigrationFailedBody');
     case 'active':
       return t('localDatabaseActiveBody');
     case 'blocked':
@@ -55,6 +58,16 @@ function statusBody(status: LocalDataMigrationStatus): string {
         ? t('localDatabaseSafariUnsupportedBody')
         : t('localDatabaseUnavailableBody');
   }
+}
+
+function diagnosticDetails(diagnostic: LocalDataMigrationStatus['diagnostics'][number]): string {
+  const details = diagnostic.diagnostics;
+  if (!details) return '';
+  const parts: string[] = [];
+  if (details.factKind) parts.push(`factKind=${details.factKind}`);
+  if (details.sourceLocalId !== undefined) parts.push(`sourceLocalId=${details.sourceLocalId}`);
+  if (details.field) parts.push(`field=${details.field}`);
+  return parts.length ? ` · ${parts.join(' · ')}` : '';
 }
 
 export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
@@ -69,17 +82,16 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
     onConfirmMigration,
     onCopyHelpText,
     onRequestMigration,
-    onResumeMigration,
     onRetryStatus,
   } = props;
   const disabled = actionBusy || loading;
   const primaryAction = status?.actions.canStart
     ? status.profileState === 'join_existing_required'
       ? t('localDatabaseJoinAction')
-      : t('localDatabaseEnableAction')
-    : status?.actions.canResume
-      ? t('localDatabaseResumeAction')
-      : null;
+      : status.profileState === 'migration_failed'
+        ? t('localDatabaseRetryAction')
+        : t('localDatabaseEnableAction')
+    : null;
   const shouldShowRecheck =
     !status ||
     status.profileState !== 'active' ||
@@ -124,11 +136,6 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
                 {t('localDatabaseFixedLocationBody')}
               </div>
             ) : null}
-            {status.profileState === 'migration_in_progress' ? (
-              <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                {t('localDatabaseMigrationStage')} {status.journal.stage ?? t('statusUnknown')}
-              </div>
-            ) : null}
           </div>
         ) : null}
 
@@ -146,6 +153,7 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
             {status.diagnostics.map((diagnostic, index) => (
               <div key={`${diagnostic.code}-${index}`} className="tw-text-xs tw-text-[var(--text-secondary)]">
                 {diagnostic.message}
+                {diagnosticDetails(diagnostic)}
               </div>
             ))}
           </div>
@@ -153,12 +161,7 @@ export function LocalDatabaseCard(props: LocalDatabaseCardProps) {
 
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-2">
           {primaryAction ? (
-            <button
-              type="button"
-              className={primaryButtonClassName}
-              disabled={disabled}
-              onClick={status?.actions.canResume ? onResumeMigration : onRequestMigration}
-            >
+            <button type="button" className={primaryButtonClassName} disabled={disabled} onClick={onRequestMigration}>
               {actionBusy ? t('localDatabaseMigrationWorking') : primaryAction}
             </button>
           ) : null}

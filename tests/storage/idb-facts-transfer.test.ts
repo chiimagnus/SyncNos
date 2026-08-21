@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
-import { MAX_MIGRATION_FACT_RECORD_BYTES, MAX_STREAM_FRAME_BYTES } from '@services/local-data/contracts';
+import {
+  LocalDataContractError,
+  MAX_MIGRATION_FACT_RECORD_BYTES,
+  MAX_STREAM_FRAME_BYTES,
+} from '@services/local-data/contracts';
 import { decodeMigrationFactRecord, type MigrationFactRecord } from '@services/local-data/facts-archive';
 import { nodeDigestProvider } from '../../packages/syncnoscli/src/runtime/node-digest';
 import {
@@ -466,7 +470,121 @@ describe('IndexedDB migration facts transfer', () => {
     expect(detachedComment?.archiveIdentity.context).toEqual({ canonicalUrl: 'https://example.com/orphan-comment' });
   });
 
-  it('fails closed on consumer cancellation and an oversized reachable asset', async () => {
+  it('drops identity-less and unreachable historical side data using the same ownership semantics as backup export', async () => {
+    const db = await openDb();
+    openedDatabases.push(db);
+    const transaction = db.transaction([...FACTS_IDB_STORE_NAMES], 'readwrite');
+    const conversations = transaction.objectStore('conversations');
+    const mappings = transaction.objectStore('sync_mappings');
+    const messages = transaction.objectStore('messages');
+    const images = transaction.objectStore('image_cache');
+    const comments = transaction.objectStore('article_comments');
+    const validConversationId = await requestToPromise<number>(
+      conversations.add({ source: 'chatgpt', conversationKey: 'valid-owner', title: 'Valid' }),
+    );
+    const invalidConversationId = await requestToPromise<number>(
+      conversations.add({ source: '', conversationKey: '', title: 'Historical broken identity' }),
+    );
+    await requestToPromise<number>(
+      mappings.add({ source: 'chatgpt', conversationKey: 'valid-owner', notionPageId: 'keep' }),
+    );
+    await requestToPromise<number>(
+      mappings.add({ source: 'gemini', conversationKey: 'missing-owner', notionPageId: 'drop' }),
+    );
+    await requestToPromise<number>(messages.add({ conversationId: invalidConversationId, messageKey: 'unreachable' }));
+    await requestToPromise<number>(
+      images.add({
+        conversationId: validConversationId,
+        url: 'https://example.com/broken.png',
+        blob: new Blob([], { type: 'image/png' }),
+        contentType: 'image/png',
+      }),
+    );
+    await requestToPromise<number>(
+      comments.add({
+        conversationId: validConversationId,
+        canonicalUrl: 'not-a-url',
+        commentText: 'invalid comment',
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    await requestToPromise<number>(
+      comments.add({
+        conversationId: validConversationId,
+        canonicalUrl: 'https://example.com/article',
+        commentText: ' keep comment ',
+        quoteText: 42,
+        authorName: 7,
+        locator: { version: 999 },
+        createdAt: 2,
+        updatedAt: 2,
+        parentId: null,
+        unknownCommentField: { keep: true },
+      }),
+    );
+    await transactionDone(transaction);
+
+    const frames: NativeWireFrame[] = [];
+    const manifest = await transferIndexedDbFacts({
+      db,
+      digestProvider: nodeDigestProvider,
+      migrationId: MIGRATION_ID,
+      createSessionId: nextSessionIds(),
+      onFrame: (wireFrame) => frames.push(wireFrame),
+    });
+
+    expect(manifest.factCounts).toMatchObject({
+      conversations: 1,
+      sync_mappings: 1,
+      messages: 0,
+      image_cache: 0,
+      article_comments: 1,
+    });
+    const facts = (await decodeSessions(frames)).flatMap((session) => (session.record ? [session.record] : []));
+    const comment = facts.find(
+      (fact): fact is Extract<MigrationFactRecord, { kind: 'article_comments' }> => fact.kind === 'article_comments',
+    );
+    expect(comment?.payload).toMatchObject({
+      authorName: '7',
+      quoteText: '42',
+      commentText: 'keep comment',
+      locator: null,
+      unknownCommentField: { keep: true },
+    });
+  });
+
+  it('reports the safe fact identity when a reachable historical row cannot be validated', async () => {
+    const db = await openDb();
+    openedDatabases.push(db);
+    const transaction = db.transaction(['conversations', 'messages'], 'readwrite');
+    const conversationId = await requestToPromise<number>(
+      transaction.objectStore('conversations').add({ source: 'chatgpt', conversationKey: 'diagnostic-owner' }),
+    );
+    const messageId = await requestToPromise<number>(
+      transaction.objectStore('messages').add({
+        conversationId,
+        messageKey: 'invalid-payload',
+        opaque: new Date(0),
+      }),
+    );
+    await transactionDone(transaction);
+
+    await expect(
+      transferIndexedDbFacts({
+        db,
+        digestProvider: nodeDigestProvider,
+        migrationId: MIGRATION_ID,
+        createSessionId: nextSessionIds(),
+        onFrame: () => undefined,
+      }),
+    ).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+      diagnostics: { factKind: 'messages', sourceLocalId: messageId, stage: 'staging' },
+    });
+  });
+
+  it('drops malformed historical cache rows without blocking core facts, while consumer cancellation still fails closed', async () => {
     const db = await openDb();
     openedDatabases.push(db);
     const transaction = db.transaction(['conversations', 'image_cache'], 'readwrite');
@@ -493,7 +611,7 @@ describe('IndexedDB migration facts transfer', () => {
         createSessionId: nextSessionIds(),
         onFrame: () => undefined,
       }),
-    ).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
+    ).resolves.toMatchObject({ factCounts: { conversations: 1, image_cache: 0 } });
     oversize.mockRestore();
 
     const controller = new AbortController();
@@ -509,6 +627,42 @@ describe('IndexedDB migration facts transfer', () => {
         },
       }),
     ).rejects.toThrow('cancelled');
+  });
+
+  it('never treats a consumer transport failure as a discardable image-cache validation failure', async () => {
+    const db = await openDb();
+    openedDatabases.push(db);
+    const transaction = db.transaction(['conversations', 'image_cache'], 'readwrite');
+    const conversationId = await requestToPromise<number>(
+      transaction.objectStore('conversations').add({ source: 'chatgpt', conversationKey: 'consumer-failure' }),
+    );
+    await requestToPromise<number>(
+      transaction.objectStore('image_cache').add({
+        conversationId,
+        url: 'https://example.com/valid.png',
+        blob: new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' }),
+        contentType: 'image/png',
+      }),
+    );
+    await transactionDone(transaction);
+
+    let recordJsonCount = 0;
+    await expect(
+      transferIndexedDbFacts({
+        db,
+        digestProvider: nodeDigestProvider,
+        migrationId: MIGRATION_ID,
+        createSessionId: nextSessionIds(),
+        onFrame: (wireFrame) => {
+          if (wireFrame.type === 'record-json' && ++recordJsonCount === 2) {
+            throw new LocalDataContractError('MIGRATION_VALIDATION_FAILED');
+          }
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'MIGRATION_VALIDATION_FAILED',
+      diagnostics: { factKind: 'image_cache', sourceLocalId: 1, stage: 'staging' },
+    });
   });
 
   it('does not finalize a migration when one JSON fact exceeds the 64 MiB record ceiling', async () => {

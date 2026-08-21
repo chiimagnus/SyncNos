@@ -72,12 +72,14 @@ export type LocalDataDiagnosticKey =
   | 'declaredBytes'
   | 'expectedSchemaVersion'
   | 'expectedProtocolVersion'
+  | 'factKind'
   | 'field'
   | 'limitBytes'
   | 'operation'
   | 'receivedSchemaVersion'
   | 'receivedProtocolVersion'
   | 'retryAfterMs'
+  | 'sourceLocalId'
   | 'stage';
 
 export type LocalDataDiagnostics = Readonly<Partial<Record<LocalDataDiagnosticKey, string | number | boolean>>>;
@@ -123,12 +125,14 @@ const DIAGNOSTIC_KEYS = new Set<LocalDataDiagnosticKey>([
   'declaredBytes',
   'expectedSchemaVersion',
   'expectedProtocolVersion',
+  'factKind',
   'field',
   'limitBytes',
   'operation',
   'receivedSchemaVersion',
   'receivedProtocolVersion',
   'retryAfterMs',
+  'sourceLocalId',
   'stage',
 ]);
 
@@ -139,6 +143,7 @@ const NUMERIC_DIAGNOSTIC_KEYS = new Set<LocalDataDiagnosticKey>([
   'expectedProtocolVersion',
   'limitBytes',
   'retryAfterMs',
+  'sourceLocalId',
 ]);
 
 const RECEIVED_VERSION_DIAGNOSTIC_KEYS = new Set<LocalDataDiagnosticKey>([
@@ -317,6 +322,10 @@ function parseDiagnostics(value: unknown): LocalDataDiagnostics {
     }
     if (diagnosticKey === 'operation') {
       diagnostics.operation = parseEnum(rawValue, LOCAL_DATA_STREAM_OPERATIONS);
+      continue;
+    }
+    if (diagnosticKey === 'factKind') {
+      diagnostics.factKind = parseEnum(rawValue, MIGRATION_FACT_KINDS);
       continue;
     }
     if (diagnosticKey === 'stage') {
@@ -1202,7 +1211,6 @@ export type InsightFactsSnapshot = Readonly<{
 export const BROWSER_RUNTIME_FACTS_COMMANDS = Object.freeze([
   'GET_LOCAL_DATA_STATUS',
   'START_LOCAL_DATA_MIGRATION',
-  'RESUME_LOCAL_DATA_MIGRATION',
   'GET_FACTS_REVISION',
   'CONVERSATION_BOOTSTRAP',
   'CONVERSATION_LOAD_MORE',
@@ -1240,7 +1248,6 @@ export type BrowserRuntimeFactsCommand = (typeof BROWSER_RUNTIME_FACTS_COMMANDS)
 export type BrowserRuntimeFactsPayloadByCommand = {
   GET_LOCAL_DATA_STATUS: EmptyPayload;
   START_LOCAL_DATA_MIGRATION: EmptyPayload;
-  RESUME_LOCAL_DATA_MIGRATION: EmptyPayload;
   GET_FACTS_REVISION: EmptyPayload;
   CONVERSATION_BOOTSTRAP: ConversationListRequestPayload;
   CONVERSATION_LOAD_MORE: ConversationListRequestPayload;
@@ -2274,7 +2281,6 @@ function parseBrowserRuntimePayload<TCommand extends BrowserRuntimeFactsCommand>
   switch (command) {
     case 'GET_LOCAL_DATA_STATUS':
     case 'START_LOCAL_DATA_MIGRATION':
-    case 'RESUME_LOCAL_DATA_MIGRATION':
     case 'GET_FACTS_REVISION':
       return parseEmptyPayload(value) as BrowserRuntimeFactsPayloadByCommand[TCommand];
     case 'CONVERSATION_BOOTSTRAP':

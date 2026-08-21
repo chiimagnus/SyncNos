@@ -110,7 +110,6 @@ describe('local data contracts', () => {
     expect(BROWSER_RUNTIME_FACTS_COMMANDS).toEqual([
       'GET_LOCAL_DATA_STATUS',
       'START_LOCAL_DATA_MIGRATION',
-      'RESUME_LOCAL_DATA_MIGRATION',
       'GET_FACTS_REVISION',
       'CONVERSATION_BOOTSTRAP',
       'CONVERSATION_LOAD_MORE',

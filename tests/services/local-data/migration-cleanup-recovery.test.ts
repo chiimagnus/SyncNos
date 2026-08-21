@@ -188,13 +188,14 @@ async function expectActive(journalRuntime: MigrationJournalRuntime) {
 
 async function expectStage(journalRuntime: MigrationJournalRuntime, stage: string, terminalCode?: string) {
   const snapshot = await readMigrationJournal(journalRuntime);
-  expect(snapshot.mode).toBe('transitional');
-  if (snapshot.mode === 'transitional')
+  expect(snapshot.mode).toBe(terminalCode ? 'failed' : 'transitional');
+  if (snapshot.mode === 'transitional' || snapshot.mode === 'failed') {
     expect(snapshot.journal).toMatchObject({ stage, ...(terminalCode ? { terminalCode } : {}) });
+  }
 }
 
-describe('migration cleanup and resume', () => {
-  it('resumes remote_committed by generating a durable patch before sidecar writes, then clears and activates', async () => {
+describe('migration cleanup recovery', () => {
+  it('recovers remote_committed by generating a durable patch before sidecar writes, then clears and activates', async () => {
     const journalRuntime = runtime();
     await seedStage(journalRuntime, 'remote_committed');
     const receipt = await receiptFor(manifest());
@@ -224,7 +225,9 @@ describe('migration cleanup and resume', () => {
       onActivated,
     });
 
-    const status = await createMigrationCoordinator(deps).resume();
+    const coordinator = createMigrationCoordinator(deps);
+    await coordinator.recover();
+    const status = await coordinator.getStatus();
 
     expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
     expect(events.indexOf('patch:build')).toBeLessThan(events.indexOf('patch:apply'));
@@ -239,13 +242,13 @@ describe('migration cleanup and resume', () => {
     await expectActive(journalRuntime);
   });
 
-  it('resumes profile_refs_pending by replaying only the durable patch without re-reading old numeric references', async () => {
+  it('recovers profile_refs_pending by replaying only the durable patch without re-reading old numeric references', async () => {
     const journalRuntime = runtime();
     await seedStage(journalRuntime, 'profile_refs_pending');
     const refs = profileReferences();
     const deps = cleanupDependencies({ journalRuntime, profile: refs, receipt: await receiptFor(manifest()) });
 
-    await createMigrationCoordinator(deps).resume();
+    await createMigrationCoordinator(deps).recover();
 
     expect(refs.buildPatch).not.toHaveBeenCalled();
     expect(refs.applyAndVerify).toHaveBeenCalledTimes(1);
@@ -253,7 +256,7 @@ describe('migration cleanup and resume', () => {
     await expectActive(journalRuntime);
   });
 
-  it('resumes cleanup_pending by verifying receipt and the already-applied sidecar before any clear', async () => {
+  it('recovers cleanup_pending by verifying receipt and the already-applied sidecar before any clear', async () => {
     const journalRuntime = runtime();
     await seedStage(journalRuntime, 'cleanup_pending');
     const events: string[] = [];
@@ -267,7 +270,7 @@ describe('migration cleanup and resume', () => {
       events,
     });
 
-    await createMigrationCoordinator(deps).resume();
+    await createMigrationCoordinator(deps).recover();
 
     expect(refs.buildPatch).not.toHaveBeenCalled();
     expect(refs.applyAndVerify).not.toHaveBeenCalled();
@@ -285,7 +288,7 @@ describe('migration cleanup and resume', () => {
     await expect(
       createMigrationCoordinator(
         cleanupDependencies({ journalRuntime, receipt: badReceipt, clearSourceFacts }),
-      ).resume(),
+      ).recover(),
     ).rejects.toMatchObject({ code: 'MIGRATION_RECEIPT_MISMATCH' });
 
     expect(clearSourceFacts).not.toHaveBeenCalled();
@@ -305,14 +308,14 @@ describe('migration cleanup and resume', () => {
     await expect(
       createMigrationCoordinator(
         cleanupDependencies({ journalRuntime, profile: refs, receipt: await receiptFor(manifest()), clearSourceFacts }),
-      ).resume(),
+      ).recover(),
     ).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
 
     expect(clearSourceFacts).not.toHaveBeenCalled();
     await expectStage(journalRuntime, 'cleanup_pending', 'MIGRATION_VALIDATION_FAILED');
   });
 
-  it('keeps cleanup_pending after clear or empty verification failure and resumes idempotently', async () => {
+  it('keeps cleanup_pending after clear or empty verification failure and retries explicitly from failed state', async () => {
     const journalRuntime = runtime();
     await seedStage(journalRuntime, 'cleanup_pending');
     const receipt = await receiptFor(manifest());
@@ -332,13 +335,13 @@ describe('migration cleanup and resume', () => {
     });
     const coordinator = createMigrationCoordinator(deps);
 
-    await expect(coordinator.resume()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
+    await expect(coordinator.recover()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
     await expectStage(journalRuntime, 'cleanup_pending', 'MIGRATION_VALIDATION_FAILED');
 
-    await expect(coordinator.resume()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
+    await expect(coordinator.start()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
     await expectStage(journalRuntime, 'cleanup_pending', 'MIGRATION_VALIDATION_FAILED');
 
-    await coordinator.resume();
+    await coordinator.start();
     expect(clearSourceFacts).toHaveBeenCalledTimes(3);
     expect(verifySourceFactsEmpty).toHaveBeenCalledTimes(2);
     await expectActive(journalRuntime);
@@ -357,7 +360,7 @@ describe('migration cleanup and resume', () => {
         clearSourceFacts,
         verifySourceFactsEmpty,
       }),
-    ).resume();
+    ).recover();
 
     expect(clearSourceFacts).toHaveBeenCalledTimes(1);
     expect(verifySourceFactsEmpty).toHaveBeenCalledTimes(1);
@@ -368,20 +371,20 @@ describe('migration cleanup and resume', () => {
     const journalRuntime = runtime();
     await seedStage(journalRuntime, 'cleanup_pending');
 
-    await expect(
-      createMigrationCoordinator(
-        cleanupDependencies({
-          journalRuntime,
-          receipt: await receiptFor(manifest()),
-          rearmSchedulers: async () => {
-            throw new Error('alarms unavailable');
-          },
-          onActivated: async () => {
-            throw new Error('ui listener gone');
-          },
-        }),
-      ).resume(),
-    ).resolves.toMatchObject({ journal: { mode: 'active', stage: 'active' } });
+    const coordinator = createMigrationCoordinator(
+      cleanupDependencies({
+        journalRuntime,
+        receipt: await receiptFor(manifest()),
+        rearmSchedulers: async () => {
+          throw new Error('alarms unavailable');
+        },
+        onActivated: async () => {
+          throw new Error('ui listener gone');
+        },
+      }),
+    );
+    await expect(coordinator.recover()).resolves.toBeUndefined();
+    await expect(coordinator.getStatus()).resolves.toMatchObject({ journal: { mode: 'active', stage: 'active' } });
 
     await expectActive(journalRuntime);
   });

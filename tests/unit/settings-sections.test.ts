@@ -270,7 +270,6 @@ describe('backup feedback', () => {
         onCancelMigration: () => {},
         onConfirmMigration: () => {},
         onCopyHelpText: () => {},
-        onResumeMigration: () => {},
         onRetryStatus: () => {},
       },
       exportStatus: '',

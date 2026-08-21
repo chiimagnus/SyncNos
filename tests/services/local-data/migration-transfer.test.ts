@@ -142,10 +142,10 @@ function hostRequest(receipt: FactsMigrationReceipt | null) {
   });
 }
 
-async function stagingSnapshot(runtime: MigrationJournalRuntime) {
+async function failedStagingSnapshot(runtime: MigrationJournalRuntime) {
   const snapshot = await readMigrationJournal(runtime);
-  expect(snapshot.mode).toBe('transitional');
-  if (snapshot.mode !== 'transitional') throw new Error('expected transitional journal');
+  expect(snapshot.mode).toBe('failed');
+  if (snapshot.mode !== 'failed') throw new Error('expected failed migration journal');
   return snapshot.journal;
 }
 
@@ -248,7 +248,7 @@ describe('local data migration transfer', () => {
 
     await expect(coordinator.start()).rejects.toMatchObject({ code: expectedCode });
 
-    expect(await stagingSnapshot(runtime)).toMatchObject({ stage: 'staging', terminalCode: expectedCode });
+    expect(await failedStagingSnapshot(runtime)).toMatchObject({ stage: 'staging', terminalCode: expectedCode });
   });
 
   it.each([
@@ -273,7 +273,7 @@ describe('local data migration transfer', () => {
 
     await expect(coordinator.start()).rejects.toMatchObject({ code });
 
-    expect(await stagingSnapshot(runtime)).toMatchObject({ stage: 'staging', terminalCode: code });
+    expect(await failedStagingSnapshot(runtime)).toMatchObject({ stage: 'staging', terminalCode: code });
     expect(transferFacts).not.toHaveBeenCalled();
   });
 
@@ -297,7 +297,7 @@ describe('local data migration transfer', () => {
     await expect(coordinator.start()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
 
     expect(nativeImport).toHaveBeenCalledTimes(1);
-    expect(await stagingSnapshot(runtime)).toMatchObject({
+    expect(await failedStagingSnapshot(runtime)).toMatchObject({
       stage: 'staging',
       terminalCode: 'MIGRATION_VALIDATION_FAILED',
     });
@@ -326,13 +326,13 @@ describe('local data migration transfer', () => {
     await expect(coordinator.start()).rejects.toMatchObject({ code: 'MIGRATION_VALIDATION_FAILED' });
 
     expect(sourceFacts).toEqual(before);
-    expect(await stagingSnapshot(runtime)).toMatchObject({
+    expect(await failedStagingSnapshot(runtime)).toMatchObject({
       stage: 'staging',
       terminalCode: 'MIGRATION_VALIDATION_FAILED',
     });
   });
 
-  it('resumes a service-worker restart from a matching durable receipt without importing twice', async () => {
+  it('automatically recovers a service-worker restart from a matching durable receipt without importing twice', async () => {
     const runtime = journalRuntime();
     await beginMigrationJournal(runtime);
     const expectedManifest = manifest();
@@ -350,14 +350,15 @@ describe('local data migration transfer', () => {
       ...completionDependencies(),
     });
 
-    const status = await coordinator.resume();
+    await coordinator.recover();
+    const status = await coordinator.getStatus();
 
     expect(status.journal).toMatchObject({ mode: 'active', stage: 'active' });
     expect(nativeImport).not.toHaveBeenCalled();
     expect(transferFacts).toHaveBeenCalledTimes(1);
   });
 
-  it('opens a fresh staging session on explicit resume only when no receipt exists', async () => {
+  it('restarts the full staging session automatically after an interrupted staging with no receipt', async () => {
     const runtime = journalRuntime();
     await beginMigrationJournal(runtime);
     const expectedManifest = manifest();
@@ -383,13 +384,13 @@ describe('local data migration transfer', () => {
       ...completionDependencies(),
     });
 
-    await coordinator.resume();
+    await coordinator.recover();
 
     expect(nativeImport).toHaveBeenCalledTimes(1);
     expect((await readMigrationJournal(runtime)).mode).toBe('active');
   });
 
-  it('blocks a conflicting durable receipt on resume instead of opening another import session', async () => {
+  it('fails recovery on a conflicting durable receipt instead of opening another import session', async () => {
     const runtime = journalRuntime();
     await beginMigrationJournal(runtime);
     const expectedManifest = manifest();
@@ -406,11 +407,11 @@ describe('local data migration transfer', () => {
       transferFacts,
     });
 
-    await expect(coordinator.resume()).rejects.toMatchObject({ code: 'MIGRATION_RECEIPT_MISMATCH' });
+    await expect(coordinator.recover()).rejects.toMatchObject({ code: 'MIGRATION_RECEIPT_MISMATCH' });
 
     expect(nativeImport).not.toHaveBeenCalled();
     expect(transferFacts).toHaveBeenCalledTimes(1);
-    expect(await stagingSnapshot(runtime)).toMatchObject({
+    expect(await failedStagingSnapshot(runtime)).toMatchObject({
       stage: 'staging',
       terminalCode: 'MIGRATION_RECEIPT_MISMATCH',
     });

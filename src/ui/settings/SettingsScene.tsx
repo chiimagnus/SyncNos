@@ -137,7 +137,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     onLocalDataRequestMigration,
     onLocalDataCancelMigration,
     onLocalDataConfirmMigration,
-    onLocalDataResumeMigration,
     onLocalDataRetryStatus,
     onLocalDataCopyHelpText,
 
@@ -378,9 +377,6 @@ export function SettingsScene(props: SettingsSceneProps) {
             },
             onCopyHelpText: (text) => {
               void onLocalDataCopyHelpText(text);
-            },
-            onResumeMigration: () => {
-              void onLocalDataResumeMigration();
             },
             onRetryStatus: () => {
               void onLocalDataRetryStatus();

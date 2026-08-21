@@ -18,7 +18,9 @@ export type FactsOperationGateDependencies = Readonly<{
 }>;
 
 function admissionError(snapshot: MigrationJournalSnapshot | null): LocalDataContractError {
-  if (snapshot?.mode === 'blocked') return new LocalDataContractError(snapshot.error.code, snapshot.error.diagnostics);
+  if (snapshot?.mode === 'blocked' || snapshot?.mode === 'failed') {
+    return new LocalDataContractError(snapshot.error.code, snapshot.error.diagnostics);
+  }
   return new LocalDataContractError('MIGRATION_IN_PROGRESS');
 }
 

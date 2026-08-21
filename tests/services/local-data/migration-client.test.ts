@@ -5,19 +5,18 @@ import { createLocalDataMigrationClient } from '@services/local-data/client';
 
 function status() {
   return {
-    actions: { canStart: true, canResume: false },
+    actions: { canStart: true },
     capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
     database: { presence: 'missing', factsHealth: 'missing' },
     diagnostics: [],
     host: { registration: 'available', compatibility: 'compatible' },
     journal: { mode: 'not_started', stage: 'not_started' },
     profileState: 'setup_required',
-    resumeReceipt: 'not_applicable',
   };
 }
 
 describe('local data migration client', () => {
-  it('maps typed status/revision/start/resume calls through the shared runtime helper surface', async () => {
+  it('maps typed status/revision/start calls through the shared runtime helper surface', async () => {
     const send = vi.fn(async (type: string) =>
       type === LOCAL_DATA_MESSAGE_TYPES.GET_FACTS_REVISION
         ? { ok: true, data: { factsRevision: 17 }, error: null }
@@ -28,13 +27,11 @@ describe('local data migration client', () => {
     await expect(client.getStatus()).resolves.toEqual(status());
     await expect(client.getFactsRevision()).resolves.toBe(17);
     await expect(client.start()).resolves.toEqual(status());
-    await expect(client.resume()).resolves.toEqual(status());
 
     expect(send.mock.calls).toEqual([
       [LOCAL_DATA_MESSAGE_TYPES.GET_STATUS],
       [LOCAL_DATA_MESSAGE_TYPES.GET_FACTS_REVISION],
       [LOCAL_DATA_MESSAGE_TYPES.START_MIGRATION],
-      [LOCAL_DATA_MESSAGE_TYPES.RESUME_MIGRATION],
     ]);
   });
 

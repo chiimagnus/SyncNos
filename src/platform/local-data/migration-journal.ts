@@ -11,6 +11,7 @@ import {
   parseOrderedFrameDigest,
   serializeMigrationProfileReferencePatch,
   type FactsEpoch,
+  type LocalDataDiagnostics,
   type LocalDataError,
   type LocalDataErrorCode,
   type MigrationId,
@@ -35,6 +36,7 @@ type MigrationJournalBase<TStage extends PersistedMigrationJournalStage> = Reado
   schemaVersion: typeof LOCAL_DATA_SCHEMA_VERSION;
   stage: TStage;
   terminalCode?: LocalDataErrorCode;
+  terminalDiagnostics?: LocalDataDiagnostics;
   updatedAt: number;
   version: typeof MIGRATION_JOURNAL_VERSION;
 }>;
@@ -60,7 +62,7 @@ export type CleanupPendingMigrationJournal = MigrationJournalBase<'cleanup_pendi
     referencePatchDigest: string;
   }>;
 
-export type ActiveMigrationJournal = Omit<MigrationJournalBase<'active'>, 'terminalCode'> &
+export type ActiveMigrationJournal = Omit<MigrationJournalBase<'active'>, 'terminalCode' | 'terminalDiagnostics'> &
   Readonly<{
     manifest: FactsManifest;
     profileReferencesCompleted: true;
@@ -93,7 +95,7 @@ type ResolvedMigrationJournalRuntime = Readonly<{
   storage: MigrationJournalStorage;
 }>;
 
-export type MigrationJournalMode = 'not_started' | 'transitional' | 'active' | 'blocked';
+export type MigrationJournalMode = 'not_started' | 'transitional' | 'failed' | 'active' | 'blocked';
 
 export type MigrationJournalSnapshot =
   | Readonly<{
@@ -109,6 +111,12 @@ export type MigrationJournalSnapshot =
       mode: 'transitional';
     }>
   | Readonly<{
+      error: LocalDataError;
+      factsEpoch: null;
+      journal: Exclude<MigrationJournal, ActiveMigrationJournal>;
+      mode: 'failed';
+    }>
+  | Readonly<{
       error: null;
       factsEpoch: `native:${MigrationId}`;
       journal: ActiveMigrationJournal;
@@ -121,15 +129,6 @@ export type MigrationJournalSnapshot =
       mode: 'blocked';
     }>;
 
-export type MigrationJournalResumeAction =
-  | 'start'
-  | 'verify-staging-receipt'
-  | 'verify-remote-receipt-and-create-profile-reference-patch'
-  | 'apply-profile-reference-patch'
-  | 'verify-receipt-and-profile-patch-before-cleanup'
-  | 'active'
-  | 'blocked';
-
 export type AdvanceMigrationJournalInput = Readonly<{
   expected: MigrationJournal;
   manifest?: FactsManifest;
@@ -140,6 +139,7 @@ export type AdvanceMigrationJournalInput = Readonly<{
 export type RecordMigrationJournalFailureInput = Readonly<{
   expected: Exclude<MigrationJournal, ActiveMigrationJournal>;
   terminalCode: LocalDataErrorCode;
+  terminalDiagnostics?: LocalDataDiagnostics;
 }>;
 
 const textEncoder = new TextEncoder();
@@ -206,6 +206,10 @@ function parseJournalBase(
   stage: PersistedMigrationJournalStage,
 ): MigrationJournalBase<PersistedMigrationJournalStage> {
   const terminalCode = hasOwn(value, 'terminalCode') ? parseTerminalCode(value.terminalCode) : undefined;
+  if (hasOwn(value, 'terminalDiagnostics') && !terminalCode) journalFailure();
+  const terminalDiagnostics = hasOwn(value, 'terminalDiagnostics')
+    ? createLocalDataError(terminalCode!, value.terminalDiagnostics).diagnostics
+    : undefined;
   if (value.version !== MIGRATION_JOURNAL_VERSION) journalFailure();
   if (value.stage !== stage) journalFailure();
   if (value.protocolVersion !== LOCAL_DATA_PROTOCOL_VERSION || value.schemaVersion !== LOCAL_DATA_SCHEMA_VERSION)
@@ -222,6 +226,7 @@ function parseJournalBase(
     createdAt,
     updatedAt,
     ...(terminalCode ? { terminalCode } : {}),
+    ...(terminalDiagnostics ? { terminalDiagnostics } : {}),
   });
 }
 
@@ -256,10 +261,13 @@ async function parseMigrationJournal(value: unknown, digestProvider: DigestProvi
     if (stage === 'not_started') journalFailure();
 
     const hasTerminalCode = hasOwn(input, 'terminalCode');
+    const hasTerminalDiagnostics = hasOwn(input, 'terminalDiagnostics');
+    if (hasTerminalDiagnostics && !hasTerminalCode) journalFailure();
     const keys = (extra: readonly string[]) => [
       ...JOURNAL_BASE_KEYS,
       ...extra,
       ...(hasTerminalCode ? ['terminalCode'] : []),
+      ...(hasTerminalDiagnostics ? ['terminalDiagnostics'] : []),
     ];
     switch (stage) {
       case 'staging': {
@@ -500,31 +508,17 @@ export async function readMigrationJournal(runtime: MigrationJournalRuntime = {}
         error: null,
       };
     }
+    if (journal.terminalCode) {
+      return {
+        mode: 'failed',
+        journal,
+        factsEpoch: null,
+        error: createLocalDataError(journal.terminalCode, journal.terminalDiagnostics),
+      };
+    }
     return { mode: 'transitional', journal, factsEpoch: null, error: null };
   } catch (_error) {
     return { mode: 'blocked', journal: null, factsEpoch: null, error: createLocalDataError('JOURNAL_CORRUPT') };
-  }
-}
-
-export function migrationJournalResumeAction(snapshot: MigrationJournalSnapshot): MigrationJournalResumeAction {
-  switch (snapshot.mode) {
-    case 'not_started':
-      return 'start';
-    case 'blocked':
-      return 'blocked';
-    case 'active':
-      return 'active';
-    case 'transitional':
-      switch (snapshot.journal.stage) {
-        case 'staging':
-          return 'verify-staging-receipt';
-        case 'remote_committed':
-          return 'verify-remote-receipt-and-create-profile-reference-patch';
-        case 'profile_refs_pending':
-          return 'apply-profile-reference-patch';
-        case 'cleanup_pending':
-          return 'verify-receipt-and-profile-patch-before-cleanup';
-      }
   }
 }
 
@@ -566,9 +560,11 @@ export async function recordMigrationJournalFailure(
   );
   if (expected.stage === 'active') invalidTransition();
   const terminalCode = parseTerminalCode(input.terminalCode);
+  const terminalDiagnostics = createLocalDataError(terminalCode, input.terminalDiagnostics).diagnostics;
   const base = {
     ...journalBase(expected, expected.stage, resolvedRuntime),
     terminalCode,
+    ...(terminalDiagnostics ? { terminalDiagnostics } : {}),
   };
   const next = (() => {
     switch (expected.stage) {

@@ -1,3 +1,4 @@
+import { parseArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import {
   createMigrationCommentFact,
@@ -59,6 +60,7 @@ type DetachedIdbFactPage = Readonly<{
 type FactsTransferState = {
   commentOccurrenceTracker: ReturnType<typeof createMigrationCommentOccurrenceTracker>;
   commentTopology: ReadonlyMap<number, MigrationCommentTopologyEntry> | null;
+  conversationIdentities: Set<string>;
   conversations: Map<number, MigrationConversationIdentity>;
   referenceValidator: ReturnType<typeof createMigrationFactReferenceValidator>;
 };
@@ -93,6 +95,18 @@ function fail(code: 'MIGRATION_VALIDATION_FAILED' | 'PAYLOAD_TOO_LARGE' = 'MIGRA
   throw new LocalDataContractError(code);
 }
 
+function rethrowFactFailure(error: unknown, factKind: FactsIdbStoreName, sourceLocalId: number): never {
+  if (error instanceof LocalDataContractError) {
+    throw new LocalDataContractError(error.code, {
+      ...(error.diagnostics ?? {}),
+      factKind,
+      sourceLocalId,
+      stage: 'staging',
+    });
+  }
+  throw error;
+}
+
 function assertFactsStoreOrder(): void {
   if (
     FACTS_IDB_STORE_NAMES.length !== FACT_STREAM_KINDS.length ||
@@ -111,11 +125,42 @@ function sourceId(value: unknown): number {
   return Number(value);
 }
 
-function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) fail();
+function plainRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) fail();
-  return value as Record<string, unknown>;
+  return prototype === Object.prototype || prototype === null ? (value as Record<string, unknown>) : null;
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return plainRecord(value) ?? fail();
+}
+
+function validIdentityText(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    encodeURIComponent(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function historicalConversationIdentity(row: unknown): MigrationConversationIdentity | null {
+  const value = plainRecord(row);
+  if (!value || !validIdentityText(value.source) || !validIdentityText(value.conversationKey)) return null;
+  return Object.freeze({ source: value.source, conversationKey: value.conversationKey });
+}
+
+function conversationIdentityKey(identity: MigrationConversationIdentity): string {
+  return JSON.stringify([identity.source, identity.conversationKey]);
+}
+
+function normalizeHistoricalCommentRow(row: unknown): Record<string, unknown> | null {
+  const value = plainRecord(row);
+  if (!value) return null;
+  const dto = parseArticleCommentDto(value);
+  if (!dto || dto.createdAt < 0 || dto.updatedAt < 0) return null;
+  return { ...value, ...dto };
 }
 
 function referencedConversationId(row: unknown): number | null {
@@ -502,14 +547,20 @@ async function readNormalizedCommentTopology(input: {
       signal: input.signal,
     });
     for (const row of page.rows) {
-      nodes.push(
-        await createMigrationCommentTopologyNode({
-          conversations: input.conversations,
-          digestProvider: input.digestProvider,
-          row: detachMissingConversation(row.row, input.conversations),
-          sourceLocalId: row.id,
-        }),
-      );
+      const normalized = normalizeHistoricalCommentRow(row.row);
+      if (!normalized) continue;
+      try {
+        nodes.push(
+          await createMigrationCommentTopologyNode({
+            conversations: input.conversations,
+            digestProvider: input.digestProvider,
+            row: detachMissingConversation(normalized, input.conversations),
+            sourceLocalId: row.id,
+          }),
+        );
+      } catch (error) {
+        rethrowFactFailure(error, 'article_comments', row.id);
+      }
     }
     if (page.exhausted) break;
     if (page.lastId == null) fail();
@@ -528,15 +579,17 @@ async function transferDetachedRow(input: {
 }): Promise<void> {
   switch (input.storeName) {
     case 'conversations': {
+      const identity = historicalConversationIdentity(input.row);
+      if (!identity) return;
       const fact = createMigrationConversationFact({ row: input.row, sourceLocalId: input.id });
-      const source = fact.payload.source;
-      const conversationKey = fact.payload.conversationKey;
-      if (typeof source !== 'string' || typeof conversationKey !== 'string') fail();
-      input.state.conversations.set(input.id, Object.freeze({ source, conversationKey }));
+      input.state.conversations.set(input.id, identity);
+      input.state.conversationIdentities.add(conversationIdentityKey(identity));
       await emitPreparedFact({ emission: input.emission, transfer: input.transfer, state: input.state, record: fact });
       return;
     }
     case 'sync_mappings': {
+      const identity = historicalConversationIdentity(input.row);
+      if (!identity || !input.state.conversationIdentities.has(conversationIdentityKey(identity))) return;
       const fact = createMigrationSyncMappingFact({ row: input.row, sourceLocalId: input.id });
       await emitPreparedFact({ emission: input.emission, transfer: input.transfer, state: input.state, record: fact });
       return;
@@ -549,7 +602,18 @@ async function transferDetachedRow(input: {
     }
     case 'image_cache': {
       if (!hasReachableConversation(input.row, input.state.conversations)) return;
-      const prepared = prepareMigrationImageFact({ row: input.row, sourceLocalId: input.id });
+      let prepared: ReturnType<typeof prepareMigrationImageFact>;
+      try {
+        prepared = prepareMigrationImageFact({ row: input.row, sourceLocalId: input.id });
+      } catch (error) {
+        if (
+          error instanceof LocalDataContractError &&
+          (error.code === 'MIGRATION_VALIDATION_FAILED' || error.code === 'PAYLOAD_TOO_LARGE')
+        ) {
+          return;
+        }
+        throw error;
+      }
       await emitPreparedFact({
         emission: input.emission,
         transfer: input.transfer,
@@ -561,8 +625,10 @@ async function transferDetachedRow(input: {
     }
     case 'article_comments': {
       const topology = input.state.commentTopology?.get(input.id);
-      if (!topology) fail();
-      const row = detachMissingConversation(input.row, input.state.conversations);
+      if (!topology) return;
+      const normalized = normalizeHistoricalCommentRow(input.row);
+      if (!normalized) return;
+      const row = detachMissingConversation(normalized, input.state.conversations);
       const fact = await createMigrationCommentFact({
         conversations: input.state.conversations,
         digestProvider: input.transfer.digestProvider,
@@ -595,6 +661,7 @@ export async function transferIndexedDbFacts(input: IndexedDbFactsTransferInput)
     const state: FactsTransferState = {
       commentOccurrenceTracker: createMigrationCommentOccurrenceTracker(),
       commentTopology: null,
+      conversationIdentities: new Set(),
       conversations: new Map(),
       referenceValidator: createMigrationFactReferenceValidator(),
     };
@@ -620,14 +687,18 @@ export async function transferIndexedDbFacts(input: IndexedDbFactsTransferInput)
         });
         for (const row of page.rows) {
           assertNotCancelled(input.signal);
-          await transferDetachedRow({
-            emission,
-            id: row.id,
-            row: row.row,
-            storeName,
-            transfer: input,
-            state,
-          });
+          try {
+            await transferDetachedRow({
+              emission,
+              id: row.id,
+              row: row.row,
+              storeName,
+              transfer: input,
+              state,
+            });
+          } catch (error) {
+            rethrowFactFailure(error, storeName, row.id);
+          }
         }
         if (page.exhausted) break;
         if (page.lastId == null) fail();

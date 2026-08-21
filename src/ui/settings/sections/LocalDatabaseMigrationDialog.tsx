@@ -5,7 +5,7 @@ import { buttonClassName, primaryButtonClassName } from '@ui/settings/ui';
 
 export type LocalDatabaseMigrationDialogProps = Readonly<{
   busy: boolean;
-  mode: 'start' | 'join';
+  mode: 'start' | 'join' | 'retry';
   onCancel: () => void;
   onConfirm: () => void;
 }>;
@@ -33,7 +33,12 @@ export function LocalDatabaseMigrationDialog(props: LocalDatabaseMigrationDialog
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [busy, onCancel]);
 
-  const title = mode === 'join' ? t('localDatabaseJoinDialogTitle') : t('localDatabaseEnableDialogTitle');
+  const title =
+    mode === 'join'
+      ? t('localDatabaseJoinDialogTitle')
+      : mode === 'retry'
+        ? t('localDatabaseRetryDialogTitle')
+        : t('localDatabaseEnableDialogTitle');
 
   return (
     <div
@@ -59,7 +64,11 @@ export function LocalDatabaseMigrationDialog(props: LocalDatabaseMigrationDialog
               id="local-database-migration-description"
               className="tw-mb-0 tw-mt-2 tw-text-sm tw-leading-6 tw-text-[var(--text-secondary)]"
             >
-              {mode === 'join' ? t('localDatabaseJoinDialogIntro') : t('localDatabaseEnableDialogIntro')}
+              {mode === 'join'
+                ? t('localDatabaseJoinDialogIntro')
+                : mode === 'retry'
+                  ? t('localDatabaseRetryDialogIntro')
+                  : t('localDatabaseEnableDialogIntro')}
             </p>
           </div>
           <button
@@ -90,7 +99,9 @@ export function LocalDatabaseMigrationDialog(props: LocalDatabaseMigrationDialog
               ? t('localDatabaseMigrationWorking')
               : mode === 'join'
                 ? t('localDatabaseConfirmJoin')
-                : t('localDatabaseConfirmEnable')}
+                : mode === 'retry'
+                  ? t('localDatabaseRetryAction')
+                  : t('localDatabaseConfirmEnable')}
           </button>
         </div>
       </div>

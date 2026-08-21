@@ -53,14 +53,18 @@ function status(
     profileState === 'active'
       ? ({ mode: 'active', stage: 'active' } as const)
       : profileState === 'migration_in_progress'
-        ? ({ mode: 'transitional', stage: 'staging', migrationId: '11111111-1111-4111-8111-111111111111' } as const)
-        : profileState === 'blocked'
-          ? ({ mode: 'blocked', stage: null } as const)
-          : ({ mode: 'not_started', stage: 'not_started' } as const);
+        ? ({ mode: 'transitional', stage: 'staging' } as const)
+        : profileState === 'migration_failed'
+          ? ({ mode: 'failed', stage: 'staging', terminalCode: 'MIGRATION_VALIDATION_FAILED' } as const)
+          : profileState === 'blocked'
+            ? ({ mode: 'blocked', stage: null } as const)
+            : ({ mode: 'not_started', stage: 'not_started' } as const);
   return {
     actions: {
-      canStart: profileState === 'setup_required' || profileState === 'join_existing_required',
-      canResume: profileState === 'migration_in_progress',
+      canStart:
+        profileState === 'setup_required' ||
+        profileState === 'join_existing_required' ||
+        profileState === 'migration_failed',
     },
     capability: { browser: 'chrome', officialIdentity: true, platform: 'unknown', supported: true },
     database: {
@@ -69,11 +73,20 @@ function status(
       factsRevision: profileState === 'setup_required' ? null : 3,
       ftsAvailable: profileState === 'setup_required' ? null : true,
     },
-    diagnostics: [],
+    diagnostics:
+      profileState === 'migration_failed'
+        ? [
+            {
+              code: 'MIGRATION_VALIDATION_FAILED',
+              message: 'The migration facts could not be validated.',
+              retryable: false,
+              diagnostics: { factKind: 'messages', sourceLocalId: 20, stage: 'staging' },
+            },
+          ]
+        : [],
     host: { registration: 'available', compatibility: 'compatible' },
     journal,
     profileState,
-    resumeReceipt: profileState === 'migration_in_progress' ? 'absent' : 'not_applicable',
     ...overrides,
   } as LocalDataMigrationStatus;
 }
@@ -91,7 +104,6 @@ describe('LocalDatabaseCard', () => {
     onConfirmMigration: vi.fn(),
     onCopyHelpText: vi.fn(),
     onRequestMigration: vi.fn(),
-    onResumeMigration: vi.fn(),
     onRetryStatus: vi.fn(),
   };
 
@@ -112,7 +124,7 @@ describe('LocalDatabaseCard', () => {
     input: {
       state?: LocalDataMigrationStatus['profileState'];
       statusOverride?: Partial<LocalDataMigrationStatus>;
-      dialogMode?: 'start' | 'join' | null;
+      dialogMode?: 'start' | 'join' | 'retry' | null;
       actionBusy?: boolean;
     } = {},
   ) {
@@ -132,7 +144,7 @@ describe('LocalDatabaseCard', () => {
     });
   }
 
-  it('renders initial setup, existing-db join, resumable migration, blocked, active, and Safari states from typed status', () => {
+  it('renders setup, join, automatic migration, terminal failure, blocked, active, and Safari states from typed status', () => {
     render({ state: 'setup_required' });
     expect(document.body.textContent).toContain('Ready to enable');
     expect(document.body.textContent).toContain('Enable Local Database');
@@ -143,8 +155,18 @@ describe('LocalDatabaseCard', () => {
     expect(document.body.textContent).toContain('explicitly join');
 
     render({ state: 'migration_in_progress' });
-    expect(document.body.textContent).toContain('Resume Migration');
-    expect(document.body.textContent).toContain('Stage:');
+    expect(document.body.textContent).toContain('Migration in progress');
+    expect(document.body.textContent).toContain('running automatically');
+    expect(document.body.textContent).not.toContain('Resume Migration');
+    expect(document.body.textContent).not.toContain('Stage:');
+
+    render({ state: 'migration_failed' });
+    expect(document.body.textContent).toContain('Migration failed');
+    expect(document.body.textContent).toContain('Retry Migration');
+    expect(document.body.textContent).toContain('The migration facts could not be validated.');
+    expect(document.body.textContent).toContain('factKind=messages');
+    expect(document.body.textContent).toContain('sourceLocalId=20');
+    expect(document.body.textContent).not.toContain('staging');
 
     render({ state: 'blocked' });
     expect(document.body.textContent).toContain('migration blocked');
@@ -189,14 +211,19 @@ describe('LocalDatabaseCard', () => {
     expect(callbacks.onRetryStatus).toHaveBeenCalledTimes(1);
   });
 
-  it('maps primary actions to request or resume callbacks and disables duplicate actions while busy', () => {
+  it('maps setup/join/retry to one start request and exposes no action while migration is running', () => {
     render({ state: 'join_existing_required' });
     clickByText('Join Existing Database');
     expect(callbacks.onRequestMigration).toHaveBeenCalledTimes(1);
 
     render({ state: 'migration_in_progress' });
-    clickByText('Resume Migration');
-    expect(callbacks.onResumeMigration).toHaveBeenCalledTimes(1);
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent?.includes('Resume'))).toBe(
+      false,
+    );
+
+    render({ state: 'migration_failed' });
+    clickByText('Retry Migration');
+    expect(callbacks.onRequestMigration).toHaveBeenCalledTimes(2);
 
     render({ state: 'setup_required', actionBusy: true });
     const button = document.querySelector('button') as HTMLButtonElement;

@@ -290,7 +290,7 @@ describe('local data explicit profile lifecycle', () => {
     await expectActive(profileB, PROFILE_B_ID);
   });
 
-  it('serializes concurrent profile confirmation at the Host import boundary and requires explicit resume after BUSY', async () => {
+  it('serializes concurrent profile confirmation at the Host import boundary and exposes BUSY as an explicit retryable failure', async () => {
     const host = createSharedHost({
       [PROFILE_A_ID]: ['chatgpt\0a'],
       [PROFILE_B_ID]: ['gemini\0b'],
@@ -305,13 +305,13 @@ describe('local data explicit profile lifecycle', () => {
     expect(profileB.clearSourceFacts).not.toHaveBeenCalled();
     expect(host.getImportCalls(PROFILE_B_ID)).toBe(1);
     const blockedB = await readMigrationJournal(profileB.journalRuntime);
-    expect(blockedB).toMatchObject({ mode: 'transitional', journal: { stage: 'staging', terminalCode: 'BUSY' } });
+    expect(blockedB).toMatchObject({ mode: 'failed', journal: { stage: 'staging', terminalCode: 'BUSY' } });
 
     host.releaseImport();
     await startA;
     expect(host.facts).toEqual(new Set(['chatgpt\0a']));
 
-    await profileB.coordinator.resume();
+    await profileB.coordinator.start();
     expect(host.getImportCalls(PROFILE_B_ID)).toBe(2);
     expect(host.facts).toEqual(new Set(['chatgpt\0a', 'gemini\0b']));
     expect(profileB.clearSourceFacts).toHaveBeenCalledTimes(1);
