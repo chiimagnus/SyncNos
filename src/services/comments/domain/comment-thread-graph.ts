@@ -9,12 +9,55 @@ export type CommentThreadGraph<T extends ArticleCommentDto = ArticleCommentDto> 
   duplicateIds: number[];
 };
 
-function timeAsc(a: ArticleCommentDto, b: ArticleCommentDto): number {
-  return a.createdAt - b.createdAt || a.id - b.id;
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (!value || typeof value !== 'object') return value;
+  const record = value as Record<string, unknown>;
+  return Object.keys(record)
+    .sort()
+    .reduce<Record<string, unknown>>((out, key) => {
+      out[key] = stableValue(record[key]);
+      return out;
+    }, {});
 }
 
-function timeDesc(a: ArticleCommentDto, b: ArticleCommentDto): number {
-  return b.createdAt - a.createdAt || b.id - a.id;
+function stableCommentTieKey(comment: ArticleCommentDto): string {
+  return JSON.stringify({
+    createdAt: Number(comment.createdAt) || 0,
+    updatedAt: Number(comment.updatedAt) || 0,
+    canonicalUrl: String(comment.canonicalUrl || ''),
+    authorName: String(comment.authorName || ''),
+    quoteText: String(comment.quoteText || ''),
+    commentText: String(comment.commentText || ''),
+    locator: stableValue(comment.locator ?? null),
+  });
+}
+
+function stableCommentTieCompare(a: ArticleCommentDto, b: ArticleCommentDto): number {
+  const aKey = stableCommentTieKey(a);
+  const bKey = stableCommentTieKey(b);
+  if (aKey < bKey) return -1;
+  if (aKey > bKey) return 1;
+  // Semantically indistinguishable rows may use the local id only as a final in-database tiebreaker.
+  return a.id - b.id;
+}
+
+function stableThreadTieCompare(a: CommentThread, b: CommentThread): number {
+  const aKey = JSON.stringify({
+    root: stableCommentTieKey(a.root),
+    replies: a.replies.map(stableCommentTieKey),
+  });
+  const bKey = JSON.stringify({
+    root: stableCommentTieKey(b.root),
+    replies: b.replies.map(stableCommentTieKey),
+  });
+  if (aKey < bKey) return -1;
+  if (aKey > bKey) return 1;
+  return a.root.id - b.root.id;
+}
+
+function timeAsc(a: ArticleCommentDto, b: ArticleCommentDto): number {
+  return a.createdAt - b.createdAt || stableCommentTieCompare(a, b);
 }
 
 type RootResolution = { rootId: number };
@@ -113,14 +156,14 @@ export function normalizeCommentThreadGraph<T extends ArticleCommentDto>(
     repliesByRoot.set(rootId, replies);
   }
 
-  const roots = [...rootIds]
+  const threads = [...rootIds]
     .map((id) => byId.get(id))
     .filter((item): item is T => Boolean(item))
-    .sort(timeDesc);
-  const threads = roots.map((root) => ({
-    root,
-    replies: (repliesByRoot.get(root.id) ?? []).sort(timeAsc),
-  }));
+    .map((root) => ({
+      root,
+      replies: (repliesByRoot.get(root.id) ?? []).sort(timeAsc),
+    }))
+    .sort((a, b) => b.root.createdAt - a.root.createdAt || stableThreadTieCompare(a, b));
 
   return {
     threads,

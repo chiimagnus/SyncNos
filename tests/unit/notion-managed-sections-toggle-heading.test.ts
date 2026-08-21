@@ -71,5 +71,8 @@ describe('notion managed sections', () => {
     expect(res.discoveredBy).toBe('scan');
     expect(appendChildren).toHaveBeenCalledTimes(0);
     expect(patchSyncMapping).toHaveBeenCalledTimes(1);
+    expect(patchSyncMapping).toHaveBeenCalledWith(1, {
+      notionSections: { conversations: { headingBlockId: 'b1' } },
+    });
   });
 });

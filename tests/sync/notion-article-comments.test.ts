@@ -168,6 +168,72 @@ describe('notion article comments blocks', () => {
     expect(renderer.computeNotionCommentsDigest(comments)).toBe(d1);
   });
 
+  it('keeps digest stable when local database ids are remapped but thread content is unchanged', async () => {
+    const renderer = await loadNotionCommentsRenderer();
+    const source = [
+      {
+        id: 41,
+        parentId: null,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        authorName: 'A',
+        quoteText: 'Quoted',
+        commentText: 'Root',
+        locator: null,
+        createdAt: 100,
+        updatedAt: 100,
+      },
+      {
+        id: 57,
+        parentId: 41,
+        conversationId: 10,
+        canonicalUrl: 'https://example.com',
+        authorName: 'B',
+        quoteText: '',
+        commentText: 'Reply',
+        locator: null,
+        createdAt: 110,
+        updatedAt: 110,
+      },
+    ];
+    const restored = [
+      { ...source[0], id: 1 },
+      { ...source[1], id: 2, parentId: 1 },
+    ];
+
+    expect(renderer.computeNotionCommentsDigest(restored)).toBe(renderer.computeNotionCommentsDigest(source));
+  });
+
+  it('keeps digest stable when equal-time roots differ only by reply creation time across id remaps', async () => {
+    const renderer = await loadNotionCommentsRenderer();
+    const comment = (id: number, parentId: number | null, createdAt: number, updatedAt: number) => ({
+      id,
+      parentId,
+      conversationId: 10,
+      canonicalUrl: 'https://example.com',
+      authorName: 'A',
+      quoteText: '',
+      commentText: parentId == null ? 'same-root' : 'same-reply',
+      locator: null,
+      createdAt,
+      updatedAt,
+    });
+    const source = [
+      comment(41, null, 100, 200),
+      comment(57, null, 100, 200),
+      comment(80, 41, 110, 300),
+      comment(70, 57, 120, 300),
+    ];
+    const restored = [
+      comment(3, null, 100, 200),
+      comment(1, null, 100, 200),
+      comment(4, 3, 110, 300),
+      comment(2, 1, 120, 300),
+    ];
+
+    expect(renderer.computeNotionCommentsDigest(restored)).toBe(renderer.computeNotionCommentsDigest(source));
+  });
+
   it('counts root threads even when a root has no quote', async () => {
     const renderer = await loadNotionCommentsRenderer();
     const result = renderer.buildNotionCommentsBlocks([

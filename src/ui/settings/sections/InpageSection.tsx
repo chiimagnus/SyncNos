@@ -239,7 +239,6 @@ export function InpageSection(props: {
             onResetRules={onResetAntiHotlinkRules}
           />
         ) : null}
-
       </section>
     </div>
   );

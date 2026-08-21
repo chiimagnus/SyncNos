@@ -11,7 +11,11 @@ import {
   getConversationListBootstrap,
   getMessagesByConversationId,
   getMessagesTailByConversationId,
+  getSyncMappingByConversation,
   mergeConversationsByIds,
+  patchSyncMapping,
+  setConversationNotionPageId,
+  setSyncCursor,
   syncConversationMessages,
   upsertConversation,
 } from '@services/conversations/data/storage-idb';
@@ -723,6 +727,256 @@ describe('conversations storage-idb', () => {
     expect(windowResult.messages[199]?.sequence).toBe(300);
   });
 
+  it('patches mapping nested state through one writer and keeps mapping identity stable', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'mapping-patch',
+      title: 'Mapping patch',
+      notionPageId: 'page-1',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    const db = await openDb();
+    const seedTx = db.transaction(['sync_mappings'], 'readwrite');
+    const mappingId = await reqToPromise<number>(
+      seedTx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'mapping-patch',
+        notionPageId: 'page-1',
+        notionSections: {
+          conversations: { headingBlockId: 'h-old', stable: true },
+          comments: { headingBlockId: 'h-comments' },
+        },
+        notionSectionCursors: {
+          conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 1 },
+        },
+        notionSectionDigests: {
+          article: { digest: 'd-old', lastSyncedAt: 10 },
+        },
+        updatedAt: 10,
+      }) as any,
+    );
+    await txDone(seedTx);
+    db.close();
+
+    await patchSyncMapping(conversationId, {
+      notionSections: { conversations: { headingBlockId: 'h-new' } },
+      notionSectionCursors: { conversations: { lastSyncedSequence: 2 } },
+      notionSectionDigests: { comments: { digest: 'd-comments', lastSyncedAt: 20 } },
+      feishuDocId: 'doc-1',
+      feishuLastContentHash: 'hash-1',
+    });
+
+    const afterPatch = await getSyncMappingByConversation(conversationId);
+    expect(afterPatch?.mapping).toMatchObject({
+      id: mappingId,
+      source: 'debug',
+      conversationKey: 'mapping-patch',
+      notionPageId: 'page-1',
+      notionSections: {
+        conversations: { headingBlockId: 'h-new', stable: true },
+        comments: { headingBlockId: 'h-comments' },
+      },
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm1', lastSyncedSequence: 2 },
+      },
+      notionSectionDigests: {
+        article: { digest: 'd-old', lastSyncedAt: 10 },
+        comments: { digest: 'd-comments', lastSyncedAt: 20 },
+      },
+      feishuDocId: 'doc-1',
+      feishuLastContentHash: 'hash-1',
+    });
+    expect(afterPatch?.conversation.feishuDocId).toBe('doc-1');
+
+    const beforeCursorUpdatedAt = Number(afterPatch?.mapping?.updatedAt) || 0;
+    await setSyncCursor(conversationId, {
+      lastSyncedMessageKey: 'm2',
+      lastSyncedSequence: null,
+      lastSyncedAt: null,
+      lastSyncedMessageUpdatedAt: null,
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm2', lastSyncedSequence: 2 },
+      },
+    });
+
+    const afterCursor = await getSyncMappingByConversation(conversationId);
+    expect(afterCursor?.mapping).toMatchObject({
+      id: mappingId,
+      source: 'debug',
+      conversationKey: 'mapping-patch',
+      lastSyncedMessageKey: 'm2',
+      lastSyncedSequence: null,
+      lastSyncedMessageUpdatedAt: null,
+      notionSections: {
+        conversations: { headingBlockId: 'h-new', stable: true },
+        comments: { headingBlockId: 'h-comments' },
+      },
+      notionSectionCursors: {
+        conversations: { lastSyncedMessageKey: 'm2', lastSyncedSequence: 2 },
+      },
+      notionSectionDigests: {
+        article: { digest: 'd-old', lastSyncedAt: 10 },
+        comments: { digest: 'd-comments', lastSyncedAt: 20 },
+      },
+    });
+    expect(Number(afterCursor?.mapping?.lastSyncedAt)).toBeGreaterThan(0);
+    expect(Number(afterCursor?.mapping?.updatedAt)).toBeGreaterThanOrEqual(beforeCursorUpdatedAt);
+  });
+
+  it('resets stale Notion continuity when the destination page changes and keeps the same mapping identity', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'page-switch',
+      title: 'Page switch',
+      notionPageId: 'page-old',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    await patchSyncMapping(conversationId, {
+      notionPageId: 'page-old',
+      notionPageUrl: 'https://notion.so/page-old',
+      notionWorkspaceSlug: 'old-workspace',
+      lastSyncedMessageKey: 'm5',
+      lastSyncedSequence: 5,
+      lastSyncedAt: 50,
+      lastSyncedMessageUpdatedAt: 55,
+      notionSections: { conversations: { headingBlockId: 'h-old' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm5', lastSyncedSequence: 5 } },
+      notionSectionDigests: { article: { digest: 'd-old' } },
+      feishuDocId: 'doc-1',
+      unknownMetadata: 'keep-me',
+    });
+    const before = await getSyncMappingByConversation(conversationId);
+    const mappingId = Number(before?.mapping?.id);
+
+    await setConversationNotionPageId(conversationId, 'page-old', {
+      notionPageUrl: 'https://notion.so/page-old-refreshed',
+      notionWorkspaceSlug: 'old-workspace-refreshed',
+    });
+    const samePage = await getSyncMappingByConversation(conversationId);
+    expect(samePage?.mapping).toMatchObject({
+      id: mappingId,
+      notionPageId: 'page-old',
+      notionPageUrl: 'https://notion.so/page-old-refreshed',
+      notionWorkspaceSlug: 'old-workspace-refreshed',
+      lastSyncedMessageKey: 'm5',
+      lastSyncedSequence: 5,
+      notionSections: { conversations: { headingBlockId: 'h-old' } },
+    });
+
+    await setConversationNotionPageId(conversationId, 'page-new', {
+      notionPageUrl: 'https://notion.so/page-new',
+      notionWorkspaceSlug: 'new-workspace',
+    });
+
+    const after = await getSyncMappingByConversation(conversationId);
+    expect(after?.mapping).toMatchObject({
+      id: mappingId,
+      source: 'debug',
+      conversationKey: 'page-switch',
+      notionPageId: 'page-new',
+      notionPageUrl: 'https://notion.so/page-new',
+      notionWorkspaceSlug: 'new-workspace',
+      feishuDocId: 'doc-1',
+      unknownMetadata: 'keep-me',
+    });
+    expect(after?.mapping?.lastSyncedMessageKey).toBeUndefined();
+    expect(after?.mapping?.lastSyncedSequence).toBeUndefined();
+    expect(after?.mapping?.lastSyncedAt).toBeUndefined();
+    expect(after?.mapping?.lastSyncedMessageUpdatedAt).toBeUndefined();
+    expect(after?.mapping?.notionSections).toBeUndefined();
+    expect(after?.mapping?.notionSectionCursors).toBeUndefined();
+    expect(after?.mapping?.notionSectionDigests).toBeUndefined();
+    expect(after?.conversation).toMatchObject({
+      notionPageId: 'page-new',
+      notionPageUrl: 'https://notion.so/page-new',
+      notionWorkspaceSlug: 'new-workspace',
+    });
+  });
+
+  it('uses the conversation Notion mirror as the current target when an old mapping is missing notionPageId', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'page-switch-missing-mapping-page',
+      title: 'Page switch legacy state',
+      notionPageId: 'page-old',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    const db = await openDb();
+    const tx = db.transaction(['sync_mappings'], 'readwrite');
+    await reqToPromise(
+      tx.objectStore('sync_mappings').add({
+        source: 'debug',
+        conversationKey: 'page-switch-missing-mapping-page',
+        lastSyncedMessageKey: 'm5',
+        lastSyncedSequence: 5,
+        notionSections: { conversations: { headingBlockId: 'h-old' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'm5', lastSyncedSequence: 5 } },
+        unknownMetadata: 'keep-me',
+      }),
+    );
+    await txDone(tx);
+    db.close();
+
+    await setConversationNotionPageId(conversationId, 'page-new');
+
+    const after = await getSyncMappingByConversation(conversationId);
+    expect(after?.mapping).toMatchObject({
+      notionPageId: 'page-new',
+      unknownMetadata: 'keep-me',
+    });
+    expect(after?.mapping?.lastSyncedMessageKey).toBeUndefined();
+    expect(after?.mapping?.lastSyncedSequence).toBeUndefined();
+    expect(after?.mapping?.notionSections).toBeUndefined();
+    expect(after?.mapping?.notionSectionCursors).toBeUndefined();
+  });
+
+  it('resets stale Feishu hash when the destination doc changes and mirrors explicit clears', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'feishu-doc-switch',
+      title: 'Feishu doc switch',
+      feishuDocId: 'doc-old',
+      lastCapturedAt: 1,
+    });
+    const conversationId = Number(convo.id);
+
+    await patchSyncMapping(conversationId, {
+      feishuDocId: 'doc-old',
+      feishuLastContentHash: 'hash-old',
+      notionPageId: 'page-1',
+      unknownMetadata: 'keep-me',
+    });
+    const before = await getSyncMappingByConversation(conversationId);
+    const mappingId = Number(before?.mapping?.id);
+
+    await patchSyncMapping(conversationId, { feishuDocId: 'doc-new' });
+    const changed = await getSyncMappingByConversation(conversationId);
+    expect(changed?.mapping).toMatchObject({
+      id: mappingId,
+      feishuDocId: 'doc-new',
+      notionPageId: 'page-1',
+      unknownMetadata: 'keep-me',
+    });
+    expect(changed?.mapping?.feishuLastContentHash).toBeUndefined();
+    expect(changed?.conversation?.feishuDocId).toBe('doc-new');
+
+    await patchSyncMapping(conversationId, { feishuDocId: '' });
+    const cleared = await getSyncMappingByConversation(conversationId);
+    expect(cleared?.mapping?.feishuDocId).toBe('');
+    expect(cleared?.mapping?.feishuLastContentHash).toBeUndefined();
+    expect(cleared?.conversation?.feishuDocId).toBe('');
+  });
+
   it('deletes conversations, messages, and sync mappings', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
@@ -784,6 +1038,18 @@ describe('conversations storage-idb', () => {
         source: 'article',
         conversationKey: 'article_https://example.com/post',
         notionPageId: 'page_old',
+        notionPageUrl: 'https://notion.so/page_old',
+        notionWorkspaceSlug: 'legacy-ws',
+        lastSyncedMessageKey: 'article_body',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 10,
+        lastSyncedMessageUpdatedAt: 9,
+        notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'article_body', lastSyncedSequence: 1 } },
+        notionSectionDigests: { article: { digest: 'd-article', lastSyncedAt: 10 } },
+        feishuDocId: 'doc-old',
+        feishuLastContentHash: 'hash-old',
+        futureMetadata: { keep: true },
         updatedAt: 1,
       }),
     );
@@ -824,6 +1090,15 @@ describe('conversations storage-idb', () => {
       source: 'web',
       conversationKey: 'article:https://example.com/post',
       notionPageId: 'page_old',
+      notionPageUrl: 'https://notion.so/page_old',
+      notionWorkspaceSlug: 'legacy-ws',
+      lastSyncedMessageKey: 'article_body',
+      notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'article_body', lastSyncedSequence: 1 } },
+      notionSectionDigests: { article: { digest: 'd-article', lastSyncedAt: 10 } },
+      feishuDocId: 'doc-old',
+      feishuLastContentHash: 'hash-old',
+      futureMetadata: { keep: true },
     });
   });
 
@@ -866,7 +1141,14 @@ describe('conversations storage-idb', () => {
         source: 'web',
         conversationKey: removeKey,
         notionPageId: 'page_remove',
+        notionPageUrl: 'https://notion.so/page_remove',
         lastSyncedMessageKey: 'x',
+        lastSyncedSequence: 2,
+        notionSections: { conversations: { headingBlockId: 'h-remove' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'x', lastSyncedSequence: 2 } },
+        feishuDocId: 'doc-remove',
+        feishuLastContentHash: 'hash-remove',
+        legacyOnly: true,
         updatedAt: 1,
       }),
     );
@@ -902,7 +1184,103 @@ describe('conversations storage-idb', () => {
       source: 'web',
       conversationKey: keepKey,
       notionPageId: 'page_remove',
+      notionPageUrl: 'https://notion.so/page_remove',
       lastSyncedMessageKey: 'x',
+      lastSyncedSequence: 2,
+      notionSections: { conversations: { headingBlockId: 'h-remove' } },
+      feishuDocId: 'doc-remove',
+      feishuLastContentHash: 'hash-remove',
+      legacyOnly: true,
+    });
+  });
+
+  it('keeps canonical provider targets atomic when merging conversations with conflicting mappings', async () => {
+    const keep = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'keep-conflict',
+      title: 'keep',
+      url: 'https://example.com/keep',
+      notionPageId: '',
+      feishuDocId: '',
+      lastCapturedAt: 10,
+    });
+    const remove = await upsertConversation({
+      sourceType: 'article',
+      source: 'web',
+      conversationKey: 'remove-conflict',
+      title: 'remove',
+      url: 'https://example.com/remove',
+      notionPageId: 'page-remove-conversation',
+      feishuDocId: 'doc-remove-conversation',
+      lastCapturedAt: 20,
+    });
+    const keepId = Number(keep.id);
+    const removeId = Number(remove.id);
+    const keepKey = String(keep.conversationKey || '');
+    const removeKey = String(remove.conversationKey || '');
+
+    const db = await openDb();
+    const tx = db.transaction(['sync_mappings'], 'readwrite');
+    const store = tx.objectStore('sync_mappings');
+    await reqToPromise(
+      store.add({
+        source: 'web',
+        conversationKey: keepKey,
+        notionPageId: 'page-keep',
+        notionPageUrl: 'https://notion.so/page-keep',
+        lastSyncedMessageKey: 'keep-m1',
+        lastSyncedSequence: 1,
+        notionSections: { conversations: { headingBlockId: 'h-keep' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'keep-m1', lastSyncedSequence: 1 } },
+        feishuDocId: 'doc-keep',
+        feishuLastContentHash: 'hash-keep',
+        sharedMetadata: 'target',
+        updatedAt: 10,
+      }),
+    );
+    await reqToPromise(
+      store.add({
+        source: 'web',
+        conversationKey: removeKey,
+        notionPageId: 'page-remove',
+        notionPageUrl: 'https://notion.so/page-remove',
+        lastSyncedMessageKey: 'remove-m9',
+        lastSyncedSequence: 9,
+        notionSections: { conversations: { headingBlockId: 'h-remove' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'remove-m9', lastSyncedSequence: 9 } },
+        feishuDocId: 'doc-remove',
+        feishuLastContentHash: 'hash-remove',
+        sharedMetadata: 'legacy',
+        legacyOnly: true,
+        updatedAt: 99,
+      }),
+    );
+    await txDone(tx);
+    db.close();
+
+    await mergeConversationsByIds({ keepConversationId: keepId, removeConversationId: removeId });
+
+    const reopened = await openDb();
+    const verifyTx = reopened.transaction(['sync_mappings'], 'readonly');
+    const mappings = await reqToPromise<any[]>(verifyTx.objectStore('sync_mappings').getAll());
+    await txDone(verifyTx);
+    reopened.close();
+
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0]).toMatchObject({
+      source: 'web',
+      conversationKey: keepKey,
+      notionPageId: 'page-keep',
+      notionPageUrl: 'https://notion.so/page-keep',
+      lastSyncedMessageKey: 'keep-m1',
+      lastSyncedSequence: 1,
+      notionSections: { conversations: { headingBlockId: 'h-keep' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'keep-m1', lastSyncedSequence: 1 } },
+      feishuDocId: 'doc-keep',
+      feishuLastContentHash: 'hash-keep',
+      sharedMetadata: 'target',
+      legacyOnly: true,
     });
   });
 

@@ -160,6 +160,99 @@ describe('storage schema migration (v2 NotionAI thread id)', () => {
     expect(String(remaining.url)).toBe(`https://app.notion.com/chat?t=${threadId}&wfv=chat`);
   });
 
+  it('merges legacy mapping metadata into an existing stable mapping without mixing provider targets', async () => {
+    const threadId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const stableKey = `notionai_t_${threadId}`;
+    const legacyKey = 'notionai_legacy_conflict';
+
+    const db1 = await openV1Db();
+    const t1 = db1.transaction(['conversations', 'sync_mappings'], 'readwrite');
+    const convStore = t1.objectStore('conversations');
+    const mapStore = t1.objectStore('sync_mappings');
+
+    await reqToPromise(
+      convStore.add({
+        sourceType: 'chat',
+        source: 'notionai',
+        conversationKey: stableKey,
+        title: 'stable',
+        url: `https://app.notion.com/chat?t=${threadId}&wfv=chat`,
+        notionPageId: 'page-target',
+        warningFlags: [],
+        lastCapturedAt: 20,
+      }),
+    );
+    await reqToPromise(
+      convStore.add({
+        sourceType: 'chat',
+        source: 'notionai',
+        conversationKey: legacyKey,
+        title: 'legacy',
+        url: `https://app.notion.com/SomePage-0123456789abcdef0123456789abcdef?t=${threadId}`,
+        notionPageId: 'page-legacy',
+        warningFlags: [],
+        lastCapturedAt: 10,
+      }),
+    );
+    await reqToPromise(
+      mapStore.add({
+        source: 'notionai',
+        conversationKey: stableKey,
+        notionPageId: 'page-target',
+        notionPageUrl: 'https://notion.so/page-target',
+        lastSyncedMessageKey: 'target-m1',
+        lastSyncedSequence: 1,
+        notionSections: { conversations: { headingBlockId: 'h-target' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'target-m1', lastSyncedSequence: 1 } },
+        feishuDocId: 'doc-target',
+        feishuLastContentHash: 'hash-target',
+        sharedMetadata: 'target',
+        updatedAt: 20,
+      }),
+    );
+    await reqToPromise(
+      mapStore.add({
+        source: 'notionai',
+        conversationKey: legacyKey,
+        notionPageId: 'page-legacy',
+        notionPageUrl: 'https://notion.so/page-legacy',
+        lastSyncedMessageKey: 'legacy-m9',
+        lastSyncedSequence: 9,
+        notionSections: { conversations: { headingBlockId: 'h-legacy' } },
+        notionSectionCursors: { conversations: { lastSyncedMessageKey: 'legacy-m9', lastSyncedSequence: 9 } },
+        feishuDocId: 'doc-legacy',
+        feishuLastContentHash: 'hash-legacy',
+        sharedMetadata: 'legacy',
+        legacyOnly: true,
+        updatedAt: 99,
+      }),
+    );
+    await txDone(t1);
+    db1.close();
+
+    const db2 = await openDb();
+    const t2 = db2.transaction(['sync_mappings'], 'readonly');
+    const maps = await reqToPromise<any[]>(t2.objectStore('sync_mappings').getAll());
+    await txDone(t2);
+    db2.close();
+
+    expect(maps).toHaveLength(1);
+    expect(maps[0]).toMatchObject({
+      source: 'notionai',
+      conversationKey: stableKey,
+      notionPageId: 'page-target',
+      notionPageUrl: 'https://notion.so/page-target',
+      lastSyncedMessageKey: 'target-m1',
+      lastSyncedSequence: 1,
+      notionSections: { conversations: { headingBlockId: 'h-target' } },
+      notionSectionCursors: { conversations: { lastSyncedMessageKey: 'target-m1', lastSyncedSequence: 1 } },
+      feishuDocId: 'doc-target',
+      feishuLastContentHash: 'hash-target',
+      sharedMetadata: 'target',
+      legacyOnly: true,
+    });
+  });
+
   it('migrates keep conversation mapping when conversationKey is rewritten to stableKey', async () => {
     const threadId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const stableKey = `notionai_t_${threadId}`;
@@ -336,6 +429,16 @@ describe('storage schema migration (v4 legacy article rows)', () => {
         source: 'article',
         conversationKey: 'article_https://example.com/post',
         notionPageId: 'page_old',
+        notionPageUrl: 'https://notion.so/page_old',
+        notionWorkspaceSlug: 'legacy-ws',
+        lastSyncedMessageKey: 'article_body',
+        lastSyncedSequence: 1,
+        lastSyncedAt: 10,
+        notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
+        notionSectionDigests: { article: { digest: 'digest-old', lastSyncedAt: 10 } },
+        feishuDocId: 'doc-old',
+        feishuLastContentHash: 'hash-old',
+        futureMetadata: { keep: true },
         updatedAt: 10,
       }),
     );
@@ -369,6 +472,15 @@ describe('storage schema migration (v4 legacy article rows)', () => {
       source: 'web',
       conversationKey: 'article:https://example.com/post',
       notionPageId: 'page_old',
+      notionPageUrl: 'https://notion.so/page_old',
+      notionWorkspaceSlug: 'legacy-ws',
+      lastSyncedMessageKey: 'article_body',
+      lastSyncedSequence: 1,
+      notionSections: { article: { headingBlockId: 'h-article' }, comments: { headingBlockId: 'h-comments' } },
+      notionSectionDigests: { article: { digest: 'digest-old', lastSyncedAt: 10 } },
+      feishuDocId: 'doc-old',
+      feishuLastContentHash: 'hash-old',
+      futureMetadata: { keep: true },
     });
   });
 
@@ -415,10 +527,35 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     );
     await reqToPromise(
       mapStore.add({
+        source: 'web',
+        conversationKey: 'article:https://example.com/post',
+        notionPageId: 'page_target',
+        notionPageUrl: 'https://notion.so/page_target',
+        lastSyncedMessageKey: 'target-body',
+        lastSyncedSequence: 1,
+        notionSections: { article: { headingBlockId: 'h-target' } },
+        notionSectionDigests: { article: { digest: 'target-digest', lastSyncedAt: 20 } },
+        feishuDocId: 'doc-target',
+        feishuLastContentHash: 'hash-target',
+        sharedMetadata: 'target',
+        updatedAt: 20,
+      }),
+    );
+    await reqToPromise(
+      mapStore.add({
         source: 'article',
         conversationKey: 'article_https://example.com/post',
         notionPageId: 'page_old',
-        updatedAt: 10,
+        notionPageUrl: 'https://notion.so/page_old',
+        lastSyncedMessageKey: 'legacy-body',
+        lastSyncedSequence: 9,
+        notionSections: { article: { headingBlockId: 'h-legacy' } },
+        notionSectionDigests: { article: { digest: 'legacy-digest', lastSyncedAt: 99 } },
+        feishuDocId: 'doc-legacy',
+        feishuLastContentHash: 'hash-legacy',
+        sharedMetadata: 'legacy',
+        legacyOnly: true,
+        updatedAt: 99,
       }),
     );
     await txDone(t1);
@@ -449,7 +586,16 @@ describe('storage schema migration (v4 legacy article rows)', () => {
     expect(maps[0]).toMatchObject({
       source: 'web',
       conversationKey: 'article:https://example.com/post',
-      notionPageId: 'page_old',
+      notionPageId: 'page_target',
+      notionPageUrl: 'https://notion.so/page_target',
+      lastSyncedMessageKey: 'target-body',
+      lastSyncedSequence: 1,
+      notionSections: { article: { headingBlockId: 'h-target' } },
+      notionSectionDigests: { article: { digest: 'target-digest', lastSyncedAt: 20 } },
+      feishuDocId: 'doc-target',
+      feishuLastContentHash: 'hash-target',
+      sharedMetadata: 'target',
+      legacyOnly: true,
     });
   });
 });

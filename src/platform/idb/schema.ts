@@ -1,3 +1,5 @@
+import { mergeSyncMappingForIdentityMove } from '@platform/idb/sync-mapping-record';
+
 export const DB_NAME = 'webclipper';
 export const DB_VERSION = 8;
 
@@ -191,14 +193,17 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
 
       const targetReq = mappingsBySourceConversationKeyIndex.get(['notionai', stableKey]);
       targetReq.onsuccess = () => {
-        const target = targetReq.result;
-        if (!target) {
-          mapping.conversationKey = stableKey;
-          mapping.updatedAt = Date.now();
-          mappingsStore.put(mapping);
-        } else {
+        const target = (targetReq.result as Record<string, unknown> | undefined) || null;
+        const merged = mergeSyncMappingForIdentityMove(target, mapping, {
+          source: 'notionai',
+          conversationKey: stableKey,
+        });
+        mappingsStore.put(merged);
+        if (target) {
           const mappingId = Number((mapping as { id?: unknown }).id);
-          if (Number.isFinite(mappingId) && mappingId > 0) mappingsStore.delete(mappingId);
+          if (Number.isFinite(mappingId) && mappingId > 0 && mappingId !== Number((target as { id?: unknown }).id)) {
+            mappingsStore.delete(mappingId);
+          }
         }
         onDone({ ok: true, changed: true });
       };
@@ -522,27 +527,6 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     return next;
   }
 
-  function mergeMappingRecord(
-    base: Record<string, unknown>,
-    incoming: Record<string, unknown>,
-    fallbackNotionPageId: string,
-  ) {
-    const next = { ...base };
-    next.source = 'web';
-    next.conversationKey = safeString(base.conversationKey || incoming.conversationKey);
-    next.notionPageId =
-      safeString(next.notionPageId) || safeString(incoming.notionPageId) || safeString(fallbackNotionPageId);
-    next.lastSyncedMessageKey = safeString(next.lastSyncedMessageKey) || safeString(incoming.lastSyncedMessageKey);
-    next.lastSyncedSequence = pickMaxFiniteNumber(next.lastSyncedSequence, incoming.lastSyncedSequence);
-    next.lastSyncedAt = pickMaxFiniteNumber(next.lastSyncedAt, incoming.lastSyncedAt);
-    next.lastSyncedMessageUpdatedAt = pickMaxFiniteNumber(
-      next.lastSyncedMessageUpdatedAt,
-      incoming.lastSyncedMessageUpdatedAt,
-    );
-    next.updatedAt = pickMaxFiniteNumber(next.updatedAt, incoming.updatedAt, Date.now()) || Date.now();
-    return next;
-  }
-
   function migrateMessagesFromDupToKeep(input: { dupId: number; keepId: number; onDone: MigrationDone }): void {
     const { dupId, keepId, onDone } = input;
     let hadAny = false;
@@ -619,13 +603,14 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
     targetReq.onsuccess = () => {
       const target = (targetReq.result as Record<string, unknown> | undefined) || null;
 
+      const identity = { source: 'web', conversationKey: canonicalKey, fallbackNotionPageId };
       if (!legacySource || !legacyKey || (legacySource === 'web' && legacyKey === canonicalKey)) {
         if (!target) {
           input.onDone({ ok: true, changed: false });
           return;
         }
-        const merged = mergeMappingRecord(target, {}, fallbackNotionPageId);
-        mappingsStore.put(merged);
+        const merged = mergeSyncMappingForIdentityMove(target, null, identity);
+        if (JSON.stringify(merged) !== JSON.stringify(target)) mappingsStore.put(merged);
         input.onDone({ ok: true, changed: true });
         return;
       }
@@ -635,22 +620,20 @@ function migrateLegacyArticleConversations({ db, tx }: MigrationContext): void {
         const legacy = (legacyReq.result as Record<string, unknown> | undefined) || null;
         if (!legacy) {
           if (target) {
-            const merged = mergeMappingRecord(target, {}, fallbackNotionPageId);
-            mappingsStore.put(merged);
+            const merged = mergeSyncMappingForIdentityMove(target, null, identity);
+            if (JSON.stringify(merged) !== JSON.stringify(target)) mappingsStore.put(merged);
           }
           input.onDone({ ok: true, changed: false });
           return;
         }
 
         if (!target) {
-          legacy.source = 'web';
-          legacy.conversationKey = canonicalKey;
-          mappingsStore.put(mergeMappingRecord(legacy, {}, fallbackNotionPageId));
+          mappingsStore.put(mergeSyncMappingForIdentityMove(null, legacy, identity));
           input.onDone({ ok: true, changed: true });
           return;
         }
 
-        const merged = mergeMappingRecord(target, legacy, fallbackNotionPageId);
+        const merged = mergeSyncMappingForIdentityMove(target, legacy, identity);
         mappingsStore.put(merged);
         const legacyId = Number((legacy as { id?: unknown }).id);
         if (Number.isFinite(legacyId) && legacyId > 0 && legacyId !== Number((target as { id?: unknown }).id)) {
